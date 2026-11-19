@@ -206,8 +206,17 @@ enum { DEFENSE_CELL_SHIFT = 8, DEFENSE_CELL_SIDE = 8,
 
 typedef struct {
     u8 head[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
-    u8 next[MAX_UNITS], flying[MAX_UNITS];
+    u8 next[MAX_UNITS];
+#ifdef SC64_DEFENSE_PACKED_OWNER_FLIGHT
+    u8 owner_flight[MAX_UNITS];
+#else
+    u8 flying[MAX_UNITS];
+#endif
 } RaceDefenseCells;
+
+#ifdef SC64_DEFENSE_PACKED_OWNER_FLIGHT
+enum { DEFENSE_AIR_OWNER_OFFSET = 8 };
+#endif
 
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_zp_cells(const Building *q, int ground, int air,
@@ -225,16 +234,29 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
     top = (top < 0 ? 0 : top) >> DEFENSE_CELL_SHIFT;
     right = (right >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : right) >> DEFENSE_CELL_SHIFT;
     bottom = (bottom >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : bottom) >> DEFENSE_CELL_SHIFT;
+#ifdef SC64_DEFENSE_PACKED_OWNER_FLIGHT
+    unsigned admitted = (ground ? hostile_mask : 0u) |
+        (air ? (unsigned)hostile_mask << DEFENSE_AIR_OWNER_OFFSET : 0u);
+#endif
 
     for (int row = top; row <= bottom; ++row) {
         for (int col = left; col <= right; ++col) {
             int cell = row * DEFENSE_CELL_SIDE + col;
             for (int j = cells->head[cell]; j != 0xff; j = cells->next[j]) {
+#ifdef SC64_DEFENSE_PACKED_OWNER_FLIGHT
+                /* Earlier defenses can kill a unit or change its visibility
+                 * and targetability. Its owner and flight class stay fixed. */
+                if (!((admitted >> cells->owner_flight[j]) & 1u)) continue;
+#endif
                 const Unit *target = &u[j];
+#ifdef SC64_DEFENSE_PACKED_OWNER_FLIGHT
+                if (!target->alive) continue;
+#else
                 unsigned owner = target->owner;
                 if (!target->alive || owner >= 5 ||
                     !(hostile_mask & (1u << owner)) ||
                     (cells->flying[j] ? !air : !ground)) continue;
+#endif
                 int dx = x - target->x, dy = y - target->y;
                 if (FAST_ABS(dx) >= range || FAST_ABS(dy) >= range ||
                     (target->flags & 16) ||
@@ -314,7 +336,13 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         }
         int cell = (u[j].y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE +
                    (u[j].x >> DEFENSE_CELL_SHIFT);
+#ifdef SC64_DEFENSE_PACKED_OWNER_FLIGHT
+        unsigned flying = (u8)sc64_race_unit_flying(u[j].type);
+        cells.owner_flight[j] = (u8)(u[j].owner +
+            (flying ? DEFENSE_AIR_OWNER_OFFSET : 0));
+#else
         cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
+#endif
         cells.next[j] = cells.head[cell];
         cells.head[cell] = (u8)j;
     }

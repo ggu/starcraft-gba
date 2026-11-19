@@ -266,21 +266,33 @@ static void sunken_explosive_size_shields_and_armor(void)
     }
 }
 
-static void air_defense_filters_ground_goliath(void)
+static void air_defense_requires_hostile_flyer(void)
 {
     clear_world();
     b[0] = (Building){ .x=240, .y=240, .hp=300, .maxhp=300,
         .owner=SIDE, .type=B_SPORE_COLONY, .raw_type=144, .alive=1 };
-    /* The closer Goliath is a large ground unit. The farther Mutalisk is the
-     * only valid target for the Spore Colony's air weapon. */
+    /* The Spore Colony must ignore both the closer enemy Goliath and the
+     * closest friendly Mutalisk. */
     u[0] = (Unit){ .x=248, .y=240, .hp=125, .maxhp=125,
         .owner=ENEMY, .type=U_GOLIATH, .raw_type=3, .alive=1 };
     u[1] = (Unit){ .x=264, .y=240, .hp=100, .maxhp=100,
         .owner=ENEMY, .type=U_MUTALISK, .raw_type=43, .alive=1 };
+    u[2] = u[1];
+    u[2].x = 244;
+    u[2].owner = SIDE;
     compare_paths();
     race_tick_defenses_zp_targets();
+    int expected_hp = 85;
+#ifdef SC64_IMPACT_EVENTS
+    if (race_impact_building_steps(&b[0], 1, 1)) {
+        assert(race_impact_count == 1);
+        assert(sc64_impact_event_target(&race_impact_rows[0]) == 1);
+        expected_hp = 100;
+    }
+#endif
     assert(u[0].hp == 125);
-    assert(u[1].hp == 85);
+    assert(u[1].hp == expected_hp);
+    assert(u[2].hp == 100);
     assert(b[0].queue_progress == 19);
 }
 
@@ -572,10 +584,10 @@ int main(void)
 #if !defined(SC64_DEFENSE_PYLON_ROSTER_TEST_ONLY) && !defined(SC64_DEFENSE_SPATIAL_PROBE)
     tie_range_and_early_kill();
     sunken_explosive_size_shields_and_armor();
-    air_defense_filters_ground_goliath();
     stock_defense_attack_intervals();
 #endif
 #ifndef SC64_DEFENSE_PYLON_ROSTER_TEST_ONLY
+    air_defense_requires_hostile_flyer();
     same_update_mutations_precede_defense_query();
     invalid_owner_falls_back_before_mutation();
     dispatcher_preserves_p3_and_skirmish_paths();
