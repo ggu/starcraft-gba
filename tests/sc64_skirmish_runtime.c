@@ -66,6 +66,84 @@ static int menu_row_raw(int raw)
     return -1;
 }
 
+#ifdef SC64_N64_SPAWNING_POOL_PRICE
+static void native_price_construction(int race, int worker_raw, int raw, int prerequisite,
+                                      int price, int gas_price)
+{
+    game_init();
+    race_mode=1; race_human=race; race_bots=1;
+    init_state();
+    assert(screen==SCREEN_PLAY && race_mode && race_player[SIDE]==race);
+    const int worker = find_worker_raw(SIDE, worker_raw), type = building_raw(raw);
+    if (worker < 0 || type < 0) { printf("SKIP construction race=%d raw=%d\n",race,raw); return; }
+    int x=0,y=0;
+    if (prerequisite) {
+        const int required_type = building_raw(prerequisite);
+        int slot = -1;
+        assert(required_type >= 0);
+        for (int py = 96; py < WORLD_H - 64 && slot < 0; py += 24)
+            for (int px = 96; px < WORLD_W - 64 && slot < 0; px += 24)
+                if (can_place(required_type, px, py))
+                    slot = fixture_building_raw(SIDE, prerequisite, px, py);
+        assert(slot >= 0 && building_complete(slot));
+    }
+    assert(race_skirmish_site_for(SIDE,type,&x,&y));
+    field_ui_site(type, &x, &y);
+    u[worker].x=x-52; u[worker].y=y;
+    u[worker].order=ORDER_IDLE;
+    u[worker].target=-1;
+    u[worker].selected=1;
+    const int row = menu_row_raw(raw);
+    assert(row >= 0 && field_ui_build_worker(type) == worker);
+    choose_command(row);
+    assert(mode == MODE_BUILD && menu == type);
+    cx=x; cy=y;
+
+    int quoted_price, quoted_gas;
+    const char *need;
+    minerals=price-1; gas=gas_price;
+    assert(ui_row_state(row, &quoted_price, &quoted_gas, &need) == UI_SITE_MINERALS);
+    assert(quoted_price == price && quoted_gas == gas_price);
+    start_build(type);
+    assert(mode == MODE_BUILD && u[worker].order == ORDER_IDLE);
+    assert(minerals == price-1 && gas == gas_price);
+    if (gas_price) {
+        minerals=price; gas=gas_price-1;
+        assert(ui_row_state(row, &quoted_price, &quoted_gas, &need) == UI_SITE_GAS);
+        start_build(type);
+        assert(mode == MODE_BUILD && u[worker].order == ORDER_IDLE);
+        assert(minerals == price && gas == gas_price-1);
+    }
+
+    minerals=price; gas=gas_price;
+    assert(ui_row_state(row, &quoted_price, &quoted_gas, &need) == UI_SITE_OK);
+    start_build(type);
+    assert(mode == MODE_NORMAL && u[worker].order == ORDER_BUILD_PENDING);
+    assert(minerals == price && gas == gas_price);
+    /* Science Facility aliases have no legacy worker in the save validator.
+     * Its fixture still round-trips the paid foundation below. */
+    if (sc64_race_building_rule(type)->worker == u[worker].type) {
+        assert(race_save_game() && race_load_game());
+        assert(u[worker].order == ORDER_BUILD_PENDING && u[worker].target == type &&
+               u[worker].tx == x && u[worker].ty == y);
+        assert(minerals == price && gas == gas_price);
+    }
+    u[worker].x=x;u[worker].y=y;race_pending_build_tick(worker);
+    int slot=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive && b[i].owner==SIDE && b[i].type==type && b[i].under_construction && b[i].x==x && b[i].y==y) { assert(slot<0);slot=i; }
+    assert(slot>=0 && minerals==0 && gas==0);
+    int progress=b[slot].build_progress;
+    assert(race_save_game() && race_load_game());
+    assert(minerals == 0 && gas == 0);
+    assert(b[slot].alive && b[slot].type==type && b[slot].under_construction && b[slot].build_progress==progress);
+    if (race == R_TER) assert(u[worker].alive && u[worker].order == ORDER_BUILD && u[worker].target == slot);
+    else assert(!u[worker].alive); /* Zerg morph consumes the builder. */
+    printf("construction price and save race=%d raw=%d price=%d/%d PASS\n",
+           race,raw,price,gas_price);
+}
+
+#endif
+
 /* Complete one ordinary worker-built structure through the engine's request
  * and arrival paths. Searching the map also respects real placement rules. */
 static int build_with_worker(int raw, int worker)
@@ -477,6 +555,13 @@ static void reaver_service_unavailable(void)
 
 int main(void)
 {
+#ifdef SC64_N64_SPAWNING_POOL_PRICE
+    gba_init();
+    native_price_construction(R_ZERG,41,142,0,150,0);
+    native_price_construction(R_TER,7,112,111,200,0);
+    native_price_construction(R_TER,7,124,122,100,0);
+    native_price_construction(R_TER,7,116,114,150,200);
+#endif
     reaver_service_unavailable();
     busy_selected_worker();
     terran_construction_and_addon();
