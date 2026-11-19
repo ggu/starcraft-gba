@@ -111,3 +111,38 @@ The stock, depth-only and combined skirmish receipt SHA-256 values are
 `51ef3c3342ba4af6b2a30d89ded095f88b070f64da7aba8ac09fc11525feb76e`.
 The combined P7 receipt SHA-256 is
 `381c66228c11c7e30c296ee5a4956f5cc278e5a0c2c8975b122a895ea5a0cbe9`.
+
+## Packed Hatchery draw
+
+On P10, the three-AI camera repeatedly draws a visible completed Hatchery
+after the terrain cache restore. The P10 build now packs just this frame
+using the existing masked-word blitter. Other frame pointers retain the
+byte-sprite path. The normal build selects the packed frame when its
+existing sprite compositor flags are present. The asset is generated
+locally from the prepared sprite bank.
+
+The composed steering and depth builds use the same frozen inputs in
+both arms. Twenty Blood Bath cuts and eleven P7 cuts match the complete
+indexed framebuffer pages, palette and sampled gameplay. The P10
+framebuffer and packed geometry sanitizer checks also pass. The linked
+ARM builds use the same IWRAM and EWRAM. The frame adds about 23 KiB of
+linked ROM payload within the existing cartridge size.
+
+| ARM cycles | Byte Hatchery | Packed Hatchery |
+| --- | ---: | ---: |
+| Blood Bath mean | 1,026,648 | 1,003,303 |
+| Blood Bath p95 | 1,426,164 | 1,404,322 |
+| Blood Bath peak | 2,209,088 | 2,182,928 |
+| P7 mean | 1,766,436 | 1,766,498 |
+| P7 p95 | 2,066,260 | 2,066,456 |
+| P7 peak | 2,433,880 | 2,433,880 |
+
+Compared with the original release in the preceding table, the combined
+Blood Bath build is now 0.17% slower on mean cycles and 0.22% faster at p95.
+P7 stays within 62 mean cycles of the faster depth-and-steering build.
+Use `P10_HATCHERY_WORDS=0` to repeat the paired comparison.
+
+The integrated Blood Bath receipt SHA-256 is
+`c4a8090ef2854b13110591fc44a11c6ec541560fcfba797ab1fd10a6fd70cb0c`.
+The integrated P7 receipt SHA-256 is
+`de9aa79d7b953b32accf6d88b1ac14d0d1b7f6b4585a8c644b279ab1cd9ad350`.
