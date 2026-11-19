@@ -1877,13 +1877,17 @@ AI wallets and full-match behavior remain unverified.
   when extending the framebuffer replay harness. The N64 Challenger
   overlap click selected the foreground Overlord over a Hatchery.
   [Draft #587](https://github.com/ggu/starcraft-gba/pull/587) applies the
-  same depth rule to cross-kind opaque hits. The HOST fixture and an
-  ordinary P10 ARM Outpost replay match that selection. Showcase scene
-  navigation and Z10 Blood Bath save/load also pass. Qualify the Terran
-  build and additional poses before broadening it.
+  same depth rule to cross-kind opaque hits. The HOST fixture and
+  ordinary P10 and Terran ARM replays match that selection. Showcase scene
+  navigation and Z10 Blood Bath save/load also pass. Qualify additional
+  poses and compose with live flight depth before enabling it by default.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
   modes and the legacy static-clip fixture.
+- Use the [dynamic depth harness cases](audits/2026-11-19-world-depth.md#dynamic-depth-harness)
+  for the next rendering qualification. Start with lift, landing and the
+  mid-flight save boundary, then cover Interceptors, detached effects and
+  picking against the same opaque overlap oracle.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.

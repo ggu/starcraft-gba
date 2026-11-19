@@ -27,6 +27,24 @@ sc64_world_actor_layer(int raw, unsigned fallback)
     }
 }
 
+static unsigned
+sc64_building_world_layer(unsigned slot)
+{
+    const Building *q = &b[slot];
+    /* Native liftoff puts the building between ground units and flyers.
+     * Use the live flight state, including during travel to a landing site. */
+    if (q->flags & 4) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_airborne((int)slot)) return 12;
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_airborne((int)slot)) return 12;
+#endif
+    }
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
+    return sc64_world_actor_layer(raw, 4);
+}
+
 enum {
     DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT,
     DEPTH_SLOT_BITS = 10,
@@ -97,8 +115,7 @@ sc64_draw_depth_ordered_actors(void)
         if (!b[i].alive) continue;
         int x = b[i].x - camx, y = b[i].y - camy + 12;
         if (x < -128 || x > 368 || y < -128 || y > 248) continue;
-        int raw = b[i].raw_type >= 0 ? b[i].raw_type : sc64_race_raw_building(b[i].type);
-        sc64_depth_push(heap, &size, sc64_world_actor_layer(raw, 4), b[i].y, DEPTH_BUILDING, i);
+        sc64_depth_push(heap, &size, sc64_building_world_layer(i), b[i].y, DEPTH_BUILDING, i);
     }
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
