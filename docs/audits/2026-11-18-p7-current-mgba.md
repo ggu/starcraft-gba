@@ -395,3 +395,28 @@ fall from 1,883,235 to 1,872,385 (0.58%), p95 from 2,179,910 to
 Qualify the other prepared profiles and saves before enabling the probe.
 
 - Paired detector range receipt SHA-256 `ae2d497db4c8981aa24bc0353455e87a76c9c42e7ec6e31e223ab52e75eae9fa`.
+
+#### Early contact axis rejection and code placement
+
+Two opt-in exact variants check coordinate reach before reading a
+candidate's type or liveness. Both agree with the scalar contact
+oracle and the recorded world and display cuts on P7 and dense Z7.
+P7 uses the IWRAM steering kernel. The dense Z7 replay runs the
+ROM steering kernel. The wave of actors and the linker placement
+both differ across these samples.
+
+| Workload | Control mean cycles | Scalar early | Packed early |
+| --- | ---: | ---: | ---: |
+| P7, 958 advancing updates | 1,883,264 | 1,850,468 | 1,853,270 |
+| Dense Z7, 477 advancing updates | 2,481,146 | 2,492,614 | 2,493,335 |
+
+The scalar variant reduces P7 orders by 3.75% and lowers mean, p95
+and peak costs. It raises mean cost 0.46% in Z7. The
+packed variant is slower in both comparisons against scalar early.
+A separate compile-time gate selects scalar early only when the
+steering kernel is placed in IWRAM. The gate reproduces the full
+P10 scalar-early and the Z10 control ROM hashes from `b7a7a614`,
+with the linker endpoints of those same builds.
+
+- Scalar P7 replay SHA-256 `88bb94ce55f8a6090bbd4b6ea4228e35a37792befaabf4c9eb497756351484e6`.
+- Scalar Z7 replay SHA-256 `58aa9fbf25e7ceeaca6e02b711bedf15a4c16235913751b081cde07f54e8d889`.

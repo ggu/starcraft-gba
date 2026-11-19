@@ -48,3 +48,26 @@ On the [November 17 regular P10 ROM](2026-11-17-protoss-early-replays.md),
 P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
 The uninterrupted P2/P3 tapes win while the tested saved continuations
 diverge. The opt-in UI context P10 separately wins both saved routes.
+
+## Public release after the construction save fix
+
+The canonical Terran, Z10 and P10 binaries built from `9e303206`
+use the same source tree as the merged public release `2d319e76`.
+The T1, Z2 and P5 controller tapes were reproduced locally by the
+matching HOST controllers. T2 uses a pinned earlier tape that matches
+every checkpoint on the current ARM build.
+
+| Mission | Save and restore | Victory |
+| --- | --- | --- |
+| T1 Wasteland | At frame 6,214, save, restart and restore from pause in the same session. | Frame 10,120. All 11 named checks pass, with Raynor rescued. |
+| T2 Backwater Station | Uninterrupted from HOME. | Frame 29,366. All 30 named checks pass, with Raynor alive and the Infested Command Center destroyed. |
+| Z2 Egression | At frame 3,240, save with ordinary controls and restore from HOME in a fresh emulator. | Frame 8,164. All nine observations match the uninterrupted run, with the Chrysalis alive. |
+| P5 Choosing Sides | At frame 2,700, save with Tassadar and two Zealots aboard a Shuttle. Fresh load restores the same occupants. | Frame 5,057. All seven observations match the uninterrupted run. |
+
+Z2 and P5 average 22.76 and 19.88 emulated main-loop updates per second
+respectively on their uninterrupted routes. Current evidence covers
+the specific routes and save points in the table.
+
+- T1 ARM replay SHA-256 `36b056c14bd2e4faff9695ddd728d8ec66ae5e3e72e160c2bbc7eaccb2dbaadf`.
+- T2 ARM replay SHA-256 `9d92e855efa640c26c29d6475359fd433c400c14607860765cfd416a3be7497c`.
+- Z2 and P5 paired ARM replay SHA-256 `31ef3fc61b3a5d66dc6700a6683a34f769640fefc0fef16ed19fef1be23f1bc5`.

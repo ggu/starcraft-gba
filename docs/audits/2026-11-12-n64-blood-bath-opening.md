@@ -566,13 +566,26 @@ building morphs. The Science Facility aliases use the same native ID.
 | 124 | Missile Turret | 100 / 0 | 75 / 0 |
 | 142 | Spawning Pool | 150 / 0 | 200 / 0 |
 
-The Pool also has the live wallet comparison above. The other three
-rows have native table evidence. The [GBA price preview](https://github.com/ggu/starcraft-gba/commit/a1d09abf5e1540b30328580fb3473438d9d392ff)
+The Pool also has the live wallet comparison above. In the retained
+four-seat replay, Academy raw 112 is the only new actor for the
+Terran CPU between observer steps 20,350 and 20,370. Its bank moves
+from 212/128 to 12/128, a 200-mineral debit. The Missile Turret and
+Science Facility have native table evidence. The [GBA price preview](https://github.com/ggu/starcraft-gba/commit/a1d09abf5e1540b30328580fb3473438d9d392ff)
 quotes and debits from the same building rule. The HOST sanitizer
 checks reject short mineral and gas banks and verify payment at the
 exact price. The tests run five product vectors, including expanded
 Zerg. Standard Zerg lacks the raw-116 mapping in that vector.
-The price preview remains opt-in pending ordinary ARM qualification.
+The price preview remains opt-in pending broader campaign qualification.
+
+A matched Terran ARM reproduction checks the Academy and Missile
+Turret. The preview refuses the old 150 and 75 mineral budgets,
+then charges exactly 200 and 100 on successful foundations. Both
+pending and paid saves load through normal controls. Loading a
+stock save into the preview preserves a paid foundation and
+rechecks a pending job against the new cost when the SCV arrives.
+These runs start from host-generated SRAM with the prerequisites,
+bank and worker approach prepared. The ARM commands, save and
+load use the normal buttons.
 
 The Academy, Missile Turret and Pool pass pending and paid build
 save checks in all five HOST vectors. Science Facility foundations
@@ -587,10 +600,29 @@ type. A same-source Terran HOST comparison reproduces the old
 rejection and restores the candidate's pending SCV before any debit.
 The new process then matches 300 uninterrupted updates, including
 the normal 100-mineral and 150-gas foundation debit. Four alias
-fixtures pass. ARM and hardware qualification remain open.
+fixtures pass. [PR #578](https://github.com/ggu/starcraft-gba/pull/578)
+also reproduces the old refusal and fixes it on the canonical
+Terran ARM ROM, from a host-prepared setup with normal buttons
+for the order and save. The under-construction foundation appears at
+update 157, with an exact 100 mineral and 150 gas debit. The
+fresh load reproduces 300 subsequent updates. Z10 and P10
+also complete ordinary skirmish saves and 600-update continuations.
+
+The [composed price preview](https://github.com/ggu/starcraft-gba/commit/c972f1a7c800b73a8497f9bc9ea893f2edb5b5c9)
+uses the merged save fix and the same prepared Terran start. The
+normal pending save at update 107 loads in a new emulator,
+places the foundation at 157, spends 150 minerals and 200 gas,
+and matches the 300-update continuation. The preview also loads a
+stock-priced pending order and refuses placement with the original
+100/150 intact. An already-paid stock foundation loads and progresses
+without another debit. The pricing change remains opt-in.
 
 - Concatenated native tables SHA-256 `0f513814ca66c6d060fbfe3af3ea8dd3c8fc0209dcd8b46d565fa226aff45f26`.
+- Native Academy wallet comparison SHA-256 `aa008c1506c2f2e81f1519ff6e0f04ffd3072a2844314957a9909f9456b3823c`.
+- Terran Academy and Missile Turret price replay SHA-256 `7d1f575797cdbb80970826e178c3ed04e25fafce11c357db604d6ffc3c096681`.
 - Terran pending Science Facility comparison SHA-256 `2b1238df14df7da973b14210a135eabfc5fd53913ae6fec26671f7b7486387ec`.
+- Terran pending Science Facility ARM comparison SHA-256 `818ca6c816f3863797cae9c37bddf0617c92737d9f9d8f4906c02b4e60a19ed4`.
+- Terran composed native-priced Science Facility comparison SHA-256 `51e80a4e502fa34e1d2963615069de9861a49126d865968643d34628853c9182`.
 
 ### Solo Outpost Protoss Gateway recovery
 
@@ -679,3 +711,59 @@ open. The receipt pins the existing emulator manifests, all six RAM
 samples, and the typed owner and resource links.
 
 - Private receipt SHA-256 `ea782f17178188af9a739771ecb4562456754436ad153183d8a3070a14f35b9f`.
+
+### Read-only mining replay and GBA contention preview
+
+A fresh ares replay of the four-seat Melee opening reports resource
+and worker transitions from step 4,200 through 12,000. Its opening
+frame and the first 3,739,298 bytes of the earlier economy trace
+through step 10,200 match. The observer records changes on 22 mineral
+patches, along with a periodic sample. All 257 observed ore debits
+are eight minerals. No recorded case has two workers timing a pickup
+on the same patch. At five handoffs, the prior waiter begins gathering
+with its native timer at 75 on the step when the previous worker
+collects eight. A separate matched replay follows two of the new
+gatherers to zero. Exactly 75 game-clock increments elapse, over
+251 and 252 observer steps. The ore is still present at the zero
+reading and drops by eight later. The GBA's present 45-update
+work phase has a different clock and completes collection on
+zero. Work timing remains separate from the contention preview.
+
+The `SC64_MINERAL_CONTENTION_PROBE` preview on release base
+`b7a7a614` advances one worker per patch. Each of the Terran, Z10 and P10
+builds plays all three human races against three fixed named CPUs on
+both maps, with a passive human through update 4,480. The 18 control
+games have 2,181 sampled cuts with concurrent mining timers in range
+of the same patch. The 18 previews have zero such cuts. Their sampled
+world state agrees with the control through update 256, when the
+starting workers are still on separate patches.
+
+Between updates 512 and 4,096, mean ore removed across all owners
+falls by about 29% on Outpost and 34% on Blood Bath. The passive human
+bank at the final cut is unchanged. Each preview saves with observed
+contention and matches 128 updates of uninterrupted play after a
+fresh SRAM load.
+
+Six additional paired runs cross-load real release saves with
+overlapping progress. At update 448 on Outpost and 576 on Blood
+Bath, both timers survive the load. Only one timer per patch advances
+on the first update. After another 127 updates the preview resaves
+and the release loader restores that world.
+
+Three full three-CPU matches, one on each cartridge, end in defeat
+of the idle human in both controls and previews. The preview also
+completes Wasteland from HOME on a separately regenerated controller
+route. It saves, restarts, restores at frame 6,198, and wins at frame
+12,092 with Raynor alive. All 13 named observations match the preview's
+HOST route. Resume the remaining campaign and competitive skirmish
+checks before enabling the preview. [Source preview](https://github.com/ggu/starcraft-gba/tree/codex/sc64-mineral-contention-arm-20261119)
+
+- Native replay manifest SHA-256 `082620a53a4e8e279841170b1154b7a9ad193497c72eba1be3054ae0c4687507`.
+- Native mining transitions SHA-256 `663ee0c1836fdd2a85dc5bada342dc6b344a72bc62f707f2a2a4de3a57b23b68`.
+- Native handoff clock comparison SHA-256 `a7f4ccf1d9d93c7f11c32e230827416afc097375af6dfed4da797b05fd23cde0`.
+- GBA paired opening matrix SHA-256 `911e72debc1e14ea5e323827e8a633feecde8c18d42a4a59735979081b67182f`.
+- Z10 paired opening matrix SHA-256 `a6b267255d4ef332b8c367ddc78ce7816cfbec81cecac5e665452cb390a87291`.
+- GBA legacy overlap cross-load SHA-256 `02cb3bb362b95b97eb93468ae153a985dbfedf9cf0d2077e5715eb5732bb5e3b`.
+- Z10 legacy overlap cross-load SHA-256 `0645cb44a849ab444ab78bbad2cebcfe0509e755ba15c4f1e3502720d3c622a9`.
+- Full passive-match comparison SHA-256 `e7d5eba3fcab7496907c1e4f73297561175d2b43d4865b2a773ea8a71e12704e`.
+- Wasteland mining-preview replay SHA-256 `2e80822ab809301bfed278e61e31a9578e13c0cc280d8dda9292c8e2253c68c7`.

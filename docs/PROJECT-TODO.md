@@ -367,6 +367,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   coverage, and original N64 behavior remain separate gates below. The
   [campaign evidence matrix](audits/2026-11-13-normal-campaign-matrix.md)
   separates exact KODAK wins, earlier normal builds and remaining checks.
+  The merged `2d319e76` builds verify Wasteland's pause restart/load,
+  Backwater Station from HOME, and Z2 and P5 through fresh-load victory.
   [Z3](audits/2026-11-13-z3-current-home.md) and
   [Z4](audits/2026-11-13-z4-two-normal-roms.md) win on both November 13
   Z10 revisions. [Z5](audits/2026-11-13-z5-kodak-replay.md) and
@@ -1493,6 +1495,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   The candidate leaves 328 bytes below the IWRAM linker limit and the
   sampled user stack has 8,216 bytes untouched above its guard.
   Keep peak frame cost and interrupt stack use in the release gate.
+- [Early contact axis rejection](audits/2026-11-18-p7-current-mgba.md#early-contact-axis-rejection-and-code-placement)
+  drops P7 mean cost 1.74% and increases dense Z7 cost 0.46%. A
+  compile-time IWRAM gate reproduces the faster P10 ROM and the
+  ROM-resident Z10 control byte for byte. Verify current profile
+  placement and linker headroom before selecting it by default.
 - [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
@@ -1678,10 +1685,16 @@ save/source-owner and timing evidence; do not advertise unwired components.
   also finds differing prices for Academy, Science Facility and Missile Turret
   in the native tables. The opt-in matches menu quotes and debits in the
   HOST checks, including paid foundations. The Science Facility exposes
-  a pending-build save rejection for its SCV order. A separate fix now
-  restores the order and matches 300 updates of uninterrupted Terran play
-  on HOST. Qualify both changes through ordinary ARM play before enabling
-  the wider adjustment.
+  a pending-build save rejection for its SCV order, fixed in
+  [#578](https://github.com/ggu/starcraft-gba/pull/578). The fix
+  restores the order and matches 300 updates through foundation
+  payment on the Terran ARM build. Academy and Missile Turret price
+  previews pass ordinary ARM placement/payment and save checks
+  on prepared skirmish starts. The composed Science Facility preview
+  restores the pending build, spends the native 150/200, and preserves
+  stock paid foundations without another debit. The Academy's native
+  200-mineral debit is also visible in the retained N64 replay.
+  Qualify campaign economy before wider activation.
 - [Solo Outpost Protoss](audits/2026-11-12-n64-blood-bath-opening.md#solo-outpost-protoss-gateway-recovery)
   now recovers its first Gateway in the public release after [#577](https://github.com/ggu/starcraft-gba/pull/577).
   T10, Z10 and P10 train a Zealot by ARM update 3,680, restore a
@@ -1700,7 +1713,16 @@ save/source-owner and timing evidence; do not advertise unwired components.
   An opt-in shared gather prototype advances one ready worker per patch.
   Its P10 host tests cover handoff for all three worker types, interruption,
   independent patches, and existing saves with overlapping mining timers.
-  Qualify ARM timing and fresh-process saves before changing the economy.
+  The [paired mining replay](audits/2026-11-12-n64-blood-bath-opening.md#read-only-mining-replay-and-gba-contention-preview)
+  confirms five native eight-mineral handoffs. On Terran, Z10 and P10,
+  18 preview games remove parallel gather timers at every observed cut.
+  Each resumes its contested save, and six older overlapping saves
+  also cross-load in both directions with only one timer advancing per
+  patch. Two native handoffs take exactly 75 game ticks to reach zero,
+  with ore deducted later. All three tested three-CPU matches end in
+  defeat of the idle human on both builds, and the Wasteland preview
+  wins on its own regenerated tape. Qualify the rest of the campaign
+  and competitive skirmishes before changing the economy.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
