@@ -441,3 +441,27 @@ or the exact elapsed time between purchase and completion. The analysis
 uses existing emulator captures and starts no additional emulator session.
 The private receipt SHA-256 is
 `a9ab3f109b69eb78e091727e5505aaa15ccc31193fdeb5cb07332826f6131772`.
+
+## Mineral patch contention and handoff
+
+The same retained Melee captures show four starting workers assigned to
+three distinct mineral targets for each of the human Terran, CPU Zerg
+and CPU Protoss. In each shared pair at step 4,230, one worker has a
+positive gather timer and the other has a zero timer. The mineral actor
+is occupied and points to the waiting worker.
+
+An ordinary group Move clears the two SCVs' gather links and releases
+their patch by step 4,273. The patch retains all 1,500 minerals. In both
+later branches, the untouched Drone and Probe pairs hand off their
+patches. Each outgoing miner heads to its own depot, each patch drops
+from 1,500 to 1,492, and the prior waiter starts its timed gather on
+the same occupied patch. The waiting link clears at the handoff.
+
+The shared GBA gather path advances per-worker timers and has no
+equivalent occupied-patch handoff. Cover contention and release on
+interruption before adjusting the mining rate. These two-worker
+observations leave longer queue order, work duration, and gas contention
+open. The receipt pins the existing emulator manifests, all six RAM
+samples, and the typed owner and resource links.
+
+- Private receipt SHA-256 `ea782f17178188af9a739771ecb4562456754436ad153183d8a3070a14f35b9f`.

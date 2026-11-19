@@ -215,3 +215,632 @@ combinations and arbitrary mid-battle saves.
 | --- | --- |
 | Eight skirmish comparisons | `85e78368c9c6be7ba1f9472af50ec7e2203e7a7234275a5af8c2dee0fd25dd6c` |
 | Protoss 10 victory comparison | `4f85ff68fda54ef92285f71cb7abc302ed2e0ccf7e265462843905da2a7ee94b` |
+
+## Wide point prefix on the current dense Z7 replay
+
+The opt-in point-prefix prototype pauses a wide flood after the requested
+origin is discovered. Four ordered pending queues retain up to 128 cells
+each. The queue restores the exact assignments when a later reader needs
+more of the field. Logical insertions, ages and route counters keep the
+previous order. Saturation, blocked origins and unsupported layouts use the
+complete flood. Topology reset discards the parked work.
+
+The host sanitizer pair matches 386,646 route queries and the full logical
+residency stream. Focused oracles check all 16,384 directions after resume,
+blocked seeds, four simultaneous queues, forced overflow, the range
+reader, and fixed range scratch bindings. The residency receipt SHA-256 is
+`829634c7cb6709f6cff3745a23427180ef5d283cef158355d08d7386e849f516`.
+
+On Z10, `SC64_ROUTE_POINT_PREFIX_PROBE` with point-tail retention off
+matches all 131 ordinary HOME checkpoints, all 480 frame and route
+samples, and nine raw world and display samples through call 48,237.
+The comparison includes the separately measured shipping tail for context.
+
+| Guest cycles | `e7daddb1` control | Shipping tail | Point prefix |
+| --- | ---: | ---: | ---: |
+| Mean advancing call | 2,511,018 | 2,481,146 | 2,282,745 |
+| Mean advancing orders | 1,402,693 | 1,372,750 | 1,172,333 |
+| All-call p95 | 3,979,392 | 3,628,357 | 3,384,700 |
+| All-call maximum | 4,877,226 | 4,841,218 | 5,253,274 |
+
+The prefix cuts mean cost by 9.09% and p95 by 14.94% against `e7daddb1`.
+The maximum rises 7.71%. At call 47,995, game frame 46,734, orders cost
+251,543 fewer cycles than the no-tail control, while work outside that
+orders counter grows by 877,724 cycles. Trace that call by stage before
+changing the frontier. Call 48,100 adds 1,021,162 cycles against the
+shipping tail, mostly within orders. Both ROMs count two builds and
+three hits on that call. Trace both paths before enabling the prefix.
+
+The Z10 ARM link stays within its original guards at `0x03004e28` IWRAM
+and `0x02038d10` EWRAM. The probe stays experimental pending other profile
+links, save/load and timing on other wide workloads. These are guest-cycle
+results, with about 7.35 emulated updates per second in this dense sample.
+
+- Point-prefix comparison SHA-256 `160d75b965e5f6623f64087a12ccb41cffb6f4359b63ea79d76e7b0f8c35e617`.
+
+### Where the two wide-prefix spikes occur
+
+Read-only breakpoints on the exact shipping tail and first prefix ROMs
+reproduce the recorded loop costs and every sampled world check. At call
+47,995, an ordinary A press issues 37 formation reachability checks.
+The prefix's first completion runs between two reads from the first
+formation pair. `update_orders` begins 871,003 cycles later with the
+prefix. The render interval is effectively flat.
+
+At call 48,100 there is no formation work. The shipping tail does one
+wide linear fill and one verified cached-field adoption. The first
+prefix ROM enters its completion helper during orders. Orders cost
+1,026,713 cycles more even though both runs report two logical builds
+and three hits for that call. A logical build alone does not identify
+physical route work.
+
+| Call and counter | Shipping tail | First point prefix |
+| --- | ---: | ---: |
+| 47,995 start to orders entry | 253,979 | 1,124,982 |
+| 47,995 game update | 3,866,299 | 4,481,493 |
+| 47,995 draw | 774,479 | 771,395 |
+| 48,100 orders | 1,487,649 | 2,514,362 |
+| 48,100 draw | 505,888 | 506,299 |
+
+The component-witness variant answers boolean reachability from up to
+four complete, fresh route fields. The host oracle covers a positive
+proof, a negative proof, and exact fallback with the same cache ages.
+On ARM it moves the first completion after `update_orders` begins in
+call 47,995. The full step costs 5,286,590 cycles, 33,316 more than the
+first prefix ROM. An orders-stage reader still enters completion in that
+same update. Test a second bounded cutoff for exact cell requests.
+
+- Stage and entry comparison SHA-256 `002edc7270d4a83e459740c378ef64e7d5a9a6c1c51c5159d6dc1e9d2174f931`.
+
+### Keep the complete tail alongside parked prefixes
+
+A separate composition restores shipping tail reuse for complete fields
+while allowing new point prefixes. Only complete victims can enter the
+saved tail. A hit installs the complete field and retires the displaced
+prefix record, if present. The existing large-queue and save fences still
+release the borrowed backing. The focused host fixtures cover both exchanges,
+forced overflow and completing a field after its backing has moved.
+
+The host sanitizer pair matches the 386,646 logical residency samples
+for the shipping tail and combined build. Started physical fills differ
+by six in the tail-plus-prefix host pair. The physical ROM samples below
+match every named checkpoint, sampled actor/mineral bank, palette and
+framebuffer, and all sampled route counters.
+
+| Guest cycles | Shipping tail | Tail and prefix | Tail, prefix, and component proof |
+| --- | ---: | ---: | ---: |
+| Mean advancing call | 2,481,146 | 2,271,542 | 2,271,609 |
+| All-call p95 | 3,628,357 | 3,340,809 | 3,339,859 |
+| All-call maximum | 4,841,218 | 5,271,133 | 5,310,998 |
+| Call 47,995 | 4,641,164 | 5,271,133 | 5,310,998 |
+| Call 48,100 | 2,552,639 | 2,575,496 | 2,574,898 |
+
+Both composed variants avoid entering prefix completion on call 48,100.
+Tail plus prefix lowers mean cost by 8.45% and p95 by 7.92% against the
+shipping build. Call 47,995 still needs a continuation. The component
+proof relocates it into orders and grows the maximum by a further 39,865
+cycles. Keep the options off in release and prioritize the resumed search
+budget for that call before cross-profile qualification.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Verified shipping tail adoption | `8a56b15d58a8060bf6b879de3875ecde9eef1ff7d5861fb734371c959c795d4b` |
+| Component and first prefix | `68327ecfa5d551c9480335b3fdc4da59479ea1cb7473b726e1ce457be208a887` |
+| Tail and prefix | `bcddd1aa4b372beef7172ce6f1daa4d55f2713ab81d3045c221c929803a41ca7` |
+| Tail, prefix, and component proof | `6e5c7ccf7a189719fab42601caea7280a9af61899606e120dfc058ee2e8536c4` |
+
+### A second bounded cutoff makes the tail heavier
+
+The demand prototype allows a resumed search to park once more after
+discovering a newly requested open cell. It writes only newly discovered
+steps and retains the remaining FIFO. The host sanitizer comparison
+matches 386,646 checks against the combined control, including the range
+reader, forced overflow, and a later full completion.
+
+The ARM sample averages 2,219,308 cycles, down 10.55% against the shipping
+tail. Its p95 is 3,011,967, down 16.99%, and its maximum rises to 5,583,455,
+up 15.33%. Call 47,995 takes all of that maximum. The read-only snapshots
+show the point field rooted at cell 6,161 park again during orders. A
+register-only observer reproduces the timing and state exactly and
+identifies the requests. Its first resume comes from the nearby-root
+test, which needs cell 445 from the field rooted at 12,730, 99 Manhattan
+steps away. The later two requests both use the field rooted at 6,161.
+The cutoff for cell 6,300 reparks the field, then a nearby-root request
+for diagonally adjacent cell 6,427 enters the resume path again. An exact
+early rejection for the first distant scan is the larger opportunity.
+A small halo around the cutoff is a separate test for the repeated
+nearby requests.
+
+All 131 named world checkpoints, all 480 frame/route entries, and nine
+actor/resource and palette cuts match. The bytes of both 240×160 frame
+pages match at all nine cuts. The selected display page differs at the
+last cut, so the stricter presentation check remains open. Keep the
+demand prototype local while attributing the repeat requests.
+
+- Demand prototype ARM receipt SHA-256 `dbe4ff97e391f8225d911cb1fa3865275a00366e5a2153c70381218c0b465378`.
+- Read-only request and caller receipt SHA-256 `c85d50ffdff7b1b8d45c86f87b923807ad366ab83d4c6418e19d4d158fc2e47f`.
+
+### Prove the distant lookup is disconnected
+
+The exact live walkability grid and parked-field metadata at call 47,995
+identify two nearby-root requests. A separate L/R/U/D reference flood
+from cell 12,730 visits 9,625 cells and cannot reach origin 445. Six
+fresh, complete open-root fields reach the former cell and exclude the
+latter. The runtime now uses that existing component proof before it
+completes a parked nearby-root candidate. Selection order, the two
+candidate budget, cache ages, and counters follow the existing path.
+
+The 480-call Z7 replay matches all 131 gameplay checks, frame and route
+timelines, nine raw world cuts, and both video pages with their selected
+page. The original group-move spike falls from 5,310,998 to 4,445,672
+cycles compared with the component-witness composition, below the
+shipping cost of 4,641,164 for that call.
+
+| Guest cycles | Shipping tail | Nearby-root rejection |
+| --- | ---: | ---: |
+| Mean advancing call | 2,481,146 | 2,250,150 |
+| All-call p95 | 3,628,357 | 2,993,653 |
+| All-call maximum | 4,841,218 | 4,873,873 |
+
+The average falls 9.31% and p95 falls 17.49%. The maximum rises 0.67%
+and moves to call 47,823, where orders cost 733,859 cycles more than the
+shipping ROM on the same call. The dense rate is 7.46 emulated updates
+per second. The first and second known spikes no longer coincide with
+the maximum.
+
+The regular Blood Bath Z10 pair matches all 25 world, route, video and
+SRAM cuts through a fresh-process continuation. Mean changes from
+802,530 to 802,657 cycles. All four configured ROMs pass the original
+RAM guards. Showcase keeps prefix expansion in ROM to preserve the
+existing IWRAM stack reservation.
+
+The configured builds match all 30 campaign launches, 72 skirmish setups
+and eight ordinary SRAM transfers. The 958-update busy P7 sample matches
+11 world and display cuts and its complete route and terrain timeline.
+Its mean changes from 1,883,264 to 1,883,899 cycles, and its maximum rises
+from 2,554,931 to 2,583,019.
+
+An independent packed-continuation experiment starts the second cutoff
+directly in the packed field before dense setup. Matching host receipts
+cover 386,646 queries and 288 complete packed-field and pending FIFO
+comparisons. Its ARM mean improves only 0.075% versus the dense second
+cutoff, p95 remains flat, the maximum rises another 40,635 cycles, and
+the selected page differs at one cut. Keep this variant local.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Live nearby-root geometry and independent route checks | `38cd99a334313d09a3961a17ba48a2ac8eaf377ef617be9d1200d7ea3140ba9b` |
+| Nearby-root rejection in Z7 | `dfadc48446af0721cf726590d7d6f016c31d519d688c182c4726909e8317b83c` |
+| Nearby-root rejection in three-AI Blood Bath and SRAM | `448fbb1b39db0e9e181877a924d198454159778e868a88fac40f0fbeff58c426` |
+| Campaign and skirmish launch matrix | `f8644030ebaa75ae0ea73e128b591e09757f1b6367c5bd96da5cf44bf7e86922` |
+| Bidirectional SRAM matrix | `d4028523e6fff80e9f67908805ba38c415a7721265b314d296f0c7ce42d90d3d` |
+| Packed second-cutoff replay | `f3ec65f364bd59859fac7d8b0266c169af40ecaafbd18c3423d8e564f2d50c12` |
+
+### Reject a connected lookup with exact distance bounds
+
+The second live request can reach the cached root, though its preferred
+route misses the newly requested goal. The captured complete point field
+rooted at cell 6,033 gives a 42-step upper bound from its one-tile
+neighbor, the cached root, to the origin. A separate field rooted at
+6,290 gives a 44-step lower bound for any route through the requested
+goal. Neither the preferred L nor a Manhattan-only proof covers this
+request. Compare at most four fresh, complete point fields beside either
+endpoint, and use the strict bound before resuming the cached search.
+The existing exact path handles ties and unavailable witnesses.
+
+| Guest cycles | Shipping tail | Component and distance checks |
+| --- | ---: | ---: |
+| Mean advancing call | 2,481,146 | 2,221,786 |
+| All-call p95 | 3,628,357 | 2,914,594 |
+| All-call maximum | 4,841,218 | 4,451,529 |
+| Call 47,823 | 4,140,591 | 4,039,121 |
+| Call 47,855 | 4,841,218 | 4,011,998 |
+
+The paired Z10 replay again matches all 131 named checkpoints, every
+sampled route and frame counter, and nine world and display cuts. Mean
+falls 10.45%, p95 falls 19.67%, and the maximum falls 8.05% against the
+shipping build. This window runs at 7.55 emulated gameplay updates per
+second. The 30 fps goal remains open.
+
+`CANONICAL_ROUTE_POINT_PREFIX=1` selects the combined policy in configured
+builds. `make test-sc64-route-point-prefix` runs the focused sanitizer cases
+and compares the logical residency stream with the reference. The range
+fixture covers cached reads that need a parked route and checks both reserved
+range planes. An uncovered cached range read can still complete a parked
+search synchronously. Keep the policy opt-in until dense ranged-combat
+timing and wider campaign save continuation are qualified.
+
+The repeated 958-update P7 combat sample matches the 11 world and display
+cuts and the complete route and terrain timeline. Mean moves from 1,883,264
+to 1,883,991 cycles, p95 from 2,179,462 to 2,176,128, and the maximum from
+2,554,931 to 2,583,074. The three-AI Blood Bath replay again matches all 25
+world, route and display cuts and exact SRAM through a fresh-process reload.
+It reproduces the component-only timing receipt byte for byte. Its mean of
+802,657 cycles remains close to the shipping build's 802,530 cycles.
+
+All four profiles pass the standard header and RAM checks. The combined
+builds reproduce the launch matrix for all 30 campaign entries and 72
+skirmish setups, spanning both maps, three human races, and one to three AI
+opponents. Eight custom-game SRAM transfers cover both directions between the
+shipping and opt-in builds across the four profiles. Both matrix receipts
+match the earlier component-only run. These checks cover startup and sampled
+custom saves. Campaign continuation needs longer input and save traces.
+
+With the opt-in disabled, all four rebuilds retain the shipping memory
+limits. Each ROM differs by four bytes. Disassembly shows the same two
+independent stack loads into `r4` and `r6` in reversed order in the linear
+flood. All other ROM bytes match the shipping build.
+
+- Combined distance-bound replay SHA-256 `c3c0177c98a6afd34b164798a855a243a597d4fb2dc7ced3cad9c252645c89ae`.
+- Combined busy P7 pair SHA-256 `52b3fde1c97ee0c115eda8967ca252d51e9ad2a40d68f87ab10ef29d04eb4a1f`.
+- Combined three-AI Blood Bath receipt SHA-256 `448fbb1b39db0e9e181877a924d198454159778e868a88fac40f0fbeff58c426`.
+
+### Full Z9 replay and campaign saves
+
+The current normal Z10 pair also plays the retained [Z9 controller tape](2026-11-13-z9-normal-physical.md)
+from a blank title screen. Each run takes 74,386 recorded controller calls
+and 74,398 emulator calls after six modal page acknowledgments. Both match
+the 32 historical checkpoints and win at campaign frame 72,628 with no
+trigger faults. A second replay confirms all 106 sampled state and display
+hashes and the separate cut at physical call 46,500. The comparator verifies
+the relocated mission pointer against each ELF's Z9 descriptor and compares
+the resolved mission identity. Both finish with 6,612 route builds and
+233,939 hits.
+
+| Guest cycles | Shipping tail | Component and distance checks |
+| --- | ---: | ---: |
+| Mean across full replay | 1,607,043 | 1,585,775 |
+| Full-replay p95 | 2,544,025 | 2,344,594 |
+| Full-replay maximum | 62,344,943 | 62,368,713 |
+| Mean across first 46,500 calls | 1,519,410 | 1,498,907 |
+
+The full mean falls 1.32% and full p95 falls 7.84%. These totals include
+menus, modal pages and the result transition. The last 500 calls of the
+46,500-call interval show nearly flat mean and order cost.
+
+Both builds also load a retained Z9 campaign SRAM through the title screen
+at frame 6,069. After 600 updates each writes the same 32 KiB SRAM through
+the pause menu. A fresh process then loads the other build's save over both
+directions and reaches frame 6,849 with matching raw actor, building,
+resource and mission state. This qualifies that campaign checkpoint in
+addition to the custom-game matrix.
+
+A retained P9 campaign save also loads in both builds at frame 30,109.
+Each build writes the same journal at frame 30,709, and fresh loads in
+both directions continue to frame 30,889 with matching simulation state.
+Both builds launch T9 from a blank title screen and produce the same
+opening journal at frame 601. Fresh cross-loads continue to frame 781
+with matching simulation state.
+
+- Full timed Z9 receipt SHA-256 `5bfea9ac5c5b1f85e8c91ad905cede0a46e0c05c92e322e9ed3bfe142a7d2c69`.
+- Full normalized Z9 replay SHA-256 `1fe8979e0c1c42fca721066f830eb40fffd1f7a9e148b440e9c26cb0e54bace0`.
+- Z9 fresh campaign cross-load receipt SHA-256 `0ea1b4025ff52287655a4fcef0ab65c2e198b1be0be712cb325ee90136d91219`.
+- P9 fresh campaign cross-load receipt SHA-256 `ae946c4e5fb9f38648f0133ac0d6840a01b973299c98501467e112c857a276e2`.
+- T9 fresh campaign cross-load receipt SHA-256 `30de9534a6788c16558439c45eb28d6ea8aff793347e046bed29a1812b425303`.
+- Disabled configuration link comparison SHA-256 `17bff2280fada694646227b91aca19d0f5398dd77bf6f4b7f2de92cd3b30e393`.
+
+### Bounded read of a parked range route
+
+An uncovered open origin next to a pending FIFO cell gets its exact step
+from the first adjacent pending cell. A visited neighbor would have already
+discovered the origin, and later neighbors enter the FIFO after the pending
+cells. A local range-reader prototype uses this witness without updating the
+packed field. The host tests cover FIFO ties, blocked and covered origins, and
+a full scan of 128 entries. Distant reads retain the existing fallback.
+
+In dense Z7 the prototype matches all 131 checkpoints and the 480-call
+route and display comparison. It changes mean cost by 15 cycles and p95
+by 46 cycles across the 477 advancing calls relative to the combined opt-in
+build. Keep it local and count hits on a ranged-heavy workload before more
+qualification. Receipt SHA-256 `118a7c9708afb4d71394bbc0b4f7713f75a5a153f5684ec52e0a8062f22511df`.
+
+### Qualification with merged P10 steering
+
+The paired build uses composed source `e2126e74` on release `03b5db64`.
+Within each cartridge pair the prepared assets and compiler recipe match
+apart from the route-prefix selector. The P10 control differs from the
+released ROM by four bytes that swap two independent stack loads in
+`sc64_route_fill_linear`. Both orders write the same registers before the
+next instruction uses them.
+
+The dense Z7 tape matches all 131 checkpoints, 480 frame and logical
+route entries, and nine raw actor, resource and framebuffer cuts.
+The average covers 477 advancing updates. The other timing statistics
+cover the full 480-update window.
+
+| Dense Z7 ARM cycles | Former route search | Resumable route search | Change |
+| --- | ---: | ---: | ---: |
+| Advancing mean | 2,410,142 | 2,149,956 | −10.80% |
+| All-update p95 | 3,547,005 | 2,844,577 | −19.80% |
+| All-update peak | 4,760,373 | 4,369,053 | −8.22% |
+
+On P10 both cartridges win after 47,194 ordinary inputs at campaign frame
+46,057. The twenty named checks, ten briefing pages, 14 dialogue
+acknowledgments and all 48 sampled world, fog, route, displayed pixel
+and palette states match. The replay includes an in-session save. It
+uses the same ordinary HOME launch and victory tape in both arms.
+
+| P10 ARM cycles | Former route search | Resumable route search |
+| --- | ---: | ---: |
+| Full mean | 1,664,780 | 1,664,708 |
+| Full p95 | 2,351,458 | 2,351,224 |
+| Full peak including result | 36,561,939 | 36,559,572 |
+| Late combat mean, calls 41,913–47,193 | 1,885,647 | 1,886,070 |
+| Late combat p95 | 2,565,223 | 2,566,304 |
+| Late combat peak | 7,797,162 | 7,801,582 |
+
+The separate P10 attribution run uses the original candidate ROM and
+one emulator breakpoint at the direct call from
+`sc64_range_cached_point_step` to `sc64_point_prefix_complete`
+(ARM address `0x08047d92` for this ELF). It observes zero calls in the
+complete victory tape, with the same final state, cuts and timing
+counters as the uninstrumented candidate. The host range fixture
+forces this fallback and verifies its returned step. Outpost and Blood
+Bath are both 64×64, and parked prefixes require an exact 128×128 map.
+Use a wide campaign or a synthetic 128×128 fixture with ranged units
+following a field seeded by nearby units to test live synchronous
+completion and its peak cost.
+
+All eight ARM links pass the existing guards. The smallest candidate
+IWRAM and EWRAM margins across products are 240 and 7,428 bytes.
+The route sanitizer target passes on the composed source. Keep the
+selector off by default while qualifying the remaining wide ranged
+workloads. In these campaign windows both builds exceed the
+561,792-cycle budget for 30 updates per second.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Dense Z7 current composition | `5dd45e37aa9915e831b1155fb2f41b42737e643d684edd2dd0b996b8a723de3e` |
+| Full P10 control | `ba52668a599e893211538fc92cbfba1d626cc97e1e0513cc52c065e019242cbc` |
+| Full P10 candidate | `d964d5fa6cbc5984725be085b36bc7946abb36568c822019e0911198b484f97a` |
+| Cached range observer | `4862627b1699e59f7b94dc36b71679d48a4cca5ced0b1aca4f49d4db8ae27991` |
+
+### Forced cached range completion on ARM
+
+A second read-only observer sees zero cached range completions in the
+first 48,237 ordinary calls of the Z7 tape. The observer matches the
+candidate's recorded gameplay and timing cuts. Its completion branch
+is at `0x080434e2` for the Z10 ELF. [P10 and Z7 comparisons](#qualification-with-merged-p10-steering)
+
+A synthetic 128×128 ARM fixture starts from the canonical P10 recipe
+and sets a wall in column 64 from rows 8 through 122, with row 110 open.
+It opens the other cells. A point field rooted at (32,32) serves a
+nearby request at (33,32) first. A cached range request from world
+(1608,1608) to (520,520) then asks for a step across the wall. Both
+builds return (1608,1624), count one logical build and zero hits, and
+keep those counters fixed during the range read. The candidate parks
+and then completes its prefix.
+
+| ARM cycles in this forced case | Former route search | Resumable route search |
+| --- | ---: | ---: |
+| Initial point fill | 1,086,583 | 102,766 |
+| Cached range read | 1,228 | 1,198,340 |
+| Combined | 1,087,811 | 1,301,106 |
+
+The test measures the two engine calls directly, outside full-frame
+rendering. The forced read costs more than two 30 fps update budgets.
+The replay observers establish frequency only for their actual
+inputs. Before enabling resumable routes by default, reduce the
+cost or bound the timing of the exact completion while preserving
+the returned step and the shared range scratch rules.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z7 range observer | `87235b9072d97309405f2673090343ea4ae9088ccaf40632f42d93cc8cca55ca` |
+| Forced ARM control | `99af92b2fa9210981ed5ce0742d2e4d4db09a95ff59d8f3b7e0ccf19c68eb17d` |
+| Forced ARM candidate | `f52a4895ac32b3639279b788c8d1c35785186b9936fadd6978a781948917c0d0` |
+
+### Restore only rows reached by the parked prefix
+
+The local row-span probe adds two bytes per parked record. A cell
+discovered by the search is at most one edge farther from a seed than
+its predecessor. After `head` FIFO pops no discovered cell can be more
+than `head` rows away from its seed. An open goal is the only seed.
+For a blocked goal, the initial seeds can start one row above or below
+the requested goal. Clamp the resulting row interval to the map.
+
+On completion, initialize the whole walkability buffer. Restore assigned
+directions within the recorded interval using the existing unpacker.
+The initial packed-field clear left all entries outside the interval
+undiscovered. Copy the same pending FIFO and use the existing ordered
+expansion and packing. Route metadata and save formats are unchanged.
+Invalid row bounds use the full restore.
+
+The existing `CANONICAL_ROUTE_POINT_PREFIX=1` selector includes the row
+bounds. The opt-in ASan/UBSan target
+`test-sc64-route-point-prefix` passed the 386,646-query residency
+comparison, the range reader with both reserved planes, and the new
+open and blocked seed cases at the top and bottom of the map.
+
+The same forced P10 ARM case parks after one pop with four pending cells.
+It restores dense rows 32–34 instead of scanning all 128 rows. The
+paired ROMs use the same fixture, 39 prepared dependencies and compiler
+arguments apart from the row-span flag. The pending FIFO, initially
+packed bytes, returned step, logical route counters and all 6,144 bytes
+of the completed field match. An independent FIFO verifies all 16,384
+packed directions.
+
+| Forced-case ARM cycles | Prefix | Prefix with row bounds |
+| --- | ---: | ---: |
+| Initial point fill | 102,766 | 102,870 |
+| Cached range read | 1,198,340 | 1,086,790 |
+| Combined | 1,301,106 | 1,189,660 |
+| Direction restoration inside the read | 115,969 | 3,670 |
+
+Ordered expansion still takes about 864,000 cycles in the forced
+read, so the read remains above the 561,792-cycle budget for 30 updates
+per second. Normal P10 and Z10 links retain their previous IWRAM
+endpoints and each uses eight additional EWRAM bytes. Folding the
+bounds into the existing selector produces byte-identical P10 and
+Z10 ROMs. Terran and Showcase also fit both link guards.
+
+The dense Z7 replay on Z10 matches 131 historical checks, all 480
+simulation and route-counter records, and all nine sampled actor,
+mineral, palette and paired framebuffer hashes. The selected page
+matches in eight samples. At the final sample on call 48,237 the
+control selects page 0 and the row-span ROM selects page 1. A repeat
+captures the individual page hashes and confirms that this sample
+shows different pixels. The mean advancing update changes from
+2,149,956 to 2,149,908 cycles. Across all 480 updates, p95 changes from
+2,844,577 to 2,843,784 and the maximum from 4,369,053 to 4,368,587.
+Keep the option disabled by default.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired forced ARM read | `1670fc48437185fcad7d37ced78decfe3860e33c974b69bdeee16dfed8db4310` |
+| Candidate restoration phase | `b35c537fcbcaedf4b24057e8352de6f56809f7e60620dd79763dd067820d0273` |
+| Dense Z7 candidate replay | `8d2b9687054a0a45b6383997cbf075b200b44c6cb3c583742cdea44e94e1d92e` |
+| Dense Z7 repeated display comparison | `ff30e273dd184a04de728cc4cb0f5e2235ea84a5129e7c7e7c5f925244017441` |
+
+### Composed with the draw-order release
+
+Composed source `35989f23` includes release `9dfba082` and the
+row-bounded prefix. Terran, Z10, P10 and Showcase all pass the ROM
+header, SRAM signature and memory checks with the existing prefix
+selector both on and off. Each pair uses the same frozen inputs. The
+off images differ from the four packaged release ROMs only in the
+order of two independent stack loads inside
+`sc64_route_fill_linear`.
+
+The packaged P10 ROM creates a 32 KiB pause save at campaign frame
+36,761. It loads the journal through the title menu in a fresh
+emulator and matches six checkpoint records through victory at frame
+46,057. The composed opt-in P10 ROM loads the same journal in a fresh
+emulator, matches the same six records and wins. Both runs preserve
+the input journal's SHA-256. This checks one campaign save cut.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Released P10 fresh SRAM win | `10a6c5394948b9d1f14817047ce00fa75ce06719aaada445ba328af5fba8c573` |
+| Composed opt-in P10 fresh SRAM win | `28965dfec4cd8dc44a53f0a50a35ecfd47bacf50c41e6f2c03605c175831778f` |
+
+### Composed with the wide depot and early contact release
+
+Composed source `882fe20f` includes release `ea041527`. Full and
+prefix point fills now share the seedless-goal check. A prefix that
+finds no reachable seed publishes the same empty packed field without
+writing dense scratch. The wide depot and the overflow fallback retain
+their existing queue bounds and neighbor order.
+
+The ASan/UBSan `test-sc64-route-point-prefix` target passes. It compares
+386,646 queries and the final live fields with the full-fill control,
+checks the new seedless case, and exercises range reads while both
+range planes are claimed. The published ARM timings above are from
+earlier source. Recheck the dense Z7 display page and the forced range
+read on this composition before enabling the selector.
+
+#### Dense Z7 and forced range on the current release
+
+The Z10 prefix ROM from `b2e75890` and release `ea041527` use the same
+38 prepared build inputs. The full 48,237-call prefix from HOME passes
+all 131 historical checks. The dense window matches all 480 simulation
+and route-counter samples. The eight cuts match the unit, building and
+mineral arrays, fog masks, both indexed framebuffer pages, the palette,
+and the hardware page select. This tape stops before victory.
+
+| Active updates, calls 47,758–48,237 | Release | Prefix | Change |
+| --- | ---: | ---: | ---: |
+| Mean cycles | 2,340,889 | 2,080,881 | −11.11% |
+| 95th percentile cycles, nearest rank | 3,389,340 | 2,783,993 | −17.86% |
+| Peak cycles | 4,696,376 | 4,297,596 | −8.49% |
+
+The new presentation check reads `front`, `flip_pending`,
+`backbuffer_index`, and `gba_present_intervals` at each input cut.
+Require the interval count plus the pending bit to equal the number
+of completed input calls. Check the displayed page against DISPCNT
+bit 4 and hash the newest completed page at `front ^ flip_pending`.
+Report display timing and completed pixels independently. At call
+48,237 the preview still shows page 0. Its next VBlank commit shows
+the already completed page 1 with its exact hash. Both pages remain
+unchanged across that commit. This observer uses the pinned reader's
+DISPCNT allowlist.
+
+The four normal ARM link recipes with the prefix option pass the ROM
+header, SRAM signature and RAM guards. All generated dependencies
+match the corresponding released builds.
+
+| Profile | ROM hash prefix | IWRAM end | EWRAM end |
+| --- | --- | --- | --- |
+| Terran | `c8650bca` | `0x030049e0` | `0x02039184` |
+| Z10 | `f38cdb2f` | `0x03004ec0` | `0x020382a8` |
+| P10 | `ace7efae` | `0x03004f50` | `0x0203b85c` |
+| Showcase | `9f624202` | `0x03004fb8` | `0x02039390` |
+
+The current P10 forced range fixture parks the same four queue cells
+and matches the previous row-span build's returned step, route counters
+and all 6,144 packed bytes. The independent FIFO matches all 16,384
+directions. The synchronous read still takes 1,086,782 cycles. A separate
+FIFO counts 14,091 pops before the queried origin is discovered out of
+16,270 reachable cells. Stopping at that origin still requires roughly
+748,000 cycles of expansion at the measured rate, before grid setup or
+packing. Any step-only shortcut must also preserve cache residency and
+future cache-only lookups. Leave the option off by default.
+
+A read-only breakpoint replay of the exact Z10 candidate reproduces
+the same 480 timing rows and eight display cuts. It measures one
+synchronous completion at each of these five calls:
+
+| Controller call | Reader | Completion cycles |
+| --- | --- | ---: |
+| 47,855 | Nearby-root gradient check | 846,209 |
+| 47,867 | Exact-root cache hit | 846,306 |
+| 47,995 | Exact-root cache hit | 850,853 |
+| 48,118 | Exact-root cache hit | 857,569 |
+| 48,147 | Exact-root cache hit | 856,857 |
+
+The four exact-root completions use the nonnegative-origin branch of
+`sc64_route_slot_for`. The selected five calls include no range-induced
+completion. Test the existing bounded second cutoff on only this
+positive exact-root path first. Keep nearby-root, range, and callers
+requesting a complete field on their existing path. Measure the five
+calls and the full frame window to catch a completion moved to another
+reader in the same update.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Release dense Z7 | `6b11688c76f516bbb0aaa0fff501b1299ee8cfd6707b20abb268c4ecdc57073c` |
+| Prefix dense Z7 and presentation | `72ec45bc0be653d7b33f23837c23e2e3c7a240cb46b6493fd85ebcd31beedbbe` |
+| Forced P10 range read | `b3fe12a43684c0b89b3e5d9e975182a231fca9e13bbbd84e9aa3fea8b9375fbc` |
+| Z7 timed completion callsites | `77d31c07178519556448eb80176dcb81d14d60c02c46fd3a6d12a22ff1b3025b` |
+
+#### Bound continuation on an exact-root hit
+
+Source `657641d3` permits one extra cutoff when an exact-root cache
+hit requests a new open origin. It resumes the parked FIFO and packs
+only newly assigned directions when it can park again. A later missing
+origin completes the field. The nearby-root, range and complete-field
+readers retain their previous completion path. Enable the experimental
+`SC64_ROUTE_POINT_SECOND_EXACT_HIT` define alongside
+`CANONICAL_ROUTE_POINT_PREFIX=1` in a fresh prepared build.
+
+The ASan/UBSan comparison matches the 386,646-query residency stream.
+The focused fixture checks all published directions after the second
+cutoff, then compares all 16,384 directions after a subsequent miss.
+The range-copy oracle still passes 8,320 cases. The same 48,237
+ordinary Z7 calls pass 131 historical checkpoints and match all 480
+simulation and route-counter rows, eight world and framebuffer cuts,
+and both the selected and newest completed pages.
+
+| Dense Z7 active-update cycles | Shipping | Earlier prefix | Exact-hit cutoff |
+| --- | ---: | ---: | ---: |
+| Mean | 2,340,889 | 2,080,881 | 2,065,179 |
+| 95th percentile, nearest rank | 3,389,340 | 2,783,993 | 2,786,667 |
+| Peak | 4,696,376 | 4,297,596 | 3,904,556 |
+
+Each of the four traced exact-root updates costs 582,241 to 623,875
+fewer cycles than the earlier prefix. The nearby-root call at 47,855
+changes by 1,193 cycles. The new peak is 9.15% below the earlier prefix
+peak, while p95 rises by 0.10%. Relative to the shipping ROM, mean and
+peak fall 11.78% and 16.86%. Dense updates still exceed the 561,792-cycle
+budget for 30 per second.
+
+All four preview links pass the ROM header, SRAM signature and RAM
+guards with the same prepared inputs as the shipping builds. The
+second cutoff adds 8 EWRAM bytes in each ROM. Showcase keeps its
+IWRAM endpoint at `0x03004fb8`. Z10 ends at `0x03004ec8` and P10
+at `0x03004f60`. ROM SHA-256 prefixes are `038bede5` (Terran),
+`7bf1a25a` (Z10), `e80d44b9` (P10) and `9041a32e` (Showcase).
+The exact-hit replay receipt SHA-256 is
+`9033f7c6eaa72e83cf5d4902d37e24900021a7e1b0a5662e2e3592ede8b0fc59`.
+Normal builds keep both options off. The forced cached-range budget
+and broader gameplay and save coverage remain open.
