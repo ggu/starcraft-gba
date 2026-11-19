@@ -257,3 +257,30 @@ The selector remains opt-in.
 | Opt-in P10 ROM | `01f5d36ee92f2f623046a098cf1bab38ca9dbc27a0556a676415273184fc2cd6` |
 | Physical controller observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
 | Paired physical input and selection receipt | `5be75d7c6cf781b073dc79e8ac664770726cb44b071aa69835d2d55fb9dccae8` |
+
+### Showcase and Z10 on ARM
+
+The Showcase and Z10 opt-in builds at `2b7cb12a` pass the ROM
+header, SRAM signature and memory checks. They use the same 32 and
+38 prepared inputs as their retained `99e4c26d` controls, respectively.
+Showcase ends at IWRAM `0x03004f10` and EWRAM `0x02038f64`.
+Z10 ends at IWRAM `0x03004ce8` and EWRAM `0x02037e80`. Both pairs
+have identical memory endpoints.
+
+In Showcase, 21 ordinary calls open the scene menu, enter Zerg
+Last Stand, resume, select the Hatchery with A, return to the same
+scene row with Select and go back to HOME with B. The sampled world,
+selection and menu states match the control. The Z10 pair uses 226
+ordinary calls to start Blood Bath as Protoss against one Terran,
+select the Nexus and save at frame 124. Both pause saves are the same
+32 KiB. A fresh opt-in process loads the release journal and matches
+the original world through frame 184.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Release Showcase ROM | `975487861480120e50d1e4294979cfa6d7a10c699f9ef43fdff7b925310e6b8e` |
+| Opt-in Showcase ROM | `6873e081d5cea03386db10de070ef328e5344279b200903570cc9be26936afae` |
+| Showcase physical input receipt | `7b0947ee406e4d48b6d4f518be3d4b2779bff1689c050cfbbc02e397e46493e1` |
+| Release Z10 ROM | `f784da09d7f772b1598b8f7c31be212d648e955a0c7f171c7e0a357db035da99` |
+| Opt-in Z10 ROM | `9091074cd2401e2446701c9c79ac80e27def634da2f13ba08310874700d93ead` |
+| Z10 physical selection and save/load receipt | `2b037ab3516cdd55710137368b14f842cdd38fe2aab94260172a23f907f0b874` |
