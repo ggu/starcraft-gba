@@ -96,6 +96,27 @@ cap rises to 18, with no new Train input or charge.
 - Preview empty-queue refusal receipt SHA-256 `6309376ff4492e27b3125678424e0d5c7078ea05b7627fe651c7f11371a125e5`.
 - Preview Depot continuation receipt SHA-256 `0b1080bf567a13b0a7b49e0095e463e86be6b224cc3f3846ba12e1aeb365339d`.
 
+## Canonical Terran profile
+
+The opt-in Terran link passes the canonical ROM verifier with the
+prepared release inputs. Ordinary Blood Bath controls with one Zerg
+opponent reproduce the cap transaction on this cartridge. The regular
+Terran ROM exports a 9/10 save at frame 1,903. The preview loads it,
+then admits the second SCV at 10/10 at frame 1,909. The matched neutral
+control confirms a 50-mineral charge and identical first-head progress.
+
+The promoted head waits at frame 2,289 and saves at frame 2,334. Two
+fresh preview processes restore the waiting state, with all 416 sampled
+selected-bar pixels in the empty shade. Canceling at frame 2,338 refunds
+50 minerals relative to neutral input and leaves the HUD at 10/10.
+The regular Terran executable falls back to the retained 9/10 bank.
+The new Terran tag is `0x764f5442`, both exported banks pass their
+payload checksum checks, and the retained bank is byte-identical.
+
+- Terran preview ROM SHA-256 `6ce5842168af1690b5e1606edba198786d5c1898eb85aba62b290285dc7731f4`.
+- Terran build receipt SHA-256 `bdfc9d5b8a0630b50b519bbe4252ec742692974c9314c7c118742f0aec61d806`.
+- Terran controller and save receipt SHA-256 `374efd5a3e36749200ff0dce1e6cf24a0f8053f7fae15ed59a3be168d8346b77`.
+
 ## Timing on matched work
 
 The regular and preview Z10 ROMs replay identical ordinary inputs.
