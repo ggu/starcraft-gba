@@ -11,7 +11,9 @@ P10_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p10_scenari
 # reachable depot. Rank candidates first to avoid filling unused routes.
 P10_CAMPAIGN_DEFINES := -DSC64_P10_DATA_ENABLED -DSC64_P10_RUNTIME -DSC64_P10_CAMPAIGN_ENTRY -DSC64_NEAREST_RESOURCE_DEPOT
 PROTOSS_P10_BASE_FLAGS = $(patsubst -I$(P9_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(PROTOSS_P9_FLAGS)) $(P10_CAMPAIGN_DEFINES) -DSC64_DEPOT_FIRST_NEAREST_PROBE
-PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS)
+# The packed coordinate scan can reject wide misses early in the IWRAM kernel.
+PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS) \
+	$(if $(filter 1,$(CANONICAL_CONTACT_COINCIDENT)),-DSC64_CONTACT_EARLY_AXIS_IWRAM_PROBE)
 PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCENARIO_HEADER)
 # The depth painter redraws completed buildings each frame. Pack only the
 # Hatchery frame so the other building art keeps the ordinary byte path.

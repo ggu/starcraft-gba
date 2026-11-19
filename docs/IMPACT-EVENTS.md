@@ -131,10 +131,10 @@ and type ranges are compile-time asserts.
 ## Save and load
 
 A save with no pending impacts writes the historical RaceSave-length record,
-byte for byte. With impacts pending, the record is RaceSave followed by an
-8-byte header and 6 bytes per live row, in launch order.
+byte for byte. With impacts pending, the usual record is RaceSave followed by
+an 8-byte header and 6 bytes per live row, in launch order.
 
-Loading reads the newest record for the save tag at either length:
+Loading reads the newest record for the save tag across supported lengths:
 
 - A RaceSave-length record restores an empty queue.
 - An extended record's block is validated (magic, count, length, every row
@@ -151,8 +151,14 @@ Each product stores as many rows as its SRAM record leaves room for:
 | --- | ---: | ---: |
 | Showcase | 14,188 B | 32 |
 | Terran | 15,816 B | 32 |
+| Standalone Protoss P6 | 16,348 B | 22 |
 | Protoss P7 | 16,292 B | 11 |
 | Zerg Z6 / Z7 | 16,296 B | 10 |
+
+Standalone P6 keeps the usual record for zero to two rows. For three to 22,
+it stores the same impact packet in the seven reserved bits of each packed
+building row. A four-byte `P6I1` suffix distinguishes this form. Loading
+validates the packet and clears those bits before normal world validation.
 
 A save attempted with more pending impacts than the product can store is
 refused before SRAM changes, showing SAVE FAILED. The impacts land within

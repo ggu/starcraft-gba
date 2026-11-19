@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-18. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-19. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,11 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **P10 cycle budget (2026-11-19)**. The [early collision rejection trial](audits/2026-11-19-p10-steering-budget.md)
+  matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
+  cycles. Advance the reviewed steering gate and keep testing point-route
+  continuation under load. Both replay windows exceed the 30 fps budget.
 
 - **Frontier Skirmish (P1):** an independently authored battle profile
   now starts Transit Yard and Stone Gardens with one to three computer
@@ -409,6 +414,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pre-expansion pause save reloads with matching state through 241 updates.
   All 30 missions now have a complete ordinary-input win on a normal ROM
   in mGBA. Check remaining older/current cross-build and save continuations.
+  [Standalone P6](audits/2026-11-19-standalone-p6-impact-saves.md) passes ROM
+  verification and saves up to 22 pending impacts. Its full host target
+  still needs a controller route that avoids the loss at frame 53,613.
   The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
