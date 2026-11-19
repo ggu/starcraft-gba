@@ -29,7 +29,7 @@ physical GBA check or all routes through a mission.
 | P3 | Not replayed on the November 13 KODAK binary | [HOME win on the packaged wide P10 ROM](2026-11-13-p3-p4-home-preparation.md#wide-p10-packaged-rom-p3-victory): 47 checkpoints, both enemy structure banks cleared, and a separate checked pause save and fresh-load prefix. |
 | P4 | [HOME win](2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win) | 146 matching observations on KODAK and staged P10; both heroes survive. |
 | P5–P6 | [HOME wins](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | Seven and 113 matching checkpoints; both also win on newer staged P10. |
-| P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | All 59 named snapshots also match on staged and nearest-first P10; all three heroes survive. |
+| P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | [Current P10 fresh SRAM win](2026-11-13-p7-carried-normal-home.md#november-20-normal-cartridge-and-fresh-sram) from frame 8,845, with all 49 remaining named checkpoints matching uninterrupted play. |
 | P8 | No complete older exact-KODAK receipt here | [November 16 normal P10 fresh SRAM win](2026-11-13-p8-host-hero-retreat.md#fresh-sram-win-on-the-november-16-normal-p10-build) from frame 30,825, 41 matched checkpoints, both heroes alive and the Stasis Cell destroyed. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
