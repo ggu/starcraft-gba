@@ -745,9 +745,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   produces the same route step and measures a 1.20M-cycle synchronous
   read. [Restoring just the visited row span](audits/2026-11-16-resumable-frontier-budget.md#restore-only-rows-reached-by-the-parked-prefix)
   cuts that read to 1.09M cycles with identical packed directions.
-  Ordered expansion alone still takes about 864,000 cycles. Reduce or
-  bound the expansion cost and verify the display-page timing before
-  enabling the selector. The packed second cutoff stays local.
+  Ordered expansion alone still takes about 864,000 cycles. The
+  [current composition](audits/2026-11-16-resumable-frontier-budget.md#dense-z7-and-forced-range-on-the-current-release)
+  passes all four ARM links and matches dense Z7 gameplay, display
+  and queued framebuffer pixels. It saves 11.11% mean, 17.86% p95
+  and 8.49% peak cycles. The exact forced read still takes 1.09M cycles.
+  A FIFO cutoff at the origin eliminates only 13.4% of the expansion.
+  Preserve cache residency while removing or bounding the synchronous
+  work before enabling the selector. Four of five traced ordinary spikes
+  come from exact-root hits. Qualify a second cutoff scoped to those
+  requests and check for cascaded completions in the same update.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup

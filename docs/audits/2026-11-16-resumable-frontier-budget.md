@@ -728,3 +728,77 @@ checks the new seedless case, and exercises range reads while both
 range planes are claimed. The published ARM timings above are from
 earlier source. Recheck the dense Z7 display page and the forced range
 read on this composition before enabling the selector.
+
+#### Dense Z7 and forced range on the current release
+
+The Z10 prefix ROM from `b2e75890` and release `ea041527` use the same
+38 prepared build inputs. The full 48,237-call prefix from HOME passes
+all 131 historical checks. The dense window matches all 480 simulation
+and route-counter samples. The eight cuts match the unit, building and
+mineral arrays, fog masks, both indexed framebuffer pages, the palette,
+and the hardware page select. This tape stops before victory.
+
+| Active updates, calls 47,758–48,237 | Release | Prefix | Change |
+| --- | ---: | ---: | ---: |
+| Mean cycles | 2,340,889 | 2,080,881 | −11.11% |
+| 95th percentile cycles, nearest rank | 3,389,340 | 2,783,993 | −17.86% |
+| Peak cycles | 4,696,376 | 4,297,596 | −8.49% |
+
+The new presentation check reads `front`, `flip_pending`,
+`backbuffer_index`, and `gba_present_intervals` at each input cut.
+Require the interval count plus the pending bit to equal the number
+of completed input calls. Check the displayed page against DISPCNT
+bit 4 and hash the newest completed page at `front ^ flip_pending`.
+Report display timing and completed pixels independently. At call
+48,237 the preview still shows page 0. Its next VBlank commit shows
+the already completed page 1 with its exact hash. Both pages remain
+unchanged across that commit. This observer uses the pinned reader's
+DISPCNT allowlist.
+
+The four normal ARM link recipes with the prefix option pass the ROM
+header, SRAM signature and RAM guards. All generated dependencies
+match the corresponding released builds.
+
+| Profile | ROM hash prefix | IWRAM end | EWRAM end |
+| --- | --- | --- | --- |
+| Terran | `c8650bca` | `0x030049e0` | `0x02039184` |
+| Z10 | `f38cdb2f` | `0x03004ec0` | `0x020382a8` |
+| P10 | `ace7efae` | `0x03004f50` | `0x0203b85c` |
+| Showcase | `9f624202` | `0x03004fb8` | `0x02039390` |
+
+The current P10 forced range fixture parks the same four queue cells
+and matches the previous row-span build's returned step, route counters
+and all 6,144 packed bytes. The independent FIFO matches all 16,384
+directions. The synchronous read still takes 1,086,782 cycles. A separate
+FIFO counts 14,091 pops before the queried origin is discovered out of
+16,270 reachable cells. Stopping at that origin still requires roughly
+748,000 cycles of expansion at the measured rate, before grid setup or
+packing. Any step-only shortcut must also preserve cache residency and
+future cache-only lookups. Leave the option off by default.
+
+A read-only breakpoint replay of the exact Z10 candidate reproduces
+the same 480 timing rows and eight display cuts. It measures one
+synchronous completion at each of these five calls:
+
+| Controller call | Reader | Completion cycles |
+| --- | --- | ---: |
+| 47,855 | Nearby-root gradient check | 846,209 |
+| 47,867 | Exact-root cache hit | 846,306 |
+| 47,995 | Exact-root cache hit | 850,853 |
+| 48,118 | Exact-root cache hit | 857,569 |
+| 48,147 | Exact-root cache hit | 856,857 |
+
+The four exact-root completions use the nonnegative-origin branch of
+`sc64_route_slot_for`. The selected five calls include no range-induced
+completion. Test the existing bounded second cutoff on only this
+positive exact-root path first. Keep nearby-root, range, and callers
+requesting a complete field on their existing path. Measure the five
+calls and the full frame window to catch a completion moved to another
+reader in the same update.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Release dense Z7 | `6b11688c76f516bbb0aaa0fff501b1299ee8cfd6707b20abb268c4ecdc57073c` |
+| Prefix dense Z7 and presentation | `72ec45bc0be653d7b33f23837c23e2e3c7a240cb46b6493fd85ebcd31beedbbe` |
+| Forced P10 range read | `b3fe12a43684c0b89b3e5d9e975182a231fca9e13bbbd84e9aa3fea8b9375fbc` |
+| Z7 timed completion callsites | `77d31c07178519556448eb80176dcb81d14d60c02c46fd3a6d12a22ff1b3025b` |
