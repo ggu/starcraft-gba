@@ -433,3 +433,22 @@ The replay comparison SHA-256 is
 `217a33acda855a949299fc7ec68fb196a084eaa0e8c50942b8450825d3a850db`.
 The stack observation SHA-256 is
 `1caaf2120794bd66a7c74b74cbd96c28b59ac44522c7e406866856dd6e8605b7`.
+
+##### Composition with selection-ring depth
+
+The normal P10 cartridge with both changes passed ROM header, SRAM
+signature, and memory checks. The 40 private build input hashes and
+linked RAM endpoints matched release `108690d5`. The detector flag
+is scoped to P10 builds with validated rectangles. Campaign and custom
+games in that cartridge use the same detector path.
+
+Against `108690d5`, the same 958 advancing P7 updates averaged
+1,749,589 cycles, down from 1,760,602 (0.63%). The p95 fell from
+2,059,279 to 2,047,006. The peak rose from 2,427,848 to 2,437,534.
+All 1,000 timeline records and 11 sampled world, palette, and full
+indexed framebuffer pairs matched. The scalar sanitizer fixture passed.
+
+The composed ROM SHA-256 is
+`fe8da4798ad548b433627121ab31f4d9894eee60119d266936ace5159ed8f2c4`.
+The paired replay comparison SHA-256 is
+`028cfd891fd251456abac5efb25d8439a671104f08d1cdde10f53ab2ee45caac`.
