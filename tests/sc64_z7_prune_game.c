@@ -104,6 +104,117 @@ static void assert_pruned_snapshot(u16 started)
 }
 
 #ifdef SC64_Z7_VALIDATED_CENSUS
+static unsigned long fused_geometry_checks, fused_failure_checks, fused_two_counter_checks;
+
+/* One tick's worth of counting both ways: the validation-pass census against
+ * the separate pruned census, with the same result, counts and active mask. */
+static void census_both_ways(u16 started)
+{
+    u32 late[2]={0,0};
+    Sc64Z7WorldContext *w=&race_z7_world;
+    unsigned needed=sc64_z7_count_snapshot_needed(started);
+    int armed=sc64_z7_census_arm(w,started);
+    int fused_path=armed && needed!=3u;
+    u32 fused_count[5]; u8 fused_active; int fused_ok, ref_ok;
+    assert(race_z7_pruned_binding_valid());
+    assert(race_z7_validate_live_world(armed?late:0));
+    fused_ok=sc64_z7_census_begin_pruned(w,started,armed?late:0);
+    memcpy(fused_count,w->count_snapshot.count,sizeof(fused_count));
+    fused_active=w->count_snapshot.active;
+    ref_ok=sc64_z7_count_snapshot_begin_pruned(w,started,0);
+    assert(fused_ok==ref_ok);
+    assert(fused_active==w->count_snapshot.active);
+    assert(!memcmp(fused_count,w->count_snapshot.count,sizeof(fused_count)));
+    if (fused_path) { ++fused_geometry_checks; fused_failure_checks+=!ref_ok; }
+    else if (armed) ++fused_two_counter_checks;
+    /* The fused state is consumed by one snapshot. */
+    assert(!sc64_z7_census.armed && !sc64_z7_census.done);
+}
+
+static void census_every_mask(void)
+{
+    static const u8 trigger[5]={0,2,4,6,7};
+    for (unsigned needed=0;needed<32u;++needed) {
+        u16 started=0xffu;
+        for (unsigned q=0;q<5;++q)
+            if (needed&(1u<<q)) started=(u16)(started&~(1u<<trigger[q]));
+        census_both_ways(started);
+    }
+}
+
+static void test_fused_census_matches_separate(void)
+{
+    unsigned l[3][4];
+    int own=-1,hostile_building=-1,force0_unit=-1,force0_building=-1,other_unit=-1;
+    load_canonical_z7();
+    census_every_mask();
+    for (unsigned k=0;k<3;++k) {
+        static const unsigned id[3]={3u,4u,5u};
+        assert(sc64_z7_world_location_source(&race_z7_world,id[k],&l[k][0],&l[k][1],
+                                              &l[k][2],&l[k][3]));
+    }
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive) {
+        unsigned slot=(unsigned)u[i].raw_owner;
+        if (slot==race_z7_world.source_current_player && own<0) own=i;
+        else if (race_z7_world.source_force_for_slot[slot]==0u && force0_unit<0) force0_unit=i;
+        else if (race_z7_world.source_force_for_slot[slot]==1u && other_unit<0) other_unit=i;
+    }
+    for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
+        unsigned slot=(unsigned)b[i].raw_owner;
+        if (race_z7_world.source_force_for_slot[slot]==1u && hostile_building<0) hostile_building=i;
+        if (race_z7_world.source_force_for_slot[slot]==0u && force0_building<0) force0_building=i;
+    }
+    assert(own>=0 && force0_unit>=0 && hostile_building>=0);
+    /* Move force-0 actors across each region edge, one pixel at a time, and
+       place a hostile building in its named region. */
+    for (unsigned k=0;k<3;++k) for (int d=-3;d<=3;++d) {
+        int x=(int)(l[k][0]/2u)+d, y=(int)(l[k][1]/2u)+d;
+        u[force0_unit].x=(s16)x; u[force0_unit].y=(s16)y;
+        b[hostile_building].x=(s16)x; b[hostile_building].y=(s16)y;
+        if (force0_building>=0) { b[force0_building].x=(s16)(x+2); b[force0_building].y=(s16)(y+2); }
+        x=(int)(l[k][2]/2u)+d; y=(int)(l[k][3]/2u)+d;
+        if (other_unit>=0) { u[other_unit].x=(s16)x; u[other_unit].y=(s16)y; }
+        census_every_mask();
+    }
+    /* Liveness and ownership transitions. */
+    for (unsigned mix=0;mix<16u;++mix) {
+        u[own].alive=(mix&1u)!=0;
+        u[force0_unit].alive=(mix&2u)!=0;
+        b[hostile_building].alive=(mix&4u)!=0;
+        if (force0_building>=0) b[force0_building].alive=(mix&8u)!=0;
+        census_every_mask();
+    }
+    u[own].alive=u[force0_unit].alive=b[hostile_building].alive=1;
+    if (force0_building>=0) b[force0_building].alive=1;
+    /* A raw id outside the source table, a unit without a live type, and an
+       actor without region bounds each make both censuses refuse. */
+    {
+        s16 raw=u[force0_unit].raw_type; int type=u[force0_unit].type;
+        int found=0;
+        for (int r=0;r<=227 && !found;++r) {
+            int al,at,ar,ab;
+            if (sc64_race_unit_from_raw(r)>=0 &&
+                !sc64_z7_world_actor_rect((unsigned)r,100,100,&al,&at,&ar,&ab)) {
+                u[force0_unit].raw_type=(s16)r; u[force0_unit].type=(__typeof__(u[0].type))sc64_race_unit_from_raw(r);
+                found=1;
+            }
+        }
+        if (found && race_z7_live_world_valid()) census_every_mask();
+        found=0;
+        for (int r=0;r<=227 && !found;++r) if (sc64_race_unit_from_raw(r)<0) {
+            u[force0_unit].raw_type=(s16)r; u[force0_unit].type=(__typeof__(u[0].type))-1;
+            found=1;
+        }
+        /* Compact unit records store an unsigned type and cannot hold -1. */
+        if (found && race_z7_live_world_valid()) census_every_mask();
+        u[force0_unit].raw_type=raw; u[force0_unit].type=(__typeof__(u[0].type))type;
+    }
+    census_every_mask();
+    assert(fused_geometry_checks>1000 && fused_two_counter_checks>0);
+    printf("Z7 fused census: %lu geometry comparisons (%lu refusals), %lu two-counter\n",
+           fused_geometry_checks,fused_failure_checks,fused_two_counter_checks);
+}
+
 static void test_validated_late_census(void)
 {
     load_canonical_z7();
@@ -338,6 +449,7 @@ int main(void)
 #ifdef SC64_Z7_PRUNE_STARTED
 #ifdef SC64_Z7_VALIDATED_CENSUS
     test_validated_late_census();
+    test_fused_census_matches_separate();
 #endif
     test_started_conditions_and_active_waits();
     test_mutations_refresh_only_unstarted_counts();
