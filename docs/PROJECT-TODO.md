@@ -1573,8 +1573,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   and keeps 10/10 supply when Cancel Last removes the stalled paid head,
   matching the GBA preview. Its Depot replay confirms the existing SCV
   automatically takes the new reservation and completes after 10/10
-  becomes 11/18. Broader ARM controls and other producer classes remain
-  in qualification before release activation.
+  becomes 11/18. The canonical Terran preview now also passes ordinary
+  cap admission, waiting-head save and fresh load, exact refund, and
+  legacy-bank fallback on its own ROM. Broader ARM controls and other
+  producer classes remain in qualification before release activation.
 - The [dense Z7 orders audit](audits/2026-11-19-z7-order-cost.md)
   separates the movement, nearest-enemy and setup costs. Movement
   averages about 920,000 instrumented cycles on calls that advance
