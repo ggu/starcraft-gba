@@ -131,3 +131,72 @@ enablement.
 | --- | --- |
 | CPU retirement and 900 resumed updates | `01c7860a07db37d010e9967e254cf74da6860336dc74ca6d14af8b816d327ec7` |
 | Human defeat and terminal SRAM | `1c62ced8deee8c6159854dd9b61b7b3781cdfeefffdf463267fe2f4aa519fab8` |
+
+## November 20 composition and final result boundary
+
+Preview `ebd7fb91` composes the full survivor-transfer draft with release
+`85d338c0`. Four normal profile vectors with the two preview flags link
+against the same prepared inputs. All four elimination fixtures pass with
+ASan and UBSan. The HOST target runs each product's fixture, including
+Protoss-specific Carrier cases.
+
+| Opt-in ARM profile | ROM hash prefix | EWRAM end | IWRAM end |
+| --- | --- | --- | --- |
+| Terran | `20ebcc13` | `0x02038d74` | `0x03004928` |
+| Z10 | `4238398b` | `0x02037e98` | `0x03004e28` |
+| P10 | `75788c1b` | `0x0203b44c` | `0x03004e50` |
+| Showcase | `5800ae73` | `0x02038f80` | `0x03004fe8` |
+
+The older physical frame-3,001 journal loads the same Terran Free for All
+lineup. On this build the Zerg CPU retires at frame 13,836 with the human
+and both other CPU ranks still active. No Zerg survivor remains at that
+cut. Two ordinary pause saves mark the retired rank, and a fresh process
+matches the uninterrupted world 900 updates later. The older reader
+rejects both marked journals. The replay receipt SHA-256 is
+`c02784e9854d6785f6d2aed5b5b1f1ea157912d05db3de26a0bfd0e6aa83e275`.
+
+The final-result ARM test starts from a separate sanitizer fixture. It
+opens the real lobby on HOST, seeds the final enemy structure and a surviving
+worker, and uses the existing writer to save one queued lethal hit. The
+shipping-code preview ROM boots from that journal in mGBA. Only ordinary
+buttons and read-only observations follow. The queued hit destroys the
+final structure at frame 3. The same worker slot changes to neutral owner
+11, and the result flags remain clear. The pause journal written at that
+cut loads into play at frame 3. The following update wins at frame 4.
+Both the saved path and the uninterrupted path reach the same world,
+and a further fresh process loads the automatic victory journal.
+
+| Prepared ARM result-boundary receipt | SHA-256 |
+| --- | --- |
+| Terran Free for All | `656c29c52cc72141bbb71f856ef57d1467f985092bc3745d0e203813a6b32823` |
+| Terran Melee | `e6c874a42db0c16e7000452c3c1740f17788fd8b8a13f61565863a1bff99e72d` |
+| P10 Free for All | `5dab4891907e35ac902a17650bd5eada4411cbd1b5602ded4715355a7153d720` |
+| P10 Melee | `5607d4e77301024c978d6929ccdd3dd29b6daed588c69471dd33a4a50a483862` |
+
+This tests the result boundary from a prepared battle, including actual ARM
+damage resolution and persistent survivor ownership. A complete human win
+from an ordinary Blood Bath opening remains open. Native CPU retirement,
+published results with simultaneous losses, and the active Carrier queue
+remain separate qualification cases.
+
+## Native two-CPU Free for All opening
+
+A cold ares replay selects Blood Bath, Free for All, human Terran, Zerg CPU,
+Terran CPU, and Closed in the last row through ordinary buttons. The lobby
+is visible at observer step 3,695. The active field shows 50 minerals
+and 4/10 supply at step 4,250, then 290 minerals and the same supply after
+neutral input through step 9,000. The observer confirms an exact view
+across the transition to read-only snapshots. Observer steps are a
+capture clock. They do not align to GBA game updates.
+
+| Native private evidence | SHA-256 |
+| --- | --- |
+| Input rows | `67dcee7d87f908d132f8a29b05f1189bd1baae1f9f37fa706051f6420c4f4cca` |
+| Observed lobby | `e9da87bd5cd45eab11fffbedf9fb4d8100f44f1621b7675834f12907df48d958` |
+| Opening field | `e2f3111108271f69217ee41c8b936f7d9fe8bc77cc73fbe3970b9d99baae450b` |
+| Field at step 9,000 | `0ff9cf14c1a8da603e0a5611cb29d7c11c96c65e19aeae3abb97ca7e61b785e1` |
+| Read-only observer status | `2c57fa78dfcd6a80c33791e34b7c436e62142d49c4393116cbb5c23e346e9eff` |
+
+The next native result check needs a grounded last building, a surviving
+unit belonging to its owner, and another CPU still in play. These captures
+cover the lobby and passive mining through step 9,000.

@@ -34,7 +34,16 @@ $(eval $(call NATIVE_MELEE_START_PROFILE,elimination-showcase,$(SHOWCASE_FLAGS),
 sc64-native-skirmish-elimination-arm: $(foreach profile,terran z10 p10 showcase,build/StarCraft-Melee-Starts-Probe-elimination-$(profile)-GBA.gba)
 
 .PHONY: test-sc64-native-skirmish-elimination
-build/test-native-skirmish-elimination: tests/sc64_skirmish_elimination.c tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/native-melee-starts/Makefile | build
-	$(CLANG) $(NATIVE_MELEE_HOST_FLAGS) $(NATIVE_MELEE_START_FLAGS) $(NATIVE_ELIMINATION_FLAGS) $(filter-out -DGBA_NO_DEBUG_INPUTS,$(TERRAN_ROM_FLAGS)) $< common/gba.c starcraft/sc64_bc_body_art.c -o $@
-test-sc64-native-skirmish-elimination: build/test-native-skirmish-elimination
-	./$<
+define NATIVE_ELIMINATION_HOST_PROFILE
+build/test-native-skirmish-elimination$(1): tests/sc64_skirmish_elimination.c tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c $$(COMMON_HEADERS) Makefile mk/native-melee-starts/Makefile | build
+	$$(CLANG) $$(NATIVE_MELEE_HOST_FLAGS) $$(NATIVE_MELEE_START_FLAGS) $$(NATIVE_ELIMINATION_FLAGS) $(filter-out -DGBA_NO_DEBUG_INPUTS,$(2)) $$< common/gba.c starcraft/sc64_bc_body_art.c $(4) -o $$@
+test-sc64-native-skirmish-elimination: build/test-native-skirmish-elimination$(1)
+endef
+
+$(eval $(call NATIVE_ELIMINATION_HOST_PROFILE,,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call NATIVE_ELIMINATION_HOST_PROFILE,-z10,$(ZERG_Z10_RELEASE_FLAGS),$(ZERG_Z10_CANONICAL_INPUTS)))
+$(eval $(call NATIVE_ELIMINATION_HOST_PROFILE,-p10,$(PROTOSS_P10_FLAGS),$(PROTOSS_P10_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES) $(P7_PROJECTILE_SOURCES)))
+$(eval $(call NATIVE_ELIMINATION_HOST_PROFILE,-showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+
+test-sc64-native-skirmish-elimination:
+	@for test in $^; do "$$test" || exit $$?; done
