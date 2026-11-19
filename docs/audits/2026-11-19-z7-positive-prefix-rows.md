@@ -74,3 +74,29 @@ deferred-seed control through victory. The seed file hash is unchanged.
 
 - Continuation receipt SHA-256 `c11cec5cfc32b3e0ccef9bcb2fdcb4f9c5d495dd7aa140f4e0ff1c19d96377df`.
 - World and display receipt SHA-256 `40983ea33a164dec97d718b01509bdb4c29141df84d58ba5ec24553eee61fda4`.
+
+## Independent Zerg 9 win and cross-load
+
+The same control and lazy-row ROMs run 74,386 controller tape inputs
+through Zerg 9, including the campaign text acknowledgments. Both win
+at game frame 72,628 on the 128 × 128 map. All 106 paired world and
+display checkpoints and all 32 historical checkpoints match. Final
+logical route counts agree at 6,612 builds and 233,939 hits.
+
+The full-playthrough mean changes from 1,527,716 to 1,524,692 cycles per
+physical update. In the separate 500-update dense window it changes
+from 1,432,366 to 1,432,092 cycles. The dense-window p95 is essentially
+flat and the maximum rises 2,304 cycles. This establishes a second
+campaign win with preserved behavior and broadly flat timing.
+
+An independent save comparison starts from a retained Zerg 9 save at
+frame 6,069. Both builds advance 600 updates, then export byte-identical
+32 KiB saves through the normal pause menu at frame 6,669. Each build
+loads the other's save from the title screen in a fresh process and
+matches the world and display through frame 6,849. All 48 historical
+field checks pass. This is an early Zerg 9 save and a separate test from
+the uninterrupted campaign victory.
+
+- Full paired replay SHA-256 `41a51785ee5c38157bd1734da1dd86afed7ebe9b61063103af24922262907150`.
+- Cross-load receipt SHA-256 `37324ec990f6670f5bfb17546b68a8561e41e3f65f3d7162a77225ab065c20d7`.
+- Exported save SHA-256 `309a96403a56ca66982b6e843016a961bb9d510f032619697311f030ebea6b8d`.
