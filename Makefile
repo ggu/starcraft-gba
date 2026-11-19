@@ -729,7 +729,7 @@ test-sc64-static-dirty-rows: build/test-sc64-static-dirty-rows
 test: test-sc64-static-dirty-rows
 
 .PHONY: test-sc64-static-dirty-rows-game
-STATIC_DIRTY_ROWS_TEST_FLAGS := -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS
+STATIC_DIRTY_ROWS_TEST_FLAGS := -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS -DSC64_DISABLE_WORLD_DEPTH
 build/test-sc64-static-dirty-rows-t4: tests/sc64_t4_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fno-strict-aliasing -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_RUNTIME_FLAGS) $(STATIC_DIRTY_ROWS_TEST_FLAGS) $< common/gba.c -o $@
 build/test-sc64-static-dirty-rows-photon: tests/sc64_photon_cannon_renderer.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build

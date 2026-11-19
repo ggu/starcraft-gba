@@ -1867,6 +1867,9 @@ AI wallets and full-match behavior remain unverified.
   ordinary P10 ARM Outpost replay match that selection. Showcase scene
   navigation and Z10 Blood Bath save/load also pass. Qualify the Terran
   build and additional poses before broadening it.
+- Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
+  to the world-depth replay harness. Keep the pixel checks for both capture
+  modes and the legacy static-clip fixture.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.
