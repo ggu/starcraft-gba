@@ -9,6 +9,20 @@ int main(void)
     assert(sc64_race_unit_rule(U_DRONE)->minerals == 50);
     assert(sc64_race_unit_rule(U_PROBE)->race == R_PROTOSS);
     assert(sc64_race_building_rule(B_GATEWAY)->prereq & SC_PR_PYLON);
+    {
+#ifdef SC64_N64_SPAWNING_POOL_PRICE
+        const unsigned short price = 150;
+#else
+        const unsigned short price = 200;
+#endif
+        Sc64RaceBank pool_bank = { price - 1, 0 };
+        assert(sc64_race_building_rule(B_SPAWNING_POOL)->minerals == price);
+        assert(!sc64_race_pay_building(&pool_bank, B_SPAWNING_POOL));
+        assert(pool_bank.minerals == price - 1);
+        ++pool_bank.minerals;
+        assert(sc64_race_pay_building(&pool_bank, B_SPAWNING_POOL));
+        assert(pool_bank.minerals == 0 && pool_bank.gas == 0);
+    }
     assert(sc64_race_unit_damage_vs(U_ZEALOT, 0) == 8);
     assert(sc64_race_unit_hits_vs(U_ZEALOT, 0) == 2);
     assert(sc64_race_unit_damage_vs(U_FENIX, 0) == 20);
