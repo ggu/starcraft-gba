@@ -69,6 +69,24 @@ The Terran host fixture reproduced premature victory on the previous source.
 The revised fixture passed under ASan and UBSan on Terran, Z10, P10 and
 Showcase. The ARM observations above used the preceding preview.
 
+## Battlecruiser survivors
+
+The opt-in transfer validates the entire owner before committing any actor
+or sidecar changes. It retains Battlecruiser energy and stages the former
+owner's Reactor bit in the existing neutral tech slot, which preserves the
+energy cap. Unreleased Yamato casts end at transfer. A released shot keeps
+its launch owner, target and motion with its caster reference cleared.
+These are preview rules. Native Reactor and projectile behavior across
+neutral transfer remain unverified.
+
+The host fixture exercises approach, charge and released shots. A malformed
+late Dropship passenger prevents retirement with the world, queued shot and
+tech bits intact. The pre-retirement save still loads. After valid
+retirement, the Battlecruiser and loaded Dropship round-trip through the
+ordinary Pause and HOME controls. A released shot hits its original target
+after load. Actor rows, tech fields and the cargo and projectile records use
+the existing save layout.
+
 ## Emulated transition cost
 
 The Terran preview's retiring update took 671,303 elapsed ARM cycles,

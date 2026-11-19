@@ -2035,9 +2035,6 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
     if (sc64_race_raw_unit(q->type) == 83) return 0;
 #endif
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    if (sc64_race_is_battlecruiser(q->type)) return 0;
-#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     if (sc64_race_ordinary_ghost(q->type)) return 0;
 #endif
@@ -2053,8 +2050,13 @@ static int race_skirmish_transfer_survivors(int owner)
 #ifdef SC64_TRANSPORT_RUNTIME
     u8 cargo[MAX_UNITS] = {0};
 #endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    unsigned battlecruiser_tech = sc64_battlecruiser_tech_bits;
+#endif
+    /* Validate every survivor and stage shared capabilities before mutating
+     * any actor or sidecar. Retirement publishes only after this commit. */
     for (int i = 0; i < MAX_UNITS; ++i) {
-        Unit *q = &u[i];
+        const Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;
         if (!race_skirmish_neutral_transfer_ready(q)) return 0;
 #ifdef SC64_SHARED_TRANSPORT
@@ -2069,14 +2071,35 @@ static int race_skirmish_transfer_survivors(int owner)
             cargo[q->target] += (u8)space;
         }
 #endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        if (sc64_race_is_battlecruiser(q->type)) {
+            int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, owner, q->raw_owner);
+            if (key < 0 || (q->raw_type != -1 && q->raw_type != 12)) return 0;
+            int reactor = sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,
+                                                     (unsigned)key, SC64_BC_TECH_REACTOR);
+            if (q->carry < 0 || q->carry > sc64_battlecruiser_energy_cap(reactor)) return 0;
+            /* Keep saved energy legal in the preview's neutral tech slot. */
+            if (reactor)
+                (void)sc64_battlecruiser_tech_complete(&battlecruiser_tech, NEUTRAL, SC64_BC_TECH_REACTOR);
+        }
+#endif
     }
 
 #ifdef SC64_SHARED_TRANSPORT
     race_skirmish_neutral_ventral |= (u8)ventral;
 #endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    sc64_battlecruiser_tech_bits = (u16)battlecruiser_tech;
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+        /* Drop the former owner's unreleased cast. An existing projectile
+         * keeps its launch owner, target and motion independently. */
+        if (sc64_race_is_battlecruiser(q->type))
+            sc64_bc_shot_caster_gone(sc64_bc_shots, (unsigned)i);
+#endif
         q->owner = NEUTRAL;
         q->raw_owner = 11;
         q->selected = 0;

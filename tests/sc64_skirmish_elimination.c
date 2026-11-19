@@ -181,16 +181,11 @@ static void check_elimination(int melee)
            frame == retired_frame + 1);
 }
 
-#if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static void check_fenced_final_result(int human_defeat)
 {
     launch(0);
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    const int owner = ENEMY, bit = 1, type = sc64_race_unit_from_raw(12);
-    assert(type >= 0 && sc64_race_is_battlecruiser(type));
-#else
     const int owner = 4, bit = 4, type = U_P7_CARRIER;
-#endif
     const int ship = spawn_unit(owner, type, 500, 500);
     const int survivor = spawn_unit(owner, U_MARINE, 480, 500);
     assert(ship >= 0 && survivor >= 0 && !race_skirmish_neutral_transfer_ready(&u[ship]));
@@ -218,6 +213,98 @@ static void check_fenced_final_result(int human_defeat)
                !owners_hostile(SIDE, NEUTRAL));
         game_update(0, 0);
         assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7);
+    }
+}
+#endif
+
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+static void check_battlecruiser_retirement(unsigned phase)
+{
+    launch(0);
+    const int reactor = phase != SC64_BC_SHOT_CHARGING;
+    const int type = sc64_race_unit_from_raw(12);
+    assert(type >= 0);
+    const int ship = spawn_unit(ENEMY, type, 500, 500);
+    const int target = spawn_unit(SIDE, U_MARINE, 520, 500);
+    assert(ship >= 0 && target >= 0);
+    const u16 old_tech = (SC64_BC_TECH_YAMATO | (reactor ? SC64_BC_TECH_REACTOR : 0)) << (2 * ENEMY);
+    sc64_battlecruiser_tech_bits = old_tech;
+    u[ship].carry = reactor ? 225 * 256 + 7 : 200 * 256;
+    u[ship].work_timer = 64 << 3;
+    const int initial_energy = u[ship].carry;
+    assert(race_bc_yamato_issue(ship, target));
+    if (phase != SC64_BC_SHOT_APPROACH) {
+        if (!sc64_battlecruiser_source_tick_due()) ++frame;
+        assert(race_bc_yamato_tick_caster(ship));
+        assert(u[ship].carry == initial_energy - 150 * 256);
+    }
+    if (phase == SC64_BC_SHOT_FLIGHT) {
+        sc64_bc_shots[0].age = SC64_BC_YAMATO_RELEASE_SOURCE_TICK;
+        assert(race_bc_yamato_launch_resolved(0, 64, 0, 1040, 1000));
+    }
+    assert(sc64_bc_shots[0].state == phase);
+    const Sc64BcYamatoShot shot = sc64_bc_shots[0];
+    const int energy = u[ship].carry;
+    const int last = building_of(ENEMY);
+    assert(last >= 0);
+
+#ifdef SC64_TRANSPORT_RUNTIME
+    const int transport = spawn_unit(ENEMY, U_DROPSHIP, 540, 500);
+    const int passenger = spawn_unit(ENEMY, U_MARINE, 540, 500);
+    assert(transport > ship && passenger > transport);
+    assert(race_transport_request_board(passenger, transport));
+    assert(race_transport_tick_unit(passenger));
+    if (phase == SC64_BC_SHOT_FLIGHT) {
+        assert(race_save_game());
+        destroy_building(last, SIDE);
+        ++u[passenger].x;
+        static Unit before[MAX_UNITS];
+        memcpy(before, u, sizeof(u));
+        race_skirmish_outcome();
+        assert(!race_skirmish_eliminated && !won && !lost && screen == SCREEN_PLAY);
+        assert(sc64_battlecruiser_tech_bits == old_tech && !memcmp(before, u, sizeof(u)) &&
+               !memcmp(&shot, &sc64_bc_shots[0], sizeof(shot)));
+        game_init(); prior_keys = 0;
+        assert(race_load_game() && b[last].alive && !race_skirmish_eliminated &&
+               u[passenger].x == u[transport].x && u[passenger].target == transport &&
+               sc64_battlecruiser_tech_bits == old_tech &&
+               !memcmp(&shot, &sc64_bc_shots[0], sizeof(shot)));
+    }
+#endif
+
+    destroy_building(last, SIDE);
+    race_skirmish_outcome();
+    const u16 new_tech = old_tech | ((reactor ? SC64_BC_TECH_REACTOR : 0) << (2 * NEUTRAL));
+    assert(race_skirmish_eliminated == 1 && !won && !lost && screen == SCREEN_PLAY);
+    assert(u[ship].alive && u[ship].owner == NEUTRAL && u[ship].raw_owner == 11 &&
+           u[ship].carry == energy && u[ship].order == ORDER_IDLE && u[ship].target == -1 &&
+           u[ship].build == -1 && !u[ship].work_timer && sc64_battlecruiser_tech_bits == new_tech);
+    Sc64BcYamatoShot expected = {0};
+    if (phase == SC64_BC_SHOT_FLIGHT) {
+        expected = shot;
+        expected.caster = SC64_BC_SHOT_NO_CASTER;
+    }
+    assert(!memcmp(&expected, &sc64_bc_shots[0], sizeof(expected)));
+
+    tap(KEY_START);
+    assert(screen == SCREEN_PAUSE);
+    tap(KEY_B);
+    game_init(); prior_keys = 0;
+    input(KEY_L);
+    assert(screen == SCREEN_PLAY && race_skirmish_eliminated == 1 && u[ship].alive &&
+           u[ship].owner == NEUTRAL && u[ship].raw_owner == 11 && u[ship].carry == energy &&
+           sc64_battlecruiser_tech_bits == new_tech &&
+           !memcmp(&expected, &sc64_bc_shots[0], sizeof(expected)));
+#ifdef SC64_TRANSPORT_RUNTIME
+    assert(u[transport].owner == NEUTRAL && u[passenger].owner == NEUTRAL &&
+           u[passenger].order == ORDER_TRANSPORTED && u[passenger].target == transport &&
+           race_transport_cargo_space(transport) == 1);
+#endif
+    assert(!race_bc_yamato_issue(ship, target));
+    if (phase == SC64_BC_SHOT_FLIGHT) {
+        for (int step = 0; step < 255 && sc64_bc_shots[0].state; ++step)
+            assert(race_bc_yamato_projectile_step(0));
+        assert(!sc64_bc_shots[0].state && !u[target].alive);
     }
 }
 #endif
@@ -434,9 +521,14 @@ int main(void)
 #ifdef SC64_IMPACT_EVENTS
     check_queued_elimination();
 #endif
-#if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     check_fenced_final_result(0);
     check_fenced_final_result(1);
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    check_battlecruiser_retirement(SC64_BC_SHOT_APPROACH);
+    check_battlecruiser_retirement(SC64_BC_SHOT_CHARGING);
+    check_battlecruiser_retirement(SC64_BC_SHOT_FLIGHT);
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
     check_neutral_cargo(U_DROPSHIP, ENEMY);
