@@ -191,7 +191,7 @@ static void economy(void)
 {
     int hx, hy, r = arena(&hx, &hy);
     const unsigned price = sc64_psc_price(), ticks = sc64_psc_build_ticks();
-    int before, prog = 0;
+    int before;
     assert(price == 15 && ticks == 105);          /* the rule table, not constants */
     assert(sc64_race_unit_rule(U_SCARAB)->minerals == 15 &&
            sc64_race_unit_rule(U_SCARAB)->build_frames == 105);
@@ -215,7 +215,7 @@ static void economy(void)
     /* Build time: one Scarab after `ticks` source ticks, and not before. */
     {
         unsigned updates = 0;
-        while (race_paid_scarab_stock(r) == 0 && updates < 400) { step(1); ++updates; ++prog; }
+        while (race_paid_scarab_stock(r) == 0 && updates < 400) { step(1); ++updates; }
         /* 105 source ticks = 131 updates at the 24:30 cadence (4 of 5 updates tick). */
         assert(race_paid_scarab_stock(r) == 1 && race_paid_scarab_queued(r) == 0);
         assert(updates >= ticks * 5 / 4 - 2 && updates <= ticks * 5 / 4 + 2);

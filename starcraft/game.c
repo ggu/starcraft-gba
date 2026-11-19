@@ -2472,6 +2472,7 @@ static void race_scarab_probe_target_invalidate(int target);
 #endif
 #endif
 #endif
+#include "sc64_paid_scarab_decl.h"
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
 static int race_p7_carrier_training_queue_selected(void);
@@ -2490,7 +2491,6 @@ static unsigned race_p7_carrier_training_child_count(int carrier);
 #endif
 static int sc64_p7_carrier_parent_type(int type);
 static int race_p7_carrier_training_queue_owner(int carrier);
-#include "sc64_paid_scarab_decl.h"
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
 static int race_p7_interceptor_flight_carrier_order(int carrier);
