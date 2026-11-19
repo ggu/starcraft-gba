@@ -723,10 +723,16 @@ race_ai_find_site(RaceAiCensus *c, int type, int ax, int ay, int min_ring,
         int n = race_ai_home_pylon(c, -1), pylon;
         if (n > 0 && (pylon = race_ai_home_pylon(c, (pass / 2) % n)) >= 0) {
             int px = b[pylon].x, py = b[pylon].y;
+            int steps = 9;
+#ifdef SC64_AI_FIRST_GATEWAY_FULL_RING
+            /* An edge Pylon's open powered sites can face away from home.
+             * Try the existing half ring first and keep the same check budget. */
+            if (type == B_GATEWAY && !race_ai_count(c, AK_GATEWAY)) steps = 16;
+#endif
             return race_ai_ring(c, type, px, py, radius[pass & 1],
                                 front_first ? WORLD_W / 2 - px : c->hx - px,
                                 front_first ? WORLD_H / 2 - py : c->hy - py,
-                                0, 9, &checks, out_x, out_y);
+                                0, steps, &checks, out_x, out_y);
         }
     }
     return 0;
