@@ -117,6 +117,29 @@ payload checksum checks, and the retained bank is byte-identical.
 - Terran build receipt SHA-256 `bdfc9d5b8a0630b50b519bbe4252ec742692974c9314c7c118742f0aec61d806`.
 - Terran controller and save receipt SHA-256 `374efd5a3e36749200ff0dce1e6cf24a0f8053f7fae15ed59a3be168d8346b77`.
 
+## Protoss Zealot waiting and Pylon recovery
+
+The same P10 preview loads the retained physical Forge save from
+frame 3,005, then uses ordinary controls to place a powered Gateway
+and train Zealots. With a Zealot already training, the existing supply
+reservation makes the HUD 17/17. At frame 8,501 the next Zealot enters
+the queue for exactly 100 minerals. The HUD stays at 17/17.
+
+The paid order reaches the head and waits from frame 9,261 through
+9,298. Normal pause save and fresh title load preserve the waiting
+state. All 416 sampled pixels of the selected production bar show its
+empty shade. A newly placed Pylon raises capacity from 17 to 25 at
+frame 9,938. The existing head reaches nine ticks of progress by
+9,948 without another Train input or debit. The Zealot completes at
+10,708 with the HUD at 19/25.
+
+The new 32 KiB SRAM retains the seed bank byte for byte. Both bank
+payload checksums pass, and the two sequence numbers are 1 and 2.
+This covers the Protoss custom-match path with normal controls.
+
+- P10 Zealot receipt SHA-256 `f074a217083b0e2b66cddb5dc6d90397920c83d6a9969123f43c93b45dad99e7`.
+- P10 Zealot SRAM SHA-256 `8e41f45a8072513443d7329fc79589d3bc200c91e82864cb868349d6520148ac`.
+
 ## Timing on matched work
 
 The regular and preview Z10 ROMs replay identical ordinary inputs.
