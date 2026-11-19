@@ -703,11 +703,10 @@ static int race_ai_ring(const RaceAiCensus *c, int type, int ax, int ay, int rad
  * the direction of the map center.
  *
  * A Protoss structure that needs psi power gets one more ring when that
- * search finds nothing: the half of an inner ring around one of the owner's
- * completed home Pylons that faces the Nexus (the map center for defenses),
- * a different Pylon and radius as the passes go by. Rings around the Nexus
- * alone often miss every psi field, which left Gateways unplaced for the
- * rest of a match. The expensive-check budget is shared by both rings. */
+ * search finds nothing: an inner ring around one of the owner's completed
+ * home Pylons. Start on the side facing the Nexus (the map center for
+ * defenses). The first Gateway also checks the far side so edge Pylons
+ * can support it. The expensive-check budget is shared by both rings. */
 static int __attribute__((noinline))
 race_ai_find_site(RaceAiCensus *c, int type, int ax, int ay, int min_ring,
                   int max_ring, int front_first, int *out_x, int *out_y)
@@ -723,10 +722,12 @@ race_ai_find_site(RaceAiCensus *c, int type, int ax, int ay, int min_ring,
         int n = race_ai_home_pylon(c, -1), pylon;
         if (n > 0 && (pylon = race_ai_home_pylon(c, (pass / 2) % n)) >= 0) {
             int px = b[pylon].x, py = b[pylon].y;
+            int steps = 9;
+            if (type == B_GATEWAY && !race_ai_count(c, AK_GATEWAY)) steps = 16;
             return race_ai_ring(c, type, px, py, radius[pass & 1],
                                 front_first ? WORLD_W / 2 - px : c->hx - px,
                                 front_first ? WORLD_H / 2 - py : c->hy - py,
-                                0, 9, &checks, out_x, out_y);
+                                0, steps, &checks, out_x, out_y);
         }
     }
     return 0;
