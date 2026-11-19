@@ -753,8 +753,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A FIFO cutoff at the origin eliminates only 13.4% of the expansion.
   Preserve cache residency while removing or bounding the synchronous
   work before enabling the selector. Four of five traced ordinary spikes
-  come from exact-root hits. Qualify a second cutoff scoped to those
-  requests and check for cascaded completions in the same update.
+  come from exact-root hits. The [scoped second cutoff](audits/2026-11-16-resumable-frontier-budget.md#bound-continuation-on-an-exact-root-hit)
+  saves roughly 0.58–0.62M cycles on each of those updates and reduces
+  the dense peak another 9.15% with matching gameplay and display.
+  All four links fit. Keep both options gated and qualify more repeated
+  demands and saves alongside a bounded cached-range read.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup

@@ -802,3 +802,45 @@ reader in the same update.
 | Prefix dense Z7 and presentation | `72ec45bc0be653d7b33f23837c23e2e3c7a240cb46b6493fd85ebcd31beedbbe` |
 | Forced P10 range read | `b3fe12a43684c0b89b3e5d9e975182a231fca9e13bbbd84e9aa3fea8b9375fbc` |
 | Z7 timed completion callsites | `77d31c07178519556448eb80176dcb81d14d60c02c46fd3a6d12a22ff1b3025b` |
+
+#### Bound continuation on an exact-root hit
+
+Source `657641d3` permits one extra cutoff when an exact-root cache
+hit requests a new open origin. It resumes the parked FIFO and packs
+only newly assigned directions when it can park again. A later missing
+origin completes the field. The nearby-root, range and complete-field
+readers retain their previous completion path. Enable the experimental
+`SC64_ROUTE_POINT_SECOND_EXACT_HIT` define alongside
+`CANONICAL_ROUTE_POINT_PREFIX=1` in a fresh prepared build.
+
+The ASan/UBSan comparison matches the 386,646-query residency stream.
+The focused fixture checks all published directions after the second
+cutoff, then compares all 16,384 directions after a subsequent miss.
+The range-copy oracle still passes 8,320 cases. The same 48,237
+ordinary Z7 calls pass 131 historical checkpoints and match all 480
+simulation and route-counter rows, eight world and framebuffer cuts,
+and both the selected and newest completed pages.
+
+| Dense Z7 active-update cycles | Shipping | Earlier prefix | Exact-hit cutoff |
+| --- | ---: | ---: | ---: |
+| Mean | 2,340,889 | 2,080,881 | 2,065,179 |
+| 95th percentile, nearest rank | 3,389,340 | 2,783,993 | 2,786,667 |
+| Peak | 4,696,376 | 4,297,596 | 3,904,556 |
+
+Each of the four traced exact-root updates costs 582,241 to 623,875
+fewer cycles than the earlier prefix. The nearby-root call at 47,855
+changes by 1,193 cycles. The new peak is 9.15% below the earlier prefix
+peak, while p95 rises by 0.10%. Relative to the shipping ROM, mean and
+peak fall 11.78% and 16.86%. Dense updates still exceed the 561,792-cycle
+budget for 30 per second.
+
+All four preview links pass the ROM header, SRAM signature and RAM
+guards with the same prepared inputs as the shipping builds. The
+second cutoff adds 8 EWRAM bytes in each ROM. Showcase keeps its
+IWRAM endpoint at `0x03004fb8`. Z10 ends at `0x03004ec8` and P10
+at `0x03004f60`. ROM SHA-256 prefixes are `038bede5` (Terran),
+`7bf1a25a` (Z10), `e80d44b9` (P10) and `9041a32e` (Showcase).
+The exact-hit replay receipt SHA-256 is
+`9033f7c6eaa72e83cf5d4902d37e24900021a7e1b0a5662e2e3592ede8b0fc59`.
+Normal builds keep both options off. The forced cached-range budget
+and broader gameplay and save coverage remain open.
