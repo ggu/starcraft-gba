@@ -116,6 +116,9 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         sc64_point_prefix_discard(prefix);
         prefix->goal = (u16)goal;
         prefix->slot = (u8)slot;
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+        prefix->second_cutoff = 0;
+#endif
         /* Each discovered cell lies at most head edges from a seed. The
          * blocked-goal seeds can start one row away from the goal. Include
          * those rows without bookkeeping in the pop or packing loops. */
@@ -138,7 +141,11 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
 
 /* Once a reader requests undiscovered data, restore the directions already
  * assigned and resume the exact pending FIFO in the original order. */
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+static int __attribute__((noinline)) sc64_point_prefix_resume(int slot, int cell)
+#else
 static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
+#endif
 {
     Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
     if (!prefix) return 0;
@@ -168,17 +175,71 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
         }
     }
     int pending = prefix->count;
+#ifndef SC64_ROUTE_POINT_SECOND_EXACT_HIT
     sc64_point_prefix_discard(prefix);
+#endif
     if (pending <= cap) {
         memcpy(bfs_queue, prefix->queue, (size_t)pending * sizeof(*bfs_queue));
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+        int head = 0, tail = pending;
+        if (cell >= 0 && !prefix->second_cutoff) {
+            int start = cell + sc64_cell_row((unsigned)cell) * SC64_LINEAR_PAD + stride + 4;
+            tail = sc64_point_prefix_expand(dense, start, stride, cap, &head, tail);
+            int remaining = tail - head;
+            if (remaining > 0 && remaining <= SC64_POINT_PREFIX_PENDING && dense[start] != 7u) {
+                /* The bounded loop does not compact. Only appended cells
+                 * need to be published, and each expands the restore span. */
+                for (int i = pending; i < tail; ++i) {
+                    int at = bfs_queue[i];
+                    int row = (int)(((unsigned)at * 241u) >> 15);
+                    int index = at - row * SC64_LINEAR_PAD - cols - 4;
+                    sc64_route_put_new(field, index, dense[at]);
+                    if (row < first_row) first_row = row;
+                    if (row > last_row) last_row = row;
+                }
+                prefix->restore_first_row = (u8)first_row;
+                prefix->restore_last_row = (u8)last_row;
+                memcpy(prefix->queue, bfs_queue + head, (size_t)remaining * sizeof(*bfs_queue));
+                prefix->count = (u8)remaining;
+                prefix->second_cutoff = 1;
+                return 1;
+            }
+        }
+        if (sc64_route_expand_linear_from(dense, tail, stride, cap, head) >= 0) {
+            sc64_point_prefix_discard(prefix);
+#else
         if (sc64_route_expand_linear(dense, pending, stride, cap) >= 0) {
+#endif
             sc64_route_pack_linear(field, dense, cols, rows, stride);
             return 1;
         }
     }
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+    sc64_point_prefix_discard(prefix);
+#endif
     (void)sc64_route_fill(slot, sc64_route_goal[slot]);
     return 1;
 }
+
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
+{
+    return sc64_point_prefix_resume(slot, -1);
+}
+
+/* An exact point hit serves this open origin immediately. Other readers
+ * still require the complete field, and a second miss cannot repark. */
+static void sc64_point_prefix_require_exact_hit(int slot, int origin)
+{
+    if (sc64_point_prefix_find(slot) &&
+        ((unsigned)origin >= (unsigned)(MAP_COLS * MAP_ROWS) ||
+         sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE)) {
+        int demand = (unsigned)origin < (unsigned)(MAP_COLS * MAP_ROWS) &&
+                     !SC64_ROUTE_LAZY(slot) && SC64_GRID_GET(path_walkable, origin);
+        (void)sc64_point_prefix_resume(slot, demand ? origin : -1);
+    }
+}
+#endif
 
 static void sc64_point_prefix_require(int slot, int cell)
 {

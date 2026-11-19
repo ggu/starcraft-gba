@@ -107,6 +107,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "point prefix requires the exact linear packed route path"
 #endif
 #endif
+#if defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+#error "second exact-hit cutoff requires resumable point prefixes"
+#endif
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
@@ -255,6 +258,9 @@ typedef struct {
     u16 goal;
     u8 slot, count;
     u8 restore_first_row, restore_last_row;
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+    u8 second_cutoff;
+#endif
     u16 queue[SC64_POINT_PREFIX_PENDING];
 } Sc64PointPrefix;
 static Sc64PointPrefix sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];
@@ -2257,7 +2263,9 @@ sc64_route_slot(int goal)
             partial_slot = i;
 #else
 #ifdef SC64_ROUTE_KEEP_FIELDS
-#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+            sc64_point_prefix_require_exact_hit(i, origin);
+#elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
             sc64_point_prefix_require(i, origin);
 #endif
             if (SC64_ROUTE_LAZY(i) &&
