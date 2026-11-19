@@ -567,11 +567,16 @@ building morphs. The Science Facility aliases use the same native ID.
 | 142 | Spawning Pool | 150 / 0 | 200 / 0 |
 
 The Pool also has the live wallet comparison above. The other three
-rows have native table evidence. In the GBA preview, check each menu
-quote and actual debit from the same building rule.
+rows have native table evidence. The [GBA price preview](https://github.com/ggu/starcraft-gba/commit/a1d09abf5e1540b30328580fb3473438d9d392ff)
+quotes and debits from the same building rule. The HOST sanitizer
+checks reject short mineral and gas banks and verify payment at the
+exact price. The tests run five product vectors, including expanded
+Zerg. Standard Zerg lacks the raw-116 mapping in that vector.
+The price preview remains opt-in pending ordinary ARM qualification.
 
 The Academy, Missile Turret and Pool pass pending and paid build
-save checks in the staged Terran-profile price test. An ordinary
+save checks in all five HOST vectors. Science Facility foundations
+round-trip where that building is available. An ordinary
 Science Facility order exposes a separate save issue while the SCV
 is still walking to build. Raw ID 116 has four internal building
 aliases. The custom catalog authorizes SCVs and the pending-save

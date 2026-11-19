@@ -1673,10 +1673,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   the already paid structure with the current 200-mineral builds.
   The [construction price audit](audits/2026-11-12-n64-blood-bath-opening.md#construction-price-audit)
   also finds differing prices for Academy, Science Facility and Missile Turret
-  in the native tables. Check menu quotes, actual payment and save
-  continuation before enabling the wider adjustment. The Science Facility
-  exposes a pending-build save rejection for its SCV order. Qualify that
-  validator separately.
+  in the native tables. The opt-in matches menu quotes and debits in the
+  HOST checks, including paid foundations. The Science Facility exposes
+  a pending-build save rejection for its SCV order. Qualify that validator
+  and the ordinary ARM price preview before enabling the wider adjustment.
 - [Solo Outpost Protoss](audits/2026-11-12-n64-blood-bath-opening.md#solo-outpost-protoss-gateway-recovery)
   now recovers its first Gateway in the public release after [#577](https://github.com/ggu/starcraft-gba/pull/577).
   T10, Z10 and P10 train a Zealot by ARM update 3,680, restore a
