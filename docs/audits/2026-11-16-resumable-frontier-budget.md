@@ -594,3 +594,38 @@ workloads. In these campaign windows both builds exceed the
 | Full P10 control | `ba52668a599e893211538fc92cbfba1d626cc97e1e0513cc52c065e019242cbc` |
 | Full P10 candidate | `d964d5fa6cbc5984725be085b36bc7946abb36568c822019e0911198b484f97a` |
 | Cached range observer | `4862627b1699e59f7b94dc36b71679d48a4cca5ced0b1aca4f49d4db8ae27991` |
+
+### Forced cached range completion on ARM
+
+A second read-only observer sees zero cached range completions in the
+first 48,237 ordinary calls of the Z7 tape. The observer matches the
+candidate's recorded gameplay and timing cuts. Its completion branch
+is at `0x080434e2` for the Z10 ELF. [P10 and Z7 comparisons](#qualification-with-merged-p10-steering)
+
+A synthetic 128×128 ARM fixture starts from the canonical P10 recipe
+and sets a wall in column 64 from rows 8 through 122, with row 110 open.
+It opens the other cells. A point field rooted at (32,32) serves a
+nearby request at (33,32) first. A cached range request from world
+(1608,1608) to (520,520) then asks for a step across the wall. Both
+builds return (1608,1624), count one logical build and zero hits, and
+keep those counters fixed during the range read. The candidate parks
+and then completes its prefix.
+
+| ARM cycles in this forced case | Former route search | Resumable route search |
+| --- | ---: | ---: |
+| Initial point fill | 1,086,583 | 102,766 |
+| Cached range read | 1,228 | 1,198,340 |
+| Combined | 1,087,811 | 1,301,106 |
+
+The test measures the two engine calls directly, outside full-frame
+rendering. The forced read costs more than two 30 fps update budgets.
+The replay observers establish frequency only for their actual
+inputs. Before enabling resumable routes by default, reduce the
+cost or bound the timing of the exact completion while preserving
+the returned step and the shared range scratch rules.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z7 range observer | `87235b9072d97309405f2673090343ea4ae9088ccaf40632f42d93cc8cca55ca` |
+| Forced ARM control | `99af92b2fa9210981ed5ce0742d2e4d4db09a95ff59d8f3b7e0ccf19c68eb17d` |
+| Forced ARM candidate | `f52a4895ac32b3639279b788c8d1c35785186b9936fadd6978a781948917c0d0` |
