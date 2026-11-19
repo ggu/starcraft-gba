@@ -88,12 +88,37 @@ passes on both ROMs with identical restored state and identical sampled model
 fields. The replay tool binds each saved summary to its ROM hash, so a
 cross-ROM resume is refused by design; the identical bytes make it equivalent.
 
+## Memory, links and suites
+
+`__iwram_end` / `__bss_end` after the change (all link within the guards
+`__iwram_end < 0x03005000`, `__bss_end < 0x0203e000`): Z7 0x030048d8 /
+0x02039874, Z8 0x03004c88 / 0x02039d34, Z9 0x03004c88 / 0x02038938, Z10
+0x03004ce8 / 0x02038940. Each ROM that compiles the adapter holds the 62-byte
+`sc64_z7_census` (Z10 IWRAM end is unchanged; Z10 `.bss` end +64). Retired Z7
+and Z8 take it with room to spare, so no ROM needed the separate pass. Z6,
+P7, P8, P9, P10, P3, Terran, Z3 and Z4 do not compile the adapter and link
+(`verify-protoss-p6` cannot build here: a private input is absent).
+
+`./dev build` passes. `./dev test` has two failures in
+`test_sc64_photon_cannon_renderer` ("missing sprite: unit raw 85") and
+`make test-unified` aborts at the gas-worker carry assertion in
+`race_engine.c:255`; both also fail in a separate checkout's earlier base logs
+and touch no Z7 code (not rerun at this exact SHA). `make unified` and
+`make test-sc64-zerg-z10` pass (Z7 won at frame 194,998, Z8 45,468, Z9 72,628).
+
+The base then moved to `2d319e76` (Makefile and race_skirmish_ai.h, not the Z7
+adapters). It merged with no conflicts. After the merge `check_source_tree`
+passes, the Z10 ROM links with the same memory ends, and the HOST verify build
+on the carried Z10 controller repeats its 166,158 geometry and 19,164
+two-counter checks with no difference and a trace identical to base's.
+
 ## Limits
 
-Emulator cycles, not hardware; one dense window plus one full run. The census
-scratch hooks still cost about 45k cycles per update (about 9.5k per-actor gate
-and 13k for the force-0 rectangle path); no further exact saving was obvious.
-Not yet run on this branch: `__iwram_end`/`__bss_end` on the other Zerg ROMs,
-the retired `verify-*` links, `./dev build`, `./dev test`, unified and the full
-`test-sc64-zerg-z10` suite (disk fell below the agreed floor). A trial merge with
-`origin/codex/sc64-z7-negative-route-20261119` has no textual conflicts.
+Emulator cycles, not hardware; one dense window plus one full run. A
+base-written save was not loaded on the candidate: the replay tool binds each
+save summary to its ROM hash and refuses it, so the evidence is that the two
+saves are byte-identical. The fused hooks still cost about 45k cycles per
+update (about 9.5k per-actor gate and 13k for the force-0 rectangle path); no
+further exact saving was obvious. The trial merge with
+`origin/codex/sc64-z7-negative-route-20261119` has no textual conflicts but was
+not built or run.
