@@ -604,6 +604,94 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
     assert_cached_matches_full();
 }
 
+#ifdef SC64_HUD_MINIMAP_CENSUS_ACTIVE
+static void
+assert_minimap_census_matches_scalar(int scalar_fallback, int outside_dot)
+{
+    gfx_begin(0xe7);
+#ifdef SC64_HUD_PAGE_BANDS
+    sc64_hud_page_version[gfx_backbuffer_index()][1] = 1;
+#endif
+    draw_minimap();
+    read_full(full_pixels);
+#ifdef SC64_HUD_PAGE_BANDS
+    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] ==
+           (outside_dot ? ~0u : 1u));
+#endif
+    gfx_end();
+
+    gfx_begin(0xe7);
+#ifdef SC64_HUD_PAGE_BANDS
+    sc64_hud_page_version[gfx_backbuffer_index()][1] = 1;
+#endif
+    sc64_hud_changed();
+    assert(sc64_minimap_requires_scalar == scalar_fallback);
+    sc64_minimap_draw_census();
+    read_full(cached_pixels);
+    assert(memcmp(cached_pixels, full_pixels, sizeof(full_pixels)) == 0);
+#ifdef SC64_HUD_PAGE_BANDS
+    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] ==
+           (outside_dot ? ~0u : 1u));
+#endif
+    gfx_end();
+}
+
+static void
+test_minimap_census_preserves_dot_order_and_page_edges(void)
+{
+    const int sizes[] = {64, 96,
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+                         128
+#endif
+    };
+    const int dot_x = SC64_MINIMAP_X + 18, dot_y = SC64_MINIMAP_Y + 18;
+    const int right_edge = SC64_MINIMAP_X + SC64_MINIMAP_SIZE;
+    const int edge_y = SC64_MINIMAP_Y + 12;
+    const int last = MAX_UNITS - 1;
+    for (unsigned dimension = 0; dimension < sizeof(sizes) / sizeof(sizes[0]); ++dimension) {
+        fixture();
+        race_cols = race_rows = sizes[dimension];
+        screen = SCREEN_PLAY;
+        SC64_GRID_CLEAR(visible);
+        memset(sc64_minimap_raster, C_FOG, sizeof(sc64_minimap_raster));
+        int dot = WORLD_W * 3 / 4;
+        int cell = (dot / 16) * MAP_COLS + dot / 16;
+        b[MAX_BUILDINGS - 1] = (Building){.alive = 1, .owner = NEUTRAL,
+            .type = B_BARRACKS, .x = dot, .y = dot};
+        u[0] = (Unit){.alive = 1, .owner = SIDE, .type = U_MARINE, .x = 0, .y = 0};
+        u[1] = (Unit){.alive = 1, .owner = SIDE, .type = U_MARINE, .x = dot, .y = dot};
+        u[last] = (Unit){.alive = 1, .owner = 1, .type = U_MARINE, .x = dot, .y = dot};
+        SC64_GRID_SET(visible, cell, 1);
+        assert_minimap_census_matches_scalar(0, 0);
+        assert(cached_pixels[dot_y * 240 + dot_x] == owner_color(1));
+        assert(cached_pixels[SC64_MINIMAP_Y * 240 + SC64_MINIMAP_X] == C_HIGHLIGHT);
+        assert(cached_pixels[edge_y * 240 + right_edge] == 0xe7);
+        assert(cached_pixels[edge_y * 240 + SC64_MINIMAP_X - 1] == 0xe7);
+
+        u[last].alive = 0;
+        assert_minimap_census_matches_scalar(0, 0);
+        assert(cached_pixels[dot_y * 240 + dot_x] == owner_color(SIDE));
+        u[last].alive = 1;
+        SC64_GRID_SET(visible, cell, 0);
+        assert_minimap_census_matches_scalar(0, 0);
+        assert(cached_pixels[dot_y * 240 + dot_x] == owner_color(SIDE));
+
+        /* A friendly dot one pixel outside the raster must still appear,
+         * and force the next restore of the containing HUD band. */
+        u[0].x = WORLD_W;
+        u[0].y = WORLD_H / 2;
+        assert_minimap_census_matches_scalar(1, 1);
+        assert(cached_pixels[edge_y * 240 + right_edge] == owner_color(SIDE));
+        u[0].alive = u[1].alive = u[last].alive = 0;
+        b[MAX_BUILDINGS - 1].alive = 0;
+        assert_minimap_census_matches_scalar(0, 0);
+        assert(cached_pixels[dot_y * 240 + dot_x] == C_FOG);
+        assert(cached_pixels[edge_y * 240 + right_edge] == 0xe7);
+    }
+    fixture();
+}
+#endif
+
 #ifdef SC64_HUD_PAGE_BANDS
 /* A page band is usable only while it holds the current content version and
  * the page has not been cleared since it was drawn or copied. */
@@ -1081,6 +1169,9 @@ main(void)
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
     test_mission_message_timer_and_minimap_stay_pixel_exact();
+#ifdef SC64_HUD_MINIMAP_CENSUS_ACTIVE
+    test_minimap_census_preserves_dot_order_and_page_edges();
+#endif
 #if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
     test_per_buffer_hud_reuse_across_changes_and_scenes();
     test_full_frame_cache_does_not_retain_map_pixels_in_hud_bands();

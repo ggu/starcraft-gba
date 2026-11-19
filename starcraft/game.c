@@ -11840,234 +11840,7 @@ draw_death_vfx(int under)
 }
 #endif
 
-#ifdef SC64_IMPORTED_MISSION
-static void sc64_hud_bottom_band_invalidate(void);
-#endif
-
-static void
-sc64_minimap_dot(int x, int y, u8 color)
-{
-    gfx_pixel(x, y, color);
-#ifdef SC64_MINIMAP_RASTER_ACTIVE
-    /* A mark outside the 24x24 map lands on the cached panel, which only a
-     * band restore clears; the per-frame panel fill used to do that. */
-    if ((unsigned)(x - 197) >= 24u || (unsigned)(y - 129) >= 24u)
-        sc64_hud_bottom_band_invalidate();
-#endif
-}
-
-#if defined(SC_FRONTIER_FACTION) && !defined(SC64_IMPORTED_MISSION)
-#include "frontier_minimap.h"
-#endif
-
-static void
-draw_minimap(void)
-{
-#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
-    int x, y, i;
-    const int map_x = 197, map_y = 129, map_size = 24;
-#else
-    int row, col, x, y, i;
-#endif
-#ifndef SC64_MINIMAP_RASTER_ACTIVE
-    gfx_rect(181, 124, 56, 34, C_BLACK);
-    gfx_frame(181, 124, 56, 34, C_EDGE);
-#endif
-#ifdef SC64_IMPORTED_MISSION
-#ifdef SC64_MINIMAP_RASTER_ACTIVE
-    /* Every map pixel is replaced, including marks left on this page. */
-    gfx_blit_opaque(map_x, map_y, 24, 24, sc64_minimap_raster);
-#else
-#ifdef SC64_TILE_RENDERER
-    if (gfx_tile_active()) {
-        /* The panel fill above already marked these tiles; store the same
-         * colors straight into the linear software layer. */
-        u8 *panel = gfx_tile_buffer_pixels() + map_y * 240 + map_x;
-        for (int row = 0; row < 24; row++, panel += 240)
-            for (int col = 0; col < 24; col++) {
-                int cell = row * 24 + col;
-                if (sc64_minimap_visible[cell]) panel[col] = C_GRASS;
-                else if (sc64_minimap_explored[cell]) panel[col] = C_FOG;
-            }
-    } else
-#endif
-    sc64_minimap_draw_terrain(map_x, map_y,
-                              sc64_minimap_visible, sc64_minimap_explored);
-#endif
-#elif defined(SC_FRONTIER_FACTION)
-    frontier_minimap_draw_terrain(map_x, map_y);
-#elif defined(SC_ORIGINAL_SKIRMISH)
-    for (int row = 0; row < map_size; row++) {
-        int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);
-        for (int col = 0; col < map_size; col++) {
-            int cell = grid_row * MAP_COLS + (2 * col + 1) * MAP_COLS / (2 * map_size);
-            if (SC64_GRID_GET(visible, cell))
-                gfx_pixel(map_x + col, map_y + row, C_GRASS);
-            else if (SC64_GRID_GET(explored, cell))
-                gfx_pixel(map_x + col, map_y + row, C_FOG);
-        }
-    }
-#else
-    /* Neighboring tiles of the same shade can be painted together.
-     * Unexplored tiles leave the panel's background and frame intact. */
-    for (row = 0; row < MAP_ROWS; row++) {
-        int start = 0, shade = -1;
-        for (col = 0; col <= MAP_COLS; col++) {
-            int next = -1;
-            if (col < MAP_COLS && cell_explored(col, row))
-                next = SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG;
-            if (next == shade)
-                continue;
-            if (shade >= 0)
-                gfx_rect(185 + start * 2, 126 + row * 2, (col - start) * 2, 2, (u8)shade);
-            start = col;
-            shade = next;
-        }
-    }
-#endif
-    for (i = 0; i < MAX_BUILDINGS; i++) {
-	if (!b[i].alive) continue;
-	if (b[i].owner != SIDE &&
-	    (b[i].x < 0 || b[i].y < 0 || b[i].x >= WORLD_W || b[i].y >= WORLD_H ||
-	     !currently_visible(b[i].x, b[i].y))) continue;
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-        if (sc64_game_building_actor_flags(b[i].type) &&
-            !(sc64_game_building_actor_flags(b[i].type) & SC64_GAME_ACTOR_DRAWABLE)) continue;
-#endif
-#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
-	    x = map_x +
-#ifdef SC64_RACES
-        sc64_minimap_pixel(b[i].x,MAP_COLS)
-#else
-        b[i].x * map_size / WORLD_W
-#endif
-        ;
-	    y = map_y +
-#ifdef SC64_RACES
-        sc64_minimap_pixel(b[i].y,MAP_ROWS)
-#else
-        b[i].y * map_size / WORLD_H
-#endif
-        ;
-#else
-	    x = 185 + b[i].x / 8;
-	    y = 126 + b[i].y / 8;
-#endif
-	    sc64_minimap_dot(x, y,
-#if defined(SC64_SKIRMISH) || defined(SC64_RACES)
-                owner_color(b[i].owner)
-#else
-                b[i].owner == SIDE ? C_TERRAN : C_RED
-#endif
-                );
-	}
-    for (i = 0; i < MAX_UNITS; i++)
-	{
-	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_HIDDEN(&u[i])) continue;
-	if (u[i].owner != SIDE &&
-	    (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H ||
-	     !currently_visible(u[i].x, u[i].y))) continue;
-#ifdef SC64_P7_OBSERVER_ENABLED
-#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-        if (u[i].owner != SIDE &&
-            !sc64_p7_observer_target_revealed_to(i,7,SIDE)) continue;
-#else
-        if (race_p7_active() && u[i].owner != SIDE && u[i].raw_type == 84 &&
-            !sc64_p7_observer_detector_sees(i,7,SIDE)) continue;
-#endif
-#endif
-#ifdef SC64_Z8_RUNTIME
-        if (u[i].owner != SIDE && race_z8_unit_hidden_from_side(i)) continue;
-#endif
-#ifdef SC64_T6_RUNTIME
-        if (race_t6_unit_burrowed(i)) continue;
-#endif
-#ifdef SC64_P6_COMBAT_ENABLED
-        if (race_p6_combat_unit_burrowed(i)) continue;
-#endif
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-        if (sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_HIDDEN) ||
-            SC64_CARRIER_STATE_HIDDEN(&u[i]) ||
-            (sc64_game_unit_actor_flags(u[i].type) &&
-             !(sc64_game_unit_actor_flags(u[i].type) & SC64_GAME_ACTOR_DRAWABLE))) continue;
-#endif
-#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
-	    x = map_x +
-#ifdef SC64_RACES
-        sc64_minimap_pixel(u[i].x,MAP_COLS)
-#else
-        u[i].x * map_size / WORLD_W
-#endif
-        ;
-	    y = map_y +
-#ifdef SC64_RACES
-        sc64_minimap_pixel(u[i].y,MAP_ROWS)
-#else
-        u[i].y * map_size / WORLD_H
-#endif
-        ;
-#else
-	    x = 185 + u[i].x / 8;
-	    y = 126 + u[i].y / 8;
-#endif
-	    sc64_minimap_dot(x, y,
-#if defined(SC64_SKIRMISH) || defined(SC64_RACES)
-                owner_color(u[i].owner)
-#else
-                u[i].owner == SIDE ? C_WHITE : C_RED
-#endif
-                );
-	}
-#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
-	{
-	    int vx = map_x +
-#ifdef SC64_RACES
-        sc64_minimap_pixel(camx,MAP_COLS)
-#else
-        camx * map_size / WORLD_W
-#endif
-        ;
-	    int vy = map_y +
-#ifdef SC64_RACES
-        sc64_minimap_pixel(camy,MAP_ROWS)
-#else
-        camy * map_size / WORLD_H
-#endif
-        ;
-	    int vw = (240 * map_size + WORLD_W - 1) / WORLD_W;
-	    int vh = (108 * map_size + WORLD_H - 1) / WORLD_H;
-	    gfx_frame(vx, vy, vw, vh, C_HIGHLIGHT);
-#ifdef SC64_MINIMAP_RASTER_ACTIVE
-	    if (vx < map_x || vy < map_y || vx + vw > map_x + map_size ||
-	        vy + vh > map_y + map_size)
-	        sc64_hud_bottom_band_invalidate();
-#endif
-	}
-#else
-	gfx_frame(185 + camx / 8, 126 + camy / 8, 30, 14, C_HIGHLIGHT);
-#endif
-#ifdef SC64_T4_SCENARIO_RUNTIME
-    if (race_t4_active() && screen == SCREEN_PLAY && !won && !lost &&
-        race_t4.ping_ticks) {
-        int px = sc64_minimap_pixel(race_t4.ping_x, MAP_COLS);
-        int py = sc64_minimap_pixel(race_t4.ping_y, MAP_ROWS);
-        unsigned radius = (race_t4.ping_ticks & 8u) ? 1u : 2u;
-        if (px >= 0 && px < map_size && py >= 0 && py < map_size) {
-            /* The cross pulses between two radii. Clip to the 24x24 map, not
-             * merely the containing panel, so edge pings cannot paint its
-             * frame or neighboring HUD. */
-            for (int offset = -(int)radius; offset <= (int)radius; ++offset) {
-                int ax = px + offset, ay = py + offset;
-                if (ax >= 0 && ax < map_size)
-                    gfx_pixel(map_x + ax, map_y + py, C_GOLD);
-                if (ay >= 0 && ay < map_size)
-                    gfx_pixel(map_x + px, map_y + ay, C_GOLD);
-            }
-            gfx_pixel(map_x + px, map_y + py, C_WHITE);
-        }
-    }
-#endif
-}
+#include "sc64_minimap_draw.h"
 
 #if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)
 #include "sc64_t4_prop_art.h"
@@ -13101,7 +12874,24 @@ sc64_hud_changed(void)
     int supply_faction = race_command_race();
     Sc64RaceSupplyLedger ledger = {0};
 #endif
+#ifdef SC64_HUD_MINIMAP_CENSUS_ACTIVE
+    sc64_minimap_census_begin();
+    /* On the minimap, units cover buildings that project to the same pixel. */
+    for (i = 0; i < MAX_BUILDINGS; i++) {
+        if (!b[i].alive) continue;
+#ifdef SC64_HUD_MINIMAP_CENSUS_ACTIVE
+        sc64_minimap_census_building(i);
+#endif
+        if (b[i].owner != SIDE) continue;
+        if (b[i].type == B_BARRACKS) values[13] = 1;
+        race_supply_count_building(&ledger, &b[i], supply_faction);
+    }
+    for (i = 0; i < MAX_UNITS; i++) if (u[i].alive) {
+        sc64_minimap_census_unit(i);
+        if (u[i].owner != SIDE) continue;
+#else
     for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
+#endif
         if (u[i].selected) { values[8]++; if (first < 0) first = i; }
         if (u[i].type == U_MARINE) values[9]++;
         if (u[i].type == U_RAYNOR) values[10] = 1;
@@ -13110,12 +12900,14 @@ sc64_hud_changed(void)
 #endif
     }
     if (first >= 0) { values[11] = u[first].type; values[12] = u[first].hp; }
+#ifndef SC64_HUD_MINIMAP_CENSUS_ACTIVE
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive && b[i].owner == SIDE) {
         if (b[i].type == B_BARRACKS) values[13] = 1;
 #ifdef SC64_RACES
         race_supply_count_building(&ledger, &b[i], supply_faction);
 #endif
     }
+#endif
     if (selected_building >= 0 && b[selected_building].alive) {
         Building *q = &b[selected_building];
         values[14] = 1; values[15] = q->type; values[16] = q->under_construction;
@@ -13256,7 +13048,11 @@ draw_hud(void)
 #ifdef SC64_DIAGNOSTIC_TILES
     u32 minimap_diag = gba_clock();
 #endif
+#ifdef SC64_HUD_MINIMAP_CENSUS_ACTIVE
+    sc64_minimap_draw_census();
+#else
     draw_minimap();
+#endif
 #ifdef SC64_DIAGNOSTIC_TILES
     SC64_TILE_DIAG(sc64_tile_diag_minimap, minimap_diag);
 #endif
