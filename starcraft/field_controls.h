@@ -442,6 +442,12 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
         if (!profile) return UI_SITE_TECH;
         *cost = profile->minerals;
         *gas_cost = profile->gas;
+#ifdef SC64_N64_SPAWNING_POOL_PRICE
+        if (kind == UI_ROW_BUILD && type >= 0) {
+            *cost = building_cost(type);
+            *gas_cost = building_gas_cost(type);
+        }
+#endif
         if (!race_skirmish_record_available(row.record)) return UI_SITE_TECH;
         if (type < 0) return UI_SITE_TECH;
         if (kind == UI_ROW_BUILD && field_ui_build_worker(type) < 0)
