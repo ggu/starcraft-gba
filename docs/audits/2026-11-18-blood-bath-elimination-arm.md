@@ -189,6 +189,13 @@ neutral input through step 9,000. The observer confirms an exact view
 across the transition to read-only snapshots. Observer steps are a
 capture clock. They do not align to GBA game updates.
 
+The Terran ARM preview starts the same lineup through normal HOME and
+Custom Game controls. The occupied-seat mask is 3 with CPU races Zerg and
+Terran. At frame 1 the HUD values are 50 minerals and 4/10 supply. At
+frame 1,701 they are 514 minerals and 4/10 supply. This checks both
+openings and passive income without aligning the clocks. The GBA receipt
+SHA-256 is `2453fd79f6fa0f3c8b5f978b716689b71c372f3b1267f031d59b9f8b394106a9`.
+
 | Native private evidence | SHA-256 |
 | --- | --- |
 | Input rows | `67dcee7d87f908d132f8a29b05f1189bd1baae1f9f37fa706051f6420c4f4cca` |
