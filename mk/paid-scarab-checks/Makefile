@@ -31,3 +31,15 @@ test-sc64-paid-scarab-old: $(PSC_DIR)/product
 	rm -f $(PSC_DIR)/old.sav $(PSC_DIR)/old.sav.state
 	$(PSC_BASE_TREE)/../psc-old-writer old-write $(CURDIR)/$(PSC_DIR)/old.sav
 	./$(PSC_DIR)/product old-read $(PSC_DIR)/old.sav
+
+# Ordinary controls end to end (pad input only): chain, Reaver, Scarabs, attack,
+# real pause-menu save with a Scarab in flight, fresh-process load and continuation.
+PSC_ORD_SRC := tests/sc64_paid_scarab_ordinary.c
+$(PSC_DIR)/ordinary: $(PSC_ORD_SRC) tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/paid-scarab-checks/Makefile | build
+	@mkdir -p $(PSC_DIR)
+	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(PSC_ORD_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-paid-scarab-ordinary
+test-sc64-paid-scarab-ordinary: $(PSC_DIR)/ordinary
+	rm -f $(PSC_DIR)/ordinary.sav $(PSC_DIR)/ordinary.sav.state
+	./$(PSC_DIR)/ordinary run $(PSC_DIR)/ordinary.sav $(PSC_DIR)/ordinary-tape.json
+	./$(PSC_DIR)/ordinary resume $(PSC_DIR)/ordinary.sav
