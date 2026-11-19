@@ -5479,6 +5479,9 @@ static void game_audio_prime(void);
 static int
 load_game(void)
 {
+#ifdef SC64_TARGET_RETAIN_PROBE
+    sc64_target_index_end();
+#endif
 #ifdef SC64_SCARAB_AI_RESTOCK_HOST_STAGE
     /* No saved record authenticates the stage's payer witnesses yet. */
     return 0;
@@ -5779,6 +5782,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_TARGET_RETAIN_PROBE
+    sc64_target_index_end();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_reset();
 #endif
@@ -9233,7 +9239,7 @@ update_orders(void)
     setup_part_start = gba_clock();
 #endif
 #ifdef SC64_RACES
-    sc64_target_index_end();
+    SC64_TARGET_BEGIN_ORDERS();
 #endif
     target_lists_valid = 0;
     for (i = 0; i < 5; ++i) target_unit_head[i] = target_building_head[i] = -1;
@@ -9626,7 +9632,7 @@ target_lists_unavailable:
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     target_hostile_masks_valid = 0;
 #endif
-    sc64_target_index_end();
+    SC64_TARGET_END_ORDERS();
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     sc64_unit_buckets_end();

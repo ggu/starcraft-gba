@@ -168,7 +168,11 @@ static void race_transport_changed(void)
 #endif
 
     sc64_unit_bucket_active = 0;
+#ifdef SC64_TARGET_RETAIN_PROBE
+    sc64_target_index_end();
+#else
     sc64_target_index_active = 0;
+#endif
     target_lists_valid = 0;
 }
 

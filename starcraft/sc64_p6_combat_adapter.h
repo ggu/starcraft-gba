@@ -628,7 +628,11 @@ race_p6_combat_infested_explode(int slot)
     source->alive = 0; source->selected = 0; source->target = -1;
     source->order = ORDER_IDLE;
 #ifdef SC64_RACES
+#ifdef SC64_TARGET_RETAIN_PROBE
+    sc64_target_index_end();
+#else
     sc64_target_index_active = 0;
+#endif
 #endif
     return hit_count + 1;
 }
