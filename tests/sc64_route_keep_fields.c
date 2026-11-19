@@ -826,6 +826,52 @@ static void check_point_prefix_resume(void)
     puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
 }
 
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+static void check_point_prefix_exact_hit(void)
+{
+    const int root = 40 + 40 * 128;
+    const int origin = root + 12 * 128;
+    const int distant = root + 30 * 128;
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+
+    int slot = sc64_route_slot_for(root, root + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+    u32 builds = sc64_route_builds, hits = sc64_route_hits;
+    assert(sc64_route_slot_for(root, origin) == slot);
+    Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+    assert(prefix && prefix->second_cutoff && prefix->restore_last_row >= 53);
+    assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
+    reference_bfs(&oracle[POOL], root);
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        int direction = sc64_route_get(slot, cell);
+        if (direction != SC64_ROUTE_UNREACHABLE)
+            assert(direction == oracle[POOL].dir[cell]);
+    }
+    assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+    assert(sc64_route_get(slot, distant) == SC64_ROUTE_UNREACHABLE);
+
+    assert(sc64_route_slot_for(root, distant) == slot);
+    assert(!sc64_point_prefix_find(slot));
+    assert(sc64_route_builds == builds && sc64_route_hits == hits + 2);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    slot = sc64_route_slot_for(root, root + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_slot(root) == slot && !sc64_point_prefix_find(slot));
+    puts("one open exact hit reparks; repeat miss and complete lookup retain the full route");
+}
+#endif
+
 static void check_point_prefix_row_span(void)
 {
     const int distant = 100 + 64 * 128;
@@ -1181,6 +1227,9 @@ int main(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
         check_point_prefix_row_span();
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+        check_point_prefix_exact_hit();
+#endif
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
         check_point_prefix_tail_exchange();
 #endif
