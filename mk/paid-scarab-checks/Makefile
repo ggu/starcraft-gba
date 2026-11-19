@@ -27,7 +27,7 @@ test-sc64-paid-scarab: $(PSC_DIR)/product
 test-sc64-paid-scarab-old: $(PSC_DIR)/product
 	@if [ -z "$(PSC_BASE_TREE)" ]; then echo "test-sc64-paid-scarab-old: set PSC_BASE_TREE to an unchanged default-branch checkout; skipped"; exit 0; fi
 	cp $(PSC_SRC) $(PSC_BASE_TREE)/tests/
-	cd $(PSC_BASE_TREE) && $(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o ../psc-old-writer
+	cd $(PSC_BASE_TREE) && $(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(patsubst -I$(P10_SCARAB_FACT_DIR),-I$(P10_FACT_V2_DIR),$(filter-out $(PROTOSS_SCARAB_FLAGS),$(PROTOSS_P10_FLAGS))) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o ../psc-old-writer
 	rm -f $(PSC_DIR)/old.sav $(PSC_DIR)/old.sav.state
 	$(PSC_BASE_TREE)/../psc-old-writer old-write $(CURDIR)/$(PSC_DIR)/old.sav
 	./$(PSC_DIR)/product old-read $(PSC_DIR)/old.sav
