@@ -1374,7 +1374,8 @@ static int forced_commit(int scenario)
     static const char *names[] = { "exhausted-small-army", "late-small-army",
                                    "exhausted-small-army-resume", "minerals-small-army-stays" };
     int owner = first_bot(), kept = 0, committed = 0, at = -1, ok = 0, supply = -1, slots[3];
-    int setup = scenario == 1 ? 45000 - 120 : 10800 - 120;
+    /* Just before the opponent's race may start an offensive. */
+    int setup = scenario == 1 ? 45000 - 120 : race_ai_first_wave(race_owner_identity(owner)) - 120;
     uint32_t reference = 0, resumed = 0;
     RaceAiCensus c;
     if (scenario < 0 || scenario > 3 || race_owner_identity(owner) != R_TER) return 0;
@@ -1455,6 +1456,164 @@ done:
            "\"commit_frame\":%d,\"reference\":\"%08x\",\"resumed\":\"%08x\",\"ok\":%d}\n",
            scenario >= 0 && scenario <= 3 ? names[scenario] : "?", kept, supply, committed, at,
            reference, resumed, ok);
+    return ok;
+}
+
+/* ---- First offensive. With one opponent and a passive human, the update
+ * on which the opponent first gives any army unit an attack-move order to a
+ * point outside its home range, how many units hold one on that update and
+ * the army supply the owner held around that update. It must not come before
+ * the race's gate (RACE_AI_FIRST_WAVE_*, measured on the StarCraft 64
+ * computer players), must come within 20 seconds of it, must be a wave (at
+ * least three units and half the army on that same update, not one or two
+ * units ahead of the rest), and the army must hold the wave supply unless
+ * the owner is all in. ---- */
+static int offensive_orders(int owner, const RaceAiCensus *c)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (race_ai_movable_army(&u[i], owner) && u[i].order == ORDER_ATTACK_MOVE &&
+            dist2(u[i].tx, u[i].ty, c->hx, c->hy) > RACE_AI_DEPLOYED_RANGE * RACE_AI_DEPLOYED_RANGE) ++n;
+    return n;
+}
+
+static int first_wave(void)
+{
+    int owner = first_bot(), race = race_owner_identity(owner), gate = race_ai_first_wave(race);
+    int at = -1, sent = 0, supply = 0, army = 0, all_in = 0, peak_before = 0, ok;
+    RaceAiCensus c;
+    while (screen == SCREEN_PLAY && !won && !lost && frame < gate + 3600 && at < 0) {
+        /* The planner decides part-way through the update: units can die
+         * before it and finish training after it. Take the smaller army
+         * of the two sides of the update, and all in only if it held on
+         * both, so neither can lift a launch over the threshold. */
+        int army_before, supply_before, all_in_before;
+        race_ai_census(owner, &c);
+        army_before = c.army; supply_before = c.army_supply; all_in_before = race_ai_all_in(&c);
+        input(0);
+        race_ai_census(owner, &c);
+        sent = offensive_orders(owner, &c);
+        if (frame < gate) { if (sent > peak_before) peak_before = sent; continue; }
+        if (sent >= 1) {
+            at = frame;
+            supply = supply_before < c.army_supply ? supply_before : c.army_supply;
+            army = army_before < c.army ? army_before : c.army;
+            all_in = all_in_before && race_ai_all_in(&c);
+        }
+    }
+    ok = at >= gate && at < gate + 600 && !peak_before && sent >= 3 && sent * 2 >= army &&
+         (supply >= RACE_AI_WAVE_SUPPLY || all_in);
+    printf("{\"kind\":\"first-wave\",\"owner\":%d,\"race\":%d,\"gate\":%d,\"frame\":%d,\"sent\":%d,"
+           "\"army\":%d,\"army_supply\":%d,\"wave_supply\":%d,\"all_in\":%d,\"before_gate\":%d,\"ok\":%d}\n",
+           owner, race, gate, at, sent, army, supply, RACE_AI_WAVE_SUPPLY, all_in, peak_before, ok);
+    return ok;
+}
+
+/* ---- Economy raid. In a mirrored match (the planner also drives the human
+ * owner, so the match reaches the engine's own result), the first opponent's
+ * economy is hit mid-game through hit_target: 0, every worker dies; 1, its
+ * main depot and all but two workers die (with no depot and no worker no
+ * race can rebuild either). Queued workers are removed too. It must mine
+ * again through its ordinary paid services: six workers with four of them
+ * mining, and at least 200 minerals of cargo delivered after that (the
+ * spending audit's income, so workers stuck on the way do not count; the
+ * audit restarts at the raid and must stay clean, so nothing unpaid can
+ * pass for income). The match must still end in the engine's victory or
+ * defeat. Nothing is granted. ---- */
+static int owner_workers(int owner)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && sc64_race_is_worker(u[i].type)) ++n;
+    return n;
+}
+
+/* Remove every queued worker of the owner, keeping other orders in place. */
+static void drop_queued_workers(int owner)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        Building *q = &b[i];
+        int kept[5], n = 0, head_dropped;
+        if (!q->alive || q->owner != owner || !q->queue_count) continue;
+        head_dropped = sc64_race_is_worker(q->queue[q->queue_head]);
+        for (int j = 0; j < q->queue_count && j < 5; ++j) {
+            int type = q->queue[(q->queue_head + j) % 5];
+            if (!sc64_race_is_worker(type)) kept[n++] = type;
+        }
+        for (int j = 0; j < n; ++j) q->queue[(q->queue_head + j) % 5] = kept[j];
+        q->queue_count = n;
+        if (head_dropped) q->queue_progress = 0;
+    }
+}
+
+static int raid(int scenario, int ticks)
+{
+    static const char *names[] = { "worker-line-killed", "main-and-workers-killed" };
+    int owner = first_bot(), before = 0, killed = 0, depots_killed = 0, at = -1, low = -1;
+    int recovered = -1, peak = 0, army_after = 0, ok = 0, bank = 0, spare = scenario == 1 ? 2 : 0;
+    int income_at_recovery = 0, delivered = 0, delivered_frame = -1, first_bad = -1, main_depot = -1;
+    RaceAiCensus home;
+    if (scenario < 0 || scenario > 1) return 0;
+    mirror_human = 1;
+    /* Mid-game: after the opponent has teched and holds an army. With no
+     * worker left nothing is mined, so the first new workers, and a lost
+     * depot, can only come from the bank: wait until it holds two workers'
+     * price (or a depot's, as the depot recovery fixture does). */
+    while (screen == SCREEN_PLAY && !won && !lost &&
+           (frame < 9000 || (frame < 12000 && race_owner_minerals(owner) < (scenario == 1 ? 450 : 100))))
+        input(0);
+    /* The main depot is the one the planner calls home (a Lair or Hive
+     * that is still morphing included), not the first finished one. */
+    race_ai_census(owner, &home);
+    main_depot = home.home;
+    if (screen != SCREEN_PLAY || won || lost || main_depot < 0) goto done;
+    before = owner_workers(owner); bank = race_owner_minerals(owner); at = frame;
+    if (scenario == 1) {
+        kill_building(main_depot);
+        depots_killed = !b[main_depot].alive || b[main_depot].owner != owner;
+    }
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && sc64_race_is_worker(u[i].type) &&
+            killed < before - spare) { kill_unit(i); ++killed; }
+    drop_queued_workers(owner);
+    low = owner_workers(owner);
+    /* The audit starts on the raided world: the fixture's own kills and
+     * queue edits are not part of what it judges. */
+    audit_start();
+    while (screen == SCREEN_PLAY && !won && !lost && frame < ticks) {
+        int workers, mining = 0;
+        input(0);
+        if (recovered >= 0 && delivered_frame < 0 &&
+            ledger.o[owner].income - income_at_recovery >= 200) delivered_frame = frame;
+        if (frame % 60) continue;
+        workers = owner_workers(owner);
+        for (int i = 0; i < MAX_UNITS; ++i)
+            mining += u[i].alive && u[i].owner == owner && sc64_race_is_worker(u[i].type) &&
+                      u[i].order == ORDER_MINE;
+        if (workers > peak) peak = workers;
+        if (recovered < 0 && workers >= 6 && mining >= 4) {
+            recovered = frame; income_at_recovery = ledger.o[owner].income;
+        }
+        if (recovered >= 0) {
+            RaceAiCensus c;
+            race_ai_census(owner, &c);
+            if (c.army > army_after) army_after = c.army;
+        }
+    }
+    if (recovered >= 0) delivered = ledger.o[owner].income - income_at_recovery;
+    first_bad = ledger.on ? ledger.o[owner].first_bad : 0;
+    ok = before >= 8 && killed == before - spare && low == spare && (scenario == 0 || depots_killed) &&
+         recovered > at && delivered_frame > recovered && first_bad < 0 &&
+         ledger.o[owner].model_errors == 0 && ledger.o[owner].supply_bad == 0 && (won || lost);
+done:
+    printf("{\"kind\":\"raid\",\"scenario\":\"%s\",\"owner\":%d,\"race\":%d,\"raid_frame\":%d,"
+           "\"workers_before\":%d,\"killed\":%d,\"depot_killed\":%d,\"bank\":%d,\"workers_after\":%d,"
+           "\"recovered_frame\":%d,\"delivered_frame\":%d,\"delivered\":%d,\"audit_first_bad\":%d,"
+           "\"audit_model_errors\":%d,\"audit_supply_bad\":%d,\"peak_workers\":%d,\"army_after\":%d,"
+           "\"end_frame\":%d,\"won\":%d,\"lost\":%d,\"ok\":%d}\n",
+           names[scenario], owner, race_owner_identity(owner), at, before, killed, depots_killed, bank, low,
+           recovered, delivered_frame, delivered, first_bad, ledger.on ? ledger.o[owner].model_errors : 0,
+           ledger.on ? ledger.o[owner].supply_bad : 0, peak, army_after, frame, won, lost, ok);
     return ok;
 }
 
@@ -1583,7 +1742,8 @@ static int air_pin(int scenario)
     static const int flyer_raw[3] = { 8, 43, 70 };   /* Wraith, Mutalisk, Scout */
     int owner = first_bot(), kept = 0, slots[3], ok = 0, flyer = -1, ground = 0, anti_air = 0;
     int enemy_air = 0, threat_d = -1, army_supply = -1, commit_at = -1, defend_at = -1, committed = 0;
-    int setup = 10800 - 120, ftype = sc64_race_unit_from_raw(flyer_raw[race_human]);
+    int setup = race_ai_first_wave(race_owner_identity(owner)) - 120;
+    int ftype = sc64_race_unit_from_raw(flyer_raw[race_human]);
     RaceAiCensus c;
     if (scenario < 0 || scenario > 1 || ftype < 0 || race_owner_identity(owner) == R_TER) goto done;
     while (screen == SCREEN_PLAY && !won && !lost && frame < setup) input(0);
@@ -1775,6 +1935,7 @@ int main(int argc, char **argv)
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
     int builder = -1, workers = -1, ai_sunken = 0, threats = 0, repowering = -1, airpin = -1, noore = -1;
+    int wave = 0, raiding = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -1799,6 +1960,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--repower") && i + 1 < argc) repowering = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--air-pin") && i + 1 < argc) airpin = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--no-ore") && i + 1 < argc) noore = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--first-wave")) wave = 1;
+        else if (!strcmp(argv[i], "--raid") && i + 1 < argc) raiding = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
     if (audit_control < -1 || audit_control > 1) return 2;
@@ -1814,6 +1977,8 @@ int main(int argc, char **argv)
     if (repowering >= 0) return repower(repowering) ? 0 : 15;
     if (airpin >= 0) return air_pin(airpin) ? 0 : 16;
     if (noore >= 0) return no_ore(noore) ? 0 : 17;
+    if (wave) return first_wave() ? 0 : 18;
+    if (raiding >= 0) return raid(raiding, ticks) ? 0 : 19;
     if (resume_at < 0 && !resume_morph) {
         audit_start();
         run_ticks(ticks, every, stdout);
