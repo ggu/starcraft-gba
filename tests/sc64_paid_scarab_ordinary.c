@@ -183,6 +183,17 @@ static void normalise_ui(void)
 enum { CHECK_AT_COUNT = 10 };
 static const unsigned check_at[CHECK_AT_COUNT] = {1, 2, 3, 5, 10, 20, 40, 80, 160, 320};
 
+/* A few readable world values at each check, for comparison with the ARM replay. */
+typedef struct { int frame, minerals, gas, scarabs, x, y, life; unsigned host_tick; } Sample;
+static Sample take_sample(void)
+{
+    Sample v = {frame, minerals, gas, scarabs_alive(), -1, -1, -1, host_ticks};
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].type == U_SCARAB) { v.x = u[i].x; v.y = u[i].y; v.life = u[i].work_timer; break; }
+    return v;
+}
+static Sample samples[CHECK_AT_COUNT];
+
 static void write_state(const char *path, const u32 *digests, unsigned frame_at_save, u32 d0)
 {
     char side[512]; FILE *f;
@@ -193,6 +204,10 @@ static void write_state(const char *path, const u32 *digests, unsigned frame_at_
     fprintf(f, "%u\n", hit_count);
     for (unsigned i = 0; i < hit_count; ++i)
         fprintf(f, "%u %d %d\n", hit_log[i].at, hit_log[i].target, hit_log[i].damage);
+    fprintf(f, "U_SCARAB %d\n", (int)U_SCARAB);
+    for (int k = 0; k < CHECK_AT_COUNT; ++k)
+        fprintf(f, "S %u %d %d %d %d %d %d %d %u\n", check_at[k], samples[k].frame, samples[k].minerals, samples[k].gas,
+                samples[k].scarabs, samples[k].x, samples[k].y, samples[k].life, samples[k].host_tick);
     assert(!fclose(f));
 }
 
@@ -275,7 +290,7 @@ static int run_scenario(const char *out, const char *trace_path)
             {
                 unsigned done = 1; int ci = 0;
                 while (ci < CHECK_AT_COUNT) {
-                    if (done == check_at[ci]) digests[ci++] = state_digest();
+                    if (done == check_at[ci]) { samples[ci] = take_sample(); digests[ci++] = state_digest(); }
                     if (ci < CHECK_AT_COUNT) { input(0); ++done; }
                 }
             }

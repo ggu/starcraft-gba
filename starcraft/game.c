@@ -1207,6 +1207,7 @@ typedef struct {
 #endif
 #endif
 } Unit;
+#include "sc64_paid_scarab_decl.h"
 #ifdef SC64_RACES
 /* Legacy saves can retain raw 36 on an Overlord. Its stored identity must
  * remain distinct from a newly produced Egg when choosing visual assets. */
@@ -2472,7 +2473,6 @@ static void race_scarab_probe_target_invalidate(int target);
 #endif
 #endif
 #endif
-#include "sc64_paid_scarab_decl.h"
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
 static int race_p7_carrier_training_queue_selected(void);
