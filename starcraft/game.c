@@ -367,9 +367,6 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 #error "Interceptor flight requires the P7 Carrier training stage"
 #endif
-#if defined(SC64_PAID_SCARAB) && !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
-#error "Paid Scarabs use the Protoss hangar command and projectile services"
-#endif
 
 #if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
@@ -2493,25 +2490,7 @@ static unsigned race_p7_carrier_training_child_count(int carrier);
 #endif
 static int sc64_p7_carrier_parent_type(int type);
 static int race_p7_carrier_training_queue_owner(int carrier);
-#ifdef SC64_PAID_SCARAB
-#define SC64_CARRIER_MENU_LABEL() race_carrier_menu_label()
-static void race_paid_scarab_trained(int slot);
-static int race_paid_scarab_menu_available(void);
-static int race_paid_scarab_stock(int slot);
-static int race_paid_scarab_queued(int slot);
-static int race_paid_scarab_queue_owner(int slot);
-static int race_paid_scarab_queue_selected(void);
-static void race_paid_scarab_launch(Unit *q, int target);
-static u8 sc64_psc_hint;
-static void race_paid_scarab_world_tick(void);
-static void race_paid_scarab_clear_slot(int slot);
-static void race_paid_scarab_end_frame(void);
-static void race_scarab_probe_target_invalidate(int ref);
-static int race_paid_scarab_candidate_valid(const Unit *actors, int count);
-static const char *race_carrier_menu_label(void);
-#else
-#define SC64_CARRIER_MENU_LABEL() "BUILD INTERCEPTOR"
-#endif
+#include "sc64_paid_scarab_decl.h"
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
 static int race_p7_interceptor_flight_carrier_order(int carrier);
@@ -3053,7 +3032,7 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(i);
 #endif
-#if defined(SC64_SCARAB_WEAPON_PROBE) || defined(SC64_PAID_SCARAB)
+#if SC64_PSC_TARGET_HOOK
     race_scarab_probe_target_invalidate(i);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -3073,9 +3052,6 @@ spawn_unit(int owner, int type, int x, int y)
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_clear_slot(i);
-#ifdef SC64_PAID_SCARAB
-    race_paid_scarab_clear_slot(i);
-#endif
 #endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(i);
@@ -3275,7 +3251,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(MAX_UNITS+i);
 #endif
-#if defined(SC64_SCARAB_WEAPON_PROBE) || defined(SC64_PAID_SCARAB)
+#if SC64_PSC_TARGET_HOOK
     race_scarab_probe_target_invalidate(MAX_UNITS+i);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -5083,7 +5059,7 @@ destroy_building(int slot, int source_owner)
 #ifdef SC64_SHARED_TRANSPORT
     race_sk_transport_producer_destroyed(slot);
 #endif
-#if defined(SC64_SCARAB_WEAPON_PROBE) || defined(SC64_PAID_SCARAB)
+#if SC64_PSC_TARGET_HOOK
     race_scarab_probe_target_invalidate(MAX_UNITS+slot);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -5289,7 +5265,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 	}
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
-#if defined(SC64_SCARAB_WEAPON_PROBE) || defined(SC64_PAID_SCARAB)
+#if SC64_PSC_TARGET_HOOK
             race_scarab_probe_target_invalidate(target);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -5298,9 +5274,6 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
             race_p7_carrier_training_clear_slot(target);
-#ifdef SC64_PAID_SCARAB
-            race_paid_scarab_clear_slot(target);
-#endif
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
             if (u[target].alive && race_late_active()) {
@@ -6707,9 +6680,7 @@ stop_selected(void)
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
             if (sc64_race_raw_unit(u[i].type) != 83)
 #endif
-#ifdef SC64_PAID_SCARAB
-            if (u[i].type != U_REAVER) /* STOP keeps the Scarabs and their orders */
-#endif
+            SC64_PSC_KEEP_STATE(u[i])
 #ifdef SC64_Z5_CLOAK_ENABLED
             if (!race_z5_cloak_actor(&u[i]))
 #endif
@@ -7499,7 +7470,7 @@ static int field_menu_count(void)
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return SC64_CARRIER_MENU_LABEL();
+    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return PSC_LABEL();
 #endif
 #ifdef SC64_EGG_RUNTIME
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
@@ -7537,7 +7508,7 @@ static const char *race_menu_label(int i)
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
-        return SC64_CARRIER_MENU_LABEL();
+        return PSC_LABEL();
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (i == race_context_command_base(RACE_CONTEXT_SCARAB) &&
@@ -9057,11 +9028,7 @@ tick_combat(Unit * q, int target)
         if (dx*dx+dy*dy<minimum_range*minimum_range) return;
 #endif
 	if (!q->cd) {
-#ifdef SC64_PAID_SCARAB
-            /* In reach, a Reaver fights only with a Scarab it holds; the
-             * generic hit is never applied to it. */
-            if (q->type==U_REAVER) { race_paid_scarab_launch(q,target); return; }
-#endif
+            SC64_PSC_FIRE(q,target)
 #ifdef SC64_IMPACT_EVENTS
             /* Decide before any launch side effect: a full queue leaves the
              * weapon ready for the next update instead of losing damage. */
@@ -9322,11 +9289,7 @@ target_lists_unavailable:
 #ifdef SC64_DIAGNOSTIC_ORDERS
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
 #endif
-#ifdef SC64_PAID_SCARAB
-    /* On the source's 24 Hz ticks, and only while a Scarab is on order, held
-     * back by a cooldown or in flight: one test otherwise. */
-    if (sc64_psc_hint && (unsigned)frame % 5u != 0u) race_paid_scarab_world_tick();
-#endif
+    SC64_PSC_WORLD_TICK();
     for (i = 0; i < MAX_UNITS; i++) {
 	Unit *q = &u[i];
 	if (!q->alive)
@@ -10908,9 +10871,6 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_P7_PROJECTILES_ENABLED
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_end_frame();
-#ifdef SC64_PAID_SCARAB
-    race_paid_scarab_end_frame();
-#endif
 #endif
     if (race_protoss_services_active()) race_p7_projectile_clear_dead_references();
 #endif
@@ -13516,9 +13476,7 @@ static unsigned race_shared_trigger_obligations(void);
 #include "sc64_p7_projectile_adapter.h"
 #include "sc64_p7_carrier_training.h"
 #include "sc64_p7_interceptor_flight.h"
-#ifdef SC64_PAID_SCARAB
 #include "sc64_paid_scarab.h"
-#endif
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_colony_service.h"

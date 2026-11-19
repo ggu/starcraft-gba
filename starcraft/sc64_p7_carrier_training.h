@@ -504,6 +504,12 @@ static void sc64_p7_carrier_child_remove(int child_slot,
 static void race_p7_carrier_training_clear_slot(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS) return;
+#ifdef SC64_PAID_SCARAB
+    /* A dying or reused unit slot: a Reaver sheds its state, Scarabs aimed at
+     * it lose the target. */
+    race_paid_scarab_clear_slot(slot);
+    race_scarab_probe_target_invalidate(slot);
+#endif
     if (sc64_p7_carrier_parent_type(u[slot].type) &&
         sc64_p7_carrier_parent_row_consistent(&u[slot])) {
         race_p7_carrier_training_parent_died(
@@ -626,6 +632,9 @@ static void race_p7_carrier_training_parent_died(
  * completed-update boundary so its hidden children cannot remain orphaned. */
 static void race_p7_carrier_training_end_frame(void)
 {
+#ifdef SC64_PAID_SCARAB
+    race_paid_scarab_end_frame();
+#endif
     if (!race_protoss_services_active()) return;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (!u[i].alive && SC64_P7_CARRIER_PARENT_TYPE(u[i].type) &&
