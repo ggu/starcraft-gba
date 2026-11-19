@@ -138,3 +138,49 @@ at the previously divergent cuts.
 | Bidirectional skirmish saves | `dd68a5697c8c2f108a84ee9c653fbd40ee36d36b5067d0a937348ffce9f441ac` |
 | Outpost fresh load through victory | `cba959cbf24af140bcbe84cc9c43469a4e9805b83845da7549f17cf16efe28a3` |
 | Full physical P7 victory | `ceb663b9638c3d0b83bc65747ae6d08376ebcc5bfe9ba722c5dbc1d9a2db3bc3` |
+
+## How long the current index stays valid
+
+Read-only breakpoints on the normal P10 and Z10 binaries from
+`ea041527` sample the completed orders index, the end of orders,
+and the defense entry. The observer walks the actual owner-cell
+chains and compares their slot membership, compact owner and
+64-pixel cell against live actors at each boundary. The Z7 replay
+also passes all 131 historical gameplay checks. At the measured cuts,
+all three runs reproduce the retained frame and order timings.
+
+| Workload | Sampled updates | Orders index build cycles | Whole defense pass cycles | Orders index covers live actors at defense entry | Exact membership at next sampled build |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P10 Homeland | 48 | 59,663 | 63,495 | 48 / 48 | 24 / 24 |
+| P10 Blood Bath, three AI seats | 48 | 35,302 | 50,542 | 46 / 48 | 23 / 24 |
+| Z10 dense Z7 | 53 | 58,999 | 79,860 | 53 / 53 | 26 / 26 |
+
+Counts require every eligible live slot and no extra index links. The last
+column samples adjacent ordinary calls only. Mean defense cycles
+include weapon checks and effects. They are an upper bound on what
+eliminating a separate defense index could save.
+
+Blood Bath frame 17,141 has a newly spawned unit at defense entry
+that is absent from the orders index. Frame 16,860 has an extra link
+after a death, which the next fresh rebuild removes. A retained index
+still needs a fresh coverage proof. Transport unloads, enemy rescue or
+ownership changes, and mission-created units provide additional paths
+to invalidate it. Defense has its own geometry, live eligibility and
+lowest-slot tie rule. Its normal skirmish dispatch uses the scalar pass.
+
+On the paired Blood Bath cuts only 2 of 24 saved indexes satisfy
+both exact membership and the original descending chain order.
+Dense Z7 has 9 of 26 and Homeland has 16 of 24. In the Homeland
+repeat, eight end-of-orders cuts have at least one dirty entry left
+over from a now-empty cell or a repeated link. Moves update
+64-pixel buckets during orders. Low-slot ties in nearest-target and
+defense queries are explicit. The Egg fallback can instead depend
+on the first equal-distance candidate. A reuse path must keep that
+iteration order wherever the Egg query is compiled.
+
+| Local read-only receipt | SHA-256 |
+| --- | --- |
+| P7 Homeland | `38178bd9da0f91753a26a5dd8fa3de8d621bccf3e1f8136df6e37e39d9ac6c7e` |
+| P7 repeat with chain order and dirty counts | `e4cc1013123ec37da1fb303aca8e3387184427c34fd95d33dd4e31f737936505` |
+| Three-AI Blood Bath | `79a22207c1cf7bbeb0ba4dfcbdd7f5eaf7c0748365c449f9b19fe824eae24e4e` |
+| Dense Z7 | `c443b19f0c3b533075cfadbb4999ac9b3d1b64479c81029f6a96238d7511ac94` |

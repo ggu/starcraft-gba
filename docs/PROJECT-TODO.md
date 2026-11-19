@@ -1500,6 +1500,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   at the two previously divergent pause cuts.
   [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
   increased mean cost 1.79% and stays outside the release.
+  The [current lifetime trace](audits/2026-11-12-target-index-bulk.md#how-long-the-current-index-stays-valid)
+  puts the index rebuild at about 59K cycles in Homeland and dense Z7.
+  The same trace catches a newly live unit between orders and defense
+  in three-AI Blood Bath. Validate live membership and preserve Egg
+  tie order before retaining the index. Keep defense coverage separate.
 - [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
