@@ -46,7 +46,7 @@ pinned sprites and are allowed to change when the private art is regenerated.
 | `unit-over-building` | Barracks at (96,43), Tank at (96,50), both layer 4 | Tank | 380/380 |
 | `air-tiers-ignore-y` | Move a Wraith north and south across a Carrier or Overlord, layers 18 and 16 | Wraith during overlap | Future replay |
 | `camera-and-hud` | Scroll an overlapping pair past screen rows 12 and 119 while flipping framebuffer pages | Foreground stays stable, HUD rows stay clear of actor pixels | Future paired replay |
-| `selected-overlap` | Select the Tank in both Tank/Barracks cases and compare pixels outside the Tank's opaque crop | Check the N64 ring against the nearer and farther building | Future native check |
+| `selected-overlap` | Select the Overlord above a Hatchery and the Tank behind a Barracks | Overlord ring over the Hatchery, Overlord body over its own ring, Barracks over the Tank ring | 15, 14 and 29 distinguishable pixels |
 
 The old renderer flipped all 192 Wraith/Tank pixels on unit slot swap and
 drew the Tank over all 459 pixels occupied by the southern Barracks. Use
@@ -54,11 +54,17 @@ drew the Tank over all 459 pixels occupied by the southern Barracks. Use
 source. The current canonical Terran framebuffer test is
 `build/test-sc64-terran-full-frame`. Add campaign and skirmish replay cases
 for picking the topmost actor and for dynamic layers such as workers against
-resources or Interceptors around Carriers. The current GBA selection
-ellipses are a world underlay beneath the actor bodies. A Barracks can
-cover part of an overlapping ring even when the Tank's body is nearer.
-Verify the ring order separately on N64. The PC implementation draws
-the ring within its selected sprite's turn in the sorted pass.
+resources or Interceptors around Carriers.
+
+In native Challenger melee, a selected Overlord moves across the Hatchery.
+The cursor is away from the overlap. At observer step 3920 the Overlord's
+lower ring arc covers two pixels of the Hatchery lip that were opaque at
+steps 3612 and 3740. The native capture SHA-256 is
+`765ca89ac1f501f021ecde36762ca79af2f0e3953cdae00d54647900b84e5926`.
+The GBA depth painter now draws a selected unit's ring immediately before
+its body. Foreground actors can cover the ring. The legacy path still draws
+the rings in a separate pass. The PC implementation also draws the ring
+within its selected sprite's turn in the sorted pass.
 [OpenBW sprite renderer](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/ui/ui.h)
 
 The terrain cache now holds background and fog. Profile counters attribute
@@ -178,3 +184,14 @@ The renderer receipt SHA-256 is
 `e68e0fae1c284e6a44d8694e0944636823fb281050080d39e032c83b63b19098`.
 The skirmish receipt SHA-256 is
 `99571add436acc888849844cbbb50d04f2a4c6078d3866aa19c2dadc40082e0c`.
+
+The selected-ring follow-up also passes all four normal ARM links and
+header checks. Against the exact `9dfba082` P10 ROM, the 958-advancing-
+update P7 window matches all 1,000 timeline rows and 11 sampled world,
+palette and framebuffer states. The release mean of 1,766,498 cycles
+falls to 1,760,602, p95 from 2,066,456 to 2,059,279, and peak from
+2,433,880 to 2,427,848. The isolated overlap fixture exercises the
+changed ring pixels. The ordinary P7 sample checks the wider scene.
+
+The selected-ring P7 receipt SHA-256 is
+`c909430793b05122a7ccd6e7c5180e2dac03e22d70d0eb2a2cfdf110b8cd4745`.
