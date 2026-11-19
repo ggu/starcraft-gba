@@ -113,6 +113,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_SEED_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
 #error "deferred point seeds require component witnesses"
 #endif
+#if defined(SC64_ROUTE_POINT_LAZY_ROWS_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+#error "lazy route rows require resumable point prefixes"
+#endif
 #if defined(SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
 #error "nearby-root component rejection requires point component witnesses"
 #endif

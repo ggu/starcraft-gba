@@ -209,9 +209,19 @@ typedef struct {
     u8 next[MAX_UNITS], flying[MAX_UNITS];
 } RaceDefenseCells;
 
+#ifdef SC64_DEFENSE_LAZY_FLIGHT
+enum { DEFENSE_FLIGHT_UNKNOWN, DEFENSE_FLIGHT_GROUND, DEFENSE_FLIGHT_AIR };
+
+/* Keep the profile's reference classification out of the IWRAM query loop. */
+static __attribute__((noinline)) u8 race_defense_classify_unit_flight(int type)
+{
+    return (u8)sc64_race_unit_flying(type) ? DEFENSE_FLIGHT_AIR : DEFENSE_FLIGHT_GROUND;
+}
+#endif
+
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_zp_cells(const Building *q, int ground, int air,
-                                  int range, const RaceDefenseCells *cells,
+                                  int range, RaceDefenseCells *cells,
                                   u8 hostile_mask)
 {
     int x = q->x, y = q->y;
@@ -225,6 +235,10 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
     top = (top < 0 ? 0 : top) >> DEFENSE_CELL_SHIFT;
     right = (right >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : right) >> DEFENSE_CELL_SHIFT;
     bottom = (bottom >= DEFENSE_CELL_LIMIT ? DEFENSE_CELL_LIMIT - 1 : bottom) >> DEFENSE_CELL_SHIFT;
+#ifdef SC64_DEFENSE_LAZY_FLIGHT
+    unsigned admitted_flight = (ground ? DEFENSE_FLIGHT_GROUND : 0u) |
+                               (air ? DEFENSE_FLIGHT_AIR : 0u);
+#endif
 
     for (int row = top; row <= bottom; ++row) {
         for (int col = left; col <= right; ++col) {
@@ -233,12 +247,26 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
                 const Unit *target = &u[j];
                 unsigned owner = target->owner;
                 if (!target->alive || owner >= 5 ||
-                    !(hostile_mask & (1u << owner)) ||
-                    (cells->flying[j] ? !air : !ground)) continue;
+                    !(hostile_mask & (1u << owner))) continue;
+#ifndef SC64_DEFENSE_LAZY_FLIGHT
+                if (cells->flying[j] ? !air : !ground) continue;
+#endif
                 int dx = x - target->x, dy = y - target->y;
                 if (FAST_ABS(dx) >= range || FAST_ABS(dy) >= range ||
-                    (target->flags & 16) ||
-                    !sc64_auto_target_candidate_allowed(-1, j, q->owner,
+                    (target->flags & 16)) continue;
+#ifdef SC64_DEFENSE_LAZY_FLIGHT
+                if (admitted_flight != (DEFENSE_FLIGHT_GROUND | DEFENSE_FLIGHT_AIR)) {
+                    /* Defense hits can remove actors, but cannot change
+                     * the type or flight class of an indexed survivor. */
+                    u8 flight = cells->flying[j];
+                    if (flight == DEFENSE_FLIGHT_UNKNOWN) {
+                        flight = race_defense_classify_unit_flight(target->type);
+                        cells->flying[j] = flight;
+                    }
+                    if (!(flight & admitted_flight)) continue;
+                }
+#endif
+                if (!sc64_auto_target_candidate_allowed(-1, j, q->owner,
                                                         q->raw_owner)) continue;
                 int d = dx * dx + dy * dy;
                 if (d < bestd || (best >= 0 && d == bestd && j < best)) {
@@ -314,7 +342,11 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         }
         int cell = (u[j].y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE +
                    (u[j].x >> DEFENSE_CELL_SHIFT);
+#ifdef SC64_DEFENSE_LAZY_FLIGHT
+        cells.flying[j] = DEFENSE_FLIGHT_UNKNOWN;
+#else
         cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
+#endif
         cells.next[j] = cells.head[cell];
         cells.head[cell] = (u8)j;
     }

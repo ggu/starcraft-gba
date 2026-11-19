@@ -826,6 +826,50 @@ static void check_point_prefix_resume(void)
     puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
 }
 
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+static void check_point_prefix_lazy_rows(void)
+{
+    enum { TOP_LEFT, BLOCKED_BOTTOM_RIGHT, GROW_BOTH, COMPLETE };
+    const int roots[] = { 0, 127 + 127 * 128, 64 + 64 * 128, 4 + 4 * 128 };
+    const int origins[] = { 2 + 2 * 128, 125 + 124 * 128, 64 + 80 * 128, 120 + 120 * 128 };
+    for (int mode = TOP_LEFT; mode <= COMPLETE; ++mode) {
+        race_cols = race_rows = 128;
+        memset(desired, 1, sizeof(desired));
+        if (mode == BLOCKED_BOTTOM_RIGHT) desired[roots[mode]] = 0;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        int cap = sc64_route_linear_queue_cap(128, 128);
+        uintptr_t at = ((uintptr_t)(void *)(bfs_queue + cap) + 3u) & ~(uintptr_t)3u;
+        u8 *scratch = (u8 *)(void *)at;
+        const int poison = mode == COMPLETE ? 0 : 0xa5;
+        memset(scratch, poison, SC64_PREFIX_PADDED_BYTES);
+
+        int slot = sc64_route_slot_for(roots[mode], origins[mode]);
+        assert(slot >= 0);
+        reference_bfs(&oracle[POOL], roots[mode]);
+        assert(sc64_route_get(slot, origins[mode]) == oracle[POOL].dir[origins[mode]]);
+        if (mode == COMPLETE) {
+            assert(!sc64_point_prefix_find(slot));
+            assert(scratch[0] == 15 && scratch[SC64_PREFIX_PADDED_BYTES - 1] == 15);
+        } else {
+            assert(sc64_point_prefix_find(slot));
+            int untouched = mode == TOP_LEFT ? 120 : 4;
+            assert(scratch[untouched * SC64_PREFIX_ROW_STRIDE + 4] == poison);
+            if (mode == GROW_BOTH) {
+                assert(scratch[59 * SC64_PREFIX_ROW_STRIDE + 64] != poison);
+                assert(scratch[81 * SC64_PREFIX_ROW_STRIDE + 64] != poison);
+            }
+            SC64_ROUTE_EXACT(slot);
+        }
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    puts("lazy padded rows preserve boundary guards, two-sided growth and completed fields");
+}
+#endif
+
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
 static void check_point_prefix_tail_exchange(void)
 {
@@ -1233,6 +1277,9 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
+#ifdef SC64_ROUTE_POINT_LAZY_ROWS_PROBE
+        check_point_prefix_lazy_rows();
+#endif
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
         check_point_prefix_tail_exchange();
 #endif
