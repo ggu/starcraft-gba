@@ -713,3 +713,18 @@ the input journal's SHA-256. This checks one campaign save cut.
 | --- | --- |
 | Released P10 fresh SRAM win | `10a6c5394948b9d1f14817047ce00fa75ce06719aaada445ba328af5fba8c573` |
 | Composed opt-in P10 fresh SRAM win | `28965dfec4cd8dc44a53f0a50a35ecfd47bacf50c41e6f2c03605c175831778f` |
+
+### Composed with the wide depot and early contact release
+
+Composed source `882fe20f` includes release `ea041527`. Full and
+prefix point fills now share the seedless-goal check. A prefix that
+finds no reachable seed publishes the same empty packed field without
+writing dense scratch. The wide depot and the overflow fallback retain
+their existing queue bounds and neighbor order.
+
+The ASan/UBSan `test-sc64-route-point-prefix` target passes. It compares
+386,646 queries and the final live fields with the full-fill control,
+checks the new seedless case, and exercises range reads while both
+range planes are claimed. The published ARM timings above are from
+earlier source. Recheck the dense Z7 display page and the forced range
+read on this composition before enabling the selector.
