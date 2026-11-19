@@ -1621,12 +1621,15 @@ save/source-owner and timing evidence; do not advertise unwired components.
   while checking IWRAM fit and timing on the other race profiles.
 - The [post-orders trace](audits/2026-11-19-z7-repeated-negative-route.md#what-remains-after-orders-in-dense-zerg-7)
   measures about 127,000 cycles in mission and AI, 81,000 in defense
-  targeting, and 46,000 in race state. Attribute defense index construction
-  and queries separately. Measure the remaining mission actor traversal
-  before combining it with provenance validation.
+  targeting, and 46,000 in race state. Measure the remaining mission
+  actor traversal before combining it with provenance validation.
   A finer 128-pixel defense grid is effectively flat in dense Z7.
   Packing owner and flight eligibility into the existing index byte
-  saves about 5,300 whole-update cycles with matching replay cuts.
+  saves about 5,300 whole-update cycles with matching replay cuts and
+  frees 112 linked IWRAM bytes. Instrumentation measures about 43,000
+  cycles in unit index construction and 31,000 in target queries.
+  Every measured update has ready defenses. Prioritize exact unit
+  classification and index insertion costs before revisiting grid size.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for

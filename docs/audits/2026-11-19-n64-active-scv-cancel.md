@@ -224,8 +224,8 @@ its controller group. The last A release is the placement at step
 
 | N64 observer step | Minerals | HUD supply | State |
 | ---: | ---: | ---: | --- |
-| 14,160 | — | 10/10 | Depot under construction, paid SCV bar empty |
-| 15,710 | — | 10/10 | Depot incomplete, paid SCV still at zero |
+| 14,160 | 72 | 10/10 | Depot under construction, paid SCV bar empty |
+| 15,710 | 80 | 10/10 | Depot incomplete, paid SCV still at zero |
 | 15,960 | 88 | 11/18 | Depot complete, existing SCV takes the supply reservation |
 | 16,410 | 88 | 11/18 | Existing SCV has 46 filled pixels of progress |
 | 17,160 | 104 | 11/18 | Training portrait and bar gone after SCV completion |

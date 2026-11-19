@@ -355,7 +355,8 @@ The matched dense Z7 ARM replay preserves all 131 historical checks,
 per-update actor transition observations. Mean whole-update cycles
 change from 1,822,508 to 1,822,015 and p95 rises from 2,652,372 to
 2,657,081. Mean post-orders cycles change from 268,636 to 268,294.
-This is effectively flat and does not justify expanding the grid.
+The default 256-pixel grid uses less temporary memory for essentially
+the same whole-update timing.
 
 - 128-pixel replay SHA-256 `842c23c538b10baab6f1a182d0a5d0397522a325be2dadb28aba05f9e84bf5f5`.
 - 128-pixel ROM SHA-256 `d578200b48e2ff83d4a1d7967068accd1b7b7df4be44cf9c47ab87461af3d220`.
@@ -388,3 +389,28 @@ while other heavy defense configurations and profiles are checked.
 
 - Packed filter replay SHA-256 `e87843dfbf97841d5fe4bd46bafa1a86fe6a98188985f4be4dbe327565938140`.
 - Packed filter ROM SHA-256 `4071ecc6882f913f81372c288963e5af8628b13f0ff8c01a683e67ede8046ce1`.
+
+### Index construction and search costs
+
+A separate diagnostic link records defense stages around the stock
+256-pixel index and queries. It reproduces the same 131 historical
+checkpoints, 480 frame and route records, nine raw cuts and actor
+transitions. The counters are instrumented scope measurements.
+
+| Defense scope across 477 advancing updates | Mean guest cycles |
+| --- | ---: |
+| Full pass | 87,925 |
+| Setup, including the unit index | 49,153 |
+| Unit index alone | 43,193 |
+| Target queries | 30,534 |
+| Remaining defense loop and effects | 8,238 |
+
+The pass runs a mean of 29.92 queries and finds at least one ready
+defense on every measured update. Lazy setup for zero-ready passes
+therefore has no opportunity on this dense window. The next defense
+probe should isolate unit classification and insertion within the
+index build. Where the profile already prepares fact tables, compare
+the reference classification with the table-backed lookup before
+adding storage.
+
+- Instrumented replay SHA-256 `4ca95c7df9bc20dbaf061010720f1206a690ad357871af0d14c41f553846b1de`.
