@@ -30,9 +30,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Current recurring-order tests](audits/2026-11-20-p7-recurring-orders.md)
   cut P7 mean cycles 1.20% by rejecting distant candidates earlier in the
   primary collision scan. The paired three-AI Blood Bath windows are
-  effectively flat. Verify the other memory-constrained links and
-  ordinary replays before enabling. Keep the optical cache and combined
-  primary/fallback mask trials out of the normal builds.
+  effectively flat. The shared recipe passes all four ARM links, the
+  T4 victory, a Showcase scene and the dense Z7 prefix. Showcase has
+  72 bytes below the IWRAM link guard. Keep the optical cache and
+  combined primary/fallback mask trials out of the normal builds.
+  Compose the resumable point-route trial with the released empty-goal
+  path before retesting its dense Z7 speedup.
 
 - **Frontier Skirmish (P1):** an independently authored battle profile
   now starts Transit Yard and Stone Gardens with one to three computer
@@ -506,9 +509,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   after retirement. Four HOST profiles pass pause/save and fresh load
   between retirement and victory. Qualify the ARM boundary and native
   countdown. An opt-in Battlecruiser survivor transfer also passes mixed
-  cargo and Yamato HOST save tests. Qualify native technology and flight
-  behavior, the other coupled survivors, and simultaneous outcomes before
-  default enablement.
+  cargo and Yamato HOST save tests. Empty and docked Carrier groups
+  now pass the P10 HOST transfer and save tests. Qualify compact saves,
+  queued and launched fighters, native technology and shot behavior,
+  the other coupled survivors, and simultaneous outcomes before enabling.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
@@ -1855,8 +1859,9 @@ AI wallets and full-match behavior remain unverified.
   overlap click selected the foreground Overlord over a Hatchery.
   [Draft #587](https://github.com/ggu/starcraft-gba/pull/587) applies the
   same depth rule to cross-kind opaque hits. The HOST fixture and an
-  ordinary P10 ARM Outpost replay match that selection. Qualify other
-  products and poses before enabling it.
+  ordinary P10 ARM Outpost replay match that selection. Showcase scene
+  navigation and Z10 Blood Bath save/load also pass. Qualify the Terran
+  build and additional poses before broadening it.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.

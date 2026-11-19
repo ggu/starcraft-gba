@@ -61,6 +61,10 @@ static u8 sc64_contact_class[SC64_CONTACT_TYPES];
     !defined(SC64_CONTACT_STEER_ROM) && !defined(SC64_CONTACT_EARLY_AXIS_PROBE)
 #define SC64_CONTACT_EARLY_AXIS_PROBE 1
 #endif
+#if defined(SC64_CONTACT_EARLY_DIRECT) && \
+    (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+#define SC64_CONTACT_EARLY_DIRECT_ENABLED 1
+#endif
 
 static int GBA_HOT unit_step_clear(const Unit *q, int nx, int ny);
 static int sc64_unit_bucket_step_clear_reference(const Unit *q, int nx, int ny, int strict);
@@ -216,7 +220,7 @@ sc64_contact_mover(const Unit *q, int *radius, int *flying)
      (!defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)))
 #error "early contact axis rejection requires packed actor coordinates"
 #endif
-#if defined(SC64_CONTACT_EARLY_AXIS_PROBE) || defined(SC64_CONTACT_EARLY_DIRECT)
+#if defined(SC64_CONTACT_EARLY_AXIS_PROBE) || defined(SC64_CONTACT_EARLY_DIRECT_ENABLED)
 _Static_assert(sizeof(((Unit *)0)->type) == 1, "contact reach proof covers byte actor types");
 enum { SC64_CONTACT_REACH_CHECKED = 4 };
 static u8 sc64_contact_reach_layers;
@@ -257,7 +261,7 @@ sc64_contact_step_clear(const Unit *q, int nx, int ny, int strict)
     if (mover == 0) return sc64_unit_bucket_step_clear_reference(q, nx, ny, strict);
     p6 = sc64_contact_p6_active();
     reach = SC64_CONTACT_REACH(mover_flying);
-#ifdef SC64_CONTACT_EARLY_DIRECT
+#ifdef SC64_CONTACT_EARLY_DIRECT_ENABLED
     unsigned layers = sc64_contact_reach_layers;
     if (!layers) layers = sc64_contact_check_reach_layers();
     unsigned axis_span = (layers & (1u << mover_flying)) && mover_radius <= reach + 1
@@ -277,7 +281,7 @@ sc64_contact_step_clear(const Unit *q, int nx, int ny, int strict)
                 const Unit *c = &u[i];
                 u8 cc;
                 int radius, dx, dy, ox, oy;
-#ifdef SC64_CONTACT_EARLY_DIRECT
+#ifdef SC64_CONTACT_EARLY_DIRECT_ENABLED
                 if (i == mover_slot) continue;
                 dx = c->x - nx; dy = c->y - ny;
                 if ((unsigned)dx + (unsigned)reach > axis_span ||
@@ -298,7 +302,7 @@ sc64_contact_step_clear(const Unit *q, int nx, int ny, int strict)
                 if (((cc & SC64_CONTACT_FLYING) != 0) != mover_flying) continue;
                 if (sc64_contact_burrowed(c, cc, p6)) continue;
                 if (radius < mover_radius) radius = mover_radius;
-#ifndef SC64_CONTACT_EARLY_DIRECT
+#ifndef SC64_CONTACT_EARLY_DIRECT_ENABLED
                 dx = c->x - nx; dy = c->y - ny;
 #endif
                 if (dx <= -radius || dx >= radius || dy <= -radius || dy >= radius) continue;

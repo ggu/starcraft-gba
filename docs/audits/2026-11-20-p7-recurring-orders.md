@@ -83,11 +83,47 @@ matching sampled world and framebuffer pairs. Blood Bath matches all
 The prepared ASan/UBSan oracle passes 4,138,459 step checks and 637,410
 active-mask checks. The trial P10 link uses 168 more IWRAM bytes, ending
 at `0x03004e20`, with unchanged EWRAM. All 40 private inputs match.
-Keep the change opt-in until the other canonical links and representative
-ordinary controller replays have been checked. These are emulated cycles.
+The initial P10 comparison used the opt-in flag. These are emulated cycles.
 In a prepared checkout, use
 `make CC='arm-none-eabi-gcc -DSC64_CONTACT_EARLY_DIRECT' verify-protoss-p10`
 for the trial. The isolated source reproduces its verified ROM byte for byte.
+
+## Shared build qualification
+
+The canonical contact recipes enable `CANONICAL_CONTACT_EARLY_DIRECT` by default.
+The implementation activates in the packed actor layouts. Older integer
+actor layouts keep their established primary query. Set the build option
+to zero for the comparison recipe. The lookup build key carries the
+setting. All four candidate links retain the prepared input hashes and
+pass ROM, SRAM signature and RAM checks. The standard P10 recipe
+reproduces the already qualified opt-in ROM byte for byte.
+
+| Canonical cartridge | Release IWRAM end | Candidate IWRAM end | Candidate EWRAM end |
+| --- | --- | --- | --- |
+| Terran | `0x03004838` | `0x030048a8` | `0x02038d5c` |
+| Zerg Z10 | `0x03004ce8` | `0x03004d88` | `0x02037e80` |
+| Protoss P10 | `0x03004d78` | `0x03004e20` | `0x0203b434` |
+| Showcase | `0x03004f10` | `0x03004fb8` | `0x02038f68` |
+
+The Terran T4 replay wins in both builds after 8,952 ordinary controller
+calls. Its 45 sampled framebuffer pairs, 10 runtime and post-save
+checkpoints, and complete final SRAM match. The busiest 600-call mean
+moves from 981,592 to 981,728 cycles.
+
+The ordinary Showcase Carrier scene prefix matches its per-call frame
+and screen sequence and all six sampled framebuffer pairs. Calls
+72–1,071 average 1,080,128 cycles in both builds. The measured peak
+increases from 1,888,176 to 1,933,292 cycles at frame 1, the scene's
+first active update. Showcase has 72 bytes below the existing IWRAM
+link guard.
+
+Both Z10 ROMs match all 131 named checkpoints on the Z7 prefix and all
+480 frame, screen and route-counter rows in the dense window. Eight
+world, palette, display selector and raw framebuffer observations match.
+Over the 477 advancing updates, mean main-loop cycles fall from
+2,344,482 to 2,340,889 and p95 from 3,393,766 to 3,389,340. The exact
+Z10 host vector also passes 4,135,391 ordinary and 4,135,391 strict
+placement comparisons under ASan and UBSan.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -101,3 +137,8 @@ for the trial. The isolated source reproduces its verified ROM byte for byte.
 | P7 baseline and earlier primary rejection | `edcf47a76a4a806b4b1def8958700b43a7e9f179c69e75af1b911daa41a3ee08` |
 | Blood Bath earlier primary rejection | `435d3afe76c5328025ebaa955bae02ff0000bd0f77a363f1b0a71368372947d2` |
 | Earlier primary rejection ARM ROM | `7e03188adcc9f1b7c1759a684e2c708d2b98d650109d003f9b7ee9d4e4829ff2` |
+| Terran T4 full replay comparison | `61e553b92689e5b259b39537c6a791ad0ee8a701e9217941805ef544a8764fe4` |
+| Showcase Carrier scene comparison | `8fa5e1f4f25e5bc7ff8589d6cd88cd8e7fb9a271ed262dae831c348ecddaca36` |
+| Z7 dense-window release | `cb3c088ca484c077cb7903c35b0875610d06b5ee5c67ba62c2700edb1f963235` |
+| Z7 dense-window candidate | `6b11688c76f516bbb0aaa0fff501b1299ee8cfd6707b20abb268c4ecdc57073c` |
+| Z10 ordinary and strict sanitizer checks | `ec57bcfba8f330901677d592e99d16dc71f979b744eb5f7b13a7981332410294` |
