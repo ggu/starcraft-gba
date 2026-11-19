@@ -739,6 +739,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   state. Late combat peak drops from 7.56M to 5.42M cycles, and the whole
   replay mean is effectively flat. Qualify another wide campaign and
   check the one sampled display-page timing difference before enabling.
+  The next stall at P10 call 45,231 spends 3.43M cycles in six distinct
+  point floods. Profile the setup, expansion, and pack loops for those
+  exact goals to guide the next routing change.
   The shared Command census cuts mean cost in current normal P8, P9, P10,
   and Z8 replays with matching outcomes. Fresh HOME reload matches P10
   through victory; both current products match paired Blood Bath saves.

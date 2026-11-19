@@ -59,6 +59,34 @@ The depot update itself falls from 7,556,344 to 3,612,590 cycles
 in the uninterrupted run. The peak moves to a different update.
 The whole replay remains at about 10.46 emulated updates per second.
 
+## Next late combat stall
+
+The new peak occurs at call 45,231. Starting from the same pause
+save reproduces the ordinary A edge and advances frame 44,122 to
+44,123. This continuation takes 5,421,981 cycles, with 4,173,362
+in orders. Six full point floods take 3,429,423 cycles. The largest
+takes 923,721 cycles. The two depot lookups take 3,288 cycles total.
+
+The 16 point lookups issue six distinct cold goals. This table gives
+the first observed request for each newly built field, in call order,
+on the 128-column map.
+
+| Origin cell | Goal cell |
+| ---: | ---: |
+| 8,244 | 9,400 |
+| 8,245 | 9,401 |
+| 8,245 | 9,402 |
+| 8,504 | 9,528 |
+| 8,632 | 9,530 |
+| 8,631 | 9,656 |
+
+The existing cache serves the repeated goals within this update.
+Profile grid setup, traversal, and packing on each cold request before
+changing their admission rules. The separate [resumable route trial](2026-11-16-resumable-frontier-budget.md)
+cuts this update from 5,363,816 to 5,167,782 cycles in its paired full
+P10 run. That replay predates the wide depot change, so the gains are
+measured independently.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Release depot call trace | `69c7d9ccea076be6fb59d37d9f96e2d20f789d23debe44dc652389078edaa705` |
@@ -67,3 +95,5 @@ The whole replay remains at about 10.46 emulated updates per second.
 | Trial fresh-SRAM victory | `968b49fb59cfca8d1a388371b62e9f3df19a915723f36b33b041fa8d7a3510b5` |
 | Release full HOME victory | `dd40e45c0578c03a9a0a59b861c86d61643d44c727ea048a9a85cd9e417c5aae` |
 | Trial full HOME victory | `207d3f5ffdd208f62912fcf217598382b45d0c24ae10e34b7d9db0ca80263a3d` |
+| Next peak phase trace | `13baad40a7bb7104c7e7c5d542c23112db7f33ae8c12bf2d80e9acc55afcbe4a` |
+| Next peak point trace | `fc25b66ca4576e0b11a5e840220db019cf53a164b33ecec5a15da9dead0c257d` |
