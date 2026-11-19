@@ -134,12 +134,20 @@ sc64_minimap_draw_indicators(void)
 #endif
 }
 
+#ifndef SC64_MINIMAP_RASTER_ACTIVE
+static inline void
+sc64_minimap_draw_panel(void)
+{
+    gfx_rect(181, 124, 56, 34, C_BLACK);
+    gfx_frame(181, 124, 56, 34, C_EDGE);
+}
+#endif
+
 static void
 draw_minimap(void)
 {
 #ifndef SC64_MINIMAP_RASTER_ACTIVE
-    gfx_rect(181, 124, 56, 34, C_BLACK);
-    gfx_frame(181, 124, 56, 34, C_EDGE);
+    sc64_minimap_draw_panel();
 #endif
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_MINIMAP_RASTER_ACTIVE
@@ -223,12 +231,11 @@ draw_minimap(void)
     sc64_minimap_draw_indicators();
 }
 
-#if defined(SC64_HUD_MINIMAP_CENSUS) && defined(SC64_RACES) && \
-    defined(SC64_MINIMAP_RASTER_ACTIVE)
+#if defined(SC64_HUD_MINIMAP_CENSUS) && defined(SC64_IMPORTED_MISSION) && \
+    defined(SC64_RACES) && !defined(SC64_TILE_RENDERER)
 #define SC64_HUD_MINIMAP_CENSUS_ACTIVE 1
 
-/* Scratch for one HUD draw. Fog keeps its own raster and can change freely
- * between draws. Copy whole words to avoid the freestanding bytewise memcpy. */
+/* Scratch for one HUD draw, regenerated from the current fog state. */
 enum { SC64_MINIMAP_WORDS = SC64_MINIMAP_SIZE * SC64_MINIMAP_SIZE / sizeof(u32) };
 static _Alignas(4) u32 sc64_minimap_composed[SC64_MINIMAP_WORDS];
 static int sc64_minimap_requires_scalar;
@@ -236,9 +243,17 @@ static int sc64_minimap_requires_scalar;
 static void
 sc64_minimap_census_begin(void)
 {
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    /* Copy whole words to avoid the freestanding bytewise memcpy. */
     for (unsigned i = 0; i < SC64_MINIMAP_WORDS; ++i)
         __builtin_memcpy(&sc64_minimap_composed[i],
                          sc64_minimap_raster + i * sizeof(u32), sizeof(u32));
+#else
+    u8 *pixels = (u8 *)(void *)sc64_minimap_composed;
+    for (unsigned i = 0; i < sizeof(sc64_minimap_composed); ++i)
+        pixels[i] = sc64_minimap_visible[i] ? C_GRASS :
+                    sc64_minimap_explored[i] ? C_FOG : C_BLACK;
+#endif
     sc64_minimap_requires_scalar = 0;
 }
 
@@ -281,6 +296,11 @@ sc64_minimap_draw_census(void)
         draw_minimap();
         return;
     }
+#ifndef SC64_MINIMAP_RASTER_ACTIVE
+    /* The scalar terrain path repaints the panel, including the frame and
+     * the margin outside the map, on every draw. */
+    sc64_minimap_draw_panel();
+#endif
     gfx_blit_opaque(SC64_MINIMAP_X, SC64_MINIMAP_Y,
                     SC64_MINIMAP_SIZE, SC64_MINIMAP_SIZE,
                     (const u8 *)(const void *)sc64_minimap_composed);

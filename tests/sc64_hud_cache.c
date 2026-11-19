@@ -606,8 +606,14 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
 
 #ifdef SC64_HUD_MINIMAP_CENSUS_ACTIVE
 static void
-assert_minimap_census_matches_scalar(int scalar_fallback, int outside_dot)
+assert_minimap_census_matches_scalar(int scalar_fallback)
 {
+#ifdef SC64_HUD_PAGE_BANDS
+    u32 expected_version = 1;
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    if (scalar_fallback) expected_version = ~0u;
+#endif
+#endif
     gfx_begin(0xe7);
 #ifdef SC64_HUD_PAGE_BANDS
     sc64_hud_page_version[gfx_backbuffer_index()][1] = 1;
@@ -615,8 +621,7 @@ assert_minimap_census_matches_scalar(int scalar_fallback, int outside_dot)
     draw_minimap();
     read_full(full_pixels);
 #ifdef SC64_HUD_PAGE_BANDS
-    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] ==
-           (outside_dot ? ~0u : 1u));
+    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] == expected_version);
 #endif
     gfx_end();
 
@@ -630,8 +635,7 @@ assert_minimap_census_matches_scalar(int scalar_fallback, int outside_dot)
     read_full(cached_pixels);
     assert(memcmp(cached_pixels, full_pixels, sizeof(full_pixels)) == 0);
 #ifdef SC64_HUD_PAGE_BANDS
-    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] ==
-           (outside_dot ? ~0u : 1u));
+    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] == expected_version);
 #endif
     gfx_end();
 }
@@ -648,6 +652,11 @@ test_minimap_census_preserves_dot_order_and_page_edges(void)
     const int right_edge = SC64_MINIMAP_X + SC64_MINIMAP_SIZE;
     const int edge_y = SC64_MINIMAP_Y + 12;
     const int last = MAX_UNITS - 1;
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    const u8 margin_color = 0xe7;
+#else
+    const u8 margin_color = C_BLACK;
+#endif
     for (unsigned dimension = 0; dimension < sizeof(sizes) / sizeof(sizes[0]); ++dimension) {
         fixture();
         memset(u, 0, sizeof(u));
@@ -655,7 +664,16 @@ test_minimap_census_preserves_dot_order_and_page_edges(void)
         race_cols = race_rows = sizes[dimension];
         screen = SCREEN_PLAY;
         SC64_GRID_CLEAR(visible);
-        memset(sc64_minimap_raster, C_FOG, sizeof(sc64_minimap_raster));
+        memset(sc64_minimap_visible, 0, sizeof(sc64_minimap_visible));
+        memset(sc64_minimap_explored, 0, sizeof(sc64_minimap_explored));
+        sc64_minimap_explored[12 * SC64_MINIMAP_SIZE + 2] = 3;
+        sc64_minimap_explored[12 * SC64_MINIMAP_SIZE + 3] = 5;
+        sc64_minimap_visible[12 * SC64_MINIMAP_SIZE + 3] = 2;
+        sc64_minimap_explored[18 * SC64_MINIMAP_SIZE + 18] = 1;
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+        for (unsigned i = 0; i < sizeof(sc64_minimap_raster); ++i)
+            sc64_minimap_raster_update(i);
+#endif
         int dot = WORLD_W * 3 / 4;
         int cell = (dot / 16) * MAP_COLS + dot / 16;
         b[MAX_BUILDINGS - 1] = (Building){.alive = 1, .owner = NEUTRAL,
@@ -664,31 +682,34 @@ test_minimap_census_preserves_dot_order_and_page_edges(void)
         u[1] = (Unit){.alive = 1, .owner = SIDE, .type = U_MARINE, .x = dot, .y = dot};
         u[last] = (Unit){.alive = 1, .owner = 1, .type = U_MARINE, .x = dot, .y = dot};
         SC64_GRID_SET(visible, cell, 1);
-        assert_minimap_census_matches_scalar(0, 0);
+        assert_minimap_census_matches_scalar(0);
         assert(cached_pixels[dot_y * 240 + dot_x] == owner_color(1));
         assert(cached_pixels[SC64_MINIMAP_Y * 240 + SC64_MINIMAP_X] == C_HIGHLIGHT);
-        assert(cached_pixels[edge_y * 240 + right_edge] == 0xe7);
-        assert(cached_pixels[edge_y * 240 + SC64_MINIMAP_X - 1] == 0xe7);
+        assert(cached_pixels[edge_y * 240 + SC64_MINIMAP_X + 2] == C_FOG);
+        assert(cached_pixels[edge_y * 240 + SC64_MINIMAP_X + 3] == C_GRASS);
+        assert(cached_pixels[edge_y * 240 + SC64_MINIMAP_X + 4] == C_BLACK);
+        assert(cached_pixels[edge_y * 240 + right_edge] == margin_color);
+        assert(cached_pixels[edge_y * 240 + SC64_MINIMAP_X - 1] == margin_color);
 
         u[last].alive = 0;
-        assert_minimap_census_matches_scalar(0, 0);
+        assert_minimap_census_matches_scalar(0);
         assert(cached_pixels[dot_y * 240 + dot_x] == owner_color(SIDE));
         u[last].alive = 1;
         SC64_GRID_SET(visible, cell, 0);
-        assert_minimap_census_matches_scalar(0, 0);
+        assert_minimap_census_matches_scalar(0);
         assert(cached_pixels[dot_y * 240 + dot_x] == owner_color(SIDE));
 
-        /* A friendly dot one pixel outside the raster must still appear,
-         * and force the next restore of the containing HUD band. */
+        /* A friendly dot just outside the map still appears on the margin.
+         * The cached-panel path invalidates its bottom band for this dot. */
         u[0].x = WORLD_W;
         u[0].y = WORLD_H / 2;
-        assert_minimap_census_matches_scalar(1, 1);
+        assert_minimap_census_matches_scalar(1);
         assert(cached_pixels[edge_y * 240 + right_edge] == owner_color(SIDE));
         u[0].alive = u[1].alive = u[last].alive = 0;
         b[MAX_BUILDINGS - 1].alive = 0;
-        assert_minimap_census_matches_scalar(0, 0);
+        assert_minimap_census_matches_scalar(0);
         assert(cached_pixels[dot_y * 240 + dot_x] == C_FOG);
-        assert(cached_pixels[edge_y * 240 + right_edge] == 0xe7);
+        assert(cached_pixels[edge_y * 240 + right_edge] == margin_color);
     }
     fixture();
 }
