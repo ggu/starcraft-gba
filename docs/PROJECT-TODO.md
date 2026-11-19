@@ -1637,6 +1637,13 @@ save/source-owner and timing evidence; do not advertise unwired components.
   against its same-source control. That candidate preserves all nine
   display and state cuts and reaches the same late-save Z7 victory.
   Qualify the other profiles and workload shapes before activation.
+- [Combined routing and defense](audits/2026-11-19-z7-repeated-negative-route.md#combined-route-and-defense-replay)
+  saves 3.23% in dense Z7 with exact sampled state and late victory.
+  Z9 also wins with 106 matching cuts and a 1.37% whole-playthrough
+  mean improvement. The fused target-index experiment increases dense
+  timing and stays separate. The mixed Blood Bath planner contributes
+  215,517 cycles per planning pass and about 13,578 per update across
+  the whole sample. The AI queue preflight leaves timing flat.
 - A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
   corroborates the paid Terran worker opening in Blood Bath Melee.
   The shared opening cuts show 50 minerals and an empty queue for
@@ -1649,6 +1656,20 @@ save/source-owner and timing evidence; do not advertise unwired components.
   on the three products preserve a paid CPU Egg through fresh SRAM
   load and Drone completion. Compare later AI build order and native
   Probe and Larva actor lifecycles in their own tests.
+- The [first-structure extension](audits/2026-11-12-n64-blood-bath-opening.md#first-structures-after-the-worker-openings)
+  reaches native step 22,000 on the same Melee tape. Terran places a
+  Barracks before a Depot. Protoss and Zerg each expand before their
+  first Pylon or Pool. The regular GBA's 24-lobby comparison starts
+  each race with a Depot, Pool or Pylon respectively. The native Pool
+  costs 150, verified against the native cost table and wallet. The
+  opt-in price preview debits that amount on both maps and cross-loads
+  the already paid structure with the current 200-mineral builds.
+- [Solo Outpost Protoss](audits/2026-11-12-n64-blood-bath-opening.md#solo-outpost-protoss-gateway-recovery)
+  has a reproducible first-Gateway stall. Its normal Pylon fallback
+  misses valid sites on the back arc. The bounded preview places the
+  Gateway and trains a Zealot by ARM update 3,680. Four control lobbies
+  match all sampled world states. Test the other profile flags and
+  long-game pressure before enabling this across all products.
 - [Native mineral handoff](audits/2026-11-12-n64-blood-bath-opening.md#mineral-patch-contention-and-handoff)
   shows one timed worker per contested patch, release on interruption,
   and a waiting worker taking over after an eight-mineral pickup.

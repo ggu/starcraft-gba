@@ -448,3 +448,76 @@ The candidate stays opt-in for further profile and workload checks.
 - Paired control replay SHA-256 `d9b485d46a3e9df2535401526f9bd5ad8d94e1e49af59f027e2c80abaf6d685d`.
 - Lazy replay SHA-256 `c5f1612cbce278298d6e95f1d74d7f5e10138d1208440c6aa0662957f5ea6b38`.
 - Lazy late-save receipt SHA-256 `1084529150f9ba3142fed0bc168c6ac0821df5ff8a958d5015798855c4dde3c6`.
+
+## Combined route and defense replay
+
+One repaired-header Z10 build enables both lazy route rows and lazy
+defense classification on the deferred-seed control. The dense Z7
+replay matches every frame and route record, all 131 historical
+checkpoints, nine raw cuts and the actor transition records. The
+mean falls from 1,822,508 to 1,763,588 cycles and p95 from 2,652,372
+to 2,566,466. The combined reduction is 3.23%, about 9.51 emulated
+updates/s in this scene. The same ROM loads the authenticated late
+save and wins at frame 194,998 with matching raw and display cuts.
+
+Zerg 9 clears the same full controller tape, including modal controls,
+and wins at frame 72,628. Its 106 world and display hashes, 32 historical
+checks, and final route counts match the pinned deferred-seed control.
+The whole-playthrough mean moves from 1,527,716 to 1,506,755 cycles.
+This is a combined campaign test on one ROM profile. Other product
+flags and stack measurements remain in qualification.
+
+- Combined ROM SHA-256 `773303cbfbbae16bdc15074b02416590f7c67c636098425b777bdad1363cf669`.
+- Dense replay SHA-256 `a1315950a36f9868e0a1c6bc60445a7869e7e153d2c243c057f898a78a48dac6`.
+- Z7 late-load cuts SHA-256 `519531073c084f5f0ad00bdeb68b898a259f6852b588e684cc34813ab72cb933`.
+- Z9 full replay SHA-256 `9f376923881ed7ed6fa7eeb503e51e27ec6f52ebb4bda246f3dbe2108af0c656`.
+
+### Fused owner-list and spatial index experiment
+
+The first combined ARM experiment builds the owner lists and spatial
+target index in the same sweep. Sanitizer fixtures cover the owner
+chains, exact spatial chains, dirty keys and fallback. The prepared
+Z10 HOST comparison produces identical 5,841,624-byte traces.
+
+On ARM, the dense replay matches the same 131 historical checks,
+480 frame and route records, nine raw cuts and actor transitions.
+Mean update cycles rise from 1,763,588 to 1,776,343 and p95 rises
+from 2,566,466 to 2,579,347. Both builds resume the late save and
+win at frame 194,998. All actor banks, palette and framebuffer bytes
+match at six cuts. The selected display page differs at frame 194,588.
+The fused prototype stays separate from the combined route and
+defense candidate.
+
+- Fused replay SHA-256 `104b203cce5db6f0192dc95f9cf547242ce40704db116fbb3c724fd7fdc718d0`.
+- Fused late-load receipt SHA-256 `82d81feeaf44be8a4953f731987549a3c4354ab55e166b50a55766bc83e43731`.
+
+## Computer planning in mixed Blood Bath
+
+A read-only instruction trace covers every planner pass in the retained
+1,000-update mixed Blood Bath battle. All 1,000 whole-update and order
+timings, frame IDs and route counters match that ROM's replay.
+
+| Scope across 63 planner passes | Mean guest cycles per pass |
+| --- | ---: |
+| Full planner | 215,517 |
+| Census | 72,452 |
+| Recovery | 8,828 |
+| Development and supply | 74,824 |
+| Production | 25,779 |
+| Military and scout | 33,634 |
+
+The busiest planner pass uses 456,092 cycles, including 270,372 in
+development and supply. In the slowest whole update, the planner uses
+338,452 of 1,990,887 cycles. Its mean contribution across all 1,000
+updates is about 13,578 cycles. This separates planner spikes from the
+larger non-planner work in the same replay.
+
+A separate flag preflights the AI's paid queue checks and skips an
+unneeded exit flood when the path grid is already valid. It preserves
+the stock grid refresh on the invalid path. The control program bytes
+match the retained indexed build. All 25 cuts, route counters and SRAM
+bytes match. Its whole-update mean changes from 787,931 to 787,936
+cycles. Keep the original order in standard builds.
+
+- Planner trace SHA-256 `3420216133772ddbc47bd219731d486eaaa1c74e33d0f46490970b09c8865945`.
+- Queue preflight replay SHA-256 `c6f67b65bfe4f27203f836111eec4c3ceba01a78a1ba67a9092ba8926ac017c2`.

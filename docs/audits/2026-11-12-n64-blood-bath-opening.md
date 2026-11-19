@@ -493,6 +493,89 @@ until the worker appears.
 - GBA opening matrix SHA-256 `c87f57cc444f36d92b87365d2ec691ede58da0bdcafda46043c9c1726e725161`.
 - GBA Egg selector and SRAM comparison SHA-256 `ccfadd1650b5c26d528c67aad550c1a7ab8c05ddddfee08160c92521429f6153`.
 
+## First structures after the worker openings
+
+The same four-seat native Melee replay extends to observer step
+22,000 with the human controls neutral. The preceding economy packets
+through step 10,200 match byte for byte, as does the opening frame.
+The clean extension has 17,801 valid samples. The table separates
+the paid actor's debut from the first full-health sample.
+
+| CPU | First structure other than a town hall | Paid step and minerals | First sampled full health |
+| --- | --- | --- | --- |
+| Terran | Barracks, raw 111, slot 33 | 8,238, 172 → 22 | 12,284 |
+| Protoss | Pylon, raw 156, slot 45 | 13,128, 124 → 24 | 14,629 |
+| Zerg | Spawning Pool, raw 142, slot 39 | 14,474, 176 → 26 | 18,500 |
+
+Terran places its Depot after the Barracks, at 10,309 for 100
+minerals. Protoss starts a second Nexus at 12,931 for 400 before
+placing the Pylon, then builds another Pylon and a Forge. Zerg
+starts a second Hatchery at 12,949 for 300 before the Pool, then
+starts an Extractor. The Pool's slot carries a Drone with the Pool
+in its order list at 14,454 and the new structure at 14,474. The
+native cost table independently agrees with all five observed prices.
+
+The retained GBA Terran, Z10 and P10 builds run 24 lobbies with 36
+opponents on Outpost and Blood Bath FFA. Each NPC slot's first
+construction transition is replayed to the exact update. Terran
+starts a 100-mineral Depot first in both maps, consistent with its
+current supply-first planning path. Its Barracks is already legal
+from a completed Command Center in the custom-game catalog. Zerg
+starts a 200-mineral Pool first, consuming a Drone, and Protoss
+starts a 100-mineral Pylon first. Exact Pool debits include 1,130 → 930
+in dense Outpost and 688 → 488 in dense Blood Bath. These controls
+compare first structures and price. The observed N64 launch and the
+regular GBA use different opponent relations and map placements.
+
+- Extended native manifest SHA-256 `7285ac2b3a793bdd427d07e6c234281bac640fdded0de50fe5cb201b4910bdb3`.
+- Extended native economy trace SHA-256 `6e88f6e2127a1325caac69e92ef826d304037b94172c120d2e9d22d0073d6cea`.
+- GBA 24-lobby comparison SHA-256 `4c868bb76743d3eac89daa760603993c88d523c6f15ac29011b7926f9fff8a05`.
+
+### N64 Spawning Pool price preview
+
+The opt-in `SC64_N64_SPAWNING_POOL_PRICE` rule sets the shared
+Spawning Pool price to 150. Menu
+quotes, AI budgeting and all paid build requests use that same rule.
+The sanitizer rules fixture checks rejection one mineral short and
+the exact debit with enough minerals under both price configurations.
+
+Two ordinary CPU Zerg openings on each Z10 build verify the debit
+at the formation update. Outpost places the Pool at frame 2,328
+on both builds, moving 1,026 → 826 on the control and 1,026 → 876
+in the preview. Blood Bath places it at frame 2,699, moving 680 → 480
+and 680 → 530 respectively. Each build saves the unfinished paid
+structure using the regular pause menu. Each loads the opposite
+build's save in a fresh process, restores the same semantic state and
+wallet, and completes the same building in the original slot. The
+preview stays opt-in pending wider profile and campaign qualification.
+
+- Price preview ROM SHA-256 `cfa810787994bee918f0aaa734d9d6f6a7e0cdbe4c7d1f5fd0b5a50a76f680c7`.
+- Ordinary controller and cross-load SHA-256 `2fb41d5df2e7595243122df144812eef1d5090f25dbede7f825bc67d9113febe`.
+
+### Solo Outpost Protoss Gateway recovery
+
+Three retained GBA profiles reach update 6,500 in the same solo
+Protoss Outpost layout with a completed Pylon and Assimilator,
+12 Probes, more than 3,800 minerals, and no Gateway. A read-only ARM
+trace confirms all 216 candidate sites that reach the final eligibility
+check fail psi power. The HOST replay reproduces the layout and finds
+two powered, clear sites on the unused back arc of the 64-pixel ring
+around the first Pylon at (93, 931).
+
+The `SC64_AI_FIRST_GATEWAY_FULL_RING` preview checks all 16 directions
+only on the first missing Gateway's fallback ring. It keeps the existing
+order for the first nine directions and the same cap of eight expensive
+checks. The ordinary HOST test pays for a Gateway at (34, 907) at frame
+1,758, completes it at 2,882 and trains a Zealot at 3,677. The paired
+ARM samples see these milestones by updates 1,760, 2,912 and 3,680.
+Control and preview match through the seven pre-change cuts. In four
+other ARM comparisons, all 27 sampled world states match per pair,
+including dense Outpost, solo and dense Blood Bath, and Outpost with
+non-Protoss opponents. The preview uses the same linked RAM limits.
+
+- ARM diagnosis SHA-256 `35eb14213a622bfa36e3ec204917912b55174c7b16b2d5c724b438e585d4012d`.
+- Paired ARM replay SHA-256 `7db24c236436ce228d63b60beb77399538417e211083e4bd361ef37943f8e47c`.
+
 ## Mineral patch contention and handoff
 
 The same retained Melee captures show four starting workers assigned to
