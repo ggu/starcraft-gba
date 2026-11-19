@@ -2012,6 +2012,11 @@ static void race_tick_ai(void)
 }
 
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int sc64_p7_carrier_child_docked(int type, unsigned flags);
+static int race_p7_carrier_training_candidate_valid(const Unit *actors, int count);
+#endif
+
 /* These actors are coupled to separately stored service records. Hold the
  * entire owner transition until the linked case is supported; do not
  * expose overlapping loaded passengers or publish half a transfer. */
@@ -2025,12 +2030,14 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
             q->x != u[carrier].x || q->y != u[carrier].y) return 0;
     }
 #endif
-    if (SC64_CARRIER_CHILD_SCRIPTED(q) || SC64_SCARAB_CHILD(q)) return 0;
+    if (SC64_SCARAB_CHILD(q)) return 0;
 #ifdef SC64_EGG_RUNTIME
     if (q->type == SC64_EGG_ACTOR) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (SC64_P7_CARRIER_PARENT_TYPE(q->type)) return 0;
+    if (SC64_P7_CARRIER_PARENT_TYPE(q->type) && q->carry) return 0;
+    if (SC64_CARRIER_CHILD_SCRIPTED(q) &&
+        !sc64_p7_carrier_child_docked(q->type, (unsigned)q->flags)) return 0;
 #endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
     if (sc64_race_raw_unit(q->type) == 83) return 0;
@@ -2053,12 +2060,18 @@ static int race_skirmish_transfer_survivors(int owner)
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     unsigned battlecruiser_tech = sc64_battlecruiser_tech_bits;
 #endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    int has_carrier_group = 0;
+#endif
     /* Validate every survivor and stage shared capabilities before mutating
      * any actor or sidecar. Retirement publishes only after this commit. */
     for (int i = 0; i < MAX_UNITS; ++i) {
         const Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;
         if (!race_skirmish_neutral_transfer_ready(q)) return 0;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        has_carrier_group |= SC64_P7_CARRIER_PARENT_TYPE(q->type) || SC64_CARRIER_CHILD_SCRIPTED(q);
+#endif
 #ifdef SC64_SHARED_TRANSPORT
         if (research >= 0 && race_skirmish_transport_tech.owner[research].researched &&
             race_transport_overlord_identity(q)) ventral = 1;
@@ -2084,6 +2097,10 @@ static int race_skirmish_transfer_survivors(int owner)
         }
 #endif
     }
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    /* Validate ranks and links, including children owned by other players. */
+    if (has_carrier_group && !race_p7_carrier_training_candidate_valid(u, MAX_UNITS)) return 0;
+#endif
 
 #ifdef SC64_SHARED_TRANSPORT
     race_skirmish_neutral_ventral |= (u8)ventral;
@@ -2107,7 +2124,7 @@ static int race_skirmish_transfer_survivors(int owner)
             q->order = ORDER_IDLE;
             q->target = -1;
         }
-        q->build = -1;
+        if (!SC64_CARRIER_CHILD_SCRIPTED(q)) q->build = -1;
         q->tx = q->path_x = q->x;
         q->ty = q->path_y = q->y;
         q->work_timer = q->path_timer = q->path_retry = 0;

@@ -87,6 +87,25 @@ ordinary Pause and HOME controls. A released shot hits its original target
 after load. Actor rows, tech fields and the cargo and projectile records use
 the existing save layout.
 
+## Empty and docked Carrier survivors
+
+The opt-in transfer supports Carrier hangars with no queued orders and only
+fully docked Interceptors. It validates the live hangar graph before retiring
+the owner. Each docked child keeps its parent slot and hangar rank while the
+group becomes neutral. Saved neutral links use the existing actor fields and
+pass the same typed graph validation as active Carrier links. Queued orders,
+training, launched and detached children still defer the owner transfer.
+
+The [native linked-survivor audit](2026-11-13-n64-blood-bath-linked-survivors.md)
+establishes the Carrier queue reset and the general owner transfer path.
+Individual Interceptor outcomes across native transfer remain unverified.
+The P10 sanitizer fixture exercised an empty Carrier and docked Interceptors
+in slots before and after their parent. A duplicate rank blocked the entire
+transfer. After restoring the rank, the group survived Pause save and HOME
+load, refused new training orders, and used the existing child cleanup when
+the neutral parent died. Compact journals and ARM timing remain open for
+this change.
+
 ## Emulated transition cost
 
 The Terran preview's retiring update took 671,303 elapsed ARM cycles,

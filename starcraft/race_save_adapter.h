@@ -3483,6 +3483,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        int docked_interceptor = 0, queued_interceptors = 0;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        docked_interceptor = sc64_p7_carrier_child_docked(RACE_U(i,type), (unsigned)RACE_U(i,flags));
+        queued_interceptors = SC64_P7_CARRIER_PARENT_TYPE(RACE_U(i,type)) && RACE_U(i,carry);
+#endif
         if ((saved_eliminated || (v[0] && v[19] && saved_starts)) &&
             (race_skirmish_retired_owner(saved_eliminated, RACE_U(i,owner)) ||
              (RACE_U(i,owner) == NEUTRAL && RACE_U(i,raw_owner) == 11 &&
@@ -3492,7 +3497,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
                ) || RACE_U(i,selected) ||
                (RACE_U(i,order) == ORDER_IDLE && RACE_U(i,target) != -1) ||
-               RACE_U(i,build) != -1 ||
+               (RACE_U(i,build) != -1 && !docked_interceptor) || queued_interceptors ||
                RACE_U(i,tx) != RACE_U(i,x) || RACE_U(i,ty) != RACE_U(i,y) ||
                RACE_U(i,path_timer) || RACE_U(i,path_retry) || RACE_U(i,work_timer))))) return 0;
 #endif

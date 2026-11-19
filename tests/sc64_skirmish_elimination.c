@@ -182,13 +182,76 @@ static void check_elimination(int melee)
 }
 
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static void check_docked_carrier_retirement(void)
+{
+    launch(0);
+    const int owner = 4;
+    const int gap = spawn_unit(owner, U_ZEALOT, 480, 500);
+    const int carrier = spawn_unit(owner, U_P7_CARRIER, 500, 500);
+    const int empty = spawn_unit(owner, U_P7_CARRIER, 520, 500);
+    assert(gap >= 0 && carrier > gap && empty > carrier);
+    hit_target(gap, 5000, U_MARINE, SIDE);
+    assert(!u[gap].alive && race_p7_carrier_training_stock(carrier, 2) == 2);
+    int second = -1;
+    for (int i = carrier + 1; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].type == U_P7_INTERCEPTOR && u[i].build == carrier) second = i;
+    assert(second > carrier && u[gap].alive && u[gap].build == carrier &&
+           sc64_p7_carrier_child_state(&u[gap]) == SC64_P7_INTERCEPTOR_INSIDE);
+    const unsigned early_rank = sc64_p7_carrier_child_rank(&u[gap]);
+    const unsigned late_rank = sc64_p7_carrier_child_rank(&u[second]);
+    assert(early_rank != late_rank);
+
+    destroy_building(building_of(owner), SIDE);
+    sc64_p7_carrier_child_set_rank(&u[second], early_rank);
+    static Unit before[MAX_UNITS];
+    memcpy(before, u, sizeof(u));
+    race_skirmish_outcome();
+    assert(!race_skirmish_eliminated && !memcmp(before, u, sizeof(u)));
+    sc64_p7_carrier_child_set_rank(&u[second], late_rank);
+
+    race_skirmish_outcome();
+    assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 4);
+    assert(u[carrier].alive && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11 &&
+           u[empty].alive && u[empty].owner == NEUTRAL && u[empty].raw_owner == 11);
+    assert(race_p7_carrier_training_child_count(carrier) == 2 &&
+           !race_p7_carrier_training_child_count(empty));
+
+    tap(KEY_START);
+    assert(screen == SCREEN_PAUSE);
+    tap(KEY_B);
+    game_init(); prior_keys = 0;
+    input(KEY_L);
+    assert(screen == SCREEN_PLAY && !won && !lost && race_skirmish_eliminated == 4);
+    assert(u[carrier].alive && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11 &&
+           u[empty].alive && u[empty].owner == NEUTRAL && u[empty].raw_owner == 11 &&
+           u[carrier].order == ORDER_IDLE && u[empty].order == ORDER_IDLE);
+    const int neutral_bank = race_minerals[NEUTRAL];
+    race_minerals[NEUTRAL] = SC64_P7_INTERCEPTOR_COST;
+    assert(!race_p7_carrier_training_queue_owner(carrier) &&
+           !race_p7_carrier_training_queue_owner(empty));
+    race_minerals[NEUTRAL] = neutral_bank;
+    for (int i = 0; i < 8; ++i) game_update(0, 0);
+    assert(u[gap].alive && u[gap].owner == NEUTRAL && u[gap].raw_owner == 11 &&
+           u[gap].build == carrier && sc64_p7_carrier_child_rank(&u[gap]) == early_rank &&
+           sc64_p7_carrier_child_state(&u[gap]) == SC64_P7_INTERCEPTOR_INSIDE);
+    assert(u[second].alive && u[second].owner == NEUTRAL && u[second].raw_owner == 11 &&
+           u[second].build == carrier && sc64_p7_carrier_child_rank(&u[second]) == late_rank &&
+           sc64_p7_carrier_child_state(&u[second]) == SC64_P7_INTERCEPTOR_INSIDE);
+    hit_target(carrier, 5000, U_MARINE, SIDE);
+    assert(!u[carrier].alive && !u[gap].alive && !u[second].alive && u[empty].alive);
+    assert(race_save_game());
+}
+
 static void check_fenced_final_result(int human_defeat)
 {
     launch(0);
     const int owner = 4, bit = 4, type = U_P7_CARRIER;
     const int ship = spawn_unit(owner, type, 500, 500);
     const int survivor = spawn_unit(owner, U_MARINE, 480, 500);
-    assert(ship >= 0 && survivor >= 0 && !race_skirmish_neutral_transfer_ready(&u[ship]));
+    assert(ship >= 0 && survivor >= 0 && race_p7_carrier_training_queue_owner(ship));
+    assert(!race_skirmish_neutral_transfer_ready(&u[ship]));
+    const int trainee = race_p7_carrier_training_start(ship);
+    assert(trainee >= 0 && !race_skirmish_neutral_transfer_ready(&u[trainee]));
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner != SIDE && b[i].owner != owner)
             destroy_building(i, SIDE);
@@ -522,6 +585,7 @@ int main(void)
     check_queued_elimination();
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    check_docked_carrier_retirement();
     check_fenced_final_result(0);
     check_fenced_final_result(1);
 #endif
