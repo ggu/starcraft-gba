@@ -1,5 +1,8 @@
 # Combined defense optimization replay
 
+The initial opt-in experiments below predate the [qualification on the
+terrain default](#qualification-on-the-terrain-default).
+
 This composes the [Pylon lookup](https://github.com/ggu/starcraft-gba/pull/396)
 with [spatial target selection](https://github.com/ggu/starcraft-gba/pull/398)
 in one optional Z10 cartridge. The two probes interact within the same defense
@@ -229,3 +232,65 @@ Outpost matched 76 observations through frame 18,621; Blood Bath matched
 campaign gain is material and custom mean cost changes by under 0.4% in
 the measured windows. Other products retain their previous selection.
 The worst route stalls and the hardware 30 fps target remain open.
+
+## Qualification on the terrain default
+
+The normal Terran, Z10, P10 and Showcase cartridges share the Pylon
+snapshot, with spatial targeting on the existing Zerg/Protoss campaign
+list path. The late Terran, P3 and custom-game target policies retain their
+original search and filtering. Z10 already enabled both queries and is
+byte-identical after the shared build change.
+
+On `dee0993e`, the exact P10 comparison uses the same 1,000 physical
+input calls, including 958 advancing updates. All 11 world, fog,
+framebuffer and palette samples match. The 1,000 frame, mode, screen and
+route observations also match.
+
+| P7 window | Terrain default | With defense queries |
+| --- | ---: | ---: |
+| Mean cycles per advancing update | 1,958,744 | 1,921,336 |
+| 95th percentile cycles | 2,254,453 | 2,215,763 |
+| Peak cycles | 2,626,585 | 2,587,134 |
+
+The mean fell 1.91%. The measured cost is still above the 561,792-cycle
+budget for a 30 fps GBA display and update loop. The budget comparison uses
+mGBA guest CPU cycles.
+
+Four ARM builds pass the original EWRAM and IWRAM guards. The paired saves
+from both maps use human Terran, Zerg and Protoss and one, two or three
+CPU rows, including a sparse two-CPU lobby. After 3,000 updates, the two
+builds have byte-identical 32 KiB SRAM in each case. A fresh emulator load
+agrees with each uninterrupted 900-update continuation.
+
+| Product | Linked IWRAM end | Linked EWRAM end | ROM SHA-256 |
+| --- | --- | --- | --- |
+| Terran | `0x030048c8` | `0x020399d0` | `9e43d38434fe03751d4968664204f40d1d3ad713326af498ce4bfd03aa71c00c` |
+| Z10 | `0x03004560` | `0x020388e0` | `631b85556aef0b591a7f3f366b368280dfdf1d98e81a887a0eb5ec4a33cba110` |
+| P10 | `0x03004d40` | `0x0203bed0` | `7edd1c5b4bfd6d3637138af708323cbcf7b4054121d67ed13c9a96d1cfba24e7` |
+| Showcase | `0x03004f90` | `0x02039a04` | `8a83d8312013d62ef7e2ca643d89840b5c05bda8eaea681aa416aa48847fbb6d` |
+
+The normal P10, Showcase and Z10 host flags pass the defense differential
+under ASan/UBSan, including simultaneous Cannon admission, unit ties,
+invalid-owner fallback, and a Pylon being destroyed or changing owners.
+The Terran differential covers the wider coordinate representation. Make
+dry runs show the flags exactly once in each canonical link and absent
+from the separate P7 and Z9 preview links.
+
+The full normal P10 replay wins Homeland at frame 55,892. It matches all
+59 checkpoints, 11 briefing pages, 10 field acknowledgments and 57,678
+physical calls against the verified earlier run.
+
+Four 12,000-call ordinary skirmishes, including a complete Outpost defeat,
+matched all sampled worlds. Instrumented variants left at least 8,200
+bytes of user stack untouched above the guard. One Showcase sample in
+the instrumented run flipped its page earlier. A follow-up at 25 adjacent
+calls matches the displayed page of the two uninstrumented builds at
+every sample and matches both framebuffer contents at the differing
+instrumented call. The stack check covers the sampled user stack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P7 timed pair | `4970e940d93dd29d5888c49c05c548a5cb86bda104c38e4dbb16ad60d4192f80` |
+| Full P7 victory | `33760bd5f4208fb8bfcf694fc9703299f1e2b0b17b742f4edbd4a937fda92fe9` |
+| Four paired skirmish SRAM continuations | `0351b2235afab469fba92d944d6f40ec173763739c57cdc3f1c9343bc015b609` |
+| Skirmish stack and display pairs | `d415f26b3c76b47ddcae102e8f8af6f8a854d799bc46c218157218944ca53c90` |

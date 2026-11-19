@@ -42,6 +42,24 @@ From the repository root, run:
 
 Playing is optional. Install mGBA using the instructions in [Development](docs/DEVELOPMENT.md), then run `./dev play starcraft`. The [StarCraft guide](starcraft/README.md) describes controls, gameplay, and current limits.
 
+## Frontier Skirmish
+
+Run `make frontier-factions` to build three original skirmish cartridges.
+Use `./dev play frontier-foundry`, `./dev play frontier-rovers`, or
+`./dev play frontier-bulwark` to launch one in mGBA. Each cartridge starts
+with its own faction selected. The Player row lets you switch factions,
+and you can choose Transit Yard or Stone Gardens with any combination
+of one to three CPU factions. Up/Down selects a row, Left/Right edits
+it, A starts, and B loads.
+
+The Foundry Rifler has the longest reach. The Rovers Skimmer moves and
+fires faster. The Bulwark Warden hits hardest and has the most health,
+with shorter reach. The factions share their economy and support units.
+Each cartridge keeps its own save file, including the selected player
+faction. Saves from earlier faction builds load on their respective
+cartridges. Foundry also accepts saves from the single-roster build,
+where all crews are treated as Foundry.
+
 ## Optional StarCraft 64 profiles
 
 This profile requires a legally obtained StarCraft 64 USA ROM that you are entitled to use. The project does not provide the ROM, imported content, or converted assets. Preparation accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one 32 MiB N64 image. It normalizes byte order and checks the resulting image against SHA-1 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`.

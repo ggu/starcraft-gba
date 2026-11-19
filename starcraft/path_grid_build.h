@@ -2,7 +2,7 @@
  * changes. Included by game.c (and by tests/sc64_path_grid_incremental.c with
  * stand-ins for the game's data) at the point where build_path_grid used to be.
  *
- * path_grid_build_full is the original whole-grid rebuild, unchanged: terrain,
+ * path_grid_build_full is the whole-grid rebuild: terrain,
  * then the footprint of every collidable building, each footprint only ever
  * clearing cells. A cell is therefore walkable exactly when its terrain is open
  * and no building footprint covers it, independent of building order.
@@ -230,6 +230,21 @@ static void GBA_HOT
 path_grid_build_full(void)
 {
     int col, row, i;
+#if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_RACES)
+    /* The authored maps define all blocked terrain as inclusive rectangles.
+     * Seed the same byte grid with spans before applying building footprints. */
+    const OriginalSkirmishMap *layout = (unsigned)original_skirmish_map < ORIGINAL_MAP_COUNT
+        ? &original_skirmish_maps[original_skirmish_map] : 0;
+    memset(path_walkable, layout != 0, sizeof path_walkable);
+    if (layout) {
+        for (i = 0; i < layout->obstacle_count; ++i) {
+            const OriginalMapObstacle *obstacle = &layout->obstacles[i];
+            int width = obstacle->right - obstacle->left + 1;
+            for (row = obstacle->top; row <= obstacle->bottom; ++row)
+                memset(path_walkable + row * MAP_COLS + obstacle->left, 0, (size_t)width);
+        }
+    }
+#else
 #if defined(SC64_BULK_TERRAIN_GRID) && defined(SC64_RACES) && \
     defined(SC64_IMPORTED_MISSION) && \
     (defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE))
@@ -242,6 +257,7 @@ path_grid_build_full(void)
 	    int cell = col + row * MAP_COLS;
 	    SC64_GRID_SET(path_walkable, cell, !terrain_blocked(col, row));
 	}
+#endif
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive) {
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
         if (race_bc_facility_airborne(i)) continue;

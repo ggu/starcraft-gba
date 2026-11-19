@@ -19,6 +19,7 @@ test: test-scarab-save-selection
 include tests/gba-save-parts/Makefile
 include mk/text-box/Makefile
 include mk/combat-perf/Makefile
+include mk/terrain-fast-validate/Makefile
 
 .PHONY: test-scarab-parent-migration
 build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
@@ -289,9 +290,9 @@ else ifeq ($(SC64_AUDIO),1)
 $(error SC64_AUDIO=1 but $(SC64_AUDIO_DIR)/sc64_audio_generated.h is missing; run tools/sc64_audio_pack.py)
 endif
 endif
-SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
+SC64_FLAGS := -DSC64_IMPORTED_MISSION$(TFV) -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
 SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
-BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
+BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION$(TFV) -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
 BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
@@ -526,7 +527,7 @@ ifneq ($(words $(CANONICAL_ROUTE_LINEAR)),1)
 $(error CANONICAL_ROUTE_LINEAR must be 0 or 1)
 endif
 include config/facility-fifo/Makefile
-CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_LINEAR_FLAGS) $(CANONICAL_ROUTE_FACILITY_FIFO_FLAGS) $(LINEAR_GRID_LUT8_FLAGS) $(ROUTE_PACK_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(POINT_RETENTION_FLAGS) $(CS_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
+CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID) $(CANONICAL_ROUTE_STRIDE_FLAGS) $(CANONICAL_ROUTE_DENSE_FLAGS) $(CANONICAL_ROUTE_LINEAR_FLAGS) $(CANONICAL_ROUTE_FACILITY_FIFO_FLAGS) $(FACILITY_FRONTIER_FLAGS) $(LINEAR_GRID_LUT8_FLAGS) $(ROUTE_PACK_FLAGS) $(CANONICAL_ROUTE_KEEP_FLAGS) $(POINT_RETENTION_FLAGS) $(CS_FLAGS) $(CANONICAL_PATH_GRID_UPDATE_FLAGS)
 # The fresh-cell writer uses the paired-visit route configuration.
 CANONICAL_ROUTE_NEW_CELL ?= $(CANONICAL_ROUTE_INDEX)
 ifneq ($(words $(filter 0 1,$(CANONICAL_ROUTE_NEW_CELL))),1)
@@ -745,6 +746,8 @@ build/starcraft.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcra
 build/StarCraft-GBA.gba: build/starcraft.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC GBA DEMO' SCGD
+
+include mk/frontier/Makefile
 
 build/test-starcraft: tests/host.c common/gba.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon tests/host.c common/gba.c $(STARCRAFT) -o $@
@@ -1843,13 +1846,20 @@ test-races-menu: build/test-sc64-frontend build/test-sc64-menu
 	./build/test-sc64-frontend
 	./build/test-sc64-menu
 
+.PHONY: test-sc64-menu-session
+build/test-sc64-menu-session: tests/sc64_menu_session.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) tests/sc64_menu_session.c common/gba.c -o $@
+test-sc64-menu-session: build/test-sc64-menu-session
+	./build/test-sc64-menu-session
+test-unified: test-sc64-menu-session
+
 # Split race-campaign ROMs use the shared race engine, with isolated save IDs.
 race-campaigns: verify-terran verify-zerg verify-protoss
 terran: verify-terran
 zerg: verify-zerg
 protoss: verify-protoss
-build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(TERRAN_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
+build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.ld Makefile mk/combat-perf/Makefile | build
+	$(CC) $(CFLAGS) $(TERRAN_ROM_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Terran-Transport1-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -3375,7 +3385,7 @@ $(TILE8_HEADER): tools/sc64_tile8_pack.py $(TILE8_SOURCE)
 	$(PYTHON) tools/sc64_tile8_pack.py --input $(TILE8_SOURCE) --output $@
 # Mode 0 needs the VRAM gap the sampled-audio buffers use between the mode-4
 # pages (see common/gba.c), so the tile probe builds silent, as SC64_AUDIO=0.
-P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(filter-out $(SC64_AUDIO_FLAGS),$(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS)) -DSC64_TILE_RENDERER
+P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(filter-out $(SC64_AUDIO_FLAGS)$(TFV),$(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS)) -DSC64_TILE_RENDERER
 build/test-sc64-p7-tile-reference: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p7-tile-candidate: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) $(TILE8_HEADER) common/gba.c common/gba.h Makefile | build
@@ -4520,16 +4530,6 @@ endif
 SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
 SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(SHOWCASE_CONTACT_BASE_FLAGS) $(if $(filter 1,$(SHOWCASE_CONTACT_CACHE)),-DSC64_CONTACT_MASK_TABLE -Ibuild/generated) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS) $(CANONICAL_ROUTE_INDEX_FLAGS) $(CANONICAL_WALK_WORDS_FLAGS) $(CANONICAL_PATH_GRID_FLAGS) $(CANONICAL_ROUTE_NEW_CELL_FLAGS) $(SHOWCASE_HUD_CACHE_FLAGS) $(SHOWCASE_TERRAIN_CACHE_FLAGS) $(SC64_RELEASE_TRANSPORT_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_WORKER_CARGO_FLAGS) $(CANONICAL_FOG_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
-build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
-	$(SIZE) $@
-build/StarCraft-Showcase-Transport1-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
-	$(OBJCOPY) -O binary $< $@
-	$(PYTHON) tools/fix_rom.py $@ 'SC SHOWCASE' SCSH
-.PHONY: showcase verify-showcase test-sc64-showcase test-sc64-showcase-front
-showcase: build/StarCraft-Showcase-Transport1-GBA.gba
-verify-showcase: build/StarCraft-Showcase-Transport1-GBA.gba
-	$(PYTHON) tools/verify_roms.py --showcase
 include mk/showcase/Makefile
 
 build/test-sc64-t5-facing: tests/sc64_t5_facing.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(UNIT_FACING_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -5257,15 +5257,18 @@ test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc
 
 # Asset-free exact contact memo contract fixture; the same collision headers
 # are compiled in their per-frame and persistent bucket lifecycle variants.
-SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST $(CS_MEMO_FLAGS)
-build/test-sc64-contact-memo-legacy: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
+SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST $(CS_MEMO_FLAGS) $(CS_STEER_FLAGS)
+SC64_CONTACT_MEMO_TEST_KEY := -rows$(CANONICAL_CONTACT_LOCAL_MEMO)-defer$(CANONICAL_CONTACT_DEFER_STEERING)
+SC64_CONTACT_MEMO_TEST_LEGACY := build/test-sc64-contact-memo-legacy$(SC64_CONTACT_MEMO_TEST_KEY)
+SC64_CONTACT_MEMO_TEST_PERSISTENT := build/test-sc64-contact-memo-persistent$(SC64_CONTACT_MEMO_TEST_KEY)
+$(SC64_CONTACT_MEMO_TEST_LEGACY): tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile config/contact-scan/Makefile | build
 	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) $< -o $@
-build/test-sc64-contact-memo-persistent: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile | build
+$(SC64_CONTACT_MEMO_TEST_PERSISTENT): tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile config/contact-scan/Makefile | build
 	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) -DSC64_PERSISTENT_COLLISION $< -o $@
 .PHONY: test-sc64-contact-memo
-test-sc64-contact-memo: build/test-sc64-contact-memo-legacy build/test-sc64-contact-memo-persistent
-	./build/test-sc64-contact-memo-legacy
-	./build/test-sc64-contact-memo-persistent
+test-sc64-contact-memo: $(SC64_CONTACT_MEMO_TEST_LEGACY) $(SC64_CONTACT_MEMO_TEST_PERSISTENT)
+	./$(SC64_CONTACT_MEMO_TEST_LEGACY)
+	./$(SC64_CONTACT_MEMO_TEST_PERSISTENT)
 test: test-sc64-contact-memo
 
 # Asset-free route-dispatch oracle for the exact monotone shortest-step probe.

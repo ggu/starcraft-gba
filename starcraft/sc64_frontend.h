@@ -52,6 +52,7 @@ enum {
 #ifdef SC64_SHOWCASE_ENABLED
     , SC_FRONT_SHOWCASE
 #endif
+    , SC_FRONT_OPTIONS, SC_FRONT_MAP_BROWSER
 };
 
 enum {
@@ -96,6 +97,33 @@ enum { SC_FRONT_HUMAN_RANDOM = SC_FRONT_BOT_RANDOM };
 #endif
 #endif
 
+enum {
+    SC_FRONT_SETTING_CURSOR,
+    SC_FRONT_SETTING_SOUND,
+    SC_FRONT_SETTING_BACK,
+    SC_FRONT_SETTING_COUNT
+};
+
+typedef struct {
+    s8 cursor_delta;
+    u8 quiet_menu;
+} Sc64MenuSettings;
+
+static inline const char *sc64_front_setting_cursor_name(const Sc64MenuSettings *settings)
+{
+    return settings->cursor_delta < 0 ? "Slow" : settings->cursor_delta > 0 ? "Fast" : "Normal";
+}
+
+static inline void sc64_front_setting_edit(Sc64MenuSettings *settings, int row, unsigned edge)
+{
+    if (row == SC_FRONT_SETTING_CURSOR) {
+        if ((edge & KEY_RIGHT) && settings->cursor_delta < 1) ++settings->cursor_delta;
+        else if ((edge & KEY_LEFT) && settings->cursor_delta > -1) --settings->cursor_delta;
+    } else if (row == SC_FRONT_SETTING_SOUND && (edge & (KEY_A | KEY_LEFT | KEY_RIGHT))) {
+        settings->quiet_menu ^= 1u;
+    }
+}
+
 typedef struct Sc64Frontend {
     unsigned ticks;
     unsigned prev_buttons;
@@ -122,9 +150,22 @@ typedef struct Sc64Frontend {
     unsigned skirmish_melee; /* Blood Bath option; existing sessions are Free for All */
 #endif
 #endif
+    Sc64MenuSettings settings;
+    int menu_return_row;
 } Sc64Frontend;
 
 #ifdef SC64_IMPORTED_SKIRMISH
+static inline void sc64_front_skirmish_set_map(Sc64Frontend *f, int map)
+{
+    f->map = map;
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (map != SC64_MAP_BLOOD_BATH) {
+        if (f->race == SC_FRONT_HUMAN_RANDOM) f->race = f->human_last_race;
+        f->skirmish_melee = 0;
+    }
+#endif
+}
+
 static inline void sc64_front_skirmish_seats(Sc64Frontend *f, unsigned seats)
 {
     for (int i = 0; i < SC64_SKIRMISH_SEAT_COUNT; ++i) {
@@ -426,6 +467,8 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->briefing_page_tick = 0;
     f->briefing_reveal_length = 0;
     f->briefing_revealed = 0;
+    f->settings = (Sc64MenuSettings){0};
+    f->menu_return_row = 0;
     for (int i = 0; i < 3; ++i) {
         int ai = (f->race + i + 1) % 3;
         if (ai == f->race) ai = (ai + 1) % 3;
@@ -521,12 +564,31 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             }
             break;
         case SC_FRONT_SKIRMISH: f->page = SC_FRONT_HOME; f->row = 1; break;
+        case SC_FRONT_OPTIONS: f->page = SC_FRONT_HOME; f->row = f->menu_return_row; break;
+        case SC_FRONT_MAP_BROWSER: f->page = SC_FRONT_SKIRMISH; f->row = f->menu_return_row; break;
 #ifdef SC64_SHOWCASE_ENABLED
         case SC_FRONT_SHOWCASE: f->page = SC_FRONT_HOME; f->row = 0; break;
 #endif
         default: f->page = SC_FRONT_HOME; f->row = 0; break;
         }
         return SC_FRONT_NONE;
+    }
+
+    if (!(edge & (KEY_A | KEY_START))) {
+        if (f->page == SC_FRONT_HOME && (edge & KEY_RIGHT)) {
+            f->menu_return_row = f->row;
+            f->page = SC_FRONT_OPTIONS;
+            f->row = SC_FRONT_SETTING_CURSOR;
+            return SC_FRONT_NONE;
+        }
+#ifdef SC64_IMPORTED_SKIRMISH
+        if (f->page == SC_FRONT_SKIRMISH && (edge & KEY_SELECT)) {
+            f->menu_return_row = f->row;
+            f->page = SC_FRONT_MAP_BROWSER;
+            f->row = f->map;
+            return SC_FRONT_NONE;
+        }
+#endif
     }
 
     if (f->page == SC_FRONT_BRIEFING && (edge & (KEY_LEFT | KEY_RIGHT))) {
@@ -549,6 +611,8 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         int count = 1;
         switch (f->page) {
         case SC_FRONT_HOME: count = 3; break;
+        case SC_FRONT_OPTIONS: count = SC_FRONT_SETTING_COUNT; break;
+        case SC_FRONT_MAP_BROWSER: count = SC64_FRONT_MAP_COUNT; break;
         case SC_FRONT_CAMPAIGN:
             count = sc64_front_campaign_count();
             break;
@@ -568,6 +632,25 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         f->row = sc64_front_wrap(f->row + delta, count);
     }
 
+    if (f->page == SC_FRONT_OPTIONS) {
+        sc64_front_setting_edit(&f->settings, f->row, edge);
+        if (f->row == SC_FRONT_SETTING_BACK && (edge & (KEY_A | KEY_START))) {
+            f->page = SC_FRONT_HOME;
+            f->row = f->menu_return_row;
+        }
+        return SC_FRONT_NONE;
+    }
+#ifdef SC64_IMPORTED_SKIRMISH
+    if (f->page == SC_FRONT_MAP_BROWSER) {
+        if (edge & (KEY_A | KEY_START)) {
+            sc64_front_skirmish_set_map(f, f->row);
+            f->page = SC_FRONT_SKIRMISH;
+            f->row = f->menu_return_row;
+        }
+        return SC_FRONT_NONE;
+    }
+#endif
+
     if (f->page == SC_FRONT_MISSION && (edge & (KEY_LEFT | KEY_RIGHT))) {
         int total = sc64_catalog_playable_count(sc64_front_catalog_faction(f->faction));
         int pages = (total + 1) / 2;
@@ -583,13 +666,7 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         int d = (edge & KEY_RIGHT) ? 1 : -1;
 #ifdef SC64_IMPORTED_SKIRMISH
         if (f->row == 0) {
-            f->map = sc64_front_wrap(f->map + d, SC64_FRONT_MAP_COUNT);
-#ifdef SC64_NATIVE_MELEE_STARTS
-            if (f->map != SC64_MAP_BLOOD_BATH) {
-                if (f->race == SC_FRONT_HUMAN_RANDOM) f->race = f->human_last_race;
-                f->skirmish_melee = 0;
-            }
-#endif
+            sc64_front_skirmish_set_map(f, sc64_front_wrap(f->map + d, SC64_FRONT_MAP_COUNT));
         } else if (f->row == 1) {
 #ifdef SC64_NATIVE_MELEE_STARTS
             if (f->map == SC64_MAP_BLOOD_BATH) {

@@ -136,8 +136,10 @@ static inline void sc64_ai_economy_tick(Sc64AiState *ai)
     ai->gas = g > 65535u ? 65535u : (unsigned short)g;
 }
 
-static inline unsigned char sc64_ai_plan(const Sc64AiState *ai, const Sc64AiWorld *world,
-                                  Sc64AiIntent *out)
+/* A map can nominate a rival to prefer only when hostile distances tie. */
+static inline unsigned char
+sc64_ai_plan_prefer_target(const Sc64AiState *ai, const Sc64AiWorld *world,
+                           Sc64AiIntent *out, int preferred)
 {
     unsigned char n = 0, i;
     unsigned short pending_workers, pending_army;
@@ -204,8 +206,12 @@ static inline unsigned char sc64_ai_plan(const Sc64AiState *ai, const Sc64AiWorl
     if (world && pending_army >= ai->attack_threshold && n < SC64_AI_MAX_INTENTS) {
         for (i = 0; i < world->count && i < SC64_AI_MAX_PLAYERS; ++i) {
             const Sc64AiTarget *t = &world->targets[i];
-            if (sc64_ai_hostile(ai, t) && (!best || t->distance < best->distance ||
-                (t->distance == best->distance && t->player < best->player))) best = t;
+            if (!sc64_ai_hostile(ai, t)) continue;
+            if (!best || t->distance < best->distance) best = t;
+            else if (t->distance == best->distance &&
+                     (t->player == preferred ||
+                      (best->player != preferred && t->player < best->player)))
+                best = t;
         }
         if (best) {
             out[n].kind = SC64_AI_INTENT_ATTACK;
@@ -217,6 +223,12 @@ static inline unsigned char sc64_ai_plan(const Sc64AiState *ai, const Sc64AiWorl
         }
     }
     return n;
+}
+
+static inline unsigned char
+sc64_ai_plan(const Sc64AiState *ai, const Sc64AiWorld *world, Sc64AiIntent *out)
+{
+    return sc64_ai_plan_prefer_target(ai, world, out, -1);
 }
 
 /* The host calls commit only when an intent was accepted.  Completion is a

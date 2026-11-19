@@ -261,12 +261,19 @@ static const s8 sc64_contact_dy[8] = {0,1,1,1,0,-1,-1,-1};
 static unsigned __attribute__((noinline))
 sc64_contact_bounds_mask(const Unit *q, int speed)
 {
+    unsigned x = (unsigned)q->x, y = (unsigned)q->y;
+    unsigned step = (unsigned)speed;
+    unsigned width = (unsigned)WORLD_W, height = (unsigned)WORLD_H;
     unsigned mask = 0;
-    int k;
-    for (k = 0; k < 8; ++k) {
-        int sx = q->x + sc64_contact_dx[k] * speed, sy = q->y + sc64_contact_dy[k] * speed;
-        if (sx < 0 || sy < 0 || sx >= WORLD_W || sy >= WORLD_H) mask |= 1u << k;
-    }
+
+    /* Each axis has three endpoints shared by the directions above.
+     * An unsigned range check excludes negative endpoints as well. */
+    if (x + step >= width) mask |= 0x83u;
+    if (x >= width)        mask |= 0x44u;
+    if (x - step >= width) mask |= 0x38u;
+    if (y + step >= height) mask |= 0x0eu;
+    if (y >= height)        mask |= 0x11u;
+    if (y - step >= height) mask |= 0xe0u;
     return mask;
 }
 
@@ -652,7 +659,15 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (((cc & SC64_CONTACT_FLYING) != 0) != mover_flying) continue;
                 if (sc64_contact_burrowed(c, cc, p6)) continue;
                 if (radius < mover_radius) radius = mover_radius;
+#if defined(SC64_CONTACT_COINCIDENT_PROBE) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+                /* The word from the coincident test already contains both
+                 * coordinates. Extract them in native halfword order. */
+                s16 coordinates[2];
+                __builtin_memcpy(coordinates, &xy, sizeof(xy));
+                ox = coordinates[0] - q->x; oy = coordinates[1] - q->y;
+#else
                 ox = c->x - q->x; oy = c->y - q->y;
+#endif
                 /* For nonzero speed every step is farther than the current
                  * zero distance. Keep speed zero and invalid-class fallback. */
                 if (speed != 0 && ox == 0 && oy == 0) continue;
@@ -687,6 +702,51 @@ sc64_contact_blocked_mask(const Unit *q, int speed)
 { return sc64_contact_blocked_mask_memo(q, speed); }
 #else
 #define sc64_contact_blocked_mask sc64_contact_blocked_mask_uncached
+#endif
+
+#if defined(SC64_CONTACT_DEFER_STEERING_MEMO) && defined(SC64_CONTACT_MEMO_ENABLED)
+/* Terrain checks run between the lookup and the final choice. A successful
+ * move immediately invalidates an answer for the mover's old position.
+ * Defer admission until the caller knows that the mover will stay put. */
+static unsigned __attribute__((noinline))
+sc64_contact_steering_query(const Unit *q, int speed, int *fresh)
+{
+    unsigned mask;
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    int eligible = sc64_contact_memo_eligible(q, speed);
+    SC64_CONTACT_MEMO_ORACLE_CALL();
+    if (eligible) ++sc64_contact_memo_counts[sc64_contact_memo_window][1];
+#endif
+    if (sc64_contact_memo_count && sc64_contact_memo_eligible(q, speed) &&
+        sc64_contact_memo_lookup(q, speed, !!sc64_contact_p6_active(), &mask)) {
+#ifdef SC64_CONTACT_MEMO_ORACLE
+        ++sc64_contact_memo_counts[sc64_contact_memo_window][2];
+        assert(mask == sc64_contact_blocked_mask_uncached(q, speed));
+#endif
+        *fresh = 0;
+        return mask;
+    }
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    if (eligible) ++sc64_contact_memo_counts[sc64_contact_memo_window][3];
+#endif
+    *fresh = 1;
+    return sc64_contact_blocked_mask_uncached(q, speed);
+}
+
+static void __attribute__((noinline))
+sc64_contact_steering_remember(const Unit *q, int speed, unsigned mask)
+{
+    if (sc64_contact_memo_eligible(q, speed))
+        sc64_contact_memo_remember(q, speed, !!sc64_contact_p6_active(), mask);
+}
+
+#define SC64_STEER_MASK(q, speed, fresh) sc64_contact_steering_query(q, speed, fresh)
+#define SC64_STEER_REMEMBER(q, speed, blocked, best, fresh) do { \
+    if ((best) < 0 && (fresh)) sc64_contact_steering_remember(q, speed, blocked); \
+} while (0)
+#else
+#define SC64_STEER_MASK(q, speed, fresh) ((void)(fresh), sc64_contact_blocked_mask(q, speed))
+#define SC64_STEER_REMEMBER(q, speed, blocked, best, fresh) ((void)0)
 #endif
 
 /* Stock motion rate without the software division: (N * 52429) >> 18 equals

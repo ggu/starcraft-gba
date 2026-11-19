@@ -1,5 +1,8 @@
 # Batched target index geometry checks
 
+The initial experiments below precede the
+[canonical release qualification](#canonical-release-qualification).
+
 The shared target index rebuild used to validate the same map dimensions
 for every actor. The optional owner-list builder validates them once,
 then checks each actor's coordinates and links the resulting cell. It
@@ -92,3 +95,46 @@ make SC64_DEFENSE_PROBE_FLAGS='-DSC64_TARGET_BULK_REBUILD_PROBE -DSC64_TARGET_FA
 | Bulk Z10 ROM | `16c576e86d965c7870c186bb676e921553cf4112727cd172cbea0e40556b7d64` |
 | Bulk and fast Z10 ROM | `48b971185e63b58e61466c64afa5eafcb2fea39c103b4cbe7a9af5f0bbd7bff5` |
 | Paired Z9 comparison | `e88924f3b9903966ee17a15e42563a459cb5f3be284fdfe335cccd42ac9d4046` |
+
+## Canonical release qualification
+
+The four canonical ARM recipes enable both exact index updates. The
+same recipes accept `CANONICAL_TARGET_INDEX=0` for a reference build.
+The local configuration stamp tracks both settings. Earlier campaign
+previews and generated inputs keep their own flags.
+
+The reference cartridges match the release with the defense and
+saved-command changes. After enabling the index options, the same
+physical P7 tape matches all 1,000 frame, mode and route observations
+and all 11 world, fog, framebuffer and palette samples. There are 958
+advancing updates in the sample.
+
+| P7 replay scope | Reference cycles | Updated target index cycles |
+| --- | ---: | ---: |
+| Mean whole update | 1,921,336 | 1,901,329 |
+| 95th percentile whole update | 2,215,763 | 2,196,884 |
+| Peak whole update | 2,587,134 | 2,566,152 |
+| Mean orders stage | 913,404 | 893,781 |
+
+Mean whole-update cost falls 1.04% on this mGBA workload. The nine
+sanitizer variants pass, and all four links retain the EWRAM bounds
+while freeing 160 IWRAM bytes per product. Eight physical reads pass
+in both save directions across both maps, preserve the nondefault
+command and the same 32 KiB SRAM, and match 180 continued updates.
+
+On the updated Terran ROM the unchanged Outpost tape also wins after
+fresh title load at the same frame 41,951. The match verifies all 56
+remaining action observations after the save cut.
+
+P10 wins the full P7 replay at frame 55,892 after 57,678 physical calls.
+All 59 gameplay checkpoints, 11 briefing pages and 10 in-field pages
+match. The same ROM also [wins P2 and P3 after fresh title loads](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation)
+at the previously divergent cuts.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Composed P7 timed comparison | `66a6a7f86744a9aae0d5d2d23e817dc9cfea43662264dbdf9a75bda3c56a0b97` |
+| Canonical link guards | `bc219f6fbb25a9a292d7581446542df01de251769f1dc7e583aa7216156f8a08` |
+| Bidirectional skirmish saves | `dd68a5697c8c2f108a84ee9c653fbd40ee36d36b5067d0a937348ffce9f441ac` |
+| Outpost fresh load through victory | `cba959cbf24af140bcbe84cc9c43469a4e9805b83845da7549f17cf16efe28a3` |
+| Full physical P7 victory | `ceb663b9638c3d0b83bc65747ae6d08376ebcc5bfe9ba722c5dbc1d9a2db3bc3` |

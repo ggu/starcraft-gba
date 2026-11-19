@@ -19,3 +19,20 @@ The fresh load restored the base camera and the same 40 minerals and 10/18 suppl
 | 11:57:09, manual reselect | `a6d1b637fa22f3efc5478b7f8f16f38a167bba6f73d17df6ac372065e05f90a4` |
 
 Only these observations and hashes are tracked. The owned ROM, flash, screenshots and emulator remain local.
+
+## Marine command controls
+
+A separate read-only ares run in Wasteland selected a 40-HP Marine and
+issued Move with C-Right. The HUD kept the fixed Hold, Move and Stop
+prompts before and after the order. The B prompt independently displayed
+Attack after moving the cursor into the field.
+
+The ordinary Load/Save path returned to the field after selecting Save
+This Game, with the Marine selected and moving. A follow-up reached Confirm Abort,
+then reached the observer's time limit before returning to title. The
+observed HUD has fixed command buttons. The earlier title-load evidence
+above supplies the Command Center selection comparison. The Marine's
+selection and pending Move after a fresh title load remain open.
+
+The pre-save procedure receipt SHA-256 is
+`ecba573940c1f7c810b1d4b284b4103b909e7887e853d02aaec44a6b36396f9a`.

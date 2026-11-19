@@ -36,6 +36,81 @@ sequence.
 | Matched command log | `bb29739983aed6997532130b47c647c54be72eb2b81dbd9c2d7e9561c66688d2` |
 | Fresh native replay manifest | `92da08cde592ccf6fe82ec971bd912e3524d21cf09cde2c3bfede585ef67e4d9` |
 
+## November 18 Wasteland group movement
+
+A separate ares run used the pinned Wasteland Marine observer under the
+native lock. Ordinary A and R selected the five visible Marines. C-Right
+issued a distant Move, and a second C-Right replaced it before arrival.
+The HUD showed five selected Marines in all three captures. The corresponding
+40-HP, owner-1 Marine records were idle at observer step 7,121. All five
+changed to move order 6 at step 7,196 and kept that order with new destinations
+at step 7,263. One record had an intermediate waypoint at (273, 90) while its
+first destination was (708, 162).
+
+| Marine | Before Move | First destination | Second destination |
+| --- | --- | --- | --- |
+| 1 | (173, 95) | (690, 120) | (297, 128) |
+| 2 | (197, 121) | (714, 146) | (318, 155) |
+| 3 | (209, 154) | (708, 162) | (294, 160) |
+| 4 | (174, 135) | (691, 160) | (270, 175) |
+| 5 | (172, 167) | (689, 180) | (249, 181) |
+
+Three first destinations are the corresponding starting positions plus
+(517, 25). Destinations vary on both axes for both orders. GBA
+`issue_order` starts the first five selected units in one row at eight-pixel
+spacing, with an optional reachability fallback to the cursor. This trace
+gives a native group-target comparison for a future formation change.
+The second Move was player-issued. Automatic replanning after a new
+obstacle, arrival timing, and the native formation algorithm remain open.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Native observation manifest | `b63cb64a4c61fd5c399c6417aa249f7a256854d045ee321eb90915b124690fee` |
+| Actor comparison | `6059687ea843cc3aad5b1628b40107d455a8aa2b6bb4eeaedab309d0a287f106` |
+
+### Blood Bath workers and the minimap
+
+A separate ares Blood Bath session placed human Terran in the northeast
+against Zerg, Terran and Protoss computers. The actor captures identified all
+four starting halls. R selected four human SCVs and the HUD showed `UNITS: 4`
+in all three samples. At observer step 4,230 the four 60-HP SCVs were mining
+with distinct mineral targets. A C-Right Move to a nearby field point gave
+all four order 6 and the same destination (1710, 337) by step 4,273. Their
+intermediate waypoints differed.
+
+With the visible cursor blue inside the minimap, a second C-Right replaced
+all four pending targets with (11, 288) by step 4,342, while the first move
+was still in progress. All four workers again had separate intermediate
+waypoints. The other Terran owner's SCVs kept their prior orders.
+
+The SCVs' two common destinations and the Marines' distinct destinations
+establish two observed cases. They differ in unit type, initial spread and
+target context. A matched same-unit comparison is still needed to determine
+when the original game assigns a formation destination.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Native observation manifest | `f600306182e49e3eddc40ae8f12f02d989c84465c072647bc5256bb578af7623` |
+| Offline actor analysis | `8a988d6542a66fbdfa1bcf40250eedfc2829edea5e0740e214e24c6a08053417` |
+
+#### Matched near and far field orders
+
+A second ares run reproduces the Blood Bath baseline and first Move, with
+byte-identical RAM and raw frames at those two points. The same four SCVs
+first target (1710, 337), 234–271 source pixels from their sampled
+positions. The second Move is issued with the green field pointer above the
+minimap. All four replace their pending target with (1216, 152) at observer
+step 4,363, at sampled distances of 487–720 source pixels. Their
+intermediate waypoints are distinct at both points. Common destinations
+occur in this scene for short and long field orders as well as for the
+minimap order. The remaining differences from the Wasteland Marines
+include the actors, initial spread and map geometry.
+
+| Local evidence (SHA-256) | Digest |
+| --- | --- |
+| Matched field observation manifest | `a84e71edb291c0f45178f0da4fde50567d09f710bba4b6f18534f0647386a25b` |
+| Matched field actor analysis | `884d4fadf377bc4fd039448f0def4c410bbe833c5470041d59be0076762ac64d` |
+
 ## Three-sample frontend budget proof before execution
 
 The separate follow-up observer permits at most three 8 MiB RDRAM samples and three frames within the existing 2 MiB frame budget. The parent caps stdout at 256 KiB and stderr at 512 KiB. The child normally runs with a 2 MiB per-file soft limit and 8 MiB hard limit; only while synchronously writing a validated RAM snapshot does it raise the soft limit to 8 MiB and immediately lower it again. During that synchronous copy no guest CPU execution is requested. The fixed pinned USA ROM copy is 32 MiB. The pinned ares `mia/medium/nintendo-64.cpp` identifies StarCraft 64 as a 128 KiB Flash game; the isolated frontend connects no controller pak.

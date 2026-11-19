@@ -667,7 +667,13 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define MAX_UNITS 96
 #define MAX_MINERALS 16
 #define MAX_BUILDINGS 32
-#ifdef SC64_TERRAN_CAMPAIGN
+#ifdef SC_ORIGINAL_SKIRMISH
+#if !defined(SC64_SKIRMISH) || defined(SC64_IMPORTED_MISSION)
+#error "The original skirmish requires the standalone bot adapter"
+#endif
+#define SC64_BASE_SAVE_VERSION 0x53434F31u
+#define SC_DEFAULT_UI 1
+#elif defined(SC64_TERRAN_CAMPAIGN)
 #define SC64_BASE_SAVE_VERSION 0x53435431u
 #elif defined(SC64_BACKWATER)
 #define SC64_BASE_SAVE_VERSION 0x53434232u
@@ -1445,6 +1451,9 @@ typedef struct {
     Sc64AiState bots[3];
     int bot_count;
 #endif
+#ifdef SC_ORIGINAL_SKIRMISH
+    int skirmish_map;
+#endif
 } SaveData;
 _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM record");
 /* Mission maps enlarge save payloads; keeping this single scratch record in
@@ -1739,7 +1748,12 @@ death_vfx_reset(void)
 #define death_vfx_reset() ((void)0)
 #endif
 static u8 explored[SC64_GRID_STORAGE_BYTES];
+#ifdef SC_ORIGINAL_SKIRMISH
+_Alignas(u32) static u8 visible[SC64_GRID_STORAGE_BYTES];
+#include "frontier_exploration.h"
+#else
 static u8 visible[SC64_GRID_STORAGE_BYTES];
+#endif
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #ifdef SC64_Z8_RUNTIME
@@ -1907,12 +1921,54 @@ static void backwater_update(void);
 #ifdef SC64_SKIRMISH
 static Sc64AiState skirmish_ai[3];
 static int skirmish_bots = 2;
+#ifdef SC64_IMPORTED_MISSION
 static int skirmish_ground_tile;
+#endif
 static void skirmish_init(void);
 static void skirmish_update(void);
 static void skirmish_outcome(void);
 static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
+static inline unsigned char skirmish_team_for_owner(int owner);
+#endif
+#ifdef SC_ORIGINAL_SKIRMISH
+#include "original_skirmish_map.h"
+_Static_assert(MAP_COLS == ORIGINAL_MAP_SIZE && MAP_ROWS == ORIGINAL_MAP_SIZE,
+               "Frontier map size must match the engine grid");
+static int original_skirmish_map;
+#endif
+#ifdef SC_FRONTIER_FACTION
+#ifndef SC_ORIGINAL_SKIRMISH
+#error "Frontier factions require the original skirmish profile"
+#endif
+#include "frontier_factions.h"
+_Static_assert(SC_FRONTIER_FACTION >= FRONTIER_FOUNDRY &&
+               SC_FRONTIER_FACTION < FRONTIER_FACTION_COUNT, "Unknown cartridge faction");
+_Static_assert(ORIGINAL_MAP_COUNT == 2, "Frontier saves reserve one bit for the map");
+enum { FRONTIER_SETUP_MAP, FRONTIER_SETUP_BOTS, FRONTIER_SETUP_PLAYER, FRONTIER_SETUP_CPU_FIRST };
+
+static unsigned char frontier_human_faction;
+static unsigned char frontier_cpu_faction[3];
+static int frontier_cpu_team;
+static int frontier_setup_row;
+
+static inline int
+frontier_owner_faction(int owner)
+{
+    switch (owner) {
+    case SIDE: return frontier_human_faction;
+    case ENEMY: return frontier_cpu_faction[0];
+    case RESCUABLE: return frontier_cpu_faction[1];
+    case 4: return frontier_cpu_faction[2];
+    default: return FRONTIER_FOUNDRY;
+    }
+}
+
+static inline const FrontierFactionProfile *
+frontier_owner_profile(int owner)
+{
+    return &frontier_faction_profiles[frontier_owner_faction(owner)];
+}
 #endif
 #ifdef SC64_RACES
 #include "sc64_font.h"
@@ -3055,6 +3111,9 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].maxhp = type == U_RAYNOR ? 200 : type == U_SCV ? 60 : type == U_MARINE ? 40 :
 	type == U_FIREBAT ? 50 : type == U_MEDIC ? 60 :
 	type == U_ZERGLING ? 35 : 80;
+#ifdef SC_FRONTIER_FACTION
+    if (type == U_MARINE) u[i].maxhp = frontier_owner_profile(owner)->hp;
+#endif
 #ifdef SC64_RACES
     u[i].maxhp=sc64_race_unit_rules[type].hp;
     u[i].shield=sc64_race_unit_rules[type].shields;
@@ -3493,11 +3552,15 @@ terrain_blocked(int col, int row)
            (row==31&&col>3&&col<60&&!(col>=14&&col<=18)&&!(col>=45&&col<=49));
 #else
 #ifdef SC64_SKIRMISH
+#ifdef SC_ORIGINAL_SKIRMISH
+    return original_skirmish_blocked(original_skirmish_map, col, row);
+#else
     if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) return 1;
     return (col == 31 && row > 3 && row < 60 && !(row >= 14 && row <= 18) &&
             !(row >= 45 && row <= 49)) ||
            (row == 31 && col > 3 && col < 60 && !(col >= 14 && col <= 18) &&
             !(col >= 45 && col <= 49));
+#endif
 #else
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_HAS_TERRAIN_ART
@@ -3520,9 +3583,16 @@ terrain_blocked(int col, int row)
 #endif
 }
 
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+#include "frontier_route_cache.h"
+#endif
+
 static void
 invalidate_path_grid(void)
 {
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+    frontier_route_cache_invalidate();
+#endif
 #ifdef SC64_DEPOT_OWNER_LIST_PROBE
     sc64_depot_owner_lists_valid = 0;
 #endif
@@ -3671,7 +3741,6 @@ is_traversable(int col, int row, int from_cell)
 
 #ifdef SC64_IMPORTED_MISSION
 #ifdef SC64_RANGE_WORK
-/* target_alive itself expects an in-range entity reference. */
 #define SC64_RANGE_TARGET_VALID(t) \
     ((unsigned)(t) < (unsigned)(MAX_UNITS + MAX_BUILDINGS) && target_alive(t))
 #endif
@@ -3734,6 +3803,7 @@ walk_search_step(int cell, int *next_x, int *next_y)
     *next_x = (first & 255u) * 16 + 8;
     *next_y = (first >> 8) * 16 + 8;
 }
+
 #endif
 
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
@@ -3749,6 +3819,17 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
     int goal_col = limit(tx / 16, 0, MAP_COLS - 1);
     int goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
     int head = 0, best = -1, bestd = 0x7fffffff;
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+    int goal = goal_col + goal_row * MAP_COLS;
+    int cached = frontier_route_cache_get(start, goal, tx, ty, next_x, next_y);
+    if (cached >= 0) return cached;
+    if (!path_grid_valid) build_path_grid();
+    int first = frontier_shortest_axis_step(start_col, start_row, goal_col, goal_row);
+    if (first != -1) {
+        frontier_route_cache_put(start, goal, first);
+        return frontier_route_result(first, tx, ty, next_x, next_y);
+    }
+#endif
     int tail = walk_search_begin(start, start_col + start_row * 256);
     int goal_open = SC64_GRID_GET(path_walkable, goal_col + goal_row * MAP_COLS);
     while (head < tail) {
@@ -3769,6 +3850,10 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 	}
 	tail = walk_search_expand(packed, col, row, cell, start, tail);
     }
+#if defined(SC_ORIGINAL_SKIRMISH) && defined(SC_FRONTIER_ROUTE_CACHE)
+    frontier_route_cache_put(start, goal_col + goal_row * MAP_COLS,
+                             best < 0 ? -1 : best == start ? -2 : bfs_first[best]);
+#endif
     if (best < 0)
 	return 0;
     if (best == start) {
@@ -4006,6 +4091,9 @@ __attribute__((optimize("Os")))
 move_toward(Unit * q, int tx, int ty)
 {
 	int nx, ny, speed = q->type == U_ZERGLING || q->type == U_FIREBAT || q->type == U_RAYNOR ? 2 : 1;
+#ifdef SC_FRONTIER_FACTION
+    if (q->type == U_MARINE) speed = frontier_owner_profile(q->owner)->speed;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if (q->type == U_ZP_RAYNOR_VULTURE) speed = 2;
 #endif
@@ -4088,15 +4176,15 @@ move_toward(Unit * q, int tx, int ty)
 	 * Static terrain still uses BFS; candidates may leave an occupied tile
 	 * but may never enter a different blocked cell. */
 #if defined(SC64_CONTACT_CACHE)
-	/* One bucket pass answers all eight unit_step_clear() offsets; the
-	 * selection order and tie-breaking below are unchanged. */
-	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+	int fresh;
+	unsigned blocked = SC64_STEER_MASK(q, speed, &fresh);
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		!(blocked & (1u << i))) { best = i; best_cost = cost; }
 	}
+	SC64_STEER_REMEMBER(q, speed, blocked, best, fresh);
 #elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,
@@ -5035,7 +5123,7 @@ destroy_building(int slot, int source_owner)
                 ++race_t3_buildings_killed;
 #endif
 	    if (q->type == B_COMMAND && q->owner == SIDE) {
-#ifndef SC64_IMPORTED_MISSION
+#if !defined(SC64_IMPORTED_MISSION) && !defined(SC_ORIGINAL_SKIRMISH)
 		lost = 1;
 #endif
 	    }
@@ -5401,6 +5489,13 @@ save_game(void)
     memcpy(data.bots, skirmish_ai, sizeof(skirmish_ai));
     data.bot_count = skirmish_bots;
 #endif
+#ifdef SC_FRONTIER_FACTION
+    data.skirmish_map = frontier_pack_setup(original_skirmish_map, SC_FRONTIER_FACTION,
+                                           frontier_human_faction, frontier_cpu_faction,
+                                           frontier_cpu_team);
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    data.skirmish_map = original_skirmish_map;
+#endif
     save_write(&data, sizeof(data), SAVE_VERSION);
     toast(7);
     return 1;
@@ -5463,6 +5558,14 @@ load_game(void)
 #ifdef SC64_SKIRMISH
     if (data.bot_count < 1 || data.bot_count > 3) return 0;
 #endif
+#ifdef SC_FRONTIER_FACTION
+    int saved_map, saved_human, saved_team;
+    unsigned char saved_factions[3];
+    if (!frontier_unpack_setup(data.skirmish_map, SC_FRONTIER_FACTION, &saved_map,
+                               &saved_human, saved_factions, &saved_team)) return 0;
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    if ((unsigned)data.skirmish_map >= ORIGINAL_MAP_COUNT) return 0;
+#endif
     for (i = 0; i < MAX_UNITS; i++) {
 	if (data.units[i].alive) {
 	    if (data.units[i].type < U_SCV || data.units[i].type > U_RAYNOR || data.units[i].owner < SIDE || data.units[i].owner > 4 || data.units[i].hp <= 0 || data.units[i].x < 0 || data.units[i].x >= WORLD_W || data.units[i].y < 0 || data.units[i].y >= WORLD_H || data.units[i].order < ORDER_IDLE || data.units[i].order > ORDER_GAS || data.units[i].path_retry < 0 || data.units[i].path_retry > 100)
@@ -5518,6 +5621,9 @@ load_game(void)
     sc64_trace_slots_reset();
     death_vfx_reset();
     memcpy(explored, data.explored_map, sizeof(explored));
+#ifdef SC_ORIGINAL_SKIRMISH
+    frontier_reset_exploration_cache();
+#endif
 #ifdef SC64_TERRAN_CAMPAIGN
     campaign_mission = data.campaign_mission;
     campaign_completed = data.campaign_completed;
@@ -5556,6 +5662,17 @@ load_game(void)
 #endif
 #ifdef SC64_SKIRMISH
     memcpy(skirmish_ai, data.bots, sizeof(skirmish_ai)); skirmish_bots = data.bot_count;
+#endif
+#ifdef SC_FRONTIER_FACTION
+    original_skirmish_map = saved_map;
+    frontier_human_faction = saved_human;
+    memcpy(frontier_cpu_faction, saved_factions, sizeof(frontier_cpu_faction));
+    frontier_cpu_team = saved_team;
+    for (i = 0; i < skirmish_bots; ++i)
+        skirmish_ai[i].team = skirmish_team_for_owner(skirmish_ai[i].player);
+    frontier_setup_row = FRONTIER_SETUP_MAP;
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    original_skirmish_map = data.skirmish_map;
 #endif
     mode = MODE_NORMAL;
     menu_open = 0;
@@ -5763,6 +5880,9 @@ init_state(void)
     death_vfx_reset();
     SC64_GRID_CLEAR(explored);
     SC64_GRID_CLEAR(visible);
+#ifdef SC_ORIGINAL_SKIRMISH
+    frontier_reset_exploration_cache();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_visibility_reset();
     geyser_count = 0;
@@ -5857,6 +5977,9 @@ init_state(void)
     train_type = U_MARINE;
     seed = 0x51a7c0deu;
     screen = SCREEN_PLAY;
+#ifdef SC_ORIGINAL_SKIRMISH
+    skirmish_init();
+#else
     spawn_build(SIDE, B_COMMAND, 76, 84, 0);
     spawn_build(ENEMY, B_HATCHERY, 314, 48, 0);
     /* Mission-start outpost: the opening fight is already underway, so this
@@ -5888,6 +6011,7 @@ init_state(void)
     spawn_unit(ENEMY, U_ZERGLING, 290, 75);
     spawn_unit(ENEMY, U_HYDRALISK, 300, 88);
     update_exploration();
+#endif
 }
 
 #ifdef SC64_IMPORTED_MISSION
@@ -6032,6 +6156,18 @@ game_init(void)
     death_vfx_reset();
     invalidate_path_grid();
     screen = SCREEN_TITLE;
+#ifdef SC_ORIGINAL_SKIRMISH
+    original_skirmish_map = 0;
+    skirmish_bots = 2;
+#endif
+#ifdef SC_FRONTIER_FACTION
+    frontier_human_faction = SC_FRONTIER_FACTION;
+    frontier_cpu_faction[0] = FRONTIER_ROVERS;
+    frontier_cpu_faction[1] = FRONTIER_BULWARK;
+    frontier_cpu_faction[2] = FRONTIER_FOUNDRY;
+    frontier_cpu_team = 0;
+    frontier_setup_row = FRONTIER_SETUP_MAP;
+#endif
     help = 0;
     menu_open = 0;
     minerals = 500;
@@ -8077,6 +8213,8 @@ add_owner_resources(int owner, int ore, int vespene)
 }
 #endif
 
+enum { SC64_MINERAL_SEARCH_RADIUS = 192 };
+
 /* Continue an established mineral job within its former mineral cluster.
  * OpenBW bounds depleted-field searches to 12 source tiles (192 pixels at
  * this engine's half scale). Reuse the normal route predicate; never assign
@@ -8086,7 +8224,7 @@ add_owner_resources(int owner, int ore, int vespene)
 static int __attribute__((noinline))
 worker_continue_minerals(Unit *q)
 {
-    int best = -1, best_d = 192 * 192 + 1;
+    int best = -1, best_d = SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS + 1;
     int origin_x, origin_y;
     if (q->target < 0 || q->target >= MAX_MINERALS) return 0;
     origin_x = m[q->target].x;
@@ -8337,6 +8475,14 @@ static int __attribute__((noinline)) sc64_pr_unit_range(const Unit *q)
 #define SC64_PR_ACQUIRE_RANGE(q) sc64_pr_unit_range(q)
 /* One evaluation: a second unit_range() call is not folded across the bonus. */
 #define SC64_PR_FAR_RANGE(q) ({ int ar_=SC64_PR_ACQUIRE_RANGE(q); ar_>64?ar_+18:64; })
+#elif defined(SC_FRONTIER_FACTION)
+static inline int
+frontier_actor_range(const Unit *q)
+{
+    return q->type == U_MARINE ? frontier_owner_profile(q->owner)->range : unit_range(q->type);
+}
+#define SC64_PR_ACQUIRE_RANGE(q) frontier_actor_range(q)
+#define SC64_PR_FAR_RANGE(q) ({ int ar_ = frontier_actor_range(q); ar_ > 64 ? ar_ + 18 : 64; })
 #else
 #define SC64_PR_ACQUIRE_RANGE(q) unit_range((q)->type)
 #define SC64_PR_FAR_RANGE(q) (SC64_PR_ACQUIRE_RANGE(q)>64?SC64_PR_ACQUIRE_RANGE(q)+18:64)
@@ -8795,6 +8941,13 @@ tick_combat(Unit * q, int target)
     dy = target_y(target) - q->y;
     range = unit_range(q->type);
     damage = unit_damage(q->type);
+#ifdef SC_FRONTIER_FACTION
+    const FrontierFactionProfile *faction = q->type == U_MARINE ? frontier_owner_profile(q->owner) : NULL;
+    if (faction) {
+        range = faction->range;
+        damage = faction->damage + weapons_level;
+    }
+#endif
 #ifdef SC64_RACES
     int flying=target<MAX_UNITS&&sc64_race_unit_flying(u[target].type);
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
@@ -8994,6 +9147,9 @@ tick_combat(Unit * q, int target)
                 sc64_race_unit_cooldown_vs(q->type,flying))*5+3)/4;
 #else
         q->cd = q->type == U_ZERGLING ? 10 : q->type == U_FIREBAT ? 28 : q->type == U_RAYNOR ? 30 : 19;
+#ifdef SC_FRONTIER_FACTION
+        if (faction) q->cd = faction->cooldown;
+#endif
 #endif
 	}
     } else {
@@ -9079,8 +9235,8 @@ static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recha
 }
 #endif
 
-#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
-static void __attribute__((noinline,long_call))
+#ifdef SC64_IMPORTED_MISSION
+static void SC64_ORDERS_ATTR
 #else
 static void GBA_HOT
 #endif
@@ -9295,7 +9451,7 @@ target_lists_unavailable:
 #endif
 	}
 
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
         /* An escort that reaches its waypoint must still return fire.
          * Holding combat units defend within weapon range without chasing
          * away from their post or interrupting worker mining/build orders. */
@@ -9839,6 +9995,9 @@ static const u8 explored_span_7[] = {7, 6, 6, 6, 5, 4, 3, 0};
 static void GBA_HOT
 mark_explored_circle(int c, int r, int radius, const u8 *span)
 {
+#ifdef SC_ORIGINAL_SKIRMISH
+    if (frontier_explored_before(c, r, radius)) return;
+#endif
     int top = r - radius < 0 ? 0 : r - radius;
     int bottom = r + radius < MAP_ROWS ? r + radius : MAP_ROWS - 1;
     for (int row = top; row <= bottom; row++) {
@@ -9878,7 +10037,11 @@ update_exploration(void)
 #ifdef SC64_IMPORTED_MISSION
     sc64_update_exploration();
 #else
+#ifdef SC_ORIGINAL_SKIRMISH
+    frontier_clear_visible();
+#else
     SC64_GRID_CLEAR(visible);
+#endif
     for (int i = 0; i < MAX_UNITS; i++) {
         Unit *q = &u[i];
         if (!q->alive || SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q) || q->owner != SIDE)
@@ -10178,10 +10341,14 @@ field_ui_select_key(void)
 #endif
 
 static void
-pause_action(u16 pressed)
+pause_action(u16 held, u16 pressed)
 {
-#if defined(SC_DEFAULT_UI) || defined(SC64_FIELD_CONTROLS)
+    (void)held;
+#ifdef SC_DEFAULT_UI
     field_ui_pause_input(pressed);
+    return;
+#elif defined(SC64_FIELD_CONTROLS)
+    field_ui_pause_input(held, pressed);
     return;
 #endif
     if (pressed & KEY_A)
@@ -10194,6 +10361,10 @@ pause_action(u16 pressed)
     } else if (pressed & KEY_R)
 	init_state();
 }
+
+#ifdef SC_FRONTIER_FACTION
+#include "frontier_title.h"
+#endif
 
 #ifdef SC64_TEXT_BOXES
 #include "sc64_text_box_runtime.h"
@@ -10245,6 +10416,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
+#ifdef SC64_RACES
+    speed += race_front.settings.cursor_delta * ((held & KEY_R) ? 2 : 1);
+#endif
 #ifndef SC64_DEATH_VFX_DISABLED
     death_vfx_update(); /* bare call: game_update's size steers IWRAM inlining */
 #endif
@@ -10272,9 +10446,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
         int action=sc64_frontend_update(&race_front,held);
         race_front_briefing_configure();
         if(race_front_load_error)race_front_load_error--;
-        if(pressed){race_front_load_error=0;audio_tone((pressed&KEY_A)?660:440,2,2);}
+        if(pressed){race_front_load_error=0;race_menu_tone((pressed&KEY_A)?660:440,2,2);}
         if(old_page!=race_front.page)race_front_transition=race_front.ticks;
-        if(old_row!=race_front.row)audio_tone(440,2,2);
+        if(old_row!=race_front.row)race_menu_tone(440,2,2);
 #ifdef SC64_SHOWCASE_ENABLED
         if (action == SC_FRONT_START_SHOWCASE) {
             sc64_display_palette(sc64_palette+32);
@@ -10312,20 +10486,35 @@ SC64_GAME_STEP(u16 held, u16 pressed)
             race_selected_mission=race_front.mission;
             race_human=race_mode?skirmish_human:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
             sc64_display_palette(sc64_palette+32);
-            audio_tone(880,5,3);
+            race_menu_tone(880,5,3);
             init_state();
         } else if(action==SC_FRONT_LOAD) {
             sc64_display_palette(sc64_palette+32);
-            if(!load_game()){race_front_load_error=90;audio_tone(180,6,2);}
+            if(!load_game()){race_front_load_error=90;race_menu_tone(180,6,2);}
         }
         return;
 #endif
 #ifdef SC64_TERRAN_CAMPAIGN
         if (pressed & (KEY_UP | KEY_DOWN)) campaign_mission = 1 - campaign_mission;
 #endif
+#ifdef SC_FRONTIER_FACTION
+        frontier_title_input(pressed);
+        return;
+#elif defined(SC_ORIGINAL_SKIRMISH)
+        if (title_notice) title_notice--;
+        if (pressed & (KEY_LEFT | KEY_RIGHT)) {
+            int direction = (pressed & KEY_RIGHT) ? 1 : ORIGINAL_MAP_COUNT - 1;
+            original_skirmish_map = (original_skirmish_map + direction) % ORIGINAL_MAP_COUNT;
+        }
+#endif
 #ifdef SC64_SKIRMISH
         if (pressed & KEY_UP) skirmish_bots = skirmish_bots % 3 + 1;
         if (pressed & KEY_DOWN) skirmish_bots = (skirmish_bots + 1) % 3 + 1;
+#endif
+#ifdef SC_ORIGINAL_SKIRMISH
+        if (pressed & KEY_A) init_state();
+        else if ((pressed & (KEY_B | KEY_L)) && !load_game()) title_notice = 90;
+        return;
 #endif
 #ifdef SC_DEFAULT_UI
         field_ui_title_input(pressed);
@@ -10340,7 +10529,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	return;
     }
     if (screen == SCREEN_PAUSE) {
-	pause_action(pressed);
+	pause_action(held, pressed);
 	return;
     }
     if (screen == SCREEN_RESULT) {
@@ -10605,7 +10794,11 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     race_bc_yamato_sync_references();
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    SC64_UPDATE_ORDERS();
+#else
     update_orders();
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_tick();
 #endif
@@ -10641,6 +10834,8 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #endif
 #ifdef SC64_IMPORTED_MISSION
     update_imported_mission();
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    skirmish_update();
 #endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_mission_cycles = gba_clock() - sc64_update_stage_start;
@@ -10698,7 +10893,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 		u[i].hp++;
     }
 #endif
-#ifndef SC64_IMPORTED_MISSION
+#if !defined(SC64_IMPORTED_MISSION) && !defined(SC_ORIGINAL_SKIRMISH)
     enemy_wave();
 #endif
     update_tracers();
@@ -10730,8 +10925,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     {
 #ifdef SC64_IMPORTED_MISSION
 	check_imported_mission_outcome();
-#endif
-#ifndef SC64_IMPORTED_MISSION
+#elif defined(SC_ORIGINAL_SKIRMISH)
+	skirmish_outcome();
+#else
 	int enemies = 0, i;
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].owner == ENEMY)
@@ -11399,10 +11595,18 @@ draw_unit_pass(Unit * q, int selection_pass)
 	gfx_pixel(x - 3, y + 3, C_GOLD);
 	if (walk) sc64_walk_treads(x, feet + 3, walk, C_SHADOW);
     } else if (q->type == U_MARINE) {
+#ifdef SC_FRONTIER_FACTION
+        int fighter = frontier_owner_faction(q->owner);
+        frontier_fighter_glyph(fighter, x, y, col);
+        if (walk && fighter == FRONTIER_ROVERS)
+            gfx_pixel(x - 5, y + 1, (walk & 1) ? C_ORANGE : C_CYAN);
+        else if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
+#else
 	gfx_rect(x - 2, y - 4, 5, 8, col);
 	gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);
 	gfx_line(x + 1, y, x + 5, y - 2, C_SILVER);
 	if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
+#endif
     } else if (q->type == U_FIREBAT) {
 	gfx_rect(x - 3, y - 4, 7, 8, col);
 	gfx_rect(x - 4, y - 5, 8, 2, C_ORANGE);
@@ -11703,10 +11907,14 @@ sc64_minimap_dot(int x, int y, u8 color)
 #endif
 }
 
+#if defined(SC_FRONTIER_FACTION) && !defined(SC64_IMPORTED_MISSION)
+#include "frontier_minimap.h"
+#endif
+
 static void
 draw_minimap(void)
 {
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
     int x, y, i;
     const int map_x = 197, map_y = 129, map_size = 24;
 #else
@@ -11737,21 +11945,36 @@ draw_minimap(void)
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
 #endif
+#elif defined(SC_FRONTIER_FACTION)
+    frontier_minimap_draw_terrain(map_x, map_y);
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    for (int row = 0; row < map_size; row++) {
+        int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);
+        for (int col = 0; col < map_size; col++) {
+            int cell = grid_row * MAP_COLS + (2 * col + 1) * MAP_COLS / (2 * map_size);
+            if (SC64_GRID_GET(visible, cell))
+                gfx_pixel(map_x + col, map_y + row, C_GRASS);
+            else if (SC64_GRID_GET(explored, cell))
+                gfx_pixel(map_x + col, map_y + row, C_FOG);
+        }
+    }
 #else
-    for (row = 0; row < MAP_ROWS; row++)
-	for (col = 0; col < MAP_COLS; col++) {
-	    if (!cell_explored(col, row))
-		continue;
-#ifdef SC64_IMPORTED_MISSION
-	    x = map_x + col * map_size / MAP_COLS;
-	    y = map_y + row * map_size / MAP_ROWS;
-	    gfx_pixel(x, y, SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG);
-#else
-	    x = 185 + col * 2;
-	    y = 126 + row * 2;
-	    gfx_rect(x, y, 2, 2, SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG);
-#endif
-	}
+    /* Neighboring tiles of the same shade can be painted together.
+     * Unexplored tiles leave the panel's background and frame intact. */
+    for (row = 0; row < MAP_ROWS; row++) {
+        int start = 0, shade = -1;
+        for (col = 0; col <= MAP_COLS; col++) {
+            int next = -1;
+            if (col < MAP_COLS && cell_explored(col, row))
+                next = SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG;
+            if (next == shade)
+                continue;
+            if (shade >= 0)
+                gfx_rect(185 + start * 2, 126 + row * 2, (col - start) * 2, 2, (u8)shade);
+            start = col;
+            shade = next;
+        }
+    }
 #endif
     for (i = 0; i < MAX_BUILDINGS; i++) {
 	if (!b[i].alive) continue;
@@ -11762,7 +11985,7 @@ draw_minimap(void)
         if (sc64_game_building_actor_flags(b[i].type) &&
             !(sc64_game_building_actor_flags(b[i].type) & SC64_GAME_ACTOR_DRAWABLE)) continue;
 #endif
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
 	    x = map_x +
 #ifdef SC64_RACES
         sc64_minimap_pixel(b[i].x,MAP_COLS)
@@ -11819,7 +12042,7 @@ draw_minimap(void)
             (sc64_game_unit_actor_flags(u[i].type) &&
              !(sc64_game_unit_actor_flags(u[i].type) & SC64_GAME_ACTOR_DRAWABLE))) continue;
 #endif
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
 	    x = map_x +
 #ifdef SC64_RACES
         sc64_minimap_pixel(u[i].x,MAP_COLS)
@@ -11846,7 +12069,7 @@ draw_minimap(void)
 #endif
                 );
 	}
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
 	{
 	    int vx = map_x +
 #ifdef SC64_RACES
@@ -12356,6 +12579,23 @@ static unsigned sc64_static_dirty_rows_host_bands;
 static void
 draw_title(void)
 {
+#ifdef SC_FRONTIER_FACTION
+    frontier_title_draw();
+    return;
+#elif defined(SC_ORIGINAL_SKIRMISH)
+    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_rect(16, 16, 208, 128, C_PANEL);
+    gfx_frame(16, 16, 208, 128, C_CYAN);
+    gfx_text(38, 28, "FRONTIER SKIRMISH", C_GOLD);
+    gfx_text(30, 54, "MAP", C_WHITE);
+    gfx_text(78, 54, original_skirmish_maps[original_skirmish_map].title, C_HIGHLIGHT);
+    gfx_text(30, 75, "COMPUTER OPPONENTS", C_WHITE);
+    gfx_num(160, 75, skirmish_bots, C_HIGHLIGHT);
+    gfx_text(30, 96, "LEFT/RIGHT MAP  UP/DOWN AI", C_CYAN);
+    gfx_text(30, 113, "A START   B LOAD SAVE", C_CYAN);
+    if (title_notice) gfx_text(30, 127, "NO SAVED MATCH", C_RED);
+    return;
+#endif
 #ifdef SC64_RACES
     sc64_frontend_draw();return;
 #endif
@@ -12462,7 +12702,7 @@ draw_result(void)
         return;
     }
 #endif
-#ifdef SC_DEFAULT_UI
+#if defined(SC_DEFAULT_UI) && !defined(SC_ORIGINAL_SKIRMISH)
     field_ui_draw_result();
     return;
 #elif defined(SC64_FIELD_CONTROLS)
@@ -12522,6 +12762,12 @@ unit_name(int type)
 {
 #ifdef SC64_RACES
     return sc64_race_unit_name(type);
+#endif
+#ifdef SC_FRONTIER_FACTION
+    if (type == U_SCV) return "HAULER";
+    if (type == U_MARINE) return frontier_owner_profile(SIDE)->fighter;
+    if (type == U_FIREBAT) return "BREACHER";
+    if (type == U_MEDIC) return "PATCHER";
 #endif
     if (type == U_SCV)
 	return "SCV WORKER";

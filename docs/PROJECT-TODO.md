@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-16. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-18. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,215 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **Frontier Skirmish (P1):** an independently authored battle profile
+  now starts Transit Yard and Stone Gardens with one to three computer
+  opponents. The host checks cover all six setups through mining,
+  production construction, pause/save, title reload, and restart.
+  The three-opponent host match also reaches an AI army attack. Normal
+  ARM inputs start each setup, save at update 900, and reproduce
+  the sampled world and AI state on a fresh-process load. The first
+  240 updates measure 19.76–20.76 emulated updates per second across
+  the six setups. Both three-opponent openings average about 560,000
+  draw cycles and 110,000 simulation cycles. The timing work and the
+  current set of complete ARM win replays for both maps are recorded below.
+
+- **Frontier factions (P1):** each of the three cartridges defaults to
+  its own faction. Skirmish setup offers all player factions, both maps,
+  and one to three independently configured CPUs. Foundry Riflers,
+  Rovers Skimmers, and Bulwark Wardens have different reach, damage,
+  cadence, movement, health, and silhouettes. The AI uses faction-specific
+  worker and attack thresholds. The factions share support units and
+  structures. All 54 cartridge, human faction, map, and CPU-count setups
+  started using ordinary buttons under host sanitizers and in mGBA.
+  On all three cartridges a save with a non-default human faction
+  resumed in a fresh emulator process and restarted with the same setup.
+  Each cartridge loaded an earlier fixed-player save and rejected another
+  cartridge's new save even when the player faction matched its default.
+  Foundry also loaded a save from the original single-roster cartridge.
+  All 54 starts and those save checks passed again on `f5e60854`.
+  An additional sanitizer run on `f804475f` exercised all 1,404 setups
+  across the three cartridges, including every CPU faction permutation
+  in Free for All and CPU Team. Ordinary inputs started, saved, loaded,
+  and restarted each match with the same map, factions, and mode.
+  The first 240 gameplay updates measured 29.50–29.57 updates per second
+  in mGBA, up from 19.75–20.75 in the earlier qualification.
+  In two earlier normal-input ARM matches, a passive Foundry player lost
+  to Rovers on Transit Yard (game tick 5,584) and to Bulwark on Stone
+  Gardens (5,524). Add distinct faction support units and production choices.
+  The [pause comparison](audits/2026-11-18-skirmish-pause.md) records
+  mining before and after a native N64 custom-game pause and an
+  exact paused-clock and mineral check on all three Frontier host builds.
+
+- **Frontier CPU Team (P1):** the title's Mode row lets players keep the
+  default Free for All or have the computers fight on one team. The CPUs
+  retain separate forces and banks. This follows the opponent relationships
+  observed at launch in the
+  [paired N64 Blood Bath runs](audits/2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches).
+  Paired ARM runs on both Frontier maps sampled orders every 60 game updates
+  from ticks 1,980 to 3,960. Free-for-all CPUs sent attacks toward other
+  computers. In CPU Team all three sent attacks toward the human base.
+  The paired three-CPU Team openings averaged 29.09–29.25 updates per
+  second through tick 3,960 in mGBA. All 54 CPU Team setups started, with
+  the first 240 game updates averaging 29.56–29.57 updates per second.
+  One save on each cartridge loaded in a fresh process and matched the
+  next 120 updates before a restart kept the team. Three saves from
+  before the mode was added loaded as Free for All.
+
+- **Frontier victory replays (P1):** each of the three player factions
+  has a normal-button win on both maps against one CPU. Both maps also
+  have mixed two- and three-CPU wins. The stored inputs use Foundry's
+  title defaults, and the replay tool translates setup for Rovers and
+  Bulwark. Each case starts at the title, builds and trains a force, issues
+  attack orders, and checks the result screen and exact game tick. In the
+  three-CPU matches, Foundry beat independently controlled Rovers, Bulwark,
+  and Foundry on Transit Yard at game tick 14,727 and on Stone Gardens at
+  tick 13,912.
+  These full mGBA replays averaged 29.05 and 29.40 updates per second
+  after the first 100 updates. Physical GBA SP timing remains open.
+  The two-CPU Team cases reached victory at tick 14,649 on Transit Yard
+  and tick 12,980 on Stone Gardens at 28.68 and 28.85 updates per second.
+  On Stone Gardens, Foundry beat three allied Bulwark CPUs at tick 15,510
+  by protecting its miners with one early barracks and attacking with a
+  larger force later. The same field input reached victory on Foundry,
+  Rovers and Bulwark with identical opening state and at 28.53 updates
+  per second in mGBA. A corresponding Transit Yard replay remains open.
+  To replay the checked-in inputs, build Foundry
+  and pass the physical observer from `tools/sc64_headless_replay.c` to
+  the optional test.
+
+  ```sh
+  make frontier-foundry
+  python3 tools/frontier_win_replay.py /absolute/path/to/sc64-headless-replay --output /tmp/frontier-victories
+  ```
+
+  Use a fresh output directory. Add `--case transit-yard-foundry`
+  to run one match. The result file includes elapsed emulator cycles and
+  average updates per second from the setup checkpoint to the result.
+  To replay on another cartridge, build its ROM and select it explicitly.
+
+  ```sh
+  make frontier-rovers
+  python3 tools/frontier_win_replay.py /absolute/path/to/sc64-headless-replay --cartridge rovers --case stone-gardens-three-cpu-team --output /tmp/frontier-rovers-team
+  ```
+
+  `--cartridge` accepts `foundry`, `rovers`, or `bulwark` and defaults to
+  Foundry. On Rovers and Bulwark the tool adjusts the title inputs for that
+  cartridge's starting faction while preserving field input timing.
+  On `50283403`, all twelve cases reached the same victory tick on each
+  of the three cartridges. The Rovers and Bulwark witness adjusted the
+  title inputs for the cartridge's default faction and kept every field
+  input at its original update relative to match start. The opening
+  game state, actors, resources, and random seed matched Foundry.
+  All 36 full matches averaged 28.68–29.48 updates per second in mGBA.
+
+- **Frontier four-player targeting (P1):** when all four corners are
+  occupied, break exact AI target-distance ties toward each attacker's
+  clockwise neighbor. In both maps' mixed three-CPU opening, the
+  northeastern CPU chose the human at tick 2,160 even though the
+  southeastern CPU was equally near at 47 planner cells. The new rule
+  chooses the southeastern CPU in that tie. The nearest hostile target
+  still wins when distances differ. The eight one- and two-CPU replay
+  victory ticks stayed fixed. Larger waves, including the rule that
+  counts queued fighters toward the dispatch threshold, remain open.
+
+- **Frontier CPU mining recovery (P1):** idle CPU workers look for
+  reachable ore within 192 pixels of a completed command center they own.
+  In twelve long defensive matches driven by identical normal inputs
+  on both versions, the CPU exhausted its four local patches around
+  game ticks 18,260–18,482. The old policy sent nine workers to other
+  corners. The new policy assigned none to a distant patch. The
+  sanitizer fixture covers both maps and one to three CPUs, including
+  reload after depletion, an unfinished hall, and a reachable local
+  patch. All twelve existing victory inputs kept their result ticks and
+  averaged 28.68–29.48 updates per second in mGBA. The paired long mGBA
+  runs also found nine remote assignments before the fix and zero after.
+  On each map a fresh load after local depletion matched the live game
+  for the next 120 updates. CPU expansion after local exhaustion remains
+  open.
+
+- **Frontier frame time (P1):** clear the byte visibility grid with
+  aligned stores, remember explored circle centers until a world load or
+  restart, and draw uninterrupted battlefield grass/fog as row spans.
+  In two normal-button ARM replays, each 240-update opening and combat
+  window starts after updates 100 and 3,950 respectively.
+
+  | Match | Opening updates/s | Combat updates/s |
+  | --- | ---: | ---: |
+  | Transit Yard, 2 CPUs | 22.31 to 29.89 | 20.60 to 23.67 |
+  | Stone Gardens, 3 CPUs | 21.50 to 29.69 | 20.43 to 22.48 |
+
+  About 54,000 simulation cycles and 63,000 draw cycles were removed per
+  opening update. Sixteen sampled world and framebuffer checkpoints
+  matched across the baseline, each change alone, and the combined
+  build. The original terrain oracle covered 512 map, camera and fog
+  cases. The combined build finished both replays with the same victory
+  ticks, produced identical mid-match SRAM, and matched 120 updates
+  after loading each build's save in the other. The cache adds 2 KiB
+  of working RAM. The measurements are from mGBA. Route and rendering
+  cost in active combat still need profiling and physical GBA timing
+  remains open.
+
+- **Frontier busy combat (P1):** an instrumented ARM build attributed
+  about 41,000–98,000 cycles to point searches and 304,000–315,000 to
+  the HUD including its minimap in sampled combat and later movement.
+  The 64-entry point cache preserves the forward search result and its
+  topology invalidation. The Frontier minimap samples the same tile
+  centers and draws a 24×24 raster before the existing markers.
+  Together they add about 1.1 KiB of working RAM and save
+  about 176,000–181,000 draw cycles per sampled combat update.
+
+  | Match | Busy updates/s | Later movement updates/s |
+  | --- | ---: | ---: |
+  | Transit Yard, 2 CPUs | 23.67 to 28.18 | 25.48 to 29.77 |
+  | Stone Gardens, 3 CPUs | 22.48 to 28.63 | 24.22 to 29.04 |
+
+  These are 240-update mGBA windows beginning after updates 3,950 and
+  5,200. After the first 100 updates, complete matches averaged 28.90
+  on Transit Yard (previously 24.50) and 28.78 on Stone Gardens
+  (previously 22.69). Both reached the original victory tick. Twelve
+  gameplay and framebuffer checkpoints matched. Mid-match SRAM matched
+  byte for byte, and both builds continued each other's saves for
+  120 matching updates. A 3-VBlank update still appears at the 95th
+  percentile in both combat windows. Repeat timing on GBA SP hardware
+  and cover more high-load lineups.
+
+  On `50283403`, eight 240-update windows across the mixed three-CPU
+  Free for All and two-CPU Team wins averaged 28.50–29.80 updates per
+  second in mGBA. The median update was 33.49 ms and five windows had
+  a 50.23 ms 95th percentile. The worst sampled update was 83.71 ms at
+  Stone Gardens game tick 5,341, with 957,144 cycles inside simulation.
+  Two instrumented runs matched the release's world state around the
+  spike. The orders pass used about 926,000 cycles, including about
+  854,000 for movement. The point route and direct corridor probes used
+  about 2,200 cycles combined.
+
+  A follow-up attributed the movement spike to one walkability rebuild.
+  Initialize the authored terrain with the map's rectangle spans and
+  apply the existing building footprints. This cut the measured rebuild
+  from 801,870 to 75,375 cycles with identical world checkpoints. The
+  normal ROM's tick 5,341 dropped from 83.71 to 33.49 ms. Its 240-update
+  window improved from 29.56 to 29.74 updates per second, and its worst
+  update dropped to 50.23 ms. The full-grid oracle covers both maps,
+  overlaps, unfinished buildings, removal, replacement, and clipped
+  footprints at the map edges. Seven other sampled windows kept their
+  reported average rates. Continue profiling the remaining combat stalls
+  and measure on GBA SP hardware.
+
+  In the Stone Gardens CPU Team match, the remaining repeat spike came from
+  a point-route search on each new starting tile. The wall time of the
+  largest update dropped from 62.25 to 33.49 ms after checking whether the
+  shortest horizontal-then-vertical route is clear before starting the
+  full search. Simulation dropped from 506,796 to 97,449 cycles at that
+  update. The 240-update window rose from 28.96 to 29.86 updates per second
+  in mGBA. Its 95th percentile fell from 50.23 to 33.49 ms and its worst
+  update fell to 37.88 ms. All sampled worlds and walkability grids matched
+  on both maps, and an independent breadth-first search checked 2,968
+  authored and randomized query pairs plus directed edge cases. The four
+  Transit Yard windows kept their rates or improved. At game tick 5,163,
+  both builds saved identical SRAM through the pause menu. Each accepted
+  the other's image in a fresh emulator process and matched the next 120
+  updates. Physical GBA SP measurements remain open.
 
 - **Original-art skirmish fog (P1):** clip sight rows before visiting tiles
   and use exact integer spans for explored tiles. In a paired ARM opening
@@ -64,8 +273,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   traced updates the minimap costs 89,410 cycles, the command panel
   59,082, and the resource strip 21,056 on average. The resource strip
   changes in 3 of 40 consecutive frame pairs, and the lower-left area
-  changes in 2. The minimap area changes in every pair. Prioritize
-  reusing the stable panels and batching minimap drawing, and check
+  changes in 2. The minimap area changes in every pair.
+
+- **Original-art minimap drawing (P1):** batch adjacent terrain cells
+  with the same shade while keeping the unit, building, and viewport
+  overlays. Mean draw cost in the 40-unit replay falls from 506,161 to
+  462,920 cycles and the complete update averages 700,949 cycles
+  (23.94 emulated updates per second). The normal opening still runs at
+  29.89 emulated updates per second. Both saves and all 28 checkpoints
+  match the preceding build. Reuse the stable HUD panels next and check
   display timing on GBA hardware.
 
 - **Carrier skirmish parity:** the normal Protoss ROM has the Carrier and
@@ -218,7 +434,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   separate qualification. The [ordinary-profile Blood Bath preview](audits/2026-11-12-skirmish-seat-options.md#ordinary-four-profile-blood-bath-preview)
   matches the last-open CPU edit and passes 24 physical same-build checks
   and 20 cross-build checks. The old ROMs reject Melee saves as intended.
-  Keep the flag off while full matches and native elimination are open.
+  The [November 18 Terran terminal pair](audits/2026-11-12-skirmish-seat-options.md#current-terran-arm-terminal-and-save-checks)
+  reaches identical defeats from HOME and fresh SRAM within each mode. Two
+  human survivors keep their owner on GBA. Keep the flag off while active
+  human wins, terminal checks on the other products and native elimination
+  are open.
   The [native T1 fresh-load witness](audits/2026-11-13-n64-t1-save-selection.md)
   clears the selected Command Center, consistent with the normal GBA
   selection reset; native Z7 remains untested.
@@ -260,8 +480,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
-  Before ARM enablement, resolve in-flight damage and simultaneous
-  outcomes against native evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
+  [Draft #566](https://github.com/ggu/starcraft-gba/pull/566) qualifies the
+  opt-in ARM build. The Terran Free for All replay transfers a surviving
+  Overlord on CPU retirement at frame 13,905. The Melee replay transfers
+  both human survivors on defeat at frame 11,706. Fresh saves match in
+  both cases. Default enablement still needs native in-flight damage and
+  simultaneous-outcome evidence. The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
   were published in that opening. A separate ordinary-input replay
@@ -441,8 +665,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   lower p95). Z8 and the facility FIFO composition also match gameplay
   checkpoints, including forced facility overflow under sanitizers.
   All four current Blood Bath save/load pairs and the full P10 physical
-  win match. Keep the switch opt-in while checking the timing distribution
-  and worst cases on wider play and on hardware.
+  win match. The [current composition](audits/2026-11-14-z7-point-flood-retention.md#coexistence-with-the-shipping-small-map-frontier)
+  preserves the small-map facility frontiers and enables the scratch tail
+  in the shared builds. Dense Z7 saves 1.19% mean and 8.82% p95, with
+  effectively flat means in busy P7 and three-AI Blood Bath. Keep testing
+  hardware timing and prioritize the count and cost of remaining wide fills.
   The
   [current instruction trace](audits/2026-11-15-z7-contact-cost.md) puts
   524k cycles in uncached collision masks in three no-flood samples,
@@ -477,8 +704,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reuses validated cells and occupancy bits. The paired Z9 campaign
   prefix matches raw world and route state and uses 1.32% fewer cycles
   on average with bulk rebuild and fast link. Z10 keeps the same EWRAM
-  and uses 160 fewer IWRAM bytes. The peak barely changes. Keep it
-  optional until other products and broader saves pass. The first
+  and uses 160 fewer IWRAM bytes. The
+  [canonical P7 qualification](audits/2026-11-12-target-index-bulk.md#canonical-release-qualification)
+  covers all four cartridges, both maps, and fresh save compatibility.
+  The first
   [mixed Z10 Carrier battle](CARRIER-PROJECTILES.md#where-the-mixed-battle-spends-its-cycles)
   matches the prior world and byte-identical 32 KiB save image;
   mean cycles fall 0.78%. This is emulator evidence only.
@@ -1158,16 +1387,18 @@ usable shared Forge/Core research, reduce measured recurring collision work,
 and repair current campaign/winning-replay gaps. Continue native visual/audio comparison with explicit
 save/source-owner and timing evidence; do not advertise unwired components.
 
-## Current baseline
+## Release and measurement baselines
 
 - Canonical branch: `codex/source-release`. The source-permitted Scourge/Spire
   correction in #290 and save-context hardening in #293 are retained. #295
   adds the explicit shared Egg preview; its normal product flag remains off.
-- Latest verified normal Mac package: `StarCraft-GBA-2026-11-07-34c101e0`:
+- The November 7 normal Mac package was `StarCraft-GBA-2026-11-07-34c101e0`:
   Terran 1–10, Zerg 1–9, Protoss 1–10, plus Showcase. The last recorded KODAK
-  package was `20261106-e9838086-campaigns`; its present contents are unverified.
-  Content coverage remains **29/30**;
-  this is not a claim of complete native mechanics or campaign parity.
+  package in this November 7 check was `20261106-e9838086-campaigns`.
+  This package carried 29 of 30 missions. The later November 13 cartridge
+  audits verify all ten Terran and all ten Zerg missions on their exact
+  builds. The T10, Z10, and P10 sources expose all 30 mission entries. The
+  campaign replay and save checks below track verification by ROM revision.
   P10 and Showcase include the shared aura optimization; T10/Z9/Z10 retain
   their qualified `f1fbf106` ROM bytes. All five 32 MiB headers, SRAM markers
   and package checksums pass read-back. Research/Flash, paid Scarab and Egg
@@ -1178,6 +1409,114 @@ save/source-owner and timing evidence; do not advertise unwired components.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
+- The [repeat-command save audit](audits/2026-11-18-saved-repeat-command.md)
+  traces a normal Terran Outpost reload that changed 22 attack-move orders
+  to move orders. Preserving only the remembered command keeps selection
+  clear and wins from a fresh SRAM load on the unchanged tape. All four
+  ARM products pass sampled fresh loads. A human Blood Bath win, wider
+  campaign SRAM replay and hardware timing remain open.
+- The [shared SC64 menu controls](RACE-CAMPAIGNS.md#menus-and-session-settings)
+  add title Options, a custom map preview, and a field pause page for objectives,
+  settings and returning to title. Cursor Speed and Menu Sound are session
+  settings. The full native map and mode catalog, Game Speed and the second
+  selectable save slot remain open.
+- The [current-release P7 comparison](audits/2026-11-18-p7-current-mgba.md)
+  at `0e536f26` measures 8.10 updates/s on the normal P10 build and 8.28
+  with the terrain-cache preview in the same mGBA combat window. All 11
+  sampled world and display checkpoints match. Unit orders still take
+  about 985,000 cycles per advancing update. Matched order diagnostics
+  attribute 392,902 cycles to movement and 269,588 to Arbiter cache work.
+  Both builds also won the carried P7 mission from HOME at frame 55,892
+  with 59 matching named checkpoints. Prioritize exact improvements in
+  movement and Arbiter work in the campaign builds.
+- [Post-menu contact and detection changes](audits/2026-11-18-p7-current-mgba.md#contact-and-detection-on-the-post-menu-build)
+  reduce mean P7 cost from 2.073M to 2.011M cycles with matching sampled
+  worlds and display. Normal Terran, Z10, P10 and Showcase links pass the
+  existing memory guards. Full contact masks still merit attention, and
+  the isolated 908,000-cycle point-field fill needs separate tail work.
+  Keep physical GBA timing and peak-stack checks open.
+  [Reusing packed candidate coordinates](audits/2026-11-18-p7-current-mgba.md#reuse-the-collision-candidate-load)
+  reduces the same mean to 2.002M cycles. A speed-plane hoist had
+  negligible mean benefit and raised the sampled peak.
+- [Terrain validation #567](audits/2026-11-18-terrain-fast-validate.md)
+  is enabled on the canonical cartridges. The carried P7 physical-input
+  window averages 1.959M cycles with the terrain change. [Spatial defense
+  queries](audits/2026-11-12-defense-combined.md#qualification-on-the-terrain-default)
+  bring the same window to 1.921M, with matched world and display samples.
+  All four canonical cartridges share the Pylon lookup. Zerg and Protoss
+  campaign passes with target lists search nearby cells. Keep prioritizing
+  unit orders and repeated mission world scans, and measure stack usage
+  and worst updates alongside mean cycles.
+- [Bulk target rebuild and fast insertion](audits/2026-11-12-target-index-bulk.md#canonical-release-qualification)
+  lower the same P7 mean from 1.921M to 1.901M cycles and free 160 IWRAM
+  bytes in each canonical cartridge. The composed Outpost replay wins
+  after a fresh load without changing the controller tape. The full P7
+  victory matches all 59 checkpoints. The normal P10 build also wins
+  [P2 and P3 after fresh loads](audits/2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation)
+  at the two previously divergent pause cuts.
+  [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
+  increased mean cost 1.79% and stays outside the release.
+- [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
+  speeds up the shared Interceptor firing path. A staged fight on the
+  normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
+  world, projectile, display and save samples. An ordinary three-CPU
+  Blood Bath fight on the compact Z10 preview drops mean cost 4.72%
+  and p95 cost 11.08%, with matching fresh loads. The older P7 tape
+  leaves the arena empty and gives identical timings. The full ordinary
+  fixed-format P10 victory also matches. Target the remaining route burst
+  at Blood Bath frame 17,128, when 12 builds share a single update.
+- The [interleaved depot flood audit](audits/2026-11-17-z10-order-tail.md#interleaved-depot-floods-after-a-building-dies)
+  found three partial depot fields restarting after six cells opened.
+  Keeping each pending queue within the orders pass cuts the worst compact
+  Blood Bath update from 5.644M to 2.621M cycles with matching route counters,
+  sampled fields, display and fresh SRAM continuation. Mean savings are
+  0.41%. The regular Z10 match drops mean cost 3.65% and worst-update
+  cost 32.51%; that vector also moves the orders loop into IWRAM. All
+  30 campaign starts, 72 skirmish starts and eight cross-loads pass on
+  the four regular cartridges. Keep profiling average cost and wider battles.
+- The [post-#572 sustained P7 audit](audits/2026-11-18-p7-current-mgba.md#sustained-combat-after-572)
+  measures 1.902M guest cycles per active update. The camera moves in 912
+  of 957 adjacent samples. A vertical cache rotation saves 0.62% overall
+  and 31,444 cycles per vertical partial restore. The two-axis rotation
+  raises p95. Two collision memo alternatives produce zero additional
+  hits on 36,650 requests.
+  Prioritize the cost of the first collision lookup and repeated terrain
+  work during both axes of camera movement.
+- The [first-lookup breakdown](audits/2026-11-18-p7-current-mgba.md#work-inside-the-first-collision-lookup)
+  visits about 20 actor nodes per mask. About 77% fail the distance check
+  after reading actor facts, and only 2% fail the flight layer. Packed
+  nodes raise mean cost 0.35%. Deferring admission of a fresh steering
+  mask until the mover stays put saves 0.97% on P7 and 0.39% in regular
+  Z10 Blood Bath. Dense Z7 saves 0.17% mean with a 0.10% p95 increase.
+  Full P7 matches victory, dialogue and 59 checkpoints at 8.31 emulated
+  updates per second. The 30 fps target remains open. The diagonal
+  fog-strip probe saves 103 cycles overall and stays local. Prioritize
+  recurring route and order work and larger terrain draw costs.
+- The [detector range probe](audits/2026-11-18-p7-current-mgba.md#detector-range-rejection)
+  skips exact distance calculation when one inclusive gap exceeds the
+  range. It saves 0.58% in P7 with matching sampled state and pixels.
+  Keep it in qualification for the other prepared profiles.
+- A [native CPU purchase](audits/2026-11-12-n64-blood-bath-opening.md#terran-cpus-first-observed-purchase)
+  corroborates the paid Terran worker opening in Blood Bath Melee.
+  The shared opening cuts show 50 minerals and an empty queue for
+  every owner. The Terran CPU spends 50 on a queued SCV before any
+  owner adds a building. Capture first purchases for Zerg and Protoss
+  before comparing the later AI build order.
+- The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
+  follows five selected Marines in ares. Two ordinary Move commands assign
+  destinations on both axes, while the GBA's initial five destinations lie
+  on one row. [Four Blood Bath SCVs](audits/2026-11-07-native-actor-differential/README.md#blood-bath-workers-and-the-minimap)
+  instead receive one common destination per command, with different
+  intermediate waypoints. A matched follow-up gives the same SCVs common
+  targets at both short and long field distances. Compare troops and
+  workers from matched starts before changing shared formation.
+- The [N64 game-speed comparison](audits/2026-11-18-native-game-speed.md)
+  matched two fresh Challenger openings and changed only the Game Speed
+  slider. The same 2,700 observer steps after resume earned 128 minerals
+  at the starting setting and 184 at the higher setting. The full set of
+  seven positions gives 7, 9, 12, 15, 18, 22 and 24 gameplay advances in
+  61 resumed observer steps. Use this ordering for a GBA Game Speed option,
+  with display pacing and long gameplay timing qualified independently.
 - The [earlier P7 measurement](audits/2026-11-06-current-native-qualification/README.md)
   at `72a71d22` costs about **2,200,226 cycles per advancing full loop**, versus
   about **559,000 cycles** available at 30 fps. The paired diagnostic matches

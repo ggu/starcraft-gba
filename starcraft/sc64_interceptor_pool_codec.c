@@ -166,11 +166,9 @@ grow(Sc64Arena * a)
     } sethead(a, H_SIZE, (uint8_t) (size + n));
     return 1;
 }
-int
-sc64_pool_acquire(Sc64Arena * a, uint8_t * ordinal, uint8_t * native_index)
+static int
+pool_acquire_linked(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index)
 {
-    if (!arena_ok(a) || !ordinal || !native_index || !sc64_pool_validate(a))
-	return 0;
     uint8_t	    size = head(a, H_SIZE);
     if (head(a, H_FREE) == SC64_END) {
 	if (size == 100 && !grow(a))
@@ -187,6 +185,13 @@ sc64_pool_acquire(Sc64Arena * a, uint8_t * ordinal, uint8_t * native_index)
     *ordinal = id;
     *native_index = sc64_native_index(id);
     return 1;
+}
+
+int
+sc64_pool_acquire(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index)
+{
+    if (!ordinal || !native_index || !sc64_pool_validate(a)) return 0;
+    return pool_acquire_linked(a, ordinal, native_index);
 }
 static void
 pool_retire_linked(Sc64Arena *a, uint8_t id)
@@ -307,6 +312,49 @@ validrow(const Sc64ProjectileRow * r)
 	r->script_phase <= 3 && r->raw_source_owner <= 11 &&
 	r->pending_damage_event <= 1 && r->next_link <= SC64_END &&
 	r->reserved_snapshot_bits == 0;
+}
+
+/* The live arena is already validated and exclusively owned. When there
+ * is room to reuse a row, check the two list splices before mutating them.
+ * Growth and suspicious links use the full validator. */
+static int live_acquire_links(const Sc64Arena *a)
+{
+    if (!arena_ok(a)) return 0;
+    unsigned size = rd(a, H_SIZE);
+    unsigned active = rd(a, H_ACTIVE_COUNT);
+    unsigned free = rd(a, H_FREE_COUNT);
+    unsigned fh = rd(a, H_FREE), ftail = rd(a, H_FREE_TAIL);
+    unsigned ah = rd(a, H_ACTIVE), atail = rd(a, H_ACTIVE_TAIL);
+    Sc64ProjectileRow row;
+    if (size > SC64_POOL_CAPACITY || size % SC64_POOL_GROWTH ||
+        active + free != size || rd(a, H_RESERVED) || !free ||
+        (free == 1 && size < SC64_POOL_CAPACITY) ||
+        fh >= size || ftail >= size || (fh == ftail) != (free == 1) ||
+        rfield(a, fh, F_PREV) != SC64_END ||
+        rfield(a, ftail, F_NEXT) != SC64_END || rfield(a, ftail, F_STATE) != 3 ||
+        !sc64_pool_get_row(a, (uint8_t)fh, &row) || !validrow(&row) || row.state != 3)
+        return 0;
+    unsigned next = row.next_link;
+    if (free == 1 ? next != SC64_END :
+        next >= size || next == fh || (next == ftail) != (free == 2) ||
+        rfield(a, next, F_PREV) != fh || rfield(a, next, F_STATE) != 3)
+        return 0;
+    if (!active) return ah == SC64_END && atail == SC64_END;
+    if (ah >= size || atail >= size || (ah == atail) != (active == 1) ||
+        rfield(a, ah, F_PREV) != SC64_END || rfield(a, atail, F_NEXT) != SC64_END ||
+        rfield(a, ah, F_STATE) >= 3 || rfield(a, atail, F_STATE) >= 3)
+        return 0;
+    next = rfield(a, ah, F_NEXT);
+    if (active == 1) return next == SC64_END;
+    return next < size && next != ah && (next == atail) == (active == 2) &&
+        rfield(a, next, F_PREV) == ah && rfield(a, next, F_STATE) < 3;
+}
+
+int sc64_pool_acquire_live(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index)
+{
+    if (!ordinal || !native_index) return 0;
+    if (!live_acquire_links(a)) return sc64_pool_acquire(a, ordinal, native_index);
+    return pool_acquire_linked(a, ordinal, native_index);
 }
 
 /* In a validated, exclusively owned arena the rest of both chains is already
@@ -727,13 +775,24 @@ size_t sc64_compact_codec_max_bytes(unsigned cap)
     return cap <= SC64_POOL_CAPACITY ? compact_bytes(compact_max_allocated(cap), cap) : 0;
 }
 
+static int compact_acquire_allowed(const Sc64Arena *a, unsigned cap)
+{
+    return arena_ok(a) && cap <= SC64_POOL_CAPACITY &&
+        rd(a, H_SIZE) <= compact_max_allocated(cap) && rd(a, H_ACTIVE_COUNT) < cap;
+}
+
 int sc64_compact_pool_acquire(Sc64Arena *a, unsigned cap,
                               uint8_t *ordinal, uint8_t *native_index)
 {
-    if (!arena_ok(a) || cap > SC64_POOL_CAPACITY ||
-        rd(a, H_SIZE) > compact_max_allocated(cap) || rd(a, H_ACTIVE_COUNT) >= cap)
-        return 0;
-    return sc64_pool_acquire(a, ordinal, native_index);
+    return compact_acquire_allowed(a, cap) &&
+        sc64_pool_acquire(a, ordinal, native_index);
+}
+
+int sc64_compact_pool_acquire_live(Sc64Arena *a, unsigned cap,
+                                   uint8_t *ordinal, uint8_t *native_index)
+{
+    return compact_acquire_allowed(a, cap) &&
+        sc64_pool_acquire_live(a, ordinal, native_index);
 }
 
 static Sc64ProjectileRow compact_free_row(void)

@@ -27,3 +27,17 @@ build/test-sc64-campaign-ui-context-z10: tests/sc64_shared_mechanics_game.c $(ST
 test-sc64-campaign-ui-context: build/test-sc64-campaign-ui-context-p10 build/test-sc64-campaign-ui-context-z10
 	./build/test-sc64-campaign-ui-context-p10
 	./build/test-sc64-campaign-ui-context-z10
+
+# Normal readers retain just the repeat command and clear transient selection.
+define SC64_REPEAT_COMMAND_CHECK
+build/test-sc64-repeat-command-$(1): tests/sc64_saved_repeat_command.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(4) common/gba.c $$(COMMON_HEADERS) | build
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $(2) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) -o $$@
+endef
+
+$(eval $(call SC64_REPEAT_COMMAND_CHECK,terran,$$(TERRAN_ROM_FLAGS),$$(TERRAN_FULL_INPUTS)))
+$(eval $(call SC64_REPEAT_COMMAND_CHECK,z10,$$(ZERG_Z10_RELEASE_FLAGS),$$(ZERG_Z10_CANONICAL_INPUTS)))
+$(eval $(call SC64_REPEAT_COMMAND_CHECK,p10,$$(PROTOSS_P10_FLAGS),$$(PROTOSS_P10_INPUTS),$$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SC64_REPEAT_COMMAND_CHECK,showcase,$$(SHOWCASE_FLAGS),$$(SHOWCASE_INPUTS),$$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+.PHONY: test-sc64-repeat-command
+test-sc64-repeat-command: $(addprefix build/test-sc64-repeat-command-,terran z10 p10 showcase)
+	@for t in $^; do "$$t" || exit; done

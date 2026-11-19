@@ -910,14 +910,102 @@ ui_text_wrap(int x, int y, int cols, int lines, const char *text, u8 color)
 /* pause_notice: the message in the top two bits, its countdown below. */
 enum { UI_NOTICE_SAVED = 1 << 6, UI_NOTICE_SAVE_FAILED = 2 << 6, UI_NOTICE_NO_SAVE = 3 << 6 };
 
+enum {
+    FIELD_PAUSE_ROOT, FIELD_PAUSE_MORE, FIELD_PAUSE_OBJECTIVES,
+    FIELD_PAUSE_SETTINGS, FIELD_PAUSE_CONFIRM_EXIT
+};
+enum { FIELD_PAUSE_MORE_OBJECTIVES, FIELD_PAUSE_MORE_SETTINGS, FIELD_PAUSE_MORE_EXIT, FIELD_PAUSE_MORE_BACK };
+static u8 field_pause_page, field_pause_row;
+
+static void field_pause_reset(void)
+{
+    field_pause_page = FIELD_PAUSE_ROOT;
+    field_pause_row = 0;
+}
+
+static void field_pause_back(void)
+{
+    switch (field_pause_page) {
+    case FIELD_PAUSE_OBJECTIVES: field_pause_row = FIELD_PAUSE_MORE_OBJECTIVES; break;
+    case FIELD_PAUSE_SETTINGS: field_pause_row = FIELD_PAUSE_MORE_SETTINGS; break;
+    case FIELD_PAUSE_CONFIRM_EXIT: field_pause_row = FIELD_PAUSE_MORE_EXIT; break;
+    default: field_pause_reset(); return;
+    }
+    field_pause_page = FIELD_PAUSE_MORE;
+}
+
+static __attribute__((noinline)) void
+field_pause_extra_input(u16 held, u16 pressed)
+{
+    if (pressed & (KEY_START | KEY_SELECT)) {
+        screen = SCREEN_PLAY;
+        return;
+    }
+    if (pressed & KEY_B) {
+        field_pause_back();
+        return;
+    }
+
+    if (field_pause_page == FIELD_PAUSE_OBJECTIVES) {
+        if (pressed & KEY_A) field_pause_back();
+        return;
+    }
+
+    int rows = field_pause_page == FIELD_PAUSE_MORE ? FIELD_PAUSE_MORE_BACK + 1 :
+               field_pause_page == FIELD_PAUSE_SETTINGS ? SC_FRONT_SETTING_COUNT : 2;
+    if (pressed & KEY_UP) field_pause_row = (u8)sc64_front_wrap(field_pause_row - 1, rows);
+    if (pressed & KEY_DOWN) field_pause_row = (u8)sc64_front_wrap(field_pause_row + 1, rows);
+
+    if (field_pause_page == FIELD_PAUSE_SETTINGS) {
+        if (field_pause_row == SC_FRONT_SETTING_BACK && (pressed & KEY_A)) {
+            field_pause_back();
+        } else {
+            sc64_front_setting_edit(&race_front.settings, field_pause_row, pressed);
+            if (pressed & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A))
+                race_menu_tone(440, 2, 2);
+        }
+        return;
+    }
+    if (pressed & (KEY_UP | KEY_DOWN)) race_menu_tone(440, 2, 2);
+    if (!(pressed & KEY_A)) return;
+
+    if (field_pause_page == FIELD_PAUSE_CONFIRM_EXIT) {
+        if (!field_pause_row) {
+            field_pause_back();
+            return;
+        }
+        screen = SCREEN_TITLE;
+        won = lost = 0;
+        race_frontend_reset();
+        race_front.prev_buttons = held;
+        return;
+    }
+
+    switch (field_pause_row) {
+    case FIELD_PAUSE_MORE_OBJECTIVES: field_pause_page = FIELD_PAUSE_OBJECTIVES; break;
+    case FIELD_PAUSE_MORE_SETTINGS: field_pause_page = FIELD_PAUSE_SETTINGS; break;
+    case FIELD_PAUSE_MORE_EXIT: field_pause_page = FIELD_PAUSE_CONFIRM_EXIT; break;
+    default: field_pause_reset(); return;
+    }
+    field_pause_row = 0;
+}
+
 /* Pause list: A chooses the highlighted row. The old one-key shortcuts
  * (B save, L load, R restart, START resume) still work and leave the
  * highlight alone, so A after a B save still resumes. */
 static __attribute__((noinline)) void
-field_ui_pause_input(u16 pressed)
+field_ui_pause_input(u16 held, u16 pressed)
 {
     int choice = -1;
     if (pause_notice && !(--pause_notice & 0x3f)) pause_notice = 0;
+    if (field_pause_page != FIELD_PAUSE_ROOT) {
+        field_pause_extra_input(held, pressed);
+        if (screen != SCREEN_PAUSE) {
+            field_pause_reset();
+            pause_cursor = pause_notice = 0;
+        }
+        return;
+    }
     if (pressed & KEY_UP) pause_cursor = (u8)((pause_cursor + 3) % 4);
     if (pressed & KEY_DOWN) pause_cursor = (u8)((pause_cursor + 1) % 4);
     if (pressed & KEY_A) choice = pause_cursor;
@@ -925,7 +1013,13 @@ field_ui_pause_input(u16 pressed)
     else if (pressed & KEY_B) choice = 1;
     else if (pressed & KEY_L) choice = 2;
     else if (pressed & KEY_R) choice = 3;
-    if (choice < 0) return;
+    if (choice < 0) {
+        if (pressed & KEY_RIGHT) {
+            field_pause_page = FIELD_PAUSE_MORE;
+            field_pause_row = 0;
+        }
+        return;
+    }
     if (choice == 0) screen = SCREEN_PLAY;
     else if (choice == 1) pause_notice = (u8)((save_game() ? UI_NOTICE_SAVED : UI_NOTICE_SAVE_FAILED) | 60);
     else if (choice == 2) {
@@ -935,12 +1029,69 @@ field_ui_pause_input(u16 pressed)
 }
 
 static void
+field_pause_draw_row(unsigned row, int y, const char *label, const char *value)
+{
+    int selected = row == field_pause_row;
+    if (selected) ui_highlight(30, y - 1, 180);
+    sc64_font_text(36, y, value ? 110 : 168, label, selected ? C_WHITE : C_SILVER);
+    if (value) sc64_font_text(152, y, 52, value, C_GOLD);
+}
+
+static __attribute__((noinline)) void field_pause_draw_extra(void)
+{
+    gfx_rect(24, 14, 192, 132, C_PANEL);
+    gfx_frame(24, 14, 192, 132, C_EDGE);
+    gfx_rect(30, 118, 180, 1, C_EDGE);
+    ui_key(36, 128, "B", "BACK", C_SILVER);
+    ui_key(110, 128, "START", "RESUME", C_SILVER);
+
+    switch (field_pause_page) {
+    case FIELD_PAUSE_OBJECTIVES: {
+        const Sc64MissionInfo *info = race_mode ? 0 : sc64_catalog_get(race_selected_mission);
+        sc64_font_text(36, 22, 168, "Objectives", C_GOLD);
+        if (info) sc64_font_text(36, 40, 168, info->title, C_WHITE);
+        ui_text_wrap(36, 54, 28, 7, race_mode ? "Destroy all enemy buildings." :
+                     race_campaign_objective_text(), C_SILVER);
+        break;
+    }
+    case FIELD_PAUSE_SETTINGS:
+        sc64_font_text(36, 22, 168, "Settings", C_GOLD);
+        field_pause_draw_row(SC_FRONT_SETTING_CURSOR, 44, "CURSOR SPEED",
+                             sc64_front_setting_cursor_name(&race_front.settings));
+        field_pause_draw_row(SC_FRONT_SETTING_SOUND, 60, "MENU SOUND",
+                             race_front.settings.quiet_menu ? "OFF" : "ON");
+        field_pause_draw_row(SC_FRONT_SETTING_BACK, 76, "BACK", 0);
+        gfx_text(36, 99, "D-PAD LEFT/RIGHT EDIT", C_DIM);
+        break;
+    case FIELD_PAUSE_CONFIRM_EXIT:
+        sc64_font_text(36, 22, 168, "Return to title?", C_GOLD);
+        sc64_font_text(36, 40, 168, "Unsaved progress", C_SILVER);
+        sc64_font_text(36, 50, 168, "will be lost.", C_SILVER);
+        field_pause_draw_row(0, 62, "CANCEL", 0);
+        field_pause_draw_row(1, 80, "RETURN TO TITLE", 0);
+        ui_key(36, 99, "A", "CONFIRM", C_DIM);
+        break;
+    default:
+        sc64_font_text(36, 22, 168, "Match options", C_GOLD);
+        field_pause_draw_row(FIELD_PAUSE_MORE_OBJECTIVES, 42, "OBJECTIVES", 0);
+        field_pause_draw_row(FIELD_PAUSE_MORE_SETTINGS, 58, "SETTINGS", 0);
+        field_pause_draw_row(FIELD_PAUSE_MORE_EXIT, 74, "RETURN TO TITLE", 0);
+        field_pause_draw_row(FIELD_PAUSE_MORE_BACK, 90, "BACK", 0);
+        break;
+    }
+}
+
+static void
 field_controls_draw_pause(void)
 {
     static const char *const items[4] = { "RESUME", "SAVE GAME", "LOAD SAVE", "RESTART" };
     static const char *const keys[4] = { "A", "B", "L", "R" };
     const Sc64MissionInfo *info = race_mode ? 0 : sc64_catalog_get(race_selected_mission);
     int i;
+    if (field_pause_page != FIELD_PAUSE_ROOT) {
+        field_pause_draw_extra();
+        return;
+    }
     gfx_rect(24,14,192,132,C_PANEL);
     sc64_chrome_panel_world(24,14,192,132);
     sc64_font_text(36,20,130,"Paused",C_GOLD);
@@ -956,6 +1107,7 @@ field_controls_draw_pause(void)
         gfx_text(130, 33, kind == UI_NOTICE_NO_SAVE ? "NO SAVE FOUND" : kind == UI_NOTICE_SAVE_FAILED ?
                  "SAVE FAILED" : "GAME SAVED", kind == UI_NOTICE_SAVED ? C_GREEN : C_RED);
     }
+    ui_key(137, 58, "D-RIGHT", "MORE", C_SILVER);
     gfx_rect(30, 79, 180, 1, C_EDGE);
     gfx_text(30, 83, race_mode ? "SKIRMISH" : "OBJECTIVE", C_GOLD);
     if (info) {

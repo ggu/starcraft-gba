@@ -779,7 +779,7 @@ static size_t encode_retire_test(const Sc64Arena *a, int compact, unsigned cap, 
         sc64_codec_encode(a, packet, SC64_CODEC_BYTES) ? SC64_CODEC_BYTES : 0;
 }
 
-static void test_live_retire_equivalence(int compact)
+static void test_live_pool_equivalence(int compact)
 {
     uint16_t strict_words[SC64_ARENA_WORDS], live_words[SC64_ARENA_WORDS];
     uint8_t strict_packet[SC64_CODEC_BYTES], live_packet[SC64_CODEC_BYTES];
@@ -790,12 +790,25 @@ static void test_live_retire_equivalence(int compact)
     unsigned trials = 0;
     for (unsigned cap = 1; cap <= SC64_POOL_CAPACITY; ++cap) {
         assert(sc64_pool_init(&strict));
+        assert(sc64_pool_init(&live));
         for (unsigned i = 0; i < cap; ++i) {
-            uint8_t id, native;
+            uint8_t id, native, live_id, live_native;
             assert(compact ? sc64_compact_pool_acquire(&strict, cap, &id, &native) :
                             sc64_pool_acquire(&strict, &id, &native));
+            assert(compact ? sc64_compact_pool_acquire_live(&live, cap, &live_id, &live_native) :
+                            sc64_pool_acquire_live(&live, &live_id, &live_native));
+            assert(id == live_id && native == live_native);
             Sc64ProjectileRow row = compact_fixture_row(i);
             assert(sc64_pool_set_row(&strict, id, &row));
+            assert(sc64_pool_set_row(&live, live_id, &row));
+            assert(!memcmp(strict_words, live_words, sizeof(strict_words)));
+        }
+        if (compact || cap == SC64_POOL_CAPACITY) {
+            uint8_t id = 255, native = 255;
+            assert(compact ? !sc64_compact_pool_acquire_live(&live, cap, &id, &native) :
+                            !sc64_pool_acquire_live(&live, &id, &native));
+            assert(id == 255 && native == 255);
+            assert(!memcmp(strict_words, live_words, sizeof(strict_words)));
         }
         size_t size = encode_retire_test(&strict, compact, cap, strict_packet);
         assert(size && (compact ? sc64_compact_codec_decode(&live, strict_packet, size, cap) :
@@ -823,14 +836,51 @@ static void test_live_retire_equivalence(int compact)
             uint8_t a, b, an, bn;
             assert(compact ? sc64_compact_pool_acquire(&strict, cap, &a, &an) :
                             sc64_pool_acquire(&strict, &a, &an));
-            assert(compact ? sc64_compact_pool_acquire(&live, cap, &b, &bn) :
-                            sc64_pool_acquire(&live, &b, &bn));
+            assert(compact ? sc64_compact_pool_acquire_live(&live, cap, &b, &bn) :
+                            sc64_pool_acquire_live(&live, &b, &bn));
             assert(a == b && an == bn && !memcmp(strict_words, live_words, sizeof(strict_words)));
         }
     }
     assert(trials == 5050);
-    printf("live %s retirement: %u arena comparisons across all caps\n",
+    printf("live %s acquisition and retirement: %u fill/retire/reuse comparisons across all caps\n",
            compact ? "compact" : "fixed", trials);
+}
+
+static void test_live_acquire_rejects_bad_splices(void)
+{
+    uint16_t baseline[SC64_ARENA_WORDS], bad[SC64_ARENA_WORDS], before[SC64_ARENA_WORDS];
+    Sc64Arena good = {baseline, SC64_ARENA_WORDS};
+    Sc64Arena suspect = {bad, SC64_ARENA_WORDS};
+    uint8_t id, native;
+    assert(sc64_pool_init(&good));
+    for (unsigned i = 0; i < 4; ++i)
+        assert(sc64_pool_acquire(&good, &id, &native));
+    uint8_t fh = baseline[TEST_H_FREE], ah = baseline[TEST_H_ACTIVE];
+    uint8_t fn = baseline[row_word(fh, TEST_F_NEXT)], an = baseline[row_word(ah, TEST_F_NEXT)];
+    struct { size_t word; uint16_t value; } corrupt[] = {
+        {TEST_H_FREE_COUNT, 100}, {TEST_H_SIZE, 999}, {TEST_H_RESERVED, 1},
+        {TEST_H_FREE, ah}, {TEST_H_FREE_TAIL, 256}, {TEST_H_ACTIVE_TAIL, fh},
+        {row_word(fh, TEST_F_NEXT), fh}, {row_word(fn, TEST_F_PREV), SC64_END},
+        {row_word(fh, TEST_F_RAWOWNER), 12}, {row_word(fh, TEST_F_STATE), 0},
+        {row_word(ah, TEST_F_PREV), fh}, {row_word(ah, TEST_F_NEXT), 300},
+        {row_word(an, TEST_F_PREV), SC64_END},
+    };
+    for (unsigned i = 0; i < sizeof corrupt / sizeof corrupt[0]; ++i) {
+        memcpy(bad, baseline, sizeof bad);
+        bad[corrupt[i].word] = corrupt[i].value;
+        memcpy(before, bad, sizeof before);
+        id = native = 255;
+        assert(!sc64_pool_acquire_live(&suspect, &id, &native));
+        assert(!sc64_compact_pool_acquire_live(&suspect, SC64_POOL_CAPACITY, &id, &native));
+        assert(id == 255 && native == 255);
+        assert(!memcmp(before, bad, sizeof before));
+    }
+    /* A growing arena still checks the canonical unused row fields. */
+    assert(sc64_pool_init(&suspect));
+    bad[row_word(42, TEST_F_RAWOWNER)] = 1;
+    memcpy(before, bad, sizeof before);
+    assert(!sc64_pool_acquire_live(&suspect, &id, &native));
+    assert(!memcmp(before, bad, sizeof before));
 }
 
 static void test_compact_live_retire_rejects_bad_splices(void)
@@ -880,8 +930,9 @@ main(void)
 {
     test_compact_all_caps();
     test_compact_bad_packets();
-    test_live_retire_equivalence(0);
-    test_live_retire_equivalence(1);
+    test_live_pool_equivalence(0);
+    test_live_pool_equivalence(1);
+    test_live_acquire_rejects_bad_splices();
     test_compact_live_retire_rejects_bad_splices();
     test_compact_resume_growth();
     test_order_oracle();
