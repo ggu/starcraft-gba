@@ -8,8 +8,10 @@ original-art skirmish planner in `skirmish_ai.h` is a different, older mode and
 is unchanged.
 
 The planner is an authored approximation. It is not a decoded StarCraft 64 AI
-script, and its build orders, wave sizes and timings are not claims about the
-original game.
+script, and its build orders are not claims about the original game. One part
+is calibrated to the original: when each race starts its first offensive and
+how much army it gathers first follow measurements of the StarCraft 64
+computer players ([audit](audits/2026-11-19-n64-skirmish-ai.md)).
 
 ## What the opponents do
 
@@ -149,17 +151,39 @@ step is skipped and holds no money.
 
 - Units gather at a rally point a third of the way from the base toward the
   map center.
-- No offensive starts before six minutes. After that, an attack starts when
-  army supply reaches a threshold. The threshold starts at 12 Marines' worth
-  and grows slowly with match time and with hostile static defenses. An owner
+- Each race has its own first offensive: the median of the first waves
+  measured for that race on the StarCraft 64 computer players (three per
+  race). One game frame is 1.25 updates here:
+
+  | Race | No offensive before | Game frames | Match time |
+  | --- | ---: | ---: | ---: |
+  | Protoss | update 10,631 | 8,505 | 5:54 |
+  | Terran | update 12,331 | 9,865 | 6:51 |
+  | Zerg | update 17,225 | 13,780 | 9:34 |
+
+  Defense is not gated. Before the gate, units that are far from home (born
+  at a distant Hatchery, or left where they defended an expansion) return
+  to the rally point and do not start an attack. Previously every race
+  attacked at update 10,800 (six minutes).
+- After its gate, an owner attacks when its army supply reaches a threshold.
+  The threshold starts at 46 in the engine's doubled supply units (23
+  Marines' worth, or 12 Zealots), the median army a StarCraft 64 computer
+  player held when its first wave left; it was 24. It grows by two for each
+  minute after the gate and with hostile static defenses, up to 64. An owner
   that has used its whole unit share, an owner whose minerals are exhausted,
-  and any owner after 25 minutes are all in: they attack with whatever army
-  they have, even one below the normal threshold (for example three
-  Marines).
+  and any owner after 25 minutes are all in: once its gate has passed it
+  attacks with whatever army it has, even one below the normal threshold
+  (for example three Marines). Workers here mine about twice as fast as in
+  the original, so the army is usually ready before the gate and the gate
+  decides when the first wave leaves.
 - An attack targets the nearest hostile structure to the rally point, with a
   25% preference for depots. When no hostile structure or ground unit remains
   within 64 pixels of the target (the reach at which the engine's attack-move
-  acquires a target), the attacking group picks the next nearest structure.
+  acquires a target), the attacking group picks the next nearest structure,
+  provided the army still holds the attack threshold: choosing an objective
+  always needs the full threshold, whether the army stands at home or in the
+  field. An army worn down below it goes back to the rally point once
+  nothing hostile is left in reach of any of its units' positions.
   Aircraft do not hold an objective, so a ground army never waits under one.
 - On an exhausted map, an owner with no army, no ore left anywhere and less
   than the price of its cheapest army unit sends its workers to attack after
@@ -201,7 +225,8 @@ step is skipped and holds no money.
 | Unit and building costs, build times, supply, prerequisites, producers, addons | Engine rule tables and the raw-ID catalog. The catalog is checked against pinned BWAPI UnitType data and the Blizzard compendium ([catalog notes](SC64_SKIRMISH_ROSTER_STATUS.md)). |
 | Script inventory | The private SC64 AI catalog (BOLT leaf `012/000`, see [SC64-AI-CATALOG.md](SC64-AI-CATALOG.md)) lists the melee custom scripts `TMCu`, `ZMCu`, `PMCu` and the Brood War `TMCx`, `ZMCx`, `PMCx`. This shows that SC64 ships per-race melee programs. Their bytecode semantics are unaudited, so nothing here is decoded from them. |
 | Plan shape | Authored. The plan follows the general structure that public AIScript documentation (PyMS) gives for stock melee scripts: build orders, defense builds, attack preparation and waves. No program content is copied. |
-| Wave sizes, timings, target choice, recovery, worker defense, scouting | Authored. |
+| First offensive per race and the army gathered before it | Measured on the StarCraft 64 computer players on Blood Bath: eight first waves in five matches, read from the game's own unit table ([audit](audits/2026-11-19-n64-skirmish-ai.md)). The gate is the median start for the race, and the threshold the median army held at a first wave. |
+| Later wave sizes, target choice, recovery, worker defense, scouting | Authored. |
 
 ## Missing engine capabilities
 
@@ -238,6 +263,10 @@ why:
   rings, rotating by plan, plus nine points around one Pylon for a Protoss
   structure that found no powered site, and sends at most eight candidates
   in total to the expensive placement services.
+- An army in the field that is below the attack threshold, once its first
+  unit's objective is clear, tests each other distinct unit destination for
+  a hostile in reach before it goes home: at most 16 more scans of the unit
+  and building pools on that pass.
 - **Unit share.** Each opponent stops training at `(MAX_UNITS - 16) / (bots +
   1)` units, counting queued products, and never above 56. Buildings have a
   matching share. This leaves the human at least the same share as each
@@ -300,6 +329,22 @@ a passive human, then:
   still leave and attack; with one (1) it must answer the flyer.
 - `--no-ore S`: every mineral field runs dry. The opponent must queue no more
   workers and spend its bank on army units.
+- `--first-wave`: with one opponent and a passive human, the update on which
+  the opponent first gives any army unit an attack-move order outside its
+  home range. It must not come before the race's gate, must come within 600
+  updates of it, no unit may hold such an order before the gate, at least
+  three units and half the army must hold one on that same update, and the
+  army must hold the wave supply unless the owner is all in.
+- `--raid S`: in a mirrored match the first opponent's economy is hit at
+  update 9,000 through `hit_target`: 0, every worker dies; 1, its main depot
+  and all but two workers die (with no depot and no worker no race can
+  rebuild either). Queued workers are removed as well. With no worker
+  nothing is mined, so the first new workers and a new depot can only come
+  from the bank: the raid waits, up to update 12,000, until the bank holds
+  two workers' price (a depot's in the second case). The opponent must mine
+  again through its ordinary paid services: six workers with four of them
+  mining, then 200 minerals of delivered cargo by the spending audit's
+  count. The match must still end in the engine's victory or defeat.
 
 `tools/sc64_skirmish_ai_matrix.py` runs the harness across products, maps,
 human races and opponent mixes. Its `match` cases run about 18 mirrored
