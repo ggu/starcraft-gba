@@ -1917,10 +1917,38 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
     return consumed + tail;
 }
 
+#ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+static inline int sc64_route_linear_goal_has_seed(int col, int row,
+                                                 int cols, int rows)
+{
+    const int left = col > 0 ? col - 1 : col;
+    const int top = row > 0 ? row - 1 : row;
+    const int right = col + 1 < cols ? col + 1 : col;
+    const int bottom = row + 1 < rows ? row + 1 : row;
+
+    for (int y = top; y <= bottom; ++y)
+        for (int x = left; x <= right; ++x)
+            if (SC64_GRID_GET(path_walkable, y * cols + x)) return 1;
+    return 0;
+}
+#endif
+
 static int __attribute__((noinline))
 sc64_route_fill_linear(u8 *field, int goal)
 {
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
+#ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+    /* With no walkable seed, the normal pack writes all unreachable codes. */
+    if (!SC64_GRID_GET(path_walkable, goal) &&
+        !sc64_route_linear_goal_has_seed(sc64_cell_col(goal), sc64_cell_row(goal), cols, rows)) {
+#ifdef SC64_ROUTE_WORD_CLEAR
+        sc64_route_field_clear(field);
+#else
+        memset(field, 0xff, sc64_route_active_bytes);
+#endif
+        return 0;
+    }
+#endif
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     const int row = sc64_cell_row(goal);
@@ -1947,6 +1975,11 @@ sc64_route_fill_linear(u8 *field, int goal)
 #endif
 #if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) && !defined(SC64_ROUTE_DENSE_FLOOD)
 #error "linear flood probe requires the active-stride packed-grid dense helpers"
+#endif
+
+#if defined(SC64_ROUTE_WIDE_DEPOT_FULL) && \
+    (!defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || !defined(SC64_DEPOT_BOUNDED))
+#error "wide depot fills require the canonical linear and bounded depot paths"
 #endif
 
 #if defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && \
@@ -2790,7 +2823,7 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     return 1;
 }
 
-#ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
+#if defined(SC64_ROUTE_FACILITY_FIFO_PROBE) || defined(SC64_ROUTE_WIDE_DEPOT_FULL)
 /* Match the packed field's seed predicate. The caller enumerates candidates
  * in row-major order. */
 static inline int sc64_route_facility_seed(int center_x, int center_y, int col, int row,
@@ -2806,6 +2839,35 @@ static inline int sc64_route_facility_seed(int center_x, int center_y, int col, 
            sc64_depot_cell_point(center_x, center_y, col, row, &px, &py);
 }
 
+#endif
+
+#ifdef SC64_ROUTE_WIDE_DEPOT_FULL
+/* A blocked worker origin requires the full facility field. Seed in
+ * scalar order and reuse the full-wide expansion used for point goals. */
+static int __attribute__((noinline))
+sc64_route_fill_wide_depot(u8 *field, int center_x, int center_y,
+                          int x0, int x1, int y0, int y1)
+{
+    const int cols = SC64_LINEAR_WIDE_COLS, rows = SC64_LINEAR_MAX_ROWS;
+    const int stride = cols + SC64_LINEAR_PAD;
+    const int cap = sc64_route_linear_queue_cap(cols, rows);
+    u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    int tail = 0;
+    for (int row = y0; row <= y1; ++row) for (int col = x0; col <= x1; ++col) {
+        if (!sc64_route_facility_seed(center_x, center_y, col, row, x0, x1, y0, y1, 0))
+            continue;
+        if (tail == cap) return -1;
+        int cell = (row + 1) * stride + col + 4;
+        dense[cell] = 0;
+        bfs_queue[tail++] = (u16)cell;
+    }
+    tail = sc64_route_expand_linear(dense, tail, stride, cap);
+    if (tail >= 0) sc64_route_pack_linear(field, dense, cols, rows, stride);
+    return tail;
+}
+#endif
+
+#ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
 #ifndef SC64_ROUTE_FACILITY_FIFO_FALLBACK
 #define SC64_ROUTE_FACILITY_FIFO_FALLBACK() ((void)0)
 #endif
@@ -3121,6 +3183,19 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     }
 #endif
     SC64_ROUTE_POINT_TAIL_RELEASE();
+#ifdef SC64_ROUTE_WIDE_DEPOT_FULL
+    if (origin < 0 && MAP_COLS == SC64_LINEAR_WIDE_COLS &&
+        MAP_ROWS == SC64_LINEAR_MAX_ROWS
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        && !edges
+#endif
+       ) {
+        tail = sc64_route_fill_wide_depot(sc64_route_field[slot], center_x, center_y,
+                                         x0, x1, y0, y1);
+        if (tail >= 0) goto facility_finished;
+        tail = 0;
+    }
+#endif
 #ifdef SC64_ROUTE_NEW_CELL
     u8 *new_field = sc64_route_field[slot];
 #endif
@@ -3236,7 +3311,7 @@ facility_expand:
 #if defined(SC64_RACES) && defined(SC64_GRID_SET)
     for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
 #endif
-#ifdef SC64_ROUTE_FACILITY_FIFO_PROBE
+#if defined(SC64_ROUTE_FACILITY_FIFO_PROBE) || defined(SC64_ROUTE_WIDE_DEPOT_FULL)
 facility_finished:
 #endif
     sc64_route_goal[slot] = key;
