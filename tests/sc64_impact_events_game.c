@@ -61,6 +61,40 @@ static int live_tracers(void)
 #ifdef SC64_IMPACT_EVENTS
 static unsigned pending(void) { return race_impact_count; }
 
+static void test_terminal_save_with_pending_impacts(void)
+{
+    for (int defeat = 0; defeat < 2; ++defeat) {
+        setup();
+        int home = spawn_build(SIDE, B_NEXUS, 224, 224, 0);
+        int enemy = spawn_build(ENEMY, B_HATCHERY, 768, 768, 0);
+        assert(home >= 0 && enemy >= 0 && save_game());
+
+        int owner = defeat ? SIDE : ENEMY;
+        int target = add_unit(defeat ? ENEMY : SIDE,
+                              defeat ? U_ZERGLING : U_ZEALOT, 500, 500);
+        for (int i = 0; i < RACE_IMPACT_CAPACITY; ++i)
+            race_impact_launch(target, 1, 1, owner, SC64_STOCK_DMG_NORMAL,
+                               U_MARINE, 200);
+        assert(pending() == RACE_IMPACT_CAPACITY);
+        if (RACE_IMPACT_SAVE_CAPACITY < RACE_IMPACT_CAPACITY)
+            assert(!save_game());
+
+        destroy_building(defeat ? home : enemy, defeat ? ENEMY : SIDE);
+        game_update(0, 0);
+        int result_frame = frame;
+        assert(screen == SCREEN_RESULT && won == !defeat && lost == defeat);
+        assert(pending() == RACE_IMPACT_CAPACITY);
+
+        game_init();
+        won = lost = 0;
+        assert(screen == SCREEN_TITLE);
+        game_update(KEY_L, KEY_L);
+        assert(screen == SCREEN_RESULT && frame == result_frame &&
+               won == !defeat && lost == defeat);
+        assert(pending() == 0 && u[target].alive);
+    }
+}
+
 /* Launch a Dragoon shot and return its end-of-update step count. */
 static unsigned launch_dragoon(int a, int t)
 {
@@ -521,6 +555,7 @@ int main(int argc, char **argv)
 #endif
     if (argc != 1) return 2;
 #ifdef SC64_IMPACT_EVENTS
+    test_terminal_save_with_pending_impacts();
     test_impact_matches_presentation();
     test_moving_target_still_hit();
     test_dead_target_and_slot_reuse();

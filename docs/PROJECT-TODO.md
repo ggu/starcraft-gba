@@ -19,6 +19,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
+  reproduced stale SRAM after a normal P10 victory with nine pending
+  impacts. The shared writer now saves the completed result with the
+  final world. All four HOST vectors check victory and defeat with a full
+  queue, including the rejection of oversized saves during active play
+  on Z10 and P10. The [Blood Bath retirement preview](https://github.com/ggu/starcraft-gba/pull/566)
+  also passes the pause and victory boundary on Terran and Protoss ARM
+  from prepared fights in both skirmish modes. Keep the preview opt-in
+  pending full ordinary match and native retirement checks.
+
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
   cycles. Keep testing point-route continuation under load. Both replay
