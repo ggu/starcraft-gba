@@ -409,6 +409,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pre-expansion pause save reloads with matching state through 241 updates.
   All 30 missions now have a complete ordinary-input win on a normal ROM
   in mGBA. Check remaining older/current cross-build and save continuations.
+  [Standalone P6](audits/2026-11-19-standalone-p6-impact-saves.md) passes ROM
+  verification and saves up to 22 pending impacts. Its full host target
+  still needs a controller route that avoids the loss at frame 53,613.
   The [old P8 route](audits/2026-11-13-p8-staged-route-loss.md)
   loses Fenix in the latest normal P10. The [updated controller](audits/2026-11-13-p8-host-hero-retreat.md)
   now [wins on the staged ROM](audits/2026-11-13-p8-host-hero-retreat.md#complete-home-win-on-staged-p10)
