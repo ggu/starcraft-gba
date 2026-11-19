@@ -18,6 +18,7 @@
  * run can afford the whole tech chain). Everything else is pad input. State
  * is read, never written, except the clearly marked UI normalisation before
  * the save (selection flags and the remembered menu row are UI, not world). */
+#include "../common/gba.c"
 #define main skirmish_controller_main
 #define SC64_TEST_HIT_OBSERVER psc_hit
 static void psc_hit(int target, int damage, int source, int owner);
@@ -85,6 +86,33 @@ static int complete_count(int type)
     return n;
 }
 
+
+/* The A press that pays, observed exactly: the bank must change by the worker
+ * deliveries that landed in the same update, minus the price. */
+static int paid_press(int mineral_price, int gas_price)
+{
+    int cargo[MAX_UNITS], m0 = minerals, g0 = gas, delivered = 0, exact;
+    for (int i = 0; i < MAX_UNITS; ++i) cargo[i] = u[i].alive && u[i].owner == SIDE ? u[i].carry : 0;
+    input(KEY_A);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) &&
+            cargo[i] > 0 && u[i].carry == 0) delivered += cargo[i];
+    exact = minerals == m0 - mineral_price + delivered && g0 - gas == gas_price;
+    fprintf(stderr, "paid press: bank %d -> %d (deliveries %d, price %d), gas %d -> %d\n",
+            m0, minerals, delivered, mineral_price, g0, gas);
+    input(0);
+    return exact;
+}
+
+/* choose_menu_command without the final A. */
+static int navigate_menu(int command)
+{
+    if (menu_open) tap(KEY_B);
+    tap(KEY_B);
+    for (int guard = 0; menu_open && menu_cursor != command && guard < 64; ++guard) tap(KEY_DOWN);
+    return menu_open && menu_cursor == command;
+}
+
 /* Build one structure from the Probe's order list, as a player would. */
 static int build_structure(int raw)
 {
@@ -104,9 +132,8 @@ static int build_structure(int raw)
     move_cursor(x, y);
     if (mode != MODE_BUILD) return 0;
     {
-        int before = complete_count(type), bank = minerals;
-        tap(KEY_A);
-        assert(minerals < bank);                       /* paid on placement */
+        int before = complete_count(type);
+        tap(KEY_A);                                    /* the Probe walks over; the bank is charged when it starts */
         for (unsigned t = 0; t < 14000 && screen == SCREEN_PLAY; ++t) {
             input(0);
             if (complete_count(type) > before) return 1;
@@ -121,13 +148,17 @@ static int select_group_of(int slot)
 
 static int buy_scarab(int slot)
 {
-    int base = race_carrier_command_base(), before = minerals;
+    int base = race_carrier_command_base();
     if (!select_group_of(slot)) return 0;
     if (strcmp(race_menu_label(base), "BUILD SCARAB")) {
         fprintf(stderr, "order list row %d is '%s'\n", base, race_menu_label(base)); return 0;
     }
-    if (!choose_menu_command(base)) return 0;
-    return minerals == before - (int)sc64_psc_price();
+    {
+        int queued = race_paid_scarab_queued(slot);
+        if (!navigate_menu(base)) return 0;
+        if (!paid_press((int)sc64_psc_price(), 0)) return 0;
+        return race_paid_scarab_queued(slot) == queued + 1;
+    }
 }
 
 static int attack_with(int slot, int x, int y)
@@ -196,8 +227,8 @@ static int run_scenario(const char *out, const char *trace_path)
         assert(select_building(robotics));
         for (int step = 0; train_type != U_REAVER && step < 8; ++step) tap(KEY_R);
         assert(train_type == U_REAVER);
-        tap(KEY_A);
-        assert(minerals == before - (int)sc64_race_unit_rule(U_REAVER)->minerals);
+        assert(paid_press((int)sc64_race_unit_rule(U_REAVER)->minerals,
+                          (int)sc64_race_unit_rule(U_REAVER)->gas));
     }
     for (unsigned t = 0; t < 6000 && count_units(SIDE, U_REAVER) < 2; ++t) input(0);
     assert(count_units(SIDE, U_REAVER) == 2);
@@ -221,9 +252,14 @@ static int run_scenario(const char *out, const char *trace_path)
         int s0 = scarab_of(reaver[0]);
         if (scarab_of(reaver[1]) >= 0) launched_from_empty = 1;
         if (u[reaver[1]].alive && race_paid_scarab_stock(reaver[1]) == 0) {
-            for (int i = 0; i < MAX_BUILDINGS; ++i)
-                if (b[i].alive && owners_hostile(SIDE, b[i].owner) &&
-                    dist2(u[reaver[1]].x, u[reaver[1]].y, b[i].x, b[i].y) < 130 * 130) { ++empty_reach_ticks; break; }
+            int in_reach = 0;
+            for (int i = 0; i < MAX_BUILDINGS && !in_reach; ++i)
+                in_reach = b[i].alive && owners_hostile(SIDE, b[i].owner) &&
+                    dist2(u[reaver[1]].x, u[reaver[1]].y, b[i].x, b[i].y) < 140 * 140;
+            for (int i = 0; i < MAX_UNITS && !in_reach; ++i)
+                in_reach = u[i].alive && !SC64_SCARAB_HIDDEN(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
+                    dist2(u[reaver[1]].x, u[reaver[1]].y, u[i].x, u[i].y) < 128 * 128;
+            empty_reach_ticks += in_reach;
         }
         if (s0 >= 0 && !saved) {
             /* A Scarab is in flight: save through the real pause menu. */
@@ -243,7 +279,7 @@ static int run_scenario(const char *out, const char *trace_path)
                     if (ci < CHECK_AT_COUNT) { input(0); ++done; }
                 }
             }
-            saved = 1;
+            saved = 1; ++flights;
             write_state(out, digests, frame_at_save, d0);
             printf("saved with a Scarab in flight at frame %u; continued %u updates, %u Scarab hits logged\n",
                    frame_at_save, check_at[CHECK_AT_COUNT - 1], hit_count);
@@ -268,6 +304,9 @@ static int run_scenario(const char *out, const char *trace_path)
         }
         if (n > best_splash) best_splash = n;
     }
+    printf("end: frame %d won %d lost %d; Reaver A %s, Reaver B %s (order %d, at %d,%d, stock %d)\n", frame, won, lost,
+           u[reaver[0]].alive ? "alive" : "dead", u[reaver[1]].alive && u[reaver[1]].type == U_REAVER ? "alive" : "dead",
+           u[reaver[1]].order, u[reaver[1]].x, u[reaver[1]].y, race_paid_scarab_stock(reaver[1]));
     printf("reaver-empty fired: %s; empty Reaver was within reach of an enemy for %u updates\n",
            launched_from_empty ? "YES" : "never", empty_reach_ticks);
     printf("Scarab in flight updates: %u; most distinct targets hit by one explosion: %u; hits logged: %u\n",

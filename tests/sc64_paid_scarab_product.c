@@ -478,14 +478,14 @@ static void loss(void)
         printf("loss: an expired Scarab did no damage\n");
     }
     kill_actor(t0);
-    /* Blocked route, built into the fixture: a wall of seven enemy Pylons
+    /* Blocked route, built into the fixture: a wall of seven of the Reaver's own Pylons
      * between the Reaver and a Hatchery on the same row. The inflated
      * footprints are unwalkable. The Scarab never enters a Pylon's tile;
      * it flies the walkable route round the wall or waits and expires. */
     {
-        int pyl[7], wallx = hx - 40, minpass = 1 << 30;
+        int pyl[7], wallx = hx - 40, minpass = 1 << 30, inside = 0;
         for (int k = 0; k < 7; ++k) {
-            int p = spawn_build(ENEMY, B_PYLON, wallx, hy - 96 + 32 * k, 0);
+            int p = spawn_build(SIDE, B_PYLON, wallx, hy - 96 + 32 * k, 0);
             assert(p >= 0);
             b[p].hp = b[p].maxhp; b[p].under_construction = 0; pyl[k] = p;
         }
@@ -504,11 +504,16 @@ static void loss(void)
                     for (int k = 0; k < 7; ++k) {
                         int d = dist2(u[s2].x, u[s2].y, b[pyl[k]].x, b[pyl[k]].y);
                         if (d < minpass) minpass = d;
+                        /* Never inside the walled-off (unwalkable) ground near the wall. */
+                        if (d < 24 * 24 && !is_traversable(u[s2].x / 16, u[s2].y / 16, -1)) {
+                            if (!inside) printf("loss: Scarab at %d,%d cell %d,%d on unwalkable ground, pylon %d at %d,%d, tick %d, life %d, reaver %d,%d\n", u[s2].x, u[s2].y, u[s2].x / 16, u[s2].y / 16, k, b[pyl[k]].x, b[pyl[k]].y, n, (int)u[s2].work_timer, u[r].x, u[r].y);
+                            ++inside;
+                        }
                     }
                 step(1);
             }
             drain();
-            assert(minpass >= 14 * 14);          /* never inside a Pylon */
+            assert(inside == 0);                 /* never on unwalkable ground at the wall */
             assert(race_paid_scarab_candidate_valid(u, MAX_UNITS));
             printf("loss: blocked route: closest approach to a wall Pylon %d px, Hatchery %s\n",
                    (int)(minpass < (1 << 30) ? (int)__builtin_sqrt((double)minpass) : -1),
@@ -713,7 +718,7 @@ static int enemy_reavers(int *out, int max)
 
 static void campaign(void)
 {
-    int rv[8], n, fired = 0, one_at_a_time = 1, bank[5];
+    int rv[8], n, fired = 0, one_at_a_time = 1, bank[5], spent_updates = 0;
     start_campaign(SC64_P8_GLOBAL_ID);
     for (int k = 0; k < 4; ++k) pad(0);
     n = enemy_reavers(rv, 8);
@@ -723,7 +728,10 @@ static void campaign(void)
     printf("campaign: %d placed enemy Reavers start with 0 Scarabs at frame %d\n", n, frame);
     for (int o = 0; o < 5; ++o) bank[o] = race_minerals[o];
     for (int t = 0; t < 5 * 131 + 120; ++t) {
+        int before[5];
+        for (int o = 0; o < 5; ++o) before[o] = race_minerals[o];
         pad(0);
+        for (int o = 0; o < 5; ++o) if (race_minerals[o] < before[o]) ++spent_updates;
         for (int k = 0; k < n; ++k)
             if (u[rv[k]].alive && race_paid_scarab_queued(rv[k]) > 1) one_at_a_time = 0;
     }
@@ -733,7 +741,8 @@ static void campaign(void)
             assert(race_paid_scarab_stock(rv[k]) == 5);
         }
     assert(one_at_a_time);
-    for (int o = 0; o < 5; ++o) assert(race_minerals[o] == bank[o]);      /* no engine bank was charged */
+    printf("campaign: updates in which any engine bank fell: %d\n", spent_updates);
+    assert(spent_updates == 0);                                           /* restock charged no engine bank */
     {   /* A target in reach: it fires and starts a replacement. */
         int r = rv[0], z = spawn_unit(SIDE, U_ZEALOT, u[r].x + 70, u[r].y);
         assert(z >= 0); u[z].order = ORDER_IDLE;

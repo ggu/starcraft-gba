@@ -225,7 +225,9 @@ static int sc64_psc_parent_tick(int slot)
     int ai;
     if (!sc64_psc_load(q, &s)) return 0;
     ai = sc64_psc_campaign_ai(q);
+#ifndef SC64_PSC_NO_CAMPAIGN_RESTOCK /* diagnosis knob, as RACE_AI_NO_CARRIERS */
     if (ai && !s.queued && s.stock < sc64_psc_capacity(q->owner)) { s.queued = 1; s.progress = 0; }
+#endif
     if (s.cooldown) --s.cooldown;
     if (s.queued && ++s.progress >= sc64_psc_build_ticks()) {
         ++s.stock; --s.queued; s.progress = 0;

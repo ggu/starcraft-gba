@@ -51,11 +51,15 @@ static inline const Sc64SkirmishRecord *sc64_skirmish_menu_record(unsigned race,
     return (const Sc64SkirmishRecord *)0;
 }
 
-/* Reaver production is intentionally unavailable until its ammunition
- * lifecycle is complete; do not offer its otherwise dead-end Support Bay. */
+/* Reaver production is unavailable until its ammunition lifecycle exists
+ * (SC64_PAID_SCARAB); do not offer its otherwise dead-end Support Bay before. */
 static inline int sc64_skirmish_menu_supported(const Sc64SkirmishRecord *r)
 {
+#ifdef SC64_PAID_SCARAB
+    return r != 0;
+#else
     return r && !(r->race == SC64_SK_PROTOSS && r->raw_id == 171);
+#endif
 }
 
 static inline unsigned sc64_skirmish_menu_count(unsigned race)
