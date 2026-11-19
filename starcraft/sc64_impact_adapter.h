@@ -239,6 +239,56 @@ race_impact_tick(void)
 #endif
 }
 
+#ifdef SC64_P6_PACKED_IMPACT_SAVE
+/* The low bit of the last building byte belongs to the building type. The
+ * other seven bits are canonical zeros in a legacy P6 building row. The
+ * marker's four-byte tail is distinct from a legacy impact packet's length. */
+static const u8 race_impact_p6_marker[SC64_P6_IMPACT_MARKER_BYTES] = {'P','6','I','1'};
+
+static int race_impact_p6_write(void)
+{
+    u8 packet[SC64_P6_IMPACT_PAD_BYTES + 1] = {0};
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i)
+        if (race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] & 0xfeu)
+            return 0;
+    sc64_impact_encode(race_impact_rows, race_impact_count, packet);
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        unsigned bit = i * SC64_P6_IMPACT_PAD_BITS, byte = bit >> 3;
+        unsigned pair = packet[byte] | ((unsigned)packet[byte + 1] << 8);
+        race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] |=
+            (u8)(((pair >> (bit & 7u)) & 0x7fu) << 1);
+    }
+    memcpy(race_impact_record.impacts, race_impact_p6_marker, sizeof(race_impact_p6_marker));
+    save_write(&race_impact_record, sizeof(RaceSave) + sizeof(race_impact_p6_marker), SAVE_VERSION);
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i)
+        race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] &= 1u;
+    return 1;
+}
+
+static int race_impact_p6_decode(Sc64ImpactEvent *candidate)
+{
+    u8 packet[SC64_P6_IMPACT_PAD_BYTES + 1] = {0};
+    if (memcmp(race_impact_record.impacts, race_impact_p6_marker, sizeof(race_impact_p6_marker)))
+        return -1;
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        unsigned bit = i * SC64_P6_IMPACT_PAD_BITS, byte = bit >> 3;
+        u8 *last = &race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1];
+        unsigned pair = ((unsigned)*last >> 1) << (bit & 7u);
+        packet[byte] |= (u8)pair;
+        packet[byte + 1] |= (u8)(pair >> 8);
+        *last &= 1u;
+    }
+    unsigned count = packet[offsetof(Sc64ImpactSaveHeader, count)];
+    if (count <= RACE_IMPACT_RAW_SAVE_CAPACITY || count > RACE_IMPACT_SAVE_CAPACITY)
+        return -1;
+    u32 bytes = sc64_impact_save_bytes(count);
+    for (unsigned i = bytes; i < SC64_P6_IMPACT_PAD_BYTES; ++i)
+        if (packet[i]) return -1;
+    return sc64_impact_decode(packet, bytes, RACE_IMPACT_SAVE_CAPACITY,
+                              MAX_UNITS + MAX_BUILDINGS, 5u, SC_RU_COUNT, candidate);
+}
+#endif
+
 /* Save: an empty queue keeps the historical RaceSave-length record. More
  * pending impacts than this profile's record holds refuse the save before
  * any SRAM write; they land within a second of play. */
@@ -278,6 +328,9 @@ race_impact_save_write(void)
 #endif
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#ifdef SC64_P6_PACKED_IMPACT_SAVE
+    if (race_impact_count > RACE_IMPACT_RAW_SAVE_CAPACITY) return race_impact_p6_write();
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
 #define SC64_SILO_COMMIT_TAG (nuke_silo_tag ? SC64_NUKE_SILO_TRANSPORT_TAG : SC64_GUARDIAN_WRITE_TAG)
 #else
@@ -617,8 +670,13 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
     if (len == sizeof(RaceSave)) return 1;
+#ifdef SC64_P6_PACKED_IMPACT_SAVE
+    if (len == sizeof(RaceSave) + sizeof(race_impact_p6_marker)) {
+        rows = race_impact_p6_decode(candidate);
+    } else
+#endif
     rows = sc64_impact_decode(race_impact_record.impacts, len - (u32)sizeof(RaceSave),
-                              RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
+                              RACE_IMPACT_RAW_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
                               SC_RU_COUNT, candidate);
 #endif
     if (rows < 0) return 0;
