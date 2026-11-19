@@ -2139,6 +2139,7 @@ static void race_skirmish_outcome(void)
              * transferring this entire owner impossible in the preview. */
             (void)race_skirmish_transfer_survivors(SIDE);
         } else {
+            const unsigned previously_eliminated = race_skirmish_eliminated;
             unsigned occupied = 0;
             for (int rank = 0; rank < race_bots && rank < 3; ++rank) {
                 const unsigned bit = 1u << rank;
@@ -2147,8 +2148,9 @@ static void race_skirmish_outcome(void)
                     race_skirmish_transfer_survivors(race_bot_owner_ids[rank]))
                     race_skirmish_eliminated |= (u8)bit;
             }
-            /* Wait for a fenced CPU to retire before declaring victory. */
-            if ((race_skirmish_eliminated & occupied) != occupied) return;
+            /* Victory evaluates the owners published before this pass. A
+             * newly retired opponent still counts for the current pass. */
+            if ((previously_eliminated & occupied) != occupied) return;
         }
     }
 #endif

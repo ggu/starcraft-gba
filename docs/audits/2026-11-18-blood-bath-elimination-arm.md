@@ -50,6 +50,25 @@ make test-sc64-native-skirmish-elimination
 The ARM target builds four independently identified preview cartridges.
 Their files and the input data stay in ignored local storage.
 
+## Ordering defeat and victory
+
+The native [result scan](2026-11-13-n64-blood-bath-result-cadence.md)
+evaluates eligible owners before publishing defeat. The opt-in GBA result
+check uses the retirement mask at entry to decide whether victory is
+eligible. The final CPU can retire on one pass and a surviving human can
+win on the next pass. For the preview, that pass still runs on the next
+GBA update. Native countdown timing remains open.
+
+The host fixture pauses after the final CPU retires, saves with all CPU
+ranks retired and both result flags clear, and reinitializes the game.
+Loading through HOME keeps the same frame and leaves the game active.
+The following update wins and writes the terminal save, which also loads
+through HOME. Both Blood Bath modes use the existing save fields. The
+fixture also checks the same publication order in uninterrupted play.
+The Terran host fixture reproduced premature victory on the previous source.
+The revised fixture passed under ASan and UBSan on Terran, Z10, P10 and
+Showcase. The ARM observations above used the preceding preview.
+
 ## Emulated transition cost
 
 The Terran preview's retiring update took 671,303 elapsed ARM cycles,

@@ -156,7 +156,29 @@ static void check_elimination(int melee)
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == 4) destroy_building(i, SIDE);
     game_update(0, 0);
-    assert(won && !lost && race_skirmish_eliminated == 7);
+    assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 7);
+    const int retired_frame = frame;
+
+    /* Pause and save between the two passes, then reload through HOME. */
+    tap(KEY_START);
+    assert(screen == SCREEN_PAUSE && frame == retired_frame);
+    tap(KEY_B);
+    assert(race_data.state[7] == retired_frame && !race_data.state[18] &&
+           !race_data.state[19] && ((unsigned)race_data.state[23] & SC64_SKIRMISH_ELIM_BITS) ==
+           SC64_SKIRMISH_ELIM_BITS);
+    game_init(); prior_keys = 0;
+    assert(screen == SCREEN_TITLE);
+    input(KEY_L);
+    assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 7 &&
+           race_skirmish_melee == (unsigned)melee && frame == retired_frame);
+    input(0);
+    assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7 &&
+           frame == retired_frame + 1);
+    game_init(); prior_keys = 0;
+    won = lost = 0; /* Model a fresh session before loading the terminal save. */
+    input(KEY_L);
+    assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7 &&
+           frame == retired_frame + 1);
 }
 
 #if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_P7_CARRIER_TRAINING_ENABLED)
@@ -191,9 +213,11 @@ static void check_fenced_final_result(int human_defeat)
         hit_target(ship, 5000, U_MARINE, SIDE);
         assert(!u[ship].alive);
         game_update(0, 0);
-        assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7);
+        assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 7);
         assert(u[survivor].alive && u[survivor].owner == NEUTRAL &&
                !owners_hostile(SIDE, NEUTRAL));
+        game_update(0, 0);
+        assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7);
     }
 }
 #endif
