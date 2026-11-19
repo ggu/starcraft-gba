@@ -32,6 +32,7 @@ import time
 
 RACES = "tzp"
 PROFILES = ("terran", "zerg", "protoss", "showcase")
+P10_PROFILE = "protoss-p10"
 BOT_OWNERS = (1, 3, 4)
 OWNER_FIELDS = ("owner", "race", "minerals", "gas", "supply", "cap", "workers", "mining",
                 "gas_workers", "idle_workers", "building_workers", "army", "army_supply",
@@ -830,7 +831,7 @@ INTERCEPTOR = 73
 # The same for Reavers: the planner's Robotics Facility and Support Bay, a
 # Reaver paid like any unit, its Scarabs ordered through the human's command
 # and fired. The lobbies are those of the sweep in which an owner did.
-REAVER_LOBBIES = ((0, "p", "pp"), (1, "p", "pp"), (0, "t", "pt"), (1, "z", "zpt"))
+REAVER_LOBBIES = ((0, "p", "pp"), (1, "p", "pt"), (0, "t", "pt"), (1, "z", "zpt"))
 REAVER = 83
 SCARAB = 85
 # A lobby that ends with nothing left in the world that can act, by profile:
@@ -889,8 +890,11 @@ def cases(ticks, criteria="development"):
         if profile == "protoss":
             for map_id, human, bots in CARRIER_LOBBIES:
                 out.append(("match-carrier", profile, map_id, RACES.index(human), bots, MATCH_TICKS))
-            for map_id, human, bots in REAVER_LOBBIES:
-                out.append(("match-reaver", profile, map_id, RACES.index(human), bots, MATCH_TICKS))
+    # The shipped P10 Protoss product, with paid Scarabs: its own harness
+    # (build/test-sc64-skirmish-ai-progress-protoss-p10), named explicitly with
+    # --profiles; the default profiles and their case counts are unchanged.
+    for map_id, human, bots in REAVER_LOBBIES:
+        out.append(("match-reaver", P10_PROFILE, map_id, RACES.index(human), bots, MATCH_TICKS))
     if criteria == "development":
         for profile in PROFILES:
             out.append(("catalog", profile, 1, 0, "t", 0))
@@ -1085,7 +1089,7 @@ def main(argv=None):
     if not 1800 <= args.ticks <= 200000 or args.every < 60:
         parser.error("ticks must be in [1800,200000] and every >= 60")
     profiles = tuple(p for p in args.profiles.split(",") if p)
-    if not profiles or any(p not in PROFILES for p in profiles) or len(set(profiles)) != len(profiles):
+    if not profiles or any(p not in PROFILES + (P10_PROFILE,) for p in profiles) or len(set(profiles)) != len(profiles):
         parser.error(f"profiles must be distinct names from {','.join(PROFILES)}")
     kinds = {k for k in args.kinds.split(",") if k}
     selected = [c for c in cases(args.ticks, args.criteria) if c[1] in profiles and (not kinds or c[0] in kinds)]

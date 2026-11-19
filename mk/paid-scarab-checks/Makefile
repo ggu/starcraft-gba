@@ -5,8 +5,8 @@
 # product vector (research, Carriers, paid Scarabs) instead of PROTOSS_ROM_FLAGS.
 # The top-level Makefile is at its size limit, so the override lives here; make
 # warns that it replaces the earlier recipes, which is intended.
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_P10_FLAGS,PROTOSS_P10_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
-$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss,PROTOSS_P10_FLAGS,PROTOSS_P10_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss-p10,PROTOSS_P10_FLAGS,PROTOSS_P10_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss-p10,PROTOSS_P10_FLAGS,PROTOSS_P10_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
 
 # HOST checks for the product (sanitized). Needs the prepared P10 inputs.
 # The pre-service save is written by a checkout of the unchanged default
