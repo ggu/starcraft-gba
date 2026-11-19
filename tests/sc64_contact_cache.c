@@ -506,6 +506,39 @@ coincident_steering(void)
     sc64_unit_buckets_end();
 }
 
+#ifdef SC64_CONTACT_EARLY_AXIS_PROBE
+static void
+early_axis_boundaries(void)
+{
+    const int proven_layers = sc64_contact_check_reach_layers();
+    for (int disabled = 0; disabled < 2; ++disabled) {
+        sc64_contact_reach_layers = disabled ? SC64_CONTACT_REACH_CHECKED : proven_layers;
+        for (int flying = 0; flying < 2; ++flying) {
+            int type = flying ? U_WRAITH : U_MARINE;
+            memset(u, 0, sizeof(u));
+            u[0].alive = u[1].alive = 1;
+            u[0].type = u[1].type = type;
+            u[0].x = u[0].y = 64;
+            for (int speed = 0; speed <= 14; ++speed) {
+                int reach = SC64_CONTACT_REACH(flying) + speed;
+                for (int sign = -1; sign <= 1; sign += 2)
+                    for (int delta = -1; delta <= 1; ++delta)
+                        for (int axis = 0; axis < 2; ++axis) {
+                            int offset = sign * (reach + delta);
+                            u[1].x = 64 + (axis == 0 ? offset : 0);
+                            u[1].y = 64 + (axis == 1 ? offset : 0);
+                            sc64_unit_buckets_begin();
+                            check_mask(&u[0], speed);
+                            sc64_unit_buckets_end();
+                        }
+            }
+        }
+    }
+    sc64_contact_reach_layers = proven_layers;
+    printf("contact early bounds: verified layers 0x%x\n", proven_layers & 3);
+}
+#endif
+
 #ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
 static void
 row_disjoint_movement(void)
@@ -588,6 +621,9 @@ main(void)
     stock_rates();
     world_passes();
     coincident_steering();
+#ifdef SC64_CONTACT_EARLY_AXIS_PROBE
+    early_axis_boundaries();
+#endif
 #ifdef SC64_CONTACT_LOCAL_MEMO_PROBE
     row_disjoint_movement();
 #endif
