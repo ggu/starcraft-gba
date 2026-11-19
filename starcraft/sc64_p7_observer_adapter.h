@@ -24,6 +24,10 @@
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
 #error "SC64_P7_ARBITER_AURA_ONCE requires the P7 Arbiter cache"
 #endif
+#if defined(SC64_P7_DETECTOR_RANGE_CULL_PROBE) && \
+    !defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED)
+#error "The P7 detector range probe requires validated source rectangles"
+#endif
 
 #ifdef SC64_P7_OBSERVER_ENABLED
 /* Current roster maxima after source-pixel conversion, including fallbacks.
@@ -212,6 +216,10 @@ static unsigned sc64_p7_observer_xy_length(unsigned x, unsigned y)
                 minor * 3u / 256u;
     return major;
 }
+
+#ifdef SC64_P7_DETECTOR_RANGE_CULL_PROBE
+#include "sc64_p7_detector_range.h"
+#endif
 
 static int sc64_p7_observer_rect_distance(unsigned raw_a, int x_a, int y_a,
                                           int building_a, unsigned raw_b,
@@ -894,13 +902,20 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         const int *ext=lists->extent[kind];
         int sx=u[i].x*2, sy=u[i].y*2;
+#ifdef SC64_P7_DETECTOR_RANGE_CULL_PROBE
+        if (sc64_p7_detector_rect_in_range(sx+ext[0],sy+ext[1],sx+ext[2],sy+ext[3],
+                target_l,target_t,target_r,target_b,sc64_p7_detector_range[kind]))
+            in_range|=mask;
+#else
         int distance=sc64_p7_observer_rect_distance_rects(
             sx+ext[0],sy+ext[1],sx+ext[2],sy+ext[3],target_l,target_t,target_r,target_b);
+        if(distance>=0 && distance<=sc64_p7_detector_range[kind]) in_range|=mask;
+#endif
 #else
         int distance=sc64_p7_observer_rect_distance(sc64_p7_detector_raw[kind],
             u[i].x,u[i].y,0,(unsigned)RACE_PROTOSS_RAW(&u[target]),x,y,0);
-#endif
         if(distance>=0 && distance<=sc64_p7_detector_range[kind]) in_range|=mask;
+#endif
     }
     for(unsigned k=0;k<lists->building_count;++k) {
         const Sc64P7Detector *detector=&lists->buildings[k];
@@ -910,13 +925,20 @@ static unsigned sc64_p7_arbiter_detected_mask_lists(int target,
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         const int *ext=lists->extent[kind];
         int sx=b[i].x*2, sy=b[i].y*2;
+#ifdef SC64_P7_DETECTOR_RANGE_CULL_PROBE
+        if (!sc64_p7_detector_rect_in_range(sx+ext[0],sy+ext[1],sx+ext[2],sy+ext[3],
+                target_l,target_t,target_r,target_b,sc64_p7_detector_range[kind]))
+            continue;
+#else
         int distance=sc64_p7_observer_rect_distance_rects(
             sx+ext[0],sy+ext[1],sx+ext[2],sy+ext[3],target_l,target_t,target_r,target_b);
+        if(distance<0 || distance>sc64_p7_detector_range[kind]) continue;
+#endif
 #else
         int distance=sc64_p7_observer_rect_distance(sc64_p7_detector_raw[kind],
             b[i].x,b[i].y,1,(unsigned)RACE_PROTOSS_RAW(&u[target]),x,y,0);
-#endif
         if(distance<0 || distance>sc64_p7_detector_range[kind]) continue;
+#endif
         if(kind==SC64_P7_DETECTOR_CANNON &&
            !sc64_p7_detector_cannon_powered(lists,powered_cannons,i,detector->source)) continue;
         in_range|=mask;

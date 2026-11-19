@@ -11181,11 +11181,10 @@ sc64_unit_energy(const Unit *q,int *maximum)
 /* StarCraft marks a selection with an ellipse at the actor's base, coloured
  * by relationship: green for the player, yellow for neutral, red for others.
  * This draws a one-pixel outline sized from the sprite, so it needs no source
- * art. Art covers a ring's far arc and sits behind its near arc. A unit draws
- * its whole ring before any unit, and a directly drawn building draws the far
- * arc before its art. Art in the static cache is already on screen, so its
- * frame is passed as a cover: the far arc only fills the frame's transparent
- * pixels, the same result without redrawing the art. */
+ * art. A unit draws its whole ring before its body, and a directly drawn
+ * building draws the far arc before its art and the near arc after. Art in the
+ * static cache is already on screen, so use its frame as a cover. The far arc
+ * only fills the frame's transparent pixels. */
 #define SELECTION_RX_MAX 64
 #define SELECTION_RY_MAX 38
 #define SELECTION_NEAR 1
@@ -11478,9 +11477,8 @@ draw_unit_pass(Unit * q, int selection_pass)
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
     if (selection_pass) {
-        /* Drawn for every selected unit before any unit, so no circle
-         * covers a neighbour. The ellipse's lower edge sits just below the
-         * sprite, and the sprite drawn later hides its far arc. */
+        /* The lower edge sits just below the standing sprite. Drawing the
+         * body after the ring lets its opaque pixels cover the arc. */
         int rx = (sprite_w + 3) / 2, ry = (rx * 3 + 2) / 5;
         if (ry < 2) ry = 2;
         draw_selection_ellipse(x, sprite_y + sprite_h + 1 - ry, rx, ry,

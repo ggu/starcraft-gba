@@ -379,12 +379,12 @@ sc64_tile_background_done:
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(1);
 #endif
-    for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].selected)
-	    draw_unit_pass(&u[i], 1);
 #ifdef SC64_WORLD_DEPTH
     sc64_draw_depth_ordered_actors();
 #else
+    for (i = 0; i < MAX_UNITS; i++)
+	if (u[i].alive && u[i].selected)
+	    draw_unit_pass(&u[i], 1);
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive)
 	    draw_unit(&u[i]);

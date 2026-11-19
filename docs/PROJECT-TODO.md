@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-19. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-20. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -19,10 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **P10 cycle budget (2026-11-19)**. The [early collision rejection trial](audits/2026-11-19-p10-steering-budget.md)
+- **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
-  cycles. Advance the reviewed steering gate and keep testing point-route
-  continuation under load. Both replay windows exceed the 30 fps budget.
+  cycles. Keep testing point-route continuation under load. Both replay
+  windows exceed the 30 fps budget.
+  The [P10 detector range check](audits/2026-11-18-p7-current-mgba.md#composition-with-selection-ring-depth)
+  saves another 0.63% mean on P7 after composing with selection-ring
+  depth. The next large savings need to come from orders, route work,
+  and draw time in busy games.
 
 - **Frontier Skirmish (P1):** an independently authored battle profile
   now starts Transit Yard and Stone Gardens with one to three computer
