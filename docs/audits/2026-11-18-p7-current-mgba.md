@@ -395,3 +395,60 @@ fall from 1,883,235 to 1,872,385 (0.58%), p95 from 2,179,910 to
 Qualify the other prepared profiles and saves before enabling the probe.
 
 - Paired detector range receipt SHA-256 `ae2d497db4c8981aa24bc0353455e87a76c9c42e7ec6e31e223ab52e75eae9fa`.
+
+##### P10 with the shared depth renderer
+
+On release `9dfba082`, the normal P10 recipe enables the range check when
+the validated rectangle path is present. The check uses the existing
+inclusive edge gap and integer distance for pairs inside its axis bounds.
+The separate optical visibility test and Cannon power gate stay in place.
+
+The physical P7 replay matches all 1,000 frame, route and terrain
+observations and 11 sampled world states, palettes and full indexed
+framebuffer pairs. These are the 958 advancing updates in that window.
+
+| Guest cycles | Release | Detector range check |
+| --- | ---: | ---: |
+| Mean | 1,766,498 | 1,755,536 |
+| p95 | 2,066,456 | 2,052,956 |
+| Maximum | 2,433,880 | 2,436,936 |
+| Mean orders | 841,983 | 831,148 |
+
+At the maximum update, simulation costs 6,940 fewer cycles while draw
+and presentation cost 9,996 more. Linked EWRAM and IWRAM endpoints stay
+at `0x0203b434` and `0x03004d78`. The detector source-tick function's
+compiled stack frame grows from 3,144 to 3,152 bytes. Linked ROM content
+grows by 392 bytes within the 32 MiB cartridge.
+At 11 read-only replay cuts, the 648 bytes below the reserved stack floor
+and above the linked image remain unchanged. The lowest observed changed
+stack byte is 8,208 bytes above that floor. This measures sampled writes.
+
+`make test-sc64-p7-detector-range` checks the inclusive thresholds under
+ASan and UBSan. The prepared owner-mask test matches 2,000 cases including
+optical, Cannon power, movement and source-owner changes. Forty frozen
+inputs match between ARM builds. The normal target reproduces the measured
+candidate bytes, SHA-256
+`4ebad7dfc416e3c498144f019ba1d2d471b7165388dd327dcf86871499a70c74`.
+The replay comparison SHA-256 is
+`217a33acda855a949299fc7ec68fb196a084eaa0e8c50942b8450825d3a850db`.
+The stack observation SHA-256 is
+`1caaf2120794bd66a7c74b74cbd96c28b59ac44522c7e406866856dd6e8605b7`.
+
+##### Composition with selection-ring depth
+
+The normal P10 cartridge with both changes passed ROM header, SRAM
+signature, and memory checks. The 40 private build input hashes and
+linked RAM endpoints matched release `108690d5`. The detector flag
+is scoped to P10 builds with validated rectangles. Campaign and custom
+games in that cartridge use the same detector path.
+
+Against `108690d5`, the same 958 advancing P7 updates averaged
+1,749,589 cycles, down from 1,760,602 (0.63%). The p95 fell from
+2,059,279 to 2,047,006. The peak rose from 2,427,848 to 2,437,534.
+All 1,000 timeline records and 11 sampled world, palette, and full
+indexed framebuffer pairs matched. The scalar sanitizer fixture passed.
+
+The composed ROM SHA-256 is
+`fe8da4798ad548b433627121ab31f4d9894eee60119d266936ace5159ed8f2c4`.
+The paired replay comparison SHA-256 is
+`028cfd891fd251456abac5efb25d8439a671104f08d1cdde10f53ab2ee45caac`.
