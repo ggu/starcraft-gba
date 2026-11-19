@@ -552,6 +552,35 @@ preview stays opt-in pending wider profile and campaign qualification.
 - Price preview ROM SHA-256 `cfa810787994bee918f0aaa734d9d6f6a7e0cdbe4c7d1f5fd0b5a50a76f680c7`.
 - Ordinary controller and cross-load SHA-256 `2fb41d5df2e7595243122df144812eef1d5090f25dbede7f825bc67d9113febe`.
 
+#### Construction price audit
+
+The native mineral and gas arrays agree across six authenticated RAM
+cuts from two capture runs. Compared with GBA source `95a435c7`,
+four prices differ across 39 worker buildings, six add-ons and five
+building morphs. The Science Facility aliases use the same native ID.
+
+| Native ID | Building | N64 minerals / gas | GBA minerals / gas |
+| --- | --- | --- | --- |
+| 112 | Academy | 200 / 0 | 150 / 0 |
+| 116 | Science Facility | 150 / 200 | 100 / 150 |
+| 124 | Missile Turret | 100 / 0 | 75 / 0 |
+| 142 | Spawning Pool | 150 / 0 | 200 / 0 |
+
+The Pool also has the live wallet comparison above. The other three
+rows have native table evidence. In the GBA preview, check each menu
+quote and actual debit from the same building rule.
+
+The Academy, Missile Turret and Pool pass pending and paid build
+save checks in the staged Terran-profile price test. An ordinary
+Science Facility order exposes a separate save issue while the SCV
+is still walking to build. Raw ID 116 has four internal building
+aliases. The custom catalog authorizes SCVs and the pending-save
+validator checks a worker field whose value is 255 for these aliases,
+so the validator rejects the pending order. Qualify this path
+independently of the price changes.
+
+- Concatenated native tables SHA-256 `0f513814ca66c6d060fbfe3af3ea8dd3c8fc0209dcd8b46d565fa226aff45f26`.
+
 ### Solo Outpost Protoss Gateway recovery
 
 Three retained GBA profiles reach update 6,500 in the same solo
@@ -573,8 +602,48 @@ other ARM comparisons, all 27 sampled world states match per pair,
 including dense Outpost, solo and dense Blood Bath, and Outpost with
 non-Protoss opponents. The preview uses the same linked RAM limits.
 
+The Z10 and P10 previews reproduce the same milestone samples in the
+third-seat solo Outpost. Their retained controls still have no Gateway
+at 6,500. Across the two products, all 27 sampled world states match
+in each of eight other lobbies. Those comparisons use the retained
+canonical Z10 and P10 controls. At update 3,712, each preview saves
+using the pause menu. Loading from HOME in a new emulator preserves
+the occupied computer seat and named world state through 600 more
+updates. The SRAM exports before and after each continuation are
+byte-identical.
+
 - ARM diagnosis SHA-256 `35eb14213a622bfa36e3ec204917912b55174c7b16b2d5c724b438e585d4012d`.
 - Paired ARM replay SHA-256 `7db24c236436ce228d63b60beb77399538417e211083e4bd361ef37943f8e47c`.
+- Z10 and P10 opening matrix SHA-256 `e11b7bb004715c69c7a999a582cda4e1a2d6ef3759ddca78cab2d60f59f41cbf`.
+
+The longer Terran preview defeats the idle human at update 11,445.
+Its control keeps playing through 48,000 with no Gateway or Zealot.
+Both restore a pause save at update 4,608 and match all 14 sampled
+states through 8,192. The difference in match outcome is a GBA
+custom-game result on Outpost.
+
+[PR #577](https://github.com/ggu/starcraft-gba/pull/577) enables the
+shared fix on the public release branch. All three rebuilt cartridges
+match the preview at 369 named world cuts across 15 ordinary-controller
+lobbies. Each loads a real SRAM save on the repaired start and matches
+600 more updates. The Terran release build also reproduces the defeat
+at update 11,445 and matches all 27 cuts through the same defeat after
+a fresh load from update 4,608.
+
+- Long paired Terran preview SHA-256 `3ec98ba17cbbb6cdbcae35f0299825f23686cabc1303060b64c2055a957acd33`.
+- Release opening and save matrix SHA-256 `46aa91f8a8ec63cb9e1a76c3bba88987e52b49b2ff158a6cb34bad116026933a`.
+- Release Terran result and continuation SHA-256 `46b114b515e955bae842ca44b0c2c06a202439eed863b81928504dff30300e9e`.
+
+The merged source `b7a7a614` also passes 702 ordinary-controller
+launches on the three release cartridges. Each cartridge covers both
+maps, all human races, and every ordered lineup of one to three named
+CPU races in the first occupied rows. The read-only observer verifies
+the player and opponent owners, their starting actors, and another
+120 updates of play. One case per cartridge, map, human race and CPU
+count also saves with START and B, reloads from HOME in a fresh
+emulator, and matches the next 60 updates. This covers 54 early saves.
+
+- Merged release lineup receipt SHA-256 `59053909136ecfa664dcd70fd85005173cf5c8ddf771affe44194e21674defce`.
 
 ## Mineral patch contention and handoff
 

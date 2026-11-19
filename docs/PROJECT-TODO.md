@@ -1483,6 +1483,13 @@ save/source-owner and timing evidence; do not advertise unwired components.
   at the two previously divergent pause cuts.
   [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
   increased mean cost 1.79% and stays outside the release.
+- On [carried P7](audits/2026-11-19-z7-repeated-negative-route.md#carried-protoss-7-on-the-p10-cartridge),
+  enabling lazy route rows and lazy defense together moves mean cost
+  from 1.884M to 1.875M cycles per advancing update, about 8.95 updates/s.
+  The slowest sampled update rises 0.70%. Matched raw and display cuts
+  pass and the paired builds cross-load real SRAM through frame 1,083.
+  The candidate leaves 328 bytes below the IWRAM linker limit.
+  Preserve the busy-frame and stack gates before enabling it.
 - [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
@@ -1664,12 +1671,22 @@ save/source-owner and timing evidence; do not advertise unwired components.
   costs 150, verified against the native cost table and wallet. The
   opt-in price preview debits that amount on both maps and cross-loads
   the already paid structure with the current 200-mineral builds.
+  The [construction price audit](audits/2026-11-12-n64-blood-bath-opening.md#construction-price-audit)
+  also finds differing prices for Academy, Science Facility and Missile Turret
+  in the native tables. Check menu quotes, actual payment and save
+  continuation before enabling the wider adjustment. The Science Facility
+  exposes a pending-build save rejection for its SCV order. Qualify that
+  validator separately.
 - [Solo Outpost Protoss](audits/2026-11-12-n64-blood-bath-opening.md#solo-outpost-protoss-gateway-recovery)
-  has a reproducible first-Gateway stall. Its normal Pylon fallback
-  misses valid sites on the back arc. The bounded preview places the
-  Gateway and trains a Zealot by ARM update 3,680. Four control lobbies
-  match all sampled world states. Test the other profile flags and
-  long-game pressure before enabling this across all products.
+  now recovers its first Gateway in the public release after [#577](https://github.com/ggu/starcraft-gba/pull/577).
+  T10, Z10 and P10 train a Zealot by ARM update 3,680, restore a
+  genuine save and match 600 further updates. Twelve unaffected control
+  pairs match all sampled world states. The Terran build defeats the
+  idle player at update 11,445, including after fresh SRAM load.
+  On the merged source, 702 ordinary-controller launches cover both maps,
+  each human race and every ordered named lineup of one to three CPUs
+  across the three cartridges. All 54 sampled early saves resume in a
+  fresh process with matching state and 60-update continuation.
 - [Native mineral handoff](audits/2026-11-12-n64-blood-bath-opening.md#mineral-patch-contention-and-handoff)
   shows one timed worker per contested patch, release on interruption,
   and a waiting worker taking over after an eight-mineral pickup.

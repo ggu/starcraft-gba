@@ -472,6 +472,35 @@ flags and stack measurements remain in qualification.
 - Z7 late-load cuts SHA-256 `519531073c084f5f0ad00bdeb68b898a259f6852b588e684cc34813ab72cb933`.
 - Z9 full replay SHA-256 `9f376923881ed7ed6fa7eeb503e51e27ec6f52ebb4bda246f3dbe2108af0c656`.
 
+### Carried Protoss 7 on the P10 cartridge
+
+Two canonical P10 links on source `6a4cc445` use the same deferred
+seeds, route prefix and retained complete fields. The candidate
+additionally enables lazy route rows and lazy defense classification.
+All 1,000 frame and route records match in the saved physical replay.
+The 11 raw cuts match actor banks, resources, fog, palette, both bitmap
+pages and the displayed page. The representative cut advances the
+mission 958 times and counts one logical route build.
+
+| Advancing-update cost | Control cycles | Combined cycles |
+| --- | ---: | ---: |
+| Mean | 1,884,093 | 1,874,878 |
+| p95 | 2,180,784 | 2,171,512 |
+| Slowest | 2,566,835 | 2,584,814 |
+
+The mean drops 0.49% to about 8.95 emulated updates/s. The slowest
+update costs 0.70% more. Most of this cut's gain is after unit orders.
+The candidate ends at `0x03004eb8` in IWRAM, 328 bytes below the
+existing linker limit, and EWRAM is unchanged at `0x0203c2f8`.
+Linker margin measures static allocation. Stack use needs its own test.
+
+Both builds make the same physical SRAM save at frame 963. Each
+fresh-loads the other build's save through HOME and matches the
+uninterrupted world through frame 1,083.
+
+- Paired P7 timing SHA-256 `2c67f21f3ac62f2c979e19d9bf6f36a1cf57dbcb301886240cfa18300d4f8c89`.
+- Paired P7 SRAM SHA-256 `165c8226b81291281f0bfaaa1efb9e60c27f350a91a37b6da39e6abe7bc76311`.
+
 ### Fused owner-list and spatial index experiment
 
 The first combined ARM experiment builds the owner lists and spatial
