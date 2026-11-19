@@ -24,11 +24,13 @@ endif
 P10_HATCHERY_WORD_DIR := build/generated/p10-hatchery-words
 P10_HATCHERY_WORD_HEADER := $(P10_HATCHERY_WORD_DIR)/sc64_building_words_generated.h
 P10_HATCHERY_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_HATCHERY_WORD_DIR)
-P10_HATCHERY_BUILD_FLAGS := $(if $(filter 1,$(P10_HATCHERY_WORDS)),$(P10_HATCHERY_WORD_FLAGS))
+P10_HATCHERY_DRAW_FLAGS = $(CFLAGS) $(PROTOSS_P10_FLAGS)
+P10_HATCHERY_CAN_PACK = $(and $(filter -DSC64_UNIT_WORD_SPRITES,$(P10_HATCHERY_DRAW_FLAGS)),$(filter -DGBA_SPRITE_WORDS,$(P10_HATCHERY_DRAW_FLAGS)))
+P10_HATCHERY_BUILD_FLAGS = $(if $(and $(filter 1,$(P10_HATCHERY_WORDS)),$(P10_HATCHERY_CAN_PACK)),$(P10_HATCHERY_WORD_FLAGS))
 P10_HATCHERY_CONFIG := build/p10-hatchery-words-config
 .PHONY: force-p10-hatchery-words-config
 $(P10_HATCHERY_CONFIG): force-p10-hatchery-words-config | build
-	@printf '%s\n' '$(P10_HATCHERY_WORDS)' > $@.tmp
+	@printf '%s\n' '$(if $(P10_HATCHERY_BUILD_FLAGS),1,0)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 $(P10_HATCHERY_WORD_HEADER): $(filter %/sc64_race_sprites_generated.h,$(PROTOSS_P10_INPUTS)) tools/sc64_building_words.py tools/sc64_unit_facing.py | build
 	mkdir -p $(dir $@)
