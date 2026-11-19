@@ -650,6 +650,8 @@ test_minimap_census_preserves_dot_order_and_page_edges(void)
     const int last = MAX_UNITS - 1;
     for (unsigned dimension = 0; dimension < sizeof(sizes) / sizeof(sizes[0]); ++dimension) {
         fixture();
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
         race_cols = race_rows = sizes[dimension];
         screen = SCREEN_PLAY;
         SC64_GRID_CLEAR(visible);
