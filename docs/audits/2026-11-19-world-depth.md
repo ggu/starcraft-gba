@@ -184,3 +184,14 @@ The renderer receipt SHA-256 is
 `e68e0fae1c284e6a44d8694e0944636823fb281050080d39e032c83b63b19098`.
 The skirmish receipt SHA-256 is
 `99571add436acc888849844cbbb50d04f2a4c6078d3866aa19c2dadc40082e0c`.
+
+The selected-ring follow-up also passes all four normal ARM links and
+header checks. Against the exact `9dfba082` P10 ROM, the 958-advancing-
+update P7 window matches all 1,000 timeline rows and 11 sampled world,
+palette and framebuffer states. The release mean of 1,766,498 cycles
+falls to 1,760,602, p95 from 2,066,456 to 2,059,279, and peak from
+2,433,880 to 2,427,848. The isolated overlap fixture exercises the
+changed ring pixels. The ordinary P7 sample checks the wider scene.
+
+The selected-ring P7 receipt SHA-256 is
+`c909430793b05122a7ccd6e7c5180e2dac03e22d70d0eb2a2cfdf110b8cd4745`.
