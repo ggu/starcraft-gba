@@ -163,20 +163,23 @@ test-sc64-route-point-tail: build/test-sc64-route-point-tail build/test-sc64-rou
 	./$< --emit build/route-point-tail-candidate.ref
 	cmp build/route-point-tail-base.ref.state build/route-point-tail-candidate.ref.state
 
-ROUTE_POINT_PREFIX_TEST_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_POINT_PREFIX_PROBE -DSC64_ROUTE_POINT_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
-build/test-sc64-route-point-prefix: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
+ROUTE_POINT_PREFIX_TEST_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_POINT_PREFIX_PROBE -DSC64_ROUTE_POINT_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_DISTANCE_PROBE $(POINT_PREFIX_ROW_SPAN_FLAGS)
+ROUTE_POINT_PREFIX_TEST_SUFFIX = $(if $(filter 1,$(CANONICAL_ROUTE_POINT_PREFIX_ROW_SPAN)),-rows)
+ROUTE_POINT_PREFIX_TEST = build/test-sc64-route-point-prefix$(ROUTE_POINT_PREFIX_TEST_SUFFIX)
+ROUTE_POINT_PREFIX_RANGE_TEST = build/test-sc64-route-point-prefix-range$(ROUTE_POINT_PREFIX_TEST_SUFFIX)
+$(ROUTE_POINT_PREFIX_TEST): $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
 	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) $< -o $@
-build/test-sc64-route-point-prefix-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
+$(ROUTE_POINT_PREFIX_RANGE_TEST): tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
 	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
 .PHONY: test-sc64-route-point-prefix
-test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64-route-point-prefix-range build/test-sc64-route-point-tail-baseline
+test-sc64-route-point-prefix: $(ROUTE_POINT_PREFIX_TEST) $(ROUTE_POINT_PREFIX_RANGE_TEST) build/test-sc64-route-point-tail-baseline
 	./$< --point-prefix-only
 	./$< --point-component-only
 	./$< --point-near-distance-only
-	./build/test-sc64-route-point-prefix-range
+	./$(ROUTE_POINT_PREFIX_RANGE_TEST)
 	./build/test-sc64-route-point-tail-baseline --emit build/route-point-prefix-reference.ref
-	./$< --emit build/route-point-prefix-candidate.ref
-	cmp build/route-point-prefix-reference.ref.state build/route-point-prefix-candidate.ref.state
+	./$< --emit build/route-point-prefix-candidate$(ROUTE_POINT_PREFIX_TEST_SUFFIX).ref
+	cmp build/route-point-prefix-reference.ref.state build/route-point-prefix-candidate$(ROUTE_POINT_PREFIX_TEST_SUFFIX).ref.state
 
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@

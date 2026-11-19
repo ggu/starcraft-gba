@@ -90,7 +90,8 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
-    int goal_start = goal + sc64_cell_row(goal) * SC64_LINEAR_PAD + stride + 4;
+    int goal_row = sc64_cell_row(goal);
+    int goal_start = goal + goal_row * SC64_LINEAR_PAD + stride + 4;
     int origin_start = origin + sc64_cell_row(origin) * SC64_LINEAR_PAD + stride + 4;
     int head = 0, tail = sc64_route_linear_seed(dense, goal_start, stride);
     tail = sc64_point_prefix_expand(dense, origin_start, stride, cap, &head, tail);
@@ -109,6 +110,14 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         sc64_point_prefix_discard(prefix);
         prefix->goal = (u16)goal;
         prefix->slot = (u8)slot;
+#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
+        /* Each discovered cell lies at most head edges from a seed. The
+         * blocked-goal seeds can start one row away from the goal. Include
+         * those rows without bookkeeping in the pop or packing loops. */
+        int radius = head + (dense[goal_start] != 0);
+        prefix->restore_first_row = (u8)limit(goal_row + 1 - radius, 1, rows);
+        prefix->restore_last_row = (u8)limit(goal_row + 1 + radius, 1, rows);
+#endif
         memcpy(prefix->queue, bfs_queue + head, (size_t)pending * sizeof(*bfs_queue));
         prefix->count = (u8)pending;
         sc64_point_prefix_index[slot] = (u8)(prefix - sc64_point_prefixes + 1);
@@ -133,8 +142,20 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
+    int first_row = 1, last_row = rows;
+#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
+    if (prefix->restore_first_row >= 1 &&
+        prefix->restore_first_row <= prefix->restore_last_row &&
+        prefix->restore_last_row <= rows) {
+        first_row = prefix->restore_first_row;
+        last_row = prefix->restore_last_row;
+    }
+    /* The initial clear left all other rows at the undiscovered code. */
+    const u8 *in = field + (first_row - 1) * (cols / 8) * 3;
+#else
     const u8 *in = field;
-    for (int row = 1; row <= rows; ++row) {
+#endif
+    for (int row = first_row; row <= last_row; ++row) {
         u8 *out = dense + row * stride + 4;
         for (int col = 0; col < cols; col += 8) {
             unsigned packed = in[0] | (unsigned)in[1] << 8 | (unsigned)in[2] << 16;

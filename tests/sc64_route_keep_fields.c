@@ -826,6 +826,40 @@ static void check_point_prefix_resume(void)
     puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
 }
 
+#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
+static void check_point_prefix_row_span(void)
+{
+    const int distant = 100 + 64 * 128;
+    race_cols = race_rows = 128;
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    for (int row = 0; row < 128; row += 127) {
+        int root = 32 + row * 128;
+        for (int blocked = 0; blocked <= 1; ++blocked) {
+            memset(desired, 1, sizeof(desired));
+            desired[root] = !blocked;
+            invalidate();
+            build_path_grid();
+            int slot = sc64_route_slot_for(root, root + 1);
+            assert(slot >= 0);
+            const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+            assert(prefix);
+            assert(prefix->restore_first_row == (row ? 127 : 1));
+            assert(prefix->restore_last_row == (row ? 128 : 2));
+            assert(sc64_route_get(slot, distant) == SC64_ROUTE_UNREACHABLE);
+            u32 metadata = state_hash();
+            SC64_ROUTE_EXACT(slot);
+            assert(!sc64_point_prefix_find(slot) && state_hash() == metadata);
+            reference_bfs(&oracle[POOL], root);
+            for (int cell = 0; cell < MAP_CELLS; ++cell)
+                assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+            check_grid_unchanged();
+        }
+    }
+    puts("point prefix row bounds preserve exact directions at both map edges");
+}
+#endif
+
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
 static void check_point_prefix_tail_exchange(void)
 {
@@ -1096,6 +1130,9 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
+#ifdef SC64_ROUTE_POINT_PREFIX_ROW_SPAN
+        check_point_prefix_row_span();
+#endif
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
         check_point_prefix_tail_exchange();
 #endif

@@ -629,3 +629,63 @@ the returned step and the shared range scratch rules.
 | Z7 range observer | `87235b9072d97309405f2673090343ea4ae9088ccaf40632f42d93cc8cca55ca` |
 | Forced ARM control | `99af92b2fa9210981ed5ce0742d2e4d4db09a95ff59d8f3b7e0ccf19c68eb17d` |
 | Forced ARM candidate | `f52a4895ac32b3639279b788c8d1c35785186b9936fadd6978a781948917c0d0` |
+
+### Restore only rows reached by the parked prefix
+
+The local row-span probe adds two bytes per parked record. A cell
+discovered by the search is at most one edge farther from a seed than
+its predecessor. After `head` FIFO pops no discovered cell can be more
+than `head` rows away from its seed. An open goal is the only seed.
+For a blocked goal, the initial seeds can start one row above or below
+the requested goal. Clamp the resulting row interval to the map.
+
+On completion, initialize the whole walkability buffer. Restore assigned
+directions within the recorded interval using the existing unpacker.
+The initial packed-field clear left all entries outside the interval
+undiscovered. Copy the same pending FIFO and use the existing ordered
+expansion and packing. Route metadata and save formats are unchanged.
+Invalid row bounds use the full restore.
+
+`CANONICAL_ROUTE_POINT_PREFIX_ROW_SPAN=1` requires
+`CANONICAL_ROUTE_POINT_PREFIX=1`. The opt-in ASan/UBSan target
+`test-sc64-route-point-prefix` passed the 386,646-query residency
+comparison, the range reader with both reserved planes, and the new
+open and blocked seed cases at the top and bottom of the map.
+
+The same forced P10 ARM case parks after one pop with four pending cells.
+It restores dense rows 32–34 instead of scanning all 128 rows. The
+paired ROMs use the same fixture, 39 prepared dependencies and compiler
+arguments apart from the row-span flag. The pending FIFO, initially
+packed bytes, returned step, logical route counters and all 6,144 bytes
+of the completed field match. An independent FIFO verifies all 16,384
+packed directions.
+
+| Forced-case ARM cycles | Prefix | Prefix with row bounds |
+| --- | ---: | ---: |
+| Initial point fill | 102,766 | 102,870 |
+| Cached range read | 1,198,340 | 1,086,790 |
+| Combined | 1,301,106 | 1,189,660 |
+| Direction restoration inside the read | 115,969 | 3,670 |
+
+Ordered expansion still takes about 864,000 cycles in the forced
+read, so the read remains above the 561,792-cycle budget for 30 updates
+per second. Normal P10 and Z10 links retain their previous IWRAM
+endpoints and each uses eight additional EWRAM bytes.
+
+The dense Z7 replay on Z10 matches 131 historical checks, all 480
+simulation and route-counter records, and all nine sampled actor,
+mineral, palette and paired framebuffer hashes. The selected page
+matches in eight samples. At the final sample on call 48,237 the
+control selects page 0 and the row-span ROM selects page 1. A repeat
+captures the individual page hashes and confirms that this sample
+shows different pixels. The mean advancing update changes from
+2,149,956 to 2,149,908 cycles. Across all 480 updates, p95 changes from
+2,844,577 to 2,843,784 and the maximum from 4,369,053 to 4,368,587.
+Keep the option disabled by default.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paired forced ARM read | `1670fc48437185fcad7d37ced78decfe3860e33c974b69bdeee16dfed8db4310` |
+| Candidate restoration phase | `b35c537fcbcaedf4b24057e8352de6f56809f7e60620dd79763dd067820d0273` |
+| Dense Z7 candidate replay | `8d2b9687054a0a45b6383997cbf075b200b44c6cb3c583742cdea44e94e1d92e` |
+| Dense Z7 repeated display comparison | `ff30e273dd184a04de728cc4cb0f5e2235ea84a5129e7c7e7c5f925244017441` |
