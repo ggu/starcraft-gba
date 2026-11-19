@@ -716,9 +716,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycle savings. The [current release replay](audits/2026-11-16-resumable-frontier-budget.md#qualification-with-merged-p10-steering)
   saves 10.80% mean and 19.80% p95 on dense Z7. The full P10 win matches
   gameplay and display and has effectively flat timing. Its separate
-  breakpoint run sees zero cached range completions. Find a dense
-  ranged skirmish with live completions and measure their worst cost
-  before enabling the selector. The packed second cutoff stays local.
+  breakpoint run sees zero cached range completions. The stock skirmish
+  maps are 64×64 and prefixes require 128×128. Find a wide campaign or
+  use a synthetic wide fixture with live ranged completions and measure
+  their worst cost before enabling the selector. The packed second
+  cutoff stays local.
   On the paired Z9 probe, busy p95 improves
   11.3%, but by itself the worst call still costs 2.0% more. The same
   audit tracks a byte lookup

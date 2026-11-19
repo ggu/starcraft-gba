@@ -575,13 +575,16 @@ one emulator breakpoint at the direct call from
 (ARM address `0x08047d92` for this ELF). It observes zero calls in the
 complete victory tape, with the same final state, cuts and timing
 counters as the uninstrumented candidate. The host range fixture
-forces this fallback and verifies its returned step. Live frequency
-under dense ranged skirmish remains open.
+forces this fallback and verifies its returned step. Outpost and Blood
+Bath are both 64×64, and parked prefixes require an exact 128×128 map.
+Use a wide campaign or a synthetic 128×128 fixture with ranged units
+following a field seeded by nearby units to test live synchronous
+completion and its peak cost.
 
 All eight ARM links pass the existing guards. The smallest candidate
 IWRAM and EWRAM margins across products are 240 and 7,428 bytes.
 The route sanitizer target passes on the composed source. Keep the
-selector off by default while qualifying the remaining dense ranged
+selector off by default while qualifying the remaining wide ranged
 workloads. In these campaign windows both builds exceed the
 561,792-cycle budget for 30 updates per second.
 
