@@ -914,7 +914,7 @@ INTERCEPTOR = 73
 # The same for Reavers: the planner's Robotics Facility and Support Bay, a
 # Reaver paid like any unit, its Scarabs ordered through the human's command
 # and fired. The lobbies are those of the sweep in which an owner did.
-REAVER_LOBBIES = ((0, "p", "pp"), (1, "p", "pt"), (0, "t", "pt"), (1, "z", "zpt"))
+REAVER_LOBBIES = ((1, "p", "pt"), (0, "t", "pt"), (0, "z", "pz"), (1, "z", "pt"))
 REAVER = 83
 SCARAB = 85
 # A lobby that ends with nothing left in the world that can act, by profile:
