@@ -788,6 +788,40 @@ static void check_nearby_lazy_root(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+static void check_empty_linear_goals(void)
+{
+    const int widths[] = { 96, 128 };
+    for (unsigned i = 0; i < sizeof(widths) / sizeof(widths[0]); ++i) {
+        race_cols = widths[i];
+        race_rows = 128;
+        const int last = MAP_COLS * MAP_ROWS - 1;
+        const int goals[] = { 0, MAP_COLS - 1, last - MAP_COLS + 1, last };
+        const int wrapping[] = { MAP_COLS - 1, MAP_COLS,
+                                 last - MAP_COLS, last - MAP_COLS + 1 };
+        const int neighbors[] = { MAP_COLS + 1, 2 * MAP_COLS - 2,
+                                  last - 2 * MAP_COLS + 2, last - MAP_COLS - 1 };
+        for (unsigned j = 0; j < sizeof(goals) / sizeof(goals[0]); ++j) {
+            memset(desired, 0, sizeof desired);
+            desired[wrapping[j]] = 1;
+            sc64_routes_reset();
+            build_path_grid();
+            int slot = sc64_route_slot_for(goals[j], -1);
+            assert(slot >= 0 && sc64_route_valid[slot] == 1);
+            for (int cell = 0; cell <= last; ++cell)
+                assert(sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE);
+
+            desired[neighbors[j]] = 1;
+            sc64_routes_reset();
+            build_path_grid();
+            slot = sc64_route_slot_for(goals[j], -1);
+            assert(slot >= 0 && sc64_route_get(slot, neighbors[j]) == 0);
+        }
+    }
+    puts("Empty point fields reject wrapped seeds and preserve diagonal seeds.");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -818,6 +852,10 @@ int main(int argc, char **argv)
         for (int terrain = 0; terrain < T_KINDS; ++terrain)
             for (int kind = 0; kind < K_KINDS; ++kind)
                 scenario(shapes[s][0], shapes[s][1], terrain, kind, 10);
+
+#ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+    check_empty_linear_goals();
+#endif
 
     printf("validated queries: %lu\n", validated);
     for (int k = 0; k < K_KINDS; ++k) printf("builds %-7s %lu\n", kind_name[k], kind_builds[k]);

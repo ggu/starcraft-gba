@@ -117,6 +117,15 @@ test-sc64-route-linear: build/test-sc64-route-linear-ref build/test-sc64-route-l
 	cmp build/route-linear-base.ref.state build/route-linear-probe.ref.state
 	cmp build/route-linear-base.ref.state build/route-linear-overflow.ref.state
 
+build/test-sc64-route-linear-empty-goal: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE $< -o $@
+.PHONY: test-sc64-route-linear-empty-goal
+test-sc64-route-linear-empty-goal: build/test-sc64-route-linear-ref build/test-sc64-route-linear-empty-goal
+	./build/test-sc64-route-linear-ref --emit build/route-linear-empty-goal.ref
+	./build/test-sc64-route-linear-empty-goal --emit build/route-linear-empty-goal.probe
+	cmp build/route-linear-empty-goal.ref build/route-linear-empty-goal.probe
+	cmp build/route-linear-empty-goal.ref.state build/route-linear-empty-goal.probe.state
+
 # Compare the same route and residency receipts with and without pointer FIFO
 # access, including the forced small queue that exercises fallback.
 ROUTE_LINEAR_POINTER_FLAGS = $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_POINTER_FIFO_PROBE

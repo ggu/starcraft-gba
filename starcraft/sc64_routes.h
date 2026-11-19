@@ -1917,10 +1917,38 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
     return consumed + tail;
 }
 
+#ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+static inline int sc64_route_linear_goal_has_seed(int col, int row,
+                                                 int cols, int rows)
+{
+    const int left = col > 0 ? col - 1 : col;
+    const int top = row > 0 ? row - 1 : row;
+    const int right = col + 1 < cols ? col + 1 : col;
+    const int bottom = row + 1 < rows ? row + 1 : row;
+
+    for (int y = top; y <= bottom; ++y)
+        for (int x = left; x <= right; ++x)
+            if (SC64_GRID_GET(path_walkable, y * cols + x)) return 1;
+    return 0;
+}
+#endif
+
 static int __attribute__((noinline))
 sc64_route_fill_linear(u8 *field, int goal)
 {
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
+#ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+    /* With no walkable seed, the normal pack writes all unreachable codes. */
+    if (!SC64_GRID_GET(path_walkable, goal) &&
+        !sc64_route_linear_goal_has_seed(sc64_cell_col(goal), sc64_cell_row(goal), cols, rows)) {
+#ifdef SC64_ROUTE_WORD_CLEAR
+        sc64_route_field_clear(field);
+#else
+        memset(field, 0xff, sc64_route_active_bytes);
+#endif
+        return 0;
+    }
+#endif
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     const int row = sc64_cell_row(goal);

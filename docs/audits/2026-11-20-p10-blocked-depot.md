@@ -81,11 +81,41 @@ on the 128-column map.
 | 8,631 | 9,656 |
 
 The existing cache serves the repeated goals within this update.
-Profile grid setup, traversal, and packing on each cold request before
-changing their admission rules. The separate [resumable route trial](2026-11-16-resumable-frontier-budget.md)
+Three goals have no walkable seed and still consume 672,175 cycles
+building and packing empty fields. The other three floods visit
+12,836 cells each. All six use the same walkability grid.
+The separate [resumable route trial](2026-11-16-resumable-frontier-budget.md)
 cuts this update from 5,363,816 to 5,167,782 cycles in its paired full
 P10 run. That replay predates the wide depot change, so the gains are
 measured independently.
+
+## Empty point fields
+
+`SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE` checks the blocked goal’s bounded
+3×3 seed region before building the padded grid. If the region contains
+no walkable seed, it writes the same packed unreachable field directly.
+The caller publishes the same cache identity, age, validity and counters.
+All searches with a seed keep the existing expansion and tie order.
+
+The normal build leaves this probe off. Build it on top of the depot
+trial with `make CC='arm-none-eabi-gcc -DSC64_ROUTE_WIDE_DEPOT_FULL -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE' verify-protoss-p10`
+in a fresh prepared checkout. The combined ARM build retains the same
+IWRAM and EWRAM endpoints.
+
+| Cycles at P10 call 45,231 after SRAM load | Wide depot trial | With empty point fields |
+| --- | ---: | ---: |
+| Full update | 5,421,981 | 4,785,608 |
+| Simulation | 4,801,466 | 4,164,862 |
+| Orders | 4,173,362 | 3,536,853 |
+
+All 14 resident field hashes, actor and resource bytes, walkability,
+visibility, and route cache metadata and counters match. The host route
+oracle covers 386,646 queries, including packed output and residency.
+The targeted fixture also checks empty goals and diagonal seeds at all
+corners on both linear widths. Run `make test-sc64-route-linear-empty-goal`.
+The exact combined cartridge also loads the same P10 pause SRAM in a
+fresh emulator and wins at frame 46,057, matching six checkpoint records.
+The source save stays byte-identical.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -97,3 +127,8 @@ measured independently.
 | Trial full HOME victory | `207d3f5ffdd208f62912fcf217598382b45d0c24ae10e34b7d9db0ca80263a3d` |
 | Next peak phase trace | `13baad40a7bb7104c7e7c5d542c23112db7f33ae8c12bf2d80e9acc55afcbe4a` |
 | Next peak point trace | `fc25b66ca4576e0b11a5e840220db019cf53a164b33ecec5a15da9dead0c257d` |
+| Point fill phase and pop trace | `b5f328cc33ee24b37807d71ab29f9de7f1d25ff8920071f0da25c30670d9ee74` |
+| Empty goal comparison baseline | `6038c572a1b203159d00bfcfea29e897edbdf5d639e5ce38c4e824bb25060618` |
+| Empty goal comparison candidate | `94dacb5e9872f20cfc5d5c39f6fa51e8b575521fe48cc4092e13e8c0fbc32686` |
+| Combined trial fresh-SRAM victory | `6d37629432a713aebc3303daaad0d4b3457cbdfd4c4978227d7dd8691ff22e7c` |
+| Verified combined trial ROM | `33335858af82835db1b31638c8d9a25c50d20257091c56b3aed54377a7cf4049` |
