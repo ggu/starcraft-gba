@@ -581,10 +581,16 @@ Science Facility order exposes a separate save issue while the SCV
 is still walking to build. Raw ID 116 has four internal building
 aliases. The custom catalog authorizes SCVs and the pending-save
 validator checks a worker field whose value is 255 for these aliases,
-so the validator rejects the pending order. Qualify this path
-independently of the price changes.
+so the validator rejects the pending order. The [separate save fix](https://github.com/ggu/starcraft-gba/commit/3007cee5)
+uses the custom catalog to validate the pending worker and resolved
+type. A same-source Terran HOST comparison reproduces the old
+rejection and restores the candidate's pending SCV before any debit.
+The new process then matches 300 uninterrupted updates, including
+the normal 100-mineral and 150-gas foundation debit. Four alias
+fixtures pass. ARM and hardware qualification remain open.
 
 - Concatenated native tables SHA-256 `0f513814ca66c6d060fbfe3af3ea8dd3c8fc0209dcd8b46d565fa226aff45f26`.
+- Terran pending Science Facility comparison SHA-256 `2b1238df14df7da973b14210a135eabfc5fd53913ae6fec26671f7b7486387ec`.
 
 ### Solo Outpost Protoss Gateway recovery
 

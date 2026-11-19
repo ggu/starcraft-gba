@@ -492,14 +492,28 @@ The mean drops 0.49% to about 8.95 emulated updates/s. The slowest
 update costs 0.70% more. Most of this cut's gain is after unit orders.
 The candidate ends at `0x03004eb8` in IWRAM, 328 bytes below the
 existing linker limit, and EWRAM is unchanged at `0x0203c2f8`.
-Linker margin measures static allocation. Stack use needs its own test.
+A separate combined build paints the user stack before entering
+`main`. It reproduces all 1,000 timeline records and 11 raw cuts.
+The P7 window touches 3,560 bytes of user stack and leaves 8,216
+untouched above its guard. Interrupt stack use remains unmeasured
+for this candidate.
 
 Both builds make the same physical SRAM save at frame 963. Each
 fresh-loads the other build's save through HOME and matches the
 uninterrupted world through frame 1,083.
 
+Both also win the full P7 controller replay from HOME at frame
+55,892. All 59 named state checkpoints, 11 briefing acknowledgments
+and ten field dialogue acknowledgments match over 57,678 input
+samples. Mean emulated loop cost, including presentation waits and
+UI, falls from 2,017,057 to 2,007,175 cycles. This is the same 0.49%
+reduction as the bounded window. The candidate remains opt-in.
+[Source branch](https://github.com/ggu/starcraft-gba/tree/codex/sc64-p10-composed-lazy-20261119)
+
 - Paired P7 timing SHA-256 `2c67f21f3ac62f2c979e19d9bf6f36a1cf57dbcb301886240cfa18300d4f8c89`.
 - Paired P7 SRAM SHA-256 `165c8226b81291281f0bfaaa1efb9e60c27f350a91a37b6da39e6abe7bc76311`.
+- P7 user-stack canary SHA-256 `9131a41bf7131ab1bbbe9f521bcce66630465e266d7a255b9181198a2cea6f32`.
+- Full P7 replay comparison SHA-256 `68da6425dd74481c6ef67e35ede35188cae2f55eececc7aa57d7f6594cc55d3f`.
 
 ### Fused owner-list and spatial index experiment
 

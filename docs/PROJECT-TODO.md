@@ -1488,8 +1488,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   from 1.884M to 1.875M cycles per advancing update, about 8.95 updates/s.
   The slowest sampled update rises 0.70%. Matched raw and display cuts
   pass and the paired builds cross-load real SRAM through frame 1,083.
-  The candidate leaves 328 bytes below the IWRAM linker limit.
-  Preserve the busy-frame and stack gates before enabling it.
+  Both win the full P7 tape at frame 55,892 with all 59 named
+  checkpoints and 21 modal acknowledgments matching.
+  The candidate leaves 328 bytes below the IWRAM linker limit and the
+  sampled user stack has 8,216 bytes untouched above its guard.
+  Keep peak frame cost and interrupt stack use in the release gate.
 - [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact
@@ -1675,8 +1678,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   also finds differing prices for Academy, Science Facility and Missile Turret
   in the native tables. The opt-in matches menu quotes and debits in the
   HOST checks, including paid foundations. The Science Facility exposes
-  a pending-build save rejection for its SCV order. Qualify that validator
-  and the ordinary ARM price preview before enabling the wider adjustment.
+  a pending-build save rejection for its SCV order. A separate fix now
+  restores the order and matches 300 updates of uninterrupted Terran play
+  on HOST. Qualify both changes through ordinary ARM play before enabling
+  the wider adjustment.
 - [Solo Outpost Protoss](audits/2026-11-12-n64-blood-bath-opening.md#solo-outpost-protoss-gateway-recovery)
   now recovers its first Gateway in the public release after [#577](https://github.com/ggu/starcraft-gba/pull/577).
   T10, Z10 and P10 train a Zealot by ARM update 3,680, restore a
