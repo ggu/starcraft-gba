@@ -55,6 +55,13 @@ static u8 sc64_contact_class[SC64_CONTACT_TYPES];
 #define SC64_CONTACT_STEER_ROM 1
 #endif
 
+/* Enable the early axis probe only for the fast-memory steering kernel.
+ * The ROM kernel keeps its original instruction sequence. */
+#if defined(SC64_CONTACT_EARLY_AXIS_IWRAM_PROBE) && \
+    !defined(SC64_CONTACT_STEER_ROM) && !defined(SC64_CONTACT_EARLY_AXIS_PROBE)
+#define SC64_CONTACT_EARLY_AXIS_PROBE 1
+#endif
+
 static int GBA_HOT unit_step_clear(const Unit *q, int nx, int ny);
 static int sc64_unit_bucket_step_clear_reference(const Unit *q, int nx, int ny, int strict);
 
@@ -202,6 +209,39 @@ sc64_contact_mover(const Unit *q, int *radius, int *flying)
 #define SC64_CONTACT_REACH(flying) 7 /* raw36 radius 8, strict inequality */
 #else
 #define SC64_CONTACT_REACH(flying) 5
+#endif
+
+#ifdef SC64_CONTACT_EARLY_AXIS_PROBE
+#if !defined(SC64_CONTACT_COINCIDENT_PROBE) || \
+    (!defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE))
+#error "early contact axis rejection requires packed actor coordinates"
+#endif
+_Static_assert(sizeof(((Unit *)0)->type) == 1, "contact reach proof covers byte actor types");
+enum { SC64_CONTACT_REACH_CHECKED = 4 };
+static u8 sc64_contact_reach_layers;
+
+/* The normal scan includes whole edge buckets. Reject individual pixels
+ * outside its envelope only after proving that the layer's search reach
+ * covers all collidable types, including the scalar fallback. */
+static unsigned __attribute__((noinline))
+sc64_contact_check_reach_layers(void)
+{
+    unsigned layers = 3;
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
+    for (int type = -128; type < SC64_CONTACT_TYPES; ++type) {
+        if (type == U_CHRYSALIS) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        unsigned facts = sc64_game_unit_actor_flags(type);
+        if (facts && !(facts & SC64_GAME_ACTOR_COLLIDABLE)) continue;
+#endif
+        int flying = sc64_race_unit_flying(type) != 0;
+        if (sc64_game_unit_collision_radius(type) > SC64_CONTACT_REACH(flying) + 1)
+            layers &= ~(1u << flying);
+    }
+#endif
+    sc64_contact_reach_layers = (u8)(layers | SC64_CONTACT_REACH_CHECKED);
+    return sc64_contact_reach_layers;
+}
 #endif
 
 /* Same answer as the reference bucket query for an unloaded alive mover
@@ -621,6 +661,15 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
         return mask;
     p6 = sc64_contact_p6_active();
     reach = SC64_CONTACT_REACH(mover_flying) + speed;
+#ifdef SC64_CONTACT_EARLY_AXIS_PROBE
+    /* An all-ones span disables the test on an unproven layer or speed. */
+    unsigned axis_span = ~0u;
+    if (can_skip_coincident && mover_radius <= SC64_CONTACT_REACH(mover_flying) + 1) {
+        unsigned layers = sc64_contact_reach_layers;
+        if (!layers) layers = sc64_contact_check_reach_layers();
+        if (layers & (1u << mover_flying)) axis_span = 2u * (unsigned)reach;
+    }
+#endif
     minx = (q->x - reach) >> 4; maxx = (q->x + reach) >> 4;
     miny = (q->y - reach) >> 4; maxy = (q->y + reach) >> 4;
     if (minx < 0) minx = 0;
@@ -646,6 +695,13 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 u32 xy;
                 __builtin_memcpy(&xy, __builtin_assume_aligned(&c->x, 4), 4);
                 if (xy == origin && can_skip_coincident) continue;
+#ifdef SC64_CONTACT_EARLY_AXIS_PROBE
+                s16 coordinates[2];
+                __builtin_memcpy(coordinates, &xy, sizeof(xy));
+                ox = coordinates[0] - q->x; oy = coordinates[1] - q->y;
+                if ((unsigned)ox + (unsigned)reach > axis_span ||
+                    (unsigned)oy + (unsigned)reach > axis_span) continue;
+#endif
 #endif
                 if (!c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
                 cc = sc64_contact_class_for(c->type);
@@ -659,6 +715,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (((cc & SC64_CONTACT_FLYING) != 0) != mover_flying) continue;
                 if (sc64_contact_burrowed(c, cc, p6)) continue;
                 if (radius < mover_radius) radius = mover_radius;
+#ifndef SC64_CONTACT_EARLY_AXIS_PROBE
 #if defined(SC64_CONTACT_COINCIDENT_PROBE) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
                 /* The word from the coincident test already contains both
                  * coordinates. Extract them in native halfword order. */
@@ -667,6 +724,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 ox = coordinates[0] - q->x; oy = coordinates[1] - q->y;
 #else
                 ox = c->x - q->x; oy = c->y - q->y;
+#endif
 #endif
                 /* For nonzero speed every step is farther than the current
                  * zero distance. Keep speed zero and invalid-class fallback. */
