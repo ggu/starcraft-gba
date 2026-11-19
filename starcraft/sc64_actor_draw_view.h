@@ -4,6 +4,11 @@
 #define SC64_WORLD_DEPTH 1
 #endif
 
+#if defined(SC64_FOREGROUND_PICK) && defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
+#define SC64_FOREGROUND_PICK_ENABLED 1
+static int sc64_foreground_pick(int unit, int building, int proximity);
+#endif
+
 static inline int
 sc64_unit_anchor_in_view(const Unit *q, int x, int y)
 {

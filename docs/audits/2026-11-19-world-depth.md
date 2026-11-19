@@ -195,3 +195,37 @@ changed ring pixels. The ordinary P7 sample checks the wider scene.
 
 The selected-ring P7 receipt SHA-256 is
 `c909430793b05122a7ccd6e7c5180e2dac03e22d70d0eb2a2cfdf110b8cd4745`.
+
+## Friendly actor selection
+
+One starting Overlord moved across the Hatchery in a fresh native
+Challenger match. At N64 observer step 4,320, the four Drones were
+selected and the cursor was over opaque pixels shared by the Overlord
+and Hatchery. The next ordinary A press selected the Overlord with
+200 HP at step 4,345. The cursor was closer to the center of the
+Hatchery's displayed selection ring. The capture observes pixels and
+selection through the interface. Internal anchor coordinates were
+outside the observer's scope.
+
+The input tape SHA-256 is
+`631cd9bce29df25060cdf4163f1d48f6a107143e2555160a97d21888825871ab`.
+The clean overlap, pre-click and post-click frame SHA-256 values are
+`ea0147de1d0cce43e2e0ecddb9bf8c5377b23e952e244b0e6369baf18185a6d1`,
+`0f272222c547928ad0667d59b623bb6f68b903c6e9315057ddc9693e8363f464` and
+`099d107cb93306c6aba103932101f16a53df043e6446bbaab3162d3f9415aa1a`.
+
+`SC64_FOREGROUND_PICK` opts the shared Mode 4 renderer's friendly
+selection into using the same depth key at an opaque intersection
+of the nearest eligible unit and building. It keeps the existing
+proximity result on single-body clicks and when the primary sprite
+cannot establish both footprints. The supported frames cover source
+flyers and stationary ground units against ordinary finished
+buildings. The picker reads indexed sprite art and does not advance
+animation state. In a fresh prepared build, pass the flag with
+`make CC='arm-none-eabi-gcc -DSC64_FOREGROUND_PICK' verify-protoss-p10`.
+
+`make test-sc64-foreground-pick` passes under ASan/UBSan. It uses the A
+handler to select an Overlord
+over a Hatchery and a Marine behind a Barracks using each actor's
+isolated painted mask. It also checks proximity selection where only one
+body has an opaque pixel or both pixels are transparent.
