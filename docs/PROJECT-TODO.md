@@ -1500,6 +1500,19 @@ save/source-owner and timing evidence; do not advertise unwired components.
   at the two previously divergent pause cuts.
   [Fusing P7 world checks with the mission census](audits/2026-11-18-p7-current-mgba.md#callback-based-census-experiment)
   increased mean cost 1.79% and stays outside the release.
+  The [current lifetime trace](audits/2026-11-12-target-index-bulk.md#how-long-the-current-index-stays-valid)
+  puts the index rebuild at about 59K cycles in Homeland and dense Z7.
+  The same trace catches a newly live unit between orders and defense
+  in three-AI Blood Bath. Validate live membership and preserve Egg
+  tie order before retaining the index. Keep defense coverage separate.
+  The [validated retention prototype](audits/2026-11-12-target-index-bulk.md#validated-cross-update-prototype)
+  saves 1.82% mean in P10 Homeland and 1.54% in three-AI Blood Bath
+  with matching sampled state and pixels. Dense Z7 remains flat at
+  mean and costs 0.48% more at p95. The option stays off while strict
+  chain validation and the remaining performance budget are open.
+  Measure the HUD census and separate minimap actor pass on the same
+  physical replays. A shared walk would still need exact visibility,
+  dot overlap and per-page overlay coverage.
 - [Checked projectile acquisition](CARRIER-PROJECTILES.md#checked-live-projectile-acquisition)
   speeds up the shared Interceptor firing path. A staged fight on the
   normal P10 engine averages 1.158M versus 1.113M guest cycles with exact

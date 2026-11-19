@@ -13,7 +13,11 @@ static int world_w=1024, world_h=1024;
 #define WORLD_W world_w
 #define WORLD_H world_h
 #define SC64_RACES 1
+#ifdef SC64_TARGET_TEST_P10
+#define SC64_P10_RUNTIME 1
+#else
 #define SC64_SCARAB_RUNTIME 1
+#endif
 #define U_SCARAB 1
 #define SC64_TRANSPORT_LOADED(q) ((q)->loaded)
 typedef struct { int alive, owner, x, y, loaded, type, carry; } Unit;
@@ -106,6 +110,9 @@ static void check_geometry_and_membership(void) {
     u[0]=(Unit){.alive=1,.owner=0,.x=126,.y=64};
     u[1]=(Unit){.alive=1,.owner=0,.x=127,.y=64,.loaded=1};
     u[2]=(Unit){.alive=1,.owner=1,.x=-1,.y=-1,.type=U_SCARAB,.carry=256};
+#ifdef SC64_TARGET_TEST_P10
+    u[2].loaded=1;
+#endif
     u[3]=(Unit){.alive=1,.owner=1,.x=126,.y=64,.type=U_SCARAB,.carry=512};
     b[0]=(Building){.alive=1,.owner=0,.x=126,.y=64};
     compare_checked_rebuild();
@@ -183,6 +190,82 @@ static void check_move_and_overflow(void) {
     compare_checked_rebuild();
 }
 
+#ifdef SC64_TARGET_RETAIN_PROBE
+static void check_retention(void) {
+    memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+    sc64_target_index_end();
+    u[0]=(Unit){.alive=1,.owner=2,.x=8,.y=10};
+    u[1]=(Unit){.alive=1,.owner=2,.x=10,.y=10};
+    u[2]=(Unit){.alive=1,.owner=3,.x=64,.y=10,.loaded=1};
+    b[0]=(Building){.alive=1,.owner=2,.x=10,.y=10};
+    lists(); sc64_target_index_begin_owner_lists();
+    assert(sc64_target_member_count==3);
+    sc64_target_index_park();
+    assert(!sc64_target_index_active && sc64_target_retained_ready);
+    assert(sc64_target_try_retained(world_w,world_h));
+
+    /* Moves leave a tombstone, duplicate entry, and obsolete axis bit. */
+    for(int i=0;i<4;i++) {
+        u[0].x=(i&1)?128:64;
+        sc64_target_index_move(&u[0]);
+    }
+    assert(sc64_target_dirty_count==5);
+    sc64_target_index_park(); lists();
+    assert(sc64_target_try_retained(world_w,world_h));
+    assert(sc64_target_dirty_count==2 && sc64_target_head[2][1]==SC64_TARGET_NONE);
+#ifdef SC64_TARGET_OCCUPANCY
+    assert(sc64_target_owner_columns[2]==5u);
+#endif
+    snapshot();
+    sc64_target_index_end(); sc64_target_index_begin_owner_lists();
+    compare_snapshot(0);
+
+    /* Lowest-ID ordinary choices tolerate this head order. The Egg-style
+     * configuration rejects it, since its first equal candidate can win. */
+    u[0].x=8;
+    sc64_target_index_move(&u[0]);
+    assert(sc64_target_head[2][0]==0 && sc64_target_next[0]==MAX_UNITS);
+    sc64_target_index_park(); lists();
+#ifdef SC64_TARGET_RETAIN_CANONICAL_CHAINS
+    assert(!sc64_target_try_retained(world_w,world_h));
+#else
+    assert(sc64_target_try_retained(world_w,world_h));
+    assert(sc64_target_head[2][0]==0 && sc64_target_next[0]==MAX_UNITS);
+    sc64_target_index_park();
+#endif
+    sc64_target_index_end(); sc64_target_index_begin_owner_lists();
+    assert(sc64_target_head[2][0]==MAX_UNITS);
+
+    /* Same cardinality can't hide an omitted member or a changed owner. */
+    sc64_target_index_park();
+    u[1].alive=0; u[2].loaded=0;
+    lists();
+    assert(!sc64_target_try_retained(world_w,world_h));
+    sc64_target_index_begin_owner_lists();
+    sc64_target_index_park();
+    u[0].owner=3; lists();
+    assert(!sc64_target_try_retained(world_w,world_h));
+    sc64_target_index_begin_owner_lists();
+    sc64_target_index_park();
+    u[0].alive=0; lists();
+    assert(!sc64_target_try_retained(world_w,world_h));
+    sc64_target_index_begin_owner_lists();
+
+    sc64_target_index_park();
+    assert(!sc64_target_try_retained(world_w-1,world_h));
+    sc64_target_index_end();
+    assert(!sc64_target_try_retained(world_w,world_h));
+    sc64_target_index_begin_owner_lists();
+    sc64_target_dirty_count=SC64_TARGET_DIRTY_CAPACITY;
+    u[2].x=512; sc64_target_index_move(&u[2]);
+    assert(!sc64_target_index_active && sc64_target_dirty_overflowed);
+    sc64_target_index_park(); lists();
+    assert(!sc64_target_try_retained(world_w,world_h));
+    sc64_target_index_begin_owner_lists();
+    assert(sc64_target_index_active && !sc64_target_dirty_overflowed);
+}
+#endif
+
 int main(void) {
     for(int round=0;round<5000;round++) {
         for(int i=0;i<MAX_UNITS;i++) {
@@ -206,6 +289,9 @@ int main(void) {
     }
     check_geometry_and_membership();
     check_move_and_overflow();
+#ifdef SC64_TARGET_RETAIN_PROBE
+    check_retention();
+#endif
     sc64_target_index_end();
     puts("owner-list index differential: 10000 randomized builds, geometry, crossings and overflow passed");
     return 0;

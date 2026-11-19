@@ -138,3 +138,134 @@ at the previously divergent cuts.
 | Bidirectional skirmish saves | `dd68a5697c8c2f108a84ee9c653fbd40ee36d36b5067d0a937348ffce9f441ac` |
 | Outpost fresh load through victory | `cba959cbf24af140bcbe84cc9c43469a4e9805b83845da7549f17cf16efe28a3` |
 | Full physical P7 victory | `ceb663b9638c3d0b83bc65747ae6d08376ebcc5bfe9ba722c5dbc1d9a2db3bc3` |
+
+## How long the current index stays valid
+
+Read-only breakpoints on the normal P10 and Z10 binaries from
+`ea041527` sample the completed orders index, the end of orders,
+and the defense entry. The observer walks the actual owner-cell
+chains and compares their slot membership, compact owner and
+64-pixel cell against live actors at each boundary. The Z7 replay
+also passes all 131 historical gameplay checks. At the measured cuts,
+all three runs reproduce the retained frame and order timings.
+
+| Workload | Sampled updates | Orders index build cycles | Whole defense pass cycles | Orders index covers live actors at defense entry | Exact membership at next sampled build |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P10 Homeland | 48 | 59,663 | 63,495 | 48 / 48 | 24 / 24 |
+| P10 Blood Bath, three AI seats | 48 | 35,302 | 50,542 | 46 / 48 | 23 / 24 |
+| Z10 dense Z7 | 53 | 58,999 | 79,860 | 53 / 53 | 26 / 26 |
+
+Counts require every eligible live slot and no extra index links. The last
+column samples adjacent ordinary calls only. Mean defense cycles
+include weapon checks and effects. They are an upper bound on what
+eliminating a separate defense index could save.
+
+Blood Bath frame 17,141 has a newly spawned unit at defense entry
+that is absent from the orders index. Frame 16,860 has an extra link
+after a death, which the next fresh rebuild removes. A retained index
+still needs a fresh coverage proof. Transport unloads, enemy rescue or
+ownership changes, and mission-created units provide additional paths
+to invalidate it. Defense has its own geometry, live eligibility and
+lowest-slot tie rule. Its normal skirmish dispatch uses the scalar pass.
+
+On the paired Blood Bath cuts only 2 of 24 saved indexes satisfy
+both exact membership and the original descending chain order.
+Dense Z7 has 9 of 26 and Homeland has 16 of 24. In the Homeland
+repeat, eight end-of-orders cuts have at least one dirty entry left
+over from a now-empty cell or a repeated link. Moves update
+64-pixel buckets during orders. Low-slot ties in nearest-target and
+defense queries are explicit. The Egg fallback can instead depend
+on the first equal-distance candidate. A reuse path must keep that
+iteration order wherever the Egg query is compiled.
+
+| Local read-only receipt | SHA-256 |
+| --- | --- |
+| P7 Homeland | `38178bd9da0f91753a26a5dd8fa3de8d621bccf3e1f8136df6e37e39d9ac6c7e` |
+| P7 repeat with chain order and dirty counts | `e4cc1013123ec37da1fb303aca8e3387184427c34fd95d33dd4e31f737936505` |
+| Three-AI Blood Bath | `79a22207c1cf7bbeb0ba4dfcbdd7f5eaf7c0748365c449f9b19fe824eae24e4e` |
+| Dense Z7 | `c443b19f0c3b533075cfadbb4999ac9b3d1b64479c81029f6a96238d7511ac94` |
+
+### Validated cross-update prototype
+
+Source `620a887e` adds the opt-in `SC64_TARGET_RETAIN_PROBE` beside
+the canonical bulk and fast-link flags. The index stays inactive at
+the update boundary. The following orders pass checks the current
+eligible slots, owner and 64-pixel cell of each actor, total
+membership and world geometry before reactivating it. Relevant
+mutations invalidate retention. Dirty list compaction restores
+a fresh build's overflow capacity and occupancy masks. Profiles
+with order-sensitive targeting also validate descending chains.
+Defense still performs its existing separate pass.
+
+The focused ASan/UBSan test passes all 15 mode and geometry vectors
+in `test_sc64_target_owner_index.py`. Targeted cases cover actor
+replacement with the same count, owner and map changes, unindexed
+movers, dirty-list duplicates, overflow recovery and profile-specific
+chain order. The normal-profile P10 replay binary is byte-identical
+before and after moving the phase macros out of the main source file.
+
+| Normal compiler recipe with probe | ROM hash prefix | IWRAM end | EWRAM end |
+| --- | --- | --- | --- |
+| Terran | `cdbe3a99` | `0x03004918` | `0x02038e94` |
+| Z10 | `e83630d0` | `0x03004df8` | `0x02038028` |
+| P10 | `f6391256` | `0x03004e70` | `0x0203b5d4` |
+| Showcase | `f9ae2cee` | `0x03004fe8` | `0x02039110` |
+
+All four pass the ROM header, SRAM signature and RAM guards using the
+same prepared inputs as release. Showcase has 24 bytes below the
+existing IWRAM link guard. That is a link measurement. The P10
+recipe with the flag absent reproduces the normal release ROM
+byte-for-byte.
+
+The P10 Homeland comparison covers 958 advancing updates across
+the last 1,000 input calls. Late Blood Bath covers 1,000 advancing
+updates from frame 16,302 with three independently selected AI
+seats. Both match all recorded timeline and route rows and the
+sampled worlds, palettes and complete framebuffer pages. At the
+11 Homeland and 32 Blood Bath cuts, the hardware page also matches.
+
+| ARM cycles per advancing update | Release mean | Preview mean | Mean change | p95 change | Peak change |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P10 Homeland | 1,728,244 | 1,696,767 | −1.82% | −1.36% | −1.78% |
+| P10 Blood Bath late | 998,765 | 983,379 | −1.54% | −1.41% | −0.88% |
+| Z10 dense Z7 | 2,340,889 | 2,340,034 | −0.04% | +0.48% | +0.27% |
+
+Mean orders cost falls 3.91% in Homeland and 3.42% in Blood Bath.
+The dense Z7 window covers 477 advancing updates. It matches all
+131 historical gameplay checkpoints, all 480 timeline and route
+rows, and eight sampled world, fog, palette and framebuffer pairs.
+Its p95 increase leaves the strict-chain cost open. All three
+whole-update means exceed the 30 fps cycle budget.
+
+| Local preview receipt | SHA-256 |
+| --- | --- |
+| P10 Homeland | `8df1dda22a845655a5b511f8b2a05e62cfa7e43bfc7f92bd320b4f2314298b5c` |
+| P10 three-AI Blood Bath | `8fde02fad6725095fdefe61a1f205317f5b8cba60de918b648ccd8c54b1f9ff7` |
+| Dense Z7 | `60a70ce28204be31052a02f9c9f7ff4a2bd22ada2090321d5363bf97cb976aba` |
+| Terran T4 paired replay | `cb806758b109711969ddef9fc1833c2746db2cb754bc992e3c25ca1638eac9ce` |
+| Showcase Carrier scene pair | `3b58e0aae72c6f40e9af65f9d89588c040b6ad0d52f4cc5d2e723f56f4d4a9e9` |
+
+The Terran T4 tape wins both runs at frame 8,911 and matches 10 periodic,
+terminal and post-save checkpoints, 45 video cuts and the final SRAM.
+The busiest 600-call control window drops from 981,731 to 968,602 mean
+elapsed cycles. An internal fog-tile cache hash differs. Visible fog,
+palette and both framebuffer pages match throughout the sampled cuts.
+The 1,071-call Showcase Carrier scene matches the frame sequence,
+two checkpoints and six video cuts. Its 1,000-call active window is
+nearly flat at 1,080,128 versus 1,079,281 mean elapsed cycles, with
+a 0.33% higher peak.
+
+Each opt-in cartridge also saves through the ordinary pause menu
+at skirmish frame 601, loads from HOME in a fresh process, and matches
+its own uninterrupted next 180 controller updates. The 32 KiB SRAM is
+unchanged after every load.
+
+| Product | Map and human race | AI seats | Fresh save and load receipt SHA-256 |
+| --- | --- | --- | --- |
+| Terran | Blood Bath, Terran | Zerg, Protoss, Terran | `9e403d4f127e08087a6c539b8cc362b3889b95c57eda6ce827d6068c93ae4425` |
+| Z10 | Outpost, Zerg | Terran | `35cf96f06fd89370e4cad18dd6cb234e36dc8117e8c458220d0ba83486d576dd` |
+| P10 | Blood Bath, Protoss | Zerg, Terran, Protoss | `79af69f060c3a723b9f894639fd1a67b84750af3db3387a900e38186c9625506` |
+| Showcase | Outpost, Zerg | Terran, Protoss | `ec9dcd2fa947fddd3e4762248317c8f2bb337a79713a3fdcff52c8b30198865a` |
+
+Repeat the strict-chain timing before enabling the probe. The draft
+retains the unmodified default selector.

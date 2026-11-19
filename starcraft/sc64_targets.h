@@ -49,6 +49,21 @@ static int sc64_target_index_initialized;
 static int sc64_target_dirty_overflowed;
 static int sc64_target_index_active;
 
+#ifdef SC64_TARGET_RETAIN_PROBE
+#if !defined(SC64_TARGET_BULK_REBUILD_PROBE) || !defined(SC64_TARGET_FAST_LINK_PROBE)
+#error "Retaining the target index requires bulk builds and checked fast relinks"
+#endif
+/* Keep the old cell field intact for the ordinary mover's inactive rows. */
+static u8 sc64_target_member_owner[SC64_TARGET_ENTITY_COUNT];
+static u16 sc64_target_member_count;
+static int sc64_target_retained_width, sc64_target_retained_height;
+static int sc64_target_retained_ready, sc64_target_retained_compact;
+#if !defined(SC64_P10_RUNTIME) || defined(SC64_EGG_RUNTIME) || defined(SC64_SCARAB_RUNTIME)
+#define SC64_TARGET_RETAIN_CANONICAL_CHAINS
+static int sc64_target_retained_may_be_unordered;
+#endif
+#endif
+
 static int GBA_HOT __attribute__((noinline))
 sc64_target_cell_for(int x, int y, int *cell)
 {
@@ -112,8 +127,12 @@ sc64_target_remove(int entity, int owner)
 {
     int cell = sc64_target_cell[entity];
     Sc64TargetIndex before = sc64_target_prev[entity], after = sc64_target_next[entity];
-    if (before == SC64_TARGET_NONE) sc64_target_head[owner][cell] = after;
-    else sc64_target_next[before] = after;
+    if (before == SC64_TARGET_NONE) {
+        sc64_target_head[owner][cell] = after;
+#ifdef SC64_TARGET_RETAIN_PROBE
+        if (after == SC64_TARGET_NONE) sc64_target_retained_compact = 1;
+#endif
+    } else sc64_target_next[before] = after;
     if (after != SC64_TARGET_NONE) sc64_target_prev[after] = before;
     sc64_target_next[entity] = sc64_target_prev[entity] = SC64_TARGET_NONE;
 }
@@ -135,6 +154,16 @@ sc64_target_index_clear(void)
     }
     sc64_target_dirty_count = 0;
     sc64_target_dirty_overflowed = 0;
+#ifdef SC64_TARGET_RETAIN_PROBE
+    memset(sc64_target_member_owner, 0xff, sizeof(sc64_target_member_owner));
+    sc64_target_member_count = 0;
+    sc64_target_retained_width = 0;
+    sc64_target_retained_ready = 0;
+    sc64_target_retained_compact = 0;
+#ifdef SC64_TARGET_RETAIN_CANONICAL_CHAINS
+    sc64_target_retained_may_be_unordered = 0;
+#endif
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     memset(sc64_target_owner_columns, 0, sizeof(sc64_target_owner_columns));
     memset(sc64_target_owner_rows, 0, sizeof(sc64_target_owner_rows));
@@ -161,9 +190,107 @@ sc64_target_link_in_world(int entity, int owner, int x, int y,
                          unsigned width, unsigned height)
 {
     if ((unsigned)x >= width || (unsigned)y >= height) return 0;
+#ifdef SC64_TARGET_RETAIN_PROBE
+    if (!sc64_target_link_cell(entity, owner,
+                               (x >> 6) + (y >> 6) * SC64_TARGET_GRID_COLS,
+                               x, y))
+        return 0;
+    sc64_target_member_owner[entity] = (u8)owner;
+    ++sc64_target_member_count;
+    return 1;
+#else
     return sc64_target_link_cell(entity, owner,
                                  (x >> 6) + (y >> 6) * SC64_TARGET_GRID_COLS,
                                  x, y);
+#endif
+}
+#endif
+
+#ifdef SC64_TARGET_RETAIN_PROBE
+static inline int
+sc64_target_retained_member(int entity, int owner, int x, int y,
+                            unsigned width, unsigned height)
+{
+    if ((unsigned)x >= width || (unsigned)y >= height ||
+        sc64_target_member_owner[entity] != owner ||
+        sc64_target_cell[entity] != (x >> 6) + (y >> 6) * SC64_TARGET_GRID_COLS)
+        return 0;
+#ifdef SC64_TARGET_RETAIN_CANONICAL_CHAINS
+    if (sc64_target_retained_may_be_unordered &&
+        sc64_target_next[entity] != SC64_TARGET_NONE &&
+        sc64_target_next[entity] > entity)
+        return 0;
+#endif
+    return 1;
+}
+
+/* A fresh build starts with one dirty entry per occupied cell and exact
+ * axis masks. Movements retain tombstones and can register a cell twice.
+ * Preserve fresh-build overflow headroom and masks before reopening. Mark
+ * each surviving head temporarily in a spare bit of its validated owner. */
+static void __attribute__((noinline))
+sc64_target_compact_retained_dirty(void)
+{
+    Sc64TargetIndex *heads = (Sc64TargetIndex *)sc64_target_head;
+    const unsigned seen = 0x80;
+    int kept = 0;
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
+    memset(sc64_target_owner_columns, 0, sizeof(sc64_target_owner_columns));
+    memset(sc64_target_owner_rows, 0, sizeof(sc64_target_owner_rows));
+#endif
+    for (int i = 0; i < sc64_target_dirty_count; ++i) {
+        u16 key = sc64_target_dirty[i];
+        Sc64TargetIndex head = heads[key];
+        if (head == SC64_TARGET_NONE || (sc64_target_member_owner[head] & seen))
+            continue;
+        unsigned owner = sc64_target_member_owner[head];
+        sc64_target_member_owner[head] = (u8)(owner | seen);
+        sc64_target_dirty[kept++] = key;
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
+        unsigned cell = sc64_target_cell[head];
+        sc64_target_owner_columns[owner] |= (u32)1u << (cell % SC64_TARGET_GRID_COLS);
+        sc64_target_owner_rows[owner] |= (u32)1u << (cell / SC64_TARGET_GRID_COLS);
+#endif
+    }
+    for (int i = 0; i < kept; ++i)
+        sc64_target_member_owner[heads[sc64_target_dirty[i]]] &= (u8)~seen;
+    sc64_target_dirty_count = (u16)kept;
+    sc64_target_retained_compact = 0;
+}
+
+/* The lists were just validated by update_orders, including eligibility and
+ * unique membership. Complete inclusion plus equal cardinality excludes
+ * stale members as well as omitted ones. P10 without Eggs or Scarabs has
+ * only the lowest-entity target reducer and the per-slot Arbiter aura OR;
+ * its same-pass movement relinks the same membership in either ordering. */
+static int __attribute__((noinline))
+sc64_target_try_retained(int width, int height)
+{
+    int count = 0;
+    if (!sc64_target_retained_ready || sc64_target_dirty_overflowed ||
+        width != sc64_target_retained_width || height != sc64_target_retained_height)
+        return 0;
+    for (int owner = 0; owner < 5; ++owner) {
+        for (int i = target_unit_head[owner]; i >= 0; i = target_unit_next[i]) {
+            if (!sc64_target_retained_member(i, owner, u[i].x, u[i].y, width, height))
+                return 0;
+            ++count;
+        }
+        for (int i = target_building_head[owner]; i >= 0; i = target_building_next[i]) {
+            if (!sc64_target_retained_member(MAX_UNITS + i, owner, b[i].x, b[i].y,
+                                             width, height))
+                return 0;
+            ++count;
+        }
+    }
+    if (count != sc64_target_member_count) return 0;
+    if (sc64_target_retained_compact) sc64_target_compact_retained_dirty();
+#ifdef SC64_TARGET_RETAIN_CANONICAL_CHAINS
+    sc64_target_retained_may_be_unordered = 0;
+#endif
+    sc64_target_retained_ready = 0;
+    sc64_target_index_active = 1;
+    return 1;
 }
 #endif
 
@@ -177,6 +304,9 @@ static void
 #endif
 sc64_target_index_begin_owner_lists(void)
 {
+#ifdef SC64_TARGET_RETAIN_PROBE
+    if (sc64_target_try_retained(WORLD_W, WORLD_H)) return;
+#endif
     sc64_target_index_clear();
 #ifdef SC64_TARGET_BULK_REBUILD_PROBE
     const int width = WORLD_W, height = WORLD_H;
@@ -208,6 +338,10 @@ sc64_target_index_begin_owner_lists(void)
             if (!sc64_target_insert(MAX_UNITS + i, owner, b[i].x, b[i].y)) return;
 #endif
     }
+#ifdef SC64_TARGET_RETAIN_PROBE
+    sc64_target_retained_width = width;
+    sc64_target_retained_height = height;
+#endif
     sc64_target_index_active = 1;
 }
 
@@ -225,6 +359,12 @@ sc64_target_index_move(Unit *q)
         return;
     }
     if (sc64_target_cell[entity] == cell) return;
+#ifdef SC64_TARGET_RETAIN_PROBE
+    /* The legacy path can see an unindexed birth or a changed owner. Leave
+     * its same-update semantics in place, but never retain that graph. */
+    if (sc64_target_member_owner[entity] != q->owner)
+        sc64_target_retained_width = 0;
+#endif
 #ifdef SC64_TARGET_FAST_LINK_PROBE
     const int owner = q->owner;
     if ((unsigned)owner >= 5u) {
@@ -234,6 +374,11 @@ sc64_target_index_move(Unit *q)
     /* cell_for already checked this position against the live map.
      * Relink directly; a dirty-list overflow still disables the index. */
     sc64_target_remove(entity, owner);
+#ifdef SC64_TARGET_RETAIN_CANONICAL_CHAINS
+    Sc64TargetIndex old = sc64_target_head[owner][cell];
+    if (old != SC64_TARGET_NONE && old > entity)
+        sc64_target_retained_may_be_unordered = 1;
+#endif
     (void)sc64_target_link_cell(entity, owner, cell, q->x, q->y);
 #else
     sc64_target_remove(entity, q->owner);
@@ -245,6 +390,24 @@ static void
 sc64_target_index_end(void)
 {
     sc64_target_index_active = 0;
+#ifdef SC64_TARGET_RETAIN_PROBE
+    sc64_target_retained_ready = 0;
+#endif
 }
+
+#ifdef SC64_TARGET_RETAIN_PROBE
+static inline void sc64_target_index_park(void)
+{
+    sc64_target_retained_ready =
+        sc64_target_index_active && sc64_target_retained_width > 0;
+    sc64_target_index_active = 0;
+}
+/* A parked graph remains inactive until the new lists verify it. */
+#define SC64_TARGET_BEGIN_ORDERS() (sc64_target_index_active = 0)
+#define SC64_TARGET_END_ORDERS() sc64_target_index_park()
+#else
+#define SC64_TARGET_BEGIN_ORDERS() sc64_target_index_end()
+#define SC64_TARGET_END_ORDERS() sc64_target_index_end()
+#endif
 
 #endif
