@@ -1810,6 +1810,8 @@ AI wallets and full-match behavior remain unverified.
   audio or saves. Consult [roster status](SC64_SKIRMISH_ROSTER_STATUS.md),
   [shared transport](SHARED-TRANSPORT.md), [validation](VALIDATION.md), and the
   dated audits for the actual scope of each earlier result.
+- Pick up the [world depth overlap cases](audits/2026-11-19-world-depth.md)
+  when extending the framebuffer replay harness.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.
