@@ -439,6 +439,36 @@ static void human_defense_fog_acquisition(void)
 }
 
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
+static void spatial_mixed_defenses_choose_distinct_targets(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=240, .y=240, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_SUNKEN_COLONY, .alive=1, .raw_type=146 };
+    b[1] = b[0];
+    b[1].type = B_SPORE_COLONY;
+    b[1].raw_type = 144;
+    u[0] = (Unit){ .x=244, .y=240, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_MUTALISK, .alive=1, .raw_type=43 };
+    u[1] = u[0];
+    u[1].x = 248;
+    u[1].type = U_ZERGLING;
+    u[1].raw_type = 37;
+
+    compare_paths();
+    assert(actual.units[1].hp == 80);
+    assert(actual.buildings[0].queue_progress == 40);
+    assert(actual.buildings[1].queue_progress == 19);
+#ifdef SC64_IMPACT_EVENTS
+    if (race_impact_building_steps(&b[1], 0, 1)) {
+        assert(actual.impact_count == 1);
+        assert(sc64_impact_event_target(&actual.impacts[0]) == 0);
+        assert(actual.units[0].hp == 100);
+        return;
+    }
+#endif
+    assert(actual.units[0].hp == 85);
+}
+
 static void spatial_skips_target_killed_earlier_in_same_pass(void)
 {
     clear_world();
@@ -567,6 +597,7 @@ int main(void)
     randomized_differential();
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
     spatial_boundaries_and_ties();
+    spatial_mixed_defenses_choose_distinct_targets();
     spatial_skips_target_killed_earlier_in_same_pass();
 #endif
 #if !defined(SC64_DEFENSE_PYLON_ROSTER_TEST_ONLY) && !defined(SC64_DEFENSE_SPATIAL_PROBE)
