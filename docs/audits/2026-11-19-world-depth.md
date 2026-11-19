@@ -229,3 +229,31 @@ handler to select an Overlord
 over a Hatchery and a Marine behind a Barracks using each actor's
 isolated painted mask. It also checks proximity selection where only one
 body has an opaque pixel or both pixels are transparent.
+
+### P10 on ARM
+
+The paired 32 MiB P10 builds use source `27ce74df` (release
+`99e4c26d` plus the opt-in) and the same 40 prepared inputs. Both
+pass ROM header, SRAM signature, and memory checks. Both end IWRAM
+at `0x03004d78` and EWRAM at `0x0203b434`. The opt-in adds 1,272
+ROM text bytes. The flag-off ROM matches the retained release P10
+image byte for byte.
+
+The same 48 physical controller calls launch Outpost from HOME with
+human Zerg and one Terran computer. A at (160,160), where only the
+Hatchery has opaque art, selects the Hatchery on both builds. Select
+clears it. Ten Left updates and one Down update move the cursor to
+(140,162), where both sprite bodies have an opaque pixel in both
+Overlord hover poses. At that point the cursor is closer to the
+Hatchery (squared distances 404 and 416). A advances frame 15 to 16
+and selects the Overlord with the opt-in, or the Hatchery with the
+flag off. The sampled world state matches on either side of that
+click. This checks two clicks in one ordinary custom-game opening.
+The selector remains opt-in.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Release P10 ROM | `4091d3ba0c6838bc4152d222dcace0007bcd20ded876dffb8247231f92111343` |
+| Opt-in P10 ROM | `01f5d36ee92f2f623046a098cf1bab38ca9dbc27a0556a676415273184fc2cd6` |
+| Physical controller observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| Paired physical input and selection receipt | `5be75d7c6cf781b073dc79e8ac664770726cb44b071aa69835d2d55fb9dccae8` |
