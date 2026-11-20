@@ -859,7 +859,11 @@ static int race_ai_supply(RaceAiCensus *c)
 enum {
     RACE_AI_STEP_BUILD = 1, RACE_AI_STEP_ADDON = 2, RACE_AI_STEP_MORPH = 3,
     RACE_AI_STEP_GAS = 4, RACE_AI_STEP_HALL = 5, RACE_AI_STEP_DEFENSE = 6,
-    RACE_AI_IF_AIR = 1, RACE_AI_IF_LATE = 2, RACE_AI_IF_RICH = 4
+    RACE_AI_IF_AIR = 1, RACE_AI_IF_LATE = 2, RACE_AI_IF_RICH = 4,
+    RACE_AI_ZERG_OPENING_DEFENSE = 8,
+    /* The first Creep Colony in the two unmodified Blood Bath runs
+     * appeared from native frame 3,725. Use the same source clock. */
+    RACE_AI_FIRST_CREEP = 3725 * 5 / 4
 };
 
 /* Ordered development plans. raw is the stock raw ID; count is the wanted
@@ -896,6 +900,7 @@ static const RaceAiStep race_ai_zerg_plan[] = {
     { RACE_AI_STEP_BUILD, 142, 1, 9, 0 },        /* Spawning Pool */
     { RACE_AI_STEP_HALL,  131, 2, 9, 0 },        /* macro Hatchery / expansion */
     { RACE_AI_STEP_GAS,   149, 1, 10, 0 },       /* Extractor */
+    { RACE_AI_STEP_DEFENSE, 146, 4, 9, RACE_AI_ZERG_OPENING_DEFENSE },
     { RACE_AI_STEP_HALL,  131, 3, 10, 0 },
     { RACE_AI_STEP_BUILD, 135, 1, 11, 0 },       /* Hydralisk Den */
     { RACE_AI_STEP_MORPH, 132, 1, 12, 0 },       /* Lair */
@@ -965,24 +970,42 @@ static int race_ai_start_attached(RaceAiCensus *c, const Sc64SkirmishRecord *r, 
     return 1;
 }
 
+static int race_ai_reserve_if_unaffordable(RaceAiCensus *c, const Sc64RaceBuildingRule *rule)
+{
+    if (race_ai_affordable(c, rule->minerals, rule->gas)) return 0;
+    /* Only hold costs the economy can still meet. */
+    if (c->ore_patches && (!rule->gas || c->refineries)) {
+        c->reserve_minerals += rule->minerals;
+        c->reserve_gas += rule->gas;
+    }
+    return 1;
+}
+
 /* Defense structures face the map center. Zerg morph a Creep Colony. */
-static int race_ai_start_defense(RaceAiCensus *c, int raw)
+static int race_ai_start_defense(RaceAiCensus *c, int raw, int opening)
 {
     int x, y, type = sc64_race_building_from_raw(raw);
     int ax = c->hx + (WORLD_W / 2 - c->hx) / 8, ay = c->hy + (WORLD_H / 2 - c->hy) / 8;
-    if (type < 0) return 0;
+    const Sc64RaceBuildingRule *rule = type < 0 ? 0 : sc64_race_building_rule(type);
+    if (!rule) return 0;
     if (c->race == R_ZERG) {
         const Sc64SkirmishRecord *r = race_ai_record(c, raw);
-        if (r && r->kind == SC64_SK_BUILDING_MORPH &&
-            race_ai_start_attached(c, r, race_ai_attach_parent(c, r))) return 1;
-        if (c->have[AK_CREEP] + c->pend[AK_CREEP]) return 0; /* wait for the colony */
+        int parent = r && r->kind == SC64_SK_BUILDING_MORPH ? race_ai_attach_parent(c, r) : -1;
+        if (parent >= 0) {
+            if (race_ai_reserve_if_unaffordable(c, rule)) return 0;
+            return race_ai_start_attached(c, r, parent);
+        }
+        if (race_ai_count(c, AK_CREEP) || c->workers <= c->pending_builders) return 0;
+        /* An early defense must leave placement passes for the rest of
+         * the opening. Five is coprime with the six-ring placement cycle. */
+        if (opening && (frame / RACE_AI_PERIOD) % 5 != 0) return 0;
         type = B_CREEP_COLONY;
+        rule = sc64_race_building_rule(type);
+        if (!rule) return 0;
         ax = c->hx; ay = c->hy;
     }
-    /* A developed Zerg base can occupy all four inner rings. Use the full
-     * existing six-ring lattice; creep, lanes and reachability still decide
-     * eligibility, with the same single-ring and candidate work budget. */
     if (!race_ai_find_site(c, type, ax, ay, 0, c->race == R_ZERG ? 5 : 2, 1, &x, &y)) return 0;
+    if (c->race == R_ZERG && race_ai_reserve_if_unaffordable(c, rule)) return 0;
     return race_ai_start_build(c, type, x, y);
 }
 
@@ -1031,6 +1054,7 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         if (c->workers < step->workers && c->workers < worker_target - 1) continue;
         if ((step->flags & RACE_AI_IF_AIR) && !c->enemy_air && !c->enemy_air_tech) continue;
         if ((step->flags & RACE_AI_IF_LATE) && frame < 18000) continue;
+        if ((step->flags & RACE_AI_ZERG_OPENING_DEFENSE) && frame < RACE_AI_FIRST_CREEP) continue;
         if ((step->flags & RACE_AI_IF_RICH) && race_owner_minerals(c->owner) < 600) continue;
         type = sc64_race_building_from_raw(step->raw);
         rule = type >= 0 ? sc64_race_building_rule(type) : 0;
@@ -1057,15 +1081,14 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         if ((step->kind == RACE_AI_STEP_ADDON || step->kind == RACE_AI_STEP_MORPH) &&
             (parent = race_ai_attach_parent(c, r)) < 0) continue;
         if (step->kind == RACE_AI_STEP_GAS && !race_ai_build_gas(c, 1)) continue;
-        if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
-            /* Reserve only when the price can eventually be met: the gas
-             * side needs a refinery, and with no ore left anywhere the bank
-             * is final and is better spent on units. */
-            if (c->ore_patches && (!rule->gas || c->refineries)) {
-                c->reserve_minerals += rule->minerals; c->reserve_gas += rule->gas;
-            }
-            return;
+        if (step->kind == RACE_AI_STEP_DEFENSE && c->race == R_ZERG) {
+            int held_minerals = c->reserve_minerals, held_gas = c->reserve_gas;
+            if (race_ai_start_defense(c, step->raw, step->flags & RACE_AI_ZERG_OPENING_DEFENSE) ||
+                c->reserve_minerals != held_minerals || c->reserve_gas != held_gas)
+                return;
+            continue;
         }
+        if (race_ai_reserve_if_unaffordable(c, rule)) return;
         switch (step->kind) {
         case RACE_AI_STEP_BUILD:
             if (race_ai_find_site(c, type, c->hx, c->hy, 0, c->race == R_ZERG ? 3 : 5, 0, &x, &y))
@@ -1074,7 +1097,7 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         case RACE_AI_STEP_GAS: started = race_ai_build_gas(c, 0); break;
         case RACE_AI_STEP_ADDON:
         case RACE_AI_STEP_MORPH: started = race_ai_start_attached(c, r, parent); break;
-        case RACE_AI_STEP_DEFENSE: started = race_ai_start_defense(c, step->raw); break;
+        case RACE_AI_STEP_DEFENSE: started = race_ai_start_defense(c, step->raw, 0); break;
         }
         if (started) return;
     }

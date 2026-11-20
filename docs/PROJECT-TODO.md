@@ -37,13 +37,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   route and recurring order costs before tuning sight again.
   [Sparse sight audit](audits/2026-11-20-late-zerg-sparse-sight.md)
 
-- **Native skirmish opening defenses.** Compare the first Zerg Creep
-  Colony, first and fourth completed Sunkens, and first offensive on
-  Blood Bath against both retained unmodified N64 runs. The native
-  first Sunken appeared at frames 4,881 and 4,933. The shared GBA
-  planner currently delays Sunken production until update 18,000.
-  Include the paid morph and mid-morph save fixture in the comparison.
-  [N64 skirmish AI audit](audits/2026-11-19-n64-skirmish-ai.md)
+- **Native skirmish opening defenses.** The shared Zerg planner now
+  builds four paid Sunkens by update 8,305 in both qualified Blood Bath
+  lobbies. The normal Terran ROM restores the active morph from SRAM.
+  The native fourth completion is about 650 to 800 updates earlier,
+  and the mixed ARM workload takes 5.4% more cycles in the sampled
+  late opening. Compare Terran Bunkers and Protoss Battery or Cannon
+  openings. Separately qualify the native 400 HP Sunken rule against
+  the GBA's 300 HP morph and save behavior.
+  [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
 
 - **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
   reproduced stale SRAM after a normal P10 victory with nine pending
