@@ -13,7 +13,7 @@ LINEAR_WORD_PACK_KEY = $(if $(ROUTE_PACK_FLAGS),-linearwordpack)$(if $(LINEAR_SP
 
 # Reuse the complete, uncompacted frontier when a small point field can be
 # packed by visiting only its discovered cells.
-CANONICAL_ROUTE_LINEAR_SPARSE_PACK ?= 0
+CANONICAL_ROUTE_LINEAR_SPARSE_PACK ?= 1
 ifneq ($(words $(CANONICAL_ROUTE_LINEAR_SPARSE_PACK)),1)
 $(error CANONICAL_ROUTE_LINEAR_SPARSE_PACK must be 0 or 1)
 endif
