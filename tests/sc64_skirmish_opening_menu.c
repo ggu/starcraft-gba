@@ -332,6 +332,54 @@ static void dense_blood_bath_start_and_save(unsigned seed, unsigned order)
 
 #endif
 
+#if defined(SC64_NATIVE_BB_TERRAN_OPENING_PROBE) && defined(SC64_IMPORTED_SKIRMISH)
+static void check_native_terran_worker_formation(void)
+{
+    static const int offsets[] = {-24, -12, 0, 12};
+    static const int northwest_targets[4][2] = {{16, 40}, {80, 40}, {96, 24}, {160, 88}};
+    for (int base = 0; base < 4; ++base) {
+        game_init();
+        race_mode = 1;
+        race_skirmish_map = SC64_MAP_BLOOD_BATH;
+        race_human = R_TER;
+        race_bots = 1;
+        race_skirmish_slots = 4;
+        race_bot_races[2] = R_ZERG;
+        race_skirmish_start_order = (unsigned)base | (((unsigned)base + 1) % 4 << 2);
+#ifdef SC64_NATIVE_MELEE_STARTS
+        race_skirmish_melee = 0;
+#endif
+        race_skirmish_init();
+        check_owner(SIDE, R_TER);
+        check_seat(SIDE, base);
+        int fields[4], count = 0;
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            const Unit *q = &u[i];
+            if (!q->alive || q->owner != SIDE) continue;
+            assert(count < 4 && q->type == U_SCV && q->order == ORDER_MINE);
+            assert(q->x == race_base_x[base] + offsets[count]);
+            assert(q->y == race_base_y[base] + 28 && !q->carry && !q->work_timer);
+            assert((unsigned)q->target < MAX_MINERALS && m[q->target].amount == 1500);
+            if (base == 0) {
+                assert(m[q->target].x == northwest_targets[count][0]);
+                assert(m[q->target].y == northwest_targets[count][1]);
+            }
+            for (int j = 0; j < count; ++j) assert(fields[j] != q->target);
+            fields[count++] = q->target;
+        }
+        assert(count == 4);
+        assert(race_save_game());
+        game_init();
+        assert(race_load_game());
+        for (int i = 0; i < 4; ++i) {
+            assert(u[i].x == race_base_x[base] + offsets[i] && u[i].y == race_base_y[base] + 28);
+            assert(u[i].order == ORDER_MINE && u[i].target == fields[i]);
+        }
+    }
+    puts("Native Terran Blood Bath formation and legal mining targets survive save/load at all four starts");
+}
+#endif
+
 int main(void)
 {
 #ifdef SC64_NATIVE_MELEE_STARTS
@@ -372,6 +420,9 @@ int main(void)
     dense_blood_bath_start_and_save(0, 0);
     puts("Default dense and sparse Blood Bath starts survive SRAM load and restart");
 #endif
+#endif
+#if defined(SC64_NATIVE_BB_TERRAN_OPENING_PROBE) && defined(SC64_IMPORTED_SKIRMISH)
+    check_native_terran_worker_formation();
 #endif
     return 0;
 }

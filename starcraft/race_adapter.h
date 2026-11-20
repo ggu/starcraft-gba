@@ -1832,6 +1832,42 @@ static void race_tick_buildings(void)
     }
 }
 
+#if defined(SC64_NATIVE_BB_TERRAN_OPENING_PROBE) && defined(SC64_IMPORTED_SKIRMISH)
+enum { SC64_NATIVE_SCV_SPACING = 12, SC64_NATIVE_SCV_SOUTH = 28 };
+
+/* The native opening walks from the hall. Use the four settled northwest
+ * jobs for the probe so the current engine never mines one patch twice.
+ * The other starts retain the usual distinct fields nearest their hall. */
+static int race_skirmish_terran_opening_fields(int base, int fields[4])
+{
+    static const int northwest[4][2] = {{16, 40}, {80, 40}, {96, 24}, {160, 88}};
+    int hall_x = race_base_x[base], hall_y = race_base_y[base];
+    for (int worker = 0; worker < 4; ++worker) {
+        int x = hall_x + SC64_NATIVE_SCV_SPACING * (worker - 2);
+        int y = hall_y + SC64_NATIVE_SCV_SOUTH;
+        int chosen = -1, best = 0x7fffffff, next_x, next_y;
+        if (terrain_blocked(x / 16, y / 16)) return 0;
+        for (int patch = 0; patch < MAX_MINERALS; ++patch) {
+            if (m[patch].amount <= 0) continue;
+            if (base == 0 &&
+                (m[patch].x != northwest[worker][0] || m[patch].y != northwest[worker][1]))
+                continue;
+            int used = 0;
+            for (int prior = 0; prior < worker; ++prior)
+                used |= fields[prior] == patch;
+            int d = dist2(m[patch].x, m[patch].y, hall_x, hall_y);
+            if (used || d >= best) continue;
+            chosen = patch;
+            best = d;
+        }
+        if (chosen < 0 || !path_next_tile(x, y, m[chosen].x, m[chosen].y, &next_x, &next_y))
+            return 0;
+        fields[worker] = chosen;
+    }
+    return 1;
+}
+#endif
+
 static void race_skirmish_init(void)
 {
     static const int mdx[4] = { 56, 42, 56, 42 };
@@ -1916,24 +1952,45 @@ static void race_skirmish_init(void)
         spawn_build(owner, townhall, race_base_x[base], race_base_y[base], 0);
         if (race_owner_identity(owner) == R_ZERG)
             spawn_unit(owner, U_OVERLORD, race_base_x[base] - 24, race_base_y[base] - 18);
+#if defined(SC64_NATIVE_BB_TERRAN_OPENING_PROBE) && defined(SC64_IMPORTED_SKIRMISH)
+        int native_fields[4];
+        int native_start = owner == SIDE && worker_type == U_SCV &&
+            race_skirmish_map == SC64_MAP_BLOOD_BATH &&
+#ifdef SC64_NATIVE_MELEE_STARTS
+            !race_skirmish_melee &&
+#endif
+            race_skirmish_terran_opening_fields(base, native_fields);
+#endif
         for (j = 0; j < 4; ++j) {
             int idx = base * 4 + j;
-#ifdef SC64_IMPORTED_SKIRMISH
-            if(race_skirmish_map>0){
-                int picked[4]={-1,-1,-1,-1};
-                for(int k=0;k<=j;k++){
-                    int best=0x7fffffff;idx=-1;
-                    for(int p=0;p<MAX_MINERALS;p++)if(m[p].amount>0){
-                        int used=0;for(int q=0;q<k;q++)if(picked[q]==p)used=1;
-                        int distance=dist2(m[p].x,m[p].y,race_base_x[base],race_base_y[base]);
-                        if(!used&&distance<best){best=distance;idx=p;}
-                    }
-                    picked[k]=idx;
-                }
-                if(idx<0)continue;
-            }
+            int x, y;
+#if defined(SC64_NATIVE_BB_TERRAN_OPENING_PROBE) && defined(SC64_IMPORTED_SKIRMISH)
+            if (native_start) {
+                idx = native_fields[j];
+                x = race_base_x[base] + SC64_NATIVE_SCV_SPACING * (j - 2);
+                y = race_base_y[base] + SC64_NATIVE_SCV_SOUTH;
+            } else
 #endif
-            int wi = spawn_unit(owner, worker_type, m[idx].x + 4, m[idx].y + 4);
+            {
+#ifdef SC64_IMPORTED_SKIRMISH
+                if(race_skirmish_map>0){
+                    int picked[4]={-1,-1,-1,-1};
+                    for(int k=0;k<=j;k++){
+                        int best=0x7fffffff;idx=-1;
+                        for(int p=0;p<MAX_MINERALS;p++)if(m[p].amount>0){
+                            int used=0;for(int q=0;q<k;q++)if(picked[q]==p)used=1;
+                            int distance=dist2(m[p].x,m[p].y,race_base_x[base],race_base_y[base]);
+                            if(!used&&distance<best){best=distance;idx=p;}
+                        }
+                        picked[k]=idx;
+                    }
+                    if(idx<0)continue;
+                }
+#endif
+                x = m[idx].x + 4;
+                y = m[idx].y + 4;
+            }
+            int wi = spawn_unit(owner, worker_type, x, y);
             if (wi >= 0) {
                 u[wi].order = ORDER_MINE;
                 u[wi].target = idx;
