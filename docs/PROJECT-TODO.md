@@ -149,8 +149,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   byte. The composed links retain all four RAM limits and the normal
   Terran active and staffed Bunker saves. The original victory
   profile attributes 5.90 million cycles to four immutable program
-  validations. Reuse validated program data within the adapter call
-  and time the current release's remaining victory work.
+  validations. Factoring the duplicate source-level check within
+  the adapter leaves timing flat because the compiler already
+  combines it. Check repeated validation of the same mission state
+  within each journal operation and preserve the independent
+  validation of both banks.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
