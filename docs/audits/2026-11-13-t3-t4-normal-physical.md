@@ -49,3 +49,52 @@ all scenarios, or frame rate on a physical GBA.
 | T4 HOST tape | `f10192aab83c53c616888b0430e354d9dc49f163d7e3a94796ff7ca362df7b7a` |
 | T3 replay receipt | `1ea3bc2d5d6bb63685d9f2f700c3748840d589494eb8ce02d92fa28a69e7c42c` |
 | T4 replay receipt | `2a600105ff8759b07e1156551b2e4ee798e35725aaa6258766c0c391b873424f` |
+
+## November 20 T4 fresh SRAM and result autosave
+
+The Jacobs Installation replay uses the normal Terran death-depth
+cartridge from `cd833c8c`. The replay tools are based on `6ea84a03`.
+The intervening runtime changes are in the custom-game AI planner.
+
+The observer starts at HOME, reveals all eight briefing pages and plays
+8,943 gameplay calls with physical buttons. The retained HOST tape
+counts nine entry calls separately. At gameplay call 4,991, frame
+4,968, unit slot 70 is selected and the game is in field mode. Start
+opens Pause and B writes bank 0. A fresh process loads the save with L
+from HOME and restores the observed world, mission state, cursor and
+selected unit. The camera derived from the cursor matches at this cut.
+
+All ten observations match, including four after the reload. The
+observer acknowledges 11 gameplay pages with the simulation frame held.
+The result arrives at frame 8,911 with Raynor alive, slot 70 at
+(1218, 1016), switch 4 set, switch 7 clear and no trigger faults.
+The game writes bank 1 without changing the first bank. A third process
+loads the frozen victory with unit slot 70 still selected and exports
+identical SRAM. A separate T10 replay with the shared harness also wins
+and restores its frozen victory at frame 3,361.
+
+The 9,009 measured controller calls average 721,782 guest cycles per
+main loop, or 23.24 emulated updates per second. The largest update is
+40,900,276 cycles. The measurement includes UI, rendering, save and
+load. Hardware frame rate remains unmeasured.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 4 --save-tick 4991 \
+  --trace "$T4_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `8abd3e731fd6db1c1c0ff449ea1426d4214213f0990c5613a3b7158b3eb611c4` |
+| Matching ELF | `357b901bdb96d325fe4388650ad2ea5d97b7ce801a7a8de14f278a913ce2e2db` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `f10192aab83c53c616888b0430e354d9dc49f163d7e3a94796ff7ca362df7b7a` |
+| Replay harness | `1a00633499c6fb8cbc44e990f4ff3328c2638772cce5559845aa32c0302cdb82` |
+| Checkpoint observer | `0c819ade9f9e31975e8c789f40dd3783a6276bfc7cc1d22b125733e5ca4a6de5` |
+| Pause SRAM | `8852e2cad249e10a1081f59babea7a838134eef4ab23a2058fa80f29556ffdb9` |
+| Victory SRAM and fresh readback | `a3d129b4805acc78b8b6ca72422585d0b47ef7d8a21885dc80728706d078c9b1` |
+| Replay and both journal checks | `29bfc1ed61f6b0fe34697c8c00989d5614ec71ac0e81a8361c203b64e0fffdc2` |
+| T10 regression | `7385746eb7904fcf48d76a655d3de34bc2583adb7b0c31c8167ac78626609200` |
