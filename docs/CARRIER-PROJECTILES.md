@@ -1,22 +1,19 @@
 # Carrier projectile development
 
-## Current status (2026-11-12)
+## Current status (2026-11-21)
 
-The three layers below (projectiles, hangar training, Interceptor flight) are
-compiled into the Protoss ROM, whose P7, P8, P9 and P10 flag vectors include
-`SC64_P7_PROJECTILES_ENABLED`, `SC64_P7_CARRIER_TRAINING_ENABLED` and
-`SC64_P7_INTERCEPTOR_FLIGHT_ENABLED`. They run for every Carrier-class actor of
-a Protoss ROM, not only in P7. The generation descriptions below are the
-history and the contract of each layer; where they call a layer "default-off"
-or say the canonical ROMs leave it off, that was true of the development
-probes, not of the Protoss ROM.
+Normal Protoss and Z10 use the shared projectile, hangar training, and
+Interceptor flight services. Protoss enables them for its Carrier-class
+actors in P7 through P10 and Custom Game. Z10 enables these services in
+Custom Game with a compact journal. The generation descriptions below
+record the earlier experiments and their respective build settings.
 
 | Parent | Where | What works |
 | --- | --- | --- |
-| Carrier (raw 72) | Protoss ROM: custom games, P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
+| Carrier (raw 72) | Z10 and Protoss Custom Game, Protoss P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
 | Gantrithor (raw 82) | Protoss ROM, P10 finale | The same service and rules (same hangar of four, 25 minerals, release cadence). It joins the human side with a full hangar, launches at enemies it faces, rebuilds lost Interceptors on the ordinary "BUILD INTERCEPTOR" command, and its children follow it if it changes owner and die with it. No save field was added: a P10 save written before this change loads with a Gantrithor that has no children. |
-| Computer opponents | Protoss ROM, custom games | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the same service ([Skirmish AI](SKIRMISH-AI.md#carriers-protoss-rom)). |
-| Everything above | Terran, Zerg Z9/Z10 and Showcase ROMs | Not compiled: see [Carriers in the other ROMs](#carriers-in-the-other-roms). |
+| Computer opponents | Z10 and Protoss Custom Game | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the shared service. [Skirmish AI](SKIRMISH-AI.md#carriers) |
+| Carrier preview | Terran and Showcase preview ROMs | The separate builds exercise paid production, flight and compact saves. [Carrier preview builds](#shared-release-selector) |
 
 How the Gantrithor is a parent: `sc64_p7_carrier_parent_type()` and
 `sc64_p7_carrier_parent_raw_of()` in `starcraft/sc64_p7_carrier_training.h` name
@@ -266,11 +263,10 @@ P7-win qualification claim. Those gates remain required before promotion.
 
 ## Carriers in the other ROMs
 
-Measured on 2026-11-12 at the base of the Gantrithor change. No additional
-ROM currently enables these services. A standalone [compact packet](#compact-packet-foundation)
-is available for future Terran and Zerg integration. A Protoss player on
-the Terran, Zerg or Showcase ROM gets no working Carrier. What stops it,
-and the smallest sound way to start:
+This table records the 2026-11-12 feasibility snapshot at the base of
+the Gantrithor change. The compact packet and selector work below led to
+the [normal Z10 cartridge](#normal-z10-cartridge) and the separate
+Terran and Showcase previews.
 
 | Fact | Terran | Zerg Z9 / Z10 | Showcase | Protoss P10 (has it) |
 | --- | --- | --- | --- | --- |
@@ -610,8 +606,8 @@ Keep the probe disabled in the standard build.
 
 ### Shared release selector
 
-The Carrier release candidate is opt-in. From a tree with the prepared
-inputs, use the same selector for each supported product:
+The separate Carrier preview targets are opt-in. From a tree with the
+prepared inputs, use the same selector for each supported product:
 
 ```sh
 make -f Makefile -f mk/carrier-release/Makefile carrier-release-plan
@@ -623,7 +619,8 @@ Set `SC64_CARRIER_RELEASE_PROFILE` to `terran`, `zerg-z10`, `showcase`
 or `protoss-p10` to run only that row; the default for these explicit
 targets is `all`. The first three write their existing preview filenames.
 Protoss uses the regular P10 artifact and the existing Gantrithor test.
-The ordinary targets and their feature flags remain unchanged.
+The regular Z10 target uses the same capability through its separate
+[build option](#normal-z10-cartridge).
 
 The single `SC64_CARRIER_RELEASE` compile capability is applied through
 `SC64_CARRIER_RELEASE_FLAGS`, which includes the selector header in every
@@ -694,6 +691,101 @@ on the exact guarded ARM candidate before changing defaults:
 The asset-free selector test checks the actual Make profile flags and
 dispatch. Its prepared HOST target runs the existing per-product tests;
 neither check constitutes the full ARM activation matrix above.
+
+#### Normal Z10 cartridge
+
+The normal Z10 cartridge enables the custom Carrier service. It uses the
+existing Z10 compact journal and keeps the ordinary campaign tag and
+actor IDs. The old custom formats remain readable. The first compact save
+after loading a stock journal preserves the old bank.
+
+Run `make Z10_CARRIER_RELEASE=0 verify-zerg-z10` for the previous normal
+build vector. Use a separate copy of the SRAM image for the comparison.
+An executable compiled with that option reads the earlier stock tags;
+the compact custom tag requires Carrier support. Keep a stock save when
+testing both build vectors. The normal ROM name, game code and SRAM size
+are unchanged. Z9, Terran, Showcase and P10 keep their existing builds.
+
+The enabled build generates its actor facts in
+`build/generated/z10-facts-carrier`. It keeps the normal packed building
+reader and target index options, including the automatic targeting
+policy. The generated actor tables pass 2,019 comparisons for all 50 unit
+types and 63 building types. With `CANONICAL_TARGET_POLICY=0`, the packaged
+ARM ROM matches the manually qualified Carrier vector byte for byte
+(`2b4938db52548a4db4172d8199e1e4f226056fe2cb94939c6092617027bb8285`).
+With the normal target policy enabled, the packaged SHA-256 is
+`92f4de77b123cde7002699fd80dc7427290a84bcb595007c10a02f1be2ff9376`.
+Both links pass header and payload checks and end at IWRAM
+`0x03004d60` and EWRAM `0x02039b30`.
+
+The ordinary ARM controller starts from blank SRAM on Outpost as a
+Protoss human against one Zerg opponent. Three Probes gather gas. The
+Stargate queues a Carrier at frame 12,346 and charges 350 minerals and
+250 gas. The selected Carrier pays 25 minerals for its Interceptor at
+frame 14,977. At frame 16,095 the player's Interceptor (slot 65) has an
+active layer-5 pulse. START/B writes a 14,114-byte payload including the
+30-byte versioned projectile packet. Fresh HOME L restores the named
+world and complete arena at that frame.
+
+The same 70-call physical retreat leaves the Interceptor docked at
+frame 16,122 with 40 HP and 40 shields in both runs. Both START/B writes
+preserve the active-flight bank and put a 14,081-byte record in the next
+bank. The two complete SRAM images match. A third boot restores the
+docked actor and empty projectile list. The controller tape SHA-256 is
+`cca77cf23bb05886b42e83283dcfac07ddb41b5baaabcd55764825188e1c0138`.
+The active and docked SRAM digests are
+`af65031f3d9ff9093a7f4c6b8b88d039459ef1246bd34cffb8ca94bacd394461`
+and `ddf503b5a2f99d4bb79ec6b55bc6652daed3a8e1a7fb6761da6e102db47fd354`.
+The tape and SRAM evidence stay local.
+
+The target policy on and off builds also load the same retained,
+ordinary Blood Bath match with Zerg, Terran and Protoss computer seats.
+They save a newly launched depth-bearing pulse at frame 17,305 and match
+180 arena updates and 12 world, two-page, and palette cuts after fresh
+load. Mean uninterrupted guest cycles drop from 881,612 to 879,732 in
+that window. Fresh stack clearance was at least 6,524 bytes above the
+existing guard. This window remains above the 30 fps cycle budget.
+
+All ten campaign chapters pass opening, pause save, fresh load,
+byte-identical payload re-save and 60 matched continuation updates.
+Both maps pass mixed and sparse custom openings, and the compact
+reader migrates an ordinary stock journal from the preceding release.
+In a separate negative test, a detached copy of the newer compact bank
+contains an out-of-range launch layer and a recomputed checksum. A fresh
+guest chooses the intact stock predecessor. With no predecessor, the same
+invalid record leaves HOME unchanged. All SRAM inputs re-export byte
+for byte. The local qualification index SHA-256 is
+`7c7e13a6301776bc5eaa0a90f08654762f8374cb3759d3e37ff8ad112a8d8b28`.
+
+Z6 wins at frame 56,913 after an ordinary save at frame 18,721 and a
+fresh HOME load. The stock and Carrier builds match all 65 gameplay
+observations, the authored pages, the full pause SRAM, and both pending
+impacts at the cut. On the fresh continuation, mean guest cycles increase
+from 834,112 to 843,400 per update.
+
+A separate Z7 comparison starts both builds from the same genuine older
+pause save at frame 185,926. Through 9,132 ordinary physical calls to
+victory at 194,998, all five named gameplay checkpoints and six raw
+actor, terrain resource, palette and two-page cuts match. Mean guest
+cycles increase from 636,409 to 647,285 (1.71%). These timing measurements
+include emulated presentation waits. The rollback build reproduces the
+preceding regular Z10 ROM, SHA-256
+`1da8c6a4bc7fe0d9f8989925b1f2fecd094072583db5b1df35b361fbf8eac478`.
+The campaign and rollback comparison index SHA-256 is
+`733bbcb062182c48dd1fccf794052e31ddbce1ac08139a1dadfe7a92203c216f`.
+The other full mission replays, sustained dense skirmishes and physical
+cartridge frame timings require separate runs.
+
+Both maps also pass all 378 named or closed-seat Custom Game launches
+on this exact Carrier-enabled ROM. The baseline and new ROM agree at
+launch and after 120 updates in every case. The 18 sampled saves match
+their own fresh continuations and the baseline's named gameplay state.
+The local matrix comparison SHA-256 is
+`9db90785a97d6b9cb398ba2c20f5a49fe0e37f48c888ab2844c86c237d2bc232`.
+The [seat matrix audit](audits/2026-11-21-current-skirmish-matrix.md)
+describes the underlying case coverage.
+
+#### Earlier selector links
 
 On release `bb348edd`, all three selector-on ARM links passed the
 ordinary memory guards and their packaged ROMs matched the direct

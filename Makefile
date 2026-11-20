@@ -272,9 +272,9 @@ COMMON_HEADERS := $(wildcard common/*.h)
 # Shared imported engine: keep line/frame wrappers in ARM ROM and use the
 # exact axis-aligned rectangle path in campaign, custom and Showcase builds.
 SC64_SHAPE_FLAGS ?= -DGBA_SHAPES_ROM_ARM
-# The order-decision foundation is linked only by its isolated host check until
-# a gameplay adapter is implemented and qualified.
-STARCRAFT := $(filter-out starcraft/sc64_interceptor_orders.c,$(wildcard starcraft/*.c))
+# Carrier-enabled profiles link the Interceptor order model separately.
+P7_INTERCEPTOR_FLIGHT_SOURCES := starcraft/sc64_interceptor_orders.c
+STARCRAFT := $(filter-out $(P7_INTERCEPTOR_FLIGHT_SOURCES),$(wildcard starcraft/*.c))
 
 # Optional private StarCraft 64 audio bank from tools/sc64_audio_pack.py. Every
 # imported profile links it when present; SC64_AUDIO=0 builds them silent.
@@ -4479,7 +4479,6 @@ protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-P
 # Generation 43: launched Interceptor flight, attack passes and return.
 # The order model is outside $(STARCRAFT) until this profile links it.
 P7_INTERCEPTOR_FLIGHT_FLAGS := $(P7_CARRIER_TRAINING_FLAGS) -DSC64_P7_INTERCEPTOR_FLIGHT_ENABLED
-P7_INTERCEPTOR_FLIGHT_SOURCES := starcraft/sc64_interceptor_orders.c
 build/test-sc64-p7-interceptor-flight: tests/sc64_p7_interceptor_flight_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-p7-interceptor-flight protoss-p7-interceptor-flight-probe
