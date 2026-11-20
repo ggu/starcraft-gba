@@ -58,8 +58,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The run averages 9.35 calls per emulated second.
   [P10 loads and wins on the nearest-mineral build](audits/2026-11-13-p10-normal-home.md#fresh-load-and-result-autosave-on-the-merged-build)
   at 10.53 calls per emulated second. Its second bank reloads the frozen
-  victory with the same world and all three heroes alive. Carry the
-  normal-ROM save and result checks to late Terran next, starting with T9.
+  victory with the same world and all three heroes alive.
+  [T9 on normal Terran](audits/2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result)
+  loads from frame 35,363 and wins with Kerrigan alive. All 51 checkpoints
+  match, including 12 after load. The second bank reloads the frozen
+  victory and re-exports identical SRAM. Apply the same check to T10.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
