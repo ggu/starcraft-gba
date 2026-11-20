@@ -99,8 +99,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Packed journal decode.** [Byte-slice reads](audits/2026-11-20-packed-save-byte-reads.md)
   lower the Z8 pause, fresh load and victory costs by 26.2%, 28.2% and
   33.7%. The full replay, both SRAM exports and fallback to an older bank
-  match the control. Current P10 and Showcase use separate typed row
-  readers. Profile those paths for the next save optimization.
+  match the control. P10 and Showcase now share the byte reader for
+  typed building rows. The [current P10 campaign pair](audits/2026-11-20-packed-save-byte-reads.md#replay-with-the-stationary-effect-depth-fix)
+  cuts the pause load by 8.2% and the victory save by 7.8%, with identical
+  journals. Both profiles also pass a three-AI save and fresh load.
+  Use the remaining journal stall attribution to choose the next
+  decoder or candidate-validation change.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
