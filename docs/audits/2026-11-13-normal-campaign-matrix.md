@@ -32,7 +32,7 @@ physical GBA check or all routes through a mission.
 | P6 | [HOME win](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | [Current P10 fresh SRAM win](2026-11-20-current-p6-save.md) from frame 64,800, with 113 matching checkpoints and both heroes alive. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | [Current P10 fresh SRAM win](2026-11-13-p7-carried-normal-home.md#november-20-normal-cartridge-and-fresh-sram) from frame 8,845, with all 49 remaining named checkpoints matching uninterrupted play. |
 | P8 | No complete older exact-KODAK receipt here | [November 20 normal P10 fresh SRAM win](2026-11-20-current-p5-p8-save.md#p8-the-trial-of-tassadar) from frame 30,825, 41 matched checkpoints, both heroes alive and the Stasis Cell destroyed. |
-| P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |
+| P9 | [HOME win](2026-11-13-p9-normal-home.md) | [November 20 fresh SRAM win](2026-11-13-p9-normal-home.md#november-20-fresh-sram-victory) from frame 30,109 with three active constructions and 30 matching post-load checkpoints. |
 | P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | Full replay averaged 8.79 emulated updates/s; below the performance target. |
 
 All ten Terran missions and all ten Zerg missions now have a checked HOME
