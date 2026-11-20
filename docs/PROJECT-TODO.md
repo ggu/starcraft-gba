@@ -44,8 +44,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T4 victory, a Showcase scene and the dense Z7 prefix. Showcase has
   72 bytes below the IWRAM link guard. Keep the optical cache and
   combined primary/fallback mask trials out of the normal builds.
-  Compose the resumable point-route trial with the released empty-goal
-  path before retesting its dense Z7 speedup.
+  [The composed resumable point-route trial](https://github.com/ggu/starcraft-gba/pull/576)
+  remains opt-in. A [compressed range read](audits/2026-11-16-resumable-frontier-budget.md#cached-range-read-on-a-compressed-wide-grid)
+  cuts a forced 128-by-128 stall from 1,086,782 to 252,139 cycles. All 86
+  real Z9 snapshots exceed its graph cap. Keep the shortcut in the
+  experiment and prioritize exact and nearby-root completion on real
+  terrain and repeat readers. The [target-index retention and
+  fused rebuild comparisons](audits/2026-11-12-target-index-bulk.md#retention-and-fused-setup-on-dense-z7)
+  match the sampled battle but raise p95. Keep those trials out of release.
 
 - **Frontier Skirmish (P1):** an independently authored battle profile
   now starts Transit Yard and Stone Gardens with one to three computer
