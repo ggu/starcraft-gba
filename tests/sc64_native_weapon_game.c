@@ -287,6 +287,70 @@ static void test_ground_projectile_world_y(void)
     }
 }
 
+static void test_stationary_projectile_depth(void)
+{
+    static _Alignas(4) u8 effect_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 actor_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        int type, raw, y, in_front;
+    } cases[] = {
+        { U_TANK, 5, 51, 0 },
+        { U_TANK, 5, 57, 1 },
+        { U_WRAITH, 8, 54, 1 },
+    };
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_SIEGE_TANK, 30, 32, 24);
+    int target = spawn_build(ENEMY, B_BUNKER, 112, 54, 0);
+    assert(target >= 0 && sc64_building_world_layer((unsigned)target) == 3);
+    assert(sc64_source_unit_vfx(&u[shooter], 112, 54, 0, MAX_UNITS + target));
+    assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_trace_profile((u32)tracers[0].color);
+    assert(profile && profile->weapon_bullet_type == SC64_SOURCE_BULLET_APPEAR_TARGET_UNIT);
+    while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    assert(tracers[0].life > 1 && sc64_trace_slots[0].bullet_layer == 4);
+    assert(sc64_trace_world_y(0) == b[target].y);
+
+    /* A released effect keeps its depth and the captured impact point
+     * when its original target disappears. */
+    b[target].alive = 0;
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        int blocker = make_unit(SIDE, cases[n].type, (unsigned)cases[n].raw, 112, cases[n].y);
+        unsigned overlap = 0;
+        while (tracers[0].life > 1) {
+            /* Siege splash remaps the underlying palette. Compare both
+             * compositions directly instead of using isolated flat colors. */
+            begin_depth_frame();
+            draw_unit(&u[blocker]);
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            capture_depth_frame(effect_in_front);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            draw_unit(&u[blocker]);
+            capture_depth_frame(actor_in_front);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += effect_in_front[i] != actor_in_front[i];
+            if (overlap) break;
+            update_tracers();
+        }
+        assert(overlap && "the stationary effect must overlap the blocker");
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
+            if (effect_in_front[i] == actor_in_front[i]) continue;
+            assert(pair[i] == (cases[n].in_front ? actor_in_front[i] : effect_in_front[i]));
+        }
+        printf("PASS stationary projectile depth against raw %d at Y%d, %u overlap pixels\n",
+               cases[n].raw, cases[n].y, overlap);
+        u[blocker].alive = 0;
+    }
+}
+
 static void test_projectile_release_layer(void)
 {
     reset_world();
@@ -502,6 +566,7 @@ int main(void)
 #ifdef SC64_PROJECTILE_DEPTH
     test_moving_projectile_overlap();
     test_ground_projectile_world_y();
+    test_stationary_projectile_depth();
     test_projectile_release_layer();
 #endif
     puts("PASS native weapon source engine integration");

@@ -119,10 +119,11 @@ sc64_depth_pop(u32 *heap, unsigned *size)
 }
 
 #ifdef SC64_PROJECTILE_DEPTH
-/* A low projectile (for example a shot at a Bunker) can share a ground
- * layer. Use its moving anchor for the Y tie, as the sprite queue does. */
+/* A projectile at a ground layer shares the same world-Y tie as actors.
+ * Use the current projectile anchor, including the fixed anchor of a
+ * target- or source-position effect. */
 static int
-sc64_moving_trace_world_y(unsigned i)
+sc64_trace_world_y(unsigned i)
 {
     const Tracer *trace = &tracers[i];
     const Sc64TraceSlot *slot = &sc64_trace_slots[i];
@@ -194,7 +195,7 @@ sc64_draw_depth_ordered_actors(void)
         const Sc64TraceSlot *slot = &sc64_trace_slots[i];
         if (tracers[i].life && slot->bullet_layer && !slot->release_life) {
             unsigned layer = slot->bullet_layer;
-            int y = layer <= 4 ? sc64_moving_trace_world_y(i) : 0;
+            int y = layer <= 4 ? sc64_trace_world_y(i) : 0;
             sc64_depth_push(heap, &size, layer, y, DEPTH_PROJECTILE, i);
         }
     }
