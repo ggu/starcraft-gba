@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Source death art: compiled layers are valid, real kills select them, and
- * the drawn pixels are the imported frames, clipped to the battlefield. */
+/* Check the legacy source-art passes with their own clip and word blitters.
+ * The Showcase fixture checks ordering in the shared world painter. */
+#define SC64_DISABLE_WORLD_DEPTH 1
 #include "../common/gba.c"
 #include "../starcraft/game.c"
 #include <assert.h>
@@ -63,7 +64,7 @@ static void check_source_pass(const Sc64DeathVfx *e, int under, int *drawn)
     for (unsigned i = 0; i < art->layer_count; ++i) {
         const Sc64DeathSourceLayer *l = &art->layers[i];
         unsigned f;
-        if (l->under != under || !sc64_death_source_layer_frame(l, age, &f)) continue;
+        if ((l->flags & SC64_DEATH_SOURCE_UNDER) != under || !sc64_death_source_layer_frame(l, age, &f)) continue;
         death_vfx_blit(sc64_death_image_frame(l->image_id, (unsigned short)f), x + l->x, y + l->y);
     }
     for (int py = 0; py < 160; ++py) for (int px = 0; px < 240; ++px)
