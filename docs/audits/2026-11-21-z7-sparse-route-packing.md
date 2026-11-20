@@ -102,13 +102,32 @@ link recipes and the Z10 Carrier fact generator. The generated fact
 table has the same SHA-256 as the control and passes 2,019 checks.
 
 All four link with unchanged static RAM endpoints. The earlier Z10
-endpoint table above applies to `e92caada`; the endpoint after Carrier
+endpoint table above applies to `e92caada`. The endpoint after Carrier
 is `0x03004d60` for IWRAM and `0x02039b30` for EWRAM. The four-ROM
 matrix includes eight ordinary Blood Bath and Outpost custom replays
 and three campaign opening replays. Each control and default candidate
 pair produces identical 32 KiB SRAM and identical fresh HOME L
 continuation observations. The matrix receipt SHA-256 is
 `8709f82d6aa6af7b16ac9ce2f0101b7a5572f17dc24d9e6d6d3b953f7cf55b23`.
+
+The current Z7 pair uses the campaign controller to write the same
+32 KiB save at frame 5,641 and resumes through fresh HOME L and ordinary
+A. Both win at frame 228,128 with 254 matching world checkpoints, ten
+dual framebuffer page, palette and camera cuts, and six full resident
+packed-route cache cuts. All sampled timing rows agree on route builds,
+cache hits and completed-update counts. The timings measure guest CPU
+cycles. The paired replay receipt SHA-256 is
+`54142b8fbcd1f98ab2c0b41e52f6e07b860c97f6440834005dd350b1bf61160c`.
+
+| Tape calls | Mean change | p95 cycles, control → sparse | Peak cycles, control → sparse |
+| --- | ---: | ---: | ---: |
+| 47,758–48,237 | −0.027% | 3,182,823 → 3,182,312 | 5,111,335 → 5,119,437 |
+| 153,812–154,741 | −2.552% | 4,461,550 → 3,764,594 | 6,811,796 → 5,837,238 |
+| 154,742–155,650 | −2.698% | 4,481,024 → 3,667,861 | 6,309,147 → 5,397,617 |
+
+The late samples with at least ten builds improve by 18.57% and
+19.24% in mean cycles. The no-build sample means change by at most
+0.04%. The first window's maximum rises 0.16%.
 
 The earlier `5dcacdce` Carrier check covers active and docked Interceptor
 saves through fresh HOME L, with byte-identical saves and restored
