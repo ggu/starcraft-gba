@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check T9 or T10 on a normal Terran ROM using physical buttons."""
+"""Check T7, T9 or T10 on a normal Terran ROM using physical buttons."""
 import argparse
 import hashlib
 import json
@@ -21,36 +21,82 @@ from sc64_terran_controller_replay import _find_raw_actor, _snapshot, _verify_te
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 INNER_TAG, OUTER_TAG = 0x72435442, 0x76435442
+T7_DIALOGUE = {1: (1, 2), 682: (661, 1), 4189: (3931, 1)}
 T9_DIALOGUE = {1: (1, 4), 47969: (47251, 9)}
+T7_FIELDS = (
+    "frame", "screen", "won", "lost", "mission", "faults", "phase",
+    "objective_flags", "race_completed", "kerrigan", "kerrigan_alive",
+    "emitter_slot", "emitter_alive", "emitter_owner", "emitter_raw_owner",
+    "emitter_x", "emitter_y", "emitter_carrier", "carrier_alive", "carrier_x",
+    "carrier_y", "carrier_hp", "carrier_order", "carrier_tx", "carrier_ty",
+    "carrier_path_retry", "nearest_enemy", "nearest_enemy_raw", "nearest_enemy_x",
+    "nearest_enemy_y", "nearest_enemy_dist2", "emitter_at_goal", "side_units",
+    "enemy_units", "side_buildings", "enemy_buildings", "minerals", "gas",
+)
 T10_FIELDS = ("frame", "screen", "won", "lost", "mission", "faults", "phase",
               "objective_flags", "race_completed", "hostile_buildings",
               "ion_cannon_slot", "ion_cannon_alive", "hero_slot", "hero_raw",
               "hero_alive", "minerals", "gas")
 
 
-def load_t10_trace(path):
+def load_late_trace(path, chapter, fields, stop, expected_ticks):
     reference = validate_trace(json.loads(path.read_text()), 256)
-    if reference["mission"] != 13:
-        raise ValueError("T10 requires a Hammer Falls controller trace")
+    if reference["mission"] != chapter + 3:
+        raise ValueError(f"T{chapter} requires a matching campaign controller trace")
     launch = reference["launch_tick"]
-    stop = reference["stop_tick"] - launch
+    if reference["stop_tick"] - launch != stop:
+        raise ValueError(f"T{chapter} controller trace ends at the wrong tick")
     rows = (reference["start"], *reference["checkpoints"], reference["final"])
-    observations = {}
+    observations, labels = {}, {}
     for row in rows:
         tick = row["source_host_tick"]
-        if any(type(row.get(name)) is not int for name in T10_FIELDS):
-            raise ValueError(f"T10 observation at {tick} is missing a required integer field")
+        if (any(type(row.get(name)) is not int for name in fields) or
+                chapter == 7 and type(row.get("tracked_carrier")) is not int):
+            raise ValueError(f"T{chapter} observation at {tick} is missing a required integer field")
         previous = observations.get(tick)
-        if previous and any(previous[name] != row[name] for name in T10_FIELDS):
-            raise ValueError(f"T10 observations disagree at {tick}")
+        if previous and any(previous[name] != row[name] for name in fields):
+            raise ValueError(f"T{chapter} observations disagree at {tick}")
         observations[tick] = row
-    expected_ticks = {0, 120, 1000, 2000, 3000, 3446}
-    if not expected_ticks <= observations.keys() or stop != 3446:
-        raise ValueError("T10 trace is missing a checkpoint from the qualified route")
+        labels.setdefault(tick, []).append(row["kind"])
+    if not expected_ticks <= observations.keys() or (chapter == 7 and len(rows) != 15):
+        raise ValueError(f"T{chapter} trace is missing a checkpoint from the qualified route")
     transitions = [(tick - launch + 1, held) for tick, held in reference["inputs"] if tick >= launch]
     if transitions and transitions[0][0] == 1:
-        raise ValueError("T10 trace must start with neutral input")
-    return dict(transitions=transitions, observations=observations, final=reference["final"], stop=stop)
+        raise ValueError(f"T{chapter} trace must start with neutral input")
+    return dict(transitions=transitions, observations=observations, labels=labels,
+                final=reference["final"], stop=stop)
+
+
+def observe_t7_carrier(game, state, last_slot):
+    # The carrier can die before the objective trigger. Follow the slot first
+    # witnessed carrying the emitter, then read its dead row at the result.
+    carrier = state["emitter_carrier"]
+    slot = carrier if carrier >= 0 else last_slot
+    names = ("alive", "x", "y", "hp", "order", "tx", "ty", "path_retry")
+    values = dict.fromkeys(names, -1)
+    if slot >= 0:
+        assert slot < game.sizes["u"] // game.unit_stride
+        row = game.rsp.read(game.sym["u"] + slot * game.unit_stride, game.unit_stride)
+        for name in names:
+            offset, width = game.unit_layout[name], game.unit_layout.widths[name]
+            assert 0 <= offset <= game.unit_stride - width and width in (1, 2, 4)
+            values[name] = int.from_bytes(row[offset:offset + width], "little",
+                                          signed=game.unit_layout.signed[name])
+    state.update({"carrier_" + name: value for name, value in values.items()})
+    state["carrier_alive"] = int(values["alive"] > 0)
+    enemies = (q for q in state["units"] if q["owner"] in (1, 4)) if slot >= 0 else ()
+    x, y = values["x"], values["y"]
+
+    def distance(q):
+        return (q["x"] - x) ** 2 + (q["y"] - y) ** 2
+
+    enemy = min(enemies, key=distance, default=None)
+    state.update(nearest_enemy=enemy["slot"] if enemy else -1,
+                 nearest_enemy_raw=enemy["raw_type"] if enemy else -1,
+                 nearest_enemy_x=enemy["x"] if enemy else -1,
+                 nearest_enemy_y=enemy["y"] if enemy else -1,
+                 nearest_enemy_dist2=distance(enemy) if enemy else 0x7fffffff)
+    return slot
 
 
 def main():
@@ -59,27 +105,36 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("trace", "rom", "elf", "runner", "out"):
         parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--chapter", type=int, choices=(9, 10), default=9)
+    parser.add_argument("--chapter", type=int, choices=(7, 9, 10), default=9)
     parser.add_argument("--save-tick", type=int, required=True,
                         help="neutral completed gameplay tick for pause, save and fresh HOME load")
     args = parser.parse_args()
     resource.setrlimit(resource.RLIMIT_FSIZE, (16 << 20, 16 << 20))
     files = (args.trace, args.rom, args.elf, args.runner, Path(__file__))
+    if args.chapter == 7:
+        files += (Path(__file__).with_name("sc64_terran_controller_replay.py"),)
     pins = input_hashes(files)
-    t10 = args.chapter == 10
-    mission = args.chapter + 3
-    compared = T10_FIELDS if t10 else COMPARED
-    dialogue_cuts = {1: (1, 4)} if t10 else T9_DIALOGUE
-    briefing_pages = 14 if t10 else 9
-    plan = load_t10_trace(args.trace) if t10 else load_trace(args.trace)
+    chapter = args.chapter
+    mission = chapter + 3
+    briefing_pages, dialogue_cuts, stop, compared = {
+        7: (17, T7_DIALOGUE, 4189, T7_FIELDS),
+        9: (9, T9_DIALOGUE, 47984, COMPARED),
+        10: (14, {1: (1, 4)}, 3446, T10_FIELDS),
+    }[chapter]
+    qualified_ticks = {
+        7: {0, 1, 2, 347, 1000, 1264, 2000, 2200, 2334, 3000, 4000, 4189},
+        10: {0, 120, 1000, 2000, 3000, 3446},
+    }
+    plan = load_trace(args.trace) if chapter == 9 else load_late_trace(
+        args.trace, chapter, compared, stop, qualified_ticks[chapter])
     plan["mission"] = mission
-    stop, cut = plan["stop"], args.save_tick
-    assert plan["final"]["kind"] == "won" and stop == (3446 if t10 else 47984)
+    cut = args.save_tick
+    assert plan["final"]["kind"] == "won" and plan["stop"] == stop
     transitions = [(0, 0)] + [(tick - 1, held) for tick, held in plan["transitions"]]
     if not 1 < cut < stop or cut in dialogue_cuts or next(
             held for index, held in reversed(transitions) if index < cut) != 0:
         parser.error("--save-tick must be a neutral live gameplay tick")
-    # Both routes keep only three 32 KiB SRAM images and small JSON receipts.
+    # Each route keeps only three 32 KiB SRAM images and small JSON receipts.
     disk_reserve = 256 << 20
     if shutil.disk_usage(args.out.parent).free < disk_reserve:
         raise RuntimeError(f"replay requires {disk_reserve >> 20} MiB free")
@@ -94,6 +149,7 @@ def main():
         return PhysicalGame(args.runner, args.rom, args.elf, directory, **save)
 
     g = open_game("guest", save_output=pause_path)
+    last_carrier_slot = -1
 
     def n(name):
         assert 0 < g.sizes[name] <= 4
@@ -107,13 +163,15 @@ def main():
         layout = g.unit_layout
         width = layout.widths["selected"]
         units = g.rsp.read(g.sym["u"], g.sizes["u"])
-        return sum(
-            int.from_bytes(units[i:i + width], "little") != 0
-            for i in range(layout["selected"], len(units), g.unit_stride))
+        return [slot for slot, i in enumerate(range(layout["selected"], len(units), g.unit_stride))
+                if int.from_bytes(units[i:i + width], "little") != 0]
 
     def observe():
+        nonlocal last_carrier_slot
         state = _snapshot(g.rsp, g.sym, g.sizes, args.elf, mission)
-        if t10:
+        if chapter == 7:
+            last_carrier_slot = observe_t7_carrier(g, state, last_carrier_slot)
+        elif chapter == 10:
             hero = _find_raw_actor(state["units"], 19)
             cannon = _find_raw_actor(state["buildings"], 127)
             state["hero_slot"] = hero["slot"] if hero else -1
@@ -121,15 +179,16 @@ def main():
             state["ion_cannon_slot"] = cannon["slot"] if cannon else -1
         else:
             state["selected_building"] = n("selected_building")
-            state["selection"] = selected_units()
+            state["selection"] = len(selected_units())
         return state
 
     def persisted():
         world = g.state()
         world.pop("screen")
+        controls = {name: n(name) for name in ("cx", "cy", "menu_last")}
+        controls["selected_units"] = selected_units()
         return dict(world=world, mission=g.rsp.read(g.sym["race_late"], g.sizes["race_late"]),
-                    controls={name: n(name) for name in
-                              ("cx", "cy", "menu_last")})
+                    controls=controls)
 
     def journal(image, bank, frame, won):
         payload = slot(image, bank, OUTER_TAG, bank + 1)
@@ -149,15 +208,19 @@ def main():
             (args.out / "divergence.json").write_text(json.dumps(
                 dict(tick=tick, expected=expected, differences=diff), indent=2) + "\n")
             raise ValueError(f"checkpoint {tick} diverged: {diff}")
-        checkpoints.append(dict(tick=tick, **{k: observed[k] for k in compared}))
+        point = dict(tick=tick, **{k: observed[k] for k in compared})
+        if chapter == 7:
+            assert expected["tracked_carrier"] == last_carrier_slot
+            point["labels"] = plan["labels"][tick]
+        checkpoints.append(point)
         print("Matched", tick, expected["kind"], observed["frame"], flush=True)
         return observed
 
     def reveal_briefing():
         g.tap(KEY_A)
-        for _ in range(4):
+        for _ in range((chapter - 1) // 2):
             g.tap(KEY_RIGHT)
-        if t10:
+        if chapter % 2 == 0:
             g.tap(KEY_DOWN)
         g.tap(KEY_A)
         assert (n("screen"), g.front_field("page"), g.front_field("mission")) == (0, 3, mission)
@@ -210,7 +273,7 @@ def main():
                 observed = compare(tick)
             if tick == cut:
                 assert n("screen") == 1 and n("mode") == n("menu_open") == g.rsp.held == 0
-                assert n("selected_building") == -1 and selected_units() == 0
+                assert n("selected_building") == -1 and not selected_units()
                 saved = persisted()
                 old_camera = [n("camx"), n("camy")]
                 g.step(KEY_START)
@@ -218,7 +281,7 @@ def main():
                 g.step(KEY_B)
                 g.step(0)
                 assert n("screen") == 2 and n("pause_notice") & 0xc0 == 0x40
-                assert persisted() == saved and n("selected_building") == -1 and selected_units() == 0
+                assert persisted() == saved and n("selected_building") == -1
                 g.rsp.export_sram()
                 pause_image = pause_path.read_bytes()
                 pause = journal(pause_image, 0, n("frame"), 0)
@@ -232,7 +295,7 @@ def main():
                 assert n("screen") == n("frame") == g.front_field("page") == 0
                 g.step(KEY_L)
                 assert n("screen") == 1 and n("race_selected_mission") == mission
-                assert n("selected_building") == -1 and selected_units() == 0
+                assert n("selected_building") == -1
                 loaded = persisted()
                 assert loaded == saved, ("pause reload differs",
                                          [k for k in loaded if loaded[k] != saved[k]],
@@ -265,9 +328,9 @@ def main():
         assert (n("screen"), n("won"), n("lost"), n("race_completed")) == (3, 1, 0, 1 << mission)
         loaded = persisted()
         assert loaded == final_state, ("result reload differs", [k for k in loaded if loaded[k] != final_state[k]])
-        # Normal Terran journals restore the cursor and the remembered menu
-        # action. The active selection and command mode reset on a fresh load.
-        assert n("selected_building") == -1 and n("mode") == n("menu_open") == 0 and selected_units() == 0
+        # Unit selection is serialized with the actors. Building selection
+        # and command mode reset on a fresh load of the normal Terran ROM.
+        assert n("selected_building") == -1 and n("mode") == n("menu_open") == 0
         assert n("race_impact_count") == 0
         g.step(0, 8)
         assert n("screen") == 3 and persisted() == loaded and n("selected_building") == -1
@@ -276,7 +339,9 @@ def main():
         require_unchanged(files, pins)
         result = dict(gameplay_calls=stop, cut=cut, briefing=briefing, dialogue=dialogue,
                       checkpoints=checkpoints, pause=pause, victory=victory,
-                      victory_selection=victory_selection, timing=timing, sha256=pins)
+                      victory_selection=victory_selection,
+                      victory_selected_units=final_state["controls"]["selected_units"],
+                      timing=timing, sha256=pins)
         (args.out / "result.json").write_text(json.dumps(result, indent=2) + "\n")
         print("Verified victory, fresh load and result journal", victory["frame"], flush=True)
     finally:

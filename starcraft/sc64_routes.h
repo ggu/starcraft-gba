@@ -113,6 +113,10 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point certificates require deferred point fields"
 #endif
+#if defined(SC64_ROUTE_POINT_FAR_READ) && (!defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) || \
+    !defined(SC64_ROUTE_MONOTONE_ENABLED) || !defined(SC64_RANGE_WORK))
+#error "far point reads require deferred point fields, the monotone oracle and range work"
+#endif
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
@@ -2701,7 +2705,11 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 #endif
 
 #if defined(SC64_RANGE_WORK) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
-/* Only read an existing point field. Never initiate or resume a flood. */
+#ifdef SC64_ROUTE_POINT_FAR_READ
+#include "sc64_route_point_far_read.h"
+#endif
+/* Read an existing point slot without touching its recency. A stale or
+ * deferred field can require exact materialization. */
 static int __attribute__((noinline))
 sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
 {
@@ -2725,6 +2733,11 @@ sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
         slot = i; break;
     }
     if (slot < 0) return 0;
+#ifdef SC64_ROUTE_POINT_FAR_READ
+    if (!SC64_ROUTE_LAZY(slot) && sc64_point_prefix_find(slot) &&
+        sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+        sc64_point_far_read(cell, goal, &direction)) goto point_direction;
+#endif
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     sc64_point_prefix_require(slot, cell);
 #endif
@@ -2734,6 +2747,9 @@ sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
         sc64_route_exact(slot);
 #endif
     direction = sc64_route_get(slot, cell);
+#ifdef SC64_ROUTE_POINT_FAR_READ
+point_direction:
+#endif
     if (direction == SC64_ROUTE_UNREACHABLE && !SC64_GRID_GET(path_walkable, cell)) {
         if (!sc64_route_blocked_start(slot, col, row, goal, &col, &row)) return 0;
     } else if (direction == SC64_ROUTE_UNREACHABLE) return 0;
