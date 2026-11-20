@@ -31,6 +31,19 @@ A subsequent exact contention experiment can start with the native duplicate fir
 
 Native workers approach outside the combined collision bounds. In the retained northwest sample the Command Center's top extent is 41 source pixels, the SCV extent is 11 and separation adds 1. The returning SCV's goal at (122, 187) is 53 pixels north of the hall center. A south approach to a mineral with 15-pixel bottom extent keeps the SCV 27 source pixels south of the patch. The GBA currently has a 32-pixel center circle for depot credit and a 7-pixel center circle for minerals. Native footprint contact is a separate experiment. It needs a consistent reach predicate in both resource-work branches of `race_update_resource_worker`, matching contact goals in `sc64_route_depot_next` and `sc64_depot_cell_point`, and matching credit eligibility. Use source-space integer comparisons to account for odd source widths at half scale. Keep route eligibility and credit geometry consistent.
 
+The native worker reach helper at `0x801401f4` expands each side by
+the opposing worker extent plus one source pixel. A local fixture
+projects the loaded SCV onto the nearest clear side of that rectangle.
+It reaches the native north and east points in two of four captured
+N64 departures. The two other north approaches end on the north edge
+at different horizontal coordinates. Starting from the actual GBA
+east miner, the candidate reaches (99,93) and the native arrival is
+(99,102). Both points use GBA pixels. Each path credits exactly eight
+minerals and the fixture repeats them through save and reload with the
+departure pinned. This isolates geometry and leaves route selection open.
+The observation SHA-256 is
+`1edc3252b3baeeb15d34bd9dd829ab681abbf09c4996e0b5eb40eff5d8d80aa8`.
+
 ## Qualification
 
 Use the existing physical Custom Game driver in `tools/sc64_skirmish_sram_continuation.py`. Launch Blood Bath with Terran and Zerg in opponent row three. Confirm base IDs [0, 3], bank 50, four workers, their formation and distinct initial positions. Hold neutral and observe each worker's target, work timer and cargo through a first paid trip. For the contention experiment, require the stock duplicate target before approach and an actual reassignment or wait before its timer starts. Capture the first eight-mineral credit and compare the GBA before/after at matched nominal update brackets.

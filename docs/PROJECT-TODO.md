@@ -29,9 +29,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   campaign target checks first.
   [Immutable actor lookups](audits/2026-11-21-z10-actor-lookups.md)
   cut the full resumed Z7 mean by 1.17% and the two late windows by
-  1.50% and 1.56%, with matching images, SRAM and campaign result. The
-  geometric-first query raises full-run cost by 0.22%. Use the measured
-  combat-only facts probe for the next exact combined comparison.
+  1.52% and 1.57%, with matching images, SRAM and campaign result.
+  Combat facts add about 2% in those late windows and 0.085% across the
+  full tape. Keep that second option off and prioritize the repeated
+  route failures and expensive permissions in the busiest updates.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
@@ -39,8 +40,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   native updates 172 and 188. The opt-in formation moves the stock
   first deposit from GBA update 75 to 141. Both normal Terran SRAM
   variants resume through the same deposits. The native nominal bracket
-  is 215–235 GBA updates. Test temporary contention and footprint
-  contact before selecting a production change.
+  is 215–235 GBA updates. Nearest footprint perimeter projection
+  reproduces two of four native arrival points. Resolve tangential
+  approach selection and temporary contention before activating it.
 
 - **Normal race cartridge win and save qualification.** All ten Protoss
   missions now win from HOME and after fresh SRAM reloads on one exact
@@ -87,6 +89,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the shared world-depth release with matching world and indexed pages.
   Continue sharing the slow simulation and route windows in the
   release gates.
+  The [empty weapon overlay probe](audits/2026-11-21-empty-weapon-overlays.md)
+  changes the current three-AI replay mean by −0.026%. Keep the default
+  renderer and use the exact frame and route receipts for larger trials.
 - **Interceptor pulse depth.** Normal P10
   [restores a live shot](audits/2026-11-19-world-depth.md#interceptor-pulse-restore)
   and matches 36 updates through damage, retirement and slot reuse.

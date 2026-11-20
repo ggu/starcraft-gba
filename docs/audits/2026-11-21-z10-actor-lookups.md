@@ -56,6 +56,29 @@ The Z6 receipt SHA-256 is
 The Custom Game receipt SHA-256 is
 `4345cad88eedcab1a517c3dae5870277a62aeed891f0eda66ce080692033c6fe`.
 
+The independent 225,208-call Z7 resumes on this release also reach
+frame 228,128 with all 254 named records, ten image cuts, the sampled
+route counters and exact SRAM matching. Mean cycles move from
+1,326,810 to 1,311,303 (1.17%). The early busy window improves 1.11%
+and the two late windows improve 1.52% and 1.57%. The runtime averages
+12.79 emulated main-loop updates per second across this tape.
+The comparison SHA-256 is
+`af170e1f3bc26c07f603569bc7107131f61110eff0291fcfef0984fe43ae802d`.
+
+After composing with `64192d4e`, the tables build becomes `7dd47332`,
+and the stock control is `7a290e51`. For each configuration the linked
+instructions, symbols and data match its preceding depth-release
+build after resolving 20 relocated linker veneers. The 647 adjusted
+call sites still reach the same functions. The standalone comparison
+keeps the measured cycle claims scoped to `defd807a`.
+The composed Custom Game pair retains the same exact pause SRAM and
+continuation in each of the three lineups. Its receipt SHA-256 is
+`75d57b25ee826392d6d2f42aebd4acb821f66e718652153c67224fe367fd5bcc`.
+The composed Z6 pair also reproduces the original pause SRAM, all
+65 gameplay observations, eight dialogue pages, and victory from
+both fresh loads. Its receipt SHA-256 is
+`68335a9ccfd420464f1f97a64573acdd3c856777b454c77283d900640e7f6786`.
+
 ## Other target and table trials
 
 The same existing tables on the Showcase profile free 392 IWRAM bytes.
@@ -73,11 +96,14 @@ checks and ten image cuts. The three timed means change by +0.25%,
 −0.10% and +0.55%. Its overall cycles rise by 0.22%. It remains opt-in.
 
 The separate combat-only facts table replaces repeated type lookups
-inside attack eligibility. That probe cuts late Z7 window means by
+inside attack eligibility. By itself it cuts late Z7 window means by
 2.64% and 2.89% and late zero-route mean by 3.38%. The full resume is
 0.11% faster with matching SRAM, 254 state checks and ten image cuts.
-Keep it opt-in pending a fresh comparison composed with the actor table
-build and the other applicable cartridge profiles.
+On `defd807a`, adding it to generated actor tables reduces the same late
+windows by a further 1.91% and 2.01%, and the full tape by 0.085%.
+The composed table passes 2,727 fact checks and again matches all
+gameplay, routes, image cuts and exact SRAM. Keep combat facts opt-in
+while checking other profiles and pursuing larger sustained gains.
 
 | Private receipt | SHA-256 |
 | --- | --- |
@@ -85,6 +111,7 @@ build and the other applicable cartridge profiles.
 | Actor tables, paired Custom Game SRAM | `435e6af01b29e0821223134718dd60661fcaa38c960f08385578f0188b6c3911` |
 | Geometric-first target paired win | `63e6b891afb81cff439efba6a65e44073c58e9a6f44b3712729cade7490e74be` |
 | Standalone combat-only paired win | `d1ee25c67461550024eaeba7868ed9b1b4fbd17f451bd834dd3b40b0d12ad1bc` |
+| Combat facts composed with actor tables | `d6faf72e99f42279ffda14cfc24ff8d92c69a02ba295ca20bc8fe274cce35457` |
 
 These measurements count emulated guest cycles. Replay the late route
 and no-route windows with the new stock build for the next experiment.
