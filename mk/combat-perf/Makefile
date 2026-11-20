@@ -199,6 +199,12 @@ test-sc64-route-point-certificate: build/test-sc64-route-point-certificate build
 	./$< --emit build/route-point-certificate-candidate.ref
 	cmp build/route-point-certificate-reference.ref.state build/route-point-certificate-candidate.ref.state
 
+build/test-sc64-route-point-far-read: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h starcraft/sc64_route_point_far_read.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ $< -o $@
+.PHONY: test-sc64-route-point-far-read
+test-sc64-route-point-far-read: build/test-sc64-route-point-far-read
+	./$<
+
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
 build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build
