@@ -1095,6 +1095,7 @@ _Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
 #define SC64_PENDING_BUILD_ORDER(o) 0
 #endif
 #define SC64_BUILD_WORKER_ORDER(o) ((o) == ORDER_BUILD || SC64_PENDING_BUILD_ORDER(o))
+enum { BUILD_WORK_RANGE = 36 };
 #ifdef SC64_NYDUS_ENABLED
 #define SC64_NYDUS_ORDER(o) ((o) == ORDER_NYDUS_ENTER)
 #else
@@ -9449,7 +9450,8 @@ target_lists_unavailable:
 	    }
 	    /* SCVs work from the footprint edge; center distance includes the
 	     * building collision radius, so a 36px work radius avoids path wedges. */
-	    if (dist2(q->x, q->y, b[q->target].x, b[q->target].y) > 36 * 36) {
+	    if (dist2(q->x, q->y, b[q->target].x, b[q->target].y) >
+                BUILD_WORK_RANGE * BUILD_WORK_RANGE) {
 		move_toward(q, b[q->target].x, b[q->target].y);
 	    }
 #ifdef SC64_CONSTRUCTION_HP

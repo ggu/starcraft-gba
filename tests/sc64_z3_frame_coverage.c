@@ -387,12 +387,8 @@ depth_spawn(DepthActor actor)
 }
 
 static void
-depth_capture(DepthActor first, DepthActor second, u8 *out)
+depth_capture_world(u8 *out)
 {
-    memset(u, 0, sizeof(u));
-    memset(b, 0, sizeof(b));
-    depth_spawn(first);
-    depth_spawn(second);
     reset_render_caches();
     gfx_begin(C_BLACK);
     gfx_set_clip_y(12, 120);
@@ -400,6 +396,16 @@ depth_capture(DepthActor first, DepthActor second, u8 *out)
     assert(camx == 0 && camy == 0);
     capture(out);
     gfx_end();
+}
+
+static void
+depth_capture(DepthActor first, DepthActor second, u8 *out)
+{
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    depth_spawn(first);
+    depth_spawn(second);
+    depth_capture_world(out);
 }
 
 static void
@@ -467,6 +473,57 @@ test_actor_depth(void)
         }
     }
     return failures;
+}
+
+static int
+test_scv_foundation_depth(void)
+{
+    static u8 background[FB_SIZE], scv[FB_SIZE], scaffold[FB_SIZE];
+    static u8 working[FB_SIZE], idle[FB_SIZE];
+    setup_depth_profile(R_TER);
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    depth_capture_world(background);
+    int worker = spawn_unit(SIDE, U_SCV, 96, 48);
+    int building = spawn_build(SIDE, B_BARRACKS, 96, 54, 1);
+    assert(worker >= 0 && building >= 0);
+    Unit *q = &u[worker];
+    Building *foundation = &b[building];
+    int duration = building_build_time(foundation->type);
+    foundation->build_progress = duration * 3 / 4;
+
+    foundation->alive = 0;
+    depth_capture_world(scv);
+    foundation->alive = 1;
+    q->alive = 0;
+    depth_capture_world(scaffold);
+    q->alive = 1;
+    depth_capture_world(idle);
+    q->order = ORDER_BUILD_PENDING;
+    q->target = B_BARRACKS;
+    assert(sc64_unit_world_layer(q) == 4);
+    q->order = ORDER_BUILD;
+    q->target = building;
+    q->y = foundation->y + BUILD_WORK_RANGE + 1;
+    assert(sc64_unit_world_layer(q) == 4);
+    q->y = foundation->y - BUILD_WORK_RANGE;
+    assert(sc64_unit_world_layer(q) == 5);
+    q->y = 48;
+    depth_capture_world(working);
+
+    foundation->build_progress = duration - 1;
+    update_orders();
+    assert(!foundation->under_construction && sc64_unit_world_layer(q) == 4);
+
+    unsigned overlap = 0, incorrect = 0;
+    for (unsigned i = 0; i < FB_SIZE; ++i) {
+        if (scv[i] == background[i] || scaffold[i] == background[i] ||
+            scv[i] == scaffold[i]) continue;
+        ++overlap;
+        incorrect += idle[i] != scaffold[i] || working[i] != scv[i];
+    }
+    printf("SCV foundation depth: %u incorrect of %u overlap pixels\n", incorrect, overlap);
+    return !overlap || incorrect;
 }
 
 static void
@@ -595,6 +652,7 @@ main(void)
 #endif
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
     failures += test_actor_depth();
+    failures += test_scv_foundation_depth();
     test_building_flight_layer();
     failures += test_selection_depth();
 #endif

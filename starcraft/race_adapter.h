@@ -1170,7 +1170,7 @@ static void __attribute__((noinline)) race_pending_build_tick(int worker)
     Unit *q = &u[worker];
     int x = q->tx, y = q->ty, type = q->target, slot;
     Sc64RaceBank bank;
-    if (dist2(q->x, q->y, x, y) > 36 * 36) {
+    if (dist2(q->x, q->y, x, y) > BUILD_WORK_RANGE * BUILD_WORK_RANGE) {
         move_toward(q, x, y);
         return;
     }
@@ -1244,7 +1244,8 @@ static int race_builder_arrived(int worker)
     building = u[worker].target;
     if (building < 0 || building >= MAX_BUILDINGS || !b[building].alive) return 0;
     if (race_owner_identity(u[worker].owner) == R_TER || SC64_P10_TERRAN_BUILDER(worker)) return 0;
-    if (dist2(u[worker].x, u[worker].y, b[building].x, b[building].y) > 36 * 36) return 0;
+    if (dist2(u[worker].x, u[worker].y, b[building].x, b[building].y) >
+        BUILD_WORK_RANGE * BUILD_WORK_RANGE) return 0;
     if (b[building].build_progress < 0) b[building].build_progress = 0;
     if (race_owner_identity(u[worker].owner) == R_ZERG) {
         int supply = unit_supply(u[worker].type);

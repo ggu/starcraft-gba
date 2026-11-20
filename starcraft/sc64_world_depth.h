@@ -45,6 +45,28 @@ sc64_building_world_layer(unsigned slot)
     return sc64_world_actor_layer(raw, 4);
 }
 
+static unsigned
+sc64_unit_world_layer(const Unit *q)
+{
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+    if (q->type == U_P7_INTERCEPTOR) return race_p7_interceptor_flight_layer(q);
+#endif
+    unsigned layer = sc64_world_actor_layer(sc64_unit_art_raw(q),
+        sc64_race_unit_flying(q->type) ? 16u : 4u);
+    /* Native SCVs gain one layer while attached to a foundation. Use the
+     * same work radius as update_orders, including after a save/load. */
+    if (q->order == ORDER_BUILD && q->type == U_SCV &&
+        (unsigned)q->target < MAX_BUILDINGS) {
+        const Building *foundation = &b[q->target];
+        if (foundation->alive && foundation->under_construction &&
+            foundation->owner == q->owner &&
+            dist2(q->x, q->y, foundation->x, foundation->y) <=
+                BUILD_WORK_RANGE * BUILD_WORK_RANGE)
+            ++layer;
+    }
+    return layer;
+}
+
 enum {
     DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT,
     DEPTH_SLOT_BITS = 10,
@@ -122,17 +144,10 @@ sc64_draw_depth_ordered_actors(void)
         if (!q->alive) continue;
         int x = q->x - camx, y = q->y - camy + 12;
         if (!sc64_unit_anchor_in_view(q, x, y)) continue;
-        int raw = sc64_unit_art_raw(q);
-        unsigned fallback = sc64_race_unit_flying(q->type) ? 16u : 4u;
-        unsigned layer;
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
-        if (q->type == U_P7_INTERCEPTOR) {
-            if (SC64_CARRIER_STATE_HIDDEN(q)) continue;
-            layer = race_p7_interceptor_flight_layer(q);
-        } else
+        if (q->type == U_P7_INTERCEPTOR && SC64_CARRIER_STATE_HIDDEN(q)) continue;
 #endif
-            layer = sc64_world_actor_layer(raw, fallback);
-        sc64_depth_push(heap, &size, layer, q->y, DEPTH_UNIT, i);
+        sc64_depth_push(heap, &size, sc64_unit_world_layer(q), q->y, DEPTH_UNIT, i);
     }
     while (size) {
         u32 key = sc64_depth_pop(heap, &size);

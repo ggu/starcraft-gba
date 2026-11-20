@@ -102,8 +102,9 @@ timing remain open for the flight overlap.
 | 1 | `building-liftoff-depth` | Move a Science Facility from grounded to airborne and back. Use a Tank whose Y is just south of the Facility. The Tank covers it on the ground and the Facility covers the Tank in flight. Repeat with a Wraith covering the airborne Facility. | Terran HOST checks cover 396 pixels for each Tank overlap and 223 for the Wraith. HOST flight transitions cover both the Science Facility and late Terran Command Center. Ordinary-input ARM lift and land replay pending. |
 | 1 | `airborne-save-depth` | Save after issuing Land but before arrival. In a fresh session, sample the same overlap at load, during flight and after touchdown. Require layer 12 until the live flight flag clears and the same winning pixels as uninterrupted play. | Pending. Use a late Terran Command Center and a shared Science Facility in Custom Game. Include Showcase if the scene supports lift and save. |
 | 1 | `air-tiers-ignore-y` | Preserve the Wraith/Overlord pixel result as the actors cross both viewport boundaries. Flip both framebuffer pages and require no actor pixels on HUD rows 0–11 and 120–159. | HOST isolated overlap passes. Ordinary-input page-flip replay pending. |
+| 1 | `scv-foundation-depth` | At a paid Terran foundation, compare an SCV north of the foundation as it approaches, attaches, works and completes. The foundation covers the idle SCV at layer 4. The working SCV at layer 5 covers the foundation. | See the [SCV foundation overlap](#scv-foundation-overlap). |
 | 1 | `interceptor-flight-depth` | Compare launch (15), attack (17), early and late far return (15 or 17), and final approach (14) against a Carrier at 16. Cover both actor slot orders and confirm docked children are hidden. | The Protoss framebuffer and save fixture covers the GBA runtime. Ordinary-input N64 and ARM overlap captures remain open. |
-| 2 | `effect-crosses-actor-depth` | Capture the same ground projectile crossing opaque pixels of ground and air actors, with animation tick and sight fixed. Verify projectile and impact layers independently before changing a pass. Include a landing shadow and a low remnant. | Pending native frame pairs. Free-standing GBA weapon effects still draw after the actor pass. |
+| 2 | `effect-crosses-actor-depth` | Capture a bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. Verify spawned impact art, shadows and remnants independently. | See the [native bullet depth rule](#native-bullet-depth). Frame pairs and GBA effect interleaving are open. |
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
 
@@ -113,6 +114,56 @@ wrong-pixel count. For native dynamic actors also record the actor and
 sprite addresses and their captured layer. Keep native screenshots and
 memory dumps local. Compare the isolated GBA masks within each version's
 palette. The N64 and GBA use different pixel scales and palettes.
+
+### SCV foundation overlap
+
+The owned USA ROM raises the builder's live sprite elevation by one when
+placing a Terran foundation or attaching to an unfinished one. The
+stores to sprite offset `0x0d` are at `0x80126854` (ROM `0xea544`)
+and `0x80125e58` (ROM `0xe9b48`). The reset-collision order restores
+the unit type's base elevation at `0x80125cc4` (ROM `0xe99b4`). Both
+attachment paths queue that reset. The SCV therefore uses elevation 5
+during construction and returns to 4 when normal collision resumes.
+[OpenBW construction and collision reset](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L4312-L4489)
+
+The shared GBA Mode 4 painter derives the layer from the existing worker
+order and foundation. A build-pending SCV and an assigned SCV outside
+the engine's 36-pixel work radius keep layer 4. An SCV in work range of
+its live, friendly, unfinished target uses layer 5. Completion or loss
+of the job restores layer 4. The GBA uses its work radius to approximate
+native attachment, with no additional save state.
+
+The Terran framebuffer fixture exercises `scv-foundation-depth` with
+isolated actor masks, a north-side overlap in idle and working states,
+both sides of the work-radius boundary, and a build tick that completes
+the structure. All 149 distinguishing pixels match. The Terran, Z10,
+P10 and Showcase ARM builds preserve their IWRAM and EWRAM endpoints
+from `0b1fbde3`. Normal menu smoke replays match the sampled world,
+palette and both indexed pages after 60 and 120 input calls. These
+smoke samples occur before construction.
+
+For ordinary-input replay, start a Barracks in T1 and in Terran Custom
+Game on all three race ROMs. Retry with a replacement CPU SCV
+approaching an interrupted build in a custom match. Use a Terran build
+scene on Showcase when available. Save during construction and reload
+in a fresh emulator before completion. Check an idle, stopped or
+orphaned SCV at the same anchor. Compare overlap pixels with
+uninterrupted play and check HUD clipping on both pages. The retained
+[native Barracks replay](2026-11-17-native-scv-foundation-interruption.md)
+supplies known working cuts at 9,308 and 9,332 and completed cuts at
+11,844 and 11,900 for a new framebuffer and sprite-layer capture.
+
+### Native bullet depth
+
+The native bullet constructor at ROM `0x93a4` reads the shooter's order
+target. The branches at `0x800087c0` and `0x800087f0` assign the
+bullet's sprite elevation once at creation from the target or shooter
+respectively. The 116 bytes at ROM `0x9394` have SHA-256
+`2824fe5e99a1890914746cb35cdbd74e46bfc84876ee41787561704fd5a81c01`.
+Capture muzzle overlays, the free-standing bullet and the resulting
+impact separately. The GBA currently paints them from a combined trace
+after the world actors.
+[OpenBW bullet creation](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13759-L13769)
 
 ### Interceptor flight overlap
 
