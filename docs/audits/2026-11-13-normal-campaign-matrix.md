@@ -349,3 +349,44 @@ outcomes and the rest of the combinations remain open.
 
 The aggregate receipt SHA-256 is
 `40c9ee9f0983b2eebd76987d453c5f78a7e647d1b327984e6ea1f0f89547b761`.
+
+## Normal Protoss cartridge at `f69b2bbd`
+
+These ordinary-button mGBA runs use normal P10 ROM SHA-256
+`81e018081beec7bf65f44dfc2cc4c4daae49b8aa1dfc515e38ea6e4bfad763ff`.
+The release link receipt in the [P9 audit](2026-11-13-p9-normal-home.md#interceptor-pulse-depth-release)
+matches the ROM produced by both prepared builds. All ten missions win
+after a fresh pause load and match 536 named observations.
+
+| Mission | Pause → victory frame | Named observations | Receipt SHA-256 |
+| --- | ---: | ---: | --- |
+| P1 First Strike | 448 → 28,270 | 26 | `4391ff85020eec05d3a9e2527c9d3a2df5a0bad388e6da4cc2505ab5f4cd4fbf` |
+| P2 Into the Flames | 372 → 33,876 | 35 | `c65c1dbd83a4e9e2145ba3f1768e3f81dda5a919712cb5f3ac35299dc408d8ae` |
+| P3 Higher Ground | 23,993 → 49,263 | 47 | `a93559d8263e30385ee1a048e705915c1584e9c523d51829323de0b227168df6` |
+| P4 The Hunt for Tassadar | 65,700 → 129,310 | 146 | `b7b93179f3cacb54fcfa02a0f4c801e5ebcc9a9f141957362e852b352868242c` |
+| P5 Choosing Sides | 2,700 → 5,057 | 7 | `f128bdce74ef082329fdd61045edc47ac9b94508f48b4614bd819cfdafed0bdd` |
+| P6 Into the Darkness | 64,800 → 99,906 | 113 | `e182610e8f4e89b3836d4879e93cedab4cd5120f55f7ea0b027c48a4754c3650` |
+| P7 Homeland | 8,845 → 55,892 | 59 | `0dc83eeb6c2d06ce2bb7ee4b55d90c623e7a28fa19359c53ee287d10d581e41d` |
+| P8 The Trial of Tassadar | 30,825 → 122,809 | 41 | `899258f3ddf2d38fcdb7ae8cdb271b5b56e364648ec2562be23276551ef4922d` |
+| P9 Shadow Hunters | 30,109 → 95,737 | 42 | `8df6b0df32bff8e4d075c531e8fe12de12e70080f4d08ab8ebac0bf778fd5b7d` |
+| P10 Eye of the Storm | 36,761 → 46,129 | 20 | `d669ee21936e307d7ebf654593fa10998b1bdc5e63f6349e8b9cd042b8c3cb29` |
+
+P1–P3 use the [observed current endings](#early-protoss-current-endings),
+including the final ordinary attack orders in P1 and P3. Each reproduces
+the observed checkpoints and the victory frame for that ending. P4 and
+P6 both write their pause banks from the normal HOME routes. Their final
+replays load those same current journals with a second verified ELF for
+the byte-identical ROM. P7 clears the selected Gateway on reload and
+preserves its queue, the named actors, and the rest of the sampled world.
+P9 checks the full route in two runs joined by
+the same authenticated pause journal and a matching named checkpoint.
+The fresh HOME prefix writes the exact journal used to verify the
+remaining route and result. The prefix receipt SHA-256 is
+`9a441175920b1cf2a29502d7a577af27604d854b643c86f8bd52511d57e787a2`.
+
+Each listed victory writes a checksummed sequence-2 bank and preserves
+its pause bank. A fresh HOME load restores the frozen result and sampled
+world. The next eight neutral updates leave the frozen world and entire
+32 KiB SRAM image identical. The separate P8 result journal receipt
+SHA-256 is `57edff8a688b3980637729d10dd83f8873aad8193d933158a0ec53c90ce1f21c`.
+These are emulator checks on the recorded routes and save points.
