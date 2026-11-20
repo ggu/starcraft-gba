@@ -107,3 +107,32 @@ remains open.
 | Uninterrupted receipt | `764572ad403651e59227dc25dd28d346ac41691d47e7c6b29a8ff128c10ec63e` |
 | Fresh-load receipt | `3afbb7b70bf3a0197d13e5bf4b658c8d6c7da6d1994c60e1d8833af5f4cb6d20` |
 | World checkpoint comparison | `7806a0659f5e59f7593d0e2dc0b75d578c0fbd458ede3f42e9fe704ad833c2a8` |
+
+## Attack-pose lookup timing
+
+An ARM trial indexed the live tracer slots by shooter once per draw.
+The lookup retained ascending tracer slot order, current shooter
+identity and position checks, and the youngest renderable pose.
+Against the exact November 20 Z10 ROM, the trial matched all 47
+sampled world checkpoints and all 24 palette, fog and framebuffer
+samples. The frame, screen and dialogue timeline matched at all
+46,487 tape calls. The same prepared inputs and memory endpoints
+were used in both builds.
+
+| Z8 window | Advancing play updates | Mean loop cycles, original → trial | Mean actor/effect cycles, original → trial |
+| --- | ---: | ---: | ---: |
+| Full route | 45,467 | 1,025,307 → 1,029,473 | 117,384 → 121,523 |
+| Calls 30,996–31,196 | 201 | 1,734,738 → 1,737,838 | 500,307 → 504,347 |
+| Calls 42,000–42,203 | 201 | 1,553,910 → 1,546,724 | 632,088 → 624,727 |
+
+The trial raises full-route mean cycles by 0.41%. Keep the existing
+lookup in the production builds. On the original build, frame 21,667
+spends 14,671,053 of 15,352,732 loop cycles in orders. Profile that
+frame separately from the recurring actor and effect load in the two
+windows above. The actor/effect counter includes sprite drawing,
+death effects and projectiles.
+
+The trial ROM SHA-256 is
+`e7e18198fbb89256ca407e7dec11c94629bdabb72546022bd065ee57c79dfb3b`.
+The comparison receipt SHA-256 is
+`aa193287361651e52418222d4b37d3e9593fe283c4ab96668e07d2c3f5769e51`.

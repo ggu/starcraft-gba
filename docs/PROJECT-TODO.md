@@ -32,7 +32,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now wins after a fresh load at frame 16,659. All 30 post-load world
   samples match, with three battlefield framebuffer differences still
   open. The route averages 16.36 advancing updates per emulated second.
-  Target draw and orders cost on that route.
+  The [Z8 attack-pose index trial](audits/2026-11-12-z8-normal-physical.md#attack-pose-lookup-timing)
+  matches gameplay and video but raises mean cycles by 0.41%. Use the
+  recorded busy draw windows for attribution and isolate the 14.67M-cycle
+  orders stall at frame 21,667.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run
