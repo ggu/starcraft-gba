@@ -59,10 +59,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [packed Overmind frame](audits/2026-11-21-p10-packed-overmind.md)
   ships in ordinary P10 and cuts the sampled late window by 1.53%,
   with both indexed pages, palette and world matching through victory.
-  In a separate normal three-AI Blood Bath match the Nexus byte blit
-  costs 84–90 thousand guest cycles. Measure the existing packed Nexus
-  choice in that lobby, and continue sharing the slow simulation and
-  route windows in the release gates.
+  The [packed Nexus frame](audits/2026-11-21-p10-packed-nexus.md#shared-world-depth-release)
+  cuts the late mean by 7.43% in a normal three-AI Blood Bath match on
+  the shared world-depth release with matching world and indexed pages.
+  Continue sharing the slow simulation and route windows in the
+  release gates.
 - **Match worker economy against the N64.** The
   [paired northwest and southwest Blood Bath run](audits/2026-11-19-n64-skirmish-ai.md#matched-northwest-and-southwest-worker-comparison)
   uses the same human and CPU hall coordinates on both machines. The GBA
