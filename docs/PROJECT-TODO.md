@@ -51,8 +51,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [P9 on this P10](audits/2026-11-13-p9-normal-home.md#november-20-fresh-sram-victory)
   restores three active constructions at frame 30,109 and wins with
   both heroes alive. All 42 checkpoints match, including 30 after load.
-  The run averages 9.35 calls per emulated second. Qualify P10's result
-  autosave and fresh continuation on the newer release.
+  The run averages 9.35 calls per emulated second.
+  [P10 wins from HOME](audits/2026-11-13-p10-normal-home.md#november-20-shared-mineral-routing-build)
+  on the nearest-mineral build at 10.53 calls per emulated second.
+  Qualify its result journal and fresh continuation next.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
