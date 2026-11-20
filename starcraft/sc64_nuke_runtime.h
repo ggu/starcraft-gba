@@ -4,7 +4,7 @@
 
 /* Opt-in world probe. The command and update paths use the same ownership
  * checks, including for campaign actors. The journal has its own gate. */
-enum { SC64_NUKE_FLIGHT_LIMIT = 8, SC64_NUKE_NO_PAYER = 255 };
+enum { SC64_NUKE_NO_PAYER = 255 };
 enum { SC64_NUKE_ASCENT_TICKS = 90, SC64_NUKE_ALERT_TICKS = 45 };
 /* T8's missile reached the ground before the impact script began, and
  * the script's flash preceded HP loss. The latter is a bounded estimate
@@ -553,6 +553,31 @@ static void race_nuke_draw_impact(int x, int y, unsigned tick)
                              x, y + SC64_NUKE_IMPACT_SOURCE_Y / 2);
 }
 
+static void race_nuke_draw_dot(unsigned slot)
+{
+    const Sc64NukeFlight *strike = &race_nuke_flights[slot].strike;
+    unsigned dot_frame = strike->age / SC64_NUKE_DOT_SOURCE_TICKS % SC64_NUKE_DOT_FRAME_COUNT;
+    sc64_nuke_draw_frame(&sc64_nuke_dot_frames[dot_frame],
+                        strike->x - camx, strike->y - camy + 12);
+}
+
+#ifdef SC64_WORLD_DEPTH
+static void sc64_depth_push_nuke_dots(u32 *heap, unsigned *size)
+{
+    if (!race_nuke_active_flights) return;
+    for (unsigned i = 0; i < SC64_NUKE_FLIGHT_LIMIT; ++i) {
+        const Sc64NukeWorldFlight *flight = &race_nuke_flights[i];
+        const Sc64NukeFlight *strike = &flight->strike;
+        if (flight->impact_tick || strike->phase != SC64_NUKE_PAINTING ||
+            (strike->owner != SIDE && !currently_visible(strike->x, strike->y))) continue;
+        /* The native sprite takes the spotter's elevation + 1 at spawn.
+         * All eligible Ghosts currently stay at the base elevation, 4. */
+        sc64_depth_push(heap, size, sc64_world_actor_layer(SC64_NUKE_GHOST_RAW, 4) + 1,
+                        strike->y, DEPTH_NUKE_DOT, i);
+    }
+}
+#endif
+
 static void race_nuke_draw(void)
 {
     if (!race_nuke_active_flights) return;
@@ -567,9 +592,10 @@ static void race_nuke_draw(void)
             continue;
         }
         if (strike->owner == SIDE || currently_visible(strike->x, strike->y)) {
+#ifndef SC64_WORLD_DEPTH
             if (strike->phase == SC64_NUKE_PAINTING)
-                sc64_nuke_draw_frame(&sc64_nuke_dot_frames[(strike->age / SC64_NUKE_DOT_SOURCE_TICKS) %
-                                                          SC64_NUKE_DOT_FRAME_COUNT], x, y);
+                race_nuke_draw_dot((unsigned)i);
+#endif
             if (strike->phase == SC64_NUKE_DESCENDING) {
                 unsigned elapsed = strike->age - strike->cadence.paint;
                 unsigned flash = strike->cadence.descent - SC64_NUKE_DAMAGE_LEAD;

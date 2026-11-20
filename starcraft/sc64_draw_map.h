@@ -56,6 +56,23 @@ draw_map_static_objects(void)
 #endif
 }
 
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
+#define SC64_STORM_RENDER 1
+static const Sc64PsionicStormState *race_storm_for_draw(void);
+
+static void draw_storm_marker(const Sc64PsionicStorm *storm)
+{
+    int x = storm->x - camx, y = storm->y - camy + 12;
+    int r = SC64_STORM_RADIUS_GBA_PX;
+    gfx_line(x, y-r, x+r, y, C_CYAN);
+    gfx_line(x+r, y, x, y+r, C_CYAN);
+    gfx_line(x, y+r, x-r, y, C_CYAN);
+    gfx_line(x-r, y, x, y-r, C_CYAN);
+    gfx_line(x-2, y, x+2, y, C_WHITE);
+    gfx_line(x, y-2, x, y+2, C_WHITE);
+}
+#endif
+
 #ifdef SC64_WORLD_DEPTH
 #include "sc64_world_depth.h"
 #endif
@@ -409,14 +426,12 @@ sc64_tile_background_done:
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
-#ifdef SC64_P4_STORM_ENABLED
-    race_p4_storm_draw();
-#endif
-#ifdef SC64_P6_STORM_ENABLED
-    race_p6_storm_draw();
-#endif
-#ifdef SC64_Z6_STORM_ENABLED
-    race_z6_storm_draw();
+#if defined(SC64_STORM_RENDER) && !defined(SC64_WORLD_DEPTH)
+    const Sc64PsionicStormState *storms = race_storm_for_draw();
+    if (storms)
+        for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
+            if (storms->storm[i].active)
+                draw_storm_marker(&storms->storm[i]);
 #endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_unit_draw_cycles = gba_clock() - profile_stage_start;
