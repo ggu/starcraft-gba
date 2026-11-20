@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-20. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-21. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,24 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **Dense Z7 orders.** The [late stage profile](audits/2026-11-21-z7-late-order-budget.md)
+  puts 65.7% of 2.661 million mean cycles in orders. Even zero-build
+  updates spend 1.296 million cycles in orders. The instruction replay
+  separates the repeated route failure of 49 Hydralisks from recurring
+  target permissions. In the current paired Z7 wins the prefix trial
+  saves 1.53% across the full resume and raises early peak cost by 10.61%.
+  Keep it opt-in and address the nearby-root completions and inactive
+  campaign target checks first.
+
+- **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
+  confirms that N64 SCVs start at the hall, briefly share a mineral
+  target, and reassign before mining. The first deposit arrives between
+  native updates 172 and 188. The opt-in formation moves the stock
+  first deposit from GBA update 75 to 141. Both normal Terran SRAM
+  variants resume through the same deposits. The native nominal bracket
+  is 215–235 GBA updates. Test temporary contention and footprint
+  contact before selecting a production change.
 
 - **Normal race cartridge win and save qualification.** All ten Protoss
   missions now win from HOME and after fresh SRAM reloads on one exact
