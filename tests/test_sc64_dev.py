@@ -87,7 +87,8 @@ BRIEFING_HEADER = (
 )
 DEATH_SOURCE_HEADER = (
     '#define SC64_DEATH_SOURCE_BANK_VERSION 2u\n'
-    '#define SC64_DEATH_SOURCE_METADATA_VERSION 1u\n'
+    '#define SC64_DEATH_SOURCE_METADATA_VERSION 2u\n'
+    '#define SC64_DEATH_SOURCE_DEPTH_LAYERS 1u\n'
     '#define SC64_DEATH_SOURCE_ACTOR_COUNT 1u\n'
     '#define SC64_DEATH_SOURCE_PIXEL_BYTES 1u\n'
     '#define SC64_DEATH_SOURCE_WORD_METADATA 1u\n'
@@ -1334,7 +1335,14 @@ class OnboardingTests(unittest.TestCase):
             header = Path(directory) / 'sc64_death_sprites_generated.h'
             self.assertFalse(dev.death_source_input_ready(header))
             header.write_text(DEATH_SOURCE_HEADER.replace(
-                '#define SC64_DEATH_SOURCE_METADATA_VERSION 1u\n', ''), encoding='ascii')
+                '#define SC64_DEATH_SOURCE_METADATA_VERSION 2u\n', ''), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_METADATA_VERSION 2u',
+                '#define SC64_DEATH_SOURCE_METADATA_VERSION 1u'), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_DEPTH_LAYERS 1u\n', ''), encoding='ascii')
             self.assertFalse(dev.death_source_input_ready(header))
             header.write_text(DEATH_SOURCE_HEADER.replace(
                 '#define SC64_DEATH_SOURCE_PIXEL_BYTES 1u',

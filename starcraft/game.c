@@ -816,9 +816,10 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_death_source.h"
 #include "sc64_death_sprites_generated.h"
 #if !defined(SC64_DEATH_SOURCE_BANK_VERSION) || SC64_DEATH_SOURCE_BANK_VERSION != 2 || \
-    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 1 || \
+    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 2 || \
+    !defined(SC64_DEATH_SOURCE_DEPTH_LAYERS) || SC64_DEATH_SOURCE_DEPTH_LAYERS == 0 || \
     !defined(SC64_DEATH_SOURCE_PIXEL_BYTES) || SC64_DEATH_SOURCE_PIXEL_BYTES == 0
-#error "Regenerate source death art with tools/sc64_death_sprites.py (bank v2)"
+#error "Regenerate source death art with tools/sc64_death_sprites.py (sprite depth metadata v2)"
 #endif
 #ifdef SC64_UNIT_WORD_SPRITES
 #if !defined(SC64_DEATH_SOURCE_WORD_METADATA) || SC64_DEATH_SOURCE_WORD_METADATA != 1 || \
@@ -11804,8 +11805,17 @@ death_vfx_draw_source_layer(const Sc64DeathSourceLayer *layer, int x, int y, uns
 static inline int
 death_vfx_world_layer(const Sc64DeathVfx *e, const Sc64DeathSourceLayer *piece)
 {
-    if (piece->flags & SC64_DEATH_SOURCE_FIXED_LOW) return 1;
-    if (piece->flags & SC64_DEATH_SOURCE_ACTOR_SPRITE) return e->actor_layer_plus1 - 1;
+    unsigned flags = piece->flags;
+    if (flags & SC64_DEATH_SOURCE_DETACHED_SPRITE) {
+        int base = (flags & SC64_DEATH_SOURCE_FIXED_LOW) ? 1 : e->actor_layer_plus1 - 1;
+        int offset = (int)(flags >> SC64_DEATH_SOURCE_LAYER_SHIFT) -
+            SC64_DEATH_SOURCE_LAYER_BIAS;
+        /* Native stores a byte. The painter uses all eight bits for the Y
+         * test, then the low five bits for the packed elevation key. */
+        return base >= 0 ? (int)((unsigned)(base + offset) & 255u) : -1;
+    }
+    if (flags & SC64_DEATH_SOURCE_FIXED_LOW) return 1;
+    if (flags & SC64_DEATH_SOURCE_ACTOR_SPRITE) return e->actor_layer_plus1 - 1;
     return -1;
 }
 #endif

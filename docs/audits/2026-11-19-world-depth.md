@@ -137,9 +137,10 @@ and their own anchors. The bank records both classes apart from the
 under/over bit. The prepared bank has 157 actor profiles with main-image
 or direct attachment frames and 84 with at least one fixed-low layer.
 The destruction scan reads lift state from the retained building flag.
-The existing off-screen and fog rules apply. Depth data occupies the same 20-byte transient row and clears
-with the effect pool. Source-art banks created before the depth metadata
-keep legacy paint order. Rebuild the local death bank for the depth cases.
+The existing off-screen and fog rules apply. Depth data occupies the same
+20-byte transient row and clears with the effect pool. Prepared builds
+require the current depth metadata. Regenerate the local bank with
+`./dev sc64 prepare --rom PATH --profile PROFILE`.
 
 | Case ID | Required overlap and checks |
 | --- | --- |
@@ -173,14 +174,42 @@ emulator cycles rise from 116,932,815 to 119,300,827 (+2.03%). The measured
 cost is specific to this emulator replay. The detailed receipt SHA-256 is
 `874b311ac6e6d14b6ecd383c37ef852f569eba16e5fc1d11c3e40749597267d2`.
 
-The native `sprol` and `sproluselo` handlers pass parent elevation plus
-one. `highsprol` and `sprul` pass parent minus one. `spruluselo` passes
-the parent layer. Record them separately from the fixed-low path and from
-image attachments. The GBA still uses the previous paint passes for these
-death children. Use the [attacker image cases](#attacker-image-depth) for
-attached weapon flashes. Report exact same-layer ties separately because
-the GBA uses kind and slot where the native queue uses the turret flag
-and sprite ID.
+#### Detached death sprite replay cuts
+
+The USA ROM's sprite-spawn handlers read the parent's live elevation.
+`sprol` and `sproluselo` add one, `highsprol` and `sprul` subtract
+one, and `spruluselo` passes it through. The child gets its own sprite
+record and anchor. The common spawn wrapper at ROM offset `0x128f4`
+matches retained native RAM. Its 120-byte SHA-256 is
+`8ad52e8696f17392798b811c3576690294c9f1b3ccbfbd9044aef73f23fd85b5`.
+This rule is established from the native code and authenticated animation
+scripts. A live native framebuffer cut for these deaths is still pending.
+
+The prepared bank contains six drawable actor scripts that use `sprol`
+in Death. Refinery, Extractor and Assimilator bursts sort at 5. Queen,
+Matriarch and Devourer bursts sort at 19. Their second image joins the
+detached sprite at source age 2, draws over its main image while both
+exist, and keeps that sprite's layer after its main image ends at age 3.
+The shared painter takes the original live actor layer from the death
+snapshot. The importer caps the queue by the greatest number of
+concurrent layers, which is two per effect for the prepared bank.
+
+| Priority | Case ID | Replay cuts and expected foreground |
+| --- | --- | --- |
+| 1 | `death-detached-gas-burst` | Destroy a Refinery, Extractor and Assimilator. At a visible burst tick, overlap a layer-4 Tank south of the source and a layer-18 Wraith at the source. The burst covers the Tank and the Wraith covers the burst. |
+| 1 | `death-detached-air-overlay` | Overlap a Wraith with a dying Queen, Matriarch or Devourer. Capture source ages 0, 2, 3 and the last overlay tick. The burst and its second image cover the Wraith. At age 3 the second image remains on top after the first image expires. |
+| 2 | `death-detached-hud-page-flip` | Scroll the Refinery/Wraith overlap across rows 12 and 119. Repeat across both indexed pages and check every HUD row. Carry the replay through pause and fresh save load, then confirm the old cosmetic burst is gone. |
+
+The Showcase HOST overlap fixture checks all three gas structures, the
+Queen's second image, and both HUD edges. It compares 1,769 distinguishing
+pixels across the seven new cases. For ordinary-input coverage, save both
+GBA page hashes, the active page, the palette, source age, each live
+elevation and world anchor, foreground overlap count, and wrong-pixel
+count. In N64 capture, record the parent and child sprite IDs and the
+active child image IDs. Keep the captures local. Compare each platform
+within its own scale and palette. Exact depth ties still need a native
+sprite-ID witness. Use the [attacker image cases](#attacker-image-depth)
+for weapon attachments.
 
 ### Dynamic depth harness
 
@@ -216,6 +245,7 @@ timing remain open for the flight overlap.
 | 1 | `effect-crosses-actor-depth` | Capture a moving bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. | Use the [projectile replay cuts](#projectile-replay-cuts). |
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
+| 2 | `burrow-sprite-depth` | In a supported encounter, capture a unit before burrow, at layer 1 underground, and after it returns to its base layer. Compare the body and the anchor used by any shot or death effect. | USA ROM writes layer 1 at `0x80156624` and restores the unit's base layer at `0x80156a30`. GBA campaign culling and native burrow presentation need their own paired test. |
 
 For replay receipts record the product, source commit, controller tape hash,
 world anchors, effective layers, active page, clip rows, overlap count and

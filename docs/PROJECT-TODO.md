@@ -2110,9 +2110,10 @@ AI wallets and full-match behavior remain unverified.
 - Add the [death sprite depth cases](audits/2026-11-19-world-depth.md#death-sprite-depth)
   to ordinary-input replay coverage. The shared queue sorts source unit
   collapse frames, direct Death attachments and opcode-17 corpses and
-  rubble. Check same-Y ties,
-  detached child opcodes and special-effect
-  pools with separate native and GBA overlap witnesses.
+  rubble. Start the [detached death replay cuts](audits/2026-11-19-world-depth.md#detached-death-sprite-replay-cuts)
+  with gas bursts and the Queen's second image, then run both HUD edges
+  across page flips. Check same-Y ties, burrow and special-effect pools
+  with separate native and GBA overlap witnesses.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.
