@@ -631,9 +631,8 @@ world anchor, distinguishing pixel count and wrong-pixel count.
 | `native-pool-id-tie` | Sample the T10 Barracks/Goliath exact-Y tie and the two equal-elevation Wraiths at different Y. Also capture a Siege hull and turret with a third overlapping sprite. | The native unsigned greater key wins. Keep the exact tie case open for the GBA until it has a shared sprite-ID lifetime and individual turret draw turns. |
 
 The native weapon-79 Interceptor pulse also uses moving behavior 0.
-It should use target elevation plus one at release and retain that layer
-after detach. Its GBA marker is still drawn after the world queue and
-its saved projectile row needs a compatible way to retain launch depth.
+Its [launch-layer and restore checks](#interceptor-pulse-restore)
+cover the shared depth queue and saved projectile row.
 
 The Terran, Protoss and Showcase sanitizer fixtures match the shared
 queue and the complete effects pass for flight, trail and impact. The
@@ -843,6 +842,7 @@ in 12, 12 and 3 bits, respectively, in completed gameplay. Unflagged
 packets retain their original layout and wider generic field ranges.
 The codecs reject unknown flags and invalid layers before changing the
 destination arena. Retiring a projectile clears its stored layer.
+Earlier cartridges reject the flagged packet version.
 
 The Protoss HOST fixture takes a layer-5 ground shot and a layer-19 air
 shot through target loss, a journal save, an arena reset and a load. On
@@ -851,15 +851,37 @@ covered by three Wraith pixels. The air shot covers all three Wraith
 pixels. The asset-free codec fixture also fills all 100 slots and checks
 every supported layer, the legacy sentinel and invalid packet rejection.
 
+The ordinary P10 Eye of the Storm replay resumes a predecessor journal
+at frame 36,761. At frame 37,589, controller START and B save an active
+layer-5 shot in slot 1. The new bank keeps the predecessor bank byte for
+byte. A fresh emulator restores the same flight row from HOME and
+matches all 36 neutral updates through impact, retirement and slot
+reuse. The target falls from 35 to 23 HP at frame 37,595. Both writers
+produce the same 32 KiB SRAM. The replay receipt SHA-256 is
+`10b638ada2c3ff4b8cc75e4d336565d317d47eb5ee90b3b0ff11523694d21c02`.
+
+A staged P10 battle with up to ten active pulses matches all 21 sampled
+world states, normalized projectile arenas, palettes and indexed pages.
+Over 1,000 updates, mean guest cycles move from 1,139,998 to 1,143,158
+(0.28%). The 518 active-pulse updates move from 1,169,470 to 1,175,392
+(0.51%). Peak cycles grow by 0.09%. The candidate's system stack uses
+4,260 changed bytes. It keeps 7,260 bytes above the intact 256-byte
+guard. The emulator timing and stack receipt SHA-256 is
+`ce0f46b904076e8567dcd884eb47797d8173241f54f8d19d38afeef229da3ee4`.
+
+Terran, Z10 and Showcase link with the same memory and payload guards.
+Each matches its release's Custom Game state and exact SRAM through
+the 360-update pause and 240-update fresh continuation. Their normal
+profiles exclude the Carrier projectile service. The comparison receipt
+SHA-256 is
+`45abd249d5ccf78c13aba9f94f07dd9efbad51d06eb2bb4574a9ec655630a647`.
+
 For the ARM harness, record launch layer, target and shooter references,
 current world anchor, active page, both HUD bands, and opaque overlap
 counts. Capture before and after a moving target changes elevation and
-after the original target is removed. Save a detached shot through pause
-and reload in a fresh process. Repeat for ordinary campaign and supported
-Carrier skirmish and Showcase profiles. The draw heap reserves 400 extra
-stack bytes. The painter walks the pool for sorted markers and again for
-older saved markers, so include a crowded battle timing case. The exact
-N64 weapon-79 framebuffer cut and active-shot ARM timing remain open.
+after the original target is removed. Add an active detached-shot reload
+on the compact-save Carrier preview profiles. The exact N64 weapon-79
+framebuffer cut and crowded hardware timing remain open.
 
 ### Cache and clip regressions
 

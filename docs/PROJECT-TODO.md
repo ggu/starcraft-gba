@@ -82,6 +82,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the shared world-depth release with matching world and indexed pages.
   Continue sharing the slow simulation and route windows in the
   release gates.
+- **Interceptor pulse depth.** Normal P10
+  [restores a live shot](audits/2026-11-19-world-depth.md#interceptor-pulse-restore)
+  and matches 36 updates through damage, retirement and slot reuse.
+  A staged ten-pulse ARM workload raises mean cycles by 0.28%.
+  Add an active compact-profile restore and the native weapon-79
+  framebuffer cut.
 - **Match worker economy against the N64.** The
   [paired northwest and southwest Blood Bath run](audits/2026-11-19-n64-skirmish-ai.md#matched-northwest-and-southwest-worker-comparison)
   uses the same human and CPU hall coordinates on both machines. The GBA
