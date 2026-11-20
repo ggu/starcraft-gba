@@ -3,12 +3,31 @@
 #define SC64_WEAPON_VFX_H
 
 enum {
-    SC64_TRACE_ATTACKER = 1,
+    SC64_TRACE_ATTACKER_OVER = 1,
     SC64_TRACE_PROJECTILE = 2,
+    SC64_TRACE_ATTACKER_SPRITE = 4,
+    SC64_TRACE_ATTACKER_UNDER = 8,
+    SC64_TRACE_ATTACKER_IMAGE = SC64_TRACE_ATTACKER_OVER | SC64_TRACE_ATTACKER_UNDER,
+    SC64_TRACE_ATTACKER = SC64_TRACE_ATTACKER_IMAGE | SC64_TRACE_ATTACKER_SPRITE,
     SC64_TRACE_ALL = SC64_TRACE_ATTACKER | SC64_TRACE_PROJECTILE
 };
 
 #include <stdint.h>
+
+static inline unsigned
+sc64_weapon_source_vfx_attacker_part(uint8_t opcode)
+{
+    switch (opcode) {
+    case 8: case 10: case 13:
+        return SC64_TRACE_ATTACKER_OVER;
+    case 9: case 11: case 14:
+        return SC64_TRACE_ATTACKER_UNDER;
+    case 15: case 16: case 17: case 19: case 20: case 21:
+        return SC64_TRACE_ATTACKER_SPRITE;
+    default:
+        return 0;
+    }
+}
 
 /* Visual styles tag the existing transient tracer without changing its
  * layout or the instant-damage combat model. The upper byte selects the

@@ -9,6 +9,26 @@
 #if defined(SC64_TRACE_PROFILE_INDEX_CACHE) && defined(SC64_TRACE_DURATION_CACHE) && defined(SC64_WEAPON_SOURCE_VFX)
 #include "sc64_trace_profile_cache.h"
 #endif
+#ifdef SC64_PROJECTILE_DEPTH
+static unsigned
+sc64_trace_attacker_parts(const Sc64WeaponSourceAttackProfile *profile)
+{
+    if (!profile || !profile->overlay_count) return 0;
+    const Sc64WeaponSourceAnimation *anim =
+        sc64_weapon_source_animation_lookup(profile->attack_image, profile->attack_anim);
+    if (!anim || anim->overlay_first > SC64_WEAPON_SOURCE_OVERLAY_COUNT ||
+        anim->overlay_count > SC64_WEAPON_SOURCE_OVERLAY_COUNT - anim->overlay_first)
+        return 0;
+    unsigned parts = 0;
+    for (unsigned i = 0; i < anim->overlay_count; ++i) {
+        const Sc64WeaponSourceOverlay *overlay =
+            &sc64_weapon_source_overlays[anim->overlay_first + i];
+        if (overlay->parent_image == profile->attack_image)
+            parts |= sc64_weapon_source_vfx_attacker_part(overlay->opcode);
+    }
+    return parts;
+}
+#endif
 /* `out` (nullable) receives the duration and, for source traces, the motion
  * values derived while computing it. */
 static int __attribute__((noinline))

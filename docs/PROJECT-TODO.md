@@ -2050,11 +2050,15 @@ AI wallets and full-match behavior remain unverified.
   after target loss. The siege overlap case compares both draw orders
   to account for palette remapping. Verify separate effects and exact
   sprite-ID ties with their own opaque overlap captures.
+- Add the [attacker image depth cases](audits/2026-11-19-world-depth.md#attacker-image-depth)
+  to the normal-input rendering harness. Capture north/south and flyer
+  muzzle overlaps, loss of visibility and shooter-slot reuse. Record the
+  native turret-flag tie separately.
 - Add the [death sprite depth cases](audits/2026-11-19-world-depth.md#death-sprite-depth)
   to ordinary-input replay coverage. The shared queue sorts source unit
   collapse frames, direct Death attachments and opcode-17 corpses and
   rubble. Check same-Y ties,
-  detached child opcodes, attacker muzzle attachments and special-effect
+  detached child opcodes and special-effect
   pools with separate native and GBA overlap witnesses.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
