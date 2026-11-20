@@ -2135,6 +2135,13 @@ AI wallets and full-match behavior remain unverified.
   after target loss. The siege overlap case compares both draw orders
   to account for palette remapping. Verify separate effects and exact
   sprite-ID ties with their own opaque overlap captures.
+- Add the [point-Storm cuts](audits/2026-11-19-world-depth.md#point-storm-cuts).
+  Capture the ground and air crossings, HUD edges and active save reload
+  in P4, P6 and Z6. Record native unit-targeted casts as a separate case.
+- Add the [nuclear target-dot cuts](audits/2026-11-19-world-depth.md#nuclear-target-dot-cuts)
+  to the preview replay harness. Test both HUD edges and a fresh paint-phase
+  reload in T8 and Custom Game. Capture native missile and impact sprite layers
+  before changing their draw order.
 - Add the [attacker image depth cases](audits/2026-11-19-world-depth.md#attacker-image-depth)
   to the normal-input rendering harness. Capture north/south and flyer
   muzzle overlaps, loss of visibility and shooter-slot reuse. Record the

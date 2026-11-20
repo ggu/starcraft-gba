@@ -49,6 +49,71 @@ static int fixture_unit(int owner, int raw, int x, int y)
     return slot;
 }
 
+#if defined(GBA_HOST) && defined(SC64_WORLD_DEPTH)
+static void test_nuke_dot_depth(void)
+{
+    enum { FIELD_BYTES = 240 * 108 };
+    static _Alignas(4) u8 actor[FIELD_BYTES], dot[FIELD_BYTES], pair[FIELD_BYTES];
+    static _Alignas(4) u8 hud[240 * 40];
+    game_init();
+    race_mode = 1; race_human = R_TER; race_bots = 1;
+    init_state();
+    memset(u, 0, sizeof u);
+    memset(b, 0, sizeof b);
+    memset(m, 0, sizeof m);
+    geyser_count = 0;
+    camx = camy = 0;
+    race_nuke_reset();
+    const int x = 108, y = 52;
+    int spotter = fixture_unit(SIDE, SC64_NUKE_GHOST_RAW, 300, y);
+    Sc64NukeWorldFlight *flight = &race_nuke_flights[0];
+    flight->strike = (Sc64NukeFlight){ .phase = SC64_NUKE_PAINTING, .spotter = spotter,
+                                     .owner = SIDE, .x = x, .y = y };
+    race_nuke_active_flights = 1;
+    gfx_begin(C_PANEL);
+    gfx_set_clip_y(12, 120);
+    race_nuke_draw_dot(0);
+    assert(gfx_read_band(12, 108, dot));
+    gfx_end();
+
+    const int raw_types[] = { 5, 8 };
+    for (unsigned j = 0; j < sizeof raw_types / sizeof *raw_types; ++j) {
+        int slot = fixture_unit(SIDE, raw_types[j], x, y);
+        assert(race_nuke_active_flights == 1);
+        assert(sc64_unit_world_layer(&u[slot]) == (j ? 18u : 4u));
+        gfx_begin(C_PANEL);
+        gfx_set_clip_y(12, 120);
+        draw_unit(&u[slot]);
+        assert(gfx_read_band(12, 108, actor));
+        gfx_end();
+
+        gfx_begin(C_PANEL);
+        gfx_set_clip_y(12, 120);
+        sc64_draw_depth_ordered_actors();
+        race_nuke_draw();
+        assert(gfx_read_band(12, 108, pair));
+        assert(gfx_read_band(0, 12, hud));
+        for (unsigned i = 0; i < 240 * 12; ++i) assert(hud[i] == C_PANEL);
+        assert(gfx_read_band(120, 40, hud));
+        for (unsigned i = 0; i < sizeof hud; ++i) assert(hud[i] == C_PANEL);
+        gfx_end();
+
+        unsigned overlap = 0;
+        for (unsigned i = 0; i < FIELD_BYTES; ++i) {
+            if (dot[i] == C_PANEL || actor[i] == C_PANEL || actor[i] == dot[i])
+                continue;
+            ++overlap;
+            assert(pair[i] == (j ? actor[i] : dot[i]));
+        }
+        assert(overlap);
+        printf("nuclear target dot against raw %d: %u overlap pixels\n",
+               raw_types[j], overlap);
+        u[slot].alive = 0;
+    }
+    puts("nuclear target dot: Tank below, Wraith above, HUD clear");
+}
+#endif
+
 static void nuke_action(int action)
 {
     int row = race_nuke_command_index();
@@ -327,6 +392,9 @@ int main(void)
     for (int i = 0; i < 80; ++i) { ++frame; race_nuke_tick(); }
     assert(!race_nuke_active_flights);
     puts("nuclear strike: stock add-on and Ghost production, GBA menu, paid ammo, abort and independent impact");
+#if defined(GBA_HOST) && defined(SC64_WORLD_DEPTH)
+    test_nuke_dot_depth();
+#endif
     nuke_supply_boundary();
 #ifdef SC64_TERRAN_LATE_RUNTIME
     t8_attachment();
