@@ -97,3 +97,26 @@ non-destructive reload and the expected result autosave. This is one
 specific mid-mission save, not arbitrary-save coverage.
 
 - Fresh-load receipt SHA-256: `ce8eb0d3fad5ab4797f1613fa589e34aeeddd0286e23c20ec59e2252607aa84a`.
+
+
+## November 20 shared mineral routing build
+
+The normal P10 build with shared nearest-mineral selection wins the
+current controller route from HOME in 47,266 ordinary calls. The
+controller uses the same build flags under ASan and UBSan. The ARM replay
+matches 20 checkpoints, ten briefing pages and 14 authored dialogue
+pages. The pause save and unpause occur in the same process. At frame
+46,129 the Overmind is gone, Zeratul, the Gantrithor and Hyperion are
+alive and human-owned, and the P10 objective and completion bits are set.
+There are zero unsupported mission actions.
+
+The measured rate is 10.53 calls per emulated second. Verify the actual
+pause journal, its fresh continuation and the result autosave on this
+revision. The earlier KODAK fresh-load evidence used a different ROM.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal P10 ROM | `bbba4fa1cf2a49d0994f7a3bc800b0e7a4f614830a1e379bb5802ff0e22e97e0` |
+| Matching ELF | `dd13057e1fd570b36c3c8e65b592a2e0b1ff613df55b0cfe1fc83b4e79ae25a1` |
+| Regenerated controller tape | `d331b46adbb941be4d25b75959e494b5f91b638a2478e9fd7170dc171cb9d3d5` |
+| Full ARM receipt | `d236963d02e20955e3583d5a8cf81fab32bb69ce1b58e5af8cbeeb993ab187b4` |

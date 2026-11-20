@@ -37,7 +37,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   recorded busy draw windows for renderer work. The
   [instruction profile](audits/2026-11-12-z8-normal-physical.md#instruction-attribution-of-the-z8-stall)
   attributes 90.89% of frame 21,667 to 16 mineral continuation route
-  fills. Prioritize eligible-field selection and its cache behavior.
+  fills. The [nearest-first selector](audits/2026-11-20-mineral-continuation-routes.md)
+  cuts that stall by 87.9% while preserving the full Z8 replay checks.
+  All four builds retain their RAM margins and match the control on a
+  three-AI Blood Bath save and load. The next [Z8 samples](audits/2026-11-20-mineral-continuation-routes.md#remaining-slow-updates)
+  attribute the two remaining orders peaks to movement route floods and
+  the result stall to save validation. Qualify point-route reuse and
+  shared candidate row decoding separately.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run
@@ -45,8 +51,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [P9 on this P10](audits/2026-11-13-p9-normal-home.md#november-20-fresh-sram-victory)
   restores three active constructions at frame 30,109 and wins with
   both heroes alive. All 42 checkpoints match, including 30 after load.
-  The run averages 9.35 calls per emulated second. Qualify P10's result
-  autosave and fresh continuation on the newer release.
+  The run averages 9.35 calls per emulated second.
+  [P10 wins from HOME](audits/2026-11-13-p10-normal-home.md#november-20-shared-mineral-routing-build)
+  on the nearest-mineral build at 10.53 calls per emulated second.
+  Qualify its result journal and fresh continuation next.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
