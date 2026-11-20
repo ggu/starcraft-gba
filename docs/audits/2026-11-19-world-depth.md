@@ -215,10 +215,12 @@ Terran, Z10, P10 and Showcase all link and pass ROM header and SRAM
 signature checks with the same IWRAM and EWRAM endpoints as `9b46188e`.
 The compiler dependency lists select the regenerated bank in every
 profile. Its indexed pixel and packed-word arrays match the prior bank.
+Moving the source renderer into its header leaves the preprocessed game
+source identical on all four profiles and produces the same Showcase ROM.
 An exact `9b46188e` Showcase comparison on ordinary Siege Line input
 matches the world, both indexed pages, active page, HUD and palette at
-24 cuts during 120 updates. This scene does not exercise the six altered
-deaths. Emulator cycles move from 119,809,410 to 119,851,039 (+0.035%).
+24 cuts during 120 updates of Zergling combat. Emulator cycles move from
+119,809,410 to 119,851,039 (+0.035%).
 The paired receipt SHA-256 is
 `7678e721cf271b4da1c686166e3a905223df3326340e992f7b221f5aea4993ef`.
 
