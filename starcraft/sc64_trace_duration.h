@@ -10,8 +10,12 @@
 #include "sc64_trace_profile_cache.h"
 #endif
 #ifdef SC64_PROJECTILE_DEPTH
+_Static_assert(SC64_WEAPON_SOURCE_OVERLAY_COUNT < 65536u,
+               "stored attack sprite index must fit");
+
 static unsigned
-sc64_trace_attacker_parts(const Sc64WeaponSourceAttackProfile *profile)
+sc64_trace_attacker_parts(const Sc64WeaponSourceAttackProfile *profile,
+                          Sc64TraceSlot *slot)
 {
     if (!profile || !profile->overlay_count) return 0;
     const Sc64WeaponSourceAnimation *anim =
@@ -19,14 +23,52 @@ sc64_trace_attacker_parts(const Sc64WeaponSourceAttackProfile *profile)
     if (!anim || anim->overlay_first > SC64_WEAPON_SOURCE_OVERLAY_COUNT ||
         anim->overlay_count > SC64_WEAPON_SOURCE_OVERLAY_COUNT - anim->overlay_first)
         return 0;
-    unsigned parts = 0;
+    unsigned parts = 0, detached = 0, detached_count = 0;
     for (unsigned i = 0; i < anim->overlay_count; ++i) {
         const Sc64WeaponSourceOverlay *overlay =
             &sc64_weapon_source_overlays[anim->overlay_first + i];
-        if (overlay->parent_image == profile->attack_image)
-            parts |= sc64_weapon_source_vfx_attacker_part(overlay->opcode);
+        if (overlay->parent_image != profile->attack_image) continue;
+        unsigned part = sc64_weapon_source_vfx_attacker_part(overlay->opcode);
+        parts |= part;
+        if (part != SC64_TRACE_ATTACKER_SPRITE) continue;
+        ++detached_count;
+        /* The prepared attack streams use one nonrepeating sprol or
+         * sproluselo. Other streams retain their existing rendering. */
+        if ((overlay->opcode == 15u || overlay->opcode == 21u) &&
+            (anim->loop_pc == UINT32_MAX || overlay->source_tick < anim->loop_source_tick))
+            detached = anim->overlay_first + i + 1u;
     }
+    if (detached_count == 1) slot->attack_sprite_plus1 = (u16)detached;
     return parts;
+}
+
+static void
+sc64_trace_birth_attack_sprite(Sc64TraceSlot *slot)
+{
+    slot->attack_sprite_birth_life = 0;
+    int source = slot->attacker_plus1 - 1;
+    if (source < 0 || !target_alive(source)) return;
+    slot->attack_sprite_layer = (u8)(sc64_trace_actor_layer(source) + 1u);
+    slot->attack_sprite_x = (s16)target_x(source);
+    slot->attack_sprite_y = (s16)target_y(source);
+}
+
+static void
+sc64_trace_schedule_attack_sprite(Sc64TraceSlot *slot, int life)
+{
+    if (!slot->attack_sprite_plus1) return;
+    const Sc64WeaponSourceOverlay *event =
+        &sc64_weapon_source_overlays[slot->attack_sprite_plus1 - 1u];
+    unsigned age = sc64_weapon_source_vfx_first_gba_age(event->source_tick);
+    if (life <= 1 || age >= (unsigned)(life - 1) || life > 65536) {
+        slot->attack_sprite_plus1 = 0;
+        return;
+    }
+    slot->attacker_parts &= (u8)~SC64_TRACE_ATTACKER_SPRITE;
+    if (!age)
+        sc64_trace_birth_attack_sprite(slot);
+    else
+        slot->attack_sprite_birth_life = (u16)(life - 1 - age);
 }
 #endif
 /* `out` (nullable) receives the duration and, for source traces, the motion

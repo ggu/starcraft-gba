@@ -89,6 +89,9 @@ The custom replay receipt SHA-256 is
 
 ## Harness cases
 
+The [selected building and detached attack sprite cuts](2026-11-21-world-depth-overlaps.md#replay-cases)
+extend this checklist with native witnesses and required overlap masks.
+
 For each case, render five frames with one fixed camera and the same
 terrain, palette and animation tick. Draw the empty scene, each actor by
 itself and the pair in both creation orders. Restrict the overlap mask to

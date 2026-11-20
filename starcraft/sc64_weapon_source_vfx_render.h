@@ -489,6 +489,25 @@ sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
         sc64_weapon_source_trace_profile(packed),x0,y0,x1,y1,camx,camy);
 }
 
+static int
+sc64_weapon_source_vfx_sprite_birth_offset(const Sc64WeaponSourceOverlay *overlay,
+    const Sc64WeaponSourceAnimation *anim, uint32_t tick, uint8_t direction,
+    int *dx, int *dy)
+{
+    const Sc64WeaponSourceImage *parent =
+        sc64_weapon_source_image_lookup(overlay->parent_image);
+    int mirror = 0;
+    uint16_t frame = sc64_weapon_source_vfx_source_frame(parent, anim, tick,
+                                                         direction, &mirror);
+    int16_t x, y;
+    if (frame == UINT16_MAX ||
+        !sc64_weapon_source_lo_lookup(overlay->parent_image, overlay->lo_index,
+                                     frame, 0, &x, &y)) return 0;
+    *dx = mirror ? -x : x;
+    *dy = y;
+    return 1;
+}
+
 /* Draw attached image overlays and independently spawned sprite trails from
  * the generated event stream. A looping SPROL stream keeps at most eight live
  * occurrences; each sprite is placed at its authored birth position. */
@@ -558,20 +577,11 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
             if (overlay->opcode == 21u) {
                 /* SPROLUSELO samples the parent's frame at sprite birth.
                  * Later parent animation frames cannot move that sprite. */
-                const Sc64WeaponSourceImage *parent =
-                    sc64_weapon_source_image_lookup(parent_image);
-                int birth_mirror = 0;
                 uint64_t birth_tick = (uint64_t)overlay->source_tick +
                                       (uint64_t)iteration * loop_len;
-                if (birth_tick > UINT32_MAX) continue;
-                uint16_t birth_frame = sc64_weapon_source_vfx_source_frame(
-                    parent, anim, (uint32_t)birth_tick, direction, &birth_mirror);
-                int16_t lo_dx, lo_dy;
-                if (birth_frame == UINT16_MAX ||
-                    !sc64_weapon_source_lo_lookup(parent_image, overlay->lo_index,
-                                                  birth_frame, 0, &lo_dx, &lo_dy)) continue;
-                child_dx = birth_mirror ? -lo_dx : lo_dx;
-                child_dy = lo_dy;
+                if (birth_tick > UINT32_MAX ||
+                    !sc64_weapon_source_vfx_sprite_birth_offset(overlay, anim,
+                        (uint32_t)birth_tick, direction, &child_dx, &child_dy)) continue;
             }
             int draw_x = world_x, draw_y = world_y;
             if (sprite && motion) {
