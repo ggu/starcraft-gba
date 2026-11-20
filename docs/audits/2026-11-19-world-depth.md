@@ -211,6 +211,17 @@ within its own scale and palette. Exact depth ties still need a native
 sprite-ID witness. Use the [attacker image cases](#attacker-image-depth)
 for weapon attachments.
 
+Terran, Z10, P10 and Showcase all link and pass ROM header and SRAM
+signature checks with the same IWRAM and EWRAM endpoints as `9b46188e`.
+The compiler dependency lists select the regenerated bank in every
+profile. Its indexed pixel and packed-word arrays match the prior bank.
+An exact `9b46188e` Showcase comparison on ordinary Siege Line input
+matches the world, both indexed pages, active page, HUD and palette at
+24 cuts during 120 updates. This scene does not exercise the six altered
+deaths. Emulator cycles move from 119,809,410 to 119,851,039 (+0.035%).
+The paired receipt SHA-256 is
+`7678e721cf271b4da1c686166e3a905223df3326340e992f7b221f5aea4993ef`.
+
 ### Dynamic depth harness
 
 The native painter reads the **live** elevation byte at sprite offset
@@ -246,6 +257,7 @@ timing remain open for the flight overlap.
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
 | 2 | `burrow-sprite-depth` | In a supported encounter, capture a unit before burrow, at layer 1 underground, and after it returns to its base layer. Compare the body and the anchor used by any shot or death effect. | USA ROM writes layer 1 at `0x80156624` and restores the unit's base layer at `0x80156a30`. GBA campaign culling and native burrow presentation need their own paired test. |
+| 3 | `nuke-target-dot-depth` | In a nuclear strike preview, capture a target dot against a ground unit and a flyer. Record both the Ghost's live layer and the spawned dot's layer. | USA ROM `0x8014c84c` gives the dot the Ghost's elevation plus one. The GBA nuclear preview paints the dot in a final pass. |
 
 For replay receipts record the product, source commit, controller tape hash,
 world anchors, effective layers, active page, clip rows, overlap count and
