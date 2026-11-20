@@ -167,3 +167,19 @@ adapter call while retaining its mutable-state checks and the generic
 validator's independent checks. Profile the composed runtime to
 measure the remaining journal cost. The profile receipt SHA-256 is
 `4b1b2e1925f8ed75f3cdf6de597c4de5584201c0577aa892dfc121882d37e4c7`.
+
+
+### Repeated program checks on the current build
+
+The normal Terran `b2087fac` and test `ebddf82d` ROMs repeat the same
+4,190-update Norad II suffix with 27 matching observations. They
+export identical victory and frozen-result journals. Factoring a
+source-level duplicate inside the scenario adapter changes the
+victory update from 40,885,763 to 40,886,141 cycles. The pause and
+frozen-result loads move by 25 and 268 cycles. The linked state
+validator already calls the immutable program validator once per
+invocation in both builds. The four profiled checks come from
+separate mission-state validations inside the journal operation.
+The trial stays out of the normal builds. The comparison receipt
+SHA-256 is
+`ddaa162492afc6b0f16f6af9ecd3378a0da6d9b79b4921f606c1668646897887`.

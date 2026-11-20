@@ -55,6 +55,21 @@ def find_roundtrip(events):
     return starts[0]
 
 
+def checkpoint(game, types, tick):
+    state = game.state()
+    owned = UNIT_FIELDS.index("owner") + 1
+    kind = UNIT_FIELDS.index("type") + 1
+
+    def count(owner, unit):
+        return sum(u[owned] == owner and u[kind] == types[unit] for u in state["units"])
+
+    hero = next((u for u in state["units"] if u[kind] == types["U_RAYNOR"]), None)
+    return dict(tick=tick, frame=state["frame"], minerals=state["minerals"],
+                marines=count(0, "U_MARINE"), scv=count(0, "U_SCV"), zerg=count(1, "U_ZERGLING"),
+                raynor_alive=int(hero is not None), raynor_owner=hero[owned] if hero else -1,
+                won=game.u32("won"), lost=game.u32("lost"))
+
+
 def replay(args):
     paths = (args.trace, args.rom, args.elf, args.runner)
     require(list(map(digest, paths)) == args.pins, "replay inputs do not match their SHA-256 pins")
@@ -129,18 +144,6 @@ def replay(args):
         require(result.keys() == set(COMMAND_FIELDS), "unexpected menu state widths")
         return result
 
-    def checkpoint(tick):
-        state = g.state()
-        owned = UNIT_FIELDS.index("owner") + 1
-        kind = UNIT_FIELDS.index("type") + 1
-        def count(owner, unit):
-            return sum(u[owned] == owner and u[kind] == types[unit] for u in state["units"])
-        hero = next((u for u in state["units"] if u[kind] == types["U_RAYNOR"]), None)
-        return dict(tick=tick, frame=state["frame"], minerals=state["minerals"],
-                    marines=count(0, "U_MARINE"), scv=count(0, "U_SCV"), zerg=count(1, "U_ZERGLING"),
-                    raynor_alive=int(hero is not None), raynor_owner=hero[owned] if hero else -1,
-                    won=g.u32("won"), lost=g.u32("lost"))
-
     saved = None
     try:
         require(g.u32("screen") == g.u32("frame") == g.front_field("page") == 0, "guest did not reach HOME")
@@ -176,7 +179,7 @@ def replay(args):
                 report["boundary"].append(dict(tick=tick, held=rsp.held, **command(),
                                                **{k: g.u32(k) for k in WORLD_FIELDS}))
             if tick + 1 in points:
-                state = checkpoint(tick + 1)
+                state = checkpoint(g, types, tick + 1)
                 report["checkpoints"].append(state)
                 differences = {k: (expected, state.get(k)) for k, expected in points[tick + 1].items()
                                if k != "state_hash" and state.get(k) != expected}
