@@ -176,7 +176,10 @@ observations, including 131 matches and 110 divergences, and reports
 zero adapter faults. Its receipt SHA-256 is
 `13ae3eb03ae0f9367b3f9c8a1af8d6708b7507a18df6c0060ae7b8874876081d`.
 Record a current winning route and then qualify a new current-writer
-pause cut.
+pause cut. The first exact-source HOST re-record reaches its 200,000-call
+budget with 80 player units alive and one undiscovered enemy structure.
+It stays in the original mission throughout and reports zero trigger
+faults. Continue the scouting coverage before attempting ARM replay.
 
 A separate compatibility replay reads the archived transport journal
 through ordinary title-L. A reselects the Hatchery, all five semantic
