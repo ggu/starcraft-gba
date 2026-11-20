@@ -148,3 +148,47 @@ focus on reducing expansion cost without changing FIFO order.
 - Word-pack cycle receipt: `c25fd850c3960f0b277bbc61625986e43e9cc78d66df8b89adbd9fe28cce8d9b`.
 - Matching raw endpoints: `12665bdcd588a704e58296b07cdc5aad4d87cc5c4679007881b52f77740a0cd4`.
 - Word-pack ROM: `0c0811c8efc9b98f7fcd08f5733fb2c6f69f7a4b3a37bbe310a2de530014a5e2`.
+
+## Current Z8 and P10 pause replays
+
+Both comparisons use the normal attacker-image-depth runtime from
+`a9f0137c` and the same prepared source inputs. The only compiler
+flag added to the trial is `SC64_ROUTE_LINEAR_WORD_PACK_PROBE`.
+The trial stores the same complete field during the same route
+request and keeps the existing seed order, FIFO, capacity checks,
+and cache publication. Unaligned outputs retain the byte writer.
+
+Z10 loads the ordinary Z8 pause journal from HOME at tape call
+17,122 and simulation frame 16,659. It follows the same ordinary
+inputs and three modal acknowledgments through call 33,900. P10
+loads from HOME at call 37,705 and simulation frame 36,761. Both
+P10 ROMs win at call 47,194, frame 46,057.
+
+| Profile | Timed updates | Mean guest cycles | p95 guest cycles | Peak guest cycles |
+| --- | ---: | ---: | ---: | ---: |
+| Z10, Z8 continuation | 203 | 1,685,501 → 1,678,389 | 3,311,417 → 3,276,408 | 12,272,717 → 12,092,659 |
+| P10 continuation | 114 | 2,100,789 → 2,099,802 | 3,193,685 → 3,168,459 | 4,754,975 → 4,709,504 |
+
+Z8 call 26,346 saves 143,962 guest cycles and call 33,800 saves
+180,058. P10 calls 43,604, 45,231, and 45,452 save 43,055, 45,471,
+and 14,831 respectively. The Z8 middle window's maximum adds
+888 cycles. The P10 window containing call 45,231 adds 240 cycles
+at p95. Aggregate timings cover the selected windows and do not
+measure a whole-campaign frame rate.
+
+All 32 named samples match the world, fog, display page, palette,
+and both indexed pages. All 337 sampled resident fields match at
+6,144 bytes each, including all 14 logical slots across each
+profile. All 317 timed frames match route build and hit counts.
+The aligned writer stays in ROM and both RAM endpoints match
+the corresponding control.
+
+| Profile | Control ROM SHA-256 prefix | Trial ROM SHA-256 prefix | Comparison receipt SHA-256 prefix |
+| --- | --- | --- | --- |
+| Z10 | `d9b38cc619c0f969` | `970cd016b85715f8` | `5a7ab1a9dee026db` |
+| P10 | `85ef7abb9a96f726` | `769293f4122db540` | `dac279df68183c01` |
+
+The shared configuration selects the aligned writer when the
+linear point or facility FIFO is enabled. Set
+`CANONICAL_ROUTE_LINEAR_WORD_PACK=0` to rebuild with the byte writer.
+The compile configuration key distinguishes the two settings.

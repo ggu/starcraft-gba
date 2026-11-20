@@ -872,7 +872,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [current pointer ROM](audits/2026-11-13-route-linear-word-pack.md#dense-z7-on-the-pointer-fifo),
   point fills take 736k cycles per active call, including 489k in FIFO
   expansion and 135k in packing. Aligned word output saves 0.52% of
-  the loop with matching fields and no extra RAM; keep it opt-in.
+  the loop with matching fields and no extra RAM. The newer
+  [Z8 and P10 timing](audits/2026-11-13-route-linear-word-pack.md#current-z8-and-p10-pause-replays)
+  finds lower route peaks with matching packed fields.
   [Pointer-only one-field retention](audits/2026-11-14-z7-point-flood-retention.md#one-plane-pointer-retention-on-the-current-fifo)
   now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
   while keeping route oracles and scratch bindings unchanged. Composed
@@ -986,12 +988,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches 43,000 normal P10 calls, with a 1.78% mean improvement and a
   3.04% late-window improvement. Keep it opt-in: it adds 40 IWRAM bytes
   and has not been replayed through victory or on all four cartridges.
-  The [linear route word-pack probe](audits/2026-11-13-route-linear-word-pack.md)
-  matches scalar output and overflow behavior under sanitizers. It
-  targets packed output writes in the expensive facility and wide point
-  fills. Exact P10 ARM comparison cuts three sampled stalls 1.42–2.35%
-  with unchanged working RAM, but mean cost only falls 0.027%. Keep it
-  off and prioritize fewer route rebuilds over output-store tuning.
+  The [aligned route word pack](audits/2026-11-13-route-linear-word-pack.md#current-z8-and-p10-pause-replays)
+  keeps eager route fields and improves the sampled Z8 and P10 peaks
+  by 1.47% and 0.96%. It leaves working RAM unchanged. Prioritize fewer
+  exact route rebuilds or faster FIFO expansion for larger gains.
   The [cursor query probe](audits/2026-11-13-p10-field-cursor-cost.md)
   matches the same P10 prefix and cuts mean cycles 1.23%, with unchanged
   IWRAM and BSS. Keep it off until all products and a composed battle
