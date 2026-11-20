@@ -1405,6 +1405,13 @@ typedef struct {
 typedef struct {
     int x, y;
 } Geyser;
+#if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION) && \
+    !defined(SC64_TILE_RENDERER) && !defined(SC64_DISABLE_WORLD_DEPTH)
+#define SC64_WORLD_DEPTH 1
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_WEAPON_SOURCE_VFX)
+#define SC64_PROJECTILE_DEPTH 1
+#endif
 typedef struct {
 #ifdef SC64_RACES
     /* RaceSave omits tracers; race maps are at most 128 cells per side. */
@@ -1525,16 +1532,23 @@ static Tracer tracers[MAX_TRACERS];
 /* Presentation values derived from a tracer's packed identity and captured
  * endpoints, which stay fixed until add_tracer replaces the slot. Never saved:
  * a load or clear empties them and each is recomputed from the stored tracer
- * on first use, exactly as before. 8 bytes per slot. */
+ * on first use, exactly as before. */
 typedef struct {
     u16 root;          /* sqrt(dx^2+dy^2) of the launch->target vector */
     u16 flight;        /* motion flight ticks */
     u16 duration;      /* 0 = unknown */
     u8 profile_plus1;  /* bank profile index + 1, 0 = unknown */
-    u8 motion_valid;   /* root/flight/profile_plus1 describe the stored tracer */
+#ifdef SC64_PROJECTILE_DEPTH
+    u8 bullet_layer;   /* zero for traces without a detached bullet */
+    u16 release_life;  /* nonzero until the first visible source release tick */
+    s16 depth_ref;     /* live target or point shot's source until release */
+#endif
 } Sc64TraceSlot;
 #ifdef SC64_WEAPON_SOURCE_VFX
 static Sc64TraceSlot sc64_trace_slots[MAX_TRACERS];
+#ifdef SC64_PROJECTILE_DEPTH
+static void sc64_trace_forget_ref(int ref);
+#endif
 static inline void sc64_trace_slots_reset(void)
 {
     memset(sc64_trace_slots, 0, sizeof(sc64_trace_slots));
@@ -3051,6 +3065,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(i);
 #endif
+#ifdef SC64_PROJECTILE_DEPTH
+    sc64_trace_forget_ref(i);
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_clear_slot(i);
 #endif
@@ -3270,6 +3287,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(MAX_UNITS + i);
+#endif
+#ifdef SC64_PROJECTILE_DEPTH
+    sc64_trace_forget_ref(MAX_UNITS + i);
 #endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
@@ -4967,6 +4987,29 @@ static int sc64_bc_yamato_visual_tag(unsigned style,unsigned heading)
 { return (int)((style<<8)|((heading&31u)<<3)|sc64_bc_yamato_visual_phase()); }
 #endif
 
+#ifdef SC64_PROJECTILE_DEPTH
+static unsigned sc64_building_world_layer(unsigned slot);
+static unsigned sc64_unit_world_layer(const Unit *q);
+
+static unsigned
+sc64_trace_actor_layer(int ref)
+{
+    return ref < MAX_UNITS ? sc64_unit_world_layer(&u[ref]) :
+        sc64_building_world_layer((unsigned)(ref - MAX_UNITS));
+}
+
+static void __attribute__((noinline))
+sc64_trace_forget_ref(int ref)
+{
+    for (unsigned i = 0; i < MAX_TRACERS; ++i) {
+        Sc64TraceSlot *slot = &sc64_trace_slots[i];
+        if (tracers[i].life && slot->release_life && slot->depth_ref == ref) {
+            /* The attack-init snapshot still describes the original actor. */
+            slot->depth_ref = -1;
+        }
+    }
+}
+#endif
 #include "sc64_trace_duration.h"
 
 #ifdef SC64_WEAPON_SOURCE_VFX
@@ -4988,8 +5031,8 @@ sc64_source_effect_direction(int dx,int dy)
 }
 
 static int __attribute__((noinline))
-sc64_source_emit(int raw,int slot_plus1,int weapon,int air,
-                 int x0,int y0,int x1,int y1)
+sc64_source_emit(int raw,int source,int weapon,int air,
+                 int x0,int y0,int x1,int y1,int target)
 {
     if(raw<0 || raw>=228 || weapon<0 || weapon>=130) return 0;
     unsigned variant=raw>=106 ? 2u : (raw==83 && weapon==82) ? 1u : 0u;
@@ -4999,20 +5042,44 @@ sc64_source_emit(int raw,int slot_plus1,int weapon,int air,
     unsigned count=profile->weapon_count==2 ? 2u : 1u;
     for(unsigned shot=0;shot<count;++shot) {
         Sc64WeaponSourceVfxKey key = {
-            .actor_raw=(uint8_t)raw,.actor_slot_plus1=(uint8_t)slot_plus1,
+            .actor_raw=(uint8_t)raw,
+            .actor_slot_plus1=(unsigned)source<MAX_UNITS ? (uint8_t)(source+1) : 0,
             .weapon_id=(uint8_t)weapon,
             .direction=(uint8_t)sc64_source_effect_direction(x1-x0,y1-y0),
             .target_air=(uint8_t)!!air,.variant=(uint8_t)(variant?variant:shot)
         };
         uint32_t packed;
-        if(sc64_weapon_source_vfx_pack(key,&packed))
-            add_tracer(x0,y0,x1,y1,(int)packed);
+        if (!sc64_weapon_source_vfx_pack(key,&packed)) continue;
+        int slot = add_tracer(x0,y0,x1,y1,(int)packed);
+#ifdef SC64_PROJECTILE_DEPTH
+        if (slot >= 0) {
+            const Sc64WeaponSourceAttackProfile *shot_profile = shot == 0 ? profile :
+                sc64_weapon_source_profile_lookup(key.actor_raw,key.weapon_id,
+                                                  key.target_air,key.variant);
+            if (shot_profile && shot_profile->projectile_image &&
+                !sc64_weapon_source_bullet_is_stationary(shot_profile->weapon_bullet_type)) {
+                Sc64TraceSlot *trace = &sc64_trace_slots[slot];
+                unsigned release = sc64_weapon_source_vfx_first_gba_age(
+                    sc64_weapon_source_trace_release_ticks(shot_profile));
+                int ref = target >= 0 ? target : source;
+                if ((unsigned)ref < MAX_UNITS + MAX_BUILDINGS &&
+                    release < (unsigned)(tracers[slot].life - 1)) {
+                    trace->bullet_layer = (u8)(sc64_trace_actor_layer(ref) + 1);
+                    trace->depth_ref = (s16)ref;
+                    trace->release_life = (u16)(tracers[slot].life - 1 - release);
+                }
+            }
+        }
+#else
+        (void)slot;
+        (void)target;
+#endif
     }
     return 1;
 }
 
 static int
-sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
+sc64_source_unit_vfx(Unit *q,int x1,int y1,int air,int target)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     Sc64StockAttack attack;
@@ -5020,16 +5087,16 @@ sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
     if(sc64_stock_attack_select(raw,air,&attack)) weapon=attack.weapon_id;
     else if(raw==83 && !air) weapon=82; /* Existing Reaver/Scarab adapter. */
     else return 0;
-    return sc64_source_emit(raw,(int)(q-u)+1,weapon,air,q->x,q->y,x1,y1);
+    return sc64_source_emit(raw,(int)(q-u),weapon,air,q->x,q->y,x1,y1,target);
 }
 
 static int
-sc64_source_building_vfx(const Building *q,int x1,int y1,int air)
+sc64_source_building_vfx(const Building *q,int x1,int y1,int air,int target)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
     Sc64StockAttack attack;
     return sc64_stock_attack_select(raw,air,&attack) &&
-        sc64_source_emit(raw,0,attack.weapon_id,air,q->x,q->y,x1,y1);
+        sc64_source_emit(raw,MAX_UNITS+(int)(q-b),attack.weapon_id,air,q->x,q->y,x1,y1,target);
 }
 #endif
 
@@ -9065,7 +9132,7 @@ tick_combat(Unit * q, int target)
 #endif
 #endif
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying))
+            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying,target))
 #endif
             add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
 	#ifdef SC64_RACES
@@ -9745,9 +9812,19 @@ update_tracers(void)
     /* Combat launches before this end-of-update step, like tracers. */
     race_impact_tick();
 #endif
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (tracers[i].life)
-	    tracers[i].life--;
+    for (i = 0; i < MAX_TRACERS; i++) {
+        if (!tracers[i].life) continue;
+        --tracers[i].life;
+#ifdef SC64_PROJECTILE_DEPTH
+        Sc64TraceSlot *slot = &sc64_trace_slots[i];
+        if (slot->release_life && tracers[i].life == slot->release_life) {
+            int ref = slot->depth_ref;
+            if (ref >= 0 && target_alive(ref))
+                slot->bullet_layer = (u8)(sc64_trace_actor_layer(ref) + 1);
+            slot->release_life = 0;
+        }
+#endif
+    }
 }
 
 #ifndef SC64_DEATH_VFX_DISABLED
@@ -11625,138 +11702,7 @@ draw_unit(Unit * q)
     draw_unit_pass(q, 0);
 }
 
-#define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
-#include "sc64_weapon_vfx_render.h"
-#undef SC64_WEAPON_VFX_VISIBLE
-#ifdef SC64_TANK_SOURCE_VFX
-#include "sc64_tank_source_vfx_render.h"
-#endif
-
-#ifdef SC64_WEAPON_SOURCE_VFX
-#include "sc64_weapon_source_vfx_render.h"
-#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-#include "sc64_yamato_raster_adapter.h"
-#endif
-#endif
-
-
-static void
-draw_tracers(void)
-{
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-    u32 diag_start=gba_clock();
-    diag_lookup=diag_cull=diag_raster=diag_motion=diag_actor=diag_projectile=diag_children=0;
-#endif
-#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-    for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
-        const Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
-        if (shot->state==SC64_BC_SHOT_CHARGING && shot->caster<MAX_UNITS && u[shot->caster].alive) {
-            int f=sc64_yamato_raster_charge_frame(shot->age);
-            if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[shot->caster].x,u[shot->caster].y);
-        } else if (shot->state==SC64_BC_SHOT_FLIGHT) {
-            Sc64BcMotionFields m;
-            if (sc64_bc_motion_unpack(shot,&m))
-                sc64_yamato_raster_draw(541,0,(((unsigned)m.heading+4u)>>3)&31u,(int)(m.x_q8/512u),(int)(m.y_q8/512u));
-        }
-    }
-    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_is_battlecruiser(u[i].type) &&
-        u[i].order==ORDER_ATTACK_TARGET && (u[i].work_timer&7)>0 && (u[i].work_timer&7)<=6) {
-        int f=sc64_yamato_raster_charge_frame(50u-((unsigned)u[i].work_timer&7u));
-        if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[i].x,u[i].y);
-    }
-#endif
-    for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
-#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-        int ys=sc64_weapon_vfx_style(tracers[i].color);
-        if (ys==SC64_YAMATO_TRAIL_STYLE || ys==SC64_YAMATO_IMPACT_STYLE) {
-            int age=sc64_tracer_duration(i)-tracers[i].life;
-            unsigned p=(unsigned)tracers[i].color&7u;
-            unsigned source_age=(unsigned)(age<=0?0:age-1);
-            source_age-= (source_age+p)/5u;
-            if (ys==SC64_YAMATO_TRAIL_STYLE && source_age<6u)
-                sc64_yamato_raster_draw(542,(source_age/2u)*17u,
-                                         ((unsigned)tracers[i].color>>3)&31u,tracers[i].x0,tracers[i].y0);
-            if (ys==SC64_YAMATO_IMPACT_STYLE && source_age<28u)
-                sc64_yamato_raster_draw(544,source_age/2u,0,tracers[i].x0,tracers[i].y0);
-            continue;
-        }
-#endif
-#ifdef SC64_WEAPON_SOURCE_VFX
-        if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
-            uint32_t packed=(uint32_t)tracers[i].color;
-            Sc64WeaponSourceVfxKey key;
-            if (!sc64_weapon_source_vfx_unpack(packed,&key)) continue;
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            u32 dt=gba_clock();
-#endif
-            const Sc64WeaponSourceAttackProfile *profile=0;
-            Sc64WeaponSourceMotion slot_motion;
-            const Sc64WeaponSourceMotion *prepared=0;
-            if (!sc64_trace_slots[i].motion_valid) sc64_trace_slot_prepare(i,key);
-            if (sc64_trace_slots[i].motion_valid) {
-                const Sc64TraceSlot *ts=&sc64_trace_slots[i];
-                profile=&sc64_weapon_source_profiles[ts->profile_plus1-1u];
-                slot_motion.distance=(uint64_t)ts->root<<9;
-                slot_motion.flight=ts->flight;
-                prepared=&slot_motion;
-            }
-#if defined(SC64_TRACE_PROFILE_INDEX_CACHE) && defined(SC64_TRACE_DURATION_CACHE)
-            if(!profile) {
-                unsigned cached=sc64_trace_durations[i]>>8;
-                profile=sc64_trace_cached_profile(cached,key);
-            }
-#endif
-            if(!profile) profile=sc64_weapon_source_profile_lookup(
-                key.actor_raw,key.weapon_id,key.target_air,key.variant);
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            diag_lookup+=gba_clock()-dt; dt=gba_clock();
-#endif
-#ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
-            if (!sc64_weapon_source_vfx_anchor_may_be_visible(
-                    tracers[i].x0, tracers[i].y0, camx, camy) &&
-                !sc64_weapon_source_vfx_anchor_may_be_visible(
-                    tracers[i].x1, tracers[i].y1, camx, camy) &&
-                sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
-                    key,profile,
-                    tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
-                    camx, camy)) {
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-                diag_cull+=gba_clock()-dt;
-#endif
-                continue;
-            }
-#endif
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            diag_cull+=gba_clock()-dt; dt=gba_clock();
-#endif
-            int age=sc64_tracer_duration(i)-tracers[i].life;
-            sc64_weapon_source_vfx_draw_trace_motion(key,profile,
-                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
-                tracers[i].life,(unsigned)(age<0?0:age),prepared);
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            diag_raster+=gba_clock()-dt;
-#endif
-            continue;
-        }
-#endif
-        int style=sc64_weapon_vfx_style(tracers[i].color);
-        /* Legacy original-art saves may contain an untagged tracer color. */
-        if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
-#ifdef SC64_TANK_SOURCE_VFX
-        if (style==SC64_TANK_SOURCE_TANK || style==SC64_TANK_SOURCE_SIEGE) {
-            sc64_private_tank_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
-                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,tracers[i].life);
-            continue;
-        }
-#endif
-        sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
-            tracers[i].x0-camx,tracers[i].y0-camy+12,
-            tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
-    }
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-    diag_tracer_cycles=gba_clock()-diag_start;
-#endif
-}
+#include "sc64_tracer_draw.h"
 
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx_render.h"

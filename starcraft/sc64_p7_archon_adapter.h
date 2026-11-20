@@ -193,7 +193,7 @@ race_p7_archon_splash_attack(Unit *attacker,int primary)
         int color=sc64_weapon_vfx_unit_profile(attacker->type,0);
 #ifdef SC64_WEAPON_SOURCE_VFX
         if(!sc64_source_unit_vfx(attacker,target_x(primary),target_y(primary),
-                primary<MAX_UNITS && sc64_race_unit_flying(u[primary].type)))
+                primary<MAX_UNITS && sc64_race_unit_flying(u[primary].type),primary))
 #endif
         add_tracer(attacker->x,attacker->y,target_x(primary),target_y(primary),color);
     }
