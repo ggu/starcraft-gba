@@ -243,3 +243,69 @@ certificate 103 times. Both enter the cached weapon-range reader at
 the same 17 calls. No candidate call enters the distant-read helper,
 so the forced-wall test remains the only timing proof for that
 branch. The observer comparison SHA-256 begins `4e0e4b53b5e79c6a`.
+
+## Current Terran and Showcase links and journals
+
+Local composition `59f668be` adds the same seven trial flags to the
+frozen normal recipes on release `6ea84a03`. The cartridge runtime and
+build configuration match `fa9b0ce3`. Both trials use the exact current
+death bank, pass header and SRAM checks, retain ordinary monotone
+movement, and link both certificate helpers. The Showcase prefix
+expansion stays in ROM.
+
+| Profile | Trial ROM SHA-256 prefix | IWRAM end / guard margin | EWRAM end / guard margin |
+| --- | --- | --- | --- |
+| Terran | `3e9f02cacaa42935` | `0x030049e8` / 1,560 B | `0x0203920c` / 19,956 B |
+| Showcase | `3fb04bcf8c8b28c1` | `0x03004fb8` / 72 B | `0x02039418` / 19,432 B |
+
+Both profiles replay the [ordinary mixed three-AI Bunker
+opening](2026-11-20-terran-bunker-opening.md#current-release-with-death-depth)
+on 64×64 Blood Bath. Each matches the release control at 35 named
+samples. The construction and four-passenger pause journals both
+match byte for byte, and both resume for 600 updates in a fresh process
+with matching sampled world and resources. Fresh continuation timing
+changes by +0.027% and +0.013% in Terran, and +0.011% and −0.005%
+in Showcase. Comparison SHA-256 prefixes are `c4455302afdb6cd8`
+and `490d4096a058d17e`. Parking point fields requires 128×128 maps,
+so these are save and inactive-path checks for the routing trial.
+
+## Z9 range-reader check and next fallback test
+
+The historical five-flag Z10 prefix-preview ROM `f38cdb2f` loads an
+ordinary Z9 pause journal at simulation frame 6,069. Starting at tape
+call 6,334 it matches 25 named checkpoints through call 31,500 on a
+128×128 map. Read-only register and route-bank inspection finds seven
+cached range-reader calls at 20,628–22,394. All origins are five to ten
+Manhattan tiles from their target, and there is no resident point slot
+for any of the seven goals. Every query returns a miss in 1,150–1,175
+guest cycles. An open distant read would need a matching deferred slot
+with an unknown direction more than 16 tiles from its goal. This
+continuation does not exercise that case. The observer receipt
+SHA-256 begins `9f8dc7c8f0ce9f1d`.
+
+Keep the combined flags opt-in. Use the cold-only build to isolate
+cost shifted from initial insertion to later reads. A declined far
+proof falls through `sc64_range_cached_point_step` to
+`sc64_point_prefix_require`. For a certificate-only field, a failed
+local proof calls `sc64_route_fill` synchronously. The exact-hit and
+nearby-root readers also reach this materialization path, and a
+whole-field consumer must still complete the field.
+
+The next test should drive a declining read through the real cached
+range entry point and time the initial fill and the first conflicting
+read separately. Use equal separator crossings and a blocked or
+disconnected endpoint, and run an explicit full-field reader after
+each case. Require the canonical step, packed field bytes after
+completion, resident slot, age, route counters, and range scratch
+planes to match. Measure the aggregate and the worst guest update
+against the frozen eager control. The known successful wall fixture
+and ordinary P10/Z8 continuations remain paired checks.
+
+If that gate reproduces a stall, first try stopping the existing
+ordered reverse FIFO when an open origin is discovered and retaining
+the exact frontier for later consumers, following the prefix-resume
+trial. Test the limit and subsequent completion as well as the early
+return. A distant or unreachable origin can still need the full
+flood. Keep full-field and blocked-start readers on the exact path,
+and require the same timing gate on the actual fallback before
+considering default activation.
