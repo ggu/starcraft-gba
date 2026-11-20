@@ -192,15 +192,17 @@ on weapon behavior. The behavior table load at `0x80008814` and jump at
 `0x80008834` follow both elevation writes above. A stationary shell burst
 therefore takes the same target-or-shooter elevation plus one as a flying
 bullet. The Gauss Rifle (weapon 0) and siege cannon (27 and 28) all take
-behavior 2 to `0x800088c0`. At game frame 10,001, a retained native
-Academy replay contains two Gauss Rifle sprites at layer 5 targeting the
+behavior 2 to `0x800088c0`. At game frame 10,001, a staged native
+Academy capture contains two Gauss Rifle sprites at layer 5 targeting the
 same layer-4 unit. The normalized RAM SHA-256 is
 `da3a833eca8432feb659271d2ac5f5609704b3d0b6f8bfd7602183dff33b6c87`.
 The GBA formerly drew stationary effects in a final pass above
 every actor. Their depth now uses the shared release snapshot and queue.
 An effect keeps its captured anchor under the existing GBA animation
-model. Native target tracking and independent child sprites require
-their own tests.
+model. The native behavior-2 launch path at `0x8012a538` calls a helper
+to place the effect within the target's bounds. Use the captured sprite
+anchor for the N64 Y oracle. Exact anchor placement and independent
+child sprites require their own tests.
 
 #### Projectile replay cuts
 
