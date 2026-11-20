@@ -1546,6 +1546,8 @@ typedef struct {
     u8 bullet_layer;   /* zero for traces without a detached bullet */
     u16 release_life;  /* nonzero until the first visible source release tick */
     s16 depth_ref;     /* live target or point shot's source until release */
+    s16 attacker_plus1; /* zero if untracked, negative once its slot is reused */
+    u8 attacker_parts;
 #endif
 } Sc64TraceSlot;
 #ifdef SC64_WEAPON_SOURCE_VFX
@@ -5011,7 +5013,9 @@ sc64_trace_forget_ref(int ref)
 {
     for (unsigned i = 0; i < MAX_TRACERS; ++i) {
         Sc64TraceSlot *slot = &sc64_trace_slots[i];
-        if (tracers[i].life && slot->release_life && slot->depth_ref == ref) {
+        if (!tracers[i].life) continue;
+        if (slot->attacker_plus1 == ref + 1) slot->attacker_plus1 = -1;
+        if (slot->release_life && slot->depth_ref == ref) {
             /* The attack-init snapshot still describes the original actor. */
             slot->depth_ref = -1;
         }
@@ -5064,8 +5068,12 @@ sc64_source_emit(int raw,int source,int weapon,int air,
             const Sc64WeaponSourceAttackProfile *shot_profile = shot == 0 ? profile :
                 sc64_weapon_source_profile_lookup(key.actor_raw,key.weapon_id,
                                                   key.target_air,key.variant);
+            Sc64TraceSlot *trace = &sc64_trace_slots[slot];
+            if ((unsigned)source < MAX_UNITS + MAX_BUILDINGS) {
+                trace->attacker_parts = (u8)sc64_trace_attacker_parts(shot_profile);
+                if (trace->attacker_parts) trace->attacker_plus1 = (s16)(source + 1);
+            }
             if (shot_profile && shot_profile->projectile_image) {
-                Sc64TraceSlot *trace = &sc64_trace_slots[slot];
                 unsigned release = sc64_weapon_source_vfx_first_gba_age(
                     sc64_weapon_source_trace_release_ticks(shot_profile));
                 int ref = target >= 0 ? target : source;
@@ -11520,9 +11528,17 @@ static int sc64_cocoon_world_visible(int x,int y)
 
 #include "sc64_actor_draw_view.h"
 
+#ifdef SC64_PROJECTILE_DEPTH
+static void sc64_draw_attacker_images(unsigned first, const u8 *next, unsigned part);
+#endif
+
 static void
-draw_unit_pass(Unit * q, int selection_pass)
+draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *next)
 {
+#ifndef SC64_PROJECTILE_DEPTH
+    (void)first;
+    (void)next;
+#endif
     if (SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q)) return;
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
@@ -11598,6 +11614,9 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     int walk = sc64_walk_track(q);
     int body_y = y - SC64_WALK_LIFT(walk);
+#ifdef SC64_PROJECTILE_DEPTH
+    if (first) sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_UNDER);
+#endif
 #if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES) && defined(SC64_UNIT_FACING)
     if (sc64_race_ordinary_ghost(q->type) && race_nuke_draw_ghost((int)(q - u), x, body_y))
         goto after_unit_body;
@@ -11703,6 +11722,9 @@ draw_unit_pass(Unit * q, int selection_pass)
 #if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES) && defined(SC64_UNIT_FACING)
 after_unit_body:
 #endif
+#ifdef SC64_PROJECTILE_DEPTH
+    if (first) sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_OVER);
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
@@ -11725,6 +11747,12 @@ after_unit_body:
         0,
 #endif
         sc64_actor_max_shields(q->type, 0), energy, maxenergy);
+}
+
+static void
+draw_unit_pass(Unit *q, int selection_pass)
+{
+    draw_unit_with_images(q, selection_pass, 0, 0);
 }
 
 static void

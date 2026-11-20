@@ -118,6 +118,9 @@ sc64_depth_pop(u32 *heap, unsigned *size)
 }
 
 #ifdef SC64_PROJECTILE_DEPTH
+_Static_assert(MAX_TRACERS <= 255 && MAX_UNITS + MAX_BUILDINGS <= 32767,
+               "attacker image lists must hold every trace and actor");
+
 /* A projectile at a ground layer shares the same world-Y tie as actors.
  * Use the current projectile anchor, including the fixed anchor of a
  * target- or source-position effect. */
@@ -251,9 +254,24 @@ sc64_draw_depth_ordered_actors(void)
         sc64_depth_push(heap, &size, sc64_unit_world_layer(q), q->y, DEPTH_UNIT, i);
     }
 #ifdef SC64_PROJECTILE_DEPTH
-    for (unsigned i = 0; i < MAX_TRACERS; ++i) {
+    /* Traces sharing a shooter paint in slot order within its existing
+     * draw turn. Use the actor key directly for both image and body. */
+    u8 image_heads[MAX_UNITS + MAX_BUILDINGS], image_next[MAX_TRACERS];
+    int have_images = 0;
+    for (unsigned remaining = MAX_TRACERS; remaining; --remaining) {
+        unsigned i = remaining - 1;
         const Sc64TraceSlot *slot = &sc64_trace_slots[i];
-        if (tracers[i].life && slot->bullet_layer && !slot->release_life) {
+        if (!tracers[i].life) continue;
+        if (slot->attacker_plus1 > 0 && (slot->attacker_parts & SC64_TRACE_ATTACKER_IMAGE)) {
+            unsigned ref = (unsigned)slot->attacker_plus1 - 1;
+            if (!have_images) {
+                memset(image_heads, 0, sizeof(image_heads));
+                have_images = 1;
+            }
+            image_next[i] = image_heads[ref];
+            image_heads[ref] = (u8)(i + 1);
+        }
+        if (slot->bullet_layer && !slot->release_life) {
             unsigned layer = slot->bullet_layer;
             int y = layer <= 4 ? sc64_trace_world_y(i) : 0;
             sc64_depth_push(heap, &size, layer, y, DEPTH_PROJECTILE, i);
@@ -273,10 +291,18 @@ sc64_draw_depth_ordered_actors(void)
         case DEPTH_GEYSER:
             draw_map_geyser((int)i);
             break;
-        case DEPTH_BUILDING:
+        case DEPTH_BUILDING: {
+#ifdef SC64_PROJECTILE_DEPTH
+            unsigned first = have_images ? image_heads[MAX_UNITS + i] : 0;
+            if (first) sc64_draw_attacker_images(first, image_next, SC64_TRACE_ATTACKER_UNDER);
+#endif
             draw_building_art(&b[i]);
+#ifdef SC64_PROJECTILE_DEPTH
+            if (first) sc64_draw_attacker_images(first, image_next, SC64_TRACE_ATTACKER_OVER);
+#endif
             draw_building_overlay(&b[i]);
             break;
+        }
 #ifdef SC64_DEATH_WORLD_DEPTH
         case DEPTH_DEATH:
             sc64_depth_draw_death(i);
@@ -284,7 +310,11 @@ sc64_draw_depth_ordered_actors(void)
 #endif
         case DEPTH_UNIT:
             if (u[i].selected) draw_unit_pass(&u[i], 1);
+#ifdef SC64_PROJECTILE_DEPTH
+            draw_unit_with_images(&u[i], 0, have_images ? image_heads[i] : 0, image_next);
+#else
             draw_unit(&u[i]);
+#endif
             break;
 #ifdef SC64_PROJECTILE_DEPTH
         case DEPTH_PROJECTILE: {
