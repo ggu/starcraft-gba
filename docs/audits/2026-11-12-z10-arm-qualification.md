@@ -58,3 +58,28 @@ previously qualified ROMs byte-for-byte. The existing Z9 filename, code
 - The matched 1,000-update Zerg ARM battle window changes mean loop cycles
   from 1,369,965 on Z9 to 1,368,916 on Z10 (−0.08%). Sampled workloads
   match. The window remains above the 561,792-cycle budget for 30 fps.
+
+## Normal sparse-route build and fresh victory
+
+The Z10 ROM `ebc0d0f4…` from [#659](https://github.com/ggu/starcraft-gba/pull/659)
+runs the current renderer, Carrier service and sparse route packing.
+Ordinary controller input from blank SRAM wins the final Zerg mission
+at frame 50,193. The replay writes its pause journal at frame 2,526
+with START and B. The complete 32 KiB export is byte-identical to the
+previous qualified normal replay. A separate mGBA process loads this new
+journal with L on HOME and wins at the same frame.
+
+All 22 historical control observations match in the HOME run. The 20
+observations after fresh load also match the uninterrupted run's named
+state, world fingerprint, campaign state, and crystal carrier. The
+replay retains the crystal Drone at the objective, clears the countdown,
+and publishes victory without a mission fault. The whole uninterrupted
+run averages 12.08 emulated main-loop updates per second. Its figure
+includes menus, presentation and waits. Dense campaign performance and
+physical-device timing remain open.
+
+| Private receipt | SHA-256 |
+| --- | --- |
+| HOME and pause save | `e1e632861aadbc8cbebd230544125bda2177ca541d635a5731db223ce504a14f` |
+| Fresh HOME load and victory | `6eb1e4ea58ac6f73659ba289927ac90c01afc45f1d4ae87a2b56326ef5dab7ca` |
+| Paired comparison | `4642cd7387339634bd530baea0989f50b90f9447a4e01514299acfba03751a58` |
