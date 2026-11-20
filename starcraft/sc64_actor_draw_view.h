@@ -1,9 +1,4 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-#if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION) && \
-    !defined(SC64_TILE_RENDERER) && !defined(SC64_DISABLE_WORLD_DEPTH)
-#define SC64_WORLD_DEPTH 1
-#endif
-
 static inline int
 sc64_unit_anchor_in_view(const Unit *q, int x, int y)
 {
