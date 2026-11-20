@@ -8,7 +8,7 @@ same disconnected 361-cell component. The three calls build 13, 14
 and 13 route fields. The two early sampled calls retry in the opposite
 direction toward a 9,625-cell component.
 
-The trial keeps the existing point route request, FIFO and completed
+Sparse packing keeps the existing point route request, FIFO and completed
 field. On a 128-wide field, it clears the packed field and writes only
 the discovered cells if there are at most 384 and the queue could not
 have compacted. Whole-field packing handles the other cases. Route
@@ -63,11 +63,11 @@ the instruction profiles and the separate targeting measurements.
 
 ## Shared normal build option
 
-Set `CANONICAL_ROUTE_LINEAR_SPARSE_PACK=1` to enable the trial on any of
-the four normal imported builds. The flag is absent when linear routing
-or fresh-cell writes are disabled. The existing canonical configuration
-key changes when the trial is active, so switching the option rebuilds
-the affected product.
+The four normal imported builds enable sparse packing by default. Set
+`CANONICAL_ROUTE_LINEAR_SPARSE_PACK=0` for an A/B control. The flag is
+absent when linear routing or fresh-cell writes are disabled. The
+canonical configuration key changes when sparse packing is active, so
+switching the option rebuilds the affected product.
 
 On `e92caada`, all four normal recipes link and pass the ROM header,
 SRAM signature and payload checks with the prepared inputs. The trial
@@ -92,6 +92,28 @@ drop from 4,418,954 to 3,699,514 and from 4,427,492 to 3,606,158
 guest cycles. The first window changes by −0.03% in mean cost. Its
 maximum is 0.06% higher in the trial. The full comparison receipt is
 `a871401a8b680975cb580d65b77c76101d6cde5d6b19bd9ef04021deb571af30`.
+
+## Normal build qualification on `13de558d`
+
+With the Carrier and sprite-depth changes included, the default build
+commands and explicitly enabled commands match. Disabling sparse packing
+removes exactly one compiler definition from each of the four normal
+link recipes and the Z10 Carrier fact generator. The generated fact
+table has the same SHA-256 as the control and passes 2,019 checks.
+
+All four link with unchanged static RAM endpoints. The earlier Z10
+endpoint table above applies to `e92caada`; the endpoint after Carrier
+is `0x03004d60` for IWRAM and `0x02039b30` for EWRAM. The four-ROM
+matrix includes eight ordinary Blood Bath and Outpost custom replays
+and three campaign opening replays. Each control and default candidate
+pair produces identical 32 KiB SRAM and identical fresh HOME L
+continuation observations. The matrix receipt SHA-256 is
+`8709f82d6aa6af7b16ac9ce2f0101b7a5572f17dc24d9e6d6d3b953f7cf55b23`.
+
+The earlier `5dcacdce` Carrier check covers active and docked Interceptor
+saves through fresh HOME L, with byte-identical saves and restored
+arena records. The comparison receipt SHA-256 is
+`df70cb775921ec29ccc73c2f644387c22f3403545842eda86be3469ea73d7331`.
 
 The Z7 timing result measures isolated 128-wide point floods in the late
 campaign. Measure a representative late P10 scene and a wider custom
