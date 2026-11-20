@@ -2701,7 +2701,8 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 #endif
 
 #if defined(SC64_RANGE_WORK) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
-/* Only read an existing point field. Never initiate or resume a flood. */
+/* Read an existing point slot without touching its recency. A stale or
+ * deferred field can require exact materialization. */
 static int __attribute__((noinline))
 sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
 {
