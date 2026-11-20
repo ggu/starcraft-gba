@@ -160,3 +160,40 @@ monotone read, 108 accepted randomized proofs against full fields,
 and the existing range scratch suite. Keep this probe opt-in until
 normal-profile links and genuine busy replays measure how often the
 fast path succeeds and what the remaining full-field fallback costs.
+
+## Current death-depth release replay
+
+The `cd833c8c` source release has the same cartridge runtime as the
+previously linked `857f59cf` P10 control. The candidate at `353329e9`
+adds all seven route probe flags to that frozen link recipe and uses
+the same prepared death and weapon banks. It passes ROM header and
+SRAM signature checks and links at `0x03004f60` IWRAM and
+`0x0203b8dc` EWRAM with both route probes and the death depth painter
+present. The control and candidate ROM hashes begin `cd4f77fe` and
+`f346750a`. The normal compile flags stay off for the probes.
+
+Both ROMs load the same historical pause SRAM from HOME and resume at
+call 37,705, frame 36,761. Both win at call 47,194, frame 46,057 with
+mission bit 29 set. Five named world and route state samples match,
+including the palette and both indexed pages. The 58 measured
+updates match frame progression and route build and hit counts.
+
+| Guest cycles | Current control | Route trial |
+| --- | ---: | ---: |
+| Call 45,231, whole loop | 4,753,977 | 2,212,146 |
+| Call 45,231, orders | 3,531,921 | 988,954 |
+| Mean, calls 45,218–45,275 | 2,012,095 | 1,969,580 |
+| p95, same window | 2,700,482 | 2,668,791 |
+| Peak, same window | 4,753,977 | 2,737,515 |
+
+At call 45,231, only the three empty-goal linear fills remain. Across
+the 9,489-call continuation, a read-only observer sees 41 control
+linear fills and 14 trial fills. Both have ten calls to the cached
+weapon-range reader on exactly the same tape calls. None reaches
+the distant-read helper. Its speedup remains a forced-case result.
+The comparison receipt SHA-256 begins `375760e916cc9731`.
+
+The regular Z10 vector omits the ordinary movement monotone flag.
+Give the far reader access to the shared monotone oracle separately
+before qualifying that profile. Keep normal movement and cache
+decisions in the same configuration across the control and trial.
