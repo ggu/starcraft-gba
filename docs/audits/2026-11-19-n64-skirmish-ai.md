@@ -190,6 +190,31 @@ native-start preview qualification.
 The paired local evidence index SHA-256 is
 `fcd444c53c2308435590ef8dfad15263ca1ca08d912851569a81e659377e69e8`.
 
+### Matched northwest and southwest worker comparison
+
+A new unmodified ares run of the same solo-Zerg lobby places the human
+Command Center at (128, 240) and the CPU Hatchery at (288, 1808).
+Ordinary GBA Custom Game inputs close the other opponent seats and
+select Zerg in the third row. The normal Terran cartridge resolves base
+IDs 0 and 3 and starts its halls at equivalent coordinates. The human
+stays passive and keeps all four SCVs in both runs.
+
+Two captured N64 gameplay HUDs show 206 and 474 minerals. Save-state
+reads around each screenshot bracket the capture calls at native frames
+916–951 and 2,397–2,431. The display gains 268 minerals. GBA samples
+bracketing the same windows using the nominal 1.25 update ratio read
+346–378 and 850–890 minerals. The wallet increases by 472–544, about
+1.76–2.03 times the N64 display gain in this matched opening.
+
+The previously monitored N64 RAM word was 227–236 and 529–535 at these
+same cuts. Use the visible HUD for the current comparison. Trace the
+actual credited amount and each SCV's patch choice, travel, harvest, and
+unload before changing gather cadence. The current test fixes the start
+geometry and measures the displayed economy for this opening.
+
+The matched local receipt SHA-256 is
+`fc754de650296c8dc7f2d47f3213643de9307251332a0bb60e279b0969641940`.
+
 ## The same lobbies on the GBA build, before the change
 
 In 60 lobbies (both maps, the three human races, ten opponent sets of one to

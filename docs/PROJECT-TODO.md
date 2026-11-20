@@ -25,9 +25,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [release 25e9e8b9 matrix](audits/2026-11-13-normal-campaign-matrix.md#release-25e9e8b9-race-replays)
   ties Z2–Z6 to one Z10 ROM and P5 to one P10 ROM. Z2 and P5 match paused
   saves and fresh continuations. Z3–Z6 match all 627 uninterrupted
-  checkpoints. Z9 and Z10 now win from HOME and after current-written
-  pause saves. Prioritize fresh cuts in Z3–Z6 and the remaining
-  same-cartridge checks. The
+  checkpoints. Z9 and Z10 win from HOME and after current-written
+  pause saves on that build. Z1 and Z3–Z6 now also win after fresh
+  loads on the [Storm-depth Z10 release](audits/2026-11-13-normal-campaign-matrix.md#z1-and-z3z6-on-the-storm-depth-release).
+  Z6 restores two queued impacts. Keep the remaining current-cartridge
+  paths in the replay gate. The
   [nine custom checks](audits/2026-11-13-normal-campaign-matrix.md#two-opponent-custom-games)
   match ordinary starts and fresh SRAM continuation with each AI count
   on all three race cartridges. Complete long custom wins and check
@@ -37,20 +39,29 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Preserve the new ending inputs and update the stale checkpoint tails.
   The [new Z7 tape](audits/2026-11-13-normal-campaign-matrix.md#current-z7-home-win)
   wins from HOME at frame 228,128 with all 271 checkpoints matched.
-  A separate frame-5,641 save resumes correctly for 300 neutral calls.
-  Qualify a current-written save through victory on the same tape.
-  The HOME win averages 12.73 game updates per emulated second.
+  The [current Z10 fresh-load proof](audits/2026-11-13-normal-campaign-matrix.md#z7-fresh-save-through-victory-on-the-storm-depth-release)
+  matches all 254 remaining checks after one ordinary A press restores
+  the Hatchery selection. It averages 12.66 main-loop updates per
+  emulated second. Keep this route in the speed and save regression gate.
 - **Measure the remaining slow updates.** The refined eager route queue
   lowers the current Z8 peak from 12.10 to 11.67 million guest cycles with
   matching route fields and framebuffer samples. Two P10 route spikes
   improve 0.86% and 2.45%. Keep the queue opt-in while checking the
   remaining RAM guards and sustained P10 simulation and draw costs.
-  Inlined Terran Building reads cut the tested T6 save and load stalls
-  by 9.76–11.19%. Paired T1, T4, T7 and T10 campaigns match their fresh
-  loads and journals through victory. Continue the remaining journal
-  cases and measure hardware against the 30 fps goal.
+  Inlined Terran Building reads now ship on normal Terran and cut the
+  tested T6 save and load stalls by 9.76–11.19%. All ten normal mission
+  pairs match their fresh loads, victories and 32 KiB journals, and
+  the composed link reproduces the qualified bytes. Measure hardware
+  against the 30 fps goal.
   [Route queue](https://github.com/ggu/starcraft-gba/pull/636)
   [Building decoder](https://github.com/ggu/starcraft-gba/pull/638)
+- **Match worker economy against the N64.** The
+  [paired northwest and southwest Blood Bath run](audits/2026-11-19-n64-skirmish-ai.md#matched-northwest-and-southwest-worker-comparison)
+  uses the same human and CPU hall coordinates on both machines. The GBA
+  wallet gains 472–544 minerals over the bracketed opening where the
+  native HUD gains 268. Trace each worker's mine and unload events before
+  adjusting gather cadence. Keep visible HUD samples and wallet reads
+  together in the next capture.
 - **Current cartridge campaign saves.** [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge
