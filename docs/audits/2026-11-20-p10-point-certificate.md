@@ -121,3 +121,42 @@ Keep the certificate opt-in. The distant cached read alone takes
 still needs a bound on distant cached reads that preserves their
 returned step and timing of orders, broader dense-battle replays,
 and fresh candidate save/result reloads.
+
+## Distant cached-read certificate
+
+`SC64_ROUTE_POINT_FAR_READ` adds a second opt-in to the cached
+point reader. It applies to unknown entries in an existing deferred
+field with a walkable origin and goal. An ordinary monotone path
+certifies the Manhattan bound. Where the preferred L route meets an
+interior barrier, every route still crosses the full row or column
+through that barrier. Scan that separator for a unique walkable
+cell minimizing the sum of Manhattan distances to the endpoints.
+Two monotone legs through that cell attain a global lower bound.
+The original FIFO chooses its first lexicographic path to that cell
+and then the first lexicographic suffix, which the existing monotone
+oracle supplies. With an ambiguous minimum, only a direct Manhattan
+proof can answer. An exhausted budget, failed proof, blocked goal,
+or blocked origin uses the existing fallback.
+
+The helper borrows scratch at the head of the route queue and uses
+at most 512 monotone states across both legs. It returns a direction
+without writing the packed field or changing its cache metadata.
+The existing full-field readers still materialize the field when
+needed.
+
+On the same forced wall case the distant read falls from 1,087,475
+to 70,103 guest cycles. Cold build and nearby read take 15,303 and
+6,382 cycles, respectively, for 91,788 cycles across the three
+operations. Both returned steps and all logical metadata match.
+The slot remains deferred after the distant read. An explicit
+full-field request costs 1,086,096 cycles and produces the same
+6,144 packed bytes as the other three builds. The P10 ARM probe
+satisfies both linker guards. Its ROM SHA-256 begins `9fab8262eddc2ef9`
+and the receipt begins `44fafae911f84f41`.
+
+`make test-sc64-route-point-far-read` checks both wall orientations,
+equal lower-bound crossings, blocked multi-seed goals, an open
+monotone read, 108 accepted randomized proofs against full fields,
+and the existing range scratch suite. Keep this probe opt-in until
+normal-profile links and genuine busy replays measure how often the
+fast path succeeds and what the remaining full-field fallback costs.
