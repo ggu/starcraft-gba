@@ -106,6 +106,7 @@ enum {
 #ifdef RACE_AI_CARRIERS
     AK_CARRIER, AK_FLEET,
 #endif
+    AK_BATTERY,
     AK_COUNT
 };
 
@@ -125,7 +126,7 @@ static const unsigned char race_ai_raw_key[256] = {
     [149] = AK_EXTRACTOR + 1,
     [154] = AK_NEXUS + 1, [156] = AK_PYLON + 1, [157] = AK_ASSIMILATOR + 1,
     [160] = AK_GATEWAY + 1, [164] = AK_CORE + 1, [166] = AK_FORGE + 1,
-    [162] = AK_CANNON + 1, [167] = AK_STARGATE + 1,
+    [162] = AK_CANNON + 1, [167] = AK_STARGATE + 1, [172] = AK_BATTERY + 1,
 #ifdef RACE_AI_CARRIERS
     [72] = AK_CARRIER + 1, [169] = AK_FLEET + 1,
 #endif
@@ -141,6 +142,7 @@ typedef struct {
     int producers, larva, pending_supply, patches, ore_patches, queued_units, free_supply, site_searches;
     int supply_used, supply_cap, supply_queued;
     unsigned char lane_patch[16], lane_patches, lane_geyser[2], lane_geysers;
+    unsigned char battery_placed;
     int enemy_air, enemy_army, enemy_air_tech, enemy_defense;
     int threat, threat_x, threat_y, threat_d, threat_count;
     int reserve_minerals, reserve_gas;
@@ -231,6 +233,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
          * pending Sunken (race_construction_deferred_morph). */
         key = race_ai_key(sc64_race_raw_building(race_construction_deferred_morph(q) >= 0 ?
                                                  race_construction_deferred_morph(q) : q->type));
+        if (key == AK_BATTERY) c->battery_placed = 1;
         if (q->under_construction &&
             !(race_mode && (q->type == B_LAIR || q->type == B_HIVE))) {
             if (key >= 0 && c->pend[key] < 255) ++c->pend[key];
@@ -861,9 +864,14 @@ enum {
     RACE_AI_STEP_GAS = 4, RACE_AI_STEP_HALL = 5, RACE_AI_STEP_DEFENSE = 6,
     RACE_AI_IF_AIR = 1, RACE_AI_IF_LATE = 2, RACE_AI_IF_RICH = 4,
     RACE_AI_ZERG_OPENING_DEFENSE = 8,
+    RACE_AI_PROTOSS_OPENING_BATTERY = 16,
     /* The first Creep Colony in the two unmodified Blood Bath runs
      * appeared from native frame 3,725. Use the same source clock. */
-    RACE_AI_FIRST_CREEP = 3725 * 5 / 4
+    RACE_AI_FIRST_CREEP = 3725 * 5 / 4,
+    /* Two native Gateway openings start a Battery from frame 4,047,
+     * before the first Assimilator seen at 6,197. */
+    RACE_AI_FIRST_BATTERY = 4047 * 5 / 4,
+    RACE_AI_BATTERY_OPENING_END = 6197 * 5 / 4
 };
 
 /* Ordered development plans. raw is the stock raw ID; count is the wanted
@@ -933,6 +941,12 @@ static const RaceAiStep race_ai_protoss_plan[] = {
     { RACE_AI_STEP_BUILD, 166, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_DEFENSE, 162, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_BUILD, 160, 4, 16, RACE_AI_IF_RICH },
+};
+
+static const RaceAiStep race_ai_protoss_battery_opening[] = {
+    { RACE_AI_STEP_BUILD, 160, 1, 9, 0 },
+    { RACE_AI_STEP_BUILD, 160, 2, 12, 0 },
+    { RACE_AI_STEP_BUILD, 172, 1, 15, RACE_AI_PROTOSS_OPENING_BATTERY },
 };
 
 static const Sc64SkirmishRecord *race_ai_record(const RaceAiCensus *c, int raw)
@@ -1041,7 +1055,23 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
     const RaceAiStep *plan;
     int steps, worker_target = race_ai_worker_target(c);
     if (c->race == R_ZERG) { plan = race_ai_zerg_plan; steps = (int)(sizeof race_ai_zerg_plan / sizeof *plan); }
-    else if (c->race == R_PROTOSS) { plan = race_ai_protoss_plan; steps = (int)(sizeof race_ai_protoss_plan / sizeof *plan); }
+    else if (c->race == R_PROTOSS) {
+        /* Leave the opening once a paid foundation is placed, even when it
+         * has yet to finish warping in. A walking Probe is only a reservation. */
+        if (race_skirmish_map == SC64_MAP_BLOOD_BATH &&
+#ifdef SC64_NATIVE_MELEE_STARTS
+            !race_skirmish_melee &&
+#endif
+            frame < RACE_AI_BATTERY_OPENING_END && worker_target >= 15 && !c->enemy_air &&
+            !c->battery_placed && !race_ai_count(c, AK_ASSIMILATOR) &&
+            !race_ai_count(c, AK_CORE) && race_ai_record(c, 172)) {
+            plan = race_ai_protoss_battery_opening;
+            steps = (int)(sizeof race_ai_protoss_battery_opening / sizeof *plan);
+        } else {
+            plan = race_ai_protoss_plan;
+            steps = (int)(sizeof race_ai_protoss_plan / sizeof *plan);
+        }
+    }
     else { plan = race_ai_terran_plan; steps = (int)(sizeof race_ai_terran_plan / sizeof *plan); }
     if (c->buildings >= race_ai_building_cap()) return;
     if (!c->depots) { (void)race_ai_hall(c, 1); return; }
@@ -1055,6 +1085,8 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         if ((step->flags & RACE_AI_IF_AIR) && !c->enemy_air && !c->enemy_air_tech) continue;
         if ((step->flags & RACE_AI_IF_LATE) && frame < 18000) continue;
         if ((step->flags & RACE_AI_ZERG_OPENING_DEFENSE) && frame < RACE_AI_FIRST_CREEP) continue;
+        if ((step->flags & RACE_AI_PROTOSS_OPENING_BATTERY) &&
+            (frame < RACE_AI_FIRST_BATTERY || c->have[AK_GATEWAY] < 2 || c->have[AK_PROBE] < 15)) continue;
         if ((step->flags & RACE_AI_IF_RICH) && race_owner_minerals(c->owner) < 600) continue;
         type = sc64_race_building_from_raw(step->raw);
         rule = type >= 0 ? sc64_race_building_rule(type) : 0;

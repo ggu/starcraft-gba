@@ -1500,6 +1500,45 @@ static int opening_defense(void)
     return ok;
 }
 
+/* Observe the Gateway opening without granting a Pylon, Probe or minerals. */
+static int opening_battery(void)
+{
+    int owner = -1, probes = 0, gateways = 0, powered = 0;
+    for (int i = 0; i < race_bots; ++i)
+        if (race_owner_identity(race_bot_owner_ids[i]) == R_PROTOSS) {
+            owner = race_bot_owner_ids[i];
+            break;
+        }
+    if (race_skirmish_map != SC64_MAP_BLOOD_BATH || race_human != R_TER || owner < 0) return 0;
+
+    audit_start();
+    const OwnerAudit *paid = &ledger.o[owner];
+    while (screen == SCREEN_PLAY && frame < 9000) {
+        input(0);
+        if (paid->made[172] == frame) {
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (u[i].alive && u[i].owner == owner && u[i].type == U_PROBE) ++probes;
+            for (int i = 0; i < MAX_BUILDINGS; ++i) {
+                if (!b[i].alive || b[i].owner != owner) continue;
+                if (b[i].type == B_GATEWAY && !b[i].under_construction) ++gateways;
+                if (sc64_battery_raw_building(&b[i]) == 172)
+                    powered = race_battery_site_powered(owner, b[i].x, b[i].y);
+            }
+        }
+        if (paid->done[172] >= 0 && paid->made[157] >= 0 && paid->made[164] >= 0) break;
+    }
+    int ok = paid->made[172] >= RACE_AI_FIRST_BATTERY && paid->made[172] <= 4229 * 5 / 4 &&
+        paid->done[172] > paid->made[172] && paid->done[172] <= 4776 * 5 / 4 &&
+        paid->made[157] > paid->made[172] && paid->made[164] > paid->made[172] &&
+        paid->made_n[172] == 1 && probes == 15 && gateways == 2 && powered &&
+        !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+    printf("{\"kind\":\"opening-battery\",\"owner\":%d,\"battery_start\":%d,\"battery_done\":%d,"
+           "\"assimilator\":%d,\"cybernetics\":%d,\"probes\":%d,\"gateways\":%d,\"powered\":%d,\"ok\":%d}\n",
+           owner, paid->made[172], paid->done[172], paid->made[157], paid->made[164],
+           probes, gateways, powered, ok);
+    return ok;
+}
+
 /* ---- Economy raid. In a mirrored match (the planner also drives the human
  * owner, so the match reaches the engine's own result), the first opponent's
  * economy is hit mid-game through hit_target: 0, every worker dies; 1, its
@@ -1927,7 +1966,7 @@ int main(int argc, char **argv)
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
     int builder = -1, workers = -1, ai_sunken = 0, sunken_legacy = 0;
     int threats = 0, repowering = -1, airpin = -1, noore = -1;
-    int wave = 0, defense = 0, raiding = -1;
+    int wave = 0, defense = 0, battery = 0, raiding = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -1955,6 +1994,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--no-ore") && i + 1 < argc) noore = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--first-wave")) wave = 1;
         else if (!strcmp(argv[i], "--opening-defense")) defense = 1;
+        else if (!strcmp(argv[i], "--opening-battery")) battery = 1;
         else if (!strcmp(argv[i], "--raid") && i + 1 < argc) raiding = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
@@ -1974,6 +2014,7 @@ int main(int argc, char **argv)
     if (noore >= 0) return no_ore(noore) ? 0 : 17;
     if (wave) return first_wave() ? 0 : 18;
     if (defense) return opening_defense() ? 0 : 20;
+    if (battery) return opening_battery() ? 0 : 21;
     if (raiding >= 0) return raid(raiding, ticks) ? 0 : 19;
     if (resume_at < 0 && !resume_morph) {
         audit_start();
