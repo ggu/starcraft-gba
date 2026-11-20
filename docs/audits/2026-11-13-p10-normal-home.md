@@ -110,9 +110,9 @@ pages. The pause save and unpause occur in the same process. At frame
 alive and human-owned, and the P10 objective and completion bits are set.
 There are zero unsupported mission actions.
 
-The measured rate is 10.53 calls per emulated second. Verify the actual
-pause journal, its fresh continuation and the result autosave on this
-revision. The earlier KODAK fresh-load evidence used a different ROM.
+The measured rate is 10.53 calls per emulated second. The same ROM also
+passes the [fresh load and result autosave](#fresh-load-and-result-autosave-on-the-merged-build)
+below.
 
 | Input or receipt | SHA-256 |
 | --- | --- |
@@ -120,3 +120,46 @@ revision. The earlier KODAK fresh-load evidence used a different ROM.
 | Matching ELF | `dd13057e1fd570b36c3c8e65b592a2e0b1ff613df55b0cfe1fc83b4e79ae25a1` |
 | Regenerated controller tape | `d331b46adbb941be4d25b75959e494b5f91b638a2478e9fd7170dc171cb9d3d5` |
 | Full ARM receipt | `d236963d02e20955e3583d5a8cf81fab32bb69ce1b58e5af8cbeeb993ab187b4` |
+
+
+### Fresh load and result autosave on the merged build
+
+On release `916bb897`, the normal P10 ROM writes its first 32 KiB journal
+through the pause menu at frame 36,761. The SRAM image matches the
+sanitized HOST controller's journal byte for byte. The sequence-one bank
+has outer tag `0x7643505f` and a 16,322-byte payload. The other bank is
+erased.
+
+Run `tools/sc64_p10_normal_replay.py` with the current controller trace,
+matching ROM and ELF, and `--fresh-save`. The observer exports the pause
+SRAM after 37,704 completed calls. A fresh emulator starts at HOME and L
+replaces the tape's unpause press. Its named world, controls and complete
+P10 persistent block match the saved state. The next neutral call advances
+to frame 36,762.
+
+All 20 gameplay checkpoints match, including six after fresh load. All
+ten briefing and 14 dialogue pages match. The frame 46,129 result keeps
+Zeratul, the Gantrithor and the Hyperion alive and player-owned. The primary
+objective and campaign completion bits are set with zero unsupported
+actions. The fresh-load run averages 10.53 calls per emulated second.
+
+The victory autosave preserves the first bank and writes a checksum-valid
+sequence-two bank with its own 16,308-byte payload. A third emulator loads
+victory through HOME L, restores the terminal world, controls and P10
+persistent block, and keeps simulation frozen across eight neutral
+updates. The generic impact queue is empty. Export from this third process
+matches the victory image byte for byte.
+
+A separate custom-game stress replay on the same ROM starts with eight
+pending impacts, reaches ten after one update and wins at frame two with
+nine still queued. It writes a new validated bank and reloads the frozen
+result with an empty queue. Its exported SRAM matches the earlier
+[terminal-impact fix](../IMPACT-EVENTS.md#save-and-load) byte for byte.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| Pause SRAM | `5b793b5a8b3ecef2cec5af326a4a1dd8bb593d6dd6cafd648c57cd62d2bef2fb` |
+| Victory SRAM and fresh readback | `4fbb2dc29e8496e3e105a38f4eecc3d02074692259baa224b3ca34040672365b` |
+| Full replay and both journal checks | `7086611cfd7735ebee71a08c44251c7f6899074749dbe9baef715787e0c40294` |
+| Pending-impact custom stress receipt | `ef48de518604ddbe33593edbd02923998994754acd8f3dabbb48b543502358e1` |

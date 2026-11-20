@@ -264,3 +264,50 @@ completion stalls seen in dense Z7.
 | --- | --- |
 | Forced P10 comparison | `faba21247030427ffc0597ec1fe42b13099ccf66bbf91dfa7d896cd03a8339e9` |
 | Z9 walkability sample | `b9298d8e5fa0ec179d07bece2e2c6e3abeec614de8429730be1fd5b149e3aff6` |
+
+
+## Z8 check on the current mineral-routing release
+
+The route code from #576 at `f556e9ba` was composed locally with release
+`916bb897`. The Z10 trial enabled point prefixes, the component and
+distance witnesses, and the second exact-hit cutoff. Prepared inputs
+and controller tape are identical to the release control. All 47
+world checkpoints, 24 two-page video samples and 19 HOST checks match.
+The frame, screen and dialogue timeline matches across all 46,487 calls.
+The paired replay is uninterrupted.
+
+| Metric | Control cycles | Point prefix cycles |
+| --- | ---: | ---: |
+| Mean advancing play update | 1,020,920 | 1,016,666 |
+| p95 advancing play update | 1,500,353 | 1,470,299 |
+| Peak advancing play update | 12,264,221 | 11,052,465 |
+| Call 33,800 entire observer interval | 12,264,714 | 11,052,958 |
+| Calls 33,889–33,896 mean observer interval | 3,281,773 | 2,517,638 |
+
+The mean gain on this full route is 0.42%. The 33,800 movement spike
+is 9.9% shorter. The route and reserved range-plane sanitizer checks
+pass. Z10 IWRAM ends at `0x03004ec8` and EWRAM at `0x02038328`, both
+within their guards. Terran, P10 and Showcase also pass the current
+five-flag links. All four profiles build successfully with 72 bytes or
+more below the IWRAM ceiling. Three-AI Blood Bath smoke pairs write the
+same pause journals and match the named world 240 updates past a fresh
+HOME load. The cross-profile build and save receipts have SHA-256
+`13eb58c2fa4379f1dc2934b9f16ddbd32853c2283ac092a47d3e47fc6c9e0608` and
+`2c69b7a22387a51834fa9226d5ee1aad0e29673dd5ee00c2117237ed8d94d911`.
+
+The current forced P10 long-wall ARM fixture returns `(1608, 1624)` and
+records one logical build and zero hits with either variant. The release
+fills the whole field in 1,087,127 cycles and reads the cached step in
+1,228 cycles. The five-flag preview parks the field in 103,404 cycles,
+then spends 1,086,880 completing it on the cached read. This reproduces
+the deferred range stall on the current code. The result SHA-256 is
+`0dbd4113fd903e1e5d91ff4d23fbfa794d83272ead9c2272e068b94e55e80861`.
+The second exact-hit flag still needs a normal selector entry and the
+cached-read cost needs a solution that can apply on real terrain.
+
+The trial ROM SHA-256 is
+`3b9e27ac57008b2a852a7cffc44802c252d85115289717ce810b9f6c570f78a6`.
+The replay receipt SHA-256 is
+`c78c41503fe8c112faa45ad0beef65808bffbb59e79394e56cb02f9e19dcc839`.
+The paired comparison SHA-256 is
+`ae04bf3920fc5f7166fef435b82ea8d2dcdb43ff9df95b5f6d67ddfef185d3e5`.
