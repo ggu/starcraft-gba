@@ -98,6 +98,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores the countdown at frame 26,993 and survives all eleven waves.
   All 56 observations match, and the frozen result re-exports identical
   SRAM. The route averages 28.47 emulated updates per second.
+  [T5 on normal Terran](audits/2026-11-13-t5-normal-physical.md#november-20-fresh-sram-and-result-autosave)
+  restores the first paid Wraith attack at frame 72,076 and wins with
+  Raynor and Kerrigan alive. All 162 observations match, and a third
+  emulator reloads the frozen result and exports identical SRAM. All
+  ten Terran missions now have a fresh-load and result check on their
+  documented normal Terran builds. A sweep on a single current ROM
+  is still pending.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
