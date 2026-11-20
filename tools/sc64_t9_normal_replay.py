@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check T1, T2, T4 and T6–T10 on a normal Terran ROM using physical buttons."""
+"""Check T1–T4 and T6–T10 on a normal Terran ROM using physical buttons."""
 import argparse
 import hashlib
 import json
@@ -31,6 +31,9 @@ T2_FIELDS = ("frame", "minerals", "gas", "marines", "scvs", "zerglings", "fireba
              "raynor_alive", "raynor_owner", "raynor_slot", "infested_cc", "objective",
              "won", "lost", "screen", "phase", "objective_flags", "backwater_outcome",
              "switches", "executed")
+T3_FIELDS = ("elapsed", "remaining", "killed", "outcome", "objective", "phase", "won",
+             "lost", "screen", "side_units", "enemy_units", "side_buildings",
+             "enemy_buildings", "side_ore", "side_gas", "enemy_ore", "enemy_gas", "sent", "waves")
 T4_FIELDS = t4.TRACE_STATE_FIELDS + ("actor_slot", "race_mode", "race_selected_mission")
 T7_DIALOGUE = {1: (1, 2), 682: (661, 1), 4189: (3931, 1)}
 T8_DIALOGUE = {1404: (1321, 1)}
@@ -157,6 +160,35 @@ def load_t2_trace(path, stop):
                 observations=observations, final=final, stop=stop)
 
 
+def load_t3_trace(path, stop):
+    reference = json.loads(path.read_text())
+    launch = 7
+    opening = (KEY_A, 0, KEY_RIGHT, 0, KEY_A, 0, KEY_START, 0)
+    if (reference.get("trace_schema") != 1 or reference.get("mode") != "controller-only-neutral-run" or
+            any(reference.get(name) != 6 for name in ("mission", "campaign_mission", "selected_mission")) or
+            reference.get("total_ticks") != launch + stop or
+            reference.get("events") != [dict(tick=tick, held=held) for tick, held in enumerate(opening)]):
+        raise ValueError("T3 requires the recorded campaign-menu entry and neutral gameplay")
+    rows = reference["checkpoints"]
+    if ([row["tick"] for row in rows] != list(range(1000, launch + stop, 1000)) or
+            any(type(row.get(name)) is not int for row in rows for name in T3_FIELDS) or
+            any(row["elapsed"] != row["tick"] - launch or row["elapsed"] + row["remaining"] != stop
+                for row in rows)):
+        raise ValueError("T3 trace is missing a countdown checkpoint")
+    final = dict(kind="won", elapsed=reference["elapsed_ticks"],
+                 remaining=reference["remaining_ticks"], killed=reference["buildings_killed"],
+                 outcome=reference["outcome"], objective=reference["objective"],
+                 won=reference["won"], lost=reference["lost"], phase=3, screen=3)
+    if tuple(final[k] for k in ("elapsed", "remaining", "outcome", "won", "lost", "objective")) != (
+            stop, 0, 1, 1, 0, 0):
+        raise ValueError("T3 requires a countdown victory")
+    observations = {row["tick"] - launch: row for row in rows}
+    observations[0] = dict(kind="start", elapsed=0, remaining=stop, outcome=0, screen=1)
+    observations[stop] = final
+    return dict(transitions=[(1, 0)], observations=observations, final=final, stop=stop,
+                initial=(reference["initial_units"], reference["initial_buildings"]))
+
+
 def observe_t7_carrier(game, state, last_slot):
     # The carrier can die before the objective trigger. Follow the slot first
     # witnessed carrying the emitter, then read its dead row at the result.
@@ -195,7 +227,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("trace", "rom", "elf", "runner", "out"):
         parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--chapter", type=int, choices=(1, 2, 4, 6, 7, 8, 9, 10), default=9)
+    parser.add_argument("--chapter", type=int, choices=(1, 2, 3, 4, 6, 7, 8, 9, 10), default=9)
     parser.add_argument("--save-tick", type=int, required=True,
                         help="neutral completed gameplay tick for pause, save and fresh HOME load")
     args = parser.parse_args()
@@ -213,10 +245,12 @@ def main():
     chapter = args.chapter
     mission = chapter + 3
     mission_symbols = {1: ("race_campaign",), 2: ("race_campaign", "backwater"),
+                       3: ("race_campaign", "race_t3", "race_t3_buildings_killed"),
                        4: ("race_t4",), 6: ("race_t6",)}.get(chapter, ("race_late",))
     briefing_pages, dialogue_cuts, stop, compared = {
         1: (9, {}, 10144, T1_FIELDS),
         2: (8, {}, 29380, T2_FIELDS),
+        3: (15, {}, 54000, T3_FIELDS),
         4: (8, {}, 8943, T4_FIELDS),
         6: (15, {}, 23849, T6_FIELDS),
         7: (17, T7_DIALOGUE, 4189, T7_FIELDS),
@@ -234,6 +268,8 @@ def main():
         plan = load_t1_trace(args.trace, stop)
     elif chapter == 2:
         plan = load_t2_trace(args.trace, stop)
+    elif chapter == 3:
+        plan = load_t3_trace(args.trace, stop)
     elif chapter == 4:
         plan = load_t4_trace(args.trace, stop)
     elif chapter == 9:
@@ -256,7 +292,7 @@ def main():
     if next_held & KEY_L and next_held & KEY_START:
         parser.error("--save-tick cannot precede a joint L and Start press")
     # Each route keeps only three 32 KiB SRAM images and small JSON receipts.
-    disk_reserve = (48 if chapter in (1, 2) else 256) << 20
+    disk_reserve = (48 if chapter in (1, 2, 3) else 256) << 20
     if shutil.disk_usage(args.out.parent).free < disk_reserve:
         raise RuntimeError(f"replay requires {disk_reserve >> 20} MiB free")
     _, save_layout = dwarf_struct_layout(args.elf, "RaceSave")
@@ -277,6 +313,9 @@ def main():
             names += ("U_FIREBAT", "B_INFESTED_COMMAND")
             _, backwater_layout = dwarf_struct_layout(args.elf, "Sc64BackwaterState")
         early_types = t1.read_types(args.elf, names)
+        campaign_layout = dwarf_struct(args.elf, "Sc64RaceCampaignState")
+    elif chapter == 3:
+        _, t3_layout = dwarf_struct_layout(args.elf, "Sc64T3State")
         campaign_layout = dwarf_struct(args.elf, "Sc64RaceCampaignState")
     elif chapter == 4:
         t4_layouts = (race_bank_profile(args.elf, g.sizes),
@@ -300,6 +339,28 @@ def main():
 
     def observe():
         nonlocal last_carrier_slot
+        if chapter == 3:
+            world = g.state()
+            campaign = campaign_state(g.rsp, g.sym["race_campaign"], *campaign_layout)
+            raw = g.rsp.read(g.sym["race_t3"], g.sizes["race_t3"])
+            runtime = {name: int.from_bytes(raw[t3_layout[name]:t3_layout[name] + t3_layout.widths[name]],
+                                            "little")
+                       for name in ("elapsed_ticks", "remaining_ticks", "outcome", "objective")}
+            assert (n("race_mode"), n("race_selected_mission"), campaign["mission"]) == (0, mission, mission)
+            assert world["frame"] == campaign["elapsed_frames"] == runtime["elapsed_ticks"]
+            point = dict(frame=world["frame"], elapsed=runtime["elapsed_ticks"],
+                         remaining=runtime["remaining_ticks"], outcome=runtime["outcome"],
+                         objective=runtime["objective"], killed=n("race_t3_buildings_killed"),
+                         phase=campaign["phase"], won=n("won"), lost=n("lost"), screen=world["screen"],
+                         sent=campaign["enemy_units_sent"], waves=campaign["enemy_wave"],
+                         objective_flags=campaign["objective_flags"])
+            for label, owner in (("side", 0), ("enemy", 1)):
+                for kind, fields in (("units", UNIT_FIELDS), ("buildings", BUILDING_FIELDS)):
+                    index = fields.index("owner") + 1
+                    point[f"{label}_{kind}"] = sum(row[index] == owner for row in world[kind])
+                point[f"{label}_ore"] = struct.unpack_from("<i", bytes.fromhex(world["race_minerals"]), 4 * owner)[0]
+                point[f"{label}_gas"] = struct.unpack_from("<i", bytes.fromhex(world["race_gas"]), 4 * owner)[0]
+            return point
         if chapter in (1, 2):
             world = g.state()
             state = t1.checkpoint(g, early_types, 0, world)
@@ -371,7 +432,7 @@ def main():
             observed["campaign_phase"] = observed["phase"]
         else:
             diff = {k: (expected[k], observed[k]) for k in compared if
-                    (chapter not in (1, 2) or k in expected) and expected[k] != observed[k]}
+                    (chapter not in (1, 2, 3) or k in expected) and expected[k] != observed[k]}
             if diff:
                 (args.out / "divergence.json").write_text(json.dumps(
                     dict(tick=tick, expected=expected, differences=diff), indent=2) + "\n")
@@ -423,16 +484,20 @@ def main():
     # T8's six victory pages are triggered once the last hostile building
     # falls. Inspect each update after the last observed assault order so
     # added physical acknowledgements cannot swallow a tape transition.
-    # The retained T1, T2, T4 and T6 tapes omit physical dialogue boundaries.
-    dialogue_scan = ({1: range(1, stop + 1), 2: range(1, stop + 1), 4: range(1, stop + 1),
-                      6: range(1, stop + 1),
+    # The retained T1–T4 and T6 tapes omit physical dialogue boundaries.
+    dialogue_scan = ({1: range(1, stop + 1), 2: range(1, stop + 1), 3: range(1, stop + 1),
+                      4: range(1, stop + 1), 6: range(1, stop + 1),
                       8: range(T8_LAST_ASSAULT + 1, stop + 1)}.get(chapter, ()))
-    dialogue_count = {1: 8, 2: 12, 4: 11, 6: 13, 8: 7}.get(chapter, sum(count for _, count in dialogue_cuts.values()))
+    dialogue_count = {1: 8, 2: 12, 3: 6, 4: 11, 6: 13, 8: 7}.get(
+        chapter, sum(count for _, count in dialogue_cuts.values()))
     try:
         assert n("screen") == n("frame") == g.front_field("page") == 0
         before = timing_snapshot(g.rsp, g.sym, g.sizes)
         reveal_briefing()
-        compare(0)
+        opening = compare(0)
+        if chapter == 3:
+            assert (opening["side_units"] + opening["enemy_units"],
+                    opening["side_buildings"] + opening["enemy_buildings"]) == plan["initial"]
         offset = g.rsp.completed
         edges = [(t + offset, mask) for t, mask in transitions]
         for tick in sorted(set(plan["observations"]) | set(dialogue_cuts) | {cut} | set(dialogue_scan)):
@@ -511,6 +576,9 @@ def main():
             assert observed["objective_flags"] & 1 and observed["raynor_slot"] == checkpoints[0]["raynor_slot"]
             if chapter == 2:
                 assert observed["backwater_outcome"] == 1
+        elif chapter == 3:
+            assert n("race_completed") == 1 << mission and observed["objective_flags"] & 1
+            assert (observed["side_units"], observed["side_buildings"], observed["waves"]) == (16, 10, 11)
         elif chapter == 4:
             t4.verify_final(plan["final"], observed)
         else:

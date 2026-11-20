@@ -94,6 +94,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores the selected worker at frame 18,204 and destroys the Infested
   Command Center with Raynor alive. All 31 observations match. A third
   emulator reloads the frozen result and exports identical SRAM.
+  [T3 on normal Terran](audits/2026-11-13-t3-t4-normal-physical.md#november-20-t3-fresh-sram-and-result-autosave)
+  restores the countdown at frame 26,993 and survives all eleven waves.
+  All 56 observations match, and the frozen result re-exports identical
+  SRAM. The route averages 28.47 emulated updates per second.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
