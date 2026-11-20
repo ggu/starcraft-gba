@@ -54,7 +54,8 @@ Its confirmed child anchors are (3213, 3361) and (3212, 3367).
 Supported Wraith, Goliath and Vulture projectiles paint their detached
 flight trails one elevation above the released bullet. Same-trace
 children on high layers share one heap entry, with their separately
-authored birth positions and lifetimes. Attached images stay in the
+authored birth positions and lifetimes. The group reuses the queue
+capacity vacated by its parent. Attached images stay in the
 parent turn. Per-child ties against other sprites at the same depth,
 ground-level children, and children that carry into later phases
 remain separate parity cases.
@@ -74,7 +75,7 @@ both indexed pages, and check that both HUD bands match the empty frame.
 | `tank-muzzle-turret-same-y` | Use the normal or sieged muzzle's live image tick and a same-row ordinary blocker. The hull precedes the blocker and the turret and attached flash follow it. Compare both compositions because the siege flash remaps existing colors. | Native owner and layer witness. Siege HOST case, with the normal active cut and native pixels pending. |
 | `goliath-turret-same-y` | Start from the native Goliath/Barracks key witness above. Require opaque overlap and both independently visible turret and hull pixels before comparing. | Native keys captured. GBA turret art and matching renderer case pending. |
 | `pool-id-exact-tie` | Use two SCVs with equal layer and Y, then two Wraiths with equal air layer and different Y. Record the real pool IDs and at least one destruction and reuse. Use the same sample for foreground picking. | Native keys captured. A shared GBA sprite-ID lifetime and exact pixel witnesses remain open. |
-| `aircraft-crop-past-anchor` | Place Wraith and Carrier anchors at screen (-9, 66), (248, 66), (120, 9), and (120, 126), with camera clear of map boundaries. Draw visible cropped art in depth order and check the Wraith over the Carrier at an opaque overlap. Repeat hostile in fog, and suppress an actor wholly outside the playfield. | N64 horizontal row admission at ROM 0xe405c selects visible sprites without a center-X test. A separate native vertical and opaque edge cut is pending. |
+| `aircraft-crop-past-anchor` | Place Wraith and Carrier anchors at screen (-9, 66), (248, 66), (120, 9), and (120, 126), with camera clear of map boundaries. Draw visible cropped art in depth order and check the Wraith over the Carrier at an opaque overlap. Repeat hostile in fog, and suppress an actor wholly outside the playfield. | N64 horizontal row admission at ROM 0xe405c selects visible sprites without a center-X test. The [GBA crop fixture](2026-11-21-world-unit-edge-crop.md#harness-cases) passes all four edges. Native vertical and opaque edge cuts are pending. |
 | `moving-missile-sprite-child` | Capture the Goliath/Wraith missile or Vulture grenade while a trail sprite is live. Put a layer-5 point Storm on the child and a higher-layer flyer across it. The child covers Storm and the flyer covers both. Trace independent fixed birth anchors through flight. | Native Terran 10 key witness has parent sprite 345/image 529, ID 528, layer 5, and two live child sprites 309/image 422, IDs 527/526, layer 6. Showcase HOST passes the Storm, Wraith and HUD comparisons for all three projectiles. Ordinary-input and native overlap pixels remain open. |
 
 Record per cut the source, ROM and input digests, mode, camera, animation
@@ -82,3 +83,22 @@ tick, actor and effect anchors, effective keys, native sprite IDs when
 available, active page, and distinguishing and incorrect pixel counts.
 Use normal controller input for a second pass after staged overlap checks.
 Compare each platform at its own scale and palette.
+
+## Combined verification
+
+Runtime `6b1531a3` passed the normal Terran, Z10, P10 and Showcase
+ARM links with authenticated prepared inputs. All four retain their
+predecessor IWRAM and EWRAM endpoints. A normal-input mGBA check ran
+both Custom Game maps on each product. All eight cases matched their
+saved world and 240 subsequent updates after fresh SRAM load. The
+first Terran, Zerg and Protoss campaigns also matched their own saves
+and 60 subsequent updates.
+
+A paired 120-update ordinary Showcase Siege Line run matched world
+state, palette, active page and both HUD bands at all 24 cuts. The
+field differs across the pair. The staged same-row tests establish
+foreground order independently. The paired run used 119,299,732 guest
+cycles on the previous ROM and 120,198,067 on the candidate (+0.75%).
+Timing an active missile-heavy overlap and measuring physical GBA
+frame rate remain open. The local verification index SHA-256 is
+`fff17013262b1788618944d6edde1a93d6aa440adfd4cf9e4e45d768a3e57235`.

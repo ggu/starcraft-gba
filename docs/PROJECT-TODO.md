@@ -2199,9 +2199,9 @@ AI wallets and full-match behavior remain unverified.
   for exact-tie cases.
 - Add the [native depth follow-up cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
   by case ID. Start with same-Y Tank hull, turret and firing flash, then
-  cover the separate Goliath turret and capture native pool-ID reuse,
-  aircraft crop and detached missile trails. Run the same cuts under the
-  campaign, Custom Game and Showcase builds.
+  cover the separate Goliath turret and capture native pool-ID reuse.
+  Promote the tested aircraft crop and detached missile-trail masks to
+  ordinary-input cuts in campaign, Custom Game and Showcase.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
   modes and the legacy static-clip fixture. Include
