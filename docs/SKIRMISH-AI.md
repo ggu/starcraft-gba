@@ -91,9 +91,9 @@ rule tables.
 
 ### Carriers
 
-The normal Z10 and P10 ROMs compile the Carrier service, so a Protoss opponent uses the
-same paid products the human does. Other ROMs compile none of it and their
-opponents keep the plan above (their bytes are unchanged).
+The normal Z10 and P10 ROMs give Protoss opponents the same paid Carrier
+and Interceptor products available to the human. Terran and Showcase
+exercise the service in their separate Carrier previews.
 
 - **Fleet Beacon.** A plan step, after the second Assimilator, once the bank
   holds 600 minerals (`RACE_AI_IF_RICH`) and the Stargate stands. The step

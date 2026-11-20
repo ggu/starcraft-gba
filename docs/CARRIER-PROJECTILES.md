@@ -1,22 +1,19 @@
 # Carrier projectile development
 
-## Current status (2026-11-12)
+## Current status (2026-11-21)
 
-The three layers below (projectiles, hangar training, Interceptor flight) are
-compiled into the Protoss ROM, whose P7, P8, P9 and P10 flag vectors include
-`SC64_P7_PROJECTILES_ENABLED`, `SC64_P7_CARRIER_TRAINING_ENABLED` and
-`SC64_P7_INTERCEPTOR_FLIGHT_ENABLED`. They run for every Carrier-class actor of
-a Protoss ROM, not only in P7. The generation descriptions below are the
-history and the contract of each layer; where they call a layer "default-off"
-or say the canonical ROMs leave it off, that was true of the development
-probes, not of the Protoss ROM.
+Normal Protoss and Z10 use the shared projectile, hangar training, and
+Interceptor flight services. Protoss enables them for its Carrier-class
+actors in P7 through P10 and Custom Game. Z10 enables these services in
+Custom Game with a compact journal. The generation descriptions below
+record the earlier experiments and their respective build settings.
 
 | Parent | Where | What works |
 | --- | --- | --- |
-| Carrier (raw 72) | Protoss ROM: custom games, P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
+| Carrier (raw 72) | Z10 and Protoss Custom Game, Protoss P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
 | Gantrithor (raw 82) | Protoss ROM, P10 finale | The same service and rules (same hangar of four, 25 minerals, release cadence). It joins the human side with a full hangar, launches at enemies it faces, rebuilds lost Interceptors on the ordinary "BUILD INTERCEPTOR" command, and its children follow it if it changes owner and die with it. No save field was added: a P10 save written before this change loads with a Gantrithor that has no children. |
-| Computer opponents | Protoss ROM, custom games | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the same service ([Skirmish AI](SKIRMISH-AI.md#carriers-protoss-rom)). |
-| Everything above | Terran, Zerg Z9/Z10 and Showcase ROMs | Not compiled: see [Carriers in the other ROMs](#carriers-in-the-other-roms). |
+| Computer opponents | Z10 and Protoss Custom Game | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the shared service. [Skirmish AI](SKIRMISH-AI.md#carriers) |
+| Carrier preview | Terran and Showcase preview ROMs | The separate builds exercise paid production, flight and compact saves. [Carrier preview builds](#shared-release-selector) |
 
 How the Gantrithor is a parent: `sc64_p7_carrier_parent_type()` and
 `sc64_p7_carrier_parent_raw_of()` in `starcraft/sc64_p7_carrier_training.h` name
@@ -266,11 +263,10 @@ P7-win qualification claim. Those gates remain required before promotion.
 
 ## Carriers in the other ROMs
 
-Measured on 2026-11-12 at the base of the Gantrithor change. No additional
-ROM currently enables these services. A standalone [compact packet](#compact-packet-foundation)
-is available for future Terran and Zerg integration. A Protoss player on
-the Terran, Zerg or Showcase ROM gets no working Carrier. What stops it,
-and the smallest sound way to start:
+This table records the 2026-11-12 feasibility snapshot at the base of
+the Gantrithor change. The compact packet and selector work below led to
+the [normal Z10 cartridge](#normal-z10-cartridge) and the separate
+Terran and Showcase previews.
 
 | Fact | Terran | Zerg Z9 / Z10 | Showcase | Protoss P10 (has it) |
 | --- | --- | --- | --- | --- |
@@ -779,6 +775,15 @@ The campaign and rollback comparison index SHA-256 is
 `733bbcb062182c48dd1fccf794052e31ddbce1ac08139a1dadfe7a92203c216f`.
 The other full mission replays, sustained dense skirmishes and physical
 cartridge frame timings require separate runs.
+
+Both maps also pass all 378 named or closed-seat Custom Game launches
+on this exact Carrier-enabled ROM. The baseline and new ROM agree at
+launch and after 120 updates in every case. The 18 sampled saves match
+their own fresh continuations and the baseline's named gameplay state.
+The local matrix comparison SHA-256 is
+`9db90785a97d6b9cb398ba2c20f5a49fe0e37f48c888ab2844c86c237d2bc232`.
+The [seat matrix audit](audits/2026-11-21-current-skirmish-matrix.md)
+describes the underlying case coverage.
 
 #### Earlier selector links
 
