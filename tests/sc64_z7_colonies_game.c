@@ -373,14 +373,23 @@ static void test_paid_spore_morph_and_native_weapon_scope(void)
     ground=spawn_unit(ENEMY,U_ZERGLING,x+8,y+8);
     air=spawn_unit(ENEMY,U_MUTALISK,x+12,y+12);
     assert(ground>=0 && air>=0);
+    update_exploration();
     int ground_hp=u[ground].hp, air_hp=u[air].hp;
     race_tick_defenses();
+#ifdef SC64_IMPACT_EVENTS
+    for (int tick=0; tick<256 && race_impact_count; ++tick)
+        race_impact_tick();
+    assert(!race_impact_count);
+#endif
     assert(u[ground].hp==ground_hp && u[air].hp==air_hp-15);
     b[colony].queue_progress=0;
     u[air].flags|=16; /* Cloaked actors remain undetected by this building path. */
     air_hp=u[air].hp;
     race_tick_defenses();
     assert(u[air].hp==air_hp);
+#ifdef SC64_IMPACT_EVENTS
+    assert(!race_impact_count);
+#endif
 }
 
 static void test_spore_morph_menu_dispatch(void)

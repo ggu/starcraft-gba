@@ -27,11 +27,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reduce full-route cycles by 16.66% with the same SRAM and victory
   checkpoints. The route still averages 15.75 calls per emulated second.
   Continue applying the normal-ROM gate to the remaining
-  [campaign entries](audits/2026-11-13-normal-campaign-matrix.md). Next
-  qualify Z8 from a fresh SRAM load on normal Z10. The
-  [current sparse Z10 replay](audits/2026-11-20-late-zerg-sparse-sight.md)
-  checks its opening through 2,320 calls. The retained full tape gives a
-  pause and reload cut for the rest of the mission.
+  [campaign entries](audits/2026-11-13-normal-campaign-matrix.md).
+  [Z8 on normal Z10](audits/2026-11-12-z8-normal-physical.md#november-20-normal-z10-with-fresh-sram)
+  now wins after a fresh load at frame 16,659. All 30 post-load world
+  samples match, with three battlefield framebuffer differences still
+  open. The route averages 16.36 advancing updates per emulated second.
+  Target draw and orders cost on that route and qualify a fresh P4
+  continuation on normal P10 next.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
