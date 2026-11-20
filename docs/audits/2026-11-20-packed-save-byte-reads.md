@@ -236,3 +236,42 @@ cycles. The packed-building getter is the next direct bit-reader
 cost. Use the same fixed-width differential and byte-identical
 journal checks if testing that row. The stack receipt SHA-256 is
 `74b16ec56a73e38499d4e441effe1fc00c7b65187c1ddcb07acd5499bdafe54a`.
+
+## Inlined packed Building reads on the detached-depth release
+
+The opt-in `SC64_COMPACT_BUILDING_FIXED_READER` inlines the existing
+shared reader at the known Building field positions. The checked spans,
+decoded fields, reserved-bit test and output commit stay in the same
+order. The candidate keeps the established Unit decoder and reuses the
+existing byte reader. Disabling the option reproduces the release
+`25e9e8b9` Terran ROM byte for byte.
+
+The asset-free sanitizer fixtures pass for both codecs and both Building
+settings. A differential against the release decoder checks 150,001
+unaligned rows, including 467 accepted rows. All 149,534 rejected rows
+leave the caller's destination untouched in both builds.
+
+The paired normal T6 test starts in a fresh process with Raynor aboard
+a Dropship at frame 19,466. It observes the same 27 controller and
+dialogue cuts, wins at frame 23,536 with Raynor and two Dropships at
+extraction, and reloads the frozen result through a second fresh
+title. Both runs export identical 32 KiB victory journals and
+result readbacks, including the unchanged first pause bank.
+
+| Event | Release guest cycles | Candidate guest cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Paused-game title load | 24,091,103 | 21,508,948 | 10.72% |
+| Victory autosave update | 30,193,167 | 26,815,427 | 11.19% |
+| Frozen-result title load | 26,454,610 | 23,872,479 | 9.76% |
+
+The candidate links with the same IWRAM and EWRAM endpoints as the
+release. This measures specific save and load stalls in emulation.
+Run the remaining campaign journal cases and check hardware timing
+before considering default activation.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Release Terran ROM | `c9845065be3e4ec276ac4a94b12762c6eae79cdc835f8ffaa7d431bcc70c7cb1` |
+| Candidate Terran ROM | `a07978856d278f636a881de0244cf12548472fff36d0f8b0ae11b4b2140c8345` |
+| Paired timing evidence | `b9c6cf96c020b0b5847312da18d1b0aed8fddc18e28870f7147e81fa4a007bab` |
+| Victory and result readback SRAM | `af0fa049ba02103ef3944a3f8f324b45c9eb0abc5b8db23318d70969713a87bc` |
