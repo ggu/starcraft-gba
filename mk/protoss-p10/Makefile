@@ -16,10 +16,10 @@ PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_T
 	$(if $(filter 1,$(CANONICAL_CONTACT_COINCIDENT)),-DSC64_CONTACT_EARLY_AXIS_IWRAM_PROBE) \
 	$(if $(filter -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED,$(CFLAGS) $(PROTOSS_P10_BASE_FLAGS)),-DSC64_P7_DETECTOR_RANGE_CULL_PROBE)
 PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCENARIO_HEADER)
-# The depth painter redraws completed buildings each frame. The packed
-# Hatchery ships normally. The shelled Overmind is an opt-in P10 probe.
+# The depth painter redraws completed buildings each frame. P10 packs the
+# Hatchery and the shelled Overmind. Each frame can be built independently.
 P10_HATCHERY_WORDS ?= 1
-P10_OVERMIND_WORDS ?= 0
+P10_OVERMIND_WORDS ?= 1
 ifneq ($(P10_HATCHERY_WORDS),0)
 ifneq ($(P10_HATCHERY_WORDS),1)
 $(error P10_HATCHERY_WORDS must be 0 or 1)

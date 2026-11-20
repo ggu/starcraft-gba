@@ -12,8 +12,9 @@ observer also checks three live return addresses on the guest stack.
 | 45,466 | 44,352 | 102,035 |
 | 45,467 | 44,353 | 102,039 |
 
-Run `make P10_OVERMIND_WORDS=1 verify-protoss-p10` to pack that exact
-frame alongside the normal Hatchery. The existing Mode 4 lookup matches
+The normal P10 cartridge packs that frame alongside the Hatchery. Run
+`make P10_OVERMIND_WORDS=0 verify-protoss-p10` for the indexed Overmind
+control. The existing Mode 4 lookup matches
 the chosen frame pointer. The generator reuses the prepared P10 source
 bank and adds 54,912 bytes across four alignment phases. The existing
 renderer, save format, and campaign behavior apply. All four combinations
@@ -53,8 +54,7 @@ Header and ROM payload verification pass. Linked text grows by
 256-byte stack guard. Deepest observed changed bytes remain 4,648
 for the system stack and 296 for IRQ.
 
-The probe stays opt-in. The measured frame belongs to the P10 campaign
-actor. In the historical Zerg-player
+The measured frame belongs to the P10 campaign actor. In the historical Zerg-player
 Blood Bath window, all 20 late samples admit only the already-packed
 Hatchery. A separate ordinary Blood Bath launch as Protoss against three
 CPUs draws the Nexus instead. Bracketed indexed Nexus draws cost
