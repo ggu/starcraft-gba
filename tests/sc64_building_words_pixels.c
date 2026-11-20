@@ -40,6 +40,9 @@ int main(void)
     }
 #ifdef SC64_HATCHERY_WORDS_EXPECTED
     assert(count == 120 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery);
+#elif defined(SC64_HATCHERY_OVERMIND_WORDS_EXPECTED)
+    assert(count == 240 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery &&
+           sc64_building_word_sources[1] == &sc64_race_sprite_overmind_with_shell);
 #else
     assert(count == 1800);
 #endif
