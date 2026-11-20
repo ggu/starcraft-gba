@@ -217,6 +217,24 @@ on each side of a Tank's anchor. The fixture also verifies the SCV's
 wind-up layer change, shooter fallback for a point shot and a target slot
 reused before release.
 
+#### Projectile cartridge coverage
+
+Against release `6720a2fb`, the current Terran, Z10, P10 and Showcase ROMs
+pass header, SRAM signature and RAM guards. IWRAM endpoints are unchanged.
+EWRAM grows by 120–128 bytes, and the painter's bounded stack array reserves
+up to 128 additional bytes. Ordinary Custom Game inputs produce matching
+indexed pages, palette and world fingerprints at 60 and 120 updates on all
+four products. Smoke receipt SHA-256 is
+`29f45efa2d2aaee32c5e012339ea62003dec87ff6cc84b68956d4698b01d23f4`.
+
+The full Z8 ARM controller replay completes 46,487 calls. All 47 world
+checkpoints and 24 sampled two-page framebuffer pairs match the control.
+The overlap oracle above covers the foreground differences directly. Mean
+cycles per advancing gameplay call come to 1,024,346 versus 1,025,307 in
+the control, a difference of 0.09%. This measures emulated guest cycles.
+The comparison receipt SHA-256 is
+`41e74a51fbdda1892a41c108454d9c90d20bc655c4cbb6d7ed1a42fd90f56648`.
+
 ### Interceptor flight overlap
 
 The owned USA ROM uses three writes to sprite offset `0x0d`. At release
