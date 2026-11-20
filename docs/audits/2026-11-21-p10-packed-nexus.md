@@ -92,3 +92,18 @@ cartridges.
 | Normal packed Nexus ROM | `c8d88776f1ac2356b8a69c51e584ec38c79fd44cedc65d96e375db0075df6df9` |
 | Normal packed Nexus link | `63ba62f05baf28dddc97a70be77e0d5a3ed1ffad9cc7f007c73feff3fd402150` |
 | Ordinary Blood Bath comparison | `5e6c7c2fd5ba23f820dfa9b3ba48f44ec82aec4234c45f393bf8aa81f41c1a35` |
+
+### Fresh P10 campaign victory on the merged cartridge
+
+The #645 control and #646 release `1a74f8e6` both load the same
+authenticated P10 pause journal from HOME at frame 36,761. The next
+9,489 physical calls reach victory at frame 46,057 with the Overmind
+destroyed and Zeratul, the Gantrithor and the Hyperion alive. All six
+named gameplay checks, 21 world and two-page video cuts, and 198 route
+field digest pairs match. Both 32 KiB result journal exports are
+byte-identical.
+
+| Retained private receipt | SHA-256 |
+| --- | --- |
+| Physical continuation comparison | `4481cd8c280255dbdbcd59944c53777a06faced94226d5e76c5c0eafab5d472f` |
+| Both result SRAM exports | `25b0b97c72ffb92721aaf597f15719c7d05d9682a499c32b7f10cb304e00ae58` |
