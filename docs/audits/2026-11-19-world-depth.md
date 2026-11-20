@@ -105,7 +105,7 @@ timing remain open for the flight overlap.
 | 1 | `scv-foundation-depth` | At a paid Terran foundation, compare an SCV north of the foundation as it approaches, attaches, works and completes. The foundation covers the idle SCV at layer 4. The working SCV at layer 5 covers the foundation. | See the [SCV foundation overlap](#scv-foundation-overlap). |
 | 1 | `interceptor-flight-depth` | Compare launch (15), attack (17), early and late far return (15 or 17), and final approach (14) against a Carrier at 16. Cover both actor slot orders and confirm docked children are hidden. | The Protoss framebuffer and save fixture covers the GBA runtime. Ordinary-input N64 and ARM overlap captures remain open. |
 | 1 | `effect-crosses-actor-depth` | Capture a moving bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. | Use the [projectile replay cuts](#projectile-replay-cuts). |
-| 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
+| 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). See [foreground picking](#foreground-picking) for the shared live layer key and current opt-in checks. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
 
 For replay receipts record the product, source commit, controller tape hash,
@@ -114,6 +114,41 @@ wrong-pixel count. For native dynamic actors also record the actor and
 sprite addresses and their captured layer. Keep native screenshots and
 memory dumps local. Compare the isolated GBA masks within each version's
 palette. The N64 and GBA use different pixel scales and palettes.
+
+### Foreground picking
+
+Both native selection comparisons after the depth helper use unsigned
+`sltu`, at ROM offsets `0x8b240` and `0x8b3c0`. Elevation uses the high
+bits of the key, which include bit 31 for layers 16 and above. The opt-in
+GBA picker compares the same unsigned key and live layers that its painter
+uses. Its kind and slot break GBA ties. Native turret and sprite-ID ties
+need separate captures.
+
+Run `make test-sc64-foreground-pick` with prepared local assets. Repeat
+the Overlord/Hatchery and Marine/Barracks overlap with both bodies
+opaque, each body transparent in turn, and both transparent. Also check
+a same-layer and same-Y Marine/Barracks pair, a lifted Science Facility
+over a Marine, and a Wraith over the lifted Facility. Outside the left
+and right viewport edges, in either HUD band, in fog, and for unsupported
+construction or attack poses, keep the normal proximity result. Keep
+friendly eligibility, same-kind selection and contextual resource orders.
+The opt-in only resolves a competing friendly unit and building.
+
+The current Terran, Z10, P10 and Showcase ARM pairs replay the same
+ordinary inputs per product from HOME through a Zerg Outpost opening.
+Both builds choose the Hatchery where its body is the only opaque one.
+At (140,162) the opt-in chooses the foreground Overlord and the release
+chooses the closer Hatchery. Both indexed pages, palette and gameplay
+state match before the click. Gameplay state still matches after it.
+All four opt-ins link with unchanged RAM endpoints. The rebuilt flag-off
+Terran ROM matches the release byte for byte. This remains opt-in.
+
+| Cartridge | Calls | Paired replay receipt SHA-256 |
+| --- | --- | --- |
+| Terran | 44 | `862778b67b9f22b90c16c9e32dbe04500132c9494f493e584998a8416bd06483` |
+| Z10 | 50 | `edf9c26e6571b4adb34b272f6b043c54e10c4cdd187d4fd4f226fdfbfb575e65` |
+| P10 | 48 | `433af1542b2798a2af55da6ee5efe7fae672c05a9c469562f2025e3ef68fc589` |
+| Showcase | 48 | `8ee69094529f9905fac5e34a724109be725c4cbca0349a42a9ad8b00da5fa27e` |
 
 ### SCV foundation overlap
 

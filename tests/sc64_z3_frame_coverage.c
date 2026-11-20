@@ -1,6 +1,6 @@
 /* Pixel-coverage oracle for race renderers with and without frame clearing.
  * Private generated map/art headers are inputs at build time, never embedded
- * in this fixture. It tests rendering only, not controller completion. */
+ * in this fixture. It checks rendering and the selection hit test. */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -635,6 +635,161 @@ test_selection_depth(void)
     }
     return failures;
 }
+
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+static void
+pick_capture_body(DepthActor actor, u8 *pixels)
+{
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    depth_spawn(actor);
+    camx = camy = 0;
+    gfx_begin(0);
+    gfx_set_clip_y(12, 120);
+    if (actor.building) draw_building_art(&b[0]);
+    else draw_unit(&u[0]);
+    capture(pixels);
+    gfx_end();
+}
+
+static int
+test_foreground_pick(void)
+{
+    static u8 unit_pixels[FB_SIZE], building_pixels[FB_SIZE];
+    const struct {
+        const char *name;
+        int race, unit_in_front;
+        DepthActor unit, building;
+    } cases[] = {
+        { "Overlord over Hatchery", R_ZERG, 1, { U_OVERLORD, 50, 0, 0, 0 }, { B_HATCHERY, 54, 1, 0, 0 } },
+        { "Marine behind Barracks", R_TER, 0, { U_MARINE, 50, 0, 0, 0 }, { B_BARRACKS, 58, 1, 0, 0 } },
+        { "same layer and Y uses the painter tie", R_TER, 1,
+          { U_MARINE, 50, 0, 0, 0 }, { B_BARRACKS, 50, 1, 0, 0 } },
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        { "Marine behind a lifted Science Facility", R_TER, 0,
+          { U_MARINE, 56, 0, 0, 0 }, { B_SCIENCE_FACILITY, 50, 1, 0, 1 } },
+        { "Wraith over a lifted Science Facility", R_TER, 1,
+          { U_WRAITH, 50, 0, 0, 0 }, { B_SCIENCE_FACILITY, 54, 1, 0, 1 } },
+#endif
+    };
+    int failures = 0;
+    unsigned fallback_checks = 0;
+
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        setup_depth_profile(cases[n].race);
+        pick_capture_body(cases[n].unit, unit_pixels);
+        pick_capture_body(cases[n].building, building_pixels);
+        depth_spawn(cases[n].unit);
+        update_exploration();
+        unsigned checked = 0;
+        for (int y = 16; y < 84; ++y) for (int x = 68; x < 124; ++x) {
+            int unit_d = dist2(x, y, u[0].x, u[0].y);
+            int building_d = dist2(x, y, b[0].x, b[0].y);
+            if (unit_d >= 31 * 31 || building_d >= 26 * 26) continue;
+
+            int proximity = building_d <= unit_d ? MAX_UNITS : 0;
+            int foreground = cases[n].unit_in_front ? 0 : MAX_UNITS;
+            if (proximity == foreground) continue;
+            unsigned at = (unsigned)((y + 12) * FB_WIDTH + x);
+            unsigned coverage = (unit_pixels[at] != 0) | ((building_pixels[at] != 0) << 1);
+            unsigned category = 1u << coverage;
+            if (checked & category) continue;
+            checked |= category;
+            int expected = coverage == 3 ? foreground : proximity;
+
+            clear_selection();
+            cx = x;
+            cy = y;
+            interact();
+            int picked = selected_building >= 0 ? MAX_UNITS + selected_building :
+                         u[0].selected ? 0 : -1;
+            if (picked != expected) {
+                fprintf(stderr, "Foreground pick %s at %d,%d mask %u: %d != %d\n",
+                        cases[n].name, x, y, coverage, picked, expected);
+                ++failures;
+            }
+            if (coverage == 3) {
+                const int offsets[][2] = {
+                    { x + 1, 0 }, { x - FB_WIDTH, 0 },
+                    { 0, y + 1 }, { 0, y - 108 },
+                };
+                for (unsigned i = 0; i < sizeof(offsets) / sizeof(offsets[0]); ++i) {
+                    camx = offsets[i][0];
+                    camy = offsets[i][1];
+                    assert(sc64_foreground_pick(0, 0, proximity) == proximity);
+                }
+                camx = camy = 0;
+                SC64_GRID_CLEAR(visible);
+                assert(selection_target() == proximity);
+                sc64_visibility_reset();
+                update_exploration();
+                assert(selection_target() == foreground);
+
+                b[0].under_construction = 1;
+                assert(selection_target() == proximity);
+                b[0].under_construction = 0;
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+                u[0].cd = 1;
+                assert(selection_target() == proximity);
+                u[0].cd = 0;
+#endif
+                u[0].owner = NEUTRAL;
+                assert(selection_target() == MAX_UNITS);
+                u[0].owner = SIDE;
+                b[0].owner = NEUTRAL;
+                assert(selection_target() == 0);
+                b[0].owner = SIDE;
+            }
+        }
+        if (!(checked & (1u << 3))) {
+            fprintf(stderr, "Foreground pick %s has no opaque depth/proximity disagreement\n",
+                    cases[n].name);
+            ++failures;
+        }
+        fallback_checks |= checked & 7u;
+    }
+    if (fallback_checks != 7u) {
+        fputs("Foreground pick lacks transparent or one-body fallback witnesses\n", stderr);
+        ++failures;
+    }
+    if (!failures) puts("Foreground pick: live layers, painter ties, visibility and ownership match");
+    return failures;
+}
+
+static void
+test_foreground_pick_context(void)
+{
+    setup_depth_profile(R_TER);
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    depth_spawn((DepthActor){ U_WRAITH, 50, 0, 0, 0 });
+    depth_spawn((DepthActor){ U_WRAITH, 50, 0, 0, 0 });
+    unsigned layer = sc64_unit_world_layer(&u[0]);
+    assert(layer == 18 && layer == sc64_unit_world_layer(&u[1]));
+    assert(sc64_world_depth_key(layer, 56, DEPTH_UNIT, 0) ==
+           sc64_world_depth_key(layer, 50, DEPTH_UNIT, 0));
+    assert(sc64_world_depth_key(layer, 50, DEPTH_UNIT, 1) >
+           sc64_world_depth_key(layer, 50, DEPTH_UNIT, 0));
+    cx = u[0].x;
+    cy = u[0].y;
+    assert(selection_target() == 0);
+
+    /* No eligible actor is under the cursor. Contextual A still mines. */
+    memset(u, 0, sizeof(u));
+    int worker = spawn_unit(SIDE, U_SCV, 96, 50);
+    assert(worker >= 0);
+    u[worker].selected = 1;
+    cx = 145;
+    cy = 50;
+    m[0].x = cx;
+    m[0].y = cy;
+    m[0].amount = 1500;
+    update_exploration();
+    assert(selection_target() < 0 && selected_worker_mineral_target() == 0);
+    interact();
+    assert(u[worker].order == ORDER_MINE && u[worker].target == 0);
+}
+#endif
 #endif
 
 int
@@ -655,6 +810,10 @@ main(void)
     failures += test_scv_foundation_depth();
     test_building_flight_layer();
     failures += test_selection_depth();
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+    failures += test_foreground_pick();
+    test_foreground_pick_context();
+#endif
 #endif
     if (failures) fprintf(stderr, "Race no-clear coverage failures: %d\n", failures);
     else puts("Race framebuffer coverage: all full-clear comparisons match");
