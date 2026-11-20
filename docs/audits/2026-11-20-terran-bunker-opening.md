@@ -125,6 +125,29 @@ The full observed world matches the uninterrupted replay 600 updates
 later, with the same four troops still loaded. The 32 MiB Terran
 cartridge retains IWRAM `0x030048a8` and EWRAM `0x02038ddc`.
 
+## Four-profile composition
+
+The shared Bunker opening plus the renderer change links with unchanged
+RAM endpoints on Terran, Z10, P10 and Showcase. In the same ordinary
+mixed Blood Bath lobby, each build first shows the paid foundation at
+10,261, completion at 10,825 and Factory placement at 11,125. The
+foundation has an active SCV, two completed Barracks and a completed
+Academy. The Factory is absent at that cut.
+
+| Profile | First four loaded infantry | Fresh continuation ends |
+| --- | ---: | ---: |
+| Terran | 11,137 | 11,737 |
+| Z10 | 11,149 | 11,749 |
+| P10 | 11,149 | 11,749 |
+| Showcase | 11,137 | 11,737 |
+
+Each 32 KiB SRAM image restores its four passenger identities, transport
+targets, resource banks and world. The next 600 ordinary updates match
+uninterrupted play. Terran also matches its pre-renderer samples and
+SRAM byte for byte. The combined source is `0cfbc84d`. The comparison
+manifest SHA-256 is
+`3ebd3fc0aef8ab7dbd703ff1ecac892b8cd24ae8f22aa0204b2a2acd3d173654`.
+
 ## Regression cases
 
 With prepared inputs, run
@@ -136,7 +159,7 @@ matches for both an active foundation and a full garrison. Run
 `--resume-at 10300` and `--resume-at 11160` with `--bots ztp`, each
 with `--resume-len 600`.
 
-The remaining normal ARM profiles can use
+Repeat the ordinary-input continuation on all four normal ARM profiles with
 `tools/sc64_skirmish_sram_continuation.py` with the profile ROM and ELF,
 the physical backend, `--physical --map 1 --human t --seats ztp`,
 and a `--play` offset at the confirmed staffed Bunker. Use

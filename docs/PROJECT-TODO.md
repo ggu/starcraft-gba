@@ -83,10 +83,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Terran opening Bunker.** The shared Blood Bath Free for All planner
   builds one paid Bunker before Factory and boards four infantry. The
-  normal Terran mixed replay restores all four identities and banks from
-  SRAM and matches 600 more updates. Repeat the qualified cargo cut on
-  Z10, P10 and Showcase. Factory placement still comes earlier than in
-  the native openings.
+  mixed replay on all four normal profiles restores all four identities
+  and banks from SRAM and matches 600 more updates. Factory placement
+  still comes earlier than in the native openings. Qualify the next
+  economy and tech phases, and test garrison replacement under attack.
   [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md)
 
 - **Native skirmish opening defenses.** The shared Zerg planner now
