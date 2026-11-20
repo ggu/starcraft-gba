@@ -36,9 +36,13 @@ coverage and the remaining passes that need separate depth references.
 The native sprite ID is the slot in one 36-byte sprite pool at `0x80207c70`.
 The observer matched `base + 36 * id` for 73 live actor sprites in an
 ordinary Blood Bath opening and 278 in the retained late-game capture.
-Starting IDs descend from 2199 and slots can be reused. Capture native
-sprite IDs through creation and reuse for exact ties. An ascending creation
-counter cannot serve as the native oracle.
+The allocator at `0x8011fde8` takes the head of one FIFO free list.
+The destruction path at `0x801207a4` returns a slot to the tail after
+its last image disappears. The next two free IDs in the ordinary
+northwest Blood Bath opening were 2126 and 2125. In the late step 31138
+capture they were 265 and 1768. Depending on reuse, either creation
+order can win a tie. Record the actual IDs and last-image retirement
+when checking exact ties across actors and independent effects.
 
 For the tie oracle, T10 observer step 18,228 has layer-18 Wraiths
 `2108` at (3096,240) and `2086` at (3120,272). The northern Wraith
