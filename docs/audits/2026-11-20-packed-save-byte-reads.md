@@ -266,8 +266,7 @@ result readbacks, including the unchanged first pause bank.
 
 The candidate links with the same IWRAM and EWRAM endpoints as the
 release. This measures specific save and load stalls in emulation.
-Run the remaining campaign journal cases and check hardware timing
-before considering default activation.
+Hardware timing remains open.
 
 | Input or receipt | SHA-256 |
 | --- | --- |
@@ -294,3 +293,32 @@ cartridges.
 
 The aggregate qualification receipt SHA-256 is
 `bd3c3c12012592c3bcf234c2a32e4dda349bfa69f40baebfb16f2d63b17bf740`.
+
+### Normal late Terran activation
+
+The normal late Terran recipe enables the fixed Building reader and
+reproduces the tested opt-in ROM SHA-256 above without that command-line
+flag. The legacy reader remains available for comparisons. The normal
+link receipt SHA-256 is
+`bef941c724569843e6673777c397bc9bc3d5ae6234e9594fb143225392908d86`.
+
+The remaining normal controller pairs cover T2, T3, T5, T8 and T9, plus a
+full T6 run starting from HOME. Each retains its mission and dialogue
+checkpoints, restores its pause journal through a fresh process, reaches
+victory and re-exports the frozen result through a third process. All
+three 32 KiB journals per mission match byte for byte. The six-route
+receipt SHA-256 is
+`027b784c0d19c5e7f8f6b6683be74b5e64f49786629a296ba64b78b98acc462c`.
+
+| Mission | Pause frame | Victory frame | Matching checkpoints |
+| --- | ---: | ---: | ---: |
+| T2 | 18,204 | 29,366 | 31 |
+| T3 | 26,993 | 54,000 | 56 |
+| T5 | 72,076 | 126,331 | 148 |
+| T6 | 19,466 | 23,536 | 42 |
+| T8 | 2,568 | 139,216 | 268 |
+| T9 | 35,363 | 47,266 | 51 |
+
+Together the paired normal ARM runs cover all ten Terran missions. The
+timed T6 suffix isolates the reader's effect on save and load. It does
+not measure sustained gameplay throughput on hardware.
