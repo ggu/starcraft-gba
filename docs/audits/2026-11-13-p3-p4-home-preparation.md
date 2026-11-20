@@ -181,3 +181,18 @@ Use both files with the pinned normal P10 ROM, ELF and observer in
 | Authored page log | `d4754eac6f547e4e41e4c9a8b3736c28d2a4def7f68bf4b2385f23cdaa3fcd` |
 | Pause SRAM | `d9af44b01f34e652eea0ee5e4e13a659647a6bb816ac19559afa2d74106403bf` |
 | Fresh-process victory receipt | `b3a856e85fb50d8dbe533411a5c2b5873529f2cbd9b91f140f324660e6cf2632` |
+
+### Current P10 with shared projectile depth
+
+The same tape also wins on the normal P10 ROM at release `d464e1f6`.
+The pause journal is byte-identical to the first qualification. HOME L
+again restores the complete P4 runtime block, world and controls at
+frame 65,700. All 146 checkpoints, both heroes at extraction on frame
+129,310 and all authored page checks match. This run averages
+15.19 controller calls per emulated second.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Current normal P10 ROM | `34859980af3065e5401e13b892adf204bea77fc6e65a1dc084f7cabef184baf5` |
+| Matching ELF | `2b92433c1dfc2201d1e8a383d8317f4bbeef50d285fe2b81e76364203414aeda` |
+| Current fresh-process victory receipt | `46ab9fb10974f026779bcc9c5c943c916124e250a259f54db4d71c5d5591f719` |

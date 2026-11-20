@@ -41,7 +41,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run
-  averages 15.21 calls per emulated second. P9 still has a gap between
+  averages 15.19 calls per emulated second on the current P10.
+  P9 still has a gap between
   its normal HOME win and its earlier replacement-loop save replay.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
