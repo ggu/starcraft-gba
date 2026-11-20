@@ -52,9 +52,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores three active constructions at frame 30,109 and wins with
   both heroes alive. All 42 checkpoints match, including 30 after load.
   The run averages 9.35 calls per emulated second.
-  [P10 wins from HOME](audits/2026-11-13-p10-normal-home.md#november-20-shared-mineral-routing-build)
-  on the nearest-mineral build at 10.53 calls per emulated second.
-  Qualify its result journal and fresh continuation next.
+  [P10 loads and wins on the nearest-mineral build](audits/2026-11-13-p10-normal-home.md#fresh-load-and-result-autosave-on-the-merged-build)
+  at 10.53 calls per emulated second. Its second bank reloads the frozen
+  victory with the same world and all three heroes alive. Carry the
+  normal-ROM save and result checks to late Terran next, starting with T9.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
