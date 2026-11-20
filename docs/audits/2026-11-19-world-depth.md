@@ -165,6 +165,14 @@ palette and both indexed pages at calls 60 and 120. These samples precede
 combat. The ARM matrix receipt SHA-256 is
 `c47baa6654c6b0d69a8bca16233b87204aa174eef46d87651393d1860f38c5c5`.
 
+An ordinary Showcase Siege Line replay advances 120 updates after unpause.
+All 24 sampled world states, displayed pages, HUD bands and palettes match.
+The battlefield differs in nine samples with active death effects. The first
+four of those samples have 13 effects born immediately after unpause. Total
+emulator cycles rise from 116,932,815 to 119,300,827 (+2.03%). The measured
+cost is specific to this emulator replay. The detailed receipt SHA-256 is
+`874b311ac6e6d14b6ecd383c37ef852f569eba16e5fc1d11c3e40749597267d2`.
+
 The native `sprol` and `sproluselo` handlers pass parent elevation plus
 one. `highsprol` and `sprul` pass parent minus one. `spruluselo` passes
 the parent layer. Record them separately from the fixed-low path and from
