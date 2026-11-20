@@ -81,9 +81,9 @@ def main():
             call,frame,row,page,trigger,action,held,key=map(int,values)
             records['modal'].append(dict(kind='modal',call_index=call,frame=frame,row=row,
                                          page=page,trigger=trigger,action=action,held=held,key=key))
-    count=len(records['briefing'])
-    assert 0<count<=32 and [r['page'] for r in records['briefing']]==list(range(count))
-    assert all(r['total']==count for r in records['briefing'])
+    briefing_count = len(records['briefing'])
+    assert 0<briefing_count<=32 and [r['page'] for r in records['briefing']]==list(range(briefing_count))
+    assert all(r['total']==briefing_count for r in records['briefing'])
     assert plan['final']['outcome']==1 and plan['final']['switches']&3==3
     keys = dict(plan['transitions'])
     checks = defaultdict(list)
@@ -219,7 +219,7 @@ def main():
                     obs = dict(page=g.front_field('briefing_page'), revealed=g.front_field('briefing_revealed'),
                                total=g.front_field('briefing_pages'), mission=g.front_field('mission'),
                                front=g.front_field('page'), screen=n('screen'))
-                    assert obs == dict(page=row['page'], revealed=1, total=count, mission=28, front=3, screen=0), (row, obs)
+                    assert obs == dict(page=row['page'], revealed=1, total=briefing_count, mission=28, front=3, screen=0), (row, obs)
                     briefing.append(dict(call_index=call, **obs))
                 elif kind == 'modal':
                     count, page, armed, current = active
@@ -244,7 +244,8 @@ def main():
                     print('Matched', call, row['label'], obs['frame'], 'switches', obs['switches'], flush=True)
         result_state = None
         if stop == plan['stop']:
-            assert len(briefing)==count and len(pages)==len(records['modal']) and len(observations)==len(records['checkpoint'])
+            assert (len(briefing), len(pages), len(observations)) == (
+                briefing_count, len(records['modal']), len(records['checkpoint']))
             result_state = dict(selected=n('race_selected_mission'), phase=n('race_campaign', campaign, 'phase'),
                                 objective_flags=n('race_campaign', campaign, 'objective_flags'),
                                 completed=n('race_completed'), switches=n('race_p9', runtime, 'switches'),
