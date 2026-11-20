@@ -88,6 +88,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   from prepared fights in both skirmish modes. Keep the preview opt-in
   pending full ordinary match and native retirement checks.
 
+- **Packed journal decode.** [Byte-slice reads](audits/2026-11-20-packed-save-byte-reads.md)
+  lower the Z8 pause, fresh load and victory costs by 26.2%, 28.2% and
+  33.7%. The full replay, both SRAM exports and fallback to an older bank
+  match the control. Current P10 and Showcase use separate typed row
+  readers. Profile those paths for the next save optimization.
+
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
   cycles. Keep testing point-route continuation under load. Both replay

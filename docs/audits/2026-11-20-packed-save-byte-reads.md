@@ -39,6 +39,13 @@ checksum. Both normal cartridges load the newer record from the clean
 journal and restore the exact older frame 16,659 from the checksum-valid
 edited journal. This covers semantic rejection after checksum acceptance.
 
+The normal Terran and Z10 controls and candidates also match on Blood Bath
+with all three independent AI seats occupied. Each ordinary pause save at
+frame 361 exports identical SRAM. HOME L restores the named world in both
+versions, and a 240-update replay matches at frame 601. The custom smoke
+receipt SHA-256 is
+`1ae32fdd59054d617dc6272bc418b19697be1d7ca866e15d5f665c5daca03b62`.
+
 The four normal ROMs pass the verifier and keep their control IWRAM and
 EWRAM link endpoints. In the Z10 disassembly, the unit decoder plus field
 reader uses eight fewer stack bytes and the building decoder plus reader
