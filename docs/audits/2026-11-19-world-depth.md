@@ -203,6 +203,7 @@ counts. Store ROM-derived pixels and memory locally.
 | `shot-release-depth` | Change target layer during wind-up, change it again during flight, then remove the target or recycle its slot. For a point shot change the shooter's layer during wind-up. | The projectile uses the release tick's actor layer and keeps it through flight. A slot recycled during wind-up leaves the attack-init snapshot in effect. |
 | `projectile-hud-page-flip` | Shift the camera so the flight intersects screen rows 12 and 119. Step two page flips with the cursor out of the overlap. | Terrain, bodies and projectiles are clipped to the field. HUD pixels are identical in both paired comparisons. The N64 oracle checks foreground UI without requiring GBA-specific row coordinates. |
 | `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
+| `independent-effect-depth` | Capture muzzle, projectile body, trail, impact and corpse or shadow on separate native animation ticks against the same covering actor. Repeat with a special-service projectile. | Record the native sprite ID and elevation when each independent sprite exists. Use the parent sprite's depth for image attachments and derive a separate oracle for independently spawned sprites. |
 
 #### Projectile host coverage
 
