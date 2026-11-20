@@ -40,8 +40,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fills. The [nearest-first selector](audits/2026-11-20-mineral-continuation-routes.md)
   cuts that stall by 87.9% while preserving the full Z8 replay checks.
   All four builds retain their RAM margins and match the control on a
-  three-AI Blood Bath save and load. Profile the remaining orders peaks
-  at calls 26,346 and 33,800 and the separate result-journal stall.
+  three-AI Blood Bath save and load. The next [Z8 samples](audits/2026-11-20-mineral-continuation-routes.md#remaining-slow-updates)
+  attribute the two remaining orders peaks to movement route floods and
+  the result stall to save validation. Qualify point-route reuse and
+  shared candidate row decoding separately.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run

@@ -48,6 +48,14 @@ same call measured as follows.
 | Calls 31,000–31,200 p95 | 2,467,438 | 2,101,584 | −14.8% |
 | Full run mean | 1,040,994 | 1,037,604 | −0.33% |
 
+An instruction sample of each exact ROM attributes the change to the same
+two worker calls. Full route builds drop from 16 to one and their
+inclusive cost drops from 13,954,593 to 870,908 cycles. Each
+instruction run matches its unprofiled clocks, frames and checkpoints.
+The control and candidate reports have SHA-256
+`7e2b526df238e00aa3ded0a35ca45e0d9987306dff7bae3b0824436b81160c5e` and
+`a2fb41b0a45847236d297be652d65dfc5fb6b4382c49f8d437bf9bff86918af6`.
+
 The original Z10 ROM SHA-256 is
 `2fe3f4c8642d49fb61c20ca8e3db53876a551a738ff6149bf3cc7058f0f7a25c`.
 The replayed candidate SHA-256 is
@@ -68,7 +76,9 @@ START and B at frame 361 write 32 KiB SRAM. HOME L in fresh processes
 restores the named world. All four control and candidate pairs produce
 byte-identical journals and matching named worlds after 240 more updates.
 This smoke covers the lobby and save path. Mineral depletion is covered
-by the HOST fixtures and the Z8 replay above.
+by the HOST fixtures and the Z8 replay above. The current P9 HOST
+controller also produces identical 98,177-call input and checkpoint data,
+briefing output and ordinary-pause SRAM before and after the change.
 
 The smoke receipt SHA-256 is
 `a4f69ac4ec3926e475c93e05b6fe9b33949d5ec63ada4e0823ca2310a8b3e76c`.
@@ -79,4 +89,17 @@ In the promoted Z8 replay, call 33,800 advances to frame 32,984 and takes
 12,264,221 loop cycles, including 11,287,595 in orders. Call 26,346
 advances to frame 25,672 and takes 9,850,769 loop cycles, including
 8,901,634 in orders. The pause-save and victory calls take 25.38M and
-60.13M loop cycles. Sample orders and the journal path independently.
+60.13M loop cycles.
+
+Instruction samples on the exact promoted ROM attribute 10.44M and 7.85M
+cycles in the two orders peaks respectively to point route floods invoked
+by `move_toward`. The pause save spends 22.94M cycles in `race_save_game`,
+with multiple validators decoding the same 240 save rows. The victory
+spends 56.35M cycles there, including 26.07M in the selected bank's
+preflight. These four samples match the unprofiled replay at every call
+and conserve all sampled cycles. The validation receipt SHA-256 is
+`951b36ab55fab16fae43e81459e96c32dc38b0bc085a7b31374e5e0b1cb41d1d`.
+
+Qualify reuse of point routes for the movement peaks. For the journal
+path, measure shared row decoding across validators while preserving all
+candidate checks and fallback to an older bank.
