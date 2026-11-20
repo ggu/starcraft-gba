@@ -1921,16 +1921,19 @@ sc64_route_expand_linear_ewram(u8 *dense, int tail, int stride, int cap)
 }
 
 static unsigned GBA_HOT __attribute__((noinline))
-sc64_route_expand_linear_ring(u8 *dense, u16 *queue, unsigned pending, int stride)
+sc64_route_expand_linear_ring(u8 *dense, u16 *queue, unsigned tail, int stride)
 {
     enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP, mask = capacity - 1 };
     /* A batch reads one contiguous window. The last three entries let its
      * writes cross the physical end without a per-cell wrap test. */
-    unsigned tail = pending & mask, popped = 0;
-    while (pending) {
+    unsigned popped = 0;
+    for (;;) {
         unsigned head = popped & mask;
+        /* The initial seeds leave slack. Each batch reserves four entries
+         * per pop, so a later batch also cannot leave the ring entirely full. */
+        unsigned pending = (tail - head) & mask;
         unsigned batch = (capacity - pending) / 4;
-        if (!batch) break;
+        if (!pending || !batch) return (pending << 16) | popped;
         if (batch > pending) batch = pending;
         if (batch > capacity - head) batch = capacity - head;
         unsigned write_limit = (capacity + 3 - tail) / 4;
@@ -1940,39 +1943,52 @@ sc64_route_expand_linear_ring(u8 *dense, u16 *queue, unsigned pending, int strid
         unsigned new_tail = (unsigned)(write - queue);
         for (unsigned i = capacity; i < new_tail; ++i) queue[i - capacity] = queue[i];
         if (new_tail >= capacity) SC64_ROUTE_IWRAM_FIFO_EVENT(WRAP, new_tail - capacity);
-        pending = pending - batch + (new_tail - tail);
         popped += batch;
         tail = new_tail & mask;
     }
-    /* The field has at most 16,384 cells. Pack the live count with progress
-     * so the spill can recover the head without touching normal outputs. */
-    return (pending << 16) | popped;
 }
 
-static int __attribute__((noinline))
-sc64_route_expand_linear_iwram(u8 *dense, int seeds, int stride, int cap)
+static void __attribute__((noinline))
+sc64_route_spill_linear_ring(const u16 *queue, unsigned popped, unsigned pending)
 {
     enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP, mask = capacity - 1 };
+    /* Preserve FIFO order when a frontier crosses the end of the ring. */
+    unsigned head = popped & mask;
+    unsigned first = pending < capacity - head ? pending : capacity - head;
+    for (unsigned i = 0; i < first; ++i) bfs_queue[i] = queue[head + i];
+    for (unsigned i = first; i < pending; ++i) bfs_queue[i] = queue[i - first];
+}
+
+static unsigned __attribute__((noinline))
+sc64_route_expand_linear_iwram(u8 *dense, int seeds, int stride)
+{
+    enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP };
     u16 queue[capacity + 3];
     for (int i = 0; i < seeds; ++i) queue[i] = bfs_queue[i];
     SC64_ROUTE_IWRAM_FIFO_EVENT(ENTER, seeds);
+    /* The field has at most 16,384 cells. The result carries the popped and
+     * pending counts, which recover the head without extra hot-loop state. */
     const unsigned progress = sc64_route_expand_linear_ring(dense, queue, (unsigned)seeds, stride);
-    const int popped = (int)(progress & 0xffffu), pending = (int)(progress >> 16);
-    if (!pending) return popped;
-
-    /* Resume the existing expansion with this frontier and dense state.
-     * The spill leaves every unexpanded cell in FIFO order. */
-    SC64_ROUTE_IWRAM_FIFO_EVENT(SPILL, popped);
-    for (int i = 0; i < pending; ++i) bfs_queue[i] = queue[(popped + i) & mask];
-    int remaining = sc64_route_expand_linear_ewram(dense, pending, stride, cap);
-    return remaining < 0 ? remaining : popped + remaining;
+    unsigned pending = progress >> 16;
+    if (pending) {
+        unsigned popped = progress & 0xffffu;
+        SC64_ROUTE_IWRAM_FIFO_EVENT(SPILL, popped);
+        sc64_route_spill_linear_ring(queue, popped, pending);
+    }
+    return progress;
 }
 
 static inline int sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
 {
-    if (cap < SC64_ROUTE_IWRAM_FIFO_CAP || tail > SC64_ROUTE_IWRAM_FIFO_CAP)
+    if (cap < SC64_ROUTE_IWRAM_FIFO_CAP || tail > SC64_ROUTE_IWRAM_FIFO_CAP - 4)
         return sc64_route_expand_linear_ewram(dense, tail, stride, cap);
-    return sc64_route_expand_linear_iwram(dense, tail, stride, cap);
+    unsigned progress = sc64_route_expand_linear_iwram(dense, tail, stride);
+    int popped = (int)(progress & 0xffffu), pending = (int)(progress >> 16);
+    if (!pending) return popped;
+    /* The IWRAM ring has unwound. Continue expanding the same dense field
+     * with the saved frontier in the original EWRAM queue. */
+    int remaining = sc64_route_expand_linear_ewram(dense, pending, stride, cap);
+    return remaining < 0 ? remaining : popped + remaining;
 }
 #else
 /* Keep the oldest-to-newest FIFO order. A batch may append at most four

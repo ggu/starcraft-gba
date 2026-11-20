@@ -103,3 +103,42 @@ link margin still matter. Showcase stack and timing and the other race ROM
 checks remain open.
 The Z8 replay and small P10 fills do not establish physical hardware frame
 rate or qualify the default.
+
+## Spill refinement
+
+The ring now derives occupancy from its cursors, transfers a spill in two
+contiguous spans, and releases its stack allocation before continuing the
+same dense flood in EWRAM. Each batch reserves space for four writes per
+pop. An eligible initial frontier has at least four free entries, and a
+finished batch always has room for at least one more entry, so equal cursors
+mean the queue is empty. The transfer preserves dequeue order on wrap.
+
+`make test-sc64-route-iwram-fifo` passes all 386,646 point and wide facility
+checks with ASan and UBSan. A new 128×128 corridor tree has one ordinary
+goal, 5,953 reachable cells and a peak scalar frontier of 1,024. The real
+512-entry ring spills after 2,878 pops. The 16-entry test ring spills after
+318 pops. Both produce the independent oracle's direction at every cell.
+
+In the same tiny ARM comparison, all eight packed fields match across the
+released FIFO, the first ring and the refined ring. The local command is
+`python3 -B build/iwram-fifo/bench-tree.py single-goal-`. The two spill cases
+measure different frontier geometries.
+
+| Tiny ARM spill case | Released FIFO | First ring | Refined ring |
+| --- | ---: | ---: | ---: |
+| Single-goal corridor tree | 529,397 | 523,835 | 520,643 |
+| Artificial 256-seed frontier | 986,038 | 1,000,427 | 996,605 |
+
+The six natural non-spill cases remain within 0.07% of the first ring. The
+refined ring uses 376 IWRAM code bytes per tiny link, down from 388. Its
+measured system stack peaks at 1,364 bytes, down from 1,380. The compiler's
+route suffix drops from 1,148 to 1,132 bytes. Once the ring unwinds, the EWRAM
+driver plus batch loop need 84 bytes. Receipt SHA-256 is
+`099ce55565ee03de8722274fd477d44aaac6cba8ba81d150bdb8a9ac71e7fbbc`.
+
+The refined ring stays opt-in. Recheck all four normal links and stack
+guards on the merged base. The next paired replays cover the Z8 peak at
+call 33,800 and P10 calls 43,604 and 45,231 for orders plus 45,466–45,467 for
+rendering. Capture route bytes, world state, both pages and the cycle tails.
+Keep the legal single-goal spill and the artificial many-seed stress in the
+test matrix. The tiny IWRAM savings need confirmation on the Showcase link.

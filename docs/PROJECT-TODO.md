@@ -893,9 +893,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [opt-in IWRAM queue](audits/2026-11-20-route-iwram-fifo.md) also removes
   409,382 cycles from the 12.09M-cycle Z8 update with identical sampled
   route fields and world state. The artificial overflow adds 1.46%, and the
-  normal Showcase link leaves 16 IWRAM bytes before the guard.
-  Keep it opt-in while reducing spill cost and qualifying the remaining links,
-  stack use and busy timing.
+  first normal Showcase link leaves 16 IWRAM bytes before the guard.
+  The refined spill saves 12 IWRAM code bytes and 16 system stack bytes in
+  tiny ARM checks. It also cuts 1.65% from a single-goal overflow. Keep it
+  opt-in while checking the revised links, stacks and busy replays.
   [Pointer-only one-field retention](audits/2026-11-14-z7-point-flood-retention.md#one-plane-pointer-retention-on-the-current-fifo)
   now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
   while keeping route oracles and scratch bindings unchanged. Composed

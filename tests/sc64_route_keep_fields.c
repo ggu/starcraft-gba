@@ -724,6 +724,39 @@ static void check_iwram_fifo_spill(void)
     printf("bounded FIFO spill after %u pops, %d complete matching route cells\n",
            iwram_spill_popped, candidate);
 }
+
+static void carve_iwram_fifo_tree(int x, int y, int length, int vertical)
+{
+    if (length < 2) return;
+    for (int sign = -1; sign <= 1; sign += 2) {
+        int dx = vertical ? 0 : sign, dy = vertical ? sign : 0;
+        for (int step = 1; step <= length; ++step)
+            desired[(y + dy * step) * 128 + x + dx * step] = 1;
+        carve_iwram_fifo_tree(x + dx * length, y + dy * length,
+                             vertical ? length / 2 : length, !vertical);
+    }
+}
+
+static void check_iwram_fifo_single_goal_spill(void)
+{
+    const int goal = 64 * 128 + 64;
+    race_cols = race_rows = 128;
+    memset(desired, 0, sizeof(desired));
+    desired[goal] = 1;
+    /* Equal-length branches keep 1,024 cells in the scalar BFS frontier. */
+    carve_iwram_fifo_tree(64, 64, 32, 0);
+    sc64_routes_reset();
+    build_path_grid();
+    assert(sc64_route_configure());
+    const unsigned spills = iwram_spill;
+    const int filled = sc64_route_fill_linear(sc64_route_field[0], goal);
+    assert(filled == 5953 && iwram_spill == spills + 1 && iwram_spill_popped > 0);
+    reference_bfs(&oracle[POOL], goal);
+    for (int i = 0; i < MAP_CELLS; ++i) assert(sc64_route_get(0, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+    printf("single-goal FIFO spill after %u pops, %d matching route cells\n",
+           iwram_spill_popped, filled);
+}
 #endif
 
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
@@ -987,6 +1020,7 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
     if (SC64_ROUTE_IWRAM_FIFO_CAP == 512) assert(iwram_cross > 0);
     check_iwram_fifo_spill();
+    check_iwram_fifo_single_goal_spill();
 #endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     check_nearby_lazy_root();
