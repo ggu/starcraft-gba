@@ -1295,7 +1295,7 @@ $(eval $(call T6_RUNTIME_TEST,engine))
 $(eval $(call T6_RUNTIME_TEST,world))
 $(eval $(call T6_RUNTIME_TEST,save))
 $(eval $(call T6_RUNTIME_TEST,tech))
-build/test-sc64-compact-unit-save: tests/sc64_compact_unit_save.c starcraft/sc64_compact_unit_save.h Makefile | build
+build/test-sc64-compact-unit-save: tests/sc64_compact_unit_save.c starcraft/sc64_compact_unit_save.h starcraft/sc64_save_bits.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-compact-unit-save
 test-sc64-compact-unit-save: build/test-sc64-compact-unit-save

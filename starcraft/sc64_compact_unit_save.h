@@ -1,5 +1,8 @@
 #ifndef SC64_COMPACT_UNIT_SAVE_H
 #define SC64_COMPACT_UNIT_SAVE_H
+
+#include "sc64_save_bits.h"
+
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
 #endif
@@ -58,14 +61,8 @@ static int
 sc64_packed_unit_get(const Sc64PackedUnitSave *row, unsigned *bit,
                      unsigned width, u32 *value)
 {
-    u32 result = 0;
-    if (!row || !bit || !value || !width || width > 32 ||
-        *bit > SC64_PACKED_UNIT_SAVE_BYTES * 8u ||
-        width > SC64_PACKED_UNIT_SAVE_BYTES * 8u - *bit) return 0;
-    for (unsigned i = 0; i < width; ++i, ++*bit)
-        result |= (u32)((row->bytes[*bit >> 3] >> (*bit & 7u)) & 1u) << i;
-    *value = result;
-    return 1;
+    return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
+                                      bit, width, value);
 }
 
 static int

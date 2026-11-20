@@ -138,8 +138,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   typed building rows. The [current P10 campaign pair](audits/2026-11-20-packed-save-byte-reads.md#replay-with-the-stationary-effect-depth-fix)
   cuts the pause load by 8.2% and the victory save by 7.8%, with identical
   journals. Both profiles also pass a three-AI save and fresh load.
-  Use the remaining journal stall attribution to choose the next
-  decoder or candidate-validation change.
+  The [Terran compact-unit read trial](audits/2026-11-13-t6-normal-physical.md#compact-unit-read-timing)
+  cuts the Norad II result autosave by 24.51% with a prior pause bank
+  present. The pause and frozen-result loads drop 22.22% and 20.95%.
+  The original pause bank and complete victory SRAM match byte for
+  byte. The composed links retain all four RAM limits and the normal
+  Terran active and staffed Bunker saves. The original victory
+  profile attributes 5.90 million cycles to four immutable program
+  validations. Reuse validated program data within the adapter call
+  and time the current release's remaining victory work.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
