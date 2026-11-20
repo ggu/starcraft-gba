@@ -166,3 +166,9 @@ python3 tools/sc64_t9_normal_replay.py --chapter 7 \
 | Victory SRAM and fresh readback | `3c8fc5166c2b92f5548f6c3ff8b719056f844bef98111affd27ed1cd94921f08` |
 | Full T7 replay and both journal checks | `b4235df6f0f9be00708e5202bf6ddb7543a6e01e5b417e658a3cf0116f237625` |
 | T10 rerun on the same ROM | `2e67743d42270f40a8434c0534401643bdb1314b70da301b2f0dc29545e4c144` |
+
+The current Terran build from release `5f40d1c8` also matches every
+observation and all three SRAM images, with the same selected unit slot
+on victory reload. The replay averages 19.68 calls per emulated second.
+The current receipt SHA-256 is
+`92ee40cb082b7bd9d1fb3e703b9b4f358d303169b4b15f17953becc08ada304a`.
