@@ -110,7 +110,8 @@ their compile lines contains the flag.
 | Z10 enemy Reavers | Open: next stage |
 | Scarab aimed at a building whose slot dies or is reused | Fixed: every building death and spawn path, including the Psionic Storm kill, drops the target; tested with a new hostile building in the freed slot |
 | P7 controller with restocking enemy Reavers | Open: it does not win; the engine checks are clean (path grid, reachability, Scarab rows) and the controller loses waves at the guarded Nexus, so the mission rule or the controller needs a decision |
-| ARM replay of a Scarab in flight | Open: the HOST process-boundary save is verified, the ARM replay is not |
+| ARM replay of a Scarab in flight | Done on the P10 ROM in mGBA with the Protoss campaign mission 2 pad tape (no fixture): see Checks. The custom-game ordinary tape still cannot be replayed on the ROM because its bank fixture needs a write |
+| Campaign save refused at some updates | Found, not changed: in mission 2, `save_game()` returns 0 at some updates (3 of 12 probed near the flight, with or without a Scarab alive; accepted in the other 9). The pause menu then writes nothing, which fails closed. The P2 check picks the first neutral call at which the writer accepts |
 
 ## Other products (path, nothing implemented)
 
@@ -142,5 +143,7 @@ without the flag). What exists there is the Zerg late-campaign enemy Reaver
 | --- | --- |
 | `make test-sc64-paid-scarab` | sanitized HOST product test: economy, combat, splash tiers, loss (target lost, expiry, walled-route detour, Reaver death, slot reuse), 21 malformed worlds, in-process and fresh-process saves, campaign restock and mid-restock save, and (with `PSC_BASE_TREE=<unchanged checkout>`) a base-written save |
 | `make test-sc64-paid-scarab-ordinary` | pad-only scenario from the title screen: build the chain, train two Reavers, buy Scarabs from the order list, attack, save through the pause menu with a Scarab in flight, fresh-process load, continue through impact |
+| `make test-sc64-paid-scarab-p2` | sanitized HOST check on Protoss mission 2 (the human has Reavers there): the P2 controller tape plus text-box acknowledgements, an ordinary pause-menu save inserted while a human Scarab is in flight, the uninterrupted tape against the tape with the save, and a fresh process loading the SRAM and continuing through impact (12 fixed-frame samples, 17 Scarab hits) |
+| `make check-sc64-paid-scarab-p2-arm PSC_ARM_RUNNER=<sc64-headless-replay>` | the same pad tape on the P10 ROM in mGBA (no-GDB, physical buttons only): SRAM exported at the save, a fresh mGBA process loads it from the title and continues; frame counter, minerals, gas, Reaver stock, Scarab position, unit count, total hit points and shields match HOST at all 12 samples (frames 29404 to 29548), and the fresh process matches the saving one |
 | `make test-sc64-protoss-px` | all ten Protoss mission controllers |
 | `python3 tools/sc64_skirmish_ai_matrix.py --build build --output OUT --profiles protoss-p10` | Reaver cases with the spending audit (the default profiles keep their cases) |

@@ -46,3 +46,19 @@ test-sc64-paid-scarab-ordinary: $(PSC_DIR)/ordinary
 	rm -f $(PSC_DIR)/ordinary.sav $(PSC_DIR)/ordinary.sav.state
 	./$(PSC_DIR)/ordinary run $(PSC_DIR)/ordinary.sav $(PSC_DIR)/ordinary-tape.json
 	./$(PSC_DIR)/ordinary resume $(PSC_DIR)/ordinary.sav
+
+# Paid Scarabs on Protoss mission 2 through the P2 controller's own pad tape: the human has
+# Reavers there, so a Scarab flies with no fixture. See tests/sc64_paid_scarab_p2.c.
+PSC_P2_SRC := tests/sc64_paid_scarab_p2.c
+$(PSC_DIR)/p2: $(PSC_P2_SRC) tests/sc64_text_box_replay.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/paid-scarab-checks/Makefile | build
+	@mkdir -p $(PSC_DIR)
+	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(PSC_P2_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-paid-scarab-p2 check-sc64-paid-scarab-p2-arm
+test-sc64-paid-scarab-p2: $(PSC_DIR)/p2 build/protoss-px/p2/trace.jsonl tools/sc64_paid_scarab_p2_host.py tools/sc64_paid_scarab_p2_tape.py
+	$(PYTHON) tools/sc64_paid_scarab_p2_host.py $(PSC_DIR)/p2 build/protoss-px/p2/trace.jsonl.raw $(PSC_DIR)/p2run
+
+# The same pad tape on the P10 ROM in mGBA (no-GDB physical-button runner), with a fresh process
+# loading the exported SRAM: make check-sc64-paid-scarab-p2-arm PSC_ARM_RUNNER=<sc64-headless-replay>
+check-sc64-paid-scarab-p2-arm: test-sc64-paid-scarab-p2 build/StarCraft-Protoss-P10-Transport1-GBA.gba tools/sc64_paid_scarab_p2_arm.py
+	@if [ -z "$(PSC_ARM_RUNNER)" ]; then echo "set PSC_ARM_RUNNER to the headless mGBA runner"; exit 2; fi
+	$(PYTHON) tools/sc64_paid_scarab_p2_arm.py build/StarCraft-Protoss-P10-Transport1-GBA.gba build/starcraft-protoss-p10.elf $(PSC_ARM_RUNNER) $(PSC_DIR)/p2run/p2-save.json $(PSC_DIR)/p2run/run.out $(PSC_DIR)/p2arm
