@@ -562,6 +562,35 @@ static void loss(void)
         if (u[shot].alive && u[shot].type == U_SCARAB) assert(u[shot].target == -1);
         drain();
     }
+    /* Slot reuse of a BUILDING target: a Scarab aimed at a destroyed building's slot must not
+     * adopt the next hostile building placed in it. It explodes at its last position. */
+    {
+        int r3 = reaver_at(hx - 96, hy), old_h, new_h, lastx, lasty, hp_new;
+        race_paid_scarab_trained(r3); u[r3].carry = SC64_PSC_INIT | 2;
+        old_h = enemy_hatchery(hx, hy);
+        attack(r3, MAX_UNITS + old_h);
+        shot = wait_launch(r3);
+        stand_down(r3);
+        assert(u[shot].target == MAX_UNITS + old_h);
+        kill_actor(MAX_UNITS + old_h);
+        assert(!b[old_h].alive);
+        /* A new hostile building takes the freed slot, far from the old one. */
+        new_h = enemy_hatchery(hx + 400, hy + 400);
+        if (new_h == old_h) printf("loss: the destroyed building's slot was reused by a new hostile building\n");
+        assert(new_h == old_h);
+        hp_new = hp_total(MAX_UNITS + new_h);
+        assert(u[shot].alive && u[shot].type == U_SCARAB && u[shot].target == -1);
+        lastx = u[shot].tx; lasty = u[shot].ty;
+        step(1);
+        if (u[shot].alive && u[shot].type == U_SCARAB) {
+            assert(u[shot].target == -1);
+            assert(u[shot].tx == lastx && u[shot].ty == lasty);   /* never re-aimed at the new one */
+        }
+        drain();
+        assert(hp_total(MAX_UNITS + new_h) == hp_new);            /* the new building took nothing */
+        printf("loss: stale building index did not damage the reused slot (hp %d unchanged)\n", hp_new);
+        kill_actor(MAX_UNITS + new_h);
+    }
     puts("loss PASS");
 }
 
