@@ -140,9 +140,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   combined primary/fallback mask trials out of the normal builds.
   The [short-path certificate trial](https://github.com/ggu/starcraft-gba/pull/616)
   cuts the P10 late-battle peak by 42.5% and the mean by 2.1% across
-  58 ordinary updates. Keep it opt-in pending all four RAM links,
-  distant cached-read timing and fresh journal checks. A two-pop
-  FIFO trial raised the sampled Z8 peak by 2.2%. Keep the single-pop loop.
+  58 ordinary updates. The cold certificate links on all four products.
+  Its forced distant read falls from 1,087,475 to 70,103 cycles with a
+  separate opt-in proof for a unique separator crossing. Other geometry
+  can still trigger a full fill. Qualify the combined flags on all four
+  profiles, real busy reads, and fresh journals before activation.
+  A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the
+  single-pop loop. The [shared render cull](audits/2026-11-19-world-depth.md#visibility-and-building-overlay-cost)
+  cuts mean loop cost by 0.17% to 0.84% across four Z8 and P10 windows,
+  with matching sampled pixels.
   [The composed resumable point-route trial](https://github.com/ggu/starcraft-gba/pull/576)
   remains opt-in. A [compressed range read](audits/2026-11-16-resumable-frontier-budget.md#cached-range-read-on-a-compressed-wide-grid)
   cuts a forced 128-by-128 stall from 1,086,782 to 252,139 cycles. All 86
