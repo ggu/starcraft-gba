@@ -58,7 +58,9 @@ army supply under the existing all-in rule. The control sends 32 with 52.
 In 72 host tests across the four profiles, both maps and all human and
 opponent races, each single-opponent first wave still respects its gate.
 The host tests also rejoin an organic in-progress morph from SRAM on all
-four profiles.
+four profiles. Four planner-versus-planner matches on the Terran profile,
+covering both maps with one and three opponents, end in victory or defeat
+between updates 22,530 and 43,374.
 
 The four regular ARM builds pass the ROM header, SRAM and RAM checks
 with the same linked RAM endpoints as the control. All four start the
@@ -87,9 +89,12 @@ The comparison of that HP column against all 228 rows of the PC-derived
 table finds two whole-HP differences. The other differences are twelve
 zero-HP entries with a native value of one Q8 unit. The second whole-HP
 difference is Zealot, at 80 in the native table and 100 in the PC-derived
-table. Completed native Zealots reach 80 HP in both the mixed and
+table. The Zealot is also the only effective shield-cap difference among
+the 228 rows, with 80 native shields and 60 in the PC-derived table.
+The native shield-enable and shield-cap columns start at offsets 2,472
+and 2,700. Completed native Zealots reach 80 HP in both the mixed and
 Protoss-only Blood Bath censuses. Qualifying a change requires checking
-the actual profile overrides and the saved HP representations.
+the profile overrides and the saved HP and shield representations.
 
 ## Regression cases
 
