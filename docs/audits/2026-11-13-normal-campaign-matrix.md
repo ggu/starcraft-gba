@@ -33,7 +33,7 @@ physical GBA check or all routes through a mission.
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | [Current P10 fresh SRAM win](2026-11-13-p7-carried-normal-home.md#november-20-normal-cartridge-and-fresh-sram) from frame 8,845, with all 49 remaining named checkpoints matching uninterrupted play. |
 | P8 | No complete older exact-KODAK receipt here | [November 20 normal P10 fresh SRAM win](2026-11-20-current-p5-p8-save.md#p8-the-trial-of-tassadar) from frame 30,825, 41 matched checkpoints, both heroes alive and the Stasis Cell destroyed. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | [November 20 fresh SRAM win](2026-11-13-p9-normal-home.md#november-20-fresh-sram-victory) from frame 30,109 with three active constructions and 30 matching post-load checkpoints. |
-| P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | [November 20 HOME win](2026-11-13-p10-normal-home.md#november-20-shared-mineral-routing-build) matches all 20 checkpoints with three surviving heroes. Fresh SRAM and the result journal on this revision remain open. |
+| P10 | [HOME and fresh SRAM wins](2026-11-13-p10-normal-home.md#exact-kodak-cartridge) | [November 20 fresh SRAM and result autosave](2026-11-13-p10-normal-home.md#fresh-load-and-result-autosave-on-the-merged-build) match all 20 checkpoints with three surviving heroes and restore the frozen victory in a third process. |
 
 All ten Terran missions and all ten Zerg missions now have a checked HOME
 win on their respective exact cartridges. The exact ROMs in this index

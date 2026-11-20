@@ -42,7 +42,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   All four builds retain their RAM margins and match the control on a
   three-AI Blood Bath save and load. The next [Z8 samples](audits/2026-11-20-mineral-continuation-routes.md#remaining-slow-updates)
   attribute the two remaining orders peaks to movement route floods and
-  the result stall to save validation. Qualify point-route reuse and
+  the result stall to save validation. The [current Z8 point-prefix trial](audits/2026-11-16-resumable-frontier-budget.md#z8-check-on-the-current-mineral-routing-release)
+  matches the release world and pixels while lowering the movement peak
+  by 9.9%. All four current ARM builds and three-AI save smokes pass.
+  The forced P10 cached read still defers a million-cycle full flood.
+  Address that path on real terrain before normal activation. Qualify
   shared candidate row decoding separately.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
@@ -52,9 +56,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores three active constructions at frame 30,109 and wins with
   both heroes alive. All 42 checkpoints match, including 30 after load.
   The run averages 9.35 calls per emulated second.
-  [P10 wins from HOME](audits/2026-11-13-p10-normal-home.md#november-20-shared-mineral-routing-build)
-  on the nearest-mineral build at 10.53 calls per emulated second.
-  Qualify its result journal and fresh continuation next.
+  [P10 loads and wins on the nearest-mineral build](audits/2026-11-13-p10-normal-home.md#fresh-load-and-result-autosave-on-the-merged-build)
+  at 10.53 calls per emulated second. Its second bank reloads the frozen
+  victory with the same world and all three heroes alive. Carry the
+  normal-ROM save and result checks to late Terran next, starting with T9.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
