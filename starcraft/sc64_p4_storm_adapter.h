@@ -175,24 +175,6 @@ static int race_p4_storm_tick(void)
     return 1;
 }
 
-static void race_p4_storm_draw(void)
-{
-    if (!race_p4_active()) return;
-    for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i) {
-        const Sc64PsionicStorm *e = &race_p4.storm.storm[i];
-        int x, y, r;
-        if (!e->active) continue;
-        x = e->x - camx; y = e->y - camy + 12;
-        r = SC64_STORM_RADIUS_GBA_PX;
-        gfx_line(x, y-r, x+r, y, C_CYAN);
-        gfx_line(x+r, y, x, y+r, C_CYAN);
-        gfx_line(x, y+r, x-r, y, C_CYAN);
-        gfx_line(x-r, y, x, y-r, C_CYAN);
-        gfx_line(x-2, y, x+2, y, C_WHITE);
-        gfx_line(x, y-2, x, y+2, C_WHITE);
-    }
-}
-
 #undef SC64_P4_STORM_APPLY
 
 #endif
