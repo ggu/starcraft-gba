@@ -183,3 +183,34 @@ separate mission-state validations inside the journal operation.
 The trial stays out of the normal builds. The comparison receipt
 SHA-256 is
 `ddaa162492afc6b0f16f6af9ecd3378a0da6d9b79b4921f606c1668646897887`.
+
+
+### One full validation per journal candidate
+
+The normal Terran trial at `ea0874b2` copies the live T6 state into
+the save candidate before the full candidate check. At load it
+copies the already validated T6 state from the candidate to the
+load plan. The full candidate validation still runs independently
+on the selected and prior journal banks. Neither operation needs a
+second check of the same T6 state.
+
+The control is normal Terran release `b2087fac`. Both ROMs repeat
+the same 4,190 gameplay calls after loading the original pause
+journal at frame 19,466. All 27 sampled observations match. They
+keep the first bank and produce byte-identical 32 KiB victory
+journals and frozen-result re-exports. Both link with IWRAM
+`0x030048a8` and EWRAM `0x02038ddc`. The HOST checks include T6
+save and load, malformed candidate rejection, failed-save
+atomicity, and older-bank fallback.
+
+| Emulator update | Control cycles | Trial cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Pause HOME load | 30,514,031 | 28,725,640 | 5.86% |
+| Victory autosave with prior bank | 40,885,763 | 37,255,350 | 8.88% |
+| Frozen-result HOME load | 32,874,369 | 31,091,420 | 5.42% |
+
+The comparison receipt SHA-256 is
+`9e31b9dac726194747f6a4925e7cd2ef51b3b1ce1cc0b5e45b207973f79016fb`.
+The source-only composition after the later campaign audit merges
+has the same runtime as the trial. Run the release gates before
+activation.

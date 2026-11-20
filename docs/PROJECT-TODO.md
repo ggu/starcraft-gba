@@ -153,7 +153,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the adapter leaves timing flat because the compiler already
   combines it. Check repeated validation of the same mission state
   within each journal operation and preserve the independent
-  validation of both banks.
+  validation of both banks. The [one-check-per-candidate trial](audits/2026-11-13-t6-normal-physical.md#one-full-validation-per-journal-candidate)
+  cuts another 8.88% from the T6 victory update and matches all 27
+  observations and both byte-identical SRAM exports. Qualify the
+  composed release checks before activation.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
