@@ -22,7 +22,7 @@
  * A launched (OUTSIDE) or orphaned (DETACHED) child keeps its order state in
  * fields the typed save codec already stores; no save bytes are added:
  *   order       ORDER_ATTACK_TARGET (attack passes) or ORDER_MOVE (return)
- *   path_retry  order state: 0/1/3/4/5 attacking, 0/1 returning
+ *   path_retry  order state: 0/1/3/4/5 attacking, 0/1/8 returning
  *   work_timer  native main order timer (15-tick ascent)
  *   tx, ty      current waypoint, runtime pixels (half source precision)
  *   path_timer  attack animation: 1 fires on the next tick, 2 recovers
@@ -45,7 +45,29 @@
 #define SC64_P7_INTERCEPTOR_DOCK_PX 5    /* 10 source px */
 #define SC64_P7_INTERCEPTOR_DETACH_MIN 15
 #define SC64_P7_INTERCEPTOR_DETACH_SPAN 31
-#define SC64_P7_INTERCEPTOR_ELEVATION 12
+/* Carrier and Gantrithor both use the native elevation 16. The active
+ * Interceptor uses 15 at release, 17 after ascent and 14 on approach. */
+#define SC64_P7_CARRIER_ELEVATION 16
+#define SC64_P7_INTERCEPTOR_LAUNCH_ELEVATION (SC64_P7_CARRIER_ELEVATION - 1)
+#define SC64_P7_INTERCEPTOR_ATTACK_ELEVATION (SC64_P7_INTERCEPTOR_LAUNCH_ELEVATION + 2)
+#define SC64_P7_INTERCEPTOR_APPROACH_ELEVATION (SC64_P7_CARRIER_ELEVATION - 2)
+
+/* While returning outside approach range, the order has no ascent history.
+ * Reserve state 8 in the existing saved path_retry field for a far return
+ * after ascent. State 0 also accepts old saves that lacked this distinction. */
+#define SC64_P7_INTERCEPTOR_RETURN_ASCENDED 8
+
+static unsigned race_p7_interceptor_flight_layer(const Unit *q)
+{
+    if (q->order == ORDER_MOVE) {
+        if (q->path_retry == 1) return SC64_P7_INTERCEPTOR_APPROACH_ELEVATION;
+        if (q->path_retry == SC64_P7_INTERCEPTOR_RETURN_ASCENDED)
+            return SC64_P7_INTERCEPTOR_ATTACK_ELEVATION;
+    } else if (q->path_retry >= SC64_INTERCEPTOR_ORDER_STATE_ATTACK) {
+        return SC64_P7_INTERCEPTOR_ATTACK_ELEVATION;
+    }
+    return SC64_P7_INTERCEPTOR_LAUNCH_ELEVATION;
+}
 
 enum {
     SC64_P7_INTERCEPTOR_ANIM_IDLE = 0,
@@ -256,10 +278,12 @@ static void race_p7_flight_child_tick(int child)
     memset(&in, 0, sizeof(in));
     order.order = q->order == ORDER_MOVE ? SC64_INTERCEPTOR_ORDER_RETURN :
                                            SC64_INTERCEPTOR_ORDER_ATTACK;
-    order.order_state = (uint8_t)q->path_retry;
+    order.order_state = order.order == SC64_INTERCEPTOR_ORDER_RETURN &&
+        q->path_retry == SC64_P7_INTERCEPTOR_RETURN_ASCENDED
+        ? 0 : (uint8_t)q->path_retry;
     order.alive = 1; order.outside = 1;
     order.timer = (uint16_t)q->work_timer;
-    order.elevation = SC64_P7_INTERCEPTOR_ELEVATION;
+    order.elevation = (int16_t)race_p7_interceptor_flight_layer(q);
     order.shields_q8 = (uint32_t)race_p7_flight_clamp(q->shield, 0, 40) * 256u;
     order.max_shields_q8 = 40u * 256u;
     order.move_x = (int16_t)(q->tx * 2); order.move_y = (int16_t)(q->ty * 2);
@@ -296,7 +320,7 @@ static void race_p7_flight_child_tick(int child)
         in.parent_x = (int16_t)(u[parent].x * 2);
         in.parent_y = (int16_t)(u[parent].y * 2);
     }
-    in.parent_elevation = SC64_P7_INTERCEPTOR_ELEVATION;
+    in.parent_elevation = SC64_P7_CARRIER_ELEVATION;
     in.target_x = (int16_t)(tx * 2); in.target_y = (int16_t)(ty * 2);
     /* Interceptor dimensions are 8/8/7/7 source px (BWAPI raw73). */
     in.move_min_x = 8; in.move_max_x = (int16_t)(width - 8);
@@ -308,7 +332,10 @@ static void race_p7_flight_child_tick(int child)
 
     if (!sc64_interceptor_order_tick(&order, &in, &result)) {
         /* Unrepresentable input: head home rather than act on it. */
-        q->order = ORDER_MOVE; q->path_retry = 0; q->target = -1;
+        q->order = ORDER_MOVE;
+        q->path_retry = order.elevation == SC64_P7_INTERCEPTOR_ATTACK_ELEVATION
+            ? SC64_P7_INTERCEPTOR_RETURN_ASCENDED : 0;
+        q->target = -1;
         return;
     }
     if (result.actions & SC64_INTERCEPTOR_ACTION_KILL) {
@@ -323,6 +350,9 @@ static void race_p7_flight_child_tick(int child)
     q->order = order.order == SC64_INTERCEPTOR_ORDER_RETURN ? ORDER_MOVE :
                                                               ORDER_ATTACK_TARGET;
     q->path_retry = order.order_state;
+    if (q->order == ORDER_MOVE && !order.order_state &&
+        order.elevation == SC64_P7_INTERCEPTOR_ATTACK_ELEVATION)
+        q->path_retry = SC64_P7_INTERCEPTOR_RETURN_ASCENDED;
     q->work_timer = order.timer;
     q->target = order.order == SC64_INTERCEPTOR_ORDER_ATTACK ? target : -1;
     q->tx = race_p7_flight_clamp(order.move_x / 2, 0, WORLD_W - 1);
@@ -396,7 +426,8 @@ static int race_p7_interceptor_flight_child_valid_in(const Unit *actors,
     if (q->order == ORDER_ATTACK_TARGET) {
         if (q->path_retry == 2 || q->path_retry > 5) return 0;
     } else if (q->order == ORDER_MOVE) {
-        if (q->path_retry > 1) return 0;
+        if (q->path_retry > 1 && q->path_retry != SC64_P7_INTERCEPTOR_RETURN_ASCENDED)
+            return 0;
     } else return 0;
     if (state == SC64_P7_INTERCEPTOR_OUTSIDE)
         return q->carry == 0 && q->build >= 0 && q->build < count &&

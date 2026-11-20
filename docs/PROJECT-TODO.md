@@ -1902,8 +1902,11 @@ AI wallets and full-match behavior remain unverified.
   modes and the legacy static-clip fixture.
 - Use the [dynamic depth harness cases](audits/2026-11-19-world-depth.md#dynamic-depth-harness)
   for the next rendering qualification. Start with lift, landing and the
-  mid-flight save boundary, then cover Interceptors, detached effects and
-  picking against the same opaque overlap oracle.
+  mid-flight save boundary, then add
+  [Interceptor flight overlap replays](audits/2026-11-19-world-depth.md#interceptor-flight-overlap)
+  around the new native layers and both far-return save histories. Verify
+  detached effects, exact sprite-ID ties and picking against the same
+  opaque overlap oracle.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.
