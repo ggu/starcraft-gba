@@ -207,9 +207,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   guards across the qualified revisions. Terran and Showcase also
   match both mixed three-AI Blood Bath saves and both fresh
   600-update continuations. The 128×128 Z9 observed range calls are
-  short cache misses. Bound the synchronous fill after a declined
-  distant proof, then compare worst update and p95 to the eager
-  control. A separate exact-cache scan trial on Z8
+  short cache misses. The bounded deferred-read FIFO trial still
+  raised the longest forced declined read from 1,245,315 to
+  1,329,267 cycles and left a later whole-field stall. Keep it off.
+  Target eager fills without moving work to a later update. A separate exact-cache scan trial on Z8
   matched 21 sampled states and saved less than 0.01% mean cycles
   across 486 timed calls. Focus on the larger route fills.
   A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the

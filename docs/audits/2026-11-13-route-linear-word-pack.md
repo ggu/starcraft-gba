@@ -192,3 +192,35 @@ The shared configuration selects the aligned writer when the
 linear point or facility FIFO is enabled. Set
 `CANONICAL_ROUTE_LINEAR_WORD_PACK=0` to rebuild with the byte writer.
 The compile configuration key distinguishes the two settings.
+
+## Four-profile default qualification
+
+The default change at `cd60befd` composes with release `0811942b`.
+The same runtime and build definitions are present at `691c9ebc`.
+Dry runs for all four normal verification targets select exactly one
+`SC64_ROUTE_LINEAR_WORD_PACK_PROBE` flag. The explicit opt-out removes
+that flag and selects a separate build configuration key. The original-art
+skirmish recipe does not select the flag.
+
+With the prepared source bank pinned, each normal cartridge passes
+the header, SRAM signature, and unchanged linker guards. Z10 and P10
+reproduce the exact measured trial ROM SHA-256 values above. IWRAM and
+EWRAM endpoints match the corresponding pretrial builds in every profile.
+
+| Profile | Default ROM SHA-256 prefix | IWRAM end | EWRAM end | Mixed skirmish comparison SHA-256 prefix |
+| --- | --- | --- | --- | --- |
+| Terran | `1ff78b901e13b6af` | `0x030048a8` | `0x02038e5c` | `0e7b2a69159035c9` |
+| Z10 | `970cd016b85715f8` | `0x03004d88` | `0x02037f78` | `a40da287b9927c3a` |
+| P10 | `769293f4122db540` | `0x03004e20` | `0x0203b52c` | `65a3c31fc73854aa` |
+| Showcase | `9c2e62a0d7240a72` | `0x03004fb8` | `0x02039068` | `4bf60cfee57c842b` |
+
+All four enter mixed three-AI Blood Bath from the ordinary lobby.
+The [retained Bunker control](2026-11-20-terran-bunker-opening.md#current-release-with-death-depth)
+matches 35 named opening samples on Terran and Showcase and 36
+on Z10 and P10. The active construction and four-passenger pause
+journals match byte for byte in each profile. Both journals restore
+the same world, resources, and assignments in a fresh process, then
+match the next 600 uninterrupted updates. The sampled fresh windows
+run 0.005% to 0.155% slower against that retained control. This is a
+64×64 skirmish save and gameplay check outside the affected wide
+packing path.
