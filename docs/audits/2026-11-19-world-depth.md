@@ -162,7 +162,12 @@ respectively. The 116 bytes at ROM `0x9394` have SHA-256
 `2824fe5e99a1890914746cb35cdbd74e46bfc84876ee41787561704fd5a81c01`.
 Capture muzzle overlays, the free-standing bullet and the resulting
 impact separately. The GBA currently paints them from a combined trace
-after the world actors.
+after the world actors. When testing a new bullet pass, include a target
+whose layer changes between attack wind-up and the release tick. Use
+the layer at release, then hold it for that bullet. Race saves clear
+cosmetic traces on load and preserve damage events in a separate queue.
+Use an uninterrupted run for pixel ownership and a fresh load to
+verify the queued hit still resolves once.
 [OpenBW bullet creation](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13759-L13769)
 
 ### Interceptor flight overlap
