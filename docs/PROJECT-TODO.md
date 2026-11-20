@@ -42,8 +42,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run
   averages 15.19 calls per emulated second on the current P10.
-  P9 still has a gap between
-  its normal HOME win and its earlier replacement-loop save replay.
+  [P9 on this P10](audits/2026-11-13-p9-normal-home.md#november-20-fresh-sram-victory)
+  restores three active constructions at frame 30,109 and wins with
+  both heroes alive. All 42 checkpoints match, including 30 after load.
+  The run averages 9.35 calls per emulated second. Qualify P10's result
+  autosave and fresh continuation on the newer release.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
