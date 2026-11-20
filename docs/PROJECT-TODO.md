@@ -139,8 +139,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   present. The pause and frozen-result loads drop 22.22% and 20.95%.
   The original pause bank and complete victory SRAM match byte for
   byte. The composed links retain all four RAM limits and the normal
-  Terran active and staffed Bunker saves. Profile the remaining
-  victory stall.
+  Terran active and staffed Bunker saves. The original victory
+  profile attributes 5.90 million cycles to four immutable program
+  validations. Reuse validated program data within the adapter call
+  and time the current release's remaining victory work.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean

@@ -143,3 +143,27 @@ matrix receipt SHA-256 is
 
 The replay comparison receipt SHA-256 is
 `8c76801a0d3753b742bc0da11448a33a5e39ba9318f2d1eb3997e21b79f41aea`.
+
+
+### Instruction attribution at victory
+
+A read-only instruction trace of the original Terran ROM reproduces
+the same paused-bank victory and frozen-result SRAM. Its complete
+input-to-input interval takes 54,161,500 cycles. The game loop's
+counter measures 54,160,869 inside that interval. The instruction
+histogram, recorded stack totals and emulator clock delta agree.
+
+| Function on the original ROM | Inclusive cycles | Calls |
+| --- | ---: | ---: |
+| `race_save_game` | 51,792,193 | 1 |
+| `sc64_unit_save_decode` | 28,088,518 | 2,881 |
+| `sc64_packed_unit_get` | 14,240,077 | 25,936 |
+| `sc64_t6_runtime_program_valid` | 5,896,350 | 4 |
+
+The counts are nested. The T6 scenario adapter checks the immutable
+program before calling the generic runtime validator, which checks
+the same program again. Reuse the verified program within the
+adapter call while retaining its mutable-state checks and the generic
+validator's independent checks. Profile the composed runtime to
+measure the remaining journal cost. The profile receipt SHA-256 is
+`4b1b2e1925f8ed75f3cdf6de597c4de5584201c0577aa892dfc121882d37e4c7`.
