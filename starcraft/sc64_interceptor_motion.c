@@ -28,7 +28,9 @@ sc64_interceptor_row_domain_valid(const Sc64ProjectileRow *row)
         row->order_signal_bit0 <= 1 && row->movement_flags_low4 <= 15 &&
         row->hit_flags_low2 <= 3 && row->script_phase <= 3 &&
         row->raw_source_owner <= 11 && row->pending_damage_event <= 1 &&
-        row->next_link <= SC64_END && row->reserved_snapshot_bits == 0;
+        row->next_link <= SC64_END &&
+        row->launch_layer_plus1 <= SC64_PROJECTILE_MAX_LAYER + 1u &&
+        (row->state != SC64_INTERCEPTOR_MOTION_FREE || !row->launch_layer_plus1);
 }
 
 int
@@ -91,6 +93,7 @@ sc64_interceptor_motion_tick(Sc64ProjectileRow *row,
     result.script_phase = p.script_phase;
     result.raw_source_owner = p.raw_owner;
     result.pending_damage_event = p.damage_event;
+    if (result.state == SC64_INTERCEPTOR_MOTION_FREE) result.launch_layer_plus1 = 0;
     if (!sc64_interceptor_row_domain_valid(&result))
         return 0;
     *row = result;
@@ -177,7 +180,7 @@ sc64_interceptor_projectile_launch(
     row.raw_source_owner = raw_source_owner;
     row.pending_damage_event = 0;
     row.next_link = 0;
-    row.reserved_snapshot_bits = 0;
+    row.launch_layer_plus1 = 0;
     *out = row;
     return 1;
 }

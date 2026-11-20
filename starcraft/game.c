@@ -2419,6 +2419,10 @@ static void race_p7_projectile_clear_dead_references(void);
 static void race_p7_projectile_source_tick(void);
 static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
+#ifdef SC64_WORLD_DEPTH
+static void race_p7_projectile_push_depth(u32 *heap, unsigned *size);
+static void race_p7_projectile_draw_depth(unsigned id);
+#endif
 static int race_p7_projectile_encode(u8 *packet);
 static int race_p7_projectile_restore(const u8 *packet
 #if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)

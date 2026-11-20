@@ -571,7 +571,7 @@ counts. Store ROM-derived pixels and memory locally.
 | `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
 | `independent-effect-depth` | Capture muzzle, projectile body, trail, impact and corpse or shadow on separate native animation ticks against the same covering actor. Repeat with a special-service projectile. | Record the native sprite ID and elevation when each independent sprite exists. Use the parent sprite's depth for image attachments and derive a separate oracle for independently spawned sprites. |
 | `yamato-charge-flight-impact-depth` | In Terran, P10 and Showcase, record Yamato charge, flight, trail and impact against a lifted building and a flyer. | Compare the charge with the caster layer, the flight and attached impact with the release layer, and the detached trail one layer below. Record a separate overlap mask for each phase. |
-| `interceptor-pulse-depth` | In P10, capture a shot from a launched Interceptor against both ground and air targets. Sample target loss and a fresh save load in flight. | Record the native projectile layer at creation and after target loss. Compare it with the GBA marker at the same shot age. The GBA marker still uses a pass above the world queue. |
+| `interceptor-pulse-depth` | In P10, capture a shot from a launched Interceptor against both ground and air targets. Sample target loss and a fresh save load in flight. | The marker joins the world queue with its launch layer. See [Interceptor pulse restore](#interceptor-pulse-restore). |
 
 #### Yamato charge attachment
 
@@ -631,9 +631,8 @@ world anchor, distinguishing pixel count and wrong-pixel count.
 | `native-pool-id-tie` | Sample the T10 Barracks/Goliath exact-Y tie and the two equal-elevation Wraiths at different Y. Also capture a Siege hull and turret with a third overlapping sprite. | The native unsigned greater key wins. Keep the exact tie case open for the GBA until it has a shared sprite-ID lifetime and individual turret draw turns. |
 
 The native weapon-79 Interceptor pulse also uses moving behavior 0.
-It should use target elevation plus one at release and retain that layer
-after detach. Its GBA marker is still drawn after the world queue and
-its saved projectile row needs a compatible way to retain launch depth.
+Its [launch-layer and restore checks](#interceptor-pulse-restore)
+cover the shared depth queue and saved projectile row.
 
 The Terran, Protoss and Showcase sanitizer fixtures match the shared
 queue and the complete effects pass for flight, trail and impact. The
@@ -826,6 +825,63 @@ and replay the tail through docking. The full Carrier service is enabled
 in regular Protoss and the Terran, Zerg and Showcase previews. The N64
 test should sample the child's sprite elevation and owner, both anchors,
 and the finished framebuffer for each cut.
+
+### Interceptor pulse restore
+
+The moving marker uses the unit-targeted bullet rule above. At launch it
+records the target's live layer plus one. Target death, slot reuse and a
+saved projectile's flight do not recompute that layer. The marker follows
+the existing motion, fog and lifetime rules. Older saved shots lack a
+launch layer and keep their earlier draw order for the rest of the shot.
+
+The fixed and compact pool codecs keep their row count and packet sizes.
+The fixed form uses a header flag and five reserved row bits. The compact
+form uses a header flag and packs five bits into the upper bits of the two
+destination fields and the source-owner field. These fields already fit
+in 12, 12 and 3 bits, respectively, in completed gameplay. Unflagged
+packets retain their original layout and wider generic field ranges.
+The codecs reject unknown flags and invalid layers before changing the
+destination arena. Retiring a projectile clears its stored layer.
+Earlier cartridges reject the flagged packet version.
+
+The Protoss HOST fixture takes a layer-5 ground shot and a layer-19 air
+shot through target loss, a journal save, an arena reset and a load. On
+both indexed pages the ground shot covers three Marine pixels and is
+covered by three Wraith pixels. The air shot covers all three Wraith
+pixels. The asset-free codec fixture also fills all 100 slots and checks
+every supported layer, the legacy sentinel and invalid packet rejection.
+
+The ordinary P10 Eye of the Storm replay resumes a predecessor journal
+at frame 36,761. At frame 37,589, controller START and B save an active
+layer-5 shot in slot 1. The new bank keeps the predecessor bank byte for
+byte. A fresh emulator restores the same flight row from HOME and
+matches all 36 neutral updates through impact, retirement and slot
+reuse. The target falls from 35 to 23 HP at frame 37,595. Both writers
+produce the same 32 KiB SRAM. The replay receipt SHA-256 is
+`10b638ada2c3ff4b8cc75e4d336565d317d47eb5ee90b3b0ff11523694d21c02`.
+
+A staged P10 battle with up to ten active pulses matches all 21 sampled
+world states, normalized projectile arenas, palettes and indexed pages.
+Over 1,000 updates, mean guest cycles move from 1,139,998 to 1,143,158
+(0.28%). The 518 active-pulse updates move from 1,169,470 to 1,175,392
+(0.51%). Peak cycles grow by 0.09%. The candidate's system stack uses
+4,260 changed bytes. It keeps 7,260 bytes above the intact 256-byte
+guard. The emulator timing and stack receipt SHA-256 is
+`ce0f46b904076e8567dcd884eb47797d8173241f54f8d19d38afeef229da3ee4`.
+
+Terran, Z10 and Showcase link with the same memory and payload guards.
+Each matches its release's Custom Game state and exact SRAM through
+the 360-update pause and 240-update fresh continuation. Their normal
+profiles exclude the Carrier projectile service. The comparison receipt
+SHA-256 is
+`45abd249d5ccf78c13aba9f94f07dd9efbad51d06eb2bb4574a9ec655630a647`.
+
+For the ARM harness, record launch layer, target and shooter references,
+current world anchor, active page, both HUD bands, and opaque overlap
+counts. Capture before and after a moving target changes elevation and
+after the original target is removed. Add an active detached-shot reload
+on the compact-save Carrier preview profiles. The exact N64 weapon-79
+framebuffer cut and crowded hardware timing remain open.
 
 ### Cache and clip regressions
 

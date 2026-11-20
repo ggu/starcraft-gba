@@ -258,6 +258,78 @@ static void check_interceptor_overlap(int carrier_slot, int child_slot, int chil
     printf("Interceptor depth %u: %u overlap pixels match\n",
            race_p7_interceptor_flight_layer(&child), overlap);
 }
+
+static void draw_pulse_with_blocker(int blocker, int marker_x, int marker_y, int marker_front)
+{
+    gfx_begin(C_BLACK);
+    gfx_set_clip_y(12, 120);
+    if (marker_front) draw_unit(&u[blocker]);
+    race_p7_projectile_marker_draw(marker_x, marker_y);
+    if (!marker_front) draw_unit(&u[blocker]);
+    gfx_end();
+}
+
+static void check_pulse_overlap(const Sc64ProjectileRow *pulse, int type, int marker_front)
+{
+    static u8 expected[240 * 160];
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    for (int i = 0; i < MAP_CELLS; ++i) SC64_GRID_SET(visible, i, 1);
+    int x = pulse->x_q8_source / 512, y = pulse->y_q8_source / 512;
+    camx = x - 96; camy = y - 38;
+    int blocker = spawn_unit(SIDE, type, x, y);
+    assert(blocker >= 0);
+    draw_pulse_with_blocker(blocker, 96, 50, marker_front);
+    for (int py = 0; py < 160; ++py) for (int px = 0; px < 240; ++px)
+        expected[py * 240 + px] = gfx_test_pixel(px, py);
+    draw_pulse_with_blocker(blocker, 96, 50, !marker_front);
+    unsigned overlap = 0;
+    for (int px = 95; px <= 97; ++px) overlap += gfx_test_pixel(px, 50) != expected[50 * 240 + px];
+    assert(overlap);
+    for (int page = 0; page < 2; ++page) {
+        gfx_begin(C_BLACK);
+        gfx_set_clip_y(12, 120);
+        sc64_draw_depth_ordered_actors();
+        race_p7_projectile_draw();
+        gfx_end();
+        for (int py = 0; py < 160; ++py) for (int px = 0; px < 240; ++px)
+            assert(gfx_test_pixel(px, py) == expected[py * 240 + px]);
+    }
+    printf("Pulse layer %u against type %d: %u distinct pixels on both pages\n",
+           pulse->launch_layer_plus1 - 1u, type, overlap);
+}
+
+static void test_detached_pulse_depth(void)
+{
+    for (int air = 0; air <= 1; ++air) {
+        int original, carrier = arena(&original, 100);
+        int target = spawn_unit(ENEMY, air ? U_WRAITH : U_MARINE, 260, 200);
+        assert(target >= 0);
+        assert(race_p7_flight_release(carrier, original));
+        int child = find_state(carrier, SC64_P7_INTERCEPTOR_OUTSIDE);
+        assert(child >= 0);
+        assert(race_p7_projectile_fire(child, target, 64, u[child].x * 512, u[child].y * 512));
+        u8 ordinal = sc64_pool_active_head(&race_p7_projectiles);
+        Sc64ProjectileRow row;
+        assert(sc64_pool_get_row(&race_p7_projectiles, ordinal, &row));
+        assert(row.launch_layer_plus1 == (air ? 20u : 6u));
+        hit_target(target, 10000, U_ZEALOT, SIDE);
+        assert(!u[target].alive);
+        race_p7_projectile_clear_dead_references();
+        assert(sc64_pool_get_row(&race_p7_projectiles, ordinal, &row) && row.target_ref == 511);
+        Sc64ProjectileRow before = row;
+        assert(race_save_game());
+        race_p7_projectile_reset();
+        assert(race_load_game());
+        assert(sc64_pool_get_row(&race_p7_projectiles, ordinal, &row));
+        assert(row.launch_layer_plus1 == before.launch_layer_plus1 && row.target_ref == 511 &&
+               row.x_q8_source == before.x_q8_source && row.y_q8_source == before.y_q8_source);
+        if (!air) check_pulse_overlap(&row, U_MARINE, 1);
+        check_pulse_overlap(&row, U_WRAITH, air);
+    }
+}
 #endif
 
 static void test_interceptor_depth(void)
@@ -462,6 +534,9 @@ int main(void)
     test_launch_attack_and_return();
     test_shield_retreat_and_hangar_rows();
     test_interceptor_depth();
+#ifdef SC64_WORLD_DEPTH
+    test_detached_pulse_depth();
+#endif
     test_parent_death_detaches();
     test_save_rejection();
     test_game_updates();
