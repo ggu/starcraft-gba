@@ -2315,6 +2315,9 @@ static void race_z8_note_unit_spawn(int slot, int owner, int type);
 static void race_z8_note_building_spawn(int slot, int owner, int type);
 static void race_z8_note_product_building(int building);
 static int race_z8_unit_hidden_from_side(int unit);
+#ifdef SC64_TARGET_POLICY_PROBE
+static u8 race_z8_hidden_any;
+#endif
 #endif
 #ifdef SC64_Z9_RUNTIME
 #define SC64_Z9_GLOBAL_ID 20
@@ -4368,34 +4371,7 @@ static int sc64_z8_can_attack_from(int attacker, int target, int owner)
 #define SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner) \
     SC64_CAN_ATTACK_FROM((attacker), (target), (owner))
 #endif
-static int __attribute__((noinline))
-sc64_auto_target_candidate_allowed(int attacker, int target, int owner,
-                                   int source_owner)
-{
-    int tx, ty;
-    (void)source_owner;
-    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_HIDDEN(&u[target]))
-        return 0;
-#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
-    /* Constructors set the source invincibility flag. Keep it a live-world
-     * property so an explicit trigger override can still change it. */
-    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_CHILD(&u[target]) &&
-        invincible_units[target]) return 0;
-#endif
-    if (owner == SIDE) {
-        if (target < 0) return 0;
-        if (target < MAX_UNITS) {
-            tx = u[target].x; ty = u[target].y;
-        } else {
-            int bi = target - MAX_UNITS;
-            if (bi < 0 || bi >= MAX_BUILDINGS) return 0;
-            tx = b[bi].x; ty = b[bi].y;
-        }
-        if (tx < 0 || ty < 0 || tx >= WORLD_W || ty >= WORLD_H ||
-            !currently_visible(tx, ty)) return 0;
-    }
-    return SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner);
-}
+#include "sc64_auto_target_policy.h"
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 static void
 sc64_target_hostility_snapshot(void)

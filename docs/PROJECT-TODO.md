@@ -25,8 +25,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   separates the repeated route failure of 49 Hydralisks from recurring
   target permissions. In the current paired Z7 wins the prefix trial
   saves 1.53% across the full resume and raises early peak cost by 10.61%.
-  Keep it opt-in and address the nearby-root completions and inactive
-  campaign target checks first.
+  Keep it opt-in and address the nearby-root completions.
+  The [live eligibility fast path](audits/2026-11-21-z7-late-order-budget.md#live-target-eligibility-fast-path)
+  cuts mean guest cycles by 5.38% and 6.17% in the two late windows on
+  the shared-depth release. It preserves the sampled route and gameplay
+  results. Prioritize the short isolated field builds and profile the
+  remaining zero-build orders before widening the route experiments.
   [Immutable actor lookups](audits/2026-11-21-z10-actor-lookups.md)
   cut the full resumed Z7 mean by 1.17% and the two late windows by
   1.52% and 1.57%, with matching images, SRAM and campaign result.
@@ -45,8 +49,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   approach selection and temporary contention before activating it.
 
 - **Normal race cartridge win and save qualification.** All ten Protoss
-  missions now win from HOME and after fresh SRAM reloads on one exact
-  normal P10 build. The
+  missions win after fresh pause loads on the
+  [normal P10 build at `f69b2bbd`](audits/2026-11-13-normal-campaign-matrix.md#normal-protoss-cartridge-at-f69b2bbd).
+  Each victory journal restores and re-exports identically. The
   [release 25e9e8b9 matrix](audits/2026-11-13-normal-campaign-matrix.md#release-25e9e8b9-race-replays)
   ties Z2–Z6 to one Z10 ROM and P5 to one P10 ROM. Z2 and P5 match paused
   saves and fresh continuations. Z3–Z6 match all 627 uninterrupted

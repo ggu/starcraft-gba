@@ -41,6 +41,84 @@ Z6 detection with an Observer and Cannon, Z5 and Z8 cloaks, transported
 units, Scourge, hidden hangar occupants, and target and fog changes within
 an update before using a shared permission snapshot.
 
+## Live target eligibility fast path
+
+The normal race recipes share `CANONICAL_TARGET_POLICY`. Set it to
+`0` to replay the original permission calls with the same prepared
+inputs. The fast path checks the persistent Z5 and Z6 cloak-active flags
+before calling their existing detector logic. On builds where the outer
+policy adds only Scourge eligibility and Z8's human-side cloak check,
+ordinary attackers reach the base eligibility check directly. They still
+consult the live Z8 hidden set when it is populated. The specialized
+wrappers handle Scourge and the builds with T6, P6, or P7 observer rules.
+Both paths still evaluate current visibility, hidden children and stock
+target eligibility as the orders pass runs.
+
+The first paired run on the `f69b2bbd` normal Z10 build keeps the
+same frame-5,641 save, all 254 resumed gameplay checkpoints, and ten
+framebuffer, palette and camera cuts through victory at frame 228,128.
+The route build and hit counters match across the three timed windows.
+
+| Tape calls | Advancing updates | Mean guest cycles, control → fast path | Change |
+| --- | ---: | ---: | ---: |
+| 47,758–48,237 | 477 | 2,139,080 → 2,138,931 | −0.007% |
+| 153,812–154,741 | 926 | 2,645,276 → 2,502,826 | −5.39% |
+| 154,742–155,650 | 905 | 2,593,044 → 2,433,066 | −6.17% |
+
+The early peak rises by 298 cycles. The two late peaks fall by 76,464
+and 128,954 cycles. Across all 225,208 fresh-resume main-loop calls,
+including presentation waits and UI, the mean drops from 1,311,303
+to 1,308,508 guest cycles (0.21%). The mean during the late active
+windows still exceeds the 30 fps budget by more than fourfold.
+The first comparison receipt SHA-256 is
+`5940e7735c8e196fb89e5dc3f119a0a4bec32f1ff6a50f190c13101ee1f2fcfc`.
+
+Against the `83edffe8` shared-depth builds, normal Terran, P10 and
+Showcase link byte-identically with the option enabled. Normal Z10 also
+reproduces its control byte for byte with the option off. The option-on
+Z10 retains the same RAM endpoints and the same 40 prepared input
+hashes. The generated actor facts are identical with the option off
+and on.
+
+The second paired Z7 replay uses that shared-depth control and the
+option-on Z10. The timed windows match route counters, camera, palette
+and both indexed pages. The exact pause journal at frame 5,641 matches.
+
+| Tape calls | Mean guest cycles, control → fast path | p95, control → fast path | Change in mean |
+| --- | ---: | ---: | ---: |
+| 47,758–48,237 | 2,143,526 → 2,143,344 | 3,130,515 → 3,130,351 | −0.008% |
+| 153,812–154,741 | 2,643,782 → 2,501,468 | 4,549,000 → 4,418,954 | −5.38% |
+| 154,742–155,650 | 2,592,019 → 2,432,039 | 4,567,098 → 4,427,492 | −6.17% |
+
+Orders account for almost the entire change in the late windows. The
+mean there drops from 1.733M to 1.591M cycles and from 1.689M to 1.529M.
+The late peak reductions are 80,936 and 128,578 cycles. These are
+emulator measurements.
+
+Both shared-depth builds reach victory at frame 228,128 after a fresh
+HOME load. They match all 254 resumed gameplay checkpoints and ten
+camera and frame cuts. Across 225,208 main-loop calls, the mean falls
+from 1,312,138 to 1,309,322 cycles (0.21%). The emulated main loop
+averages 12.79 to 12.81 updates per second over the full run, including
+menus and presentation waits.
+
+Paired Z6 replays on those two Z10 cartridges match all 65 named
+checkpoints and eight modal pages through victory at frame 56,913.
+Both write the same frame-18,721 pause journal with two pending impacts
+and preserve the selected unit. Both restore it from fresh HOME and
+complete the mission with the same physical controls. The three paired
+Custom Game cases cover both maps and one, two and three independently
+selected AI seats. Their ordinary saves and 240-update fresh
+continuations match. The Z5, Z6 and Z8 sanitizer fixtures exercise the
+real cloak and detection arrays. The Z6 and Z8 fixtures assert live
+automatic attack eligibility as well.
+
+| Receipt | SHA-256 |
+| --- | --- |
+| Current paired Z7 fresh victory and timed windows | `7beebd23024065bbe1c5f4274798b17fe033d3c7f3f794f1ce52903aeb02e6ed` |
+| Current paired Z6 fresh victory | `98d774c9c3dc1bc8adca0aea982553253a29ce635b2edae64026ada5c1481c49` |
+| Current paired Custom Game saves and continuations | `2bb757834f8faaa14ac4b0a2c376d340aa578dd0acd1a1d1c2bfe81a3cf78c59` |
+
 ## Resumable point-route trial on the shared-depth release
 
 The [point-route trial](https://github.com/ggu/starcraft-gba/pull/576)
