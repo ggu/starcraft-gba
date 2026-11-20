@@ -27,7 +27,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reduce full-route cycles by 16.66% with the same SRAM and victory
   checkpoints. The route still averages 15.75 calls per emulated second.
   Continue applying the normal-ROM gate to the remaining
-  [campaign entries](audits/2026-11-13-normal-campaign-matrix.md).
+  [campaign entries](audits/2026-11-13-normal-campaign-matrix.md). Next
+  qualify Z8 from a fresh SRAM load on normal Z10. The
+  [current sparse Z10 replay](audits/2026-11-20-late-zerg-sparse-sight.md)
+  checks its opening through 2,320 calls. The retained full tape gives a
+  pause and reload cut for the rest of the mission.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
@@ -45,8 +49,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   late opening. Compare Terran Bunkers and Protoss Battery or Cannon
   openings. The shared Sunken rule now uses the native 400 HP cap.
   Native morph completion and the GBA campaign and custom fixtures
-  preserve damage. Older saves keep their stored current HP under
-  the new cap. Qualify Zealot HP and shields (80 each) against profile
+  preserve damage. Fresh ARM loads on all four profiles keep the stored
+  current HP of older colonies and complete an older pending morph at
+  400 HP. Qualify Zealot HP and shields (80 each) against profile
   overrides and the existing unit save representations.
   [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
 

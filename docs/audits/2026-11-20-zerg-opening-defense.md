@@ -132,6 +132,27 @@ save containing a Sunken above 300 current HP.
 | In-progress morph, `0x1185e8`, 88 bytes | `83784b12d693730886c93153ca0dd2fd70e64ce9741c9309a21b9e59776691b0` |
 | Finish guard, `0xf864c`, 76 bytes | `18dcb0fa008d61b3634815283bc007f19c9a5f486e20a7c28f88490a6011862e` |
 
+All four normal ARM profiles open solo Blood Bath through the controller.
+The release `b67bb89b` writes a live morph at frame 5,524 and completed
+colonies at 8,905. In fresh processes the new builds load the same pending
+row and reach four full 400/400 Sunkens. They also load all four previously
+completed 300/300 Sunkens at 300/400, save again and reproduce those same
+rows in another fresh process. The synthetic host journal checks add
+current HP of 117 and 357 and the Z9 Q8 fixture tests a half-HP morph.
+All four ARM links preserve their IWRAM and EWRAM endpoints.
+
+From frame 8,305 to 8,905, the old uninterrupted route and the new route
+resumed from the first morph have nearly the same mean cycle cost.
+These are emulator opening measurements. Busy games and the physical
+30 fps target remain separate checks.
+
+| Profile | Old → new mean cycles | SRAM receipt SHA-256 |
+| --- | ---: | --- |
+| Terran | 561,372 → 561,372 | `63b707a2581ae2a855df61fd638b5df2eb39f8202456496b9e14c66cbc8deaba` |
+| Z10 | 562,258 → 562,257 | `c0e239297535c194acdab6d1e94730ebec5bcc71ff99996cee73a8a15f0c0a48` |
+| P10 | 595,250 → 595,508 | `fabbd69e58c07146469b3fbee00973283097b1a5be9c1686606bf961d52fc264` |
+| Showcase | 563,110 → 563,100 | `92af5a838ec9201084033aaeba61347b7454ed7b9b7c167b55efdf478202f2f6` |
+
 ## Regression cases
 
 With the prepared profile inputs, build
