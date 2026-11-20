@@ -65,6 +65,44 @@ static void unavailable_fields(void)
 #endif
     one_tick(); assert(u[w].target==4 && u[w].order==ORDER_MINE);
 }
+
+static void continued_field_rank(int block_nearest)
+{
+    reset_scene(R_ZERG, R_TER);
+    int w = spawn_unit(SIDE, U_DRONE, 120, 120);
+    assert(w >= 0);
+    u[w].target = 0;
+    m[0].x = 264;
+    m[0].y = 168;
+    m[1].x = m[2].x = m[3].x = 280;
+    m[1].y = 248;
+    m[2].y = block_nearest ? 88 : 216;
+    m[3].y = 168;
+    m[1].amount = m[2].amount = m[3].amount = 24;
+
+    /* Make each route detour past the wall. The fallback fields are tied
+     * when the nearest goal and all its seed cells are blocked. */
+    for (int y = 0; y < 20; ++y)
+        SC64_GRID_SET(path_walkable, 10 + y * MAP_COLS, 0);
+    if (block_nearest)
+        for (int y = 9; y <= 11; ++y)
+            for (int x = 16; x <= 18; ++x)
+                SC64_GRID_SET(path_walkable, x + y * MAP_COLS, 0);
+#ifdef SC64_IMPORTED_MISSION
+    sc64_routes_reset();
+    u32 builds = sc64_route_builds;
+#endif
+    assert(worker_continue_minerals(&u[w]));
+    assert(u[w].target == (block_nearest ? 1 : 3));
+#ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_MINERAL_FIRST_NEAREST_PROBE
+    assert(sc64_route_builds - builds == (block_nearest ? 2u : 1u));
+#else
+    assert(sc64_route_builds - builds == (block_nearest ? 2u : 3u));
+#endif
+#endif
+}
+
 /* A real selected Probe order is still pending when another Probe collects
  * the final cargo. Retarget through the same known/reachable-field policy. */
 static void pending_trip_depletes(void)
@@ -122,6 +160,8 @@ int main(void)
     continuation_scene(R_ZERG,U_DRONE,B_HATCHERY);
     continuation_scene(R_PROTOSS,U_PROBE,B_NEXUS);
     unavailable_fields();
+    continued_field_rank(0);
+    continued_field_rank(1);
     pending_trip_depletes();
     puts("mineral depletion continuation fixtures: PASS");
     return 0;
