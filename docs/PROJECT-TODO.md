@@ -77,6 +77,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   route and recurring order costs before tuning sight again.
   [Sparse sight audit](audits/2026-11-20-late-zerg-sparse-sight.md)
 
+- **Terran opening Bunker.** Qualify one paid Bunker before Factory on
+  Blood Bath Free for All. Then qualify the linked AI garrison and its
+  continuation from SRAM. Native cargo pointers confirm four passengers.
+  [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md)
+
 - **Native skirmish opening defenses.** The shared Zerg planner now
   builds four paid Sunkens by update 8,305 in both qualified Blood Bath
   lobbies. The normal Terran ROM restores the active morph from SRAM.
