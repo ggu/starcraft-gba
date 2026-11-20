@@ -173,3 +173,10 @@ $(eval $(call P10_ARM_ROM,replay-prefix,-DP10_REPLAY_PREFIX,Replay-Prefix))
 $(eval $(call P10_ARM_ROM,replay-resume,-DP10_REPLAY_RESUME,Replay-Resume))
 .PHONY: sc64-p10-arm-replay
 sc64-p10-arm-replay: build/StarCraft-Protoss-P10-Replay.gba build/StarCraft-Protoss-P10-Replay-Prefix.gba build/StarCraft-Protoss-P10-Replay-Resume.gba
+
+.PHONY: test-sc64-unit-edge-crop
+build/test-sc64-unit-edge-crop: tests/sc64_unit_edge_crop.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_BUILDING_WORD_HEADER) $(P7_INTERCEPTOR_FLIGHT_SOURCES) common/gba.h common/gba.c Makefile mk/protoss-p10/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P10_BUILDING_WORD_FLAGS) $(PROTOSS_P10_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-unit-edge-crop: build/test-sc64-unit-edge-crop
+	./build/test-sc64-unit-edge-crop
+test-sc64-protoss-p10: test-sc64-unit-edge-crop

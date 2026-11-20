@@ -90,13 +90,12 @@ sc64_facing_fire(const Unit *q, int tx, int ty)
     SC64_FACING_SET(slot, sc64_facing_direction(tx - q->x, ty - q->y));
 }
 
-/* Called before drawing a visible unit: face where it is going. */
-static void
-sc64_facing_track(const Unit *q)
+/* Return the next direction, or -1 when the facing stays unchanged. */
+static int
+sc64_facing_order_direction(const Unit *q)
 {
-    int slot = (int)(q - u), dx, dy;
-    if (slot < 0 || slot >= MAX_UNITS || q->order == ORDER_IDLE) return;
-    if (q->cd && q->order == ORDER_ATTACK_TARGET) return;
+    int dx, dy;
+    if (q->order == ORDER_IDLE || (q->cd && q->order == ORDER_ATTACK_TARGET)) return -1;
     if (sc64_race_unit_flying(q->type)) {
         dx = q->tx - q->x;
         dy = q->ty - q->y;
@@ -104,8 +103,18 @@ sc64_facing_track(const Unit *q)
         dx = q->path_x - q->x;
         dy = q->path_y - q->y;
     }
-    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return;
-    SC64_FACING_SET(slot, sc64_facing_direction(dx, dy));
+    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return -1;
+    return sc64_facing_direction(dx, dy);
+}
+
+/* Called before drawing a visible unit: face where it is going. */
+static void
+sc64_facing_track(const Unit *q)
+{
+    int slot = (int)(q - u);
+    if ((unsigned)slot >= MAX_UNITS) return;
+    int direction = sc64_facing_order_direction(q);
+    if (direction >= 0) SC64_FACING_SET(slot, direction);
 }
 
 static void
