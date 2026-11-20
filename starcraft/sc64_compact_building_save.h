@@ -1,6 +1,8 @@
 #ifndef SC64_COMPACT_BUILDING_SAVE_H
 #define SC64_COMPACT_BUILDING_SAVE_H
 
+#include "sc64_save_bits.h"
+
 /* Versioned, slot-preserving building save codec for the opt-in T6 storage
  * profile. Every field in every slot is retained, including dead source
  * structures whose raw type/owner/position remain part of T4 save validation.
@@ -43,14 +45,8 @@ static int
 sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
                          unsigned width, u32 *value)
 {
-    u32 result = 0;
-    if (!row || !bit || !value || !width || width > 32 ||
-        *bit > SC64_PACKED_BUILDING_SAVE_BYTES * 8u ||
-        width > SC64_PACKED_BUILDING_SAVE_BYTES * 8u - *bit) return 0;
-    for (unsigned i = 0; i < width; ++i, ++*bit)
-        result |= (u32)((row->bytes[*bit >> 3] >> (*bit & 7u)) & 1u) << i;
-    *value = result;
-    return 1;
+    return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
+                                      bit, width, value);
 }
 
 /* All values below are bounded by the current game representation: map
