@@ -117,26 +117,28 @@ static void test_death_depth(void)
 {
     static _Alignas(4) u8 actor_pixels[240 * 108], effect_pixels[240 * 108], pair[240 * 108];
     static const struct {
-        int y, dy, type, elapsed, layer, effect_in_front, victim_raw;
+        int y, dy, type, elapsed, layer, effect_in_front, victim_raw, burrowed;
     } cases[] = {
-        { 52, -3, U_TANK, 5, 4, 1, 37 },
-        { 52,  3, U_TANK, 5, 4, 0, 37 },
-        { 52,  0, U_WRAITH, 5, 4, 0, 37 },
-        {  1,  0, U_WRAITH, 5, 4, 0, 37 },
-        { 106, 0, U_WRAITH, 5, 4, 0, 37 },
-        { 52,  0, U_TANK, 30, 1, 0, 37 },
-        { 52, -3, U_TANK, 5, 4, 1, 7 },
-        { 52,  3, U_TANK, 5, 4, 0, 7 },
-        { 52,  0, U_WRAITH, 5, 4, 0, 7 },
+        { 52, -3, U_TANK, 5, 4, 1, 37, 0 },
+        { 52,  3, U_TANK, 5, 4, 0, 37, 0 },
+        { 52,  0, U_WRAITH, 5, 4, 0, 37, 0 },
+        /* The same collapse stays behind a north Tank if the victim burrowed. */
+        { 52, -3, U_TANK, 5, 1, 0, 37, 1 },
+        {  1,  0, U_WRAITH, 5, 4, 0, 37, 0 },
+        { 106, 0, U_WRAITH, 5, 4, 0, 37, 0 },
+        { 52,  0, U_TANK, 30, 1, 0, 37, 0 },
+        { 52, -3, U_TANK, 5, 4, 1, 7, 0 },
+        { 52,  3, U_TANK, 5, 4, 0, 7, 0 },
+        { 52,  0, U_WRAITH, 5, 4, 0, 7, 0 },
         /* Each gas structure spawns a separate burst one tier above itself. */
-        { 52,  3, U_TANK, 5, 5, 1, 110 },
-        { 52,  0, U_WRAITH, 5, 5, 0, 110 },
-        {  1,  0, U_WRAITH, 5, 5, 0, 110 },
-        { 106, 0, U_WRAITH, 5, 5, 0, 110 },
-        { 52,  3, U_TANK, 5, 5, 1, 149 },
-        { 52,  0, U_WRAITH, 5, 5, 0, 157 },
+        { 52,  3, U_TANK, 5, 5, 1, 110, 0 },
+        { 52,  0, U_WRAITH, 5, 5, 0, 110, 0 },
+        {  1,  0, U_WRAITH, 5, 5, 0, 110, 0 },
+        { 106, 0, U_WRAITH, 5, 5, 0, 110, 0 },
+        { 52,  3, U_TANK, 5, 5, 1, 149, 0 },
+        { 52,  0, U_WRAITH, 5, 5, 0, 157, 0 },
         /* The Queen's attached image outlasts its detached sprite body. */
-        { 52,  0, U_WRAITH, 5, 19, 1, 45 },
+        { 52,  0, U_WRAITH, 5, 19, 1, 45, 0 },
     };
     for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
         game_init();
@@ -163,6 +165,14 @@ static void test_death_depth(void)
             int victim = spawn_unit(SIDE, type, 96, y);
             assert(victim >= 0);
             u[victim].raw_type = raw;
+            if (cases[n].burrowed) {
+                assert(sc64_unit_world_layer(&u[victim]) == 4);
+                u[victim].flags |= 2u;
+                assert(sc64_unit_world_layer(&u[victim]) == 1);
+                u[victim].flags &= ~2u;
+                assert(sc64_unit_world_layer(&u[victim]) == 4);
+                u[victim].flags |= 2u;
+            }
             death_vfx_scan();
             u[victim].hp = 0;
             u[victim].alive = 0;
@@ -170,7 +180,7 @@ static void test_death_depth(void)
         }
         death_vfx_scan();
         assert(death_vfx[0].source &&
-               death_vfx[0].actor_layer_plus1 == (raw == 45 ? 19 : 5));
+               death_vfx[0].actor_layer_plus1 == (cases[n].burrowed ? 2 : raw == 45 ? 19 : 5));
         frame += cases[n].elapsed;
 
         u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];

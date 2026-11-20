@@ -158,6 +158,35 @@ sc64_tracer_profile_reset(void)
 }
 #endif
 
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+static void draw_yamato_charge_frame(const Unit *q, unsigned age)
+{
+    int f = sc64_yamato_raster_charge_frame(age);
+    if (f >= 0) sc64_yamato_raster_draw(543, (unsigned)f, 0, q->x, q->y);
+}
+
+static void draw_yamato_release_charge(const Unit *q)
+{
+    unsigned remaining = sc64_yamato_release_charge_ticks(q);
+    if (remaining) draw_yamato_charge_frame(q, 50u - remaining);
+}
+
+#ifdef SC64_WORLD_DEPTH
+/* The USA Battlecruiser CastSpell script runs imgolorig for image 543.
+ * The charge belongs to the ship's sprite and shares its world depth. */
+static void draw_yamato_charge(const Unit *q)
+{
+    unsigned caster = (unsigned)(q - u);
+    for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i) {
+        const Sc64BcYamatoShot *shot = &sc64_bc_shots[i];
+        if (shot->state == SC64_BC_SHOT_CHARGING && shot->caster == caster)
+            draw_yamato_charge_frame(q, shot->age);
+    }
+    draw_yamato_release_charge(q);
+}
+#endif
+#endif
+
 static void
 draw_tracers_pass(int after_world)
 {
@@ -168,20 +197,23 @@ draw_tracers_pass(int after_world)
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
     for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
         const Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
+#ifndef SC64_WORLD_DEPTH
         if (shot->state==SC64_BC_SHOT_CHARGING && shot->caster<MAX_UNITS && u[shot->caster].alive) {
-            int f=sc64_yamato_raster_charge_frame(shot->age);
-            if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[shot->caster].x,u[shot->caster].y);
-        } else if (shot->state==SC64_BC_SHOT_FLIGHT) {
+            draw_yamato_charge_frame(&u[shot->caster], shot->age);
+            continue;
+        }
+#endif
+        if (shot->state==SC64_BC_SHOT_FLIGHT) {
             Sc64BcMotionFields m;
             if (sc64_bc_motion_unpack(shot,&m))
                 sc64_yamato_raster_draw(541,0,(((unsigned)m.heading+4u)>>3)&31u,(int)(m.x_q8/512u),(int)(m.y_q8/512u));
         }
     }
-    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_is_battlecruiser(u[i].type) &&
-        u[i].order==ORDER_ATTACK_TARGET && (u[i].work_timer&7)>0 && (u[i].work_timer&7)<=6) {
-        int f=sc64_yamato_raster_charge_frame(50u-((unsigned)u[i].work_timer&7u));
-        if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[i].x,u[i].y);
-    }
+#ifndef SC64_WORLD_DEPTH
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && sc64_race_is_battlecruiser(u[i].type))
+            draw_yamato_release_charge(&u[i]);
+#endif
 #endif
 #ifndef SC64_PROJECTILE_DEPTH
     (void)after_world;

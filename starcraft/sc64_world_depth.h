@@ -46,6 +46,9 @@ sc64_building_world_layer(unsigned slot)
 static unsigned
 sc64_unit_world_layer(const Unit *q)
 {
+    /* Native Burrow lowers the sprite to layer 1 until Unburrow. Read the
+     * retained instance flag even after death clears the actor's alive bit. */
+    if (q->flags & 2u) return 1;
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     if (q->type == U_P7_INTERCEPTOR) return race_p7_interceptor_flight_layer(q);
 #endif
@@ -67,7 +70,7 @@ sc64_unit_world_layer(const Unit *q)
 
 enum {
     DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT, DEPTH_PROJECTILE,
-    DEPTH_DEATH, DEPTH_NUKE_DOT, DEPTH_STORM,
+    DEPTH_DEATH, DEPTH_NUKE_EFFECT, DEPTH_STORM,
     DEPTH_SLOT_BITS = 10,
     DEPTH_SLOT_MASK = (1 << DEPTH_SLOT_BITS) - 1,
     DEPTH_KIND_MASK = 7,
@@ -224,7 +227,7 @@ sc64_draw_depth_ordered_actors(void)
              + SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_DEPTH_LAYERS
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
-             + SC64_NUKE_FLIGHT_LIMIT
+             + SC64_NUKE_FLIGHT_LIMIT * SC64_NUKE_MAX_DRAW_PARTS
 #endif
 #ifdef SC64_STORM_RENDER
              + SC64_STORM_MAX_ACTIVE
@@ -290,7 +293,7 @@ sc64_draw_depth_ordered_actors(void)
     sc64_depth_push_deaths(heap, &size);
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
-    sc64_depth_push_nuke_dots(heap, &size);
+    sc64_depth_push_nuke_effects(heap, &size);
 #endif
 #ifdef SC64_STORM_RENDER
     const Sc64PsionicStormState *storms = race_storm_for_draw();
@@ -329,8 +332,8 @@ sc64_draw_depth_ordered_actors(void)
             break;
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
-        case DEPTH_NUKE_DOT:
-            race_nuke_draw_dot(i);
+        case DEPTH_NUKE_EFFECT:
+            race_nuke_draw_part(i);
             break;
 #endif
 #ifdef SC64_STORM_RENDER

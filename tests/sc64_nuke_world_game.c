@@ -50,11 +50,26 @@ static int fixture_unit(int owner, int raw, int x, int y)
 }
 
 #if defined(GBA_HOST) && defined(SC64_WORLD_DEPTH)
+static void assert_nuke_draw_key(u32 key, unsigned part, unsigned layer)
+{
+    assert((key & DEPTH_SLOT_MASK) == part);
+    assert(((key >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) == DEPTH_NUKE_EFFECT);
+    assert(key >> DEPTH_LAYER_BITS == layer);
+}
+
+static void assert_nuke_hud_untouched(void)
+{
+    static _Alignas(4) u8 hud[240 * 40];
+    assert(gfx_read_band(0, 12, hud));
+    for (unsigned i = 0; i < 240 * 12; ++i) assert(hud[i] == C_PANEL);
+    assert(gfx_read_band(120, 40, hud));
+    for (unsigned i = 0; i < sizeof hud; ++i) assert(hud[i] == C_PANEL);
+}
+
 static void test_nuke_dot_depth(void)
 {
     enum { FIELD_BYTES = 240 * 108 };
     static _Alignas(4) u8 actor[FIELD_BYTES], dot[FIELD_BYTES], pair[FIELD_BYTES];
-    static _Alignas(4) u8 hud[240 * 40];
     game_init();
     race_mode = 1; race_human = R_TER; race_bots = 1;
     init_state();
@@ -72,7 +87,7 @@ static void test_nuke_dot_depth(void)
     race_nuke_active_flights = 1;
     gfx_begin(C_PANEL);
     gfx_set_clip_y(12, 120);
-    race_nuke_draw_dot(0);
+    assert(sc64_nuke_draw_frame(&sc64_nuke_dot_frames[0], x, y + 12));
     assert(gfx_read_band(12, 108, dot));
     gfx_end();
 
@@ -90,12 +105,8 @@ static void test_nuke_dot_depth(void)
         gfx_begin(C_PANEL);
         gfx_set_clip_y(12, 120);
         sc64_draw_depth_ordered_actors();
-        race_nuke_draw();
         assert(gfx_read_band(12, 108, pair));
-        assert(gfx_read_band(0, 12, hud));
-        for (unsigned i = 0; i < 240 * 12; ++i) assert(hud[i] == C_PANEL);
-        assert(gfx_read_band(120, 40, hud));
-        for (unsigned i = 0; i < sizeof hud; ++i) assert(hud[i] == C_PANEL);
+        assert_nuke_hud_untouched();
         gfx_end();
 
         unsigned overlap = 0;
@@ -111,6 +122,126 @@ static void test_nuke_dot_depth(void)
         u[slot].alive = 0;
     }
     puts("nuclear target dot: Tank below, Wraith above, HUD clear");
+}
+
+static void nuke_fixture_paint(int actor, int actor_above, const Sc64NukeFrame *part, int x, int y,
+                               const Sc64NukeFrame *child)
+{
+    if (!actor_above) draw_unit(&u[actor]);
+    assert(sc64_nuke_draw_frame(part, x, y));
+    if (child) assert(sc64_nuke_draw_frame(child, x, y + SC64_NUKE_IMPACT_SOURCE_Y / 2));
+    if (actor_above) draw_unit(&u[actor]);
+}
+
+static void compare_nuke_paint(int actor, int actor_above, const Sc64NukeFrame *part, int x, int y,
+                               const Sc64NukeFrame *child)
+{
+    enum { FIELD_BYTES = 240 * 108 };
+    static _Alignas(4) u8 expected[FIELD_BYTES], actual[FIELD_BYTES];
+    gfx_begin(C_PANEL);
+    gfx_set_clip_y(12, 120);
+    nuke_fixture_paint(actor, actor_above, part, x, y, child);
+    assert(gfx_read_band(12, 108, expected));
+    gfx_end();
+
+    /* Opaque missiles and mapped explosion pixels have different coverage.
+     * A reversed control must change visible pixels for either raster mode. */
+    gfx_begin(C_PANEL);
+    gfx_set_clip_y(12, 120);
+    nuke_fixture_paint(actor, !actor_above, part, x, y, child);
+    assert(gfx_read_band(12, 108, actual));
+    assert(memcmp(expected, actual, sizeof expected) != 0);
+    gfx_end();
+
+    for (unsigned page = 0; page < 2; ++page) {
+        gfx_begin(C_PANEL);
+        gfx_set_clip_y(12, 120);
+        sc64_draw_depth_ordered_actors();
+        assert(gfx_read_band(12, 108, actual));
+        assert(memcmp(expected, actual, sizeof expected) == 0);
+        assert_nuke_hud_untouched();
+        gfx_end();
+    }
+}
+
+static void test_nuke_missile_depth(void)
+{
+    game_init();
+    race_mode = 1; race_human = R_TER; race_bots = 1;
+    init_state();
+    memset(u, 0, sizeof u);
+    memset(b, 0, sizeof b);
+    memset(m, 0, sizeof m);
+    memset(visible, 0, sizeof visible);
+    geyser_count = 0;
+    camx = camy = 0;
+    race_nuke_reset();
+    const int x = 108, y = 52;
+    int actor = fixture_unit(SIDE, 12, x, y);
+    assert(sc64_unit_world_layer(&u[actor]) == 16);
+    Sc64NukeWorldFlight *flight = &race_nuke_flights[0];
+    flight->origin_x = x;
+    flight->origin_y = y;
+    Sc64NukeCadence cadence = race_nuke_cadence_at(y, y, &flight->ascent_ticks);
+    /* An enemy launch can show its ascent while its remote target is unseen. */
+    flight->strike = (Sc64NukeFlight){.x = 200, .y = y, .owner = ENEMY,
+                                    .phase = SC64_NUKE_PAINTING, .cadence = cadence};
+    race_nuke_active_flights = 1;
+    SC64_GRID_SET(visible, y / 16 * MAP_COLS + x / 16, 1);
+    u32 heap[SC64_NUKE_FLIGHT_LIMIT * SC64_NUKE_MAX_DRAW_PARTS];
+    unsigned size = 0;
+    sc64_depth_push_nuke_effects(heap, &size);
+    assert(size == 1);
+    assert_nuke_draw_key(sc64_depth_pop(heap, &size), SC64_NUKE_DRAW_MISSILE, 18);
+    compare_nuke_paint(actor, 0, &sc64_nuke_missile_frames[0], x, y + 12, NULL);
+    /* A synthetic raw-202 painter row isolates the next elevation without
+     * assuming that this optional runtime exposes a playable Dark Swarm. */
+    u[actor].raw_type = 202;
+    assert(sc64_unit_world_layer(&u[actor]) == 19);
+    compare_nuke_paint(actor, 1, &sc64_nuke_missile_frames[0], x, y + 12, NULL);
+    u[actor].raw_type = 12;
+
+    flight->strike.phase = SC64_NUKE_DESCENDING;
+    flight->strike.x = x;
+    flight->strike.age = cadence.paint + cadence.descent - SC64_NUKE_DAMAGE_LEAD - 1;
+    sc64_depth_push_nuke_effects(heap, &size);
+    assert(size == 1);
+    assert_nuke_draw_key(sc64_depth_pop(heap, &size), SC64_NUKE_DRAW_MISSILE, 18);
+    compare_nuke_paint(actor, 0, &sc64_nuke_missile_frames[1], x, y + 12, NULL);
+
+    /* The attachment and independent child start together before damage.
+     * After damage, its retained row preserves the same independent layers. */
+    const unsigned tick = 4 * SC64_NUKE_BURST_SOURCE_TICKS;
+    const Sc64NukeFrame *burst = &sc64_nuke_burst_frames[tick / SC64_NUKE_BURST_SOURCE_TICKS];
+    const Sc64NukeFrame *child = &sc64_nuke_impact_frames[tick / SC64_NUKE_IMPACT_SOURCE_TICKS];
+    for (unsigned phase = 0; phase < 2; ++phase) {
+        flight->strike.age = cadence.paint + cadence.descent - SC64_NUKE_DAMAGE_LEAD + tick;
+        if (phase) {
+            flight->strike.phase = SC64_NUKE_IDLE;
+            flight->impact_tick = tick + 1;
+        }
+        sc64_depth_push_nuke_effects(heap, &size);
+        assert(size == 2);
+        assert_nuke_draw_key(sc64_depth_pop(heap, &size), SC64_NUKE_DRAW_BURST, 18);
+        assert_nuke_draw_key(sc64_depth_pop(heap, &size), SC64_NUKE_DRAW_IMPACT, 19);
+        compare_nuke_paint(actor, 0, burst, x, y + 12, child);
+    }
+    /* Once the burst ends, the remaining layer-19 child still modifies an
+     * actual layer-18 Wraith. This assertion avoids an equal-layer tie. */
+    const unsigned child_tick = SC64_NUKE_BURST_FRAME_COUNT * SC64_NUKE_BURST_SOURCE_TICKS;
+    flight->impact_tick = child_tick + 1;
+    u[actor].alive = 0;
+    int flyer = fixture_unit(SIDE, 8, x, y);
+    assert(sc64_unit_world_layer(&u[flyer]) == 18);
+    sc64_depth_push_nuke_effects(heap, &size);
+    assert(size == 1);
+    assert_nuke_draw_key(sc64_depth_pop(heap, &size), SC64_NUKE_DRAW_IMPACT, 19);
+    compare_nuke_paint(flyer, 0, &sc64_nuke_impact_frames[child_tick / SC64_NUKE_IMPACT_SOURCE_TICKS],
+                       x, y + 12 + SC64_NUKE_IMPACT_SOURCE_Y / 2, NULL);
+    SC64_GRID_SET(visible, y / 16 * MAP_COLS + x / 16, 0);
+    sc64_depth_push_nuke_effects(heap, &size);
+    assert(size == 0);
+    puts("nuclear missile depth: ascent and descent 18, burst 18, impact child 19, fog and HUD clear");
 }
 #endif
 
@@ -388,12 +519,19 @@ int main(void)
     assert(!race_nuke_reserved_supply(SIDE));
     assert(!u[friendly].alive && !u[enemy].alive);
     assert(race_nuke_active_flights);
-    gfx_begin(0); gfx_set_clip_y(12, 120); race_nuke_draw(); gfx_end();
+    gfx_begin(0); gfx_set_clip_y(12, 120);
+#ifdef SC64_WORLD_DEPTH
+    sc64_draw_depth_ordered_actors();
+#else
+    race_nuke_draw();
+#endif
+    gfx_end();
     for (int i = 0; i < 80; ++i) { ++frame; race_nuke_tick(); }
     assert(!race_nuke_active_flights);
     puts("nuclear strike: stock add-on and Ghost production, GBA menu, paid ammo, abort and independent impact");
 #if defined(GBA_HOST) && defined(SC64_WORLD_DEPTH)
     test_nuke_dot_depth();
+    test_nuke_missile_depth();
 #endif
     nuke_supply_boundary();
 #ifdef SC64_TERRAN_LATE_RUNTIME
