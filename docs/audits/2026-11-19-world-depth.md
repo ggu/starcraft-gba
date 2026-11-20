@@ -384,9 +384,10 @@ current image and its owning sprite to the image attachment routine at
 `0x80011b08`. The 116-byte handler at ROM offset `0x12e40` has SHA-256
 `a2caafe03b35e6e3bdeef66d1efb9c0ee3b2cad0511193a1b9bae5eeac289b8e`.
 The normal Tank uses `imgol` (8). Both flashes share their parent sprite's
-depth. In the retained Blood Bath capture at step 26877 the siege hull
-and turret share anchor (672,782) and elevation 4. The turret flag places
-the turret ahead of the hull and other ordinary sprites at that same Y.
+depth. The retained defeat-suppressed Blood Bath observer at step 26877
+shows the siege hull and turret sharing anchor (672,782) and elevation 4.
+The turret flag places the turret ahead of the hull and other ordinary
+sprites at that same Y.
 The native observation establishes the sort and attachment rules. A
 framebuffer witness for the active flash remains open.
 
