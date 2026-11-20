@@ -41,10 +41,10 @@ class CarrierReleaseTest(unittest.TestCase):
         return run(["make", "-s", "-f", "Makefile", "-f",
                     "mk/carrier-release/Makefile", *args], stdin)
 
-    def release_flags(self, *names):
+    def release_flags(self, *names, settings=()):
         program = ".PHONY: print-carrier-flags\nprint-carrier-flags:\n"
         program += "".join(f"\t@printf '%s\\n' '$({name})'\n" for name in names)
-        result = self.make("-f", "-", "print-carrier-flags", stdin=program)
+        result = self.make("-f", "-", *settings, "print-carrier-flags", stdin=program)
         self.assertEqual(result.returncode, 0, result.stderr)
         return [shlex.split(line) for line in result.stdout.splitlines()]
 
@@ -83,6 +83,32 @@ class CarrierReleaseTest(unittest.TestCase):
                       ["-DSC64_SHOWCASE_ENABLED", "-DSC64_SHOWCASE_CARRIER_PROBE"]):
             with self.subTest(flags=flags):
                 self.assertNotEqual(self.macros(*selector, *flags).returncode, 0)
+
+    def test_normal_z10_preserves_fact_and_target_flags(self):
+        names = ("Z10_CARRIER_FLAGS", "Z10_ARM_SOURCES", "Z10_FACT_FLAGS",
+                 "Z10_FACT_REFERENCE_FLAGS")
+        [selector] = self.release_flags("SC64_CARRIER_RELEASE_FLAGS")
+        for policy in ("0", "1"):
+            with self.subTest(target_policy=policy):
+                shared = (f"CANONICAL_TARGET_POLICY={policy}",)
+                off, stock_sources, stock_tables, stock_generator = self.release_flags(
+                    *names, settings=(*shared, "Z10_CARRIER_RELEASE=0"))
+                on, carrier_sources, carrier_tables, carrier_generator = self.release_flags(
+                    *names, settings=(*shared, "Z10_CARRIER_RELEASE=1"))
+                self.assertEqual(off, [])
+                self.assertEqual(on, selector)
+                model = "starcraft/sc64_interceptor_orders.c"
+                self.assertEqual(carrier_sources.count(model), 1)
+                self.assertEqual([source for source in carrier_sources if source != model],
+                                 stock_sources)
+                self.assertEqual(stock_tables, ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts"])
+                self.assertEqual(carrier_tables,
+                                 ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts-carrier"])
+                self.assertEqual(carrier_generator, stock_generator + selector)
+                self.assertIn("-DSC64_BUILDING_WORDS_PROBE", carrier_generator)
+                self.assertIn("-DSC64_TARGET_FAST_LINK_PROBE", carrier_generator)
+                self.assertEqual("-DSC64_TARGET_POLICY_PROBE" in carrier_generator, policy == "1")
+        self.assertNotEqual(self.make("Z10_CARRIER_RELEASE=2", "carrier-release-plan").returncode, 0)
 
     def test_dispatch_maps_each_product_and_does_not_accept_unknowns(self):
         expected = [f"{name} {row[2]} {row[3]}" for name, row in PROFILES.items()]
