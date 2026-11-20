@@ -275,3 +275,22 @@ before considering default activation.
 | Candidate Terran ROM | `a07978856d278f636a881de0244cf12548472fff36d0f8b0ae11b4b2140c8345` |
 | Paired timing evidence | `b9c6cf96c020b0b5847312da18d1b0aed8fddc18e28870f7147e81fa4a007bab` |
 | Victory and result readback SRAM | `af0fa049ba02103ef3944a3f8f324b45c9eb0abc5b8db23318d70969713a87bc` |
+
+### Four additional current Terran campaigns
+
+The same control and candidate start from HOME, save from the pause
+menu, load through a fresh title, win and restore the frozen result in
+a third process. All observed controls, briefing and dialogue, gameplay
+checkpoints and victory selection match. Each pause, victory and
+frozen-result readback is a byte-identical 32 KiB journal across the two
+cartridges.
+
+| Mission | Observed ticks | Pause frame | Victory frame |
+| --- | ---: | ---: | ---: |
+| T1 | 12 | 6,214 | 10,120 |
+| T4 | 10 | 4,968 | 8,911 |
+| T7 | 12 | 2,289 | 3,931 |
+| T10 | 6 | 2,276 | 3,361 |
+
+The aggregate qualification receipt SHA-256 is
+`bd3c3c12012592c3bcf234c2a32e4dda349bfa69f40baebfb16f2d63b17bf740`.
