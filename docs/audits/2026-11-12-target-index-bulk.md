@@ -138,3 +138,34 @@ at the previously divergent cuts.
 | Bidirectional skirmish saves | `dd68a5697c8c2f108a84ee9c653fbd40ee36d36b5067d0a937348ffce9f441ac` |
 | Outpost fresh load through victory | `cba959cbf24af140bcbe84cc9c43469a4e9805b83845da7549f17cf16efe28a3` |
 | Full physical P7 victory | `ceb663b9638c3d0b83bc65747ae6d08376ebcc5bfe9ba722c5dbc1d9a2db3bc3` |
+
+## Retention and fused setup on dense Z7
+
+Draft [#590](https://github.com/ggu/starcraft-gba/pull/590) checks whether a
+target chain can be reused without changing scan order. The early-rejection
+variant first checks whether the movement flag could have disturbed that order.
+A separate trial builds the owner lists and a fresh target index in one pass.
+Each pair matches 131 gameplay checkpoints, 480 frame and route-counter
+observations, and both indexed pages, the displayed page and the palette
+at all eight sampled cuts. Compare timing only within each control pair.
+
+| Trial | Whole update mean | Whole update p95 | Peak update | Median change in paired orders cycles |
+| --- | ---: | ---: | ---: | ---: |
+| Retention control | 2,340,889 | 3,389,340 | 4,696,376 | — |
+| Original retention | 2,340,034 | 3,405,579 | 4,709,175 | +12,434 |
+| Early rejection | 2,334,112 | 3,402,619 | 4,694,904 | +7,194 |
+| Fused rebuild control, `81f62111` | 2,338,639 | 3,390,991 | 4,692,183 | — |
+| Fused rebuild, `f07c3599` | 2,352,696 | 3,401,407 | 4,714,382 | +13,601 |
+
+The table uses 477 advancing updates and nearest-rank p95. Early rejection
+saves 0.29% of mean cycles and raises p95 by 0.39%. The fused rebuild slows
+orders in all 477 updates and uses 64 more IWRAM bytes. Keep both trials
+outside the default build.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Retention control | `6b11688c76f516bbb0aaa0fff501b1299ee8cfd6707b20abb268c4ecdc57073c` |
+| Original retention | `60a70ce28204be31052a02f9c9f7ff4a2bd22ada2090321d5363bf97cb976aba` |
+| Early rejection | `6a2f52db50a638b8bbdd9e4f22971123da874af3d38bafc48ff5120a4e148a9a` |
+| Fused control | `a1a008ed9dffdd9fb6c8294bf0373fe990c83796070dc6045d33d523ebf4b89d` |
+| Fused rebuild | `2d34beb6788dfe386e510047cddd33f8b2fdf3a648890b206763c311cdf0d9d0` |
