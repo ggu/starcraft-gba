@@ -2176,7 +2176,7 @@ zerg-z5-cloak: build/StarCraft-Zerg-Z5-Cloak-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z5-cloak
 
 build/test-sc64-z5-cloak-runtime: tests/sc64_z5_cloak_runtime.c tests/sc64_z5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CLOAK_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CLOAK_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z5-cloak-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CLOAK_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z5-cloak-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -3167,7 +3167,7 @@ build/test-sc64-p6-storm-game: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(w
 build/test-sc64-z6-storm-game: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z6-cloak-game: tests/sc64_z6_cloak_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-campaign-spells
 test-sc64-campaign-spells: build/test-sc64-p6-storm-game build/test-sc64-z6-storm-game build/test-sc64-z6-cloak-game
 	./build/test-sc64-p6-storm-game
@@ -4117,7 +4117,7 @@ verify-zerg-z8: build/StarCraft-Zerg-Z8-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z8
 zerg-z8: verify-zerg-z8
 build/test-sc64-z8-game: tests/sc64_z8_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z8_CANONICAL_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z8_CANONICAL_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $< common/gba.c -o $@
 .PHONY: test-zerg-z8
 test-zerg-z8: build/test-sc64-z8-game
 	./build/test-sc64-z8-game

@@ -57,6 +57,7 @@ build/canonical-target-index-config: force-canonical-target-index-config | build
 	@printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z8-game: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
 
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.
