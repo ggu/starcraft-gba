@@ -1504,6 +1504,9 @@ static int opening_defense(void)
 static int opening_battery(void)
 {
     int owner = -1, probes = 0, gateways = 0, powered = 0;
+#ifdef SC64_PROTOSS_THIRD_GATEWAY_PROBE
+    int third = -1, third_probes = 0, third_ready = 0, third_power = 0, gas_during_warp = 0;
+#endif
     for (int i = 0; i < race_bots; ++i)
         if (race_owner_identity(race_bot_owner_ids[i]) == R_PROTOSS) {
             owner = race_bot_owner_ids[i];
@@ -1525,6 +1528,24 @@ static int opening_battery(void)
                     powered = race_battery_site_powered(owner, b[i].x, b[i].y);
             }
         }
+#ifdef SC64_PROTOSS_THIRD_GATEWAY_PROBE
+        if ((third < 0 && paid->made_n[160] == 3) || paid->made[157] == frame) {
+            RaceAiCensus census;
+            race_ai_census(owner, &census);
+            if (third < 0 && paid->made_n[160] == 3) {
+                third = frame;
+                third_probes = census.have[AK_PROBE];
+                third_ready = census.have[AK_BATTERY] == 1 &&
+                    census.have[AK_GATEWAY] == 2 && census.gateway_placed == 3;
+                for (int i = 0; i < MAX_BUILDINGS; ++i)
+                    if (b[i].alive && b[i].owner == owner && b[i].type == B_GATEWAY &&
+                        b[i].under_construction)
+                        third_power = race_site_powered(owner, b[i].x, b[i].y);
+            }
+            if (paid->made[157] == frame)
+                gas_during_warp = census.have[AK_GATEWAY] == 2 && census.gateway_placed == 3;
+        }
+#endif
         if (paid->done[172] >= 0 && paid->made[157] >= 0 && paid->made[164] >= 0) break;
     }
     int ok = paid->made[172] >= RACE_AI_FIRST_BATTERY && paid->made[172] <= 4229 * 5 / 4 &&
@@ -1532,6 +1553,14 @@ static int opening_battery(void)
         paid->made[157] > paid->made[172] && paid->made[164] > paid->made[172] &&
         paid->made_n[172] == 1 && probes == 15 && gateways == 2 && powered &&
         !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+#ifdef SC64_PROTOSS_THIRD_GATEWAY_PROBE
+    int third_ok = third > paid->done[172] && paid->made[157] > third &&
+        paid->made[164] > paid->made[157] && third_ready && third_power && gas_during_warp;
+    printf("{\"kind\":\"opening-third-gateway\",\"owner\":%d,\"gateway\":%d,"
+           "\"probes\":%d,\"prerequisites\":%d,\"powered\":%d,\"gas_during_warp\":%d,\"ok\":%d}\n",
+           owner, third, third_probes, third_ready, third_power, gas_during_warp, third_ok);
+    ok &= third_ok;
+#endif
     printf("{\"kind\":\"opening-battery\",\"owner\":%d,\"battery_start\":%d,\"battery_done\":%d,"
            "\"assimilator\":%d,\"cybernetics\":%d,\"probes\":%d,\"gateways\":%d,\"powered\":%d,\"ok\":%d}\n",
            owner, paid->made[172], paid->done[172], paid->made[157], paid->made[164],
