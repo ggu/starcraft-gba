@@ -131,9 +131,9 @@ unchanged EWRAM and IWRAM ends (`0x02038b00` and `0x03004d50`).
 | Whole loop, all calls p95 | 4,420,534 | 4,362,853 | −1.30% |
 | Whole loop, all calls maximum | 5,583,925 | 5,515,951 | −1.22% |
 
-The result establishes a small improvement on this tape. Keep the
-option off pending comparable evidence from the other products; this
-experiment does not replay a full win, saves or hardware timing. FIFO
+The initial trial left the option off pending comparable evidence from
+the other products. This tape measures a combat window. The current
+pause replays below also cover save loading and a P10 victory. FIFO
 expansion remains the largest measured part of point fills. The earlier
 stock victim trace placed every one of its 448 point fills in logical
 slots 1, 2 or 4, away from the two range scratch planes. That makes
@@ -196,7 +196,8 @@ The compile configuration key distinguishes the two settings.
 ## Four-profile default qualification
 
 The default change at `cd60befd` composes with release `0811942b`.
-The same runtime and build definitions are present at `691c9ebc`.
+The same runtime and build definitions are present at `f4e0e5e1`
+before applying this setting.
 Dry runs for all four normal verification targets select exactly one
 `SC64_ROUTE_LINEAR_WORD_PACK_PROBE` flag. The explicit opt-out removes
 that flag and selects a separate build configuration key. The original-art
