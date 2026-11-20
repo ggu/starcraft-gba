@@ -79,9 +79,8 @@ def main():
     if not 1 < cut < stop or cut in dialogue_cuts or next(
             held for index, held in reversed(transitions) if index < cut) != 0:
         parser.error("--save-tick must be a neutral live gameplay tick")
-    # This observer keeps only three 32 KiB SRAM images and small JSON
-    # receipts. Retain the existing long-run disk guard for T9.
-    disk_reserve = 256 << 20 if t10 else 4 << 30
+    # Both routes keep only three 32 KiB SRAM images and small JSON receipts.
+    disk_reserve = 256 << 20
     if shutil.disk_usage(args.out.parent).free < disk_reserve:
         raise RuntimeError(f"replay requires {disk_reserve >> 20} MiB free")
     _, save_layout = dwarf_struct_layout(args.elf, "RaceSave")

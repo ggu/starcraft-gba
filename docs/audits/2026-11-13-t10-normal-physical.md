@@ -67,6 +67,12 @@ The split run averages 1,020,626 guest cycles over 3,528 main-loop
 calls, including menus and pause/load, for 16.44 calls per emulated
 second. Physical GBA timing remains unmeasured.
 
+The same replay harness still accepts the default
+[New Gettysburg invocation](2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result).
+On this Terran ROM all 51 T9 checkpoints match, including 12 after
+the cut at frame 35,363. Both SRAM images and the frozen victory
+readback are byte-identical to the earlier T9 run.
+
 With prepared Terran inputs, build `build/test-sc64-t10-campaign-run`
 and generate the HOST tape with `--limit 100000 --trace "$trace"`.
 Run the [controller replay](../../tools/sc64_t9_normal_replay.py) with
@@ -85,7 +91,8 @@ python3 tools/sc64_t9_normal_replay.py --chapter 10 \
 | Matching ELF | `484c6ea35ddd385223db78b7ce84d2555d8f752436cc710680b1a7ee9b2ca12a` |
 | Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
 | Sanitized HOST tape | `a6c04ab0297bf7e0dea2182b895e4d45746d836f97ff8ef9032bcfe87d52a00e` |
-| Replay harness | `7acf52f654f11cd0253227cae6b88281fc520527b3b42259cdf42cdd1014b607` |
+| Replay harness | `a4cb9f8bc5deb574ae791a878d685e276d99d5db683b29525169c439303b1f44` |
 | Pause SRAM | `4f23a41c6cc575174713d479dcd99793c63ef12e8df427e663dcf970fc6c82bc` |
 | Victory SRAM and fresh readback | `54ba0309ae345f76f18b798194d1bef7164580de750cc00725fefc6f0b50fca1` |
-| Full replay and both journal checks | `dc02aa666b13f2d9eae0ee1d43404c3bf8baf2975117501f649a9a3582d0a760` |
+| Full replay and both journal checks | `51e538d932ff23bc134a368356ae37ccbcdebdcc6682cc6103725b64b1b143d9` |
+| Default T9 rerun on the same ROM | `7117be4d86c61d0537f5b75f64706d77738c0b92cc303c45fc0e4781f241aa79` |
