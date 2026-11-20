@@ -127,12 +127,39 @@ were used in both builds.
 
 The trial raises full-route mean cycles by 0.41%. Keep the existing
 lookup in the production builds. On the original build, frame 21,667
-spends 14,671,053 of 15,352,732 loop cycles in orders. Profile that
-frame separately from the recurring actor and effect load in the two
-windows above. The actor/effect counter includes sprite drawing,
-death effects and projectiles.
+spends 14,671,053 of 15,352,732 loop cycles in orders. The actor/effect
+counter includes sprite drawing, death effects and projectiles.
 
 The trial ROM SHA-256 is
 `e7e18198fbb89256ca407e7dec11c94629bdabb72546022bd065ee57c79dfb3b`.
 The comparison receipt SHA-256 is
 `aa193287361651e52418222d4b37d3e9593fe283c4ab96668e07d2c3f5769e51`.
+
+
+## Instruction attribution of the Z8 stall
+
+The pinned November 20 Z10 ROM replay samples individual updates at
+controller calls 22,253, 31,098, 42,000 and 42,100. All 42,100 calls
+match the control clocks, screens and frames. All checkpoint states
+match. The four instruction samples conserve cycles and report zero
+shadow-stack overflows.
+
+At call 22,253, advancing from frame 21,666 to 21,667, the full
+observer interval takes 15,353,225 guest cycles. The call stack
+attributes 14,065,864 cycles to two invocations of
+`worker_continue_minerals`. Their 16 nested `sc64_route_fill` calls take
+13,954,604 cycles, or 90.89% of the update. The controller mask stays
+held at 912 across the stall. Compare nearest eligible mineral
+selection against the existing reachable-field scan, including route
+cache effects, before changing the flood implementation.
+
+| Controller call | Whole update cycles | Renderer cycles | Sorted actor pass cycles |
+| --- | ---: | ---: | ---: |
+| 31,098 | 2,238,886 | 1,562,800 | 1,003,011 |
+| 42,000 | 1,348,467 | 764,144 | 202,378 |
+| 42,100 | 1,852,834 | 1,211,905 | 314,363 |
+
+These are three individual draw samples. Use full advancing-update
+windows to qualify changes to recurring renderer cost. The instruction
+profile receipt SHA-256 is
+`fba05b2221c06872dfcb02409893301b71eaf565e4cdad4bdfb3e41b422f56ed`.
