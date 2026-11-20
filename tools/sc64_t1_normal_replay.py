@@ -33,11 +33,11 @@ def digest(path):
     return h.hexdigest()
 
 
-def read_types(elf):
+def read_types(elf, names=("U_SCV", "U_MARINE", "U_ZERGLING", "U_RAYNOR")):
     info = subprocess.run(["arm-none-eabi-readelf", "--debug-dump=info", elf], check=True,
                           capture_output=True, text=True).stdout
     result = {}
-    for name in ("U_SCV", "U_MARINE", "U_ZERGLING", "U_RAYNOR"):
+    for name in names:
         values = set(re.findall(rf"DW_AT_name\s*:.*\b{name}\s*\n"
                                 r"[^\n]*DW_AT_const_value\s*:\s*([0-9]+)", info))
         require(len(values) == 1, f"ELF does not name one value for {name}")
@@ -55,8 +55,9 @@ def find_roundtrip(events):
     return starts[0]
 
 
-def checkpoint(game, types, tick):
-    state = game.state()
+def checkpoint(game, types, tick, state=None):
+    if state is None:
+        state = game.state()
     owned = UNIT_FIELDS.index("owner") + 1
     kind = UNIT_FIELDS.index("type") + 1
 

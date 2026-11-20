@@ -50,6 +50,54 @@ all scenarios, or frame rate on a physical GBA.
 | T3 replay receipt | `1ea3bc2d5d6bb63685d9f2f700c3748840d589494eb8ce02d92fa28a69e7c42c` |
 | T4 replay receipt | `2a600105ff8759b07e1156551b2e4ee798e35725aaa6258766c0c391b873424f` |
 
+## November 20 T3 fresh SRAM and result autosave
+
+The normal Terran ROM built from `afffebec` runs the exact
+Desperate Alliance HOST tape from the November 13 audit. The observer
+selects the mission at HOME, reveals 15 briefing pages and deploys
+with Start. All 54,000 advancing gameplay calls use neutral input.
+The observer acknowledges six dialogue pages at simulation frames 30,
+480, 36,000, 45,000, 52,200 and 54,000. Each press and release holds
+the current frame.
+
+At frame 26,993, four enemy waves have begun and the countdown has
+27,007 frames left. The player has 20 units, 12 buildings and an empty
+selection. Start pauses and B writes bank 0. A fresh emulator loads
+that journal with L at HOME. The observed world, mission state,
+countdown, selection and cursor match before continuation. The camera
+reconstructed from the cursor matches at this cut.
+
+All 54 periodic checkpoints match, along with launch and the result.
+Twenty-eight observations follow the fresh load. The base survives
+all eleven waves and the clock reaches zero at frame 54,000. The
+player retains 16 units and ten buildings. Bank 1 records the frozen
+win and leaves bank 0 byte-identical. A third emulator reloads the
+result through HOME and re-exports identical SRAM.
+
+The 54,082 measured controller calls average 589,210 guest cycles
+per main loop, or 28.47 emulated updates per second. The largest
+update is 30,769,720 cycles. These values include briefing, dialogue,
+rendering, save and load. Physical GBA performance remains unmeasured.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 3 --save-tick 26993 \
+  --trace "$T3_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `01240c5e95c1f0e648028dad75005e3185904c02e6c9b0577aa368d14e7958f3` |
+| Matching ELF | `85aa28c9206b11cd9baebdc9f33d8d9bf6de49fa624146480c1cf351d87dbc10` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `b212efeeaa935c800b1ac66004da915d37b17bbba31d84e8cac647cb2c626724` |
+| Replay harness | `cd4775adb7666127abefee211f45575f74682dd6fc81f045ee69850a326d766b` |
+| Pause SRAM | `f6eff38a038a36ae7ae8b1a611391d248bf720546202fd3f4f06ac574f80ce29` |
+| Victory SRAM and fresh readback | `6126131ce79069993de77566260d1c9150d95dd858b19b88f55b0ee10d787f81` |
+| T3 replay and both journal checks | `d16bf1760bf74bcb8c8b46330251255508a8436d441ae6108c20aac95dc8d239` |
+
 ## November 20 T4 fresh SRAM and result autosave
 
 The Jacobs Installation replay uses the normal Terran death-depth
