@@ -187,8 +187,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   combines it. [Validating each T6 journal candidate once](audits/2026-11-13-t6-normal-physical.md#composition-with-the-attacker-image-renderer)
   saves another 8.88% on the victory update and 5.86% on the pause load
   on the composed normal Terran. All observations and SRAM bytes
-  match and both banks keep independent validation. Re-profile the
-  remaining result stall before changing either bank boundary.
+  match and both banks keep independent validation. The
+  [remaining result profile](audits/2026-11-13-t6-normal-physical.md#remaining-cost-on-the-composed-terran)
+  assigns 15.10 million inclusive cycles to compact-unit decoding and
+  6.07 million direct cycles to the generic bit reader. The writer
+  uses 1.57 million inclusive cycles. Compare a fixed-width decoder
+  before changing either bank boundary.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
@@ -217,9 +221,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   guards across the qualified revisions. Terran and Showcase also
   match both mixed three-AI Blood Bath saves and both fresh
   600-update continuations. The 128×128 Z9 observed range calls are
-  short cache misses. Bound the synchronous fill after a declined
-  distant proof, then compare worst update and p95 to the eager
-  control. A separate exact-cache scan trial on Z8
+  short cache misses. The bounded deferred-read FIFO trial still
+  raised the longest forced declined read from 1,245,315 to
+  1,329,267 cycles and left a later whole-field stall. Keep it off.
+  Target eager fills without moving work to a later update. A separate exact-cache scan trial on Z8
   matched 21 sampled states and saved less than 0.01% mean cycles
   across 486 timed calls. Focus on the larger route fills.
   A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the
@@ -882,7 +887,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [current pointer ROM](audits/2026-11-13-route-linear-word-pack.md#dense-z7-on-the-pointer-fifo),
   point fills take 736k cycles per active call, including 489k in FIFO
   expansion and 135k in packing. Aligned word output saves 0.52% of
-  the loop with matching fields and no extra RAM; keep it opt-in.
+  the loop with matching fields and no extra RAM. The newer
+  [Z8 and P10 timing](audits/2026-11-13-route-linear-word-pack.md#current-z8-and-p10-pause-replays)
+  finds lower route peaks with matching packed fields.
   [Pointer-only one-field retention](audits/2026-11-14-z7-point-flood-retention.md#one-plane-pointer-retention-on-the-current-fifo)
   now saves 2.85% mean loop and 8.29% p95 cycles on the same dense tape
   while keeping route oracles and scratch bindings unchanged. Composed
@@ -996,12 +1003,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches 43,000 normal P10 calls, with a 1.78% mean improvement and a
   3.04% late-window improvement. Keep it opt-in: it adds 40 IWRAM bytes
   and has not been replayed through victory or on all four cartridges.
-  The [linear route word-pack probe](audits/2026-11-13-route-linear-word-pack.md)
-  matches scalar output and overflow behavior under sanitizers. It
-  targets packed output writes in the expensive facility and wide point
-  fills. Exact P10 ARM comparison cuts three sampled stalls 1.42–2.35%
-  with unchanged working RAM, but mean cost only falls 0.027%. Keep it
-  off and prioritize fewer route rebuilds over output-store tuning.
+  The [aligned route word pack](audits/2026-11-13-route-linear-word-pack.md#current-z8-and-p10-pause-replays)
+  keeps eager route fields and improves the sampled Z8 and P10 peaks
+  by 1.47% and 0.96%. It leaves working RAM unchanged. Prioritize fewer
+  exact route rebuilds or faster FIFO expansion for larger gains.
   The [cursor query probe](audits/2026-11-13-p10-field-cursor-cost.md)
   matches the same P10 prefix and cuts mean cycles 1.23%, with unchanged
   IWRAM and BSS. Keep it off until all products and a composed battle

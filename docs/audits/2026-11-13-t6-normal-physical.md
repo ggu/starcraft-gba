@@ -238,5 +238,28 @@ The combined cartridge matrix SHA-256 is
 `e05b672c05c5ff24a56adf0d9a2b3f6cf5997b6c859709f54732616f00929e87`.
 The replay comparison SHA-256 is
 `8c4740890bf38fe7228edec2b0f84b4f9d670765aebb946896f3aaefe6d44196`.
-The result remains a one-update stall. Re-profile both bank checks and
-the SRAM writer before changing their trust or write boundaries.
+The result remains a one-update stall.
+
+### Remaining cost on the composed Terran
+
+The instruction observer samples the victory update of the same
+`01240c5e` Terran ROM. It repeats the 27 observations and byte-identical
+victory and re-export. The loop counter still reads 37,255,972 cycles.
+The observer spans 37,256,603 cycles between its instruction boundaries.
+
+| Function | Inclusive cycles | Self cycles | Calls |
+| --- | ---: | ---: | ---: |
+| `race_save_game` | 35,251,917 | 778,479 | 1 |
+| `race_worker_cargo_previous` | 18,976,015 | 123 | 1 |
+| `sc64_unit_save_decode` | 15,100,199 | 3,096,171 | 2,881 |
+| `race_t6_save_candidate_valid` | 7,189,640 | 127,480 | 2 |
+| `sc64_packed_unit_get` | 6,072,200 | 6,072,200 | 42,146 |
+| `save_write_selected` | 1,570,939 | 809,345 | 1 |
+
+The inclusive rows overlap. The generic compact-unit bit reads are
+a larger direct cost than the SRAM writer here. Prefer a fixed-width
+decoder comparison before changing the independent validation or bank
+write boundaries. Require identical accepted rows, rejection behavior,
+and output SRAM through the normal HOME, pause and result paths.
+The stack receipt SHA-256 is
+`be8797ef0b31a1fa0264aa3e1f16b0481300d24e07d4c9535857d080029fdac1`.
