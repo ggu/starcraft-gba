@@ -616,9 +616,8 @@ static void test_real_campaign_sram_resume(void)
            b[colony].raw_type==SC64_Z7_SPORE_RAW && b[colony].hp==280);
     assert(race_save_game());
 
-    /* Death can occur after the normal pre/post production hooks. Use a
-       second canonical-world colony, retain its morph marker through save and
-       a HOME cold-load, then let the next real frame clean the dead row. */
+    /* Death after production clears the morph state before an immediate save.
+       Verify the dead row through HOME load and the next advancing frame. */
     site = find_legal_site(B_CREEP_COLONY, b[hatch].x + 120, b[hatch].y + 64);
     if (site < 0)
         site = find_legal_site(B_CREEP_COLONY, b[hatch].x - 120, b[hatch].y + 64);
@@ -633,7 +632,8 @@ static void test_real_campaign_sram_resume(void)
     hit_target(MAX_UNITS + colony, b[colony].hp + 1000,
                U_MARINE, ENEMY);
     assert(!b[colony].alive &&
-           (b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG));
+           !(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
+           b[colony].queue_progress == 0);
     assert(race_save_game());
     saved = race_data;
     save_write(&saved, sizeof(saved), SAVE_VERSION);
@@ -642,7 +642,8 @@ static void test_real_campaign_sram_resume(void)
     assert(!race_z7_active() && screen == SCREEN_TITLE);
     assert(race_load_game());
     assert(race_z7_active() && !b[colony].alive &&
-           (b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG));
+           !(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
+           b[colony].queue_progress == 0);
     game_update(0, 0);
     assert(race_z7_active() && !b[colony].alive &&
            !(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
