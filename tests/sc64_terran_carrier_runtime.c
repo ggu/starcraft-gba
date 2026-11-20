@@ -58,8 +58,12 @@ int main(void)
     assert(race_carrier_command_base()<field_menu_count());
     choose_command(race_carrier_command_base());
     assert(u[carrier].carry==1 && minerals==625);
-    race_p7_carrier_training_source_tick();
-    for (unsigned n=0;n<300;++n) race_p7_carrier_training_source_tick();
+    race_protoss_generic_clock[0]=4;
+    race_p7_carrier_training_frame_tick();
+    assert(u[carrier].carry==1 && find_actor(U_P7_INTERCEPTOR)<0);
+    race_protoss_generic_clock[0]=0;
+    race_p7_carrier_training_frame_tick();
+    for (unsigned n=0;n<300;++n) race_p7_carrier_training_frame_tick();
     int child=find_actor(U_P7_INTERCEPTOR);
     assert(child>=0 && sc64_p7_carrier_child_state(&u[child])==SC64_P7_INTERCEPTOR_INSIDE);
     int target=spawn_unit(ENEMY,U_MARINE,u[carrier].x+100,u[carrier].y);
@@ -68,8 +72,8 @@ int main(void)
     u[carrier].order=ORDER_ATTACK_TARGET;u[carrier].target=target;
     assert(race_p7_interceptor_flight_carrier_holds(carrier));
     for (unsigned n=0;n<180 && sc64_pool_active_head(&race_p7_projectiles)==SC64_END;++n) {
-        race_p7_interceptor_flight_source_tick();
-        race_p7_interceptor_flight_frame_move();
+        race_protoss_generic_clock[0]=(u8)((unsigned)frame%5u);
+        race_p7_carrier_training_frame_tick();
         race_p7_carrier_training_end_frame();
         ++frame;
     }
@@ -91,6 +95,19 @@ int main(void)
         race_p7_projectile_source_tick();
     assert(!u[target].alive || u[target].hp<hp);
     assert(!race_p7_projectile_fault);
+
+    /* A last detached Interceptor still runs without a live Carrier. */
+    hit_target(carrier,100000,U_MARINE,ENEMY);
+    assert(!u[carrier].alive && u[child].alive);
+    assert(sc64_p7_carrier_child_state(&u[child])==SC64_P7_INTERCEPTOR_DETACHED);
+    int lifetime=u[child].carry;
+    race_protoss_generic_clock[0]=4;
+    race_p7_carrier_training_frame_tick();
+    assert(u[child].carry==lifetime);
+    race_protoss_generic_clock[0]=0;
+    race_p7_carrier_training_frame_tick();
+    assert(u[child].carry==lifetime-1);
+
     /* Preserve the real packet shape but name an unoccupied shooter slot.
      * Structural validation still passes; the candidate-world check must fail. */
     memcpy(race_p7_projectile_host_words,shot_bank,sizeof(shot_bank));

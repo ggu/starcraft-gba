@@ -504,12 +504,17 @@ static void race_p7_carrier_training_clear_slot(int slot)
     }
 }
 
-static void race_p7_carrier_training_source_tick(void)
+static int race_p7_carrier_training_source_tick(void)
 {
+    int has_parent = 0, has_child = 0;
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *child = &u[i];
-        if (!child->alive || child->type != U_P7_INTERCEPTOR ||
-            RACE_PROTOSS_RAW(child) != SC64_P7_INTERCEPTOR_RAW) continue;
+        if (!child->alive) continue;
+        if (SC64_P7_CARRIER_PARENT_TYPE(child->type)) has_parent = 1;
+        if (child->type != U_P7_INTERCEPTOR) continue;
+        /* Flight movement uses the live type, including detached children. */
+        has_child = 1;
+        if (RACE_PROTOSS_RAW(child) != SC64_P7_INTERCEPTOR_RAW) continue;
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         /* Flight owns launched and detached children. */
         if (sc64_p7_carrier_child_state(child) >= SC64_P7_INTERCEPTOR_OUTSIDE)
@@ -534,9 +539,12 @@ static void race_p7_carrier_training_source_tick(void)
             sc64_p7_carrier_inside_insert_front(i);
         }
     }
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].carry>0 && sc64_p7_carrier_parent_valid(i))
-            (void)race_p7_carrier_training_start(i);
+    if (has_parent) {
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].carry > 0 && sc64_p7_carrier_parent_valid(i))
+                (void)race_p7_carrier_training_start(i);
+    }
+    return has_parent || has_child;
 }
 
 /* game_update can call this before orders; race_p7 is fully defined by the
@@ -544,14 +552,17 @@ static void race_p7_carrier_training_source_tick(void)
  * by the projectile and Observer systems, without introducing another clock. */
 static void race_p7_carrier_training_frame_tick(void)
 {
-    if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0] != 4u) {
-        race_p7_carrier_training_source_tick();
+    if (!race_protoss_services_active()) return;
+    if (RACE_PROTOSS_SERVICE_CLOCK[0] != 4u) {
+        /* If the training pass saw no actors, it could not create a child.
+         * The remaining passes would only scan empty Carrier work. */
+        if (!race_p7_carrier_training_source_tick()) return;
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         race_p7_interceptor_flight_source_tick();
 #endif
     }
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
-    if (race_protoss_services_active()) race_p7_interceptor_flight_frame_move();
+    race_p7_interceptor_flight_frame_move();
 #endif
 }
 
