@@ -211,6 +211,32 @@ atomicity, and older-bank fallback.
 
 The comparison receipt SHA-256 is
 `9e31b9dac726194747f6a4925e7cd2ef51b3b1ce1cc0b5e45b207973f79016fb`.
-The source-only composition after the later campaign audit merges
-has the same runtime as the trial. Run the release gates before
-activation.
+The first composition after the campaign audit merges is byte-identical
+to the timed trial. Its source-boundary, doctor, default build and test,
+and prepared Unified build and test pass.
+
+### Composition with the attacker-image renderer
+
+The normal Terran control at `a9f0137c` and combined candidate at
+`afffebec` repeat the same fresh-load route. All 27 observations agree
+and both victory journals and fresh frozen-result re-exports match the
+earlier journal byte for byte. The T6 save fixture and 3-generation
+bank-selection fixture pass under sanitizers on the combined source.
+The default cartridge is byte-identical to the tested renderer release.
+All four normal products pass the ROM and RAM guards. Z10, P10 and
+Showcase are byte-identical to their renderer release builds. The
+Terran candidate retains the control's IWRAM `0x030048a8` and EWRAM
+`0x02038e5c` endpoints.
+
+| Emulator update | Control cycles | Combined cycles |
+| --- | ---: | ---: |
+| Pause HOME load | 30,516,047 | 28,727,633 |
+| Victory autosave with prior bank | 40,886,041 | 37,255,972 |
+| Frozen-result HOME load | 32,876,489 | 31,093,497 |
+
+The combined cartridge matrix SHA-256 is
+`e05b672c05c5ff24a56adf0d9a2b3f6cf5997b6c859709f54732616f00929e87`.
+The replay comparison SHA-256 is
+`8c4740890bf38fe7228edec2b0f84b4f9d670765aebb946896f3aaefe6d44196`.
+The result remains a one-update stall. Re-profile both bank checks and
+the SRAM writer before changing their trust or write boundaries.

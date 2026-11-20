@@ -151,12 +151,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   profile attributes 5.90 million cycles to four immutable program
   validations. Factoring the duplicate source-level check within
   the adapter leaves timing flat because the compiler already
-  combines it. Check repeated validation of the same mission state
-  within each journal operation and preserve the independent
-  validation of both banks. The [one-check-per-candidate trial](audits/2026-11-13-t6-normal-physical.md#one-full-validation-per-journal-candidate)
-  cuts another 8.88% from the T6 victory update and matches all 27
-  observations and both byte-identical SRAM exports. Qualify the
-  composed release checks before activation.
+  combines it. [Validating each T6 journal candidate once](audits/2026-11-13-t6-normal-physical.md#composition-with-the-attacker-image-renderer)
+  saves another 8.88% on the victory update and 5.86% on the pause load
+  on the composed normal Terran. All observations and SRAM bytes
+  match and both banks keep independent validation. Re-profile the
+  remaining result stall before changing either bank boundary.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
