@@ -8328,7 +8328,14 @@ worker_continue_minerals(Unit *q)
 static int
 worker_gather_ready(Unit *q)
 {
-    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? 45 : 60;
+#ifdef SC64_NATIVE_MINERAL_WAIT_PROBE
+    /* Native starts a 75-tick timer on an order poll. The first poll
+     * after it expires is at 81 ticks. Round up at the 5:4 update scale. */
+    const unsigned mineral_wait = (81u * 5u + 3u) / 4u;
+#else
+    const unsigned mineral_wait = 45;
+#endif
+    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? mineral_wait : 60;
     return --q->work_timer == 0;
 }
 
