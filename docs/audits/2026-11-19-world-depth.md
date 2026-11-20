@@ -106,6 +106,75 @@ the sorted actor pass, including buildings, to `sc64_unit_draw_cycles`.
 For before/after comparisons sum building and unit draw counters and compare
 the combined cost with background and full-update timings.
 
+### Death sprite depth
+
+The authenticated USA N64 order dispatcher calls the ordinary Death routine
+at `0x8012c3bc`. That routine starts animation 1 on the actor's existing
+sprite and preserves its live elevation at entry. The 280-byte function at
+ROM offset `0xf00ac` has SHA-256
+`c34b5423cecba28d75020590fd0d100f89e3937a369363c7d92cac2b2db1b1fc`.
+A retained capture at native game frame 26,877 has a dying SCV at (46,1260)
+with HP zero, order zero and sprite ID `0x066c`. Its sprite is in render row
+39 with elevation 4 and sort key `0x213b066c`. The normalized RAM SHA-256 is
+`c564005d460558a307f550955a5ffd86dc88fc53cfb1fa4e6ff6b167ce6e6134`.
+The SCV Death script uses `imgol` to add image 332. Native sprite
+`0x802163a0` has that image at the head of its image list, and the image
+points back to the same sprite and shares its key.
+
+The N64 IScript handler for opcode 17 (`lowsprul`) passes fixed elevation 1
+to the independent sprite constructor. The 68-byte handler at ROM offset
+`0x13238` has SHA-256
+`8a258b2707f64dd1a8d60f14561de2f027dcd906b9c2ed09d7d5b153b0aec14a`.
+Two Hydralisk remnants in the frame 26,877 render list have image 32 and
+elevation 1. Two Marine remnants with image 241 also have elevation 1 at
+frame 19,444 (RAM SHA-256
+`0924c9a329824371d7271968eb0b16ca1eaccceae76b54c44ca66a741866bac1`).
+
+The shared Mode 4 painter queues the source actor's own collapse frames
+and direct `imgol` Death attachments at the actor's captured elevation and
+world Y. Independently spawned opcode-17 corpses and rubble use elevation 1
+and their own anchors. The bank records both classes apart from the
+under/over bit. The prepared bank has 157 actor profiles with main-image
+or direct attachment frames and 84 with at least one fixed-low layer.
+The destruction scan reads lift state from the retained building flag.
+The existing off-screen and fog rules apply. Depth data occupies the same 20-byte transient row and clears
+with the effect pool. Source-art banks created before the depth metadata
+keep legacy paint order. Rebuild the local death bank for the depth cases.
+
+| Case ID | Required overlap and checks |
+| --- | --- |
+| `death-root-ground-by-y` | Isolate a Zergling collapse at layer 4 and a Tank at a slightly smaller or larger world Y. Require the larger Y to win every distinguishing pixel in each pair. Repeat with a Marine or Hydralisk and capture its native Death image, sprite ID and elevation. |
+| `death-attachment-depth` | Compare the SCV's attached image 332 against a Tank north and south of its anchor, then against a Wraith. Use the SCV sprite key for the native attachment. Repeat with a lifted Facility, whose burst sorts at 12 and whose rubble sorts at 1. |
+| `death-root-under-flyer` | Place a Wraith above the collapse and move the camera past both HUD bands. Require the flyer to cover the root on each Mode 4 page and zero HUD changes. |
+| `death-remnant-low` | Advance past the collapse to the independent corpse or rubble phase. Verify layer 1 at the remnant's own anchor and require a layer-4 survivor to cover it. Include building rubble and two layer-1 sprites at different world Y values. |
+| `death-source-retained-depth` | Recycle the victim slot before the collapse ends and draw both products from the same camera. Require the effect to keep its death snapshot, exclude hidden effects and confirm that fresh SRAM load clears cosmetic entries. |
+
+Use `make test-sc64-showcase-death-source` with the current private bank for
+the isolated pixel checks. Add ordinary-input cuts from a battle in campaign,
+Custom Game and Showcase. Record frame, screen page, actor and effect anchor,
+layer, and distinguishing and wrong-pixel counts. Keep capture data local.
+
+The Showcase sanitizer fixture matches all 2,110 distinguishing pixels
+across nine SCV and Zergling overlaps, including both HUD edges. The Terran
+fixture confirms a lifted Facility's layer-12 attachment and independent
+layer-1 rubble after destruction. All four normal ARM profiles pass header
+and SRAM checks with unchanged IWRAM and EWRAM endpoints. The painter stack
+frame adds 192 to 200 bytes, with a 2,784-byte maximum across these builds.
+Normal Custom Game launch checks match the prior release's gameplay,
+palette and both indexed pages at calls 60 and 120. These samples precede
+combat. The ARM matrix receipt SHA-256 is
+`c47baa6654c6b0d69a8bca16233b87204aa174eef46d87651393d1860f38c5c5`.
+
+The native `sprol` and `sproluselo` handlers pass parent elevation plus
+one. `highsprol` and `sprul` pass parent minus one. `spruluselo` passes
+the parent layer. Record them separately from the fixed-low path and from
+image attachments. The GBA still uses the previous paint passes for these
+death children, and attacker weapon image overlays still paint above the
+queue. For the latter, use the Tank muzzle image over a ground sprite and
+under a Wraith, then retest a hidden and a recycled shooter. Report exact
+same-layer ties separately because the GBA uses kind and slot where the
+native queue uses the turret flag and sprite ID.
+
 ### Dynamic depth harness
 
 The native painter reads the **live** elevation byte at sprite offset

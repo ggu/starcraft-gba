@@ -131,12 +131,14 @@ def compile_death(payload: bytes, scripts: dict[int, int], image_iscript: Sequen
         return starts[name]
 
     def walk(image_id: int, name: str, at: int, x: int, y: int, under: bool,
-             remnant: bool, depth: int) -> None:
+             remnant: bool, depth: int, fixed_low: bool = False,
+             actor_overlay: bool = False) -> None:
         if depth > MAX_DEPTH:
             raise Unsupported("overlay nesting exceeds bound")
         pc = start_of(image_id, name)
         layer = {"image_id": image_id, "x": x, "y": y, "under": under,
-                 "remnant": remnant, "steps": [], "start": None,
+                 "remnant": remnant, "actor_sprite": depth == 0 or actor_overlay, "fixed_low": fixed_low,
+                 "steps": [], "start": None,
                  "loop_start": HOLD_LAST, "animation": name}
         layers.append(layer)
         if len(layers) > MAX_LAYERS:
@@ -175,7 +177,8 @@ def compile_death(payload: bytes, scripts: dict[int, int], image_iscript: Sequen
             elif opcode in IMAGE_OVER or opcode in IMAGE_UNDER:
                 ox, oy = (0, 0) if opcode in USES_LO or len(args) < 3 else (args[1], args[2])
                 walk(args[0], "Init", at + elapsed, x + to_s8(ox), y + to_s8(oy),
-                     opcode in IMAGE_UNDER, remnant, depth + 1)
+                     opcode in IMAGE_UNDER, remnant, depth + 1,
+                     actor_overlay=depth == 0 and opcode == 8)
             elif opcode == 61:
                 walk(image_id + 1, "Init", at + elapsed, x + to_s8(args[0]),
                      y + to_s8(args[1]), True, remnant, depth + 1)
@@ -184,7 +187,7 @@ def compile_death(payload: bytes, scripts: dict[int, int], image_iscript: Sequen
                     raise Unsupported("sprite id out of range")
                 ox, oy = (0, 0) if opcode in USES_LO else (args[1], args[2])
                 walk(sprite_image[args[0]], "Init", at + elapsed, x + to_s8(ox),
-                     y + to_s8(oy), opcode in SPRITE_UNDER, opcode == 17, depth + 1)
+                     y + to_s8(oy), opcode in SPRITE_UNDER, opcode == 17, depth + 1, fixed_low=opcode == 17)
             elif opcode == 22:
                 break
             elif opcode in SKIP_OPS:
@@ -243,12 +246,15 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
                  images: dict[int, dict[str, Any]]) -> None:
     packed_images = packed_under_image_ids(sources)
     word_bytes = word_payload_bytes(sources, images)
+    depth_layers = max((sum(l.get("actor_sprite", False) or l.get("fixed_low", False)
+                            for l in s["layers"]) for s in sources.values()), default=0)
     lines = [
         "/* Private generated source death art. Do not commit. */",
         "#ifndef SC64_DEATH_SPRITES_GENERATED_H",
         "#define SC64_DEATH_SPRITES_GENERATED_H",
         "#define SC64_DEATH_SOURCE_BANK_VERSION 2u",
         "#define SC64_DEATH_SOURCE_METADATA_VERSION 1u",
+        f"#define SC64_DEATH_SOURCE_DEPTH_LAYERS {depth_layers}u",
         f"#define SC64_DEATH_SOURCE_PIXEL_BYTES {sum(len(f['pixels']) for im in images.values() for f in im['frames'])}u",
         "#define SC64_DEATH_SOURCE_WORD_METADATA 1u",
         f"#define SC64_DEATH_SOURCE_WORD_BYTES {word_bytes}u",
@@ -298,7 +304,8 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
                 lines.extend(["};", f"static const SC64ConstructionAnimDesc {symbol} = {{",
                               f"    {symbol}_steps, {len(steps)}u, {key[1]}u, {key[2]}u", "};"])
             layer_symbols.append((layer, programs[key]))
-        key = tuple((l["image_id"], l["x"], l["y"], l["start"], l["end"], int(l["under"]),
+        key = tuple((l["image_id"], l["x"], l["y"], l["start"], l["end"], int(l["under"]) |
+                     (2 if l.get("actor_sprite") else 0) | (4 if l.get("fixed_low") else 0),
                      int(l["remnant"]), p) for l, p in layer_symbols)
         if key not in layer_sets:
             symbol = f"sc64_death_layers_{len(layer_sets)}"
@@ -477,7 +484,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
                     "remap_sha256": hashlib.sha256(remap).hexdigest()},
         "actors": [{"raw_unit_id": raw, "image_id": s["image_id"], **s["timing"],
                     "layers": [{k: l[k] for k in ("image_id", "x", "y", "start", "end",
-                                                  "under", "remnant", "loop_start")}
+                                                  "under", "remnant", "actor_sprite", "fixed_low", "loop_start")}
                                for l in s["layers"]]} for raw, s in sources.items()],
         "images": [{"image_id": iid, "grp_path": im["grp_path"], "grp_sha1": im["grp_sha1"],
                     "draw_function": im["draw_function"], "remapping": im["remapping"],

@@ -1412,6 +1412,10 @@ typedef struct {
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_WEAPON_SOURCE_VFX)
 #define SC64_PROJECTILE_DEPTH 1
 #endif
+#if defined(SC64_WORLD_DEPTH) && !defined(SC64_DEATH_VFX_DISABLED) && \
+    defined(SC64_DEATH_SOURCE_DEPTH_LAYERS) && SC64_DEATH_SOURCE_DEPTH_LAYERS > 0
+#define SC64_DEATH_WORLD_DEPTH 1
+#endif
 typedef struct {
 #ifdef SC64_RACES
     /* RaceSave omits tracers; race maps are at most 128 cells per side. */
@@ -2087,6 +2091,7 @@ static void race_bc_parent_detach(int slot);
 static int race_bc_parent_addon_constructing(int slot);
 static void race_bc_parent_relink(int slot);
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+static int race_bc_facility_in_flight(const Building *q);
 static int race_bc_facility_airborne(int slot);
 static int race_bc_facility_landing_site(int slot,int x,int y);
 static int race_bc_facility_lift(int slot);
@@ -2151,6 +2156,7 @@ static int race_t5_unit_product_available(int owner, int raw_owner, int type);
 #ifdef SC64_T6_RUNTIME
 static Sc64T6MissionState race_t6;
 #ifdef SC64_TERRAN_LATE_RUNTIME
+static int race_late_building_in_flight(const Building *q);
 static int race_late_airborne(int slot);
 static int race_late_lift(int slot);
 static int race_late_flight_order(int slot, int x, int y, int land);
@@ -4987,10 +4993,12 @@ static int sc64_bc_yamato_visual_tag(unsigned style,unsigned heading)
 { return (int)((style<<8)|((heading&31u)<<3)|sc64_bc_yamato_visual_phase()); }
 #endif
 
-#ifdef SC64_PROJECTILE_DEPTH
+#ifdef SC64_WORLD_DEPTH
 static unsigned sc64_building_world_layer(unsigned slot);
 static unsigned sc64_unit_world_layer(const Unit *q);
+#endif
 
+#ifdef SC64_PROJECTILE_DEPTH
 static unsigned
 sc64_trace_actor_layer(int ref)
 {
@@ -9907,9 +9915,18 @@ death_vfx_spawn_slot(Sc64DeathVfx *pool, int slot, int x, int y, int owner)
         source = 1;
     }
 #endif
-    sc64_death_vfx_spawn(pool, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
-                         x, y, death_vfx_extent(slot, raw), &timing, source,
-                         owner_color(owner));
+    int effect = sc64_death_vfx_spawn(pool, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
+                                      x, y, death_vfx_extent(slot, raw), &timing, source,
+                                      owner_color(owner));
+#ifdef SC64_DEATH_WORLD_DEPTH
+    if (source && effect >= 0) {
+        unsigned layer = building ? sc64_building_world_layer((unsigned)(slot - MAX_UNITS)) :
+                                    sc64_unit_world_layer(&u[slot]);
+        pool[effect].actor_layer_plus1 = layer + 1;
+    }
+#else
+    (void)effect;
+#endif
 }
 
 /* Observe alive-to-dead transitions with non-positive HP after a simulation
@@ -11737,6 +11754,34 @@ death_vfx_blit(const Sc64SpriteFrame *s, int cx, int cy)
     if (h > 0) gfx_blit_sprite(x, y, s->w, h, pixels);
 }
 
+static void __attribute__((noinline))
+death_vfx_draw_source_layer(const Sc64DeathSourceLayer *layer, int x, int y, unsigned frame)
+{
+    const Sc64SpriteFrame *sprite = sc64_death_image_frame(layer->image_id, (unsigned short)frame);
+    if (!sprite) return;
+#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_DEATH_INDEXED_REMNANTS)
+    const GbaSpriteWordFrame *words =
+        sc64_death_image_word_frame(layer->image_id, (unsigned short)frame);
+    int left = x + layer->x - sprite->canvas_w / 2 + sprite->offset_x;
+    int top = y + layer->y - sprite->canvas_h / 2 + sprite->offset_y;
+    if (words && top >= 12 && top + (int)sprite->h <= 120) {
+        gfx_blit_sprite_words(left, top, words);
+        return;
+    }
+#endif
+    death_vfx_blit(sprite, x + layer->x, y + layer->y);
+}
+
+#ifdef SC64_DEATH_WORLD_DEPTH
+static inline int
+death_vfx_world_layer(const Sc64DeathVfx *e, const Sc64DeathSourceLayer *piece)
+{
+    if (piece->flags & SC64_DEATH_SOURCE_FIXED_LOW) return 1;
+    if (piece->flags & SC64_DEATH_SOURCE_ACTOR_SPRITE) return e->actor_layer_plus1 - 1;
+    return -1;
+}
+#endif
+
 static int
 death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
 {
@@ -11745,29 +11790,23 @@ death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
     for (unsigned i = 0; i < art->layer_count; ++i) {
         const Sc64DeathSourceLayer *layer = &art->layers[i];
         unsigned frame_index;
-        if (layer->under != under ||
-            !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
-        const Sc64SpriteFrame *sprite =
-            sc64_death_image_frame(layer->image_id, (unsigned short)frame_index);
-        if (sprite) {
-#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_DEATH_INDEXED_REMNANTS)
-            const GbaSpriteWordFrame *words =
-                sc64_death_image_word_frame(layer->image_id,(unsigned short)frame_index);
-            int left=x+layer->x-sprite->canvas_w/2+sprite->offset_x;
-            int top=y+layer->y-sprite->canvas_h/2+sprite->offset_y;
-            /* Packed collapse/remnant frames use the word compositor and no extra
-             * RAM. The indexed fallback explicitly clips partial HUD-edge
-             * frames even in builds without the scene-clip API. */
-            if (words && top>=12 && top+(int)sprite->h<=120)
-                gfx_blit_sprite_words(left,top,words);
-            else
+#ifdef SC64_DEATH_WORLD_DEPTH
+        if (death_vfx_world_layer(e, layer) >= 0) continue;
 #endif
-                death_vfx_blit(sprite, x + layer->x, y + layer->y);
-        }
+        if ((layer->flags & SC64_DEATH_SOURCE_UNDER) != under ||
+            !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
+        death_vfx_draw_source_layer(layer, x, y, frame_index);
     }
     return 1;
 }
 #endif
+
+static inline int
+death_vfx_in_view(const Sc64DeathVfx *row, int x, int y)
+{
+    return x >= -64 && x <= 304 && y >= -52 && y <= 172 &&
+           currently_visible(row->x, row->y);
+}
 
 /* under=1 draws remnants and collapse frames beneath units; under=0 draws
  * explosions above them. Effects in unseen cells stay hidden, as units do. */
@@ -11793,7 +11832,7 @@ draw_death_vfx(int under)
          * collapse frames draw beneath units from the start. */
         if (under ? !row->source && age < row->remnant_start : age >= row->burst_su) continue;
         int x = row->x - camx, y = row->y - camy + 12;
-        if (x < -64 || x > 304 || y < -52 || y > 172 || !currently_visible(row->x, row->y)) continue;
+        if (!death_vfx_in_view(row, x, y)) continue;
 #ifdef SC64_DEATH_SOURCE_ART
         if (row->source && death_vfx_draw_source(row, x, y, age, under)) continue;
 #endif

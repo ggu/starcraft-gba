@@ -73,6 +73,8 @@ class CompileTests(unittest.TestCase):
         layers = self.compile(death, {2: {0: overlay}, 3: {0: remnant}})
         self.assertEqual([l["image_id"] for l in layers], [10, 20, 30])
         actor, explosion, rest = layers
+        self.assertEqual([(l["actor_sprite"], l["fixed_low"]) for l in layers],
+                         [(True, False), (True, False), (False, True)])
         self.assertEqual(actor["steps"], [[3, 2], [4, 3]])
         self.assertEqual((actor["start"], actor["end"], actor["under"]), (0, 5, True))
         self.assertEqual(explosion["steps"], [[0, 2], [1, 2]])
