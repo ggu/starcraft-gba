@@ -62,6 +62,14 @@ enum {
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
 
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+static unsigned iwram_enter, iwram_spill, iwram_wrap, iwram_cross, iwram_spill_popped;
+#define SC64_ROUTE_IWRAM_FIFO_EVENT(name, value) iwram_##name(value)
+static void iwram_ENTER(int seeds) { if (seeds > 0) ++iwram_enter; }
+static void iwram_SPILL(int popped) { ++iwram_spill; iwram_spill_popped = (unsigned)popped; }
+static void iwram_WRAP(int overrun) { ++iwram_wrap; if (overrun > 0) ++iwram_cross; }
+#endif
+
 #ifdef SC64_ROUTE_KEEP_FIELDS
 static void sc64_routes_topology_changed(void);
 static void sc64_routes_grid_begin(void);
@@ -659,6 +667,9 @@ static void check_linear_uses_expected_path(int cols)
     build_path_grid();
     memset(sc64_route_field[0], 0x53, sc64_route_active_bytes);
     memset(SC64_ROUTE_OLD_GRID, 0x5a, sizeof(path_walkable));
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+    const unsigned enters = iwram_enter, spills = iwram_spill, wraps = iwram_wrap;
+#endif
     filled = sc64_route_fill_linear(sc64_route_field[0], goal);
     for (unsigned i = 0; i < sizeof(path_walkable); ++i) assert(SC64_ROUTE_OLD_GRID[i] == 0x5a);
 #ifdef TEST_LINEAR_OVERFLOW
@@ -669,9 +680,49 @@ static void check_linear_uses_expected_path(int cols)
 #else
     assert(filled == cells); /* must compact: the field is larger than the queue */
 #endif
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+    assert(iwram_enter == enters + 1);
+    if (SC64_ROUTE_IWRAM_FIFO_CAP == 512) {
+        assert(iwram_spill == spills && iwram_wrap > wraps);
+    } else {
+        assert(iwram_spill == spills + 1 && iwram_spill_popped > 0);
+    }
+#endif
     reference_bfs(&oracle[POOL], goal);
     for (int i = 0; i < cells; ++i) assert(sc64_route_get(0, i) == oracle[POOL].dir[i]);
     check_grid_unchanged();
+}
+#endif
+
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+static void check_iwram_fifo_spill(void)
+{
+    enum { side = 128, stride = side + SC64_LINEAR_PAD, bytes = stride * (side + 2),
+           seeds = SC64_ROUTE_IWRAM_FIFO_CAP / 2 };
+    static u8 dense_reference[bytes], dense_candidate[bytes];
+    u16 frontier[seeds];
+    race_cols = race_rows = side;
+    for (int row = 1; row <= side; ++row)
+        memset(dense_reference + row * stride + 4, 7, side);
+    /* A broad artificial starting frontier makes the real 512-entry tier
+     * spill as well. Production multi-goal seeds are separate from this test. */
+    for (unsigned i = 0; i < seeds; ++i) {
+        const int col = 2 + (int)(i % 32) * 4, row = 2 + (int)(i / 32) * 4;
+        frontier[i] = (u16)((row + 1) * stride + col + 4);
+        dense_reference[frontier[i]] = 0;
+    }
+    memcpy(dense_candidate, dense_reference, bytes);
+    const int cap = sc64_route_linear_queue_cap(side, side);
+    memcpy(bfs_queue, frontier, sizeof(frontier));
+    const int reference = sc64_route_expand_linear_ewram(dense_reference, seeds, stride, cap);
+    memcpy(bfs_queue, frontier, sizeof(frontier));
+    const unsigned spills = iwram_spill;
+    const int candidate = sc64_route_expand_linear(dense_candidate, seeds, stride, cap);
+    assert(reference == side * side && candidate == reference);
+    assert(iwram_spill == spills + 1 && iwram_spill_popped > 0);
+    assert(memcmp(dense_reference, dense_candidate, bytes) == 0);
+    printf("bounded FIFO spill after %u pops, %d complete matching route cells\n",
+           iwram_spill_popped, candidate);
 }
 #endif
 
@@ -932,6 +983,10 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
     check_linear_uses_expected_path(96);
     check_linear_uses_expected_path(128);
+#endif
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+    if (SC64_ROUTE_IWRAM_FIFO_CAP == 512) assert(iwram_cross > 0);
+    check_iwram_fifo_spill();
 #endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     check_nearby_lazy_root();

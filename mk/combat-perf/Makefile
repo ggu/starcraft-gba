@@ -144,6 +144,23 @@ test-sc64-route-linear-pointer: build/test-sc64-route-linear build/test-sc64-rou
 	cmp build/route-linear-pointer-overflow-stock.ref build/route-linear-pointer-overflow-probe.ref
 	cmp build/route-linear-pointer-overflow-stock.ref.state build/route-linear-pointer-overflow-probe.ref.state
 
+ROUTE_IWRAM_FIFO_FLAGS = $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_POINTER_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE
+build/test-sc64-route-iwram-base: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_IWRAM_FIFO_FLAGS) $< -o $@
+build/test-sc64-route-iwram-fifo: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_IWRAM_FIFO_FLAGS) -DSC64_ROUTE_IWRAM_FIFO_PROBE $< -o $@
+build/test-sc64-route-iwram-spill: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_IWRAM_FIFO_FLAGS) -DSC64_ROUTE_IWRAM_FIFO_PROBE -DSC64_ROUTE_IWRAM_FIFO_CAP=16 $< -o $@
+.PHONY: test-sc64-route-iwram-fifo
+test-sc64-route-iwram-fifo: build/test-sc64-route-iwram-base build/test-sc64-route-iwram-fifo build/test-sc64-route-iwram-spill
+	./build/test-sc64-route-iwram-base --emit build/route-iwram-base.ref
+	./build/test-sc64-route-iwram-fifo --emit build/route-iwram-fifo.ref
+	./build/test-sc64-route-iwram-spill --emit build/route-iwram-spill.ref
+	cmp build/route-iwram-base.ref build/route-iwram-fifo.ref
+	cmp build/route-iwram-base.ref build/route-iwram-spill.ref
+	cmp build/route-iwram-base.ref.state build/route-iwram-fifo.ref.state
+	cmp build/route-iwram-base.ref.state build/route-iwram-spill.ref.state
+
 build/test-sc64-route-point-pointer: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_POINTER_FLAGS) -DSC64_ROUTE_POINT_POINTER_PROBE $< -o $@
 build/test-sc64-route-point-pointer-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h | build

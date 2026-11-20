@@ -1861,6 +1861,109 @@ static inline void sc64_route_pack_linear(u8 *field, const u8 *dense,
 
 #endif
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+#ifndef SC64_ROUTE_LINEAR_POINTER_FIFO_PROBE
+#error SC64_ROUTE_IWRAM_FIFO_PROBE requires the linear pointer FIFO
+#endif
+#ifndef SC64_ROUTE_IWRAM_FIFO_CAP
+#define SC64_ROUTE_IWRAM_FIFO_CAP 512
+#endif
+#if SC64_ROUTE_IWRAM_FIFO_CAP < 8 || SC64_ROUTE_IWRAM_FIFO_CAP > 512 || \
+    (SC64_ROUTE_IWRAM_FIFO_CAP & (SC64_ROUTE_IWRAM_FIFO_CAP - 1))
+#error SC64_ROUTE_IWRAM_FIFO_CAP must be a power of two between 8 and 512
+#endif
+#ifndef SC64_ROUTE_IWRAM_FIFO_EVENT
+#define SC64_ROUTE_IWRAM_FIFO_EVENT(event, value) ((void)0)
+#endif
+
+static u16 *GBA_HOT __attribute__((noinline))
+sc64_route_linear_pop_batch(u8 *dense, const u16 *read, const u16 *end,
+                            u16 *write, int stride)
+{
+    do {
+        const int c = *read++;
+#define SC64_LINEAR_STEP(offset, direction) \
+        if (dense[c + (offset)] == 7u) { \
+            dense[c + (offset)] = direction; \
+            *write++ = (u16)(c + (offset)); \
+        }
+        SC64_LINEAR_STEP(-1, 1)
+        SC64_LINEAR_STEP(1, 2)
+        SC64_LINEAR_STEP(-stride, 3)
+        SC64_LINEAR_STEP(stride, 4)
+#undef SC64_LINEAR_STEP
+    } while (read != end);
+    return write;
+}
+
+static int __attribute__((noinline))
+sc64_route_expand_linear_ewram(u8 *dense, int tail, int stride, int cap)
+{
+    int head = 0, consumed = 0;
+    while (head < tail) {
+        int limit = head + (cap - tail) / 4;
+        if (limit > tail) limit = tail;
+        if (limit == head) {
+            int pending = tail - head;
+            if (pending > cap - 4) return -1;
+            for (int i = 0; i < pending; ++i) bfs_queue[i] = bfs_queue[head + i];
+            consumed += head;
+            head = 0;
+            tail = pending;
+            continue;
+        }
+        u16 *write = sc64_route_linear_pop_batch(dense, bfs_queue + head,
+                                                  bfs_queue + limit, bfs_queue + tail, stride);
+        head = limit;
+        tail = (int)(write - bfs_queue);
+    }
+    return consumed + tail;
+}
+
+static int __attribute__((noinline))
+sc64_route_expand_linear_iwram(u8 *dense, int pending, int stride, int cap)
+{
+    enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP, mask = capacity - 1 };
+    /* A batch reads one contiguous window. The last three entries let its
+     * writes cross the physical end without a per-cell wrap test. */
+    u16 queue[capacity + 3];
+    int head = 0, tail = pending & mask, popped = 0;
+    for (int i = 0; i < pending; ++i) queue[i] = bfs_queue[i];
+    SC64_ROUTE_IWRAM_FIFO_EVENT(ENTER, pending);
+    while (pending) {
+        int batch = (capacity - pending) / 4;
+        if (!batch) {
+            /* Resume the existing expansion with this frontier and dense
+             * state. The spill leaves every unexpanded cell in FIFO order. */
+            SC64_ROUTE_IWRAM_FIFO_EVENT(SPILL, popped);
+            for (int i = 0; i < pending; ++i) bfs_queue[i] = queue[(head + i) & mask];
+            int remaining = sc64_route_expand_linear_ewram(dense, pending, stride, cap);
+            return remaining < 0 ? remaining : popped + remaining;
+        }
+        if (batch > pending) batch = pending;
+        if (batch > capacity - head) batch = capacity - head;
+        int write_limit = (capacity + 3 - tail) / 4;
+        if (batch > write_limit) batch = write_limit;
+        u16 *write = sc64_route_linear_pop_batch(dense, queue + head,
+                                                  queue + head + batch, queue + tail, stride);
+        int new_tail = (int)(write - queue);
+        for (int i = capacity; i < new_tail; ++i) queue[i - capacity] = queue[i];
+        if (new_tail >= capacity) SC64_ROUTE_IWRAM_FIFO_EVENT(WRAP, new_tail - capacity);
+        pending += new_tail - tail - batch;
+        popped += batch;
+        head = (head + batch) & mask;
+        tail = new_tail & mask;
+    }
+    return popped;
+}
+
+static inline int sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
+{
+    if (cap < SC64_ROUTE_IWRAM_FIFO_CAP || tail > SC64_ROUTE_IWRAM_FIFO_CAP)
+        return sc64_route_expand_linear_ewram(dense, tail, stride, cap);
+    return sc64_route_expand_linear_iwram(dense, tail, stride, cap);
+}
+#else
 /* Keep the oldest-to-newest FIFO order. A batch may append at most four
  * cells per pop; make room between batches instead of wrapping each access.
  * No live route bytes or grid bits have changed if a frontier does not fit. */
@@ -1916,6 +2019,7 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
     }
     return consumed + tail;
 }
+#endif
 
 #ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
 static inline int sc64_route_linear_goal_has_seed(int col, int row,
