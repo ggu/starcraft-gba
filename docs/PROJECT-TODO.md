@@ -168,8 +168,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   counters and video match in each pair. The measured P10 and Z10
   range readers have zero visits to the separate far helper. Its
   1,087,475-to-70,103-cycle result comes from a forced read. Keep the
-  flags opt-in for further normal-profile links, busy far reads and
-  journal continuations. A separate exact-cache scan trial on Z8
+  flags opt-in. All four combinations now pass their normal link
+  guards across the qualified revisions. Terran and Showcase also
+  match both mixed three-AI Blood Bath saves and both fresh
+  600-update continuations. The 128×128 Z9 observed range calls are
+  short cache misses. Bound the synchronous fill after a declined
+  distant proof, then compare worst update and p95 to the eager
+  control. A separate exact-cache scan trial on Z8
   matched 21 sampled states and saved less than 0.01% mean cycles
   across 486 timed calls. Focus on the larger route fills.
   A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the
