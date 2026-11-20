@@ -29,6 +29,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_MONOTONE_PROBE) && defined(SC64_RACES) && \
     !defined(SC64_ROUTE_PARTIAL_FLOOD)
 #define SC64_ROUTE_MONOTONE_ENABLED 1
+#endif
+/* Cached range reads can reuse the oracle without changing point movement. */
+#if defined(SC64_ROUTE_MONOTONE_ENABLED) || defined(SC64_ROUTE_POINT_FAR_READ)
 #include "sc64_route_monotone_probe.h"
 #endif
 #if defined(GBA_HOST) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
@@ -114,8 +117,8 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #error "point certificates require deferred point fields"
 #endif
 #if defined(SC64_ROUTE_POINT_FAR_READ) && (!defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) || \
-    !defined(SC64_ROUTE_MONOTONE_ENABLED) || !defined(SC64_RANGE_WORK))
-#error "far point reads require deferred point fields, the monotone oracle and range work"
+    !defined(SC64_RANGE_WORK))
+#error "far point reads require deferred point fields and range work"
 #endif
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"

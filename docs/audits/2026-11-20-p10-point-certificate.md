@@ -194,6 +194,8 @@ the distant-read helper. Its speedup remains a forced-case result.
 The comparison receipt SHA-256 begins `375760e916cc9731`.
 
 The regular Z10 vector omits the ordinary movement monotone flag.
-Give the far reader access to the shared monotone oracle separately
-before qualifying that profile. Keep normal movement and cache
-decisions in the same configuration across the control and trial.
+The far reader now compiles its shared oracle separately, preserving
+the profile's ordinary point movement. `make test-sc64-route-point-far-read`
+runs the same sanitizer checks both ways. The second fixture asserts
+at compile time that the ordinary movement optimization stays off.
+Normal Z10 ARM qualification remains pending.

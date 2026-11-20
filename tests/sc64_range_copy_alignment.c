@@ -44,6 +44,11 @@ static int limit(int n, int lo, int hi)
 static int sc64_cell_row(unsigned cell) { return (int)cell / MAP_COLS; }
 static int sc64_cell_col(unsigned cell) { return (int)cell % MAP_COLS; }
 #include "../starcraft/sc64_routes.h"
+#ifdef SC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT
+#if !defined(SC64_ROUTE_POINT_FAR_READ) || defined(SC64_ROUTE_MONOTONE_ENABLED)
+#error "this fixture must use far cached reads with ordinary point movement"
+#endif
+#endif
 
 static void test_copy_alignment_and_remainders(void)
 {
