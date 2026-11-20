@@ -1980,6 +1980,7 @@ static inline int sc64_route_expand_linear(u8 *dense, int tail, int stride, int 
 #endif
 
 #ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
 static inline int sc64_route_linear_goal_is_empty(int goal, int cols, int rows)
 {
     if (SC64_GRID_GET(path_walkable, goal)) return 0;
@@ -1994,8 +1995,24 @@ static inline int sc64_route_linear_goal_is_empty(int goal, int cols, int rows)
             if (SC64_GRID_GET(path_walkable, y * cols + x)) return 0;
     return 1;
 }
+#else
+static inline int sc64_route_linear_goal_has_seed(int col, int row,
+                                                 int cols, int rows)
+{
+    const int left = col > 0 ? col - 1 : col;
+    const int top = row > 0 ? row - 1 : row;
+    const int right = col + 1 < cols ? col + 1 : col;
+    const int bottom = row + 1 < rows ? row + 1 : row;
+
+    for (int y = top; y <= bottom; ++y)
+        for (int x = left; x <= right; ++x)
+            if (SC64_GRID_GET(path_walkable, y * cols + x)) return 1;
+    return 0;
+}
+#endif
 #endif
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
 static inline int sc64_route_linear_seed(u8 *dense, int start, int stride)
 {
     int tail = 0;
@@ -2012,6 +2029,7 @@ static inline int sc64_route_linear_seed(u8 *dense, int start, int stride)
     }
     return tail;
 }
+#endif
 
 static int __attribute__((noinline))
 sc64_route_fill_linear(u8 *field, int goal)
@@ -2019,7 +2037,12 @@ sc64_route_fill_linear(u8 *field, int goal)
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
 #ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
     /* With no walkable seed, the normal pack writes all unreachable codes. */
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     if (sc64_route_linear_goal_is_empty(goal, cols, rows)) {
+#else
+    if (!SC64_GRID_GET(path_walkable, goal) &&
+        !sc64_route_linear_goal_has_seed(sc64_cell_col(goal), sc64_cell_row(goal), cols, rows)) {
+#endif
 #ifdef SC64_ROUTE_WORD_CLEAR
         sc64_route_field_clear(field);
 #else
@@ -2032,7 +2055,23 @@ sc64_route_fill_linear(u8 *field, int goal)
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     const int row = sc64_cell_row(goal);
     const int start = goal + row * SC64_LINEAR_PAD + stride + 4;
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     int tail = sc64_route_linear_seed(dense, start, stride);
+#else
+    int tail = 0;
+
+    if (dense[start] == 7u) {
+        dense[start] = 0;
+        bfs_queue[tail++] = (u16)start;
+    } else {
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            int seed = start + dy * stride + dx;
+            if (dense[seed] != 7u) continue;
+            dense[seed] = 0;
+            bfs_queue[tail++] = (u16)seed;
+        }
+    }
+#endif
     tail = sc64_route_expand_linear(dense, tail, stride, cap);
     if (tail < 0) return tail;
     sc64_route_pack_linear(field, dense, cols, rows, stride);
