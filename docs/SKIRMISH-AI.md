@@ -7,11 +7,11 @@ planner in [`race_skirmish_ai.h`](../starcraft/race_skirmish_ai.h). The
 original-art skirmish planner in `skirmish_ai.h` is a different, older mode and
 is unchanged.
 
-The planner is an authored approximation. It is not a decoded StarCraft 64 AI
-script, and its build orders are not claims about the original game. One part
-is calibrated to the original: when each race starts its first offensive and
-how much army it gathers first follow measurements of the StarCraft 64
-computer players ([audit](audits/2026-11-19-n64-skirmish-ai.md)).
+The planner is an authored approximation. The timing and size of each
+race's first offensive follow measurements of the StarCraft 64 computer
+players. The Zerg opening also targets four paid Sunken Colonies based on
+two native Blood Bath matches.
+[First-wave audit](audits/2026-11-19-n64-skirmish-ai.md) · [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
 
 ## What the opponents do
 

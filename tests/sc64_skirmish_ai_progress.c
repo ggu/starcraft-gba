@@ -1138,7 +1138,7 @@ static int ai_sunken_save(void)
     if (pool < 0 || creep < 0) return 0;
     race_minerals[owner] += 50;
     race_ai_census(owner, &c);
-    if (!race_ai_start_defense(&c, 146) || !b[creep].under_construction ||
+    if (!race_ai_start_defense(&c, 146, 0) || !b[creep].under_construction ||
         race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY) return 0;
     for (int t = 0; t < 120; ++t) input(0);
     hit_target(MAX_UNITS + creep, 30, U_MARINE, SIDE);
@@ -1442,6 +1442,35 @@ static int first_wave(void)
     printf("{\"kind\":\"first-wave\",\"owner\":%d,\"race\":%d,\"gate\":%d,\"frame\":%d,\"sent\":%d,"
            "\"army\":%d,\"army_supply\":%d,\"wave_supply\":%d,\"all_in\":%d,\"before_gate\":%d,\"ok\":%d}\n",
            owner, race, gate, at, sent, army, supply, RACE_AI_WAVE_SUPPLY, all_in, peak_before, ok);
+    return ok;
+}
+
+/* Native Blood Bath openings field four paid Sunkens before the first wave.
+ * Keep the replay in the ordinary lobby and include real worker arrival,
+ * foundation placement and completion in the spending audit. */
+static int opening_defense(void)
+{
+    int owner = first_bot(), four = -1;
+    if (race_skirmish_map != 1 || race_human != R_TER ||
+        race_owner_identity(owner) != R_ZERG) return 0;
+    audit_start();
+    while (screen == SCREEN_PLAY && frame < 8640 && four < 0) {
+        int completed = 0;
+        input(0);
+        for (int i = 0; i < MAX_BUILDINGS; ++i)
+            if (b[i].alive && b[i].owner == owner && b[i].type == B_SUNKEN_COLONY &&
+                !b[i].under_construction) ++completed;
+        if (completed == 4) four = frame;
+    }
+    const OwnerAudit *paid = &ledger.o[owner];
+    int ok = paid->made[143] >= RACE_AI_FIRST_CREEP && paid->made[143] <= 5520 &&
+        paid->made[146] >= paid->done[142] && paid->done[146] >= paid->made[146] &&
+        paid->done[146] <= 6480 && four >= 0 && four < RACE_AI_FIRST_WAVE_ZERG &&
+        paid->made_n[143] == 4 && paid->made_n[146] == 4 &&
+        !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+    printf("{\"kind\":\"opening-defense\",\"owner\":%d,\"creep_start\":%d,"
+           "\"first_sunken\":%d,\"four_sunkens\":%d,\"creep_paid\":%d,\"sunken_paid\":%d,\"ok\":%d}\n",
+           owner, paid->made[143], paid->done[146], four, paid->made_n[143], paid->made_n[146], ok);
     return ok;
 }
 
@@ -1871,7 +1900,7 @@ int main(int argc, char **argv)
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
     int builder = -1, workers = -1, ai_sunken = 0, threats = 0, repowering = -1, airpin = -1, noore = -1;
-    int wave = 0, raiding = -1;
+    int wave = 0, defense = 0, raiding = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -1897,6 +1926,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--air-pin") && i + 1 < argc) airpin = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--no-ore") && i + 1 < argc) noore = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--first-wave")) wave = 1;
+        else if (!strcmp(argv[i], "--opening-defense")) defense = 1;
         else if (!strcmp(argv[i], "--raid") && i + 1 < argc) raiding = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
@@ -1914,6 +1944,7 @@ int main(int argc, char **argv)
     if (airpin >= 0) return air_pin(airpin) ? 0 : 16;
     if (noore >= 0) return no_ore(noore) ? 0 : 17;
     if (wave) return first_wave() ? 0 : 18;
+    if (defense) return opening_defense() ? 0 : 20;
     if (raiding >= 0) return raid(raiding, ticks) ? 0 : 19;
     if (resume_at < 0 && !resume_morph) {
         audit_start();
