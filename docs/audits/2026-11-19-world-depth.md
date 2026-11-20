@@ -251,15 +251,16 @@ timing remain open for the flight overlap.
 | Priority | Case ID | Setup and expected result | Status |
 | --- | --- | --- | --- |
 | 1 | `building-liftoff-depth` | Move a Science Facility from grounded to airborne and back. Use a Tank whose Y is just south of the Facility. The Tank covers it on the ground and the Facility covers the Tank in flight. Repeat with a Wraith covering the airborne Facility. | Terran HOST checks cover 396 pixels for each Tank overlap and 223 for the Wraith. HOST flight transitions cover both the Science Facility and late Terran Command Center. Ordinary-input ARM lift and land replay pending. |
-| 1 | `airborne-save-depth` | Save after issuing Land but before arrival. In a fresh session, sample the same overlap at load, during flight and after touchdown. Require layer 12 until the live flight flag clears and the same winning pixels as uninterrupted play. | Pending. Use a late Terran Command Center and a shared Science Facility in Custom Game. Include Showcase if the scene supports lift and save. |
+| 1 | `airborne-save-depth` | Save after issuing Land but before arrival. In a fresh session, sample the same overlap at load, during flight and after touchdown. Require layer 12 until the live flight flag clears and the same winning pixels as uninterrupted play. | The normal Terran T8 replay verifies the live state and depth inputs after reload. Add an on-screen overlap fixture and repeat with a shared Science Facility in Custom Game. Include Showcase if the scene supports lift and save. |
 | 1 | `air-tiers-ignore-y` | Preserve the Wraith/Overlord pixel result as the actors cross both viewport boundaries. Flip both framebuffer pages and require no actor pixels on HUD rows 0–11 and 120–159. | HOST isolated overlap passes. Ordinary-input page-flip replay pending. |
 | 1 | `scv-foundation-depth` | At a paid Terran foundation, compare an SCV north of the foundation as it approaches, attaches, works and completes. The foundation covers the idle SCV at layer 4. The working SCV at layer 5 covers the foundation. | See the [SCV foundation overlap](#scv-foundation-overlap). |
 | 1 | `interceptor-flight-depth` | Compare launch (15), attack (17), early and late far return (15 or 17), and final approach (14) against a Carrier at 16. Cover both actor slot orders and confirm docked children are hidden. | The Protoss framebuffer and save fixture covers the GBA runtime. Ordinary-input N64 and ARM overlap captures remain open. |
 | 1 | `effect-crosses-actor-depth` | Capture a moving bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. | Use the [projectile replay cuts](#projectile-replay-cuts). |
+| 1 | `storm-point-depth` | Cast at open ground with ground and air units crossing the storm. Repeat at a HUD edge and through a fresh save load. | The shared queue draws the three campaign adapters' point-Storm markers at layer 5. See [point-Storm cuts](#point-storm-cuts). |
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
 | 2 | `burrow-sprite-depth` | In a supported encounter, capture a unit before burrow, at layer 1 underground, and after it returns to its base layer. Compare the body and the anchor used by any shot or death effect. | USA ROM writes layer 1 at `0x80156624` and restores the unit's base layer at `0x80156a30`. GBA campaign culling and native burrow presentation need their own paired test. |
-| 3 | `nuke-target-dot-depth` | In a nuclear strike preview, capture a target dot against a ground unit and a flyer. Record both the Ghost's live layer and the spawned dot's layer. | USA ROM `0x8014c84c` gives the dot the Ghost's elevation plus one. The GBA nuclear preview paints the dot in a final pass. |
+| 2 | `nuke-target-dot-depth` | In a nuclear strike preview, capture the blinking target dot against a Tank and a Wraith. Record the Ghost's layer and the spawned dot's layer. | The shared queue puts the layer-5 dot above the Tank and below the Wraith. See [nuclear target-dot cuts](#nuclear-target-dot-cuts). |
 
 For replay receipts record the product, source commit, controller tape hash,
 world anchors, effective layers, active page, clip rows, overlap count and
@@ -267,6 +268,96 @@ wrong-pixel count. For native dynamic actors also record the actor and
 sprite addresses and their captured layer. Keep native screenshots and
 memory dumps local. Compare the isolated GBA masks within each version's
 palette. The N64 and GBA use different pixel scales and palettes.
+
+#### T8 pending landing and fresh save
+
+The normal Terran ROM linked from `25e9e8b9` enters T8 through HOME with
+two authored airborne Command Centers. Ordinary input issues Land for raw
+106 in slot 86. At frame 473 the building still has flight flag 4, layer
+12 and a pending goal at (1387, 1492). Start/B writes its pause save.
+A fresh HOME load restores the same actor row and goal. All 1,208 paired
+actor-state samples match through touchdown at frame 1,681, where the
+flag and goal clear and the building returns to layer 4. The camera and
+palette match at six render cuts. The fresh selection and active page
+differ, so use this replay for state continuity and add a visible crossing
+for the pixel-ownership oracle. The native Blood Bath capture witnesses
+lift and pending Land. Its native touchdown layer is verified in the ROM
+code above.
+
+The ordinary-input receipt SHA-256 is
+`d61e443713180e3ee8bb5f97c14a66dd25a15f740519e76267567f03327bdf50`.
+
+### Point-Storm cuts
+
+The USA N64 order dispatch for Psionic Storm (order 142, weapon 84)
+reaches the generic spell order at `0x80149c18`. The caster's CastSpell
+script runs opcode 39, which reaches the native bullet constructor at
+`0x80008600`. At `0x800087f0` a point cast takes the caster's sprite
+layer plus one. High Templar, Tassadar and Kerrigan use layer 4. Weapon
+84 uses behavior 3 and starts animation 14 on the existing bullet sprite
+at `0x80008c28`. The animation unhides its image and plays frames without
+changing elevation. The 96 ROM bytes from `0x97d4` match the retained
+native RAM and have SHA-256
+`09cd6957168bb5632031dc884b6d98c289dce4e5177d1099606f186dbc80d7e0`.
+
+P4, P6 and Z6 now draw their existing point-Storm marker in the shared
+Mode 4 queue at layer 5. Their states retain the same position and
+lifetime fields. The GBA cursor still previews the point before the cast.
+Native unit-targeted casts take their elevation from the target and need
+a separate fixture.
+
+| Case ID | Inputs | Expected output |
+| --- | --- | --- |
+| `storm-point-ground-air` | In P4, P6 and Z6, cast at a point and move a layer-4 ground actor, a layer-12 lifted building and a layer-18 flyer across the marker, one at a time. Isolate the marker and body at the same camera. | The Storm covers the ground actor. The building and flyer cover the Storm. Require nonzero distinguishing overlap and zero wrong foreground pixels in each case. |
+| `storm-point-hud-reload` | Save after a cast and resume in a fresh emulator. Move the camera to put the marker against field rows 12 and 119. Advance through both indexed pages and the expiration tick. | The active world anchor and foreground samples agree with uninterrupted play. Both HUD bands stay clear of the marker. Expiration removes the marker from the queue. |
+
+Use `make test-sc64-campaign-spells` for the existing spell control and
+save fixtures and the isolated Storm overlap checks. For each of P4, P6
+and Z6, the sanitizer fixture matches ten distinguishing pixels against
+a Tank and nine against a Wraith. The P6 and Z6 control and SRAM tests
+also pass. For ordinary-input
+cuts record the adapter, caster layer, cast target kind, marker world
+anchor, age at save, live layer and both foreground counts. Record the
+N64 bullet and sprite IDs through the first visible animation tick. The
+native elevation is established by the ROM and retained RAM. An ordinary
+N64 Storm overlap capture is still pending.
+
+The four normal ARM builds pass header and RAM checks with unchanged
+IWRAM and EWRAM endpoints. Terran reproduces its previous ROM bytes.
+An ordinary Siege Line Showcase replay matches the world, palette,
+displayed page and both indexed pages and HUD bands at 24 samples over
+120 combat updates. Guest cycles increase from 119,851,039 to 119,868,520
+(0.015%). That scene has no active Storm, and active-effect timing on
+hardware remains open. The comparison receipt SHA-256 is
+`4de84f1774ae396e425befdb00526ea5c8121ccfd67bf85da9657a5a340798e3`.
+
+### Nuclear target-dot cuts
+
+The USA ROM reads the Ghost sprite's elevation at `0x8014c840`, increments
+it at `0x8014c848` and writes it to the target-dot sprite at `0x8014c84c`.
+The existing T8 replay witnesses the blinking dot and its removal at
+descent. Eligible GBA Ghosts have layer 4 throughout painting. The shared
+queue draws the committed dot at layer 5 with its existing fog rules and
+playfield clip. Its layer follows from the Ghost's fixed layer, including
+after a fresh save load.
+[Native T8 strike](2026-11-12-ghost-nuclear-strike.md)
+
+| Case ID | Inputs | Expected output |
+| --- | --- | --- |
+| `nuke-dot-ground-air` | Pause a committed strike on each visible dot frame. Overlap the dot with an allied or visible enemy Tank, then a Wraith. Reverse unit creation order and shift the camera by a few pixels. | The dot covers the Tank. The Wraith covers the dot. Require a nonzero distinguishing mask in each test and zero wrong foreground pixels. |
+| `nuke-dot-fog-page-flip` | Bring each overlap to HUD rows 12 and 119 and advance through both backbuffers. Repeat for a hostile strike with the target point out of visibility. | The dot respects fog and the field clip. Hash both HUD bands and compare both indexed pages. |
+| `nuke-dot-paint-reload` | Save during painting in the active-strike probe. Load it from HOME in a fresh process and replay through release. Repeat with a canceled strike. | The same phase and target anchor produce the same dot and foreground pixels on reload. Descent and cancellation remove it. |
+
+Use `make test-sc64-nuke-world` with the prepared private bank to check
+layer ownership against both unit types. The Terran sanitizer fixture
+matches all five distinguishing pixels in each overlap and leaves both
+HUD bands unchanged. The ARM world fixture also passes the ordinary
+cast, abort, impact and T8 active-strike SRAM checks. For recorded replays
+use the ordinary cast command in T8 and in Custom Game on the preview
+cartridges.
+Record dot phase, caster and target anchors, effective elevation, active
+page, palette and overlap counts. The pre-cast cursor is UI. The missile
+body and impact sprites still need their own native elevation witnesses.
 
 ### SCV foundation overlap
 

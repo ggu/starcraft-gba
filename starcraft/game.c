@@ -1183,13 +1183,11 @@ static int race_p4_storm_menu_available(void);
 static int race_p4_storm_cast_selected(int x, int y);
 static void race_p4_storm_initialize_source_units(void);
 static void race_p4_storm_init_actor(int i);
-static void race_p4_storm_draw(void);
 #endif
 #ifdef SC64_P6_STORM_ENABLED
 static int race_p6_storm_menu_available(void);
 static int race_p6_storm_cast_selected(int x, int y);
 static void race_p6_storm_initialize_source_units(void);
-static void race_p6_storm_draw(void);
 #endif
 
 typedef struct {
@@ -2561,7 +2559,6 @@ static int race_z6_cloaked_target_attackable(int target);
 #ifdef SC64_Z6_STORM_ENABLED
 static int race_z6_storm_menu_available(void);
 static int race_z6_storm_cast_selected(int x,int y);
-static void race_z6_storm_draw(void);
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
 static int race_z5_consume_issue_selected(int x, int y);
@@ -2592,11 +2589,16 @@ static const Sc64SpriteFrame *mission_building_sprite(int type);
 static int race_owner_supply(int owner),race_owner_supply_capacity(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 #ifdef SC64_SHARED_NUKE_PROBE
+enum { SC64_NUKE_FLIGHT_LIMIT = 8 };
 enum { NUKE_MENU_NONE, NUKE_MENU_ARM, NUKE_MENU_CANCEL_ARM, NUKE_MENU_CAST,
        NUKE_MENU_ABORT, NUKE_MENU_ARMED };
 enum { NUKE_TOAST_WARNING = 16, NUKE_TOAST_ARMED, NUKE_TOAST_ABORTED,
        NUKE_TOAST_EMPTY, NUKE_TOAST_OCCUPIED };
 static void race_nuke_reset(void), race_nuke_tick(void), race_nuke_draw(void);
+#ifdef SC64_WORLD_DEPTH
+static void sc64_depth_push_nuke_dots(u32 *heap, unsigned *size);
+static void race_nuke_draw_dot(unsigned slot);
+#endif
 static void race_nuke_forget_building(int slot);
 static int race_nuke_parent_slot(int addon, unsigned parent_raw);
 static void race_nuke_relink_neutral_addon(int parent);
@@ -13476,6 +13478,21 @@ static unsigned race_shared_trigger_obligations(void);
 #endif
 #endif
 #include "race_campaign_adapter.h"
+#ifdef SC64_STORM_RENDER
+static const Sc64PsionicStormState *race_storm_for_draw(void)
+{
+#ifdef SC64_P4_STORM_ENABLED
+    if (race_p4_active()) return &race_p4.storm;
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_active()) return &race_p6.storm;
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+    if (race_z6_active()) return &race_z6.storm;
+#endif
+    return 0;
+}
+#endif
 #include "sc64_z8_game_bridge.h"
 #ifdef SC64_P9_RUNTIME
 /* P9 builds dispatch the shared-service hooks between P8 and P9 (see

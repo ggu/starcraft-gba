@@ -67,7 +67,7 @@ sc64_unit_world_layer(const Unit *q)
 
 enum {
     DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT, DEPTH_PROJECTILE,
-    DEPTH_DEATH,
+    DEPTH_DEATH, DEPTH_NUKE_DOT, DEPTH_STORM,
     DEPTH_SLOT_BITS = 10,
     DEPTH_SLOT_MASK = (1 << DEPTH_SLOT_BITS) - 1,
     DEPTH_KIND_MASK = 7,
@@ -81,6 +81,7 @@ _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
                MAX_MINERALS <= DEPTH_SLOT_MASK + 1 &&
                MAX_RACE_GEYSERS <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every actor slot");
+_Static_assert(DEPTH_STORM <= DEPTH_KIND_MASK, "painter keys must hold every kind");
 
 /* Ground depth uses the world anchor. Air ties use kind and slot.
  * Camera position and animation offsets leave this ordering stable. */
@@ -222,6 +223,12 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_DEATH_WORLD_DEPTH
              + SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_DEPTH_LAYERS
 #endif
+#ifdef SC64_SHARED_NUKE_PROBE
+             + SC64_NUKE_FLIGHT_LIMIT
+#endif
+#ifdef SC64_STORM_RENDER
+             + SC64_STORM_MAX_ACTIVE
+#endif
              ];
     unsigned size = 0;
     for (unsigned i = 0; i < MAX_MINERALS; ++i) {
@@ -282,6 +289,18 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_DEATH_WORLD_DEPTH
     sc64_depth_push_deaths(heap, &size);
 #endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    sc64_depth_push_nuke_dots(heap, &size);
+#endif
+#ifdef SC64_STORM_RENDER
+    const Sc64PsionicStormState *storms = race_storm_for_draw();
+    if (storms)
+        for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
+            /* Current adapters cast at points. The native bullet takes
+             * the caster's elevation (4) plus one for a point cast. */
+            if (storms->storm[i].active)
+                sc64_depth_push(heap, &size, 5, storms->storm[i].y, DEPTH_STORM, i);
+#endif
     while (size) {
         u32 key = sc64_depth_pop(heap, &size);
         unsigned i = key & DEPTH_SLOT_MASK;
@@ -307,6 +326,16 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_DEATH_WORLD_DEPTH
         case DEPTH_DEATH:
             sc64_depth_draw_death(i);
+            break;
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+        case DEPTH_NUKE_DOT:
+            race_nuke_draw_dot(i);
+            break;
+#endif
+#ifdef SC64_STORM_RENDER
+        case DEPTH_STORM:
+            draw_storm_marker(&storms->storm[i]);
             break;
 #endif
         case DEPTH_UNIT:
