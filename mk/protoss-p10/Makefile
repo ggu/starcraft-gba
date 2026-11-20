@@ -20,7 +20,7 @@ PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P
 # frame can be built independently.
 P10_HATCHERY_WORDS ?= 1
 P10_OVERMIND_WORDS ?= 1
-P10_NEXUS_WORDS ?= 0
+P10_NEXUS_WORDS ?= 1
 ifneq ($(P10_HATCHERY_WORDS),0)
 ifneq ($(P10_HATCHERY_WORDS),1)
 $(error P10_HATCHERY_WORDS must be 0 or 1)
