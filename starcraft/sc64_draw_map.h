@@ -41,7 +41,7 @@ draw_map_geyser(int i)
 
 /* The tile renderer still lifts its static objects into a background
  * plane. Mode 4 race builds paint them with the other world actors. */
-static void
+static inline void
 draw_map_static_objects(void)
 {
 #ifndef SC64_WORLD_DEPTH
@@ -292,7 +292,8 @@ draw_map(void)
 	    }
 #undef SC64_DRAW_TILE_STATE
 #endif
-#ifdef SC64_STATIC_DIRTY_ROWS
+#if defined(SC64_STATIC_DIRTY_ROWS) && \
+    (!defined(SC64_WORLD_DEPTH) || defined(SC64_TERRAIN_DIRTY_CAPTURE_ACTIVE))
     {
         u16 saved_clip = gfx_get_clip_y();
         int view_col0, view_row0, view_col1, view_row1;
@@ -321,6 +322,7 @@ draw_map(void)
                 (unsigned)(view_row1 - view_row0), view_row0, camy,
                 (int)(saved_clip & 0xffu), (int)(saved_clip >> 8), plan);
 
+#ifndef SC64_WORLD_DEPTH
         if (planned) {
             for (unsigned band = 0; band < plan->count; ++band) {
                 gfx_set_clip_y(plan->bands[band].top, plan->bands[band].bottom);
@@ -334,8 +336,13 @@ draw_map(void)
             /* Full misses and non-map caller clips retain the full pass. */
             draw_map_static_objects();
         }
-    }
 #else
+        /* World actors are drawn after capture. The row plan is only
+         * needed as input to the optional dirty terrain capture. */
+        (void)planned;
+#endif
+    }
+#elif !defined(SC64_WORLD_DEPTH)
     draw_map_static_objects();
 #endif
 #ifdef SC64_IMPORTED_MISSION

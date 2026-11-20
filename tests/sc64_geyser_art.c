@@ -68,7 +68,11 @@ static void static_case(int x, int y, int is_visible, int gas_raw)
     }
     gfx_begin(C_BLACK);
     gfx_set_clip_y(12, 120);
+#ifdef SC64_WORLD_DEPTH
+    sc64_draw_depth_ordered_actors();
+#else
     draw_map_static_objects();
+#endif
     gfx_end();
     compare_pixels();
 }

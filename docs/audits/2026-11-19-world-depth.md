@@ -44,7 +44,7 @@ pinned sprites and are allowed to change when the private art is regenerated.
 | `ground-by-y` | Tank at (96,50) and Goliath at (96,56), both layer 4 | Goliath in both unit slot orders | 115/115 |
 | `building-over-unit` | Tank at (96,50), Barracks at (96,58), both layer 4 | Barracks | 459/459 |
 | `unit-over-building` | Barracks at (96,43), Tank at (96,50), both layer 4 | Tank | 380/380 |
-| `air-tiers-ignore-y` | Move a Wraith north and south across a Carrier or Overlord, layers 18 and 16 | Wraith during overlap | Future replay |
+| `air-tiers-ignore-y` | Place a Wraith six pixels north and then south of an Overlord, layers 18 and 16 | Wraith in both slot and Y orders | Terran HOST fixture |
 | `camera-and-hud` | Scroll an overlapping pair past screen rows 12 and 119 while flipping framebuffer pages | Foreground stays stable, HUD rows stay clear of actor pixels | Future paired replay |
 | `selected-overlap` | Select the Overlord above a Hatchery and the Tank behind a Barracks | Overlord ring over the Hatchery, Overlord body over its own ring, Barracks over the Tank ring | 15, 14 and 29 distinguishable pixels |
 
@@ -71,6 +71,93 @@ The terrain cache now holds background and fog. Profile counters attribute
 the sorted actor pass, including buildings, to `sc64_unit_draw_cycles`.
 For before/after comparisons sum building and unit draw counters and compare
 the combined cost with background and full-update timings.
+
+### Dynamic depth harness
+
+The native painter reads the **live** elevation byte at sprite offset
+`0x0d`. Rechecking the owned USA ROM and the local N64 observer RAM confirms
+that takeoff writes 12 at `0x8014bb9c` (ROM `0x10f88c`) and landing writes 4
+at `0x8014b7e8` (ROM `0x10f4d8`). The ordinary-input [Blood Bath lift
+capture](2026-11-13-n64-blood-bath-airborne-last-building.md) identifies the
+same Command Center before and after takeoff. The layer stores establish the
+depth rule, while the retained controller run documents the visible takeoff.
+The independent Blood Bath observer RAM from step 4230 has SHA-256
+`bcacbc2bc25e1a0f4b0321654ff28b42e98788e81dfc40869dfb5c2ceb3d58f1`.
+Its depth helper and layer stores match the owned ROM byte for byte.
+
+The shared GBA painter derives building elevation from the live flight
+predicates. Layer 12 goes in front of ground actors regardless of world Y
+and behind ordinary flyers at 16 or above. Landing restores the building's
+ground depth. The change uses the existing campaign and shared Science
+Facility flight state, with no additional save data.
+
+The Terran framebuffer fixture passes under ASan and UBSan. The Terran,
+Zerg, Protoss and Showcase ARM links preserve the IWRAM and EWRAM endpoints
+from `81f62111` with the same prepared inputs. Frame replay and hardware
+timing remain open for the flight overlap.
+
+| Priority | Case ID | Setup and expected result | Status |
+| --- | --- | --- | --- |
+| 1 | `building-liftoff-depth` | Move a Science Facility from grounded to airborne and back. Use a Tank whose Y is just south of the Facility. The Tank covers it on the ground and the Facility covers the Tank in flight. Repeat with a Wraith covering the airborne Facility. | Terran HOST checks cover 396 pixels for each Tank overlap and 223 for the Wraith. HOST flight transitions cover both the Science Facility and late Terran Command Center. Ordinary-input ARM lift and land replay pending. |
+| 1 | `airborne-save-depth` | Save after issuing Land but before arrival. In a fresh session, sample the same overlap at load, during flight and after touchdown. Require layer 12 until the live flight flag clears and the same winning pixels as uninterrupted play. | Pending. Use a late Terran Command Center and a shared Science Facility in Custom Game. Include Showcase if the scene supports lift and save. |
+| 1 | `air-tiers-ignore-y` | Preserve the Wraith/Overlord pixel result as the actors cross both viewport boundaries. Flip both framebuffer pages and require no actor pixels on HUD rows 0–11 and 120–159. | HOST isolated overlap passes. Ordinary-input page-flip replay pending. |
+| 2 | `interceptor-flight-depth` | Capture launch, attack, approach and dock beside a Carrier. The native Carrier body is 16. Its visible Interceptor starts at 15, rises to 17 after the attack ascent, stays at the previous layer during far return, and drops to 14 on final approach. Docked children are hidden. Save and reload both early and late far-return cases. | Native layer writes found at `0x801282e4`, `0x801287ec`, and `0x80128990`. GBA still uses the raw Interceptor layer and needs to retain pre- or post-ascent state on far return. |
+| 2 | `effect-crosses-actor-depth` | Capture the same ground projectile crossing opaque pixels of ground and air actors, with animation tick and sight fixed. Verify projectile and impact layers independently before changing a pass. Include a landing shadow and a low remnant. | Pending native frame pairs. Free-standing GBA weapon effects still draw after the actor pass. |
+| 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
+
+For replay receipts record the product, source commit, controller tape hash,
+world anchors, effective layers, active page, clip rows, overlap count and
+wrong-pixel count. For native dynamic actors also record the actor and
+sprite addresses and their captured layer. Keep native screenshots and
+memory dumps local. Compare the isolated GBA masks within each version's
+palette. The N64 and GBA use different pixel scales and palettes.
+
+### Cache and clip regressions
+
+| ID | Setup | Expected framebuffer |
+| --- | --- | --- |
+| `depth-cache-scroll` | Put a building and a mineral patch at each horizontal viewport edge. Scroll either way by 4 pixels across all 16 camera phases on each axis. Change a visible fog cell, construction state or mineral depletion on the next frame. | Every indexed pixel matches a fresh render of the same world and animation tick. The actors keep their depth order as they enter and leave view. |
+| `depth-cache-fixed-fog` | Hold the camera, change fog near overlapping actors, and render across alternating backbuffers. Run with full capture and again with optional dirty capture. | Both captures reproduce the fresh render, including the pixels between dirty bands and at each HUD boundary. Dirty capture reports fewer captured rows when its reuse checks pass. |
+| `legacy-static-clip` | Compile the static-row fixture with world depth disabled. Change two separated fog rows while overlapping static props share a band. | Each dirty band replays the static props in painter order, and `draw_map` restores the incoming clip. |
+
+`make test-sc64-terrain-transfer-scenes` runs the first case for Terran,
+Zerg, Protoss and Showcase. `make test-sc64-static-dirty-rows-game` covers
+the legacy path. A local Protoss sanitizer probe checks the fixed-camera
+case at 16 camera phases. It reproduces every fresh-frame pixel on all 64
+fog changes, capturing 48 of 108 rows per change. Keep the fixed-camera
+case in the ordinary-input replay harness backlog.
+The world-depth renderer no longer computes static clip bands on the
+default full-capture path. With optional dirty capture, the planner still
+supplies terrain row ranges, while the sorted actors draw after capture.
+
+### Removing the empty static clip pass
+
+On the release P10 build, the measured Homeland window contains 907
+moving-camera partial restores, all with word-aligned horizontal shifts.
+Instruction-edge measurements across 113 of those updates attribute a mean
+41,254 cycles to restoring the scrolled background, 11,557 to filling fog
+signatures, and 42,150 to capturing the two cache regions. The total
+background pass averages 191,287 cycles in this subset. These intervals
+include any audio interrupt time. The full capture remains a candidate for
+further profiling.
+
+The table compares the release renderer on `0994f416` with the same
+build inputs after removing the empty clip pass. Eleven sampled Homeland
+and 32 Blood Bath states match, including both indexed pages, palette,
+fog, units, buildings and resources. Camera positions, route counters
+and frame advancement match across the measured windows.
+
+| P10 ARM replay | Advancing updates | Mean background cycles | Mean update cycles | Peak update cycles |
+| --- | ---: | ---: | ---: | ---: |
+| Homeland | 958 | 183,372 → 181,031 | 1,728,678 → 1,726,409 | 2,418,393 → 2,405,240 |
+| Blood Bath, three AIs | 1,000 | 54,903 → 54,657 | 998,765 → 998,489 | 2,184,140 → 2,185,216 |
+
+The Homeland, Blood Bath and instruction-edge receipt SHA-256 values are
+`9c4283413d0c2bd41519acefcb17fe07613856988b7a0747e98aa581edc981f3`,
+`f48814330def8cb9af91089c03dfaacc3ff93fd682e37edb125a4bae0826dfd8`
+and `ac5bf6cb73cd9e48f0911b5d4450035f6d9367cef0899b26acc54b39f3293df5`.
+These are emulator cycle measurements. Blood Bath's peak rises 0.05%,
+and performance on hardware remains unmeasured.
 
 ## Local ARM performance
 
