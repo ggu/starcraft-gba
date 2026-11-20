@@ -20,7 +20,8 @@ In native gameplay footage the
 Overlords cover the Hatchery rim, and a Probe covers the southeast Nexus lip.
 
 The GBA Mode 4 painter uses those elevation and Y rules for units, buildings
-and resources. Composite turrets remain with their hull. GBA actor kind and
+and resources. The static lookup matches all 228 entries in the pinned N64
+unit table. Composite turrets remain with their hull. GBA actor kind and
 slot resolve exact ties as a deterministic approximation of the native
 sprite-ID tie. Native depth changes for special states still need individual
 checks. The change covers world actors in the shared campaign, skirmish and
@@ -145,8 +146,18 @@ and SRAM signature checks with the same IWRAM and EWRAM endpoints.
 Terran, Z10 and Showcase are byte-identical. The P10 ROM SHA-256 is
 `8a19f47f8030fc80511c16fdef7887e52e90ba4ab661308c00dace82916c8ca5`.
 Ordinary-input smoke replays match both indexed pages, palette and
-sampled world at 60 and 120 calls on all four products. Those opening
-samples do not exercise Interceptor overlap.
+sampled world at 60 and 120 calls on all four products. The host fixture
+exercises Interceptor overlap.
+
+The Terran, Z10 and Showcase Carrier previews also link with valid
+headers and within their RAM guards. The ordinary controller chord and
+scene menu reach the Showcase preview's Carrier battle. Over 450 updates,
+the first observed docked, launch, early far return, attack, approach and
+late far return states occur at frames 2, 60, 75, 80, 87 and 90.
+The observer records both indexed pages and the palette at each first
+observation. The receipt SHA-256 is
+`d60671fd05299b37f13cb06fd21a3b0866428ba9a2a935291a37caa01022a527`. These are state and frame captures. The isolated-host mask
+provides the pixel-ownership check.
 
 For the ordinary-input harness, record these cuts in Protoss campaign
 and custom games, then repeat in the Terran, Zerg and Showcase Carrier
@@ -154,10 +165,10 @@ previews. Capture the first release, the first ascent, a far-return cut
 for each history, the first approach cut, and dock. Compare the visible
 indexed page and the isolated actor mask at a fixed camera. At each
 far-return cut save via the pause menu, load via HOME in a fresh process,
-and replay the tail through docking. The normal Terran, Zerg and Showcase
-products do not yet enable the full Carrier service. The N64 test should
-sample the child's sprite elevation and owner, both anchors, and the
-finished framebuffer for each cut.
+and replay the tail through docking. The full Carrier service is enabled
+in regular Protoss and the Terran, Zerg and Showcase previews. The N64
+test should sample the child's sprite elevation and owner, both anchors,
+and the finished framebuffer for each cut.
 
 ### Cache and clip regressions
 
