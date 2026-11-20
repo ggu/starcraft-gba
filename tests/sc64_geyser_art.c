@@ -77,6 +77,67 @@ static void static_case(int x, int y, int is_visible, int gas_raw)
     compare_pixels();
 }
 
+#ifdef SC64_WORLD_DEPTH
+static void mineral_case(int x, int y, int style, int is_visible)
+{
+    clear_objects();
+    reveal(is_visible);
+    m[0] = (Mineral){ .x = camx + x, .y = camy + y - 12,
+                      .amount = 1500, .style = style };
+    memset(expected, C_BLACK, sizeof(expected));
+    if (is_visible) assert(expect_sprite(mission_mineral_sprite(style), x, y) > 0);
+    /* The anchor has left the field. The visible edge must survive both
+       page flips, while all pixels outside the field stay black. */
+    for (int page = 0; page < 2; ++page) {
+        gfx_begin(C_BLACK);
+        gfx_set_clip_y(12, 120);
+        sc64_draw_depth_ordered_actors();
+        gfx_end();
+        compare_pixels();
+    }
+}
+
+static void draw_mineral_pair(int actor, int actor_first)
+{
+    gfx_begin(C_BLACK);
+    gfx_set_clip_y(12, 120);
+    if (actor_first) draw_unit(&u[actor]);
+    draw_map_mineral(0);
+    if (!actor_first) draw_unit(&u[actor]);
+    gfx_end();
+}
+
+static void mineral_overlap(int mineral_y, int actor_y, int type, int actor_first)
+{
+    clear_objects();
+    reveal(1);
+    m[0] = (Mineral){ .x = camx + 120, .y = camy + mineral_y - 12,
+                      .amount = 1500, .style = SC64_RAW_MINERAL_FIELD_1 };
+    int actor = spawn_unit(SIDE, type, camx + 120, camy + actor_y - 12);
+    assert(actor >= 0);
+
+    draw_mineral_pair(actor, actor_first);
+    for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x)
+        expected[y * 240 + x] = gfx_test_pixel(x, y);
+
+    draw_mineral_pair(actor, !actor_first);
+    unsigned changed = 0;
+    for (int y = 12; y < 120; ++y) for (int x = 0; x < 240; ++x)
+        changed += gfx_test_pixel(x, y) != expected[y * 240 + x];
+    assert(changed > 0);
+
+    for (int page = 0; page < 2; ++page) {
+        gfx_begin(C_BLACK);
+        gfx_set_clip_y(12, 120);
+        sc64_draw_depth_ordered_actors();
+        gfx_end();
+        compare_pixels();
+    }
+    printf("Mineral overlap at y=%d and actor %d: %u pixels match\n",
+           mineral_y, type, changed);
+}
+#endif
+
 static void compare_cache(void)
 {
     game_render(); /* Refresh after the preceding mutation. */
@@ -105,6 +166,19 @@ int main(void)
     const int gas_raws[] = {110, 149, 157};
     for (unsigned i = 0; i < sizeof(gas_raws) / sizeof(gas_raws[0]); ++i)
         static_case(120, 66, 1, gas_raws[i]);
+
+#ifdef SC64_WORLD_DEPTH
+    const int mineral_edges[][2] = {{-10,66}, {249,66}, {120,3}, {120,130}};
+    const int styles[] = {SC64_RAW_MINERAL_FIELD_1, SC64_RAW_MINERAL_FIELD_2,
+                          SC64_RAW_MINERAL_FIELD_3};
+    for (unsigned style = 0; style < sizeof(styles) / sizeof(styles[0]); ++style)
+        for (unsigned edge = 0; edge < sizeof(mineral_edges) / sizeof(mineral_edges[0]); ++edge)
+            mineral_case(mineral_edges[edge][0], mineral_edges[edge][1], styles[style], 1);
+    mineral_case(120, 130, SC64_RAW_MINERAL_FIELD_1, 0);
+    mineral_overlap(3, 13, U_PROBE, 0);
+    mineral_overlap(130, 117, U_PROBE, 1);
+    mineral_overlap(130, 117, U_WRAITH, 0);
+#endif
 
     clear_objects(); reveal(1);
     camx = viewport_left(); camy = viewport_top();

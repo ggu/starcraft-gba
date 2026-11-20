@@ -6,12 +6,25 @@
 #if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
 #include "frontier_terrain.h"
 #endif
+
+static inline int
+mineral_in_view(const Mineral *mineral, int x, int y)
+{
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
+    const Sc64SpriteFrame *sprite = mission_mineral_sprite(mineral->style);
+    if (sprite) return resource_sprite_in_view(sprite, x, y);
+#else
+    (void)mineral;
+#endif
+    return x > -6 && x < 245 && y > 7 && y < 123;
+}
+
 static inline void
 draw_map_mineral(int i)
 {
     if (m[i].amount <= 0) return;
     int x = m[i].x - camx, y = m[i].y - camy + 12;
-    if (x <= -6 || x >= 245 || y <= 7 || y >= 123 ||
+    if (!mineral_in_view(&m[i], x, y) ||
         !currently_visible(m[i].x, m[i].y)) return;
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);

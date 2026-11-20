@@ -4,6 +4,38 @@
 #include "sc64_battlecruiser_yamato_motion.h"
 #include "sc64_battlecruiser_yamato_launch_rules.h"
 #include "sc64_world_dark_swarm_query.h"
+
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+static unsigned race_bc_yamato_draw_layer(const Sc64BcYamatoShot *shot,
+                                         const Sc64BcMotionFields *motion)
+{
+    if (motion->draw_layer) return motion->draw_layer;
+    if (shot->target < MAX_UNITS + MAX_BUILDINGS && target_alive(shot->target))
+        return sc64_trace_actor_layer(shot->target) + 1;
+    /* Older saves with a detached target did not retain its elevation. */
+    return 17;
+}
+#endif
+
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+static void race_bc_yamato_add_effect(const Sc64BcMotionFields *motion,
+                                     unsigned style, unsigned heading)
+{
+    int x = (int)(motion->x_q8 / 512u), y = (int)(motion->y_q8 / 512u);
+    int slot = add_tracer(x, y, x, y, sc64_bc_yamato_visual_tag(style, heading));
+#ifdef SC64_WORLD_DEPTH
+    /* sprul creates a trail below its projectile. The impact is an
+     * image on that projectile and inherits its depth and anchor. */
+    if (slot >= 0) {
+        unsigned layer = motion->draw_layer - (style == SC64_YAMATO_TRAIL_STYLE);
+        sc64_trace_slots[slot].bullet_layer = (u8)(SC64_TRACE_EXPLICIT_DEPTH | layer);
+    }
+#else
+    (void)slot;
+#endif
+}
+#endif
+
 /* Private integration seam: heading and miss are supplied by a future
  * authenticated launch/RNG adapter. No UI or production caller uses this. */
 static int race_bc_yamato_launch_resolved(int index,unsigned heading,int missed,
@@ -23,6 +55,9 @@ static int race_bc_yamato_launch_resolved(int index,unsigned heading,int missed,
     m.destination_y=(int16_t)destination_y;
     m.heading=m.velocity_direction=(uint8_t)heading;
     m.turn_rate=127; m.lifetime=255; m.turning=1;
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    m.draw_layer=(uint8_t)race_bc_yamato_draw_layer(shot,&m);
+#endif
     shot->state=SC64_BC_SHOT_FLIGHT;
     shot->phase=(unsigned char)((shot->phase&63u)|(missed?64u:0u));
     if (!sc64_bc_motion_pack(shot,&m)) { sc64_bc_shot_clear(shot); return 0; }
@@ -81,22 +116,22 @@ static int race_bc_yamato_projectile_step(int index)
     if (index<0 || index>=SC64_BC_SHOT_LIMIT) return 0;
     shot=&sc64_bc_shots[index];
     if (shot->state!=SC64_BC_SHOT_FLIGHT || !sc64_bc_motion_unpack(shot,&m)) return 0;
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    m.draw_layer=(uint8_t)race_bc_yamato_draw_layer(shot,&m);
+#endif
     result=sc64_yamato_motion_step(&m,(unsigned)WORLD_W*2u,(unsigned)WORLD_H*2u);
     if (result<0) return 0;
     if (!result) {
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
         unsigned age=255u-(unsigned)m.lifetime;
         if (age>=5u && (age-5u)%3u==0)
-            add_tracer((int)(m.x_q8/512u),(int)(m.y_q8/512u),
-                       (int)(m.x_q8/512u),(int)(m.y_q8/512u),
-                       sc64_bc_yamato_visual_tag(SC64_YAMATO_TRAIL_STYLE,(((unsigned)m.heading+4u)>>3)&31u));
+            race_bc_yamato_add_effect(&m, SC64_YAMATO_TRAIL_STYLE,
+                                      (((unsigned)m.heading+4u)>>3)&31u);
 #endif
         return sc64_bc_motion_pack(shot,&m);
     }
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-    add_tracer((int)(m.x_q8/512u),(int)(m.y_q8/512u),
-               (int)(m.x_q8/512u),(int)(m.y_q8/512u),
-               sc64_bc_yamato_visual_tag(SC64_YAMATO_IMPACT_STYLE,0));
+    race_bc_yamato_add_effect(&m, SC64_YAMATO_IMPACT_STYLE, 0);
 #endif
     int target=shot->target, owner=shot->phase&7, missed=shot->phase&64;
     sc64_bc_shot_clear(shot);

@@ -5006,6 +5006,9 @@ static unsigned sc64_unit_world_layer(const Unit *q);
 #endif
 
 #ifdef SC64_PROJECTILE_DEPTH
+/* The high bit lets a tracer participate at elevation zero. */
+#define SC64_TRACE_EXPLICIT_DEPTH 0x80u
+
 static unsigned
 sc64_trace_actor_layer(int ref)
 {
@@ -11220,6 +11223,17 @@ draw_construction_image(unsigned short image_id, unsigned short frame_index,
 #endif
 #endif
 
+#ifdef SC64_HAS_SPRITES
+static inline int
+resource_sprite_in_view(const Sc64SpriteFrame *sprite, int x, int y)
+{
+    int left = x - sprite->canvas_w / 2 + sprite->offset_x;
+    int top = y - sprite->canvas_h / 2 + sprite->offset_y;
+    return left < 240 && left + sprite->w > 0 &&
+           top < 120 && top + sprite->h > 12;
+}
+#endif
+
 /* Use the same footprint in the painter and its cached-object key. Geyser
  * art can remain visible when its center has left the playfield. */
 static int
@@ -11227,12 +11241,7 @@ geyser_in_view(int x, int y)
 {
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_geyser_sprite();
-    if (sprite) {
-        int left = x - sprite->canvas_w / 2 + sprite->offset_x;
-        int top = y - sprite->canvas_h / 2 + sprite->offset_y;
-        return left < 240 && left + sprite->w > 0 &&
-               top < 120 && top + sprite->h > 12;
-    }
+    if (sprite) return resource_sprite_in_view(sprite, x, y);
 #endif
     return x > 0 && x < 240 && y > 12 && y < 120;
 }

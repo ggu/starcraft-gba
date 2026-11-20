@@ -5,6 +5,11 @@ elevations 0 through 4 it sorts by ascending world Y within each elevation.
 Higher elevations ignore Y. A turret flag and a sprite ID break remaining
 ties. The target picker calls the same depth helper.
 
+The native queue compares unsigned keys. Its elevation starts at bit 27,
+the ground sprite anchor Y at bit 14, and the turret flag at bit 13.
+The native sprite pool index occupies the low bits. Capture sprite Y
+directly from the sprite record when a unit's simulation position differs.
+
 The layer values come from the 228-byte elevation column at offset 4068 in
 BOLT section `00C/001`. The section SHA-256 is
 `54356d7585c66cd463346996444fd208336eaacf6335d30eb2688aa73c9cb2df`.
@@ -31,9 +36,13 @@ coverage and the remaining passes that need separate depth references.
 The native sprite ID is the slot in one 36-byte sprite pool at `0x80207c70`.
 The observer matched `base + 36 * id` for 73 live actor sprites in an
 ordinary Blood Bath opening and 278 in the retained late-game capture.
-Starting IDs descend from 2199 and slots can be reused. Capture native
-sprite IDs through creation and reuse for exact ties. An ascending creation
-counter cannot serve as the native oracle.
+The allocator at `0x8011fde8` takes the head of one FIFO free list.
+The destruction path at `0x801207a4` returns a slot to the tail after
+its last image disappears. The next two free IDs in the ordinary
+northwest Blood Bath opening were 2126 and 2125. In the late step 31138
+capture they were 265 and 1768. Depending on reuse, either creation
+order can win a tie. Record the actual IDs and last-image retirement
+when checking exact ties across actors and independent effects.
 
 For the tie oracle, T10 observer step 18,228 has layer-18 Wraiths
 `2108` at (3096,240) and `2086` at (3120,272). The northern Wraith
@@ -97,6 +106,7 @@ pinned sprites and are allowed to change when the private art is regenerated.
 | `unit-over-building` | Barracks at (96,43), Tank at (96,50), both layer 4 | Tank | 380/380 |
 | `air-tiers-ignore-y` | Place a Wraith six pixels north and then south of an Overlord, layers 18 and 16 | Wraith in both slot and Y orders | Terran HOST fixture |
 | `camera-and-hud` | Scroll an overlapping pair past screen rows 12 and 119 while flipping framebuffer pages | Foreground stays stable, HUD rows stay clear of actor pixels | Future paired replay |
+| `mineral-edge-depth` | Move mineral anchors to screen positions (-10,66), (249,66), (120,3), and (120,130). Compare visible and hidden center fog at each edge, all three art styles and both pages. Pair with a Probe on either side of the patch's world Y and a Wraith. | Visible crop pixels remain in the queue at layer 4. The greater world Y wins the Probe overlap. The Wraith covers the patch, and both HUD bands match the empty scene. | 6, 32 and 44 distinguishing overlap pixels in the P10 host fixture |
 | `selected-overlap` | Select the Overlord above a Hatchery and the Tank behind a Barracks | Overlord ring over the Hatchery, Overlord body over its own ring, Barracks over the Tank ring | 15, 14 and 29 distinguishable pixels |
 
 The old renderer flipped all 192 Wraith/Tank pixels on unit slot swap and
@@ -106,6 +116,11 @@ source. The current canonical Terran framebuffer test is
 `build/test-sc64-terran-full-frame`. Add campaign and skirmish replay cases
 for picking the topmost actor and for dynamic layers such as workers against
 resources or Interceptors around Carriers.
+
+The shared Mode 4 mineral culler now admits the prepared sprite crop
+whenever it intersects the playfield. Its center still supplies the
+visibility sample and its world Y still supplies the layer-4 depth key.
+The P10 `test-sc64-geyser-art` fixture covers the edge positions above.
 
 In native Challenger melee, a selected Overlord moves across the Hatchery.
 The cursor is away from the overlap. At observer step 3920 the Overlord's
@@ -555,7 +570,7 @@ counts. Store ROM-derived pixels and memory locally.
 | `projectile-hud-page-flip` | Shift the camera so the flight intersects screen rows 12 and 119. Step two page flips with the cursor out of the overlap. | Terrain, bodies and projectiles are clipped to the field. HUD pixels are identical in both paired comparisons. The N64 oracle checks foreground UI without requiring GBA-specific row coordinates. |
 | `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
 | `independent-effect-depth` | Capture muzzle, projectile body, trail, impact and corpse or shadow on separate native animation ticks against the same covering actor. Repeat with a special-service projectile. | Record the native sprite ID and elevation when each independent sprite exists. Use the parent sprite's depth for image attachments and derive a separate oracle for independently spawned sprites. |
-| `yamato-charge-flight-impact-depth` | In Terran, P10 and Showcase, record Yamato charge, flight, trail and impact against a lifted building and a flyer. | The charge shares the caster's sprite turn. Record one overlap mask per detached part. The flight, trail and impact still need their own depth conversion and replay. |
+| `yamato-charge-flight-impact-depth` | In Terran, P10 and Showcase, record Yamato charge, flight, trail and impact against a lifted building and a flyer. | Compare the charge with the caster layer, the flight and attached impact with the release layer, and the detached trail one layer below. Record a separate overlap mask for each phase. |
 | `interceptor-pulse-depth` | In P10, capture a shot from a launched Interceptor against both ground and air targets. Sample target loss and a fresh save load in flight. | Record the native projectile layer at creation and after target loss. Compare it with the GBA marker at the same shot age. The GBA marker still uses a pass above the world queue. |
 
 #### Yamato charge attachment
@@ -573,15 +588,69 @@ playfield whose glow extends into it.
 | `yamato-charge-overlap` | Sample manual charging and automatic release with a Wraith over the glow. Compare body → charge → Wraith to the actual queue. Reverse the two draw turns and require a different overlap. |
 | `yamato-charge-viewport` | Repeat with the caster just beyond a field edge and the glow in view. Sample both indexed pages and HUD bands. When the caster or charge is hidden, its image must respect the same actor visibility rule. |
 
-The flight uses image 541 and an independently spawned `sprul` trail
-sprite 351 with image 542 at parent layer minus one. The impact attaches
-image 544 to the projectile sprite. Use those relationships for the
-later detached-effect replay. The charge fix changes only image 543.
-
 The Terran sanitizer fixture checks 121 distinguishing pixels for the
 manual charge and 217 for the release glow. The selected offscreen
 caster cases match 223 pixels at the left edge and 413 at the top edge,
 including an untouched HUD and no stray selection ring.
+
+#### Yamato flight, trail and impact
+
+In the USA ROM, weapon 30 takes moving behavior 0 from the table at
+`0x800cdd68`. The common constructor at `0x800087c0` captures the
+target's sprite elevation plus one before that dispatch. Target removal
+at `0x8000859c` clears the reference and preserves the projectile layer.
+Flight uses image 541. IScript `sprul` creates trail sprite 351 with
+image 542 one layer below its parent. Impact image 544 attaches to the
+projectile sprite and inherits its layer. This reference comes from the
+native constructor and scripts. A live N64 Yamato overlap capture is open.
+
+Terran, P10 and Showcase send all three parts through the shared Mode 4
+queue. Flight and impact use the saved release layer. Targeting a Bunker
+gives layer 4, an ordinary ground unit 5, a lifted building 13, and a
+Wraith 19. A trail uses one
+layer below with its own world anchor. The 20-byte flight record stores
+the captured layer in motion bits 21–25. Older rows read as zero. On
+those rows, use the surviving target's current layer plus one, or 17 if
+the target is gone, until the next movement tick stores that value.
+Older executables reject rows written with a nonzero layer. The trail
+and impact use the transient tracer pool and clear on reload.
+
+Run the five-frame overlap oracle with a fixed camera and animation tick.
+For a destination-dependent shade, compare actual pixels with expected
+composition and reversed composition, using only pixels those two
+compositions distinguish. Store the profile, ROM digest, input tape
+digest, camera, page, source and GBA ticks, phase, target presence, layer,
+world anchor, distinguishing pixel count and wrong-pixel count.
+
+| Case ID | Replay setup | Expected result |
+| --- | --- | --- |
+| `yamato-ground-flight-impact` | Launch at a layer-4 actor and stage each phase over a Tank, then a Wraith. Repeat with the blocker created before and after the target. | Flight and impact at 5 cover the Tank and pass behind the Wraith. The color-remapping impact matches the sorted composition. |
+| `yamato-trail-ground-y` | Sample a layer-4 trail on the same effect tick with a Tank north and then south of its trail anchor. Repeat near both HUD bands and on both indexed pages. | The larger world sprite Y is foreground. The HUD bands match the effect-free reference. |
+| `yamato-live-target-release` | In Custom Game, lift a target before release in one run and after release in a second. Destroy it or reuse its slot during flight. | A pre-release lift produces flight layer 13 and trail layer 12. A post-release lift or removal preserves the original release layer and the impact inherits it. |
+| `yamato-release-depth-reload` | Save an active flight in the pause menu. Resume from HOME in a fresh process and compare with uninterrupted input. Repeat after destroying the target and with a predecessor save. | The live flight anchor, release layer, subsequent trail and impact, and damage match. Predecessor rows use the documented fallback. Pre-save transient trails are excluded from the first reload image comparison. |
+| `native-pool-id-tie` | Sample the T10 Barracks/Goliath exact-Y tie and the two equal-elevation Wraiths at different Y. Also capture a Siege hull and turret with a third overlapping sprite. | The native unsigned greater key wins. Keep the exact tie case open for the GBA until it has a shared sprite-ID lifetime and individual turret draw turns. |
+
+The native weapon-79 Interceptor pulse also uses moving behavior 0.
+It should use target elevation plus one at release and retain that layer
+after detach. Its GBA marker is still drawn after the world queue and
+its saved projectile row needs a compatible way to retain launch depth.
+
+The Terran, Protoss and Showcase sanitizer fixtures match the shared
+queue and the complete effects pass for flight, trail and impact. The
+opposite render order changes 172 and 122 flight pixels, 172 and 150
+trail pixels, and 179 and 78 impact pixels. All expected pixels and both
+HUD bands match. A separate fixture checks 100,000 motion-row round trips
+and rejects invalid depth values and reserved bits. Each of the three
+Yamato profiles also saves two airborne shots and continues them in a
+fresh host process. Fresh readers accept real predecessor saves and
+preserve all 11 observed gameplay states through impact.
+
+The four normal cartridge builds pass the existing memory, header and
+payload checks. Ordinary ARM Custom Game inputs cover the compact map
+and Blood Bath across one, two and three CPUs. Each product plays 360
+updates, saves through pause and reproduces the following 240 updates
+from fresh SRAM. These opening runs check shared composition and save
+integrity. The staged fixtures supply the Yamato overlap witnesses.
 
 #### Shared renderer cartridge smoke
 
