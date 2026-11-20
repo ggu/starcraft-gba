@@ -449,6 +449,89 @@ static void test_attached_attacker_depth(void)
     assert(!memcmp(pair, shooter_without_muzzle, BATTLEFIELD_BYTES));
 }
 
+static void test_detached_attack_sprite_depth(void)
+{
+    static _Alignas(4) u8 child_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 blocker_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_HYDRALISK, 38, 64, 54);
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 54, 0, -1));
+    Sc64TraceSlot *slot = &sc64_trace_slots[0];
+    assert(slot->attack_sprite_birth_life && !slot->attack_sprite_layer);
+    u[shooter].x = 112;
+    u[shooter].y = 60;
+    while (slot->attack_sprite_birth_life && tracers[0].life > 1) update_tracers();
+    assert(slot->attack_sprite_layer == 5);
+    assert(slot->attack_sprite_x == 112 && slot->attack_sprite_y == 60);
+    Sc64AttackSpriteDraw child;
+    assert(sc64_attack_sprite_draw_state(0, &child));
+    assert(child.image == 35 && child.age == 0);
+    assert(child.x != tracers[0].x0 && child.y > 44 && child.y < 76);
+
+    u[shooter].alive = 0;
+    int blocker = make_unit(SIDE, U_TANK, 5, child.x, child.y);
+    assert(blocker == shooter && slot->attacker_plus1 < 0);
+    /* Keep the main projectile out of the isolated attacker-child fixture. */
+    assert(slot->bullet_layer);
+    slot->release_life = 1;
+    int init_x = tracers[0].x0, init_y = tracers[0].y0;
+    for (int air = 0; air <= 1; ++air) {
+        u[blocker].type = air ? U_WRAITH : U_TANK;
+        u[blocker].raw_type = air ? 8 : 5;
+        unsigned overlap = 0;
+        for (int dx = -10; dx <= 10 && !overlap; ++dx) {
+            u[blocker].x = child.x + dx;
+            /* Use the previous standalone compositor as the isolated art
+             * reference, anchored at the captured spawn instead of emit. */
+            tracers[0].x0 = slot->attack_sprite_x;
+            tracers[0].y0 = slot->attack_sprite_y;
+            begin_depth_frame();
+            draw_unit(&u[blocker]);
+            draw_tracer(0, SC64_TRACE_ATTACKER_SPRITE);
+            capture_depth_frame(child_in_front);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_ATTACKER_SPRITE);
+            draw_unit(&u[blocker]);
+            capture_depth_frame(blocker_in_front);
+            tracers[0].x0 = init_x;
+            tracers[0].y0 = init_y;
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += child_in_front[i] != blocker_in_front[i];
+        }
+        assert(overlap);
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        assert(!memcmp(pair, air ? blocker_in_front : child_in_front, BATTLEFIELD_BYTES));
+        printf("PASS detached Hydralisk sprite versus %s, %u overlap pixels\n",
+               air ? "Wraith" : "Tank", overlap);
+    }
+
+    clear_tracers();
+    u[blocker].alive = 0;
+    shooter = make_unit(SIDE, U_HYDRALISK, 38, 112, 60);
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 60, 0, -1));
+    u[shooter].alive = 0;
+    assert(make_unit(SIDE, U_HYDRALISK, 38, 112, 60) == shooter);
+    while (slot->attack_sprite_birth_life && tracers[0].life > 1) update_tracers();
+    assert(tracers[0].life && !slot->attack_sprite_layer);
+    assert(!sc64_attack_sprite_draw_state(0, &child));
+
+    clear_tracers();
+    u[shooter].alive = 0;
+    shooter = make_unit(SIDE, U_SCOURGE, 47, 112, 60);
+    assert(sc64_source_unit_vfx(&u[shooter], 116, 60, 1, -1));
+    assert(slot->attack_sprite_layer == 19 && !slot->attack_sprite_birth_life);
+    u[shooter].alive = 0;
+    update_tracers();
+    assert(sc64_attack_sprite_draw_state(0, &child));
+    assert(child.image == 4 && child.x == 112 && child.y == 60);
+}
+
 static void test_projectile_release_layer(void)
 {
     reset_world();
@@ -666,6 +749,7 @@ int main(void)
     test_ground_projectile_world_y();
     test_stationary_projectile_depth();
     test_attached_attacker_depth();
+    test_detached_attack_sprite_depth();
     test_projectile_release_layer();
 #endif
     puts("PASS native weapon source engine integration");

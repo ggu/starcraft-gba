@@ -2179,6 +2179,10 @@ AI wallets and full-match behavior remain unverified.
   ordinary P10 and Terran ARM replays match that selection. Showcase scene
   navigation and Z10 Blood Bath save/load also pass. Qualify additional
   poses and compose with live flight depth before enabling it by default.
+- Add the [selected building and detached attack sprite cases](audits/2026-11-21-world-depth-overlaps.md#replay-cases)
+  to the framebuffer replay harness. Preserve separate masks for the ring,
+  the detached sprite and the weapon projectile. Use the native sprite IDs
+  for exact-tie cases.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
   modes and the legacy static-clip fixture. Include

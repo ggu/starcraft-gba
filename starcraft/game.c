@@ -1547,6 +1547,10 @@ typedef struct {
     s16 depth_ref;     /* live target or point shot's source until release */
     s16 attacker_plus1; /* zero if untracked, negative once its slot is reused */
     u8 attacker_parts;
+    u8 attack_sprite_layer;
+    u16 attack_sprite_plus1;
+    u16 attack_sprite_birth_life;
+    s16 attack_sprite_x, attack_sprite_y;
 #endif
 } Sc64TraceSlot;
 #ifdef SC64_WEAPON_SOURCE_VFX
@@ -5082,8 +5086,9 @@ sc64_source_emit(int raw,int source,int weapon,int air,
                                                   key.target_air,key.variant);
             Sc64TraceSlot *trace = &sc64_trace_slots[slot];
             if ((unsigned)source < MAX_UNITS + MAX_BUILDINGS) {
-                trace->attacker_parts = (u8)sc64_trace_attacker_parts(shot_profile);
+                trace->attacker_parts = (u8)sc64_trace_attacker_parts(shot_profile, trace);
                 if (trace->attacker_parts) trace->attacker_plus1 = (s16)(source + 1);
+                sc64_trace_schedule_attack_sprite(trace, tracers[slot].life);
             }
             if (shot_profile && shot_profile->projectile_image) {
                 unsigned release = sc64_weapon_source_vfx_first_gba_age(
@@ -9865,6 +9870,9 @@ update_tracers(void)
                 slot->bullet_layer = (u8)(sc64_trace_actor_layer(ref) + 1);
             slot->release_life = 0;
         }
+        if (slot->attack_sprite_birth_life &&
+            tracers[i].life == slot->attack_sprite_birth_life)
+            sc64_trace_birth_attack_sprite(slot);
 #endif
     }
 }
@@ -12184,7 +12192,7 @@ draw_building_ring(const Building *q,int x,int bottom,int sprite_w,int parts,
                            selection_color(q->owner), parts, cover);
 }
 
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) && !defined(SC64_WORLD_DEPTH)
 #ifdef SC64_HAS_SPRITES
 /* draw_building_art leaves these out of the static pass. */
 static int
@@ -12203,7 +12211,7 @@ building_art_is_static(const Building *q)
     return 1;
 }
 #endif
-#else
+#elif !defined(SC64_IMPORTED_MISSION)
 /* The far arc of a directly drawn building, ahead of its art. */
 static void
 draw_building_far_arc(const Building *q)
@@ -12239,7 +12247,7 @@ draw_building_overlay(Building *q)
 #else
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
 #endif
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) && !defined(SC64_WORLD_DEPTH)
     /* This runs before the dynamic art below, which then covers the arc as
      * direct drawing does. Only finished art is already in the static cache. */
     if (selected) {
@@ -12368,7 +12376,9 @@ draw_building_overlay(Building *q)
     }
 #endif
     if (selected) {
+#ifndef SC64_WORLD_DEPTH
         draw_building_ring(q, x, sprite_y + sprite_h, sprite_w, SELECTION_NEAR, 0);
+#endif
         int vitals_y = sprite_y + sprite_h + 3;
 #ifdef SC64_RACES
         if (q->under_construction) vitals_y += 3;

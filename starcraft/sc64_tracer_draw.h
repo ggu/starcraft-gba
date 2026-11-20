@@ -133,6 +133,58 @@ draw_tracer(int i, unsigned parts)
 }
 
 #ifdef SC64_PROJECTILE_DEPTH
+typedef struct {
+    int x, y;
+    u32 age;
+    u16 image;
+    u8 direction;
+} Sc64AttackSpriteDraw;
+
+static int __attribute__((noinline))
+sc64_attack_sprite_draw_state(unsigned i, Sc64AttackSpriteDraw *draw)
+{
+    const Sc64TraceSlot *slot = &sc64_trace_slots[i];
+    if (!slot->attack_sprite_layer) return 0;
+    const Tracer *trace = &tracers[i];
+    const Sc64WeaponSourceOverlay *event =
+        &sc64_weapon_source_overlays[slot->attack_sprite_plus1 - 1u];
+    int age = sc64_tracer_duration((int)i) - trace->life;
+    u32 source_age = sc64_weapon_source_vfx_source_tick(age > 0 ? (unsigned)age : 0u);
+    if (source_age < event->source_tick) return 0;
+    u32 child_age = source_age - event->source_tick;
+    const Sc64WeaponSourceAnimation *init =
+        sc64_weapon_source_animation_lookup(event->image_id, 0);
+    u32 life = init && init->duration_ticks ? init->duration_ticks : 1u;
+    if ((!init || init->loop_pc == UINT32_MAX) && child_age >= life) return 0;
+    Sc64WeaponSourceVfxKey key;
+    if (!sc64_weapon_source_vfx_unpack((u32)trace->color, &key)) return 0;
+    int dx = event->x, dy = event->y;
+    if (event->opcode == 21u || dx) {
+        const Sc64WeaponSourceAttackProfile *profile = slot->profile_plus1 ?
+            &sc64_weapon_source_profiles[slot->profile_plus1 - 1u] :
+            sc64_weapon_source_trace_profile((u32)trace->color);
+        if (!profile) return 0;
+        const Sc64WeaponSourceAnimation *anim =
+            sc64_weapon_source_animation_lookup(event->parent_image, profile->attack_anim);
+        if (event->opcode == 21u) {
+            if (!sc64_weapon_source_vfx_sprite_birth_offset(event, anim,
+                    event->source_tick, key.direction, &dx, &dy)) return 0;
+        } else {
+            const Sc64WeaponSourceImage *parent =
+                sc64_weapon_source_image_lookup(event->parent_image);
+            int mirror = 0;
+            sc64_weapon_source_vfx_source_frame(parent, anim, event->source_tick,
+                                                 key.direction, &mirror);
+            if (mirror) dx = -dx;
+        }
+    }
+    *draw = (Sc64AttackSpriteDraw){
+        slot->attack_sprite_x + dx / 2, slot->attack_sprite_y + dy / 2,
+        child_age, event->image_id, key.direction
+    };
+    return 1;
+}
+
 static void
 sc64_draw_attacker_images(unsigned first, const u8 *next, unsigned part)
 {
