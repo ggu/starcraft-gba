@@ -101,10 +101,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [T5 on normal Terran](audits/2026-11-13-t5-normal-physical.md#november-20-fresh-sram-and-result-autosave)
   restores the first paid Wraith attack at frame 72,076 and wins with
   Raynor and Kerrigan alive. All 162 observations match, and a third
-  emulator reloads the frozen result and exports identical SRAM. All
-  ten Terran missions now have a fresh-load and result check on their
-  documented normal Terran builds. A sweep on a single current ROM
-  is still pending.
+  emulator reloads the frozen result and exports identical SRAM. The
+  [single-cartridge Terran sweep](audits/2026-11-13-normal-campaign-matrix.md#single-cartridge-terran-sweep)
+  now passes all ten normal HOME routes, fresh pause loads, victories,
+  and frozen-result re-exports on ROM `4b66e7e8`. T1 and T3 average
+  roughly 29 emulated updates per second. The slower routes still
+  need performance work and a physical GBA pass.
+  [Z1, Z2 and P5 on the current word-packed cartridges](audits/2026-11-13-normal-campaign-matrix.md#current-z10-and-p10-cartridges)
+  match their full observations. Z2 and P5 also match their pause SRAM
+  through a fresh process. Continue the other missions on those same ROM
+  hashes and add a Z1 pause cut.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
@@ -191,8 +197,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [remaining result profile](audits/2026-11-13-t6-normal-physical.md#remaining-cost-on-the-composed-terran)
   assigns 15.10 million inclusive cycles to compact-unit decoding and
   6.07 million direct cycles to the generic bit reader. The writer
-  uses 1.57 million inclusive cycles. Compare a fixed-width decoder
-  before changing either bank boundary.
+  uses 1.57 million inclusive cycles. The
+  [fixed-width decoder](audits/2026-11-20-packed-save-byte-reads.md#normal-terran-activation-with-aligned-route-packing)
+  saves 18.96% on the result update with aligned route packing enabled.
+  The pause and frozen-result loads save 16.14% and 14.92%. Both
+  bank boundaries retain independent validation. In the
+  [combined result profile](audits/2026-11-20-packed-save-byte-reads.md#remaining-save-cost-after-activation)
+  the packed-building bit reader now uses 2.97 million direct cycles.
+  Compare a fixed-width building reader against the current wire
+  and both independent journal bank checks.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
