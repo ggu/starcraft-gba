@@ -111,8 +111,33 @@ Z10_BUILDING_WORDS_FLAGS = $(if $(filter 1,$(Z10_BUILDING_WORDS)),-DSC64_BUILDIN
 Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
-build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) | build
-	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+# Actor flags, flight and collision radius use the existing immutable tables.
+Z10_FACT_TABLES ?= 1
+ifneq ($(words $(Z10_FACT_TABLES)),1)
+$(error Z10_FACT_TABLES must be 0 or 1)
+endif
+ifeq ($(filter 0 1,$(Z10_FACT_TABLES)),)
+$(error Z10_FACT_TABLES must be 0 or 1)
+endif
+Z10_FACT_DIR := build/generated/z10-facts
+Z10_FACT_HEADER := $(Z10_FACT_DIR)/sc64_fact_tables_generated.h
+Z10_FACT_FLAGS = $(if $(filter 1,$(Z10_FACT_TABLES)),-DSC64_FACT_TABLES -I$(Z10_FACT_DIR))
+Z10_FACT_REFERENCE_FLAGS = $(filter -D% -I%,$(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS))
+Z10_FACT_SIGNATURE = $(subst ','"'"',$(strip $(Z10_FACT_TABLES) $(Z10_FACT_REFERENCE_FLAGS)))
+Z10_FACT_CONFIG := $(if $(shell test -f build/z10-facts-config && printf '%s\n' '$(Z10_FACT_SIGNATURE)' | cmp -s - build/z10-facts-config && printf matched),,force-z10-facts-rebuild)
+$(Z10_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) $(ZERG_Z10_CANONICAL_INPUTS) Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-facts-config $(Z10_FACT_CONFIG) | build
+	mkdir -p $(Z10_FACT_DIR)
+	$(CLANG) -std=c11 -O2 -Istarcraft $(Z10_FACT_REFERENCE_FLAGS) $< -o $(Z10_FACT_DIR)/generator
+	$(Z10_FACT_DIR)/generator > $@.tmp
+	mv $@.tmp $@
+.PHONY: force-z10-facts-config force-z10-facts-rebuild
+force-z10-facts-config:
+force-z10-facts-rebuild:
+build/z10-facts-config: force-z10-facts-config | build
+	@printf '%s\n' '$(Z10_FACT_SIGNATURE)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) build/z10-facts-config $(Z10_FACT_CONFIG) $(if $(Z10_FACT_FLAGS),$(Z10_FACT_HEADER)) | build
+	$(CC) $(Z10_FACT_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -121,6 +146,12 @@ build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/
 verify-zerg-z10: build/StarCraft-Zerg-Z10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z10
 zerg-z10: verify-zerg-z10
+
+.PHONY: test-sc64-z10-fact-tables
+build/test-sc64-z10-fact-tables: tests/sc64_fact_tables_check.c $(Z10_FACT_HEADER) $(wildcard starcraft/*.h) Makefile tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) -Istarcraft $(Z10_FACT_REFERENCE_FLAGS) -DSC64_FACT_TABLES -I$(Z10_FACT_DIR) $< -o $@
+test-sc64-z10-fact-tables: build/test-sc64-z10-fact-tables
+	./build/test-sc64-z10-fact-tables
 
 build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_SIGHT_ROW_LUT_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS -DSC64_Z7_VISIBILITY_SPARSE_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
