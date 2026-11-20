@@ -761,9 +761,24 @@ invalid record leaves HOME unchanged. All SRAM inputs re-export byte
 for byte. The local qualification index SHA-256 is
 `7c7e13a6301776bc5eaa0a90f08654762f8374cb3759d3e37ff8ad112a8d8b28`.
 
-The campaign checks cover opening and save compatibility. Full current
-mission replays, sustained dense skirmishes and physical cartridge frame
-timings require separate runs.
+Z6 wins at frame 56,913 after an ordinary save at frame 18,721 and a
+fresh HOME load. The stock and Carrier builds match all 65 gameplay
+observations, the authored pages, the full pause SRAM, and both pending
+impacts at the cut. On the fresh continuation, mean guest cycles increase
+from 834,112 to 843,400 per update.
+
+A separate Z7 comparison starts both builds from the same genuine older
+pause save at frame 185,926. Through 9,132 ordinary physical calls to
+victory at 194,998, all five named gameplay checkpoints and six raw
+actor, terrain resource, palette and two-page cuts match. Mean guest
+cycles increase from 636,409 to 647,285 (1.71%). These timing measurements
+include emulated presentation waits. The rollback build reproduces the
+preceding regular Z10 ROM, SHA-256
+`1da8c6a4bc7fe0d9f8989925b1f2fecd094072583db5b1df35b361fbf8eac478`.
+The campaign and rollback comparison index SHA-256 is
+`733bbcb062182c48dd1fccf794052e31ddbce1ac08139a1dadfe7a92203c216f`.
+The other full mission replays, sustained dense skirmishes and physical
+cartridge frame timings require separate runs.
 
 #### Earlier selector links
 
