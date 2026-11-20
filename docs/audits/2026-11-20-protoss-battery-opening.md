@@ -92,6 +92,12 @@ building codecs, so their first Battery builds cover the combined source.
 | P10 | `5276ed939d8c61ab5bed2099ce11d36a14b5570302eb8f16fad83a56d8221787` | `91e7c177091af6383969dd263a4118af818ca05982fe8f137202e77e437d4ec0` |
 | Showcase | `2a4e3552343ae144a7ba829b6eb9fa39bf6bf60030dafcc74b8c63bb8fbaa8e4` | `6de3f58440f936f92abece43e069f1b454f013d31ad21c27e1ab3accbd485909` |
 
+The combined P10 also matches all 47,266 Eye of the Storm calls, all
+20 campaign observations, all measured cycles and all three 32 KiB SRAM
+images from the typed-decoder release. The combined campaign receipt
+SHA-256 is
+`f4b29d56fbf895d1e51a2bb09206a50b252a70d46352b9f697f9aac513ceb340`.
+
 ## Regression cases
 
 With the prepared inputs, build `build/test-sc64-skirmish-ai-progress-terran`
