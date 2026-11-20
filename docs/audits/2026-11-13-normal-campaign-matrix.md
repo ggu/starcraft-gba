@@ -14,7 +14,7 @@ physical GBA check or all routes through a mission.
 | T7 | [HOME win](2026-11-13-t7-t9-normal-physical.md) | All 15 checkpoints matched. |
 | T8 | [HOME win](2026-11-13-t8-normal-physical.md) | All 272 checkpoints matched. |
 | T9 | [HOME win](2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) | [November 20 fresh SRAM and result autosave](2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result) match all 51 checkpoints and restore the frozen victory in a third process. |
-| T10 | [HOME win](2026-11-13-t10-normal-physical.md) | Raynor alive; Ion Cannon destroyed. |
+| T10 | [HOME win](2026-11-13-t10-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t10-normal-physical.md#november-20-fresh-sram-and-result-autosave) match all six checkpoints, with Raynor alive and the Ion Cannon destroyed. |
 | Z1–Z2 | [Z1 HOME win](2026-11-13-z1-normal-home.md), [Z2 HOME win](2026-11-13-z2-normal-home.md) | Briefings and authored pages acknowledged. |
 | Z3 | [HOME win](2026-11-13-z3-current-home.md) | All 465 observations also match on staged `c906058`; Chrysalis retains all 250 HP. |
 | Z4 | [HOME win](2026-11-13-z4-two-normal-roms.md) | All 42 checkpoints also match on staged `c906058`; Kerrigan survives. |

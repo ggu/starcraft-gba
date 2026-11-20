@@ -62,7 +62,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [T9 on normal Terran](audits/2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result)
   loads from frame 35,363 and wins with Kerrigan alive. All 51 checkpoints
   match, including 12 after load. The second bank reloads the frozen
-  victory and re-exports identical SRAM. Apply the same check to T10.
+  victory and re-exports identical SRAM.
+  [T10 on normal Terran](audits/2026-11-13-t10-normal-physical.md#november-20-fresh-sram-and-result-autosave)
+  loads from frame 2,276 and wins with Raynor alive and the Ion Cannon
+  destroyed. All six checkpoints match. A third emulator restores
+  the frozen result and exports identical SRAM. Continue with a current
+  save and result check for T7.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
@@ -102,8 +107,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Packed journal decode.** [Byte-slice reads](audits/2026-11-20-packed-save-byte-reads.md)
   lower the Z8 pause, fresh load and victory costs by 26.2%, 28.2% and
   33.7%. The full replay, both SRAM exports and fallback to an older bank
-  match the control. Current P10 and Showcase use separate typed row
-  readers. Profile those paths for the next save optimization.
+  match the control. P10 and Showcase now share the byte reader for
+  typed building rows. The [current P10 campaign pair](audits/2026-11-20-packed-save-byte-reads.md#replay-with-the-stationary-effect-depth-fix)
+  cuts the pause load by 8.2% and the victory save by 7.8%, with identical
+  journals. Both profiles also pass a three-AI save and fresh load.
+  Use the remaining journal stall attribution to choose the next
+  decoder or candidate-validation change.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean

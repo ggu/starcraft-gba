@@ -7,9 +7,9 @@ reader validates the entire span before reading and touches only its
 covering bytes. Journal selection, candidate validators, encode and commit
 order remain the same.
 
-Z10 uses both readers. Terran uses the packed building reader. P10 and
-Showcase use the P7 typed compact unit and building codecs, and their
-candidate ROMs are byte-identical to their controls.
+Z10 uses both readers. Terran uses the packed building reader. For this
+first change, the P10 and Showcase typed compact codecs remain outside
+the changed path. Their candidate ROMs are byte-identical to their controls.
 
 ## Cartridge comparison
 
@@ -60,3 +60,73 @@ straddle five bytes and invalid tails. The tests cover the compact building
 and typed codecs, legacy row fields, malformed decode without mutation,
 prepared journal fallback and atomic predecessor preservation. The normal
 Z10 host startup and save fixture passes 234 skirmish configurations.
+
+## Typed building follow-up
+
+P10 and Showcase now use the shared byte reader for their 25-byte typed
+building rows. The existing fixed-offset reader continues to decode typed
+unit rows. The typed building encoder and the checks for the row marker,
+type range, padding and field values retain their existing behavior.
+
+Both candidates use the normal compiler commands and pinned inputs from
+the `06353a5d` runtime. They pass the ROM verifier and retain their IWRAM
+and EWRAM endpoints. The typed building decoder and reader together use
+12 fewer bytes of stack in both ARM builds. The save and load entry frames
+are unchanged. The sanitized typed codec, packed codec and prepared journal
+fixtures pass.
+
+The Eye of the Storm A/B replay matches 47,266 physical controller calls,
+10 briefing pages, 14 modal pages and 20 gameplay checkpoints. Both ROMs
+restore the pause world with HOME L at frame 36,761 and finish at frame
+46,129 with zero faults. Their 32 KiB pause, victory and victory readback
+journals match the archived release journals byte for byte.
+
+| P10 event | Control clock cycles | Candidate clock cycles | Change |
+| --- | ---: | ---: | ---: |
+| Pause B save at call 37,703 | 17,138,906 | 16,667,429 | −2.8% |
+| Fresh HOME L from pause | 34,061,620 | 31,257,728 | −8.2% |
+| Victory autosave at call 47,266 | 36,545,515 | 33,694,918 | −7.8% |
+| Fresh HOME L from victory | 36,269,856 | 33,466,129 | −7.7% |
+
+Clearing the typed building marker in the newer victory entry and
+recomputing its checksum makes both normal P10 ROMs restore the same older
+pause world. The unedited journal restores the newer victory on both.
+
+Blood Bath with three occupied AI seats also produces byte-identical
+pause SRAM and matching worlds 240 updates after fresh HOME L on both
+P10 and Showcase. The respective save and load clock reductions are
+1.1% and 1.5% for P10 and 0.6% and 1.5% for Showcase.
+
+The P10 replay comparison receipt SHA-256 is
+`a63416f8c98c75d49ad4990059f224b747ad2a39839b5dc4807495363e8b2625`.
+The three-AI comparison receipt SHA-256 is
+`9b86e75d2cc488fd196bb30fd4e7b920f8bf54c8f6d66df36681048fe78c266e`.
+
+### Replay with the stationary-effect depth fix
+
+Paired normal cartridges from release `f6869829` confirm all 47,266
+controller calls and 20 gameplay checkpoints, including the fresh HOME L
+load at frame 36,761 and victory at frame 46,129. Both builds reproduce
+all three archived SRAM images byte for byte. Both also recover the
+older pause entry from the checksum-valid journal with an invalid
+typed-building marker in the newer entry.
+
+| P10 event | Release cycles | Candidate cycles | Change |
+| --- | ---: | ---: | ---: |
+| Pause B save at call 37,703 | 17,140,329 | 16,668,832 | −2.8% |
+| Fresh HOME L from pause | 34,061,620 | 31,257,728 | −8.2% |
+| Victory autosave | 36,543,443 | 33,692,621 | −7.8% |
+| Fresh HOME L from victory | 36,269,856 | 33,466,129 | −7.7% |
+
+Mean across the full route stays at 10.52 emulated calls per second
+rounded to two decimal places. The gain is concentrated at save and load.
+Both current P10 and Showcase builds keep their RAM endpoints. Both match
+the release save at frame 361 and the world at frame 601 after a fresh
+HOME L in the three-AI Blood Bath comparison. Release `f5ea4cf3` then
+updates the Unified HOST fixtures and keeps these two cartridge recipes
+unchanged.
+
+The campaign comparison receipt SHA-256 is
+`1c1b4b4b5ddb043e04f674368b1905453aef892c8806b777a600e553d7b5538b`.
+The three-AI receipt SHA-256 is
+`e0ba425c919e495cdee46740636b9829acde9c07612a213e97837c669dedb00f`.
