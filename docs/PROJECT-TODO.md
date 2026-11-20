@@ -170,9 +170,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   7.68%, peak falls 10.25%, and p95 rises 0.14%. Sampled world, route
   counters and video match in each pair. The measured P10 and Z10
   range readers have zero visits to the separate far helper. Its
-  1,087,475-to-70,103-cycle result comes from a forced read. Keep the
-  flags opt-in for further normal-profile links, busy far reads and
-  journal continuations. A separate exact-cache scan trial on Z8
+  1,087,475-to-70,103-cycle result comes from a forced read. Combined
+  Terran and Showcase links leave 1,560 and 72 bytes under the IWRAM
+  guard. Both match the mixed Blood Bath journals and fresh
+  continuations. A 128×128 Z9 continuation sees seven short range
+  reads, all without a matching cached point field. Keep the flags
+  opt-in and [time the exact fallback on declined reads](audits/2026-11-20-p10-point-certificate.md#z9-range-reader-check-and-next-fallback-test).
+  A separate exact-cache scan trial on Z8
   matched 21 sampled states and saved less than 0.01% mean cycles
   across 486 timed calls. Focus on the larger route fills.
   A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the
