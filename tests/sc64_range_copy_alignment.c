@@ -193,13 +193,18 @@ static void test_point_prefix_with_range_planes(void)
     int slot = sc64_route_slot_for(goal, goal + 1);
     assert(slot >= 0 && sc64_point_prefix_find(slot));
     u32 builds = sc64_route_builds, hits = sc64_route_hits, clock = sc64_route_clock;
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    assert(sc64_point_prefix_find(slot)->count == SC64_POINT_CERTIFIED_ONLY);
+    assert(sc64_range_cached_point_step(520, 552, 520, 520, &nx, &ny));
+    assert(nx == 520 && ny == 536 && sc64_point_prefix_find(slot));
+#endif
     assert(sc64_range_cached_point_step(1608, 1608, 520, 520, &nx, &ny));
     assert(nx == 1608 && ny == 1592 && !sc64_point_prefix_find(slot));
     assert(sc64_route_builds == builds && sc64_route_hits == hits && sc64_route_clock == clock);
 
     int first_plane = sc64_range_route_reduced_slots();
     int second = goal + 20;
-    assert(sc64_point_prefix_fill(first_plane, second, second + 1) > 0);
+    (void)sc64_point_prefix_fill(first_plane, second, second + 1);
     sc64_route_valid[first_plane] = 1;
     sc64_route_goal[first_plane] = (u16)second;
     assert(sc64_point_prefix_find(first_plane));

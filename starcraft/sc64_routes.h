@@ -110,6 +110,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "second exact-hit cutoff requires resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
+#error "point certificates require deferred point fields"
+#endif
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
