@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check T7 through T10 on a normal Terran ROM using physical buttons."""
+"""Check T6 through T10 on a normal Terran ROM using physical buttons."""
 import argparse
 import hashlib
 import json
@@ -17,7 +17,9 @@ from sc64_skirmish_sram_continuation import (
     KEY_A, KEY_B, KEY_DOWN, KEY_L, KEY_RIGHT, KEY_START, PhysicalGame,
 )
 from sc64_t9_arm_replay import COMPARED, load_trace
-from sc64_terran_controller_replay import _find_raw_actor, _snapshot, _verify_terminal, validate_trace
+from sc64_terran_controller_replay import (
+    _compare_trace_row, _find_raw_actor, _snapshot, _verify_terminal, validate_trace,
+)
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 INNER_TAG, OUTER_TAG = 0x72435442, 0x76435442
@@ -25,6 +27,15 @@ T7_DIALOGUE = {1: (1, 2), 682: (661, 1), 4189: (3931, 1)}
 T8_DIALOGUE = {1404: (1321, 1)}
 T8_LAST_ASSAULT = 143122
 T9_DIALOGUE = {1: (1, 4), 47969: (47251, 9)}
+T6_FIELDS = (
+    "frame", "screen", "won", "lost", "mission", "faults", "campaign_phase",
+    "objective_stage", "t6_outcome", "objective_flags", "race_completed",
+    "switch2", "rescue_mask", "raynor", "raynor_alive", "raynors_at_goal",
+    "norad", "norad_alive", "side_units", "enemy_units", "side_buildings",
+    "enemy_buildings", "minerals", "gas", "cc_slot", "cc_x", "cc_y",
+    "refinery_slot", "factory_slot", "starport_slot", "tower_slot",
+    "dropships", "dropships_at_goal", "cargo_loaded", "raw19_alive", "raw126_alive",
+)
 T7_FIELDS = (
     "frame", "screen", "won", "lost", "mission", "faults", "phase",
     "objective_flags", "race_completed", "kerrigan", "kerrigan_alive",
@@ -63,7 +74,7 @@ def load_late_trace(path, chapter, fields, stop, expected_ticks):
             raise ValueError(f"T{chapter} observations disagree at {tick}")
         observations[tick] = row
         labels.setdefault(tick, []).append(row["kind"])
-    expected_rows = {7: 15, 8: 272}
+    expected_rows = {6: 42, 7: 15, 8: 272}
     if not expected_ticks <= observations.keys() or len(rows) != expected_rows.get(chapter, len(rows)):
         raise ValueError(f"T{chapter} trace is missing a checkpoint from the qualified route")
     transitions = [(tick - launch + 1, held) for tick, held in reference["inputs"] if tick >= launch]
@@ -111,24 +122,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("trace", "rom", "elf", "runner", "out"):
         parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--chapter", type=int, choices=(7, 8, 9, 10), default=9)
+    parser.add_argument("--chapter", type=int, choices=(6, 7, 8, 9, 10), default=9)
     parser.add_argument("--save-tick", type=int, required=True,
                         help="neutral completed gameplay tick for pause, save and fresh HOME load")
     args = parser.parse_args()
     resource.setrlimit(resource.RLIMIT_FSIZE, (16 << 20, 16 << 20))
     files = (args.trace, args.rom, args.elf, args.runner, Path(__file__))
-    if args.chapter == 7:
+    if args.chapter in (6, 7):
         files += (Path(__file__).with_name("sc64_terran_controller_replay.py"),)
     pins = input_hashes(files)
     chapter = args.chapter
     mission = chapter + 3
+    mission_symbol = "race_t6" if chapter == 6 else "race_late"
     briefing_pages, dialogue_cuts, stop, compared = {
+        6: (15, {}, 23849, T6_FIELDS),
         7: (17, T7_DIALOGUE, 4189, T7_FIELDS),
         8: (9, T8_DIALOGUE, 143260, T8_FIELDS),
         9: (9, T9_DIALOGUE, 47984, COMPARED),
         10: (14, {1: (1, 4)}, 3446, T10_FIELDS),
     }[chapter]
     qualified_ticks = {
+        6: {0, 680, 1792, 3765, 9056, 11559, 19659, 20578, 23846, 23849},
         7: {0, 1, 2, 347, 1000, 1264, 2000, 2200, 2334, 3000, 4000, 4189},
         8: {0, 120, 332, 507, 1645, 5795, 143260, *range(1000, 143260, 1000)},
         10: {0, 120, 1000, 2000, 3000, 3446},
@@ -142,6 +156,9 @@ def main():
     if not 1 < cut < stop or cut in dialogue_cuts or next(
             held for index, held in reversed(transitions) if index < cut) != 0:
         parser.error("--save-tick must be a neutral live gameplay tick")
+    next_held = dict(transitions).get(cut, 0)
+    if next_held & KEY_L and next_held & KEY_START:
+        parser.error("--save-tick cannot precede a joint L and Start press")
     # Each route keeps only three 32 KiB SRAM images and small JSON receipts.
     disk_reserve = 256 << 20
     if shutil.disk_usage(args.out.parent).free < disk_reserve:
@@ -195,7 +212,7 @@ def main():
         world.pop("screen")
         controls = {name: n(name) for name in ("cx", "cy", "menu_last")}
         controls["selected_units"] = selected_units()
-        return dict(world=world, mission=g.rsp.read(g.sym["race_late"], g.sizes["race_late"]),
+        return dict(world=world, mission=g.rsp.read(g.sym[mission_symbol], g.sizes[mission_symbol]),
                     controls=controls)
 
     def journal(image, bank, frame, won):
@@ -211,15 +228,19 @@ def main():
     def compare(tick):
         expected = plan["observations"][tick]
         observed = observe()
-        diff = {k: (expected[k], observed[k]) for k in compared if expected[k] != observed[k]}
-        if diff:
-            (args.out / "divergence.json").write_text(json.dumps(
-                dict(tick=tick, expected=expected, differences=diff), indent=2) + "\n")
-            raise ValueError(f"checkpoint {tick} diverged: {diff}")
+        if chapter == 6:
+            _compare_trace_row(expected, observed)
+            observed["campaign_phase"] = observed["phase"]
+        else:
+            diff = {k: (expected[k], observed[k]) for k in compared if expected[k] != observed[k]}
+            if diff:
+                (args.out / "divergence.json").write_text(json.dumps(
+                    dict(tick=tick, expected=expected, differences=diff), indent=2) + "\n")
+                raise ValueError(f"checkpoint {tick} diverged: {diff}")
         point = dict(tick=tick, **{k: observed[k] for k in compared})
         if chapter == 7:
             assert expected["tracked_carrier"] == last_carrier_slot
-        if chapter in (7, 8):
+        if chapter in (6, 7, 8):
             point["labels"] = plan["labels"][tick]
         checkpoints.append(point)
         print("Matched", tick, expected["kind"], observed["frame"], flush=True)
@@ -263,8 +284,9 @@ def main():
     # T8's six victory pages are triggered once the last hostile building
     # falls. Inspect each update after the last observed assault order so
     # added physical acknowledgements cannot swallow a tape transition.
-    t8_final_cuts = range(T8_LAST_ASSAULT + 1, stop + 1) if chapter == 8 else ()
-    dialogue_count = 7 if chapter == 8 else sum(count for _, count in dialogue_cuts.values())
+    # T6's retained tape does not carry physical dialogue boundaries.
+    dialogue_scan = {6: range(1, stop + 1), 8: range(T8_LAST_ASSAULT + 1, stop + 1)}.get(chapter, ())
+    dialogue_count = {6: 13, 8: 7}.get(chapter, sum(count for _, count in dialogue_cuts.values()))
     try:
         assert n("screen") == n("frame") == g.front_field("page") == 0
         before = timing_snapshot(g.rsp, g.sym, g.sizes)
@@ -272,7 +294,7 @@ def main():
         compare(0)
         offset = g.rsp.completed
         edges = [(t + offset, mask) for t, mask in transitions]
-        for tick in sorted(set(plan["observations"]) | set(dialogue_cuts) | {cut} | set(t8_final_cuts)):
+        for tick in sorted(set(plan["observations"]) | set(dialogue_cuts) | {cut} | set(dialogue_scan)):
             if not tick:
                 continue
             if shutil.disk_usage(args.out).free < disk_reserve:
@@ -282,7 +304,7 @@ def main():
                 acknowledge(tick, *dialogue_cuts[tick])
                 offset = g.rsp.completed - tick
                 edges = [(t + offset, mask) for t, mask in transitions if t >= tick]
-            elif tick in t8_final_cuts and modal()[0]:
+            elif tick in dialogue_scan and modal()[0]:
                 acknowledge(tick, n("frame"), dialogue_count - len(dialogue), allow_fewer=True)
                 offset = g.rsp.completed - tick
                 edges = [(t + offset, mask) for t, mask in transitions if t >= tick]
@@ -292,7 +314,9 @@ def main():
                 observed = compare(tick)
             if tick == cut:
                 assert n("screen") == 1 and n("mode") == n("menu_open") == g.rsp.held == 0
-                assert n("selected_building") == -1 and not selected_units()
+                assert n("selected_building") == -1
+                if chapter != 6:
+                    assert not selected_units()
                 saved = persisted()
                 old_camera = [n("camx"), n("camy")]
                 g.step(KEY_START)
@@ -304,6 +328,8 @@ def main():
                 g.rsp.export_sram()
                 pause_image = pause_path.read_bytes()
                 pause = journal(pause_image, 0, n("frame"), 0)
+                if chapter == 6:
+                    pause["selected_units"] = saved["controls"]["selected_units"]
                 assert pause_image[SLOT_SIZE:] == b"\xff" * SLOT_SIZE
                 (args.out / "pause.json").write_text(json.dumps(pause, indent=2) + "\n")
                 prefix = timing_delta(before, timing_snapshot(g.rsp, g.sym, g.sizes), g.rsp.completed)
@@ -319,6 +345,15 @@ def main():
                 assert loaded == saved, ("pause reload differs",
                                          [k for k in loaded if loaded[k] != saved[k]],
                                          loaded["controls"], saved["controls"])
+                if next_held & KEY_L:
+                    # HOME Continue used L. Release it while paused so the
+                    # next tape sample can press L without advancing gameplay.
+                    g.step(KEY_START)
+                    assert n("screen") == 2 and persisted() == saved
+                    g.step(0)
+                    g.step(KEY_START)
+                    assert n("screen") == 1 and persisted() == saved
+                    pause["release_home_l_calls"] = 3
                 pause["camera_before"] = old_camera
                 pause["camera_after"] = [n("camx"), n("camy")]
                 (args.out / "pause.json").write_text(json.dumps(pause, indent=2) + "\n")

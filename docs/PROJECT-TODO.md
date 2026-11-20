@@ -76,7 +76,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   resumes after relocation and worker landing at frame 2,568. All 272
   observation labels match, including 265 after the load. The Norad II
   survives, all hostile buildings are destroyed, and the frozen result
-  re-exports identical SRAM. Apply the same gate to T6 next.
+  re-exports identical SRAM.
+  [T6 on normal Terran](audits/2026-11-13-t6-normal-physical.md#november-20-fresh-sram-and-result-autosave)
+  saves with Raynor aboard the first Dropship at frame 19,466. The
+  fresh route delivers Raynor and two Dropships, with Norad alive.
+  All 42 observations match, and the frozen result re-exports identical
+  SRAM. The 54.16-million-cycle result autosave is the slowest update.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
