@@ -169,8 +169,14 @@ the observed mission objective and victory state for these new routes.
 Two fresh HOME runs on this Z10 match the first 131 archived observations
 through call 48,237. Both first diverge at call 48,728 and frame 47,460.
 The player has 55 units where the old tape expects 57, and the enemy has
-50 buildings where it expects 49. A current uninterrupted result and
-current-writer pause cut remain open.
+50 buildings where it expects 49. A separate ordinary-input diagnostic
+continues the old tape, observes two mission resets, and reaches defeat
+at call 173,452 and game frame 6,725. It records 241 named checkpoint
+observations, including 131 matches and 110 divergences, and reports
+zero adapter faults. Its receipt SHA-256 is
+`13ae3eb03ae0f9367b3f9c8a1af8d6708b7507a18df6c0060ae7b8874876081d`.
+Record a current winning route and then qualify a new current-writer
+pause cut.
 
 A separate compatibility replay reads the archived transport journal
 through ordinary title-L. A reselects the Hatchery, all five semantic
