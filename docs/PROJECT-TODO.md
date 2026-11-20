@@ -120,7 +120,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Academy complete, and compare the worker count, first-wave orders,
   and spending. Repeat from a fresh pause save after the Bunker fills,
   and check that the other map and early air or economy-loss fallbacks
-  can still develop normally.
+  can still develop normally. Include the earlier Factory from the newer
+  restored-lobby sample before using timing across mixed start rotations.
   [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md#current-release-with-death-depth)
   [Factory timing evidence](audits/2026-11-20-terran-bunker-opening.md#factory-timing)
 
@@ -136,8 +137,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and pause-save continuation. For `protoss-cannon-opening-native`,
   repeat unmodified Blood Bath starts and record the first Nexus
   expansion, Pylon, Forge, Cannon, Gateway, and Assimilator before any
-  player loses their final building. Compare the first-wave timing
-  after verifying the opening and its selector.
+  player loses their final building. One unmodified restored lobby
+  now confirms the expansion and Cannon sequence, while two other
+  clean runs open with Gateways. Compare seat and opening selection
+  before changing production behavior.
   The shared Sunken rule now uses the native 400 HP cap.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored
