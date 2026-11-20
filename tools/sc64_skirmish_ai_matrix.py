@@ -521,7 +521,7 @@ def _hex(value, name):
 
 
 def validate_morph_hp(lines, scenario):
-    """Recompute the BW morph rule from the record; its ok flag must agree."""
+    """Check the equal-cap StarCraft 64 morph rule and the recorded result."""
     r = _one(lines, "morph-hp")
     if r.get("scenario") != MORPH_SCENARIOS[scenario]:
         raise RecordError("morph-hp record does not match its scenario")
@@ -536,10 +536,9 @@ def validate_morph_hp(lines, scenario):
         good = (r["alive"] == 0 and r["during_hp"] == 0 and r["final_raw"] == 143 and
                 r["charged"] == 50 and r["start_hp"] > 0)
     else:
-        expected = min(300, max(1, r["during_hp"] - 100))
         good = (r["alive"] == 1 and r["completed_at"] > 0 and r["charged"] == 50 and
-                r["during_max"] == 400 and r["final_max"] == 300 and r["final_raw"] == 146 and
-                r["final_hp"] == expected and 0 < r["during_hp"] <= 400)
+                r["during_max"] == 400 and r["final_max"] == 400 and r["final_raw"] == 146 and
+                r["final_hp"] == r["during_hp"] and 0 < r["during_hp"] <= 400)
         if name in ("low-hp", "save-resume-low-hp"):
             good = good and r["during_hp"] == r["start_hp"] and r["start_hp"] < 100
         if name == "damaged-during":

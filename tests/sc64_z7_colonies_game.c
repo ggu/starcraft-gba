@@ -245,7 +245,7 @@ static void test_paid_in_place_morph_and_roundtrip(int damage_mode)
     forged.owner = ENEMY;
     assert(!race_z7_colony_morph_state_valid(&forged));
     forged = decoded;
-    forged.maxhp = SC64_Z7_SUNKEN_HP;
+    forged.maxhp = SC64_Z7_CREEP_HP - 1;
     assert(!race_z7_colony_morph_state_valid(&forged));
     forged = decoded;
     forged.shield_remainder = 1;
@@ -261,9 +261,8 @@ static void test_paid_in_place_morph_and_roundtrip(int damage_mode)
     }
     assert(building_complete(colony));
     assert(b[colony].type == B_SUNKEN_COLONY && b[colony].raw_type == 146 &&
-           b[colony].raw_owner == 3 && b[colony].maxhp == 300);
-    assert(b[colony].hp == (damage_mode == 1 ? 90 :
-                            damage_mode == 2 ? 280 : 290));
+           b[colony].raw_owner == 3 && b[colony].maxhp == 400);
+    assert(b[colony].hp == old_hp - (damage_mode == 2 ? 20 : 10));
     assert(!(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
            b[colony].shield == 0 && b[colony].shield_remainder == 0);
     int sunken_hp = b[colony].hp;
@@ -571,7 +570,7 @@ static void test_real_campaign_sram_resume(void)
     }
     assert(building_complete(colony) && b[colony].type == B_SUNKEN_COLONY &&
            b[colony].raw_type == 146 && b[colony].raw_owner == 3 &&
-           b[colony].hp == 300 && b[colony].shield == 0);
+           b[colony].hp == 400 && b[colony].maxhp == 400 && b[colony].shield == 0);
 
     /* Spore source morphs preserve the same source row and use the packed
        morph flag through a cold HOME restore. */

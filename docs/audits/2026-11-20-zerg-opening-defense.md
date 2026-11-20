@@ -81,9 +81,8 @@ Physical GBA timing remains open.
 
 The native HP table and live samples give a completed Sunken 400 HP.
 The value is raw unit 146 in the Q8 HP column at offset 3,156 of
-authenticated BOLT section `00C/001`. The current GBA profile uses 300.
-Keep the HP and save-boundary check separate from this opening comparison
-so the timing and combat effects can be measured independently.
+authenticated BOLT section `00C/001`. The GBA control for this opening
+comparison used a 300 HP cap.
 
 The comparison of that HP column against all 228 rows of the PC-derived
 table finds two whole-HP differences. The other differences are twelve
@@ -96,6 +95,43 @@ and 2,700. Completed native Zealots reach 80 HP in both the mixed and
 Protoss-only Blood Bath censuses. Qualifying a change requires checking
 the profile overrides and the saved HP and shield representations.
 
+## Sunken health and save compatibility
+
+The N64's USA morph order captures current Q8 HP at `0x80154854`,
+then adds the target cap and subtracts the previous cap at
+`0x801548b0`. The helper at `0x80126e64` applies the upper bound.
+Before finalizing the actor the order zeroes its remaining build time,
+which bypasses the generic full-HP reset. The incomplete morph skips
+construction health growth. Creep and Sunken Colonies both have
+102,400 Q8 HP (400 whole HP). Two completed CPU morphs in the native
+Melee capture retain the same 102,400 Q8 at VI 20,270 and 20,606.
+The instruction path establishes damage retention. The retained
+controller capture supplies full-health morphs.
+
+The shared GBA rule uses 400 maximum HP for a completed Sunken in
+campaigns, Custom Game and Showcase. The integer and optional Q8
+morphs keep the existing current HP, including positive fractions in
+the Q8 path. The campaign and skirmish morph clocks and costs are
+independent of the cap. The PC-derived reference table retains its PC
+values.
+
+Older Terran and Z10 saves explicitly store the Sunken's 300 maximum.
+The loader validates that saved record before raising its cap to 400.
+P10 and Showcase derive the cap from the saved building type.
+The old current HP is retained in all four products. An older Sunken
+saved at 300/300 resumes at 300/400, and a damaged Sunken saved at
+117/300 resumes at 117/400. Pending morphs keep their source type,
+remaining time and current HP. The record layout stays compatible
+with earlier saves. An older P10 or Showcase ROM may reject a new
+save containing a Sunken above 300 current HP.
+
+| Native USA ROM range | SHA-256 |
+| --- | --- |
+| Morph completion, `0x118544`, 100 bytes | `9cacb5fc881c1aff6868695fd635577effa2a57ec4f465c6e370bcd54c6f1d2e` |
+| HP store, `0xeab54`, 72 bytes | `847295b032dc94fe0b3650a1bf1472f4baa0e3fb58e855d49083f348ac91ecba` |
+| In-progress morph, `0x1185e8`, 88 bytes | `83784b12d693730886c93153ca0dd2fd70e64ce9741c9309a21b9e59776691b0` |
+| Finish guard, `0xf864c`, 76 bytes | `18dcb0fa008d61b3634815283bc007f19c9a5f486e20a7c28f88490a6011862e` |
+
 ## Regression cases
 
 With the prepared profile inputs, build
@@ -105,6 +141,13 @@ With the prepared profile inputs, build
 Protoss and Showcase profile builds. Use `--first-wave` in the
 single-opponent lobbies and `--resume-at-morph --resume-at 8640 --resume-len 600`
 in the solo Blood Bath lobby for the continuation.
+
+For health retention run `--human z --bots t --morph-hp N` with
+`N` from 0 through 5 on each profile, including damage, lethal damage
+and in-progress save and load. Run `--human z --bots t --sunken-legacy-hp`
+to write and load explicit-cap and typed rows twice. The separate
+Z7/Z8 colony tests cover the campaign marker and the Q8 lifecycle test
+covers exact fractional HP on completion.
 
 | Evidence | SHA-256 |
 | --- | --- |

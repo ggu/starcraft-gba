@@ -1018,10 +1018,36 @@ static int damage_building(int slot, int amount)
     return b[slot].alive ? b[slot].hp : 0;
 }
 
-static int morph_expected(int hp)
+static int sunken_legacy_hp(void)
 {
-    hp += 300 - 400;
-    return hp < 1 ? 1 : hp > 300 ? 300 : hp;
+    static const int saved_hp[] = { 300, 117, 357 };
+    int slots[sizeof(saved_hp) / sizeof(saved_hp[0])];
+    for (unsigned i = 0; i < sizeof(saved_hp) / sizeof(saved_hp[0]); ++i) {
+        int x, y;
+        /* A Sunken uses the Creep Colony's site and is normally morphed there. */
+        if (!human_site(B_CREEP_COLONY, &x, &y)) return 0;
+        int slot = spawn_build(SIDE, B_SUNKEN_COLONY, x, y, 0);
+        if (slot < 0 || b[slot].maxhp != 400) return 0;
+        slots[i] = slot;
+        b[slot].raw_type = sc64_race_raw_building(B_SUNKEN_COLONY);
+        invalidate_path_grid();
+        b[slot].hp = saved_hp[i];
+#if !defined(SC64_P7_TYPED_COMPACT_ENABLED) && !defined(SC64_Z7_DERIVED_SAVE)
+        /* Typed and derived wire rows hold only the current HP. */
+        if (saved_hp[i] <= 300) b[slot].maxhp = 300;
+#endif
+    }
+    for (int pass = 0; pass < 2; ++pass) {
+        if (!save_through_pause() || !reload_saved()) return 0;
+        for (unsigned i = 0; i < sizeof(saved_hp) / sizeof(saved_hp[0]); ++i) {
+            const Building *colony = &b[slots[i]];
+            if (!colony->alive || colony->type != B_SUNKEN_COLONY ||
+                colony->under_construction || colony->maxhp != 400 ||
+                colony->hp != saved_hp[i]) return 0;
+        }
+    }
+    puts("Sunken saves retain 300, 117 and 357 current HP at a 400 HP cap");
+    return 1;
 }
 
 static int morph_hp(int scenario)
@@ -1050,7 +1076,7 @@ static int morph_hp(int scenario)
         b[creep].hp != start_hp || race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY)
         goto done;
     for (int t = 0; t < 120; ++t) input(0);
-    if (scenario == 1) damage_building(creep, 350); /* BW: survives with 50 */
+    if (scenario == 1) damage_building(creep, 350);
     if (scenario == 3) damage_building(creep, 60);  /* 50 hit points: destroyed */
     if (scenario == 4) damage_building(creep, 30);
     during_hp = b[creep].alive ? b[creep].hp : 0; during_max = b[creep].maxhp;
@@ -1080,7 +1106,7 @@ static int morph_hp(int scenario)
         ok = !alive && during_hp == 0 && charged == 50 && sc64_race_raw_building(final_type) == 143;
     else
         ok = alive && completed_at >= 0 && charged == 50 && final_type == B_SUNKEN_COLONY &&
-            final_max == 300 && final_hp == morph_expected(during_hp) && during_max == 400 &&
+            final_max == 400 && final_hp == during_hp && during_max == 400 &&
             (scenario != 1 || (during_hp > 0 && during_hp <= 100)) &&
             (scenario != 2 || during_hp == start_hp);
 done:
@@ -1154,7 +1180,7 @@ static int ai_sunken_save(void)
     for (int t = 0; t < 400; ++t) input(0);
     resumed = world_hash();
     ok = reference == resumed && b[creep].alive && b[creep].type == B_SUNKEN_COLONY &&
-        b[creep].hp == morph_expected(hp);
+        b[creep].hp == hp && b[creep].maxhp == 400;
     printf("{\"kind\":\"ai-sunken-save\",\"hp\":%d,\"reference\":\"%08x\",\"resumed\":\"%08x\",\"ok\":%d}\n", hp, reference, resumed, ok);
     return ok;
 }
@@ -1899,7 +1925,8 @@ int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
-    int builder = -1, workers = -1, ai_sunken = 0, threats = 0, repowering = -1, airpin = -1, noore = -1;
+    int builder = -1, workers = -1, ai_sunken = 0, sunken_legacy = 0;
+    int threats = 0, repowering = -1, airpin = -1, noore = -1;
     int wave = 0, defense = 0, raiding = -1;
     gba_init();
     for (int i = 1; i < argc; ++i) {
@@ -1916,6 +1943,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
         else if (!strcmp(argv[i], "--morph-hp") && i + 1 < argc) morph = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--ai-sunken-save")) ai_sunken = 1;
+        else if (!strcmp(argv[i], "--sunken-legacy-hp")) sunken_legacy = 1;
         else if (!strcmp(argv[i], "--threat-census")) threats = 1;
         else if (!strcmp(argv[i], "--addon") && i + 1 < argc) addon = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--commit") && i + 1 < argc) commit = atoi(argv[++i]);
@@ -1935,6 +1963,7 @@ int main(int argc, char **argv)
     if (recover >= 0) return recovery(recover) ? 0 : 7;
     if (morph >= 0) return morph_hp(morph) ? 0 : 8;
     if (ai_sunken) return ai_sunken_save() ? 0 : 13;
+    if (sunken_legacy) return sunken_legacy_hp() ? 0 : 8;
     if (threats) return threat_census() ? 0 : 14;
     if (addon >= 0) return addon_feasibility(addon) ? 0 : 9;
     if (commit >= 0) return forced_commit(commit) ? 0 : 10;

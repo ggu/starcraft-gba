@@ -560,11 +560,9 @@ static int race_site_creep(int owner, int x, int y)
     return 0;
 }
 
-/* A custom-game Creep Colony morphing into a Sunken Colony (400 to 300
- * maximum) stays a Creep Colony with its maximum while incomplete; raw_type
- * names the target. Saves derive the maximum from the type, so the morph's
- * full hit points survive a save, and race_complete_building then applies
- * the difference as BW does. Returns the target type, or -1. */
+/* An incomplete custom-game Sunken morph keeps the Creep Colony type and
+ * armor. The saved raw_type identifies the morph target until completion.
+ * Both colony types have the same maximum HP on StarCraft 64. */
 static int race_construction_deferred_morph(const Building *q)
 {
     return race_mode && q->under_construction && q->type == B_CREEP_COLONY &&
@@ -1511,7 +1509,8 @@ static void race_complete_building(int i)
             unsigned hp; int64_t next;
             if (!sc64_pr_q8_actor_hp(MAX_UNITS+i,&hp)) return;
             next=(int64_t)hp+((int64_t)b[i].maxhp-old_max)*256;
-            if (next<256) next=256;
+            /* Native Sunken completion retains positive fractional HP. */
+            if (next<256 && (next<=0 || b[i].type!=B_SUNKEN_COLONY)) next=256;
             if (next>(int64_t)b[i].maxhp*256) next=(int64_t)b[i].maxhp*256;
             if (!sc64_pr_q8_commit_hp(MAX_UNITS+i,(unsigned)next)) return;
 #else
