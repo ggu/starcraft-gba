@@ -145,9 +145,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   repeat unmodified Blood Bath starts and record the first Nexus
   expansion, Pylon, Forge, Cannon, Gateway, and Assimilator before any
   player loses their final building. One unmodified restored lobby
-  now confirms the expansion and Cannon sequence, while two other
-  clean runs open with Gateways. Compare seat and opening selection
-  before changing production behavior.
+  now confirms the expansion and Cannon sequence. An unmodified
+  solo Protoss repeat also opens with Cannons where the earlier solo
+  capture opens with Gateways and a Battery. Keep the
+  [third-Gateway prototype](audits/2026-11-20-protoss-battery-opening.md#host-trial-for-the-third-gateway)
+  scoped to actual Battery openings and qualify ordinary ARM
+  placement, payment, and save continuation before activation.
   The shared Sunken rule now uses the native 400 HP cap.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored
