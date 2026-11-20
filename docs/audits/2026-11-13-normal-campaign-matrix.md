@@ -29,7 +29,7 @@ physical GBA check or all routes through a mission.
 | P3 | Not replayed on the November 13 KODAK binary | [Fresh SRAM win on the November 18 normal P10 ROM](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation), 47 matched checkpoints and both enemy structure banks cleared. |
 | P4 | [HOME win](2026-11-13-p3-p4-home-preparation.md#p4-full-staged-home-win) | 146 matching observations on KODAK and staged P10; both heroes survive. |
 | P5 | [HOME win](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | [November 20 fresh SRAM win](2026-11-20-current-p5-p8-save.md#p5-choosing-sides) from frame 2,700 with seven matching observations and Tassadar at extraction. |
-| P6 | [HOME win](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | 113 matching checkpoints. The current normal P10 fresh SRAM route still needs qualification. |
+| P6 | [HOME win](2026-11-14-p5-p6-normal-home.md#exact-kodak-p10-replays) | [Current P10 fresh SRAM win](2026-11-20-current-p6-save.md) from frame 64,800, with 113 matching checkpoints and both heroes alive. |
 | P7 | [HOME win](2026-11-13-p7-carried-normal-home.md) | [Current P10 fresh SRAM win](2026-11-13-p7-carried-normal-home.md#november-20-normal-cartridge-and-fresh-sram) from frame 8,845, with all 49 remaining named checkpoints matching uninterrupted play. |
 | P8 | No complete older exact-KODAK receipt here | [November 20 normal P10 fresh SRAM win](2026-11-20-current-p5-p8-save.md#p8-the-trial-of-tassadar) from frame 30,825, 41 matched checkpoints, both heroes alive and the Stasis Cell destroyed. |
 | P9 | [HOME win](2026-11-13-p9-normal-home.md) | All 11 briefing pages. |

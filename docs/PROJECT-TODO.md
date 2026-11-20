@@ -19,6 +19,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Current cartridge campaign saves.** [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
+  reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
+  113 checkpoints match, including 40 after the reload. The same cartridge
+  loads the earlier frame-121 journal and matches its 120-update continuation.
+  Continue applying the normal-ROM gate to the remaining
+  [campaign entries](audits/2026-11-13-normal-campaign-matrix.md).
+
 - **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
   reproduced stale SRAM after a normal P10 victory with nine pending
   impacts. The shared writer now saves the completed result with the
