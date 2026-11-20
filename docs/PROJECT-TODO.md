@@ -81,9 +81,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   route and recurring order costs before tuning sight again.
   [Sparse sight audit](audits/2026-11-20-late-zerg-sparse-sight.md)
 
-- **Terran opening Bunker.** Qualify one paid Bunker before Factory on
-  Blood Bath Free for All. Then qualify the linked AI garrison and its
-  continuation from SRAM. Native cargo pointers confirm four passengers.
+- **Terran opening Bunker.** The shared Blood Bath Free for All planner
+  builds one paid Bunker before Factory and boards four infantry. The
+  normal Terran mixed replay restores all four identities and banks from
+  SRAM and matches 600 more updates. Repeat the qualified cargo cut on
+  Z10, P10 and Showcase. Factory placement still comes earlier than in
+  the native openings.
   [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md)
 
 - **Native skirmish opening defenses.** The shared Zerg planner now
@@ -93,7 +96,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and the mixed ARM workload takes 5.4% more cycles in the sampled
   late opening. Protoss now places a paid Shield Battery after 15 Probes
   and two completed Gateways in the same lobbies. Compare its later gas
-  and Core timing, Terran Bunkers and the distinct Protoss Cannon opening.
+  and Core timing and the distinct Protoss Cannon opening.
   The shared Sunken rule now uses the native 400 HP cap.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored

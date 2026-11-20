@@ -75,31 +75,75 @@ build step or boarding decision. It starts a Factory before the native
 Bunker window and roughly 6,500 to 11,300 updates before the respective
 first native Factory samples at the 5/4 clock.
 
-## Next checks
+## Paid GBA opening
 
-1. Qualify a single paid forward Bunker before Factory in the two
-   Blood Bath Free for All lobbies. Use the normal SCV construction
-   path and the completed production prerequisites observed above.
-   Keep a bounded placement search and fall back to ordinary tech if
-   a Bunker cannot be completed within the opening. Check spending,
-   two completed Barracks, Academy, and the first-offensive gate with
-   the prepared `build/test-sc64-skirmish-ai-progress-*` programs.
-   `--map 1 --human t --bots t --first-wave` exercises the solo gate.
-   Run the spending observer in the same solo lobby and `--bots ztp`
-   for the mixed lobby.
-2. Reuse the existing boarding order for up to four same-owner combat
-   passengers. Count pending boarders against capacity, preserve their
-   orders during an army rally, and keep actual cargo counted in supply
-   but out of the movable army. Use `make test-sc64-shared-bunker` with
-   prepared inputs to check the four profiles' boarding, combat and
-   cargo save handling.
-3. On each normal ARM profile, run
-   `tools/sc64_skirmish_sram_continuation.py` with the profile ROM and ELF,
-   the physical backend, `--physical --map 1 --human t --seats t--`,
-   and the observed `--play` offset for an active SCV build or a staffed
-   Bunker. Use `--continue 600` and repeat the relevant observation with
-   `--seats ztp`. Check the saved and restored Bunker slot, passenger
-   order and target, resource banks, and uninterrupted continuation.
+The shared planner now requests one Bunker in Blood Bath Free for All
+after two completed Barracks, one completed Academy, and 18 SCVs
+counting production, with at least 17 live SCVs. The
+placement search faces the map interior and uses the existing SCV
+build and wallet services. It begins at update 8,652 for the standard
+opening and 10,002 for the measured Terran versus Zerg, Terran and
+Protoss roster. Both are the last native sample without a foundation,
+converted using the 5/4 clock.
+
+The ordinary tech plan resumes when the Bunker completes or the
+opening ends at 11,042. It also remains available when the home
+mineral line runs dry, the worker target is low and there are too few
+SCVs, the Bunker record is unavailable, hostile aircraft appear, or a
+Factory already exists or is on order. Other maps and game types keep
+their build plans.
+
+Once the Bunker is complete, the planner sends one nearby eligible
+Marine or Firebat per planning pass through the existing boarding
+order. Pending boarders and loaded passengers share the four-slot
+limit. The army planner leaves their boarding orders intact. Loaded
+units still take up supply and actor slots. The existing save records
+hold their orders and targets.
+
+| Observation | Terran host solo | Terran host mixed | Terran ARM mixed, first sample |
+| --- | ---: | ---: | ---: |
+| First Bunker foundation | 8,898 | 10,258 | 10,261 |
+| First complete Bunker | 9,460 | 10,820 | 10,825 |
+| First Factory foundation | 9,589 | 11,125 | 11,125 |
+| First four loaded infantry | 9,767 | 11,135 | 11,137 |
+
+Both host lobbies place one forward Bunker within the corresponding
+native foundation and completion brackets and reconcile spending and
+supply. The solo Terran first offensive still leaves at 12,336, with
+34 movable fighters. The same host fixture on the other map and the
+mixed Protoss Battery and Zerg Sunken opening fixtures also pass.
+The Factory still starts earlier than the corresponding native first
+sample in both lobbies. Boarding policy stays limited to the first
+Bunker, and the native comparison only confirms the time bounds above.
+
+The ordinary-button ARM replay samples the mixed foundation with an
+SCV assigned, 18 live SCVs, the two completed Barracks and Academy,
+and no Factory. At update 11,137 the Bunker holds three Marines and a
+Firebat. Pause-save writes 32 KiB, and HOME+L in a fresh process
+restores the Bunker, passenger slots, targets and per-owner banks.
+The full observed world matches the uninterrupted replay 600 updates
+later, with the same four troops still loaded. The 32 MiB Terran
+cartridge retains IWRAM `0x030048a8` and EWRAM `0x02038ddc`.
+
+## Regression cases
+
+With prepared inputs, run
+`build/test-sc64-skirmish-ai-progress-terran --map 1 --human t --bots t --opening-bunker`
+and repeat with `--bots ztp`. Use `--first-wave` for the solo and the
+other-map control. The host pause and 600-update continuation
+matches for both an active foundation and a full garrison. Run
+`--resume-at 9000` and `--resume-at 9850` with `--bots t`, and
+`--resume-at 10300` and `--resume-at 11160` with `--bots ztp`, each
+with `--resume-len 600`.
+
+The remaining normal ARM profiles can use
+`tools/sc64_skirmish_sram_continuation.py` with the profile ROM and ELF,
+the physical backend, `--physical --map 1 --human t --seats ztp`,
+and a `--play` offset at the confirmed staffed Bunker. Use
+`--continue 600` and compare building slots, passenger orders and
+targets, banks and the uninterrupted world. The prepared
+`make test-sc64-shared-bunker` suite covers the shared boarding,
+combat and cargo codec fixtures.
 
 | Evidence | SHA-256 |
 | --- | --- |
@@ -110,3 +154,5 @@ first native Factory samples at the 5/4 clock.
 | GBA Terran ARM control cartridge | `8df962af5e292af798e2fe0934e2356cf929f3853d61c3a6b17e1fffbb86aa92` |
 | GBA solo control observer receipt | `5480d710095fb1082363612f0c96fc5b839e2feb2a5b6977b98ff9bcd8ad43d8` |
 | GBA mixed control observer receipt | `1be779b75bef20b20ed38a4dfd5f77cca2b831a7154684d89bdfcf44853f2c9d` |
+| GBA Terran ARM Bunker cartridge | `1420ec734293ad760b4da5b12feebab5c1c172925863dc2183c25b708b70fb54` |
+| GBA Terran mixed ARM opening and fresh garrison continuation | `7cedceaf92800b5dd915297b148c2fea9a0975b42263378eedbcef7efffe44d4` |
