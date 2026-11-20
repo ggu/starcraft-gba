@@ -6298,6 +6298,8 @@ field_cursor_near(int x, int y, int a, int b, int radius)
 }
 #endif
 
+#include "sc64_actor_draw_view.h"
+
 static int
 selection_target(void)
 {
@@ -6342,10 +6344,13 @@ selection_target(void)
 	    best_building = i;
 	}
     }
-    if (best_building >= 0 && (best_unit < 0 || building_distance <= unit_distance)) {
-        return MAX_UNITS + best_building;
-    }
-    return best_unit;
+    int proximity = best_building >= 0 && (best_unit < 0 || building_distance <= unit_distance)
+        ? MAX_UNITS + best_building : best_unit;
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+    if (best_unit >= 0 && best_building >= 0)
+        return sc64_foreground_pick(best_unit, best_building, proximity);
+#endif
+    return proximity;
 }
 
 static int
@@ -11500,8 +11505,6 @@ static int sc64_cocoon_world_visible(int x,int y)
         (unsigned)y < (unsigned)(MAP_ROWS*16) && currently_visible(x,y);
 }
 #endif
-
-#include "sc64_actor_draw_view.h"
 
 static void
 draw_unit_pass(Unit * q, int selection_pass)

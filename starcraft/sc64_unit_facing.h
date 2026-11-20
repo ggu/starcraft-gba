@@ -147,6 +147,17 @@ sc64_facing_blit(unsigned raw, int dir, int x, int y)
 static int sc64_walk_clock_frame = -1;
 static unsigned sc64_walk_clock_ticks;
 
+static inline const Sc64SpriteFrame *
+sc64_walk_pose_at(const Sc64UnitWalkCycle *cycle, int slot, unsigned source_tick,
+                  unsigned *step_out)
+{
+    unsigned tick = (source_tick + (unsigned)slot * 3u) % cycle->cycle_ticks;
+    unsigned step = 0;
+    while (step + 1 < cycle->count && cycle->steps[step + 1].tick <= tick) ++step;
+    if (step_out) *step_out = step;
+    return cycle->steps[step].frames;
+}
+
 /* The 32 directional frames (western ones pre-mirrored) of the walk pose a
  * moving unit shows now, or 0 when the source has no walk cycle for it. The
  * cycle runs on the game clock while the unit moves; the slot offsets its
@@ -160,11 +171,7 @@ sc64_walk_pose_step(unsigned raw, int slot, unsigned *step_out)
         sc64_walk_clock_frame = frame;
         sc64_walk_clock_ticks = (unsigned)frame * 4u / 5u;
     }
-    unsigned tick = (sc64_walk_clock_ticks + (unsigned)slot * 3u) % cycle->cycle_ticks;
-    unsigned step = 0;
-    while (step + 1 < cycle->count && cycle->steps[step + 1].tick <= tick) ++step;
-    if (step_out) *step_out = step;
-    return cycle->steps[step].frames;
+    return sc64_walk_pose_at(cycle, slot, sc64_walk_clock_ticks, step_out);
 }
 static const Sc64SpriteFrame *sc64_walk_pose(unsigned raw, int slot)
 { return sc64_walk_pose_step(raw, slot, 0); }

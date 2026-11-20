@@ -85,13 +85,23 @@ _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
 
 /* Ground depth uses the world anchor. Air ties use kind and slot.
  * Camera position and animation offsets leave this ordering stable. */
+static inline u32
+sc64_world_depth_key(unsigned layer, int y, unsigned kind, unsigned slot)
+{
+    unsigned row = layer <= 4 ? (unsigned)limit(y, 0, (1 << DEPTH_WORLD_Y_BITS) - 1) : 0;
+    return (layer << DEPTH_LAYER_BITS) | (row << DEPTH_Y_BITS) |
+           (kind << DEPTH_SLOT_BITS) | slot;
+}
+
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+#include "sc64_foreground_pick.h"
+#endif
+
 static void
 sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
                 unsigned kind, unsigned slot)
 {
-    unsigned row = layer <= 4 ? (unsigned)limit(y, 0, (1 << DEPTH_WORLD_Y_BITS) - 1) : 0;
-    u32 key = (layer << DEPTH_LAYER_BITS) | (row << DEPTH_Y_BITS) |
-              (kind << DEPTH_SLOT_BITS) | slot;
+    u32 key = sc64_world_depth_key(layer, y, kind, slot);
     unsigned at = (*size)++;
     while (at) {
         unsigned parent = (at - 1) / 2;
