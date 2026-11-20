@@ -23,6 +23,9 @@ PX_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft
 
 # These HOST controllers record the authored HOME path and isolate steering
 # reads. Their tapes are separate from the older replacement-loop checks.
+build/px-p4-normal-home: tests/sc64_p4_campaign_run.c tests/sc64_route_purity.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-carried/Makefile | build
+	$(PX_CLANG) -DSC64_P34_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< common/gba.c $(PX_SOURCES) -o $@
+
 build/px-p5-normal-home build/px-p6-normal-home: build/px-p%-normal-home: tests/sc64_p%_campaign_run.c tests/sc64_route_purity.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-carried/Makefile | build
 	$(PX_CLANG) -DSC64_P56_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< common/gba.c $(PX_SOURCES) -o $@
 
