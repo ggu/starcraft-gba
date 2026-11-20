@@ -71,3 +71,58 @@ costs before comparing performance across these two runs.
 | Pause SRAM | `7cfe4b14b562c8f7c3bfe04bdd03c898054d09e8f2251264a338b1bba79b80b6` |
 | Active construction witness | `f67393f21f1ef1f7cb31d68c3168274b11144f081f889ffbbc89235e9fb9f00a` |
 | Fresh-load replay receipt | `45004a7cedec296e86b7d7d01ac88dead8365922499d95d06ca1ef3957b1db81` |
+
+## Scripted destruction and result autosave
+
+The exact packed-Nexus P10 replay reached RESULT, but its SRAM export
+still held the pause journal. A read-only terminal trace reached the
+synchronous save at frame 95,737 and passed all 240 unit rows. The
+typed building writer then rejected the Hive in slot 10 because its HP
+fell below the signed journal range. The save returned before either
+SRAM writer ran. Both authored building kill actions subtract a lethal
+packet through the shared destruction path. P9 now supplies enough
+damage to reduce the building to zero HP before its death row is saved.
+
+The normal candidate on `defd807a` loads the original frame-30,109
+pause journal and follows the same 67,202 physical controller updates
+to frame 95,737. All 30 named gameplay checkpoints match. The dead
+Hive's row retains its identity and zero HP. The 30 pre-result captures
+match both indexed pages and the palette from the earlier replay. At
+the final result one indexed page differs.
+
+Victory writes a valid 16,308-byte sequence-2 payload and retains the
+original pause bank byte for byte. A second fresh HOME load restores
+the winning screen, live world, and dead Hive. The world stays frozen
+for eight neutral updates and re-exports the identical 32 KiB journal.
+The normal P10 link verifies its cartridge header, ELF payload, and
+40 prepared inputs. The focused sanitizer preflight invokes the
+authored Hive kill and encodes and decodes its dead row.
+
+| Retained evidence | SHA-256 |
+| --- | --- |
+| Original failed save trace | `26ae41f602bcf49b51dccb733064f2526e44b95ef6c6f64e924793676963bc50` |
+| Normal repair ROM | `0e68933eee0f03216c24d36478533bffb536e0b53d96f2be2dab6ae285fc1e3f` |
+| Normal ARM link | `787f8017e89f492e58b30a924f7643fdef961cdee1925798f09763378dd39b84` |
+| Physical replay and fresh result load | `c9a6137dbc5b2020d94b571494c1ad59187422746c2e69c44eb8dd8dedc54485` |
+| Victory and fresh-load SRAM exports | `5efb8db7b9f4b5f75d1e91ad36550ecd626c7e8df0ea7fb22f6d51978e6b06a2` |
+
+### Interceptor pulse-depth release
+
+The normal P10 link on `64192d4e` verifies the 40 prepared inputs and
+retains the release RAM endpoints. The same physical controller suffix
+matches all 30 named gameplay checkpoints and all 31 palette and
+indexed-page captures from the first repair. The frame-95,737 victory
+writes the same sequence-2 journal bytes. Fresh HOME L restores the
+result and re-exports those bytes after eight neutral updates.
+
+| Retained evidence | SHA-256 |
+| --- | --- |
+| Normal P10 ROM | `81e018081beec7bf65f44dfc2cc4c4daae49b8aa1dfc515e38ea6e4bfad763ff` |
+| Normal ARM link | `5a1843a00aee1e452fe83d5eee13f782fa5cbb194d288627b6f8be1a5ba6b60b` |
+| Physical replay and fresh result load | `8df6b0df32bff8e4d075c531e8fe12de12e70080f4d08ab8ebac0bf778fd5b7d` |
+
+The normal P10 recipe on `b127c1c0` with this repair regenerates the
+exact cartridge used by the Interceptor-release replay. The 40 pinned
+inputs, header, linked payload and RAM endpoints pass again. The
+composition receipt SHA-256 is
+`b856004427cb59a0be966066e82da065472e32a62242a55632c7f0875da690a4`.
