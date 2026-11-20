@@ -108,6 +108,9 @@ their compile lines contains the flag.
 | Capacity and damage research | Open / not applicable: neither exists in the product; capacity is 5 |
 | Terran, Zerg, Showcase | Open, see below |
 | Z10 enemy Reavers | Open: next stage |
+| Scarab aimed at a building whose slot dies or is reused | Fixed: every building death and spawn path, including the Psionic Storm kill, drops the target; tested with a new hostile building in the freed slot |
+| P7 controller with restocking enemy Reavers | Open: it does not win; the engine checks are clean (path grid, reachability, Scarab rows) and the controller loses waves at the guarded Nexus, so the mission rule or the controller needs a decision |
+| ARM replay of a Scarab in flight | Open: the HOST process-boundary save is verified, the ARM replay is not |
 
 ## Other products (path, nothing implemented)
 
