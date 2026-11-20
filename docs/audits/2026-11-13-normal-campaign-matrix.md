@@ -189,6 +189,64 @@ pages differ across the writer and reader ROMs. The compatibility
 receipt SHA-256 is
 `f3c54f1d246146bc3ba81b68d8e95b38db5df2f18a628f3bad836104b835a9e7`.
 
+### Current Z7 HOME win
+
+The exact-source HOST recorder reaches victory after increasing its
+input budget and keeping the same controller policy. The new tape's
+ordinary HOME run on normal Z10 `8da84f1c…` then matches all 271 named
+checkpoints across 231,031 controller calls. It wins at frame 228,128
+with 81 allied units, no enemy buildings and zero mission faults.
+The run averages 1,317,559 guest cycles per main-loop call, or 12.73
+calls per emulated second.
+
+A separate same-ROM run writes a 32 KiB journal at frame 5,641 and loads
+it through fresh title-L. Three hundred neutral calls match the next
+checkpoint at frame 5,941 and the save bytes stay identical. Replay
+the full victory from a current-written pause save as a separate check.
+
+| Z7 input or receipt | SHA-256 |
+| --- | --- |
+| New HOST controller tape | `18d4060c6bbf858a4861f2cfe395c1e89a8c74583dba67e7f4f16c72027742fa` |
+| Normal HOME win | `243573710483bff69214f02a9f3500b10a2c6a99445f456da69730c50c9574d9` |
+| Current save and fresh neutral replay | `a3bc570b1a10296e72568db7f0a34cba56e5679b3a799f85513e8ec2bdd79634` |
+
+### Current Z9 and Z10 HOME and fresh-save wins
+
+The same normal Z10 cartridge wins both missions from HOME and after a
+fresh HOME load of a journal written during that mission. The retained
+Z9 tape still works. The old Z10 tape restarts repeatedly. The current
+Z10 tape uses the existing controller on the exact current source and
+matches all 22 named checkpoints on normal Z10. Both fresh continuations
+match the uninterrupted world fingerprints and named checkpoints through
+victory, with zero resets or mission faults.
+
+| Mission | Current pause frame | Victory frame | HOME / paired post-load checks | Receipt SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Z9 | 6,069 | 72,628 | 32 / 29 | `73008ea81da54814ea4ec4a1b6043038e1ae74b64633a4150d512f8a72fb607c` |
+| Z10 | 2,526 | 50,193 | 22 / 20 | `d46f00f7a0a2431c42f0f1907a43f3309a3383362124e1e526e2a3d0522c5522` |
+
+### Additional current Protoss save continuations
+
+The exact P10 `5a52775d…` reproduces the earlier ordinary HOME runs
+and all paused journals below. Each continues after fresh title-L and
+checks the mission's own victory and surviving actors.
+
+| Mission | Pause frame | Victory frame | Matching checkpoints | Result SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| P4 | 65,700 | 129,310 | 146 | `346c31dc72817acac952247536a9f2999af6bcbc62caafceafc135a8820faf5d` |
+| P6 | 64,800 | 99,906 | 113 | `e630337f58fbfc58faf7b872b69af6099944f6b8ece8cea916e9c30b7ec7c540` |
+| P7 | 8,845 | 55,892 | 59 | `59466265070b89e8f729cc52603ffd81c3cf399c25fdb2f3c5effd50e17bdf41` |
+| P8 | 30,825 | 122,809 | 41 | `7426288a1affd26deace151ae1dd82b4331290f89ecd58158ab9b8fc04580f8c` |
+| P9 | 30,109 | 95,737 | 42 | `1a6b796fa77aece5ee6f520e859ebb47c2da71be75eaf0cfda8bb7bbd2a6adaf` |
+| P10 | 36,761 | 46,129 | 20 | `016461de4f66c00c0ad98fa7cdd801f79df02094669b28e8a9d3e284c21e9a5b` |
+
+P7 verifies all three heroes alive and both original required Nexuses gone.
+P8 verifies Fenix and the Hyperion alive and the Stasis Cell cleared.
+P9 verifies both Cerebrate switches and both heroes alive.
+P10 re-exports identical result SRAM after a third fresh load.
+With the earlier current P1–P3 and P5 receipts, all ten Protoss missions
+have a normal-ROM ordinary and fresh-save win on this exact cartridge.
+
 ### Two-opponent custom games
 
 The same release also starts two named AI opponents with the second

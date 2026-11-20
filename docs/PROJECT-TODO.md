@@ -19,24 +19,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Normal race cartridges after the shared depth fix.** The
+- **Normal race cartridge win and save qualification.** All ten Protoss
+  missions now win from HOME and after fresh SRAM reloads on one exact
+  normal P10 build. The
   [release 25e9e8b9 matrix](audits/2026-11-13-normal-campaign-matrix.md#release-25e9e8b9-race-replays)
   ties Z2–Z6 to one Z10 ROM and P5 to one P10 ROM. Z2 and P5 match paused
   saves and fresh continuations. Z3–Z6 match all 627 uninterrupted
-  checkpoints. Prioritize fresh cuts in those routes and the remaining
-  same-cartridge campaigns. The
+  checkpoints. Z9 and Z10 now win from HOME and after current-written
+  pause saves. Prioritize fresh cuts in Z3–Z6 and the remaining
+  same-cartridge checks. The
   [nine custom checks](audits/2026-11-13-normal-campaign-matrix.md#two-opponent-custom-games)
   match ordinary starts and fresh SRAM continuation with each AI count
   on all three race cartridges. Complete long custom wins and check
   hardware timing.
-- **Refresh early campaign tapes.** Current P1–P3 win after
+- **Keep campaign tapes current.** Current P1–P3 win after
   [fresh saves and updated ordinary endings](audits/2026-11-13-normal-campaign-matrix.md#early-protoss-current-endings).
-  Preserve the new ending inputs, update the stale checkpoint tails,
-  and re-record the
-  [Z7 trace](audits/2026-11-13-normal-campaign-matrix.md#z7-retained-tape-check)
-  from the first divergent battle. The old commands reset twice and
-  end in defeat. The archived Z7 save still loads through victory.
-  Use new independently observed victory and SRAM receipts.
+  Preserve the new ending inputs and update the stale checkpoint tails.
+  The [new Z7 tape](audits/2026-11-13-normal-campaign-matrix.md#current-z7-home-win)
+  wins from HOME at frame 228,128 with all 271 checkpoints matched.
+  A separate frame-5,641 save resumes correctly for 300 neutral calls.
+  Qualify a current-written save through victory on the same tape.
+  The HOME win averages 12.73 game updates per emulated second.
 - **Measure the remaining slow updates.** The refined eager route queue
   lowers the current Z8 peak from 12.10 to 11.67 million guest cycles with
   matching route fields and framebuffer samples. Two P10 route spikes

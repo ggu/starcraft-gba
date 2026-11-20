@@ -160,6 +160,36 @@ known to be later than 14,055), and 46 to 50 supply held across the eight
 waves. In run 2 the Terran computer's second wave left 3,600 frames after
 its first (13,634, 17 to 22 units).
 
+### Current Blood Bath worker cadence samples
+
+Two fresh ares runs use the same retained solo-Zerg Blood Bath lobby,
+ordinary Start and passive human Terran. The first assigns the human
+to owner 2. All of that owner's actors are gone at the frame-4,010
+sample and the observer ends there. The second assigns owner 1 and
+starts its Command Center at source coordinates (288, 1808). Four
+SCVs survive through the last sample at frame 4,245. All four start
+gathering without controller orders in both accepted opening samples.
+
+The second native run's mineral observation word used in the methods
+above rises from 48 to 723 between frames 41 and 4,245. A mid-run
+gameplay screenshot shows four supply used and 274 minerals. The GBA
+normal Terran at `25e9e8b9` starts a solo-Zerg Blood Bath with four
+SCVs and a Command Center at (64, 120), equivalent to source
+coordinates (128, 240). Its human bank rises from 50 to 1,506 between
+updates 1 and 5,281, corresponding to 4,224 source-frame intervals at
+the engine's 1.25 scale.
+
+The observed increases are about 0.161 and 0.345 minerals per
+source-frame interval. The two samples use different starts and
+mineral paths. Pair the base geometry and confirm the native HUD
+bank at the sampled frames before changing the gather rules. Ordinary
+normal GBA uses the legacy fixed start order in this lobby. Record
+short-distance contacts and matching attack timings as part of the
+native-start preview qualification.
+
+The paired local evidence index SHA-256 is
+`fcd444c53c2308435590ef8dfad15263ca1ca08d912851569a81e659377e69e8`.
+
 ## The same lobbies on the GBA build, before the change
 
 In 60 lobbies (both maps, the three human races, ten opponent sets of one to

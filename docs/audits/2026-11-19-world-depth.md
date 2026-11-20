@@ -704,3 +704,27 @@ changed ring pixels. The ordinary P7 sample checks the wider scene.
 
 The selected-ring P7 receipt SHA-256 is
 `c909430793b05122a7ccd6e7c5180e2dac03e22d70d0eb2a2cfdf110b8cd4745`.
+
+## Current P10 sprite cost
+
+The exact normal `25e9e8b9` P10 resumes from HOME at controller
+call 37,705. The instruction profiler matches the release's world,
+palette and both indexed pages at route-heavy call 45,231 and
+renderer-heavy calls 45,466 and 45,467. The last two updates build
+zero new route fields.
+
+| Direct cycles | Call 45,466 | Call 45,467 |
+| --- | ---: | ---: |
+| Full guest update | 2,526,746 | 3,250,803 |
+| Depth painter inclusive | 585,114 | 583,306 |
+| Depth painter self | 50,860 | 51,095 |
+| All indexed byte sprite blits | 300,651 | 302,313 |
+| Source death byte blits | 126,925 | 121,449 |
+| One building byte blit | 102,025 | 102,029 |
+| Visibility row spans | 166,843 | 163,268 |
+
+Prioritize the large indexed building and death frames and persistent
+visibility work. Measure overlap, clipped pixels and both framebuffer
+pages again when using an existing word-packed frame in more cases.
+The profiler receipt SHA-256 is
+`fccac7948620da38231cd87f7e86c3bf42192e54f087b4f511c8fbb573a60368`.
