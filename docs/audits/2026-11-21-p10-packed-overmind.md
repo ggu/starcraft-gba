@@ -2,9 +2,9 @@
 
 Three physical Eye of the Storm replay cuts draw the same completed
 101×66 shelled Overmind frame once through the indexed byte blitter.
-Breakpoints at the blit call and return on the authenticated control
-identify the pixel pointer as the linked Overmind source symbol. The
-observer also checks three live return addresses on the guest stack.
+Breakpoints at the blit call and return on the authenticated `25e9e8b9`
+control identify the pixel pointer as the linked Overmind source symbol.
+The observer also checks three live return addresses on the guest stack.
 
 | Controller call | Game frame | Byte blit cycles including interrupts |
 | --- | ---: | ---: |
@@ -14,12 +14,12 @@ observer also checks three live return addresses on the guest stack.
 
 The normal P10 cartridge packs that frame alongside the Hatchery. Run
 `make P10_OVERMIND_WORDS=0 verify-protoss-p10` for the indexed Overmind
-control. The existing Mode 4 lookup matches
-the chosen frame pointer. The generator reuses the prepared P10 source
+control. The existing Mode 4 lookup matches the chosen frame pointer.
+The generator reuses the prepared P10 source
 bank and adds 54,912 bytes across four alignment phases. The existing
 renderer, save format, and campaign behavior apply. All four combinations
-of the Hatchery and Overmind switches
-select their expected bank. With Overmind off, the Hatchery-only header
+of the Hatchery and Overmind switches select their expected bank.
+With Overmind off, the Hatchery-only header
 is byte-identical to the released header. The other cartridge recipes
 keep their existing selections.
 
@@ -48,14 +48,22 @@ cycles across all 114 sampled updates drop by 1.14%. Calls 45,231,
 45,466 and 45,467 drop by 56,148, 87,019 and 55,499 respectively.
 These are emulated GBA cycle measurements.
 
+On release `349797f6`, the ordinary Makefile recipe links the default
+P10 cartridge byte-for-byte equal to the measured packed ROM. The ROM
+SHA-256 is `c153ef42df4980ba59a36758ba4ca6cffa1319f9dd3687f69876167bc2e98b5f`.
+The build verifies all 40 inputs, the header and the ELF payload.
+The same ROM bytes carry the ordinary-input evidence above to the
+default build. For the same prepared inputs, `P10_OVERMIND_WORDS=0`
+selects the Hatchery-only header in the link recipe.
+
 Header and ROM payload verification pass. Linked text grows by
 54,792 bytes within the same 32 MiB ROM. IWRAM and EWRAM endpoints remain
 `0x03004e20` and `0x0203b52c`. Both replays change no bytes in the
 256-byte stack guard. Deepest observed changed bytes remain 4,648
 for the system stack and 296 for IRQ.
 
-The measured frame belongs to the P10 campaign actor. In the historical Zerg-player
-Blood Bath window, all 20 late samples admit only the already-packed
+The measured frame belongs to the P10 campaign actor. In the historical
+Zerg-player Blood Bath window, all 20 late samples admit only the already-packed
 Hatchery. A separate ordinary Blood Bath launch as Protoss against three
 CPUs draws the Nexus instead. Bracketed indexed Nexus draws cost
 83,643, 90,161, and 89,957 cycles at frames 120, 180, and 240.
@@ -66,4 +74,5 @@ The Nexus is an existing generator choice for a separate benchmark.
 | Original Overmind attribution | `db840e10830eaf6ccf714095ba59e501bf1671c656ee15de9b7c4a6aececc1b9` |
 | P10 ARM link | `12306dba5d5057153610e24f767e762ffebc6e83ed828bd44061a11ce9694c9d` |
 | P10 ordinary-input comparison | `b0d7ad83598592b86c205bd202eeb6d317016e78f95cc15210660b30a706606f` |
+| P10 default ARM link | `0c6065885cafe425b229873da2728c8785d6c2a82c5367c3e306553ffd695441` |
 | Blood Bath Nexus attribution | `242aecc0096637daeafcb30748211dba91494c789e8696bcf6a38d130f91866d` |
