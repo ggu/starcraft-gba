@@ -55,3 +55,26 @@ python3 tools/sc64_skirmish_sram_continuation.py --physical \
 Repeat the opening and fresh continuation checks when a release changes
 roster options or the save format. Longer paid-production, skirmish wins,
 and physical-device timing have separate gates.
+
+## Current sparse-route and Terran Carrier builds
+
+The normal-title input matrix was repeated after sparse route packing
+and with the Terran Carrier candidate composed with it. The exact
+tested ROMs were Terran `d9a2bd5f…`, Z10 `ebc0d0f4…`, and P10
+`6e0f09d4…`. Z10 and P10 are the ROMs from
+[#659](https://github.com/ggu/starcraft-gba/pull/659). The Terran
+candidate was linked from `685d4a7d` before the final release-only
+Makefile change reproduced the same normal ROM.
+
+All 1,134 ordinary starts match the preceding roster matrix through
+the first 120 game updates, including the map, seat mask, races,
+building locations and world fingerprints. The comparison includes
+162 single-AI, 486 two-AI and 486 three-AI cases. The Z10 comparison
+uses the normal Carrier build as its earlier baseline. All 54
+sampled pause journals also load from HOME in fresh mGBA processes
+and continue for another 60 matching updates. These are startup and
+save checks. The [result replay](2026-11-21-blood-bath-live-results.md)
+covers a separate full match.
+
+Private aggregate SHA-256
+`9a6793cd3df2c41f92d37b1abcd25347dbc863eb1ac2da0c611a34098010cbcd`.

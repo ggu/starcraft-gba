@@ -754,6 +754,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pre-expansion pause save reloads with matching state through 241 updates.
   All 30 missions now have a complete ordinary-input win on a normal ROM
   in mGBA. Check remaining older/current cross-build and save continuations.
+  The [sparse-route Z10 cartridge](audits/2026-11-12-z10-arm-qualification.md#normal-sparse-route-build-and-fresh-victory)
+  wins the final Zerg mission from HOME and from the new pause journal,
+  with the same 20 post-load checkpoints and the same victory at frame 50,193.
   [Standalone P6](audits/2026-11-19-standalone-p6-impact-saves.md) passes ROM
   verification and saves up to 22 pending impacts. Its full host target
   still needs a controller route that avoids the loss at frame 53,613.
