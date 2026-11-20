@@ -82,7 +82,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fresh route delivers Raynor and two Dropships, with Norad alive.
   All 42 observations match, and the frozen result re-exports identical
   SRAM. The 54.16-million-cycle result autosave is the slowest update.
-  [T4 on normal Terran](audits/2026-11-13-t3-t4-normal-physical.md#november-20-t4-fresh-sram-and-result-autosave)
+  [T4 on normal Terran](audits/2026-11-13-t3-t4-normal-physical.md#current-packed-reader-release)
   restores the selected unit at frame 4,968 and wins with Raynor alive.
   All ten observations match, and a third emulator reloads the frozen
   victory with byte-identical SRAM.

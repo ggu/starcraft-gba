@@ -10,7 +10,7 @@ physical GBA check or all routes through a mission.
 | T1 | [HOME win](2026-11-13-t1-t2-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t1-t2-normal-physical.md#november-20-t1-fresh-sram-and-result-autosave) restore the rescued Raynor and replay through the ten-Marine victory. |
 | T2 | [HOME win](2026-11-13-t1-t2-normal-physical.md) | Fresh SRAM and hardware still separate. |
 | T3 | [HOME win](2026-11-13-t3-t4-normal-physical.md) | Fresh SRAM and hardware still separate. |
-| T4 | [HOME win](2026-11-13-t3-t4-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t3-t4-normal-physical.md#november-20-t4-fresh-sram-and-result-autosave) retain the selected unit and restore the frozen win with Raynor alive. |
+| T4 | [HOME win](2026-11-13-t3-t4-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t3-t4-normal-physical.md#current-packed-reader-release) retain the selected unit and restore the frozen win with Raynor alive. |
 | T5 | [HOME win](2026-11-13-t5-normal-physical.md#exact-november-13-kodak-cartridge) | All 150 observations matched and both heroes survived. |
 | T6 | [HOME win](2026-11-13-t6-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t6-normal-physical.md#november-20-fresh-sram-and-result-autosave) resume with Raynor aboard a Dropship and deliver him with two Dropships. |
 | T7 | [HOME win](2026-11-13-t7-t9-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t7-t9-normal-physical.md#november-20-t7-fresh-sram-and-result-autosave) resume with the Emitter's carrier aboard the Dropship and match all 15 observation labels. |
