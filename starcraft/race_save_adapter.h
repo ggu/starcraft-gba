@@ -2685,8 +2685,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active()) {
-        if (!race_t6_save_pack(&race_data.t6, &race_t6) ||
-            !race_t6_save_candidate_valid(&race_data, race_cols, race_rows SC64_GCTX_ARG))
+        /* Candidate validation also checks this exact copy of the live state. */
+        race_data.t6 = race_t6;
+        if (!race_t6_save_candidate_valid(&race_data, race_cols, race_rows SC64_GCTX_ARG))
             return 0;
     } else
 #endif
@@ -4445,8 +4446,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_T6_RUNTIME
     if (!v[0] && v[2] == SC64_T6_GLOBAL_ID) {
-        if (!race_t6_save_candidate_valid(&race_data, width, height SC64_GCTX_ARG) ||
-            !race_t6_save_expand(&plan->expanded.t6, &race_data.t6)) return 0;
+        if (!race_t6_save_candidate_valid(&race_data, width, height SC64_GCTX_ARG))
+            return 0;
+        plan->expanded.t6 = race_data.t6;
         plan->expanded_t6_valid = 1;
     } else
 #endif

@@ -16,26 +16,6 @@ static void init_t6_state(Sc64T6MissionState *state)
     assert(race_t6_save_state_valid(state));
 }
 
-static void test_full_state_roundtrip_and_atomic_rejection(void)
-{
-    Sc64T6MissionState source, encoded, decoded, sentinel;
-    init_t6_state(&source);
-    source.deaths[1] = 3;
-    source.deaths[4] = 9;
-    source.rescue_mask = (u8)(1u << 2);
-    sc64_t6_burrowed_set(&source, 159, 1);
-    assert(race_t6_save_pack(&encoded, &source));
-    memset(&decoded, 0xa5, sizeof(decoded));
-    assert(race_t6_save_expand(&decoded, &encoded));
-    assert(!memcmp(&source, &decoded, sizeof(source)));
-
-    memset(&sentinel, 0x5a, sizeof(sentinel));
-    decoded = sentinel;
-    encoded.triggers.player[7].owner = 0;
-    assert(!race_t6_save_expand(&decoded, &encoded));
-    assert(!memcmp(&decoded, &sentinel, sizeof(decoded)));
-}
-
 static void test_bounds_and_canonical_fields(void)
 {
     Sc64T6MissionState state;
@@ -158,10 +138,22 @@ static void test_actual_game_save_load_and_atomic_validation(void)
     assert(race_save_game());
     good_sram = race_data;
     assert(good_sram.version == SAVE_VERSION);
+    assert(!memcmp(&good_sram.t6, &race_t6, sizeof(race_t6)));
     assert(race_t6_save_candidate_valid(&good_sram, 96, 96));
     assert(sizeof(RaceSave) == 15644);
     for (unsigned i = sizeof(good_sram.t6); i < sizeof(good_sram.t4); ++i)
         assert(((const u8 *)&good_sram.t4)[i] == 0);
+
+    /* An invalid live candidate must leave the accepted journal untouched. */
+    race_t6.triggers.player[7].owner = 0;
+    remember_live_world();
+    assert(!race_save_game());
+    assert_live_world_unchanged();
+    RaceSave persisted;
+    assert(save_read(&persisted, sizeof(persisted), SAVE_VERSION));
+    assert(!memcmp(&persisted, &good_sram, sizeof(persisted)));
+    assert(race_load_game());
+    assert(!memcmp(&race_t6, &good_sram.t6, sizeof(race_t6)));
 
     remember_live_world();
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
@@ -186,7 +178,6 @@ static void test_actual_game_save_load_and_atomic_validation(void)
 
 int main(void)
 {
-    test_full_state_roundtrip_and_atomic_rejection();
     test_bounds_and_canonical_fields();
     test_candidate_identity_clock_and_outcome();
     test_actual_game_save_load_and_atomic_validation();

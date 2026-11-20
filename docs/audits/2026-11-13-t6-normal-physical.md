@@ -183,3 +183,60 @@ separate mission-state validations inside the journal operation.
 The trial stays out of the normal builds. The comparison receipt
 SHA-256 is
 `ddaa162492afc6b0f16f6af9ecd3378a0da6d9b79b4921f606c1668646897887`.
+
+
+### One full validation per journal candidate
+
+The normal Terran trial at `ea0874b2` copies the live T6 state into
+the save candidate before the full candidate check. At load it
+copies the already validated T6 state from the candidate to the
+load plan. The full candidate validation still runs independently
+on the selected and prior journal banks. Neither operation needs a
+second check of the same T6 state.
+
+The control is normal Terran release `b2087fac`. Both ROMs repeat
+the same 4,190 gameplay calls after loading the original pause
+journal at frame 19,466. All 27 sampled observations match. They
+keep the first bank and produce byte-identical 32 KiB victory
+journals and frozen-result re-exports. Both link with IWRAM
+`0x030048a8` and EWRAM `0x02038ddc`. The HOST checks include T6
+save and load, malformed candidate rejection, failed-save
+atomicity, and older-bank fallback.
+
+| Emulator update | Control cycles | Trial cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Pause HOME load | 30,514,031 | 28,725,640 | 5.86% |
+| Victory autosave with prior bank | 40,885,763 | 37,255,350 | 8.88% |
+| Frozen-result HOME load | 32,874,369 | 31,091,420 | 5.42% |
+
+The comparison receipt SHA-256 is
+`9e31b9dac726194747f6a4925e7cd2ef51b3b1ce1cc0b5e45b207973f79016fb`.
+The first composition after the campaign audit merges is byte-identical
+to the timed trial. Its source-boundary, doctor, default build and test,
+and prepared Unified build and test pass.
+
+### Composition with the attacker-image renderer
+
+The normal Terran control at `a9f0137c` and combined candidate at
+`afffebec` repeat the same fresh-load route. All 27 observations agree
+and both victory journals and fresh frozen-result re-exports match the
+earlier journal byte for byte. The T6 save fixture and 3-generation
+bank-selection fixture pass under sanitizers on the combined source.
+The default cartridge is byte-identical to the tested renderer release.
+All four normal products pass the ROM and RAM guards. Z10, P10 and
+Showcase are byte-identical to their renderer release builds. The
+Terran candidate retains the control's IWRAM `0x030048a8` and EWRAM
+`0x02038e5c` endpoints.
+
+| Emulator update | Control cycles | Combined cycles |
+| --- | ---: | ---: |
+| Pause HOME load | 30,516,047 | 28,727,633 |
+| Victory autosave with prior bank | 40,886,041 | 37,255,972 |
+| Frozen-result HOME load | 32,876,489 | 31,093,497 |
+
+The combined cartridge matrix SHA-256 is
+`e05b672c05c5ff24a56adf0d9a2b3f6cf5997b6c859709f54732616f00929e87`.
+The replay comparison SHA-256 is
+`8c4740890bf38fe7228edec2b0f84b4f9d670765aebb946896f3aaefe6d44196`.
+The result remains a one-update stall. Re-profile both bank checks and
+the SRAM writer before changing their trust or write boundaries.
