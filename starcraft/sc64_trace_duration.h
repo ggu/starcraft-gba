@@ -48,7 +48,6 @@ sc64_trace_duration_ex(int packed, int x0, int y0, int x1, int y1,
                 out->root = (u16)(motion.distance >> 9);
                 out->flight = (u16)motion.flight;
                 out->profile_plus1 = (u8)(index + 1);
-                out->motion_valid = 1;
             }
             out->duration = duration > 0 && duration <= 0xffffu ? (u16)duration : 0;
         }
@@ -90,7 +89,11 @@ sc64_tracer_duration(int slot)
 #ifdef SC64_WEAPON_SOURCE_VFX
     Sc64TraceSlot info;
     int duration = sc64_trace_duration_ex(t->color,t->x0,t->y0,t->x1,t->y1,&info);
-    sc64_trace_slots[slot] = info; /* derived from the stored tracer itself */
+    /* An uncached duration must not replace the release snapshot. */
+    sc64_trace_slots[slot].root = info.root;
+    sc64_trace_slots[slot].flight = info.flight;
+    sc64_trace_slots[slot].duration = info.duration;
+    sc64_trace_slots[slot].profile_plus1 = info.profile_plus1;
 #else
     int duration = sc64_trace_duration(t->color,t->x0,t->y0,t->x1,t->y1);
 #endif
@@ -118,15 +121,14 @@ sc64_trace_slot_prepare(int slot, Sc64WeaponSourceVfxKey key)
     out->root = (u16)(motion.distance >> 9);
     out->flight = (u16)motion.flight;
     out->profile_plus1 = (u8)(index + 1);
-    out->motion_valid = 1;
 }
 #endif
 
-static void __attribute__((noinline))
+static int __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
     int slot=0,oldest=-1;
-    if (!color) return; /* Non-combat actor: no invented weapon. */
+    if (!color) return -1; /* Non-combat actor: no invented weapon. */
     if (!sc64_weapon_vfx_style(color))
         color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_MUZZLE,color);
 #ifdef SC64_WEAPON_SOURCE_VFX
@@ -135,7 +137,7 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
 #else
     int duration=sc64_trace_duration(color,x0,y0,x1,y1);
 #endif
-    if (duration<=0) return;
+    if (duration<=0) return -1;
     for (int i=0;i<MAX_TRACERS;++i) {
         if (!tracers[i].life) { slot=i; break; }
         int age=sc64_tracer_duration(i)+1-tracers[i].life;
@@ -167,6 +169,7 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
 #endif
     /* Combat emits before end-of-update aging, including the first draw. */
     tracers[slot].life=duration+1;
+    return slot;
 }
 
 #endif

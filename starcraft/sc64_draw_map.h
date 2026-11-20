@@ -386,6 +386,9 @@ sc64_tile_background_done:
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(1);
 #endif
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    sc64_tracer_profile_reset();
+#endif
 #ifdef SC64_WORLD_DEPTH
     sc64_draw_depth_ordered_actors();
 #else
@@ -399,7 +402,7 @@ sc64_tile_background_done:
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(0);
 #endif
-    draw_tracers();
+    draw_tracers_pass(1);
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_draw();
 #endif

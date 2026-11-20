@@ -2,6 +2,12 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #define SC64_WEAPON_VFX_H
 
+enum {
+    SC64_TRACE_ATTACKER = 1,
+    SC64_TRACE_PROJECTILE = 2,
+    SC64_TRACE_ALL = SC64_TRACE_ATTACKER | SC64_TRACE_PROJECTILE
+};
+
 #include <stdint.h>
 
 /* Visual styles tag the existing transient tracer without changing its

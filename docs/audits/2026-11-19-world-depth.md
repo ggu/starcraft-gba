@@ -25,8 +25,8 @@ unit table. Composite turrets remain with their hull. GBA actor kind and
 slot resolve exact ties as a deterministic approximation of the native
 sprite-ID tie. Native depth changes for special states still need individual
 checks. The change covers world actors in the shared campaign, skirmish and
-Showcase renderer. Target picking, free-standing effects, HUD and the
-experimental tile/OAM renderer need separate coverage.
+Showcase renderer. See the projectile section for moving weapon sprite
+coverage and the remaining passes that need separate depth references.
 
 ## Harness cases
 
@@ -104,7 +104,7 @@ timing remain open for the flight overlap.
 | 1 | `air-tiers-ignore-y` | Preserve the Wraith/Overlord pixel result as the actors cross both viewport boundaries. Flip both framebuffer pages and require no actor pixels on HUD rows 0–11 and 120–159. | HOST isolated overlap passes. Ordinary-input page-flip replay pending. |
 | 1 | `scv-foundation-depth` | At a paid Terran foundation, compare an SCV north of the foundation as it approaches, attaches, works and completes. The foundation covers the idle SCV at layer 4. The working SCV at layer 5 covers the foundation. | See the [SCV foundation overlap](#scv-foundation-overlap). |
 | 1 | `interceptor-flight-depth` | Compare launch (15), attack (17), early and late far return (15 or 17), and final approach (14) against a Carrier at 16. Cover both actor slot orders and confirm docked children are hidden. | The Protoss framebuffer and save fixture covers the GBA runtime. Ordinary-input N64 and ARM overlap captures remain open. |
-| 2 | `effect-crosses-actor-depth` | Capture a bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. Verify spawned impact art, shadows and remnants independently. | See the [native bullet depth rule](#native-bullet-depth). Frame pairs and GBA effect interleaving are open. |
+| 1 | `effect-crosses-actor-depth` | Capture a moving bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. | Use the [projectile replay cuts](#projectile-replay-cuts). |
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
 
@@ -160,15 +160,62 @@ target. The branches at `0x800087c0` and `0x800087f0` assign the
 bullet's sprite elevation once at creation from the target or shooter
 respectively. The 116 bytes at ROM `0x9394` have SHA-256
 `2824fe5e99a1890914746cb35cdbd74e46bfc84876ee41787561704fd5a81c01`.
-Capture muzzle overlays, the free-standing bullet and the resulting
-impact separately. The GBA currently paints them from a combined trace
-after the world actors. When testing a new bullet pass, include a target
-whose layer changes between attack wind-up and the release tick. Use
-the layer at release, then hold it for that bullet. Race saves clear
-cosmetic traces on load and preserve damage events in a separate queue.
-Use an uninterrupted run for pixel ownership and a fresh load to
-verify the queued hit still resolves once.
+The N64 render traversal at `0x8012036c` walks the sprite row heads at
+`0x801128a0` and submits sprites to the same queue as units. The unmodified
+Blood Bath capture at step 4230 shows a live mining effect in that queue
+with sprite ID 2088 at (1958,284), elevation 5. Its RAM SHA-256 is
+`bcacbc2bc25e1a0f4b0321654ff28b42e98788e81dfc40869dfb5c2ceb3d58f1`.
+The native target-detach routine at `0x8000859c` copies the target position
+and clears the pointer. The sprite retains its existing layer. In a retained
+late-game trace, a bullet at layer 5 outlives its target while its Lurker
+shooter remains at layer 1. The late-game trace used a defeat-suppression
+patch. Its game frame 31138 RAM SHA-256 is
+`3688890b01895af6bd85ecc7eb23cefd26506da8a742ff30dd7fdafd2b30cdbc`.
 [OpenBW bullet creation](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13759-L13769)
+
+The shared GBA Mode 4 painter interleaves source-backed moving weapon
+sprites with actors. It reads live depth on the first GBA update that reaches
+the source release tick, then holds the result. If an actor disappears
+during wind-up, the attack-init snapshot supplies the depth. Reusing its
+slot cannot redirect the depth sample to the new occupant. Layers 0–4 use
+the moving projectile's world Y. The projectile and its current visual
+children draw together. Shooter overlays still use
+their separate pass. Stationary effects, special-service projectile pools,
+independently spawned impact and trail sprites, and exact native sprite-ID
+ties need their own depth comparisons. The existing queue slot order
+breaks GBA projectile ties.
+
+#### Projectile replay cuts
+
+Use the same five-frame overlap oracle as the actor cases above. Capture
+the isolated projectile part without the shooter's overlays when measuring
+foreground ownership. Run through the normal campaign, Custom Game and
+Showcase entry points. Record the product, source hash, tape hash, scene,
+camera, trace slot, target or shooter ref, source and GBA release ticks,
+that actor's layer, captured projectile layer, active page and both overlap
+counts. Store ROM-derived pixels and memory locally.
+
+| ID | Setup | Expected outcome |
+| --- | --- | --- |
+| `ground-shot-through-flyer` | Pause a shot across a ground unit, then repeat it across a lifted building and a flyer. Repeat with reverse actor creation order. | At layer 5 the shot covers the ground unit. Layer 12 and higher sprites cover the shot. |
+| `air-shot-over-ground` | Fire at a flyer backed by a ground unit and sample the projectile's flight. | The projectile takes the target's layer plus one and covers the ground actor. |
+| `ground-shot-by-moving-y` | Fire diagonally at a layer-3 Bunker. At the same animation step, put a Tank north of the projectile anchor, then south. | The layer-4 projectile covers the north Tank and passes behind the south Tank. |
+| `shot-release-depth` | Change target layer during wind-up, change it again during flight, then remove the target or recycle its slot. For a point shot change the shooter's layer during wind-up. | The projectile uses the release tick's actor layer and keeps it through flight. A slot recycled during wind-up leaves the attack-init snapshot in effect. |
+| `projectile-hud-page-flip` | Shift the camera so the flight intersects screen rows 12 and 119. Step two page flips with the cursor out of the overlap. | Terrain, bodies and projectiles are clipped to the field. HUD pixels are identical in both paired comparisons. The N64 oracle checks foreground UI without requiring GBA-specific row coordinates. |
+| `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
+
+#### Projectile host coverage
+
+Run `make test-sc64-native-weapon-game` with the prepared weapon bank. The
+Showcase sanitizer fixture exercises all 66 source weapon profiles and
+isolates the palette-indexed moving Dragoon projectile at fixed ages. The
+ground shot covers the Tank on all 47 distinguishing pixels and goes
+behind the Wraith on all 28. An air shot covers the Wraith on all 28.
+Boundary clips preserve both HUD bands and match 8 upper-edge and 38
+lower-edge overlap pixels. The diagonal, layer-4 shot matches 48 pixels
+on each side of a Tank's anchor. The fixture also verifies the SCV's
+wind-up layer change, shooter fallback for a point shot and a target slot
+reused before release.
 
 ### Interceptor flight overlap
 

@@ -68,11 +68,12 @@ sc64_unit_world_layer(const Unit *q)
 }
 
 enum {
-    DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT,
+    DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT, DEPTH_PROJECTILE,
     DEPTH_SLOT_BITS = 10,
     DEPTH_SLOT_MASK = (1 << DEPTH_SLOT_BITS) - 1,
-    DEPTH_Y_BITS = DEPTH_SLOT_BITS + 2,
-    DEPTH_WORLD_Y_BITS = 15,
+    DEPTH_KIND_MASK = 7,
+    DEPTH_Y_BITS = DEPTH_SLOT_BITS + 3,
+    DEPTH_WORLD_Y_BITS = 14,
     DEPTH_LAYER_BITS = DEPTH_Y_BITS + DEPTH_WORLD_Y_BITS,
 };
 
@@ -117,10 +118,49 @@ sc64_depth_pop(u32 *heap, unsigned *size)
     return first;
 }
 
+#ifdef SC64_PROJECTILE_DEPTH
+/* A low projectile (for example a shot at a Bunker) can share a ground
+ * layer. Use its moving anchor for the Y tie, as the sprite queue does. */
+static int
+sc64_moving_trace_world_y(unsigned i)
+{
+    const Tracer *trace = &tracers[i];
+    const Sc64TraceSlot *slot = &sc64_trace_slots[i];
+    Sc64WeaponSourceVfxKey key;
+    if (!sc64_weapon_source_vfx_unpack((uint32_t)trace->color, &key))
+        return trace->y0;
+    const Sc64WeaponSourceAttackProfile *profile = slot->profile_plus1 ?
+        &sc64_weapon_source_profiles[slot->profile_plus1 - 1] :
+        sc64_weapon_source_trace_profile((uint32_t)trace->color);
+    if (!profile) return trace->y0;
+
+    int x, y;
+    sc64_weapon_source_trace_launch_origin(profile, key.direction,
+        trace->x0, trace->y0, &x, &y);
+    int age = sc64_tracer_duration((int)i) - trace->life;
+    uint32_t source_age = sc64_weapon_source_vfx_source_tick(age > 0 ? (unsigned)age : 0u);
+    uint32_t start = sc64_weapon_source_trace_release_ticks(profile) +
+        sc64_weapon_source_trace_startup_ticks(profile);
+    Sc64WeaponSourceMotion prepared = {
+        .distance = (uint64_t)slot->root << 9, .flight = slot->flight
+    };
+    int px, py;
+    if (sc64_weapon_source_trace_position_motion(profile, x, y, trace->x1, trace->y1,
+            source_age > start ? source_age - start : 0u, &px, &py,
+            slot->profile_plus1 ? &prepared : 0))
+        return py;
+    return y;
+}
+#endif
+
 static void __attribute__((noinline))
 sc64_draw_depth_ordered_actors(void)
 {
-    u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + MAX_RACE_GEYSERS];
+    u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + MAX_RACE_GEYSERS
+#ifdef SC64_PROJECTILE_DEPTH
+             + MAX_TRACERS
+#endif
+             ];
     unsigned size = 0;
     for (unsigned i = 0; i < MAX_MINERALS; ++i) {
         if (m[i].amount <= 0) continue;
@@ -149,10 +189,20 @@ sc64_draw_depth_ordered_actors(void)
 #endif
         sc64_depth_push(heap, &size, sc64_unit_world_layer(q), q->y, DEPTH_UNIT, i);
     }
+#ifdef SC64_PROJECTILE_DEPTH
+    for (unsigned i = 0; i < MAX_TRACERS; ++i) {
+        const Sc64TraceSlot *slot = &sc64_trace_slots[i];
+        if (tracers[i].life && slot->bullet_layer && !slot->release_life) {
+            unsigned layer = slot->bullet_layer;
+            int y = layer <= 4 ? sc64_moving_trace_world_y(i) : 0;
+            sc64_depth_push(heap, &size, layer, y, DEPTH_PROJECTILE, i);
+        }
+    }
+#endif
     while (size) {
         u32 key = sc64_depth_pop(heap, &size);
         unsigned i = key & DEPTH_SLOT_MASK;
-        switch ((key >> DEPTH_SLOT_BITS) & 3u) {
+        switch ((key >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) {
         case DEPTH_MINERAL:
             draw_map_mineral((int)i);
             break;
@@ -167,6 +217,18 @@ sc64_draw_depth_ordered_actors(void)
             if (u[i].selected) draw_unit_pass(&u[i], 1);
             draw_unit(&u[i]);
             break;
+#ifdef SC64_PROJECTILE_DEPTH
+        case DEPTH_PROJECTILE: {
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+            u32 start = gba_clock();
+#endif
+            draw_tracer((int)i, SC64_TRACE_PROJECTILE);
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+            diag_tracer_cycles += gba_clock() - start;
+#endif
+            break;
+        }
+#endif
         }
     }
 }

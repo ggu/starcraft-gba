@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include "../common/gba.h"
+#include "sc64_weapon_vfx.h"
 
 /* Compact view over one generated GRP frame. Generated source pixels are
  * cropped to this opaque rectangle; x/y place the crop in the full canvas. */
@@ -648,11 +649,11 @@ sc64_vfx_projectile_animations(uint16_t image_id,
 /* `prepared` is nullable; when given it must be the motion prepared for this
  * profile from the trace's launch point to (x1,y1). */
 static inline void
-sc64_weapon_source_vfx_draw_trace_motion(Sc64WeaponSourceVfxKey key,
+sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
                                      const Sc64WeaponSourceAttackProfile *p,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age,
-                                     const Sc64WeaponSourceMotion *prepared)
+                                     const Sc64WeaponSourceMotion *prepared, unsigned parts)
 {
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     u32 section_start=gba_clock();
@@ -679,23 +680,25 @@ sc64_weapon_source_vfx_draw_trace_motion(Sc64WeaponSourceVfxKey key,
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
      * on its absolute source clock, then start the projectile at attackwith. */
-    const Sc64WeaponSourceAnimation *actor_anim =
-        sc64_weapon_source_animation_lookup(p->attack_image, p->attack_anim);
-    const Sc64WeaponSourceImage *actor_image =
-        sc64_weapon_source_image_lookup(p->attack_image);
-    if (actor_anim && actor_image && p->attackwith_tick != UINT16_MAX) {
-        int actor_mirror = 0;
-        uint16_t actor_frame = sc64_weapon_source_vfx_source_frame(
-            actor_image, actor_anim, attack_age, key.direction, &actor_mirror);
-        (void)actor_mirror;
-        sc64_weapon_source_vfx_draw_overlays(actor_anim,
-            attack_age, attack_age, p->attack_image, actor_frame, x0, y0,
-            key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0);
+    if (parts & SC64_TRACE_ATTACKER) {
+        const Sc64WeaponSourceAnimation *actor_anim =
+            sc64_weapon_source_animation_lookup(p->attack_image, p->attack_anim);
+        const Sc64WeaponSourceImage *actor_image =
+            sc64_weapon_source_image_lookup(p->attack_image);
+        if (actor_anim && actor_image && p->attackwith_tick != UINT16_MAX) {
+            int actor_mirror = 0;
+            uint16_t actor_frame = sc64_weapon_source_vfx_source_frame(
+                actor_image, actor_anim, attack_age, key.direction, &actor_mirror);
+            (void)actor_mirror;
+            sc64_weapon_source_vfx_draw_overlays(actor_anim,
+                attack_age, attack_age, p->attack_image, actor_frame, x0, y0,
+                key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0);
+        }
     }
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     diag_actor+=gba_clock()-section_start; section_start=gba_clock();
 #endif
-    if (attack_age < release_ticks) return;
+    if (!(parts & SC64_TRACE_PROJECTILE) || attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
     const Sc64WeaponSourceAnimation *init, *flight_anim, *death;
     sc64_vfx_projectile_animations(image->image_id,&init,&death,&flight_anim);
@@ -798,8 +801,8 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age)
 {
-    sc64_weapon_source_vfx_draw_trace_motion(key, p, x0, y0, x1, y1, live,
-                                             gba_age, 0);
+    sc64_weapon_source_vfx_draw_trace_parts(key, p, x0, y0, x1, y1, live,
+                                            gba_age, 0, SC64_TRACE_ALL);
 }
 
 static inline void
