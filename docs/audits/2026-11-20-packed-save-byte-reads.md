@@ -7,9 +7,9 @@ reader validates the entire span before reading and touches only its
 covering bytes. Journal selection, candidate validators, encode and commit
 order remain the same.
 
-Z10 uses both readers. Terran uses the packed building reader. P10 and
-Showcase use the P7 typed compact unit and building codecs, and their
-candidate ROMs are byte-identical to their controls.
+Z10 uses both readers. Terran uses the packed building reader. For this
+first change, the P10 and Showcase typed compact codecs remain outside
+the changed path. Their candidate ROMs are byte-identical to their controls.
 
 ## Cartridge comparison
 
@@ -101,3 +101,32 @@ The P10 replay comparison receipt SHA-256 is
 `a63416f8c98c75d49ad4990059f224b747ad2a39839b5dc4807495363e8b2625`.
 The three-AI comparison receipt SHA-256 is
 `9b86e75d2cc488fd196bb30fd4e7b920f8bf54c8f6d66df36681048fe78c266e`.
+
+### Replay with the stationary-effect depth fix
+
+Paired normal cartridges from release `f6869829` confirm all 47,266
+controller calls and 20 gameplay checkpoints, including the fresh HOME L
+load at frame 36,761 and victory at frame 46,129. Both builds reproduce
+all three archived SRAM images byte for byte. Both also recover the
+older pause entry from the checksum-valid journal with an invalid
+typed-building marker in the newer entry.
+
+| P10 event | Release cycles | Candidate cycles | Change |
+| --- | ---: | ---: | ---: |
+| Pause B save at call 37,703 | 17,140,329 | 16,668,832 | −2.8% |
+| Fresh HOME L from pause | 34,061,620 | 31,257,728 | −8.2% |
+| Victory autosave | 36,543,443 | 33,692,621 | −7.8% |
+| Fresh HOME L from victory | 36,269,856 | 33,466,129 | −7.7% |
+
+Mean across the full route stays at 10.52 emulated calls per second
+rounded to two decimal places. The gain is concentrated at save and load.
+Both current P10 and Showcase builds keep their RAM endpoints. Both match
+the release save at frame 361 and the world at frame 601 after a fresh
+HOME L in the three-AI Blood Bath comparison. Release `f5ea4cf3` then
+updates the Unified HOST fixtures and keeps these two cartridge recipes
+unchanged.
+
+The campaign comparison receipt SHA-256 is
+`1c1b4b4b5ddb043e04f674368b1905453aef892c8806b777a600e553d7b5538b`.
+The three-AI receipt SHA-256 is
+`e0ba425c919e495cdee46740636b9829acde9c07612a213e97837c669dedb00f`.
