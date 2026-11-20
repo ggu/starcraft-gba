@@ -2,18 +2,18 @@
 
 ## Current status (2026-11-21)
 
-Normal Protoss and Z10 use the shared projectile, hangar training, and
+Normal Terran, Z10 and Protoss use the shared projectile, hangar training, and
 Interceptor flight services. Protoss enables them for its Carrier-class
-actors in P7 through P10 and Custom Game. Z10 enables these services in
-Custom Game with a compact journal. The generation descriptions below
+actors in P7 through P10 and Custom Game. Terran and Z10 enable these services
+in Custom Game with compact journals. The generation descriptions below
 record the earlier experiments and their respective build settings.
 
 | Parent | Where | What works |
 | --- | --- | --- |
-| Carrier (raw 72) | Z10 and Protoss Custom Game, Protoss P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
+| Carrier (raw 72) | Terran, Z10 and Protoss Custom Game, Protoss P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
 | Gantrithor (raw 82) | Protoss ROM, P10 finale | The same service and rules (same hangar of four, 25 minerals, release cadence). It joins the human side with a full hangar, launches at enemies it faces, rebuilds lost Interceptors on the ordinary "BUILD INTERCEPTOR" command, and its children follow it if it changes owner and die with it. No save field was added: a P10 save written before this change loads with a Gantrithor that has no children. |
-| Computer opponents | Z10 and Protoss Custom Game | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the shared service. [Skirmish AI](SKIRMISH-AI.md#carriers) |
-| Carrier preview | Terran and Showcase preview ROMs | The separate builds exercise paid production, flight and compact saves. [Carrier preview builds](#shared-release-selector) |
+| Computer opponents | Terran, Z10 and Protoss Custom Game | A Protoss opponent builds a Fleet Beacon, trains Carriers and pays for their Interceptors through the shared service. [Skirmish AI](SKIRMISH-AI.md#carriers) |
+| Carrier preview | Showcase preview ROM | The separate build exercises paid production, flight and compact saves. [Carrier preview builds](#shared-release-selector) |
 
 How the Gantrithor is a parent: `sc64_p7_carrier_parent_type()` and
 `sc64_p7_carrier_parent_raw_of()` in `starcraft/sc64_p7_carrier_training.h` name
@@ -600,9 +600,8 @@ and 40 shields. The docked custom save has a 13,685-byte payload and no
 active projectiles. Fresh title-L continuation restores the docked actor,
 and the immediate re-save reproduces the entire payload byte for byte.
 
-The memory guards and these receipts do not establish physical stack
-use, timing, or coverage of the other custom and campaign configurations.
-Keep the probe disabled in the standard build.
+These preview receipts cover the listed route. The regular cartridge
+qualification below also covers a current mixed fight and stock SRAM migration.
 
 ### Shared release selector
 
@@ -619,8 +618,8 @@ Set `SC64_CARRIER_RELEASE_PROFILE` to `terran`, `zerg-z10`, `showcase`
 or `protoss-p10` to run only that row; the default for these explicit
 targets is `all`. The first three write their existing preview filenames.
 Protoss uses the regular P10 artifact and the existing Gantrithor test.
-The regular Z10 target uses the same capability through its separate
-[build option](#normal-z10-cartridge).
+Regular [Terran](#normal-terran-cartridge) and [Z10](#normal-z10-cartridge)
+use the same capability through their normal build options.
 
 The single `SC64_CARRIER_RELEASE` compile capability is applied through
 `SC64_CARRIER_RELEASE_FLAGS`, which includes the selector header in every
@@ -692,6 +691,55 @@ The asset-free selector test checks the actual Make profile flags and
 dispatch. Its prepared HOST target runs the existing per-product tests;
 neither check constitutes the full ARM activation matrix above.
 
+#### Normal Terran cartridge
+
+`make verify-terran` enables the shared Carrier service in Custom Game.
+The Terran ROM name and game code remain `StarCraft-Terran-Transport1-GBA.gba`
+and `SCT8`. The campaign uses the ordinary `0x76435442` envelope. The
+first compact Custom Game save writes `0x764d5442` to the other SRAM bank
+and preserves the stock predecessor. Build with `TERRAN_CARRIER_RELEASE=0`
+for the stock comparison and keep a separate copy of stock SRAM. The
+disabled executable reads the previous stock tags.
+
+The normal ARM candidate uses the shared renderer in `13de558d`. The
+compact and disabled links use the same 38 prepared inputs. IWRAM ends at
+`0x030049f8` and EWRAM ends at `0x0203aa0c`. The disabled link reproduces
+the previous normal ROM byte for byte.
+
+- Outpost starts with erased SRAM and ordinary keys as Protoss against
+  Zerg. The human pays 350 minerals and 250 gas at frame 12,346 and pays
+  25 minerals for the Interceptor at frame 14,977. A layer-5 moving pulse
+  survives START/B and fresh HOME L at frame 16,100. A MOVE order brings
+  the child back to its Carrier at frame 16,140 with 40 HP and 40 shields.
+  Immediate fresh re-saves match both complete payloads byte for byte.
+- Blood Bath starts with erased SRAM as Terran against Protoss, Terran
+  and Zerg computers. The Protoss computer pays for its Carrier at
+  frame 13,920 and an Interceptor order at frame 16,848. Idle play from
+  frames 16,957–17,149 averages 876,475 emulated cycles per world update.
+  At frame 17,335 a live layer-5 shot survives fresh HOME L, with 192
+  matched full-arena updates and 12 world checks. The full 32 KiB SRAM
+  re-export matches the saved image.
+- Both maps pass mixed and sparse physical opening, save, load and restart.
+  The exact stock custom journal migrates while preserving its full older
+  bank. T1 and T10 pass ordinary ARM opening and fresh continuation. T10
+  also wins at frame 3,361 with the same six gameplay observations and all
+  three SRAM images byte-identical to stock. Its mean loop cost rises
+  1.17%. HOST ASan/UBSan verifies all ten campaign journal payloads against
+  stock and all 234 ordinary custom openings.
+
+| Exact local evidence | SHA-256 |
+| --- | --- |
+| Enabled Terran ROM | `8cba29a2cb0fda0d3911e49b7ee24b8ae03ce6cbccb2ed68d18fa26a52f9c845` |
+| Disabled Terran ROM | `526a3329d85cc5b207088b0f7da681410ea3c5bbebd5b76c073ab6a807fd3701` |
+| Human lifecycle | `8ed6d5790f294da1c441056a9fb7a4f70d2247b0be20f5fae603a9f8d54b2e33` |
+| Human exact re-saves | `ea3571db9036cead8da1c04afd5ebb7a4d332db2ba9bc21ad0f84e4cea3f7832` |
+| Mixed computer lifecycle | `9690085ff40f79f5ae3c032d37ad94cdb8d7cd0041724977c8f7625dc4ee2414` |
+| Stock migration | `b3293c4365c82f9320bd258d5a8fea11cde22de55a7b447cd4c72ca0ba456e9a` |
+| T10 victory | `83b7dd4590f0dee64db24a2f8dd20c2e2bca368ad765ac5ec8fb4259889c0296` |
+
+Physical GBA timing, stack high-water during sustained play, and a full
+ten-mission ARM replay on this cartridge remain open.
+
 #### Normal Z10 cartridge
 
 The normal Z10 cartridge enables the custom Carrier service. It uses the
@@ -704,7 +752,7 @@ build vector. Use a separate copy of the SRAM image for the comparison.
 An executable compiled with that option reads the earlier stock tags;
 the compact custom tag requires Carrier support. Keep a stock save when
 testing both build vectors. The normal ROM name, game code and SRAM size
-are unchanged. Z9, Terran, Showcase and P10 keep their existing builds.
+are unchanged. The Terran activation is documented separately above.
 
 The enabled build generates its actor facts in
 `build/generated/z10-facts-carrier`. It keeps the normal packed building

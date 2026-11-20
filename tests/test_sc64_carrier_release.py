@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Asset-free checks for the opt-in Carrier release vector and target dispatch."""
+"""Asset-free checks for Carrier profile selection and target dispatch."""
 import os
 from pathlib import Path
 import re
@@ -111,6 +111,20 @@ class CarrierReleaseTest(unittest.TestCase):
                 self.assertIn("-DSC64_TARGET_FAST_LINK_PROBE", carrier_generator)
                 self.assertEqual("-DSC64_TARGET_POLICY_PROBE" in carrier_generator, policy == "1")
         self.assertNotEqual(self.make("Z10_CARRIER_RELEASE=2", "carrier-release-plan").returncode, 0)
+
+    def test_normal_terran_links_only_the_selected_carrier_service(self):
+        names = ("TERRAN_CARRIER_FLAGS", "TERRAN_ARM_SOURCES")
+        [selector] = self.release_flags("SC64_CARRIER_RELEASE_FLAGS")
+        [default] = self.release_flags("TERRAN_CARRIER_FLAGS")
+        self.assertEqual(default, selector)
+        off, ordinary_sources = self.release_flags(*names, settings=("TERRAN_CARRIER_RELEASE=0",))
+        on, carrier_sources = self.release_flags(*names, settings=("TERRAN_CARRIER_RELEASE=1",))
+        self.assertEqual(off, [])
+        self.assertEqual(on, selector)
+        model = "starcraft/sc64_interceptor_orders.c"
+        self.assertEqual(carrier_sources.count(model), 1)
+        self.assertEqual([source for source in carrier_sources if source != model], ordinary_sources)
+        self.assertNotEqual(self.make("TERRAN_CARRIER_RELEASE=2", "carrier-release-plan").returncode, 0)
 
     def test_dispatch_maps_each_product_and_does_not_accept_unknowns(self):
         expected = [f"{name} {row[2]} {row[3]}" for name, row in PROFILES.items()]
