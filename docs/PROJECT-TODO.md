@@ -1968,10 +1968,11 @@ AI wallets and full-match behavior remain unverified.
   [SCV foundation overlap](audits/2026-11-19-world-depth.md#scv-foundation-overlap)
   with an approach, attached builder, completion and fresh save load.
   Use the [projectile replay cuts](audits/2026-11-19-world-depth.md#projectile-replay-cuts)
-  for moving source weapons. Pair ground and air shots with a lifted
-  building, and record the release-layer snapshot before and after target
-  loss. Verify separate effects and exact sprite-ID ties with their own
-  opaque overlap captures.
+  for moving and stationary source weapons. Pair ground and air shots
+  with a lifted building and record the release-layer snapshot before and
+  after target loss. The siege overlap case compares both draw orders
+  to account for palette remapping. Verify separate effects and exact
+  sprite-ID ties with their own opaque overlap captures.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.
