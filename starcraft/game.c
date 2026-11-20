@@ -2589,15 +2589,17 @@ static const Sc64SpriteFrame *mission_building_sprite(int type);
 static int race_owner_supply(int owner),race_owner_supply_capacity(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 #ifdef SC64_SHARED_NUKE_PROBE
-enum { SC64_NUKE_FLIGHT_LIMIT = 8 };
+enum { SC64_NUKE_FLIGHT_LIMIT = 8, SC64_NUKE_MAX_DRAW_PARTS = 2 };
 enum { NUKE_MENU_NONE, NUKE_MENU_ARM, NUKE_MENU_CANCEL_ARM, NUKE_MENU_CAST,
        NUKE_MENU_ABORT, NUKE_MENU_ARMED };
 enum { NUKE_TOAST_WARNING = 16, NUKE_TOAST_ARMED, NUKE_TOAST_ABORTED,
        NUKE_TOAST_EMPTY, NUKE_TOAST_OCCUPIED };
-static void race_nuke_reset(void), race_nuke_tick(void), race_nuke_draw(void);
+static void race_nuke_reset(void), race_nuke_tick(void);
 #ifdef SC64_WORLD_DEPTH
-static void sc64_depth_push_nuke_dots(u32 *heap, unsigned *size);
-static void race_nuke_draw_dot(unsigned slot);
+static void sc64_depth_push_nuke_effects(u32 *heap, unsigned *size);
+static void race_nuke_draw_part(unsigned slot);
+#else
+static void race_nuke_draw(void);
 #endif
 static void race_nuke_forget_building(int slot);
 static int race_nuke_parent_slot(int addon, unsigned parent_raw);
@@ -11534,6 +11536,9 @@ static int sc64_cocoon_world_visible(int x,int y)
 #ifdef SC64_PROJECTILE_DEPTH
 static void sc64_draw_attacker_images(unsigned first, const u8 *next, unsigned part);
 #endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+static void draw_yamato_charge(const Unit *q);
+#endif
 
 static void
 draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *next)
@@ -11547,7 +11552,12 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
-    if (!sc64_unit_anchor_in_view(q, x, y)) return;
+    int body_in_view = sc64_unit_body_anchor_in_view(q, x, y);
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    if (!body_in_view && (selection_pass || !sc64_unit_charge_anchor_in_view(q, x, y))) return;
+#else
+    if (!body_in_view) return;
+#endif
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
@@ -11570,6 +11580,12 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
     unsigned actor_flags = sc64_game_unit_actor_flags(q->type);
     if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    if (!body_in_view) {
+        draw_yamato_charge(q);
+        return;
+    }
 #endif
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
@@ -11727,6 +11743,9 @@ after_unit_body:
 #endif
 #ifdef SC64_PROJECTILE_DEPTH
     if (first) sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_OVER);
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    if (sc64_race_is_battlecruiser(q->type)) draw_yamato_charge(q);
 #endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)

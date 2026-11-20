@@ -28,6 +28,23 @@ checks. The change covers world actors in the shared campaign, skirmish and
 Showcase renderer. See the projectile section for moving weapon sprite
 coverage and the remaining passes that need separate depth references.
 
+The native sprite ID is the slot in one 36-byte sprite pool at `0x80207c70`.
+The observer matched `base + 36 * id` for 73 live actor sprites in an
+ordinary Blood Bath opening and 278 in the retained late-game capture.
+Starting IDs descend from 2199 and slots can be reused. Capture native
+sprite IDs through creation and reuse for exact ties. An ascending creation
+counter cannot serve as the native oracle.
+
+For the tie oracle, T10 observer step 18,228 has layer-18 Wraiths
+`2108` at (3096,240) and `2086` at (3120,272). The northern Wraith
+sorts in front. The same cut has a layer-4 Barracks `1951` at (192,1808)
+and a Goliath `1931` at (112,1808). The Barracks sorts in front at the
+same Y. The GBA kind tie puts the Goliath in front. These are key-order
+witnesses. Use an isolated opaque pixel mask to verify visible foreground.
+The sort reads the native sprite anchor at `+0x16`. The moving Drone in
+the step 31,138 capture shows why the unit's simulation coordinate is an
+insufficient substitute for that anchor.
+
 ## Visibility and building overlay cost
 
 The shared Mode 4 queue now skips objects that the fog test would reject
@@ -259,7 +276,7 @@ timing remain open for the flight overlap.
 | 1 | `storm-point-depth` | Cast at open ground with ground and air units crossing the storm. Repeat at a HUD edge and through a fresh save load. | The shared queue draws the three campaign adapters' point-Storm markers at layer 5. See [point-Storm cuts](#point-storm-cuts). |
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
 | 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
-| 2 | `burrow-sprite-depth` | In a supported encounter, capture a unit before burrow, at layer 1 underground, and after it returns to its base layer. Compare the body and the anchor used by any shot or death effect. | USA ROM writes layer 1 at `0x80156624` and restores the unit's base layer at `0x80156a30`. GBA campaign culling and native burrow presentation need their own paired test. |
+| 2 | `burrow-sprite-depth` | In a supported encounter, capture a unit before burrow, at layer 1 underground, and after it returns to its base layer. Compare the body and the anchor used by any shot or death effect. | The shared painter, projectile depth snapshot and source death snapshot read the existing burrow flag. The Showcase HOST collapse overlap passes. Capture the native body and a supported campaign burrow transition with ordinary input. |
 | 2 | `nuke-target-dot-depth` | In a nuclear strike preview, capture the blinking target dot against a Tank and a Wraith. Record the Ghost's layer and the spawned dot's layer. | The shared queue puts the layer-5 dot above the Tank and below the Wraith. See [nuclear target-dot cuts](#nuclear-target-dot-cuts). |
 
 For replay receipts record the product, source commit, controller tape hash,
@@ -268,6 +285,26 @@ wrong-pixel count. For native dynamic actors also record the actor and
 sprite addresses and their captured layer. Keep native screenshots and
 memory dumps local. Compare the isolated GBA masks within each version's
 palette. The N64 and GBA use different pixel scales and palettes.
+
+#### Burrowed collapse
+
+The authenticated USA ROM writes `1` to the sprite elevation byte at
+`0x80156624` (ROM `0x11a314`) and restores the base layer at `0x80156a30`
+(ROM `0x11a720`). The 32-byte windows starting 12 bytes before the stores
+have SHA-256 `fb9423afd5176d78a656e8f99ad63560e88473cd2e4847657df16fe5e0b27fa7`
+and `29fcd3c3efc2445fadb9312f478a89152b867a9c7ea26db575fc339bfd0cd5d2`.
+The GBA resolves elevation from the persisted instance flag, which is still
+available after the death scan sees the unit become inactive. This covers
+depth of existing visuals and keeps each campaign's visibility rules.
+
+| Case ID | Replay cuts and expected result |
+| --- | --- |
+| `burrow-collapse-depth` | At world (96,52), compare a raised and a buried Zergling's source collapse against a Tank at (96,49). Sample the same collapse age. The raised collapse (4) covers the Tank and the Tank (4) covers the buried collapse (1). Use both isolated renders and the pair. |
+| `burrow-release-depth` | In a supported campaign encounter, save before the release trigger and reload through it. Record the last underground and first raised layer, body visibility, attack or death snapshot layer and both indexed pages. The stored flag and active transition determine which layer to expect at each cut. |
+
+`make test-sc64-showcase-death-source` compares 244 distinguishing pixels
+in each collapse setup and preserves the HUD rows. Ordinary-input GBA/N64
+burrow overlap and visibility captures remain open.
 
 #### T8 pending landing and fresh save
 
@@ -368,6 +405,44 @@ HUD bands unchanged. The ARM world fixture also passes the ordinary
 cast, abort, impact and T8 active-strike SRAM checks. For recorded replays
 use the ordinary cast command in T8 and in Custom Game on the preview
 cartridges.
+
+### Nuclear missile and impact depth
+
+The native missile uses raw 14, sprite 266 and base elevation 18. Retained
+T10 step 18,228 shows that elevation on the missile in Silo approach state,
+with the Silo body itself at elevation 4. The observer state SHA-256 is
+`89e8cb1a135076946f405c374b55a98e753fe986fb4556a4e6822899862fb668`.
+Native order 125 keeps that sprite through ascent, hiding, repositioning,
+descent and impact. The 820-byte order handler at ROM `0x11015c` has
+SHA-256 `e3b46006d2bf1e1d8cd508d6bc65d6f4e1f8dd932240bb47515ac09a2c16fb29`.
+At impact the missile starts SpecialState1. `imgol` adds image 428 to
+its own sprite at layer 18. `sprol` creates independent sprite 267 at
+layer 19, with world Y offset −42 source pixels. The 272-byte `sprol`
+handler at ROM `0x12fe8` has SHA-256
+`54e830122d5d015debaf6b419794df635d852a56142fba988a7e4e220240ab38`.
+
+The GBA preview uses its shared world queue for all four visuals. Each
+flight can contribute two entries when the dot and ascending missile or
+the burst and impact child coexist. The draw state is derived from the
+existing flight fields after a fresh load.
+
+| Case ID | Replay cuts and expected result |
+| --- | --- |
+| `nuke-missile-air-tier` | Capture ascent at the Silo and descent over the target. The layer-18 missile covers a layer-16 Battlecruiser. Use the Silo origin for ascent fog and the target for descent fog. |
+| `nuke-impact-parent-child` | Pause when burst and child frames overlap at the target. Both cover a layer-16 Battlecruiser. The child (`19`) covers a layer-18 Wraith. Record native IDs for the equal-layer Wraith and burst tie and record the child's anchor separately. |
+| `nuke-impact-reload-hud` | Compare the first missile, burst and child cuts after fresh paint- and descent-phase loads. Sample both display pages, both HUD bands, fog at the origin and target, and expiration of each part. Verify the same simulation impact count and damage through reload. |
+
+The active native T8 sprite-row and pixel witness remains open. Capture
+before descent, on the first visible descending body, on SpecialState1's
+first tick and after the burst ends. Record both native sprite IDs and
+layer bytes in addition to the frame hashes.
+
+The Terran HOST world fixture checks ascent and descent against a
+Battlecruiser, ascent against a layer-19 blocker, and the retained
+impact child against a Wraith after the burst ends. It compares explicit
+draw orders on both pages and checks hostile fog and HUD clipping. The
+ARM Terran world fixture passes production, abort, impact, the 200 supply
+boundary, and the T8 paint-phase SRAM round trip.
 Record dot phase, caster and target anchors, effective elevation, active
 page, palette and overlap counts. The pre-cast cursor is UI. The missile
 body and impact sprites still need their own native elevation witnesses.
@@ -480,8 +555,51 @@ counts. Store ROM-derived pixels and memory locally.
 | `projectile-hud-page-flip` | Shift the camera so the flight intersects screen rows 12 and 119. Step two page flips with the cursor out of the overlap. | Terrain, bodies and projectiles are clipped to the field. HUD pixels are identical in both paired comparisons. The N64 oracle checks foreground UI without requiring GBA-specific row coordinates. |
 | `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
 | `independent-effect-depth` | Capture muzzle, projectile body, trail, impact and corpse or shadow on separate native animation ticks against the same covering actor. Repeat with a special-service projectile. | Record the native sprite ID and elevation when each independent sprite exists. Use the parent sprite's depth for image attachments and derive a separate oracle for independently spawned sprites. |
-| `yamato-charge-flight-impact-depth` | In Terran, P10 and Showcase, record Yamato charge, flight, trail and impact against a lifted building and a flyer. | Classify the charge image and each spawned sprite on the N64 before selecting a GBA layer. Record one overlap mask per part. The current separate Yamato passes still draw above the world queue. |
+| `yamato-charge-flight-impact-depth` | In Terran, P10 and Showcase, record Yamato charge, flight, trail and impact against a lifted building and a flyer. | The charge shares the caster's sprite turn. Record one overlap mask per detached part. The flight, trail and impact still need their own depth conversion and replay. |
 | `interceptor-pulse-depth` | In P10, capture a shot from a launched Interceptor against both ground and air targets. Sample target loss and a fresh save load in flight. | Record the native projectile layer at creation and after target loss. Compare it with the GBA marker at the same shot age. The GBA marker still uses a pass above the world queue. |
+
+#### Yamato charge attachment
+
+The verified Battlecruiser CastSpell script (body image 218, script 66,
+PC `0x6c94`) attaches image 543 with `imgolorig` on its own sprite. The
+GBA now draws the manual and automatic charge within the caster's turn
+at layer 16. The destination-dependent glow can change the caster art
+and any already painted pixels. A foreground Wraith at layer 18 covers
+the glow. Test both an onscreen caster and a caster just outside the
+playfield whose glow extends into it.
+
+| Case ID | Replay cuts and expected result |
+| --- | --- |
+| `yamato-charge-overlap` | Sample manual charging and automatic release with a Wraith over the glow. Compare body → charge → Wraith to the actual queue. Reverse the two draw turns and require a different overlap. |
+| `yamato-charge-viewport` | Repeat with the caster just beyond a field edge and the glow in view. Sample both indexed pages and HUD bands. When the caster or charge is hidden, its image must respect the same actor visibility rule. |
+
+The flight uses image 541 and an independently spawned `sprul` trail
+sprite 351 with image 542 at parent layer minus one. The impact attaches
+image 544 to the projectile sprite. Use those relationships for the
+later detached-effect replay. The charge fix changes only image 543.
+
+The Terran sanitizer fixture checks 121 distinguishing pixels for the
+manual charge and 217 for the release glow. The selected offscreen
+caster cases match 223 pixels at the left edge and 413 at the top edge,
+including an untouched HUD and no stray selection ring.
+
+#### Shared renderer cartridge smoke
+
+Terran, Z10, P10 and Showcase pass the header, payload, SRAM signature
+and unchanged RAM endpoint checks against `bf846b88` with pinned local
+inputs. Showcase Siege Line has 24 matching cuts over 120 advancing
+updates, comparing world state, palette, both indexed pages and HUD
+bands. The cycle count moves from 119,868,520 to 119,287,017. Ordinary
+P10 Blood Bath with three named CPUs matches world state, seats, palette
+and both indexed pages at 60, 120 and 360 updates. The paired cycle count
+moves from 202,803,414 to 202,528,343. These replays do not contain an
+active nuclear strike or Yamato cast. The focused fixtures above verify
+foreground changes during those effects.
+
+The Showcase comparison receipt SHA-256 is
+`be1ad4f91b54246543c4df7265c7edef9c56569427514d3dd50f4217b7a1c5f2`.
+The P10 comparison receipt SHA-256 is
+`b3f01752a3ec67f3d607bde8a74a1ca4f742f674e54b76698b4544640de4a96e`.
 
 #### Projectile host coverage
 
