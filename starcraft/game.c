@@ -12188,8 +12188,12 @@ draw_building_overlay(Building *q)
 #endif
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
         return;
+    int selected = selected_building >= 0 && q == &b[selected_building];
 #ifdef SC64_HAS_SPRITES
-    const Sc64SpriteFrame *sprite = building_art_sprite(q);
+    /* Selection and construction use the footprint. Other overlays use
+     * their own frames at the building anchor. */
+    const Sc64SpriteFrame *sprite =
+        selected || q->under_construction ? building_art_sprite(q) : 0;
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 12;
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 12;
     int sprite_w = sprite ? sprite->w : 24;
@@ -12197,7 +12201,6 @@ draw_building_overlay(Building *q)
 #else
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
 #endif
-    int selected = selected_building >= 0 && q == &b[selected_building];
 #ifdef SC64_IMPORTED_MISSION
     /* This runs before the dynamic art below, which then covers the arc as
      * direct drawing does. Only finished art is already in the static cache. */

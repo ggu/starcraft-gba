@@ -1,5 +1,38 @@
 # World depth regression cases
 
+## Visibility and building overlay cost
+
+The shared Mode 4 queue now skips objects that the fog test would reject
+in the paint pass. Friendly unit and building visibility keeps its
+existing treatment. Construction and selection resolve building
+footprints when they need them. Weapon, damage, and other overlays use
+their own frames and anchors. The depth key and pixel order remain the
+same.
+
+Paired normal Z10 and P10 replays on release `9ee056c2` match sampled
+world state, palette and both indexed pages. Z8 has 21 matching samples
+and P10 has four through the result screen. Each Z8 timed sample also
+matches the frame and route counters.
+
+| Replay window | Main-loop mean cycles | Actor and effect mean cycles |
+| --- | ---: | ---: |
+| Z8 calls 17,400–17,480 | 1,101,537 → 1,099,631 | 125,554 → 123,198 |
+| Z8 calls 31,050–31,250 | 1,593,060 → 1,589,338 | 482,107 → 478,790 |
+| Z8 calls 42,000–42,203 | 1,587,927 → 1,574,512 | 660,949 → 647,109 |
+| P10 calls 45,218–45,275 | 2,018,288 → 2,006,353 | 359,837 → 346,210 |
+
+Across these windows, the mean drops by 0.17% to 0.84%. All four normal
+products keep their RAM endpoints. Ordinary custom replays cover
+one middle-seat opponent on the compact map and three named opponents
+on Blood Bath. Each pair matches resolved seats, world state, palette,
+and both indexed pages at 120 and 360 updates. The Terran, Z7 and P10
+framebuffer fixtures and Showcase weapon fixture pass under sanitizers.
+
+The comparison receipt SHA-256 is
+`9f801806018fbe1e960bf8c004329fc017906f58830bdc946583dc275b7040ff`.
+The custom replay receipt SHA-256 is
+`e72ce8250143c07c5c9b55e4bb4bbabe64b22ca4992987cd50ff7439c911a672`.
+
 The USA N64 renderer sorts visible sprites back to front by elevation. For
 elevations 0 through 4 it sorts by ascending world Y within each elevation.
 Higher elevations ignore Y. A turret flag and a sprite ID break remaining

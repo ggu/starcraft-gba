@@ -166,18 +166,20 @@ sc64_draw_depth_ordered_actors(void)
     for (unsigned i = 0; i < MAX_MINERALS; ++i) {
         if (m[i].amount <= 0) continue;
         int x = m[i].x - camx, y = m[i].y - camy + 12;
-        if (x > -6 && x < 245 && y > 7 && y < 123)
+        if (x > -6 && x < 245 && y > 7 && y < 123 &&
+            currently_visible(m[i].x, m[i].y))
             sc64_depth_push(heap, &size, 4, m[i].y, DEPTH_MINERAL, i);
     }
     for (int i = 0; i < geyser_count; ++i) {
         int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
-        if (geyser_in_view(x, y))
+        if (geyser_in_view(x, y) && currently_visible(geysers[i].x, geysers[i].y))
             sc64_depth_push(heap, &size, 4, geysers[i].y, DEPTH_GEYSER, (unsigned)i);
     }
     for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
         if (!b[i].alive) continue;
         int x = b[i].x - camx, y = b[i].y - camy + 12;
         if (x < -128 || x > 368 || y < -128 || y > 248) continue;
+        if (b[i].owner != SIDE && !currently_visible(b[i].x, b[i].y)) continue;
         sc64_depth_push(heap, &size, sc64_building_world_layer(i), b[i].y, DEPTH_BUILDING, i);
     }
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
@@ -185,6 +187,7 @@ sc64_draw_depth_ordered_actors(void)
         if (!q->alive) continue;
         int x = q->x - camx, y = q->y - camy + 12;
         if (!sc64_unit_anchor_in_view(q, x, y)) continue;
+        if (q->owner != SIDE && !currently_visible(q->x, q->y)) continue;
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         if (q->type == U_P7_INTERCEPTOR && SC64_CARRIER_STATE_HIDDEN(q)) continue;
 #endif
