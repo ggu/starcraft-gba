@@ -24,6 +24,11 @@ enum {
     SC64_DEATH_SOURCE_UNDER = 1,
     SC64_DEATH_SOURCE_ACTOR_SPRITE = 2,
     SC64_DEATH_SOURCE_FIXED_LOW = 4,
+    SC64_DEATH_SOURCE_DETACHED_SPRITE = 8,
+    /* Detached sprites encode their signed offset from the actor or layer 1
+     * in the upper nibble. Their world anchor includes the spawn offset. */
+    SC64_DEATH_SOURCE_LAYER_SHIFT = 4,
+    SC64_DEATH_SOURCE_LAYER_BIAS = 8,
 };
 
 typedef struct {

@@ -54,6 +54,8 @@ IMAGE_OVER = {8, 10, 13}      # imgol, imgolorig, imgoluselo
 IMAGE_UNDER = {9, 11, 14}     # imgul, switchul, imguluselo
 SPRITE_OVER = {15, 16, 21}    # sprol, highsprol, sproluselo
 SPRITE_UNDER = {17, 19, 20}   # lowsprul, spruluselo, sprul
+SPRITE_LAYER_DELTA = {15: 1, 16: -1, 19: 0, 20: -1, 21: 1}
+SPRITE_LAYER_BIAS = 8
 USES_LO = {13, 14, 19, 21}    # offsets come from LO files: use the origin
 # Remapped fire images (draw function 9) store 1..63 intensities rather than
 # palette indices; the source blends them over the ground through the
@@ -131,13 +133,16 @@ def compile_death(payload: bytes, scripts: dict[int, int], image_iscript: Sequen
         return starts[name]
 
     def walk(image_id: int, name: str, at: int, x: int, y: int, under: bool,
-             remnant: bool, depth: int, fixed_low: bool = False,
-             actor_overlay: bool = False) -> None:
+             remnant: bool, depth: int, sprite_elevation: tuple[bool, int] = (False, 0),
+             *, detached: bool = False, actor_overlay: bool = False) -> None:
         if depth > MAX_DEPTH:
             raise Unsupported("overlay nesting exceeds bound")
         pc = start_of(image_id, name)
+        fixed_base, elevation_offset = sprite_elevation
         layer = {"image_id": image_id, "x": x, "y": y, "under": under,
-                 "remnant": remnant, "actor_sprite": depth == 0 or actor_overlay, "fixed_low": fixed_low,
+                 "remnant": remnant, "actor_sprite": depth == 0 or actor_overlay,
+                 "fixed_low": detached and fixed_base,
+                 "detached_elevation_offset": elevation_offset if detached else None,
                  "steps": [], "start": None,
                  "loop_start": HOLD_LAST, "animation": name}
         layers.append(layer)
@@ -177,17 +182,23 @@ def compile_death(payload: bytes, scripts: dict[int, int], image_iscript: Sequen
             elif opcode in IMAGE_OVER or opcode in IMAGE_UNDER:
                 ox, oy = (0, 0) if opcode in USES_LO or len(args) < 3 else (args[1], args[2])
                 walk(args[0], "Init", at + elapsed, x + to_s8(ox), y + to_s8(oy),
-                     opcode in IMAGE_UNDER, remnant, depth + 1,
+                     opcode in IMAGE_UNDER, remnant, depth + 1, sprite_elevation,
+                     # Keep ordinary overlaid images with a detached sprite
+                     # when they share its sort Y and paint after its body.
+                     detached=detached and opcode == 8 and oy == 0,
                      actor_overlay=depth == 0 and opcode == 8)
             elif opcode == 61:
                 walk(image_id + 1, "Init", at + elapsed, x + to_s8(args[0]),
-                     y + to_s8(args[1]), True, remnant, depth + 1)
+                     y + to_s8(args[1]), True, remnant, depth + 1, sprite_elevation)
             elif opcode in SPRITE_OVER or opcode in SPRITE_UNDER:
                 if not 0 <= args[0] < cs.SPRITE_COUNT:
                     raise Unsupported("sprite id out of range")
                 ox, oy = (0, 0) if opcode in USES_LO else (args[1], args[2])
+                elevation = ((True, 0) if opcode == 17 else
+                             (fixed_base, elevation_offset + SPRITE_LAYER_DELTA[opcode]))
                 walk(sprite_image[args[0]], "Init", at + elapsed, x + to_s8(ox),
-                     y + to_s8(oy), opcode in SPRITE_UNDER, opcode == 17, depth + 1, fixed_low=opcode == 17)
+                     y + to_s8(oy), opcode in SPRITE_UNDER, opcode == 17, depth + 1,
+                     elevation, detached=True)
             elif opcode == 22:
                 break
             elif opcode in SKIP_OPS:
@@ -246,14 +257,30 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
                  images: dict[int, dict[str, Any]]) -> None:
     packed_images = packed_under_image_ids(sources)
     word_bytes = word_payload_bytes(sources, images)
-    depth_layers = max((sum(l.get("actor_sprite", False) or l.get("fixed_low", False)
-                            for l in s["layers"]) for s in sources.values()), default=0)
+
+    def flags(layer: dict[str, Any]) -> int:
+        value = int(layer["under"])
+        if layer.get("actor_sprite"):
+            value |= 2
+        if layer.get("fixed_low"):
+            value |= 4
+        offset = layer.get("detached_elevation_offset")
+        if offset is not None:
+            value |= 8 | ((offset + SPRITE_LAYER_BIAS) << 4)
+        return value
+
+    depth_layers = 0
+    for source in sources.values():
+        sorted_layers = [l for l in source["layers"] if flags(l) & 14]
+        for layer in sorted_layers:
+            depth_layers = max(depth_layers, sum(
+                l["start"] <= layer["start"] < l["end"] for l in sorted_layers))
     lines = [
         "/* Private generated source death art. Do not commit. */",
         "#ifndef SC64_DEATH_SPRITES_GENERATED_H",
         "#define SC64_DEATH_SPRITES_GENERATED_H",
         "#define SC64_DEATH_SOURCE_BANK_VERSION 2u",
-        "#define SC64_DEATH_SOURCE_METADATA_VERSION 1u",
+        "#define SC64_DEATH_SOURCE_METADATA_VERSION 2u",
         f"#define SC64_DEATH_SOURCE_DEPTH_LAYERS {depth_layers}u",
         f"#define SC64_DEATH_SOURCE_PIXEL_BYTES {sum(len(f['pixels']) for im in images.values() for f in im['frames'])}u",
         "#define SC64_DEATH_SOURCE_WORD_METADATA 1u",
@@ -304,9 +331,8 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
                 lines.extend(["};", f"static const SC64ConstructionAnimDesc {symbol} = {{",
                               f"    {symbol}_steps, {len(steps)}u, {key[1]}u, {key[2]}u", "};"])
             layer_symbols.append((layer, programs[key]))
-        key = tuple((l["image_id"], l["x"], l["y"], l["start"], l["end"], int(l["under"]) |
-                     (2 if l.get("actor_sprite") else 0) | (4 if l.get("fixed_low") else 0),
-                     int(l["remnant"]), p) for l, p in layer_symbols)
+        key = tuple((l["image_id"], l["x"], l["y"], l["start"], l["end"],
+                     flags(l), int(l["remnant"]), p) for l, p in layer_symbols)
         if key not in layer_sets:
             symbol = f"sc64_death_layers_{len(layer_sets)}"
             layer_sets[key] = symbol
@@ -453,7 +479,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
     manifest = {
         "generator": {
             "death_bank_version": 2,
-            "metadata_version": 1,
+            "metadata_version": 2,
             "word_metadata_version": 1,
             "word_bytes": word_bytes,
             "word_image_count": len(packed_under_image_ids(sources)),
@@ -484,7 +510,8 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
                     "remap_sha256": hashlib.sha256(remap).hexdigest()},
         "actors": [{"raw_unit_id": raw, "image_id": s["image_id"], **s["timing"],
                     "layers": [{k: l[k] for k in ("image_id", "x", "y", "start", "end",
-                                                  "under", "remnant", "actor_sprite", "fixed_low", "loop_start")}
+                                                  "under", "remnant", "actor_sprite", "fixed_low",
+                                                  "detached_elevation_offset", "loop_start")}
                                for l in s["layers"]]} for raw, s in sources.items()],
         "images": [{"image_id": iid, "grp_path": im["grp_path"], "grp_sha1": im["grp_sha1"],
                     "draw_function": im["draw_function"], "remapping": im["remapping"],

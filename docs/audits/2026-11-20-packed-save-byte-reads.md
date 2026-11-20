@@ -130,3 +130,109 @@ The campaign comparison receipt SHA-256 is
 `1c1b4b4b5ddb043e04f674368b1905453aef892c8806b777a600e553d7b5538b`.
 The three-AI receipt SHA-256 is
 `e0ba425c919e495cdee46740636b9829acde9c07612a213e97837c669dedb00f`.
+
+## Opt-in fixed-width compact Unit reader
+
+`SC64_COMPACT_UNIT_FIXED_READER` uses the existing field sequence and
+running bit cursor. GCC propagates the positions and widths through the
+straight-line assignments. The decoder reads only the bytes each field
+spans. The encoder, 38-byte wire row, all-zero slot, 303-bit field length,
+reserved padding check, field validation and final assignment after
+successful validation retain the existing behavior. Journal tags,
+checksums and candidate selection use the existing load path.
+
+The normal and opt-in ASan/UBSan builds pass the existing 10,000-row
+fixture. A differential using the production 56-byte Unit layout
+compares 300,307 unaligned wire and dimension cases. Both readers accept
+the same 4,834 cases and produce byte-identical outputs. Rejected inputs
+leave the output sentinel unchanged. The compact ZP and Guardian wire
+fixtures also pass with the opt-in flag. A standalone ARM7TDMI Thumb
+object matches the original object byte-for-byte with the flag off.
+With the flag on, it uses the same code as the evaluated explicit-offset
+form and removes calls to the generic compact Unit bit getter.
+
+The paired, pre-word-packing Terran control uses compiled source
+`afffebec` from the #627 result-save audit. The opt-in cartridge
+uses the same recipe and inputs and keeps the same EWRAM and IWRAM
+endpoints. All 27 observations in the 4,190-call T6 suffix match.
+Both versions export identical victory SRAM and frozen-result readback.
+[T6 journal timing](2026-11-13-t6-normal-physical.md).
+
+| T6 event | Control guest cycles | Fixed reader guest cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| HOME load from pause | 28,727,633 | 24,091,076 | 16.14% |
+| Result autosave | 37,255,972 | 30,193,003 | 18.96% |
+| HOME load from victory | 31,093,497 | 26,454,592 | 14.92% |
+
+A full ordinary T6 run from HOME also matches all 42 checkpoints,
+including nine after a fresh HOME load. The pause, victory and frozen
+readback SRAM files match the retained full replay byte-for-byte. The
+private driver uses a 48 MiB disk reserve for its bounded outputs.
+This opt-in measurement predates the aligned route-word packing default
+and uses emulated guest cycles.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Pre-word-packing control ROM | `01240c5e95c1f0e648028dad75005e3185904c02e6c9b0577aa368d14e7958f3` |
+| Control ELF | `85aa28c9206b11cd9baebdc9f33d8d9bf6de49fa624146480c1cf351d87dbc10` |
+| Fixed-reader ROM | `277c302b87ae06437d5c9e2ee95b538cd30782297f2632be716f9244d4778563` |
+| Fixed-reader ELF | `e437be5747bfd59caaab2299614e46dd2d4d71585cce09a57a4d052a10590b3c` |
+| Paired timing receipt | `0f9a44cf1157742ec9259283d84e14206c78b2166cec5185f4cd407d3ef208f3` |
+| Full T6 replay receipt | `923cf831e5839f05f08a558b2b4279a7eddb9eb60b460531f32c3ce7f94f63fc` |
+
+## Normal Terran activation with aligned route packing
+
+The released Terran control rebuilt from `603755a7` matches ROM
+`1ff78b901e13b6af59d89ab93634b0c04eea3d05694b5092893fa34082e2d1f9`.
+Adding fixed-width decoding to that recipe produces
+`4b66e7e8be4b3655aded09c1adaf56836fe4f18b4856b6684d092489ad5e2cf7`.
+The ordinary late Terran codec now selects the fixed reader by default.
+The normal production recipe, with no opt-in compiler flag, reproduces
+the tested candidate ROM byte for byte. The explicit
+`SC64_COMPACT_UNIT_LEGACY_READER` setting reproduces the control ROM.
+These settings leave the wire format and both bank validation paths
+intact.
+
+On the combined release, all 27 observed T6 suffix states match and
+the two builds export identical victory and fresh-result SRAM. The
+observed timings are the same as in the table above. The mixed
+three-opponent Blood Bath replay matches all 35 named samples,
+both pause journals, and both fresh 600-update continuations. This
+includes the active Bunker foundation and four loaded passengers.
+
+Terran keeps IWRAM `0x030048a8` and EWRAM `0x02038e5c`. The linked
+Z10, P10 and Showcase ROMs remain byte-identical to the released
+word-packed products, including when the codec flag is passed in
+their qualification recipes. The combined receipt SHA-256 is
+`9c7221662961da0ab25d9900cb6e669899771ff553ce97128bb640ead6719b2a`.
+The default and legacy Terran identity receipts are
+`d30aac01132a613fdd816a44405fab05f31d166255adb70d232538361de42542`
+and `ee1198c120bac61775ab896da684e23ff522d9f65d800404f828544a59e75c0f`.
+
+The source-boundary check, doctor, asset-free build and full default
+suite pass locally. The Python suite runs 1,166 tests with 35 optional
+cases skipped in its isolated asset-free checkout. The prepared Terran
+sanitizer lane separately executes the full campaign targets and the
+T6 and bank-validation fixtures. It passes all 33 cases from 30 binaries.
+
+### Remaining save cost after activation
+
+The same combined Terran ROM was profiled on the result autosave at
+frame 23,536. All 27 suffix observations and both SRAM exports match
+the ordinary replay. The main-loop counter reads 30,193,003 cycles
+and the instruction interval spans 30,193,530 cycles.
+
+| Function | Inclusive cycles | Self cycles | Calls |
+| --- | ---: | ---: | ---: |
+| `race_save_game` | 28,342,471 | 778,513 | 1 |
+| `sc64_unit_save_decode` | 8,190,416 | 2,259,491 | 2,881 |
+| `sc64_building_save_decode` | 6,958,491 | 1,369,108 | 866 |
+| `sc64_packed_building_get` | 2,966,450 | 2,966,450 | 21,650 |
+| `save_write_selected` | 1,570,936 | 809,369 | 1 |
+
+The inclusive decoder rows overlap their children. Fixed Unit
+decoding reduces its inclusive work from 15.10 to 8.19 million
+cycles. The packed-building getter is the next direct bit-reader
+cost. Use the same fixed-width differential and byte-identical
+journal checks if testing that row. The stack receipt SHA-256 is
+`74b16ec56a73e38499d4e441effe1fc00c7b65187c1ddcb07acd5499bdafe54a`.

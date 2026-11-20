@@ -51,3 +51,63 @@ On the [November 17 regular P10 ROM](2026-11-17-protoss-early-replays.md),
 P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
 The tested P2/P3 saves diverge on that revision. Both saved routes win
 after [repeat-command persistence entered the normal P10 build](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation).
+
+## Single-cartridge Terran sweep
+
+All ten routes pass on the same normal Terran ROM with aligned route
+packing and the fixed-width save reader. Each starts from HOME through
+ordinary controller input, saves and resumes in a fresh process, and
+reaches victory. A third process restores each frozen victory and
+re-exports identical 32 KiB SRAM. All checkpoint dictionaries and
+pause and victory journals match their earlier qualified routes.
+
+| Mission | Observed ticks | Pause frame | Victory frame | Emulated updates/s |
+| --- | ---: | ---: | ---: | ---: |
+| T1 | 12 | 6,214 | 10,120 | 29.34 |
+| T2 | 31 | 18,204 | 29,366 | 25.16 |
+| T3 | 56 | 26,993 | 54,000 | 28.49 |
+| T4 | 10 | 4,968 | 8,911 | 23.35 |
+| T5 | 148 | 72,076 | 126,331 | 20.95 |
+| T6 | 42 | 19,466 | 23,536 | 15.39 |
+| T7 | 12 | 2,289 | 3,931 | 20.17 |
+| T8 | 268 | 2,568 | 139,216 | 20.02 |
+| T9 | 51 | 35,363 | 47,266 | 15.30 |
+| T10 | 6 | 2,276 | 3,361 | 16.89 |
+
+The counts are unique observed input ticks. T5 and T8 have 162 and
+272 named observations respectively, with some names sharing a tick.
+The rates include main-loop and presentation work in emulation.
+Physical GBA timing remains open.
+
+Terran ROM SHA-256
+`4b66e7e8be4b3655aded09c1adaf56836fe4f18b4856b6684d092489ad5e2cf7`.
+Aggregate sweep receipt SHA-256
+`aa793698b130ffff1dbd6192205673d871d244769275b97a8b25c57e3d6173c2`.
+The normal default build reproduces the replayed ROM byte for byte.
+[Decoder activation](2026-11-20-packed-save-byte-reads.md#normal-terran-activation-with-aligned-route-packing)
+
+## Current Z10 and P10 cartridges
+
+The prior ordinary-input HOME routes and fresh-process reloads pass on
+the normal word-packed products. Both retain the earlier complete
+checkpoint and dialogue observations and export byte-identical 32 KiB
+pause SRAM. The fixed-width Terran reader leaves these two ROMs
+byte-identical to the word-packed release.
+
+| Mission | Start or pause → victory frame | Matched observations | Outcome |
+| --- | ---: | ---: | --- |
+| Z1 Among the Ruins | HOME → 50,669 | 51 | The Chrysalis survives with 30 Hydralisks. |
+| Z2 Egression | 3,240 → 8,164 | 9 | The Chrysalis survives aboard carrier slot 18 with objective flags 17. |
+| P5 Choosing Sides | 2,700 → 5,057 | 7 | A Shuttle returns in flight and Tassadar survives at extraction. |
+
+Z10 ROM SHA-256
+`970cd016b85715f89aca663de16ab5f56ccff2396d594132d9e42901a5f798c9`.
+Z1 receipt SHA-256
+`282295d22c1b60ff11ca081aa9e3aab5102e295090cb6f7f2767bdfacf09df06`.
+Z2 receipt SHA-256
+`517ec92b6b039bafed454e560bc4dce7449635afa1c043d20d81fd4d57dc822e`.
+P10 ROM SHA-256
+`769293f4122db540e803a137f349d3988469787dad81bdbe148c7f4f1e0c6fae`.
+P5 receipt SHA-256
+`20d29a445368e1d63de49ff5a5e139676da97fd56725bceadf59539983ae6ecc`.
+The remaining Zerg and Protoss missions need this same-cartridge pass.
