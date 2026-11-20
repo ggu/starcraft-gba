@@ -79,6 +79,19 @@ There is no duplicate Battery or second charge on the resumed route.
 | P10 | `23f62fd7b2441041e558e382cabfa472112d068b3e0b167c5e30b27fc9170a24` | `6d08c0a9bdee9c798705194908f22a7104a5e7a8350e051b711efbbfb014a501` |
 | Showcase | `392d62ea1be37f947c5d4c0c05143e3d0e3162e22f44d63b5fc9d5c866561999` | `2bd6a3dccf8917a55a82c9fad1bc032642bdc064a89d8eeee6f4a3250561e1e5` |
 
+### Current release composition
+
+P10 and Showcase linked again with the typed-building decoder from
+release `8318fa1d` and retained their previous RAM endpoints. The paired
+ordinary solo and mixed observations, paused SRAM hashes and resumed
+worlds all match the first Battery builds. Terran and Z10 use the other
+building codecs, so their first Battery builds cover the combined source.
+
+| Profile | Combined solo and fresh load receipt | Combined mixed receipt |
+| --- | --- | --- |
+| P10 | `5276ed939d8c61ab5bed2099ce11d36a14b5570302eb8f16fad83a56d8221787` | `91e7c177091af6383969dd263a4118af818ca05982fe8f137202e77e437d4ec0` |
+| Showcase | `2a4e3552343ae144a7ba829b6eb9fa39bf6bf60030dafcc74b8c63bb8fbaa8e4` | `6de3f58440f936f92abece43e069f1b454f013d31ad21c27e1ab3accbd485909` |
+
 ## Regression cases
 
 With the prepared inputs, build `build/test-sc64-skirmish-ai-progress-terran`
