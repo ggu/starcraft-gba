@@ -124,6 +124,10 @@ sc64_depth_pop(u32 *heap, unsigned *size)
 #ifdef SC64_PROJECTILE_DEPTH
 _Static_assert(MAX_TRACERS <= 255 && MAX_UNITS + MAX_BUILDINGS <= 32767,
                "attacker image lists must hold every trace and actor");
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+_Static_assert(MAX_TRACERS + SC64_BC_SHOT_LIMIT <= DEPTH_SLOT_MASK + 1,
+               "painter keys must hold every projectile slot");
+#endif
 
 /* A projectile at a ground layer shares the same world-Y tie as actors.
  * Use the current projectile anchor, including the fixed anchor of a
@@ -222,6 +226,9 @@ sc64_draw_depth_ordered_actors(void)
     u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + MAX_RACE_GEYSERS
 #ifdef SC64_PROJECTILE_DEPTH
              + MAX_TRACERS
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+             + SC64_BC_SHOT_LIMIT
+#endif
 #endif
 #ifdef SC64_DEATH_WORLD_DEPTH
              + SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_DEPTH_LAYERS
@@ -284,10 +291,22 @@ sc64_draw_depth_ordered_actors(void)
         }
         if (slot->bullet_layer && !slot->release_life) {
             unsigned layer = slot->bullet_layer;
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+            layer &= ~SC64_TRACE_EXPLICIT_DEPTH;
+#endif
             int y = layer <= 4 ? sc64_trace_world_y(i) : 0;
             sc64_depth_push(heap, &size, layer, y, DEPTH_PROJECTILE, i);
         }
     }
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+    for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i) {
+        const Sc64BcYamatoShot *shot = &sc64_bc_shots[i];
+        Sc64BcMotionFields motion;
+        if (sc64_bc_motion_unpack(shot, &motion))
+            sc64_depth_push(heap, &size, race_bc_yamato_draw_layer(shot, &motion),
+                            (int)(motion.y_q8 / 512u), DEPTH_PROJECTILE, MAX_TRACERS + i);
+    }
+#endif
 #endif
 #ifdef SC64_DEATH_WORLD_DEPTH
     sc64_depth_push_deaths(heap, &size);
@@ -354,7 +373,11 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             u32 start = gba_clock();
 #endif
-            draw_tracer((int)i, SC64_TRACE_PROJECTILE);
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+            if (i >= MAX_TRACERS) draw_yamato_flight(i - MAX_TRACERS);
+            else
+#endif
+                draw_tracer((int)i, SC64_TRACE_PROJECTILE);
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             diag_tracer_cycles += gba_clock() - start;
 #endif

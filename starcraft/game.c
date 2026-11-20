@@ -5006,6 +5006,9 @@ static unsigned sc64_unit_world_layer(const Unit *q);
 #endif
 
 #ifdef SC64_PROJECTILE_DEPTH
+/* The high bit lets a tracer participate at elevation zero. */
+#define SC64_TRACE_EXPLICIT_DEPTH 0x80u
+
 static unsigned
 sc64_trace_actor_layer(int ref)
 {

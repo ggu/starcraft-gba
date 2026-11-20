@@ -24,6 +24,7 @@ draw_tracer(int i, unsigned parts)
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
     int ys=sc64_weapon_vfx_style(tracers[i].color);
     if (ys==SC64_YAMATO_TRAIL_STYLE || ys==SC64_YAMATO_IMPACT_STYLE) {
+        if (!(parts & SC64_TRACE_PROJECTILE)) return;
         int age=sc64_tracer_duration(i)-tracers[i].life;
         unsigned p=(unsigned)tracers[i].color&7u;
         unsigned source_age=(unsigned)(age<=0?0:age-1);
@@ -159,6 +160,14 @@ sc64_tracer_profile_reset(void)
 #endif
 
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+static void draw_yamato_flight(unsigned index)
+{
+    Sc64BcMotionFields motion;
+    if (sc64_bc_motion_unpack(&sc64_bc_shots[index], &motion))
+        sc64_yamato_raster_draw(541, 0, (((unsigned)motion.heading + 4u) >> 3) & 31u,
+                               (int)(motion.x_q8 / 512u), (int)(motion.y_q8 / 512u));
+}
+
 static void draw_yamato_charge_frame(const Unit *q, unsigned age)
 {
     int f = sc64_yamato_raster_charge_frame(age);
@@ -203,11 +212,12 @@ draw_tracers_pass(int after_world)
             continue;
         }
 #endif
-        if (shot->state==SC64_BC_SHOT_FLIGHT) {
-            Sc64BcMotionFields m;
-            if (sc64_bc_motion_unpack(shot,&m))
-                sc64_yamato_raster_draw(541,0,(((unsigned)m.heading+4u)>>3)&31u,(int)(m.x_q8/512u),(int)(m.y_q8/512u));
-        }
+        if (shot->state==SC64_BC_SHOT_FLIGHT
+#ifdef SC64_WORLD_DEPTH
+            && !after_world
+#endif
+            )
+            draw_yamato_flight((unsigned)i);
     }
 #ifndef SC64_WORLD_DEPTH
     for (int i=0;i<MAX_UNITS;++i)

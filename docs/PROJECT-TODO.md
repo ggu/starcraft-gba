@@ -2188,7 +2188,10 @@ AI wallets and full-match behavior remain unverified.
   for the two active native sprite layers and fresh descent-phase reload.
 - Add the [Yamato charge cuts](audits/2026-11-19-world-depth.md#yamato-charge-attachment)
   for a flyer crossing the glow and a caster just outside the viewport.
-  Qualify the detached flight, trail and impact layers separately.
+  Use the [Yamato flight, trail and impact cases](audits/2026-11-19-world-depth.md#yamato-flight-trail-and-impact)
+  for normal-input overlap and fresh-load replays. Keep exact native
+  sprite-ID ties and the [Interceptor pulse](audits/2026-11-19-world-depth.md#projectile-replay-cuts)
+  as separate harness cases.
 - Add the [attacker image depth cases](audits/2026-11-19-world-depth.md#attacker-image-depth)
   to the normal-input rendering harness. Capture north/south and flyer
   muzzle overlaps, loss of visibility and shooter-slot reuse. Record the
