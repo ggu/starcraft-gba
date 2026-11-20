@@ -1,5 +1,14 @@
 # Blood Bath elimination on ARM
 
+The [November 21 live result audit](2026-11-21-blood-bath-live-results.md)
+records last-building defeat on the owned N64 ROM and the current GBA
+Terran ROM. It also verifies a three-CPU preview match on the composed
+`0a05194f` runtime. The preview retires a CPU at 14,196 and reaches the
+same 15,112 defeat and four neutral SCVs after loading the save made
+just after retirement. All four current ARM products and host fixtures
+pass. The live native survivor transfer and an ordinary human win
+remain open.
+
 This opt-in build carries forward the [CPU retirement host preview #445](https://github.com/ggu/starcraft-gba/pull/445).
 It uses the same resolved starts and allied-CPU options on Blood Bath. A
 player at zero buildings can transfer its surviving units to neutral owner
