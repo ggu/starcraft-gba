@@ -73,8 +73,14 @@ comparison receipt is `db6370709b6c065d4a3feab30be5364414bfb3cfd2b97d1a888a3f177
 The candidate normal Z10 link passes the GBA header, payload and RAM guards.
 IWRAM ends at `0x03004dc8` with 568 bytes before the `0x03005000` guard. It
 uses 64 bytes more than the released Z10 image. EWRAM ends unchanged at
-`0x02037f78`. Applying that IWRAM delta to the existing Showcase margin of
-72 bytes would leave **eight bytes**. The actual Showcase margin needs a link.
+`0x02037f78`.
+
+The normal Showcase recipe for released ROM `9c2e62a0d7240a72b4414709d1a7709ec594ab5d9567e017d1ba96afa4db668d`
+also links with the single probe flag and its 33 frozen inputs. The GBA
+header and ELF payload match, and both queue kernels are in IWRAM with the
+overflow driver in ROM. IWRAM ends at `0x03004ff0`, 56 bytes beyond the
+released build and **16 bytes** before the guard. EWRAM ends unchanged at
+`0x02039068`. The Showcase link receipt SHA-256 is `a07353e8b155bfa686db43fb077acd9f3e1fb3182acc5cf3cd6e015979e3d15f`.
 
 Compiler stack records give a 1,148-byte worst route suffix including the
 1,056-byte ring wrapper, 56-byte ring controller and 36-byte batch loop.
@@ -92,7 +98,8 @@ the IRQ callback, mixer frame, decoder, and Thumb switch helper. The normal
 Z8 replay observes the same 296-byte depth, leaving 120 bytes between the
 observed IRQ depth and the system-stack top.
 
-Keep the probe opt-in. The artificial spill regression, narrow projected
-Showcase link margin and other product stack and timing checks remain open.
+Keep the probe opt-in. The artificial spill regression and 16-byte Showcase
+link margin still matter. Showcase stack and timing and the other race ROM
+checks remain open.
 The Z8 replay and small P10 fills do not establish physical hardware frame
 rate or qualify the default.
