@@ -214,3 +214,25 @@ suite pass locally. The Python suite runs 1,166 tests with 35 optional
 cases skipped in its isolated asset-free checkout. The prepared Terran
 sanitizer lane separately executes the full campaign targets and the
 T6 and bank-validation fixtures. It passes all 33 cases from 30 binaries.
+
+### Remaining save cost after activation
+
+The same combined Terran ROM was profiled on the result autosave at
+frame 23,536. All 27 suffix observations and both SRAM exports match
+the ordinary replay. The main-loop counter reads 30,193,003 cycles
+and the instruction interval spans 30,193,530 cycles.
+
+| Function | Inclusive cycles | Self cycles | Calls |
+| --- | ---: | ---: | ---: |
+| `race_save_game` | 28,342,471 | 778,513 | 1 |
+| `sc64_unit_save_decode` | 8,190,416 | 2,259,491 | 2,881 |
+| `sc64_building_save_decode` | 6,958,491 | 1,369,108 | 866 |
+| `sc64_packed_building_get` | 2,966,450 | 2,966,450 | 21,650 |
+| `save_write_selected` | 1,570,936 | 809,369 | 1 |
+
+The inclusive decoder rows overlap their children. Fixed Unit
+decoding reduces its inclusive work from 15.10 to 8.19 million
+cycles. The packed-building getter is the next direct bit-reader
+cost. Use the same fixed-width differential and byte-identical
+journal checks if testing that row. The stack receipt SHA-256 is
+`74b16ec56a73e38499d4e441effe1fc00c7b65187c1ddcb07acd5499bdafe54a`.

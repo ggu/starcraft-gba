@@ -52,6 +52,40 @@ P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
 The tested P2/P3 saves diverge on that revision. Both saved routes win
 after [repeat-command persistence entered the normal P10 build](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation).
 
+## Single-cartridge Terran sweep
+
+All ten routes pass on the same normal Terran ROM with aligned route
+packing and the fixed-width save reader. Each starts from HOME through
+ordinary controller input, saves and resumes in a fresh process, and
+reaches victory. A third process restores each frozen victory and
+re-exports identical 32 KiB SRAM. All checkpoint dictionaries and
+pause and victory journals match their earlier qualified routes.
+
+| Mission | Observed ticks | Pause frame | Victory frame | Emulated updates/s |
+| --- | ---: | ---: | ---: | ---: |
+| T1 | 12 | 6,214 | 10,120 | 29.34 |
+| T2 | 31 | 18,204 | 29,366 | 25.16 |
+| T3 | 56 | 26,993 | 54,000 | 28.49 |
+| T4 | 10 | 4,968 | 8,911 | 23.35 |
+| T5 | 148 | 72,076 | 126,331 | 20.95 |
+| T6 | 42 | 19,466 | 23,536 | 15.39 |
+| T7 | 12 | 2,289 | 3,931 | 20.17 |
+| T8 | 268 | 2,568 | 139,216 | 20.02 |
+| T9 | 51 | 35,363 | 47,266 | 15.30 |
+| T10 | 6 | 2,276 | 3,361 | 16.89 |
+
+The counts are unique observed input ticks. T5 and T8 have 162 and
+272 named observations respectively, with some names sharing a tick.
+The rates include main-loop and presentation work in emulation.
+Physical GBA timing remains open.
+
+Terran ROM SHA-256
+`4b66e7e8be4b3655aded09c1adaf56836fe4f18b4856b6684d092489ad5e2cf7`.
+Aggregate sweep receipt SHA-256
+`aa793698b130ffff1dbd6192205673d871d244769275b97a8b25c57e3d6173c2`.
+The normal default build reproduces the replayed ROM byte for byte.
+[Decoder activation](2026-11-20-packed-save-byte-reads.md#normal-terran-activation-with-aligned-route-packing)
+
 ## Current Z10 and P10 cartridges
 
 The prior ordinary-input HOME routes and fresh-process reloads pass on
