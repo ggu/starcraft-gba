@@ -180,12 +180,45 @@ static void test_retained_point_with_range_planes(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+static void test_point_prefix_with_range_planes(void)
+{
+    const int goal = 32 + 32 * 128;
+    int nx, ny;
+    race_cols = race_rows = 128;
+    memset(path_walkable, SC64_GRID_OPEN_BYTE, sizeof(path_walkable));
+    path_grid_valid = 1;
+    sc64_routes_reset();
+    assert(!sc64_route_pcount);
+    int slot = sc64_route_slot_for(goal, goal + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    u32 builds = sc64_route_builds, hits = sc64_route_hits, clock = sc64_route_clock;
+    assert(sc64_range_cached_point_step(1608, 1608, 520, 520, &nx, &ny));
+    assert(nx == 1608 && ny == 1592 && !sc64_point_prefix_find(slot));
+    assert(sc64_route_builds == builds && sc64_route_hits == hits && sc64_route_clock == clock);
+
+    int first_plane = sc64_range_route_reduced_slots();
+    int second = goal + 20;
+    assert(sc64_point_prefix_fill(first_plane, second, second + 1) > 0);
+    sc64_route_valid[first_plane] = 1;
+    sc64_route_goal[first_plane] = (u16)second;
+    assert(sc64_point_prefix_find(first_plane));
+    sc64_range_route_claim_planes();
+    assert(!sc64_point_prefix_find(first_plane));
+    puts("PASS cached point reads preserve logical counters and range claims retire parked fields");
+}
+#endif
+
 int main(void)
 {
     test_copy_alignment_and_remainders();
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     test_retained_point_with_range_planes();
-#else
+#endif
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    test_point_prefix_with_range_planes();
+#endif
+#if !defined(SC64_ROUTE_POINT_POINTER_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
     test_lazy_plane_reservation();
 #endif
     return 0;
