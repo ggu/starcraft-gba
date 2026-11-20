@@ -365,7 +365,7 @@ test_consecutive_viewport_edge_frames(void)
 
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
 typedef struct {
-    int type, y, building, selected;
+    int type, y, building, selected, airborne;
 } DepthActor;
 
 static void
@@ -376,6 +376,14 @@ depth_spawn(DepthActor actor)
                               : spawn_unit(SIDE, actor.type, 96, actor.y);
     assert(slot >= 0);
     if (!actor.building) u[slot].selected = actor.selected;
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (actor.airborne) {
+        assert(actor.building);
+        assert(race_bc_facility_lift(slot));
+    }
+#else
+    assert(!actor.airborne);
+#endif
 }
 
 static void
@@ -414,16 +422,24 @@ static int
 test_actor_depth(void)
 {
     static u8 pixels[5][FB_SIZE];
-    const DepthActor empty = { -1, 0, 0, 0 };
-    const DepthActor tank = { U_TANK, 50, 0, 0 };
+    const DepthActor empty = { -1, 0, 0, 0, 0 };
+    const DepthActor tank = { U_TANK, 50, 0, 0, 0 };
     const struct {
         const char *name;
         DepthActor back, front;
     } cases[] = {
-        { "air-over-ground", tank, { U_WRAITH, 50, 0, 0 } },
-        { "ground-by-y", tank, { U_GOLIATH, 56, 0, 0 } },
-        { "building-over-unit", tank, { B_BARRACKS, 58, 1, 0 } },
-        { "unit-over-building", { B_BARRACKS, 43, 1, 0 }, tank },
+        { "air-over-ground", tank, { U_WRAITH, 50, 0, 0, 0 } },
+        { "ground-by-y", tank, { U_GOLIATH, 56, 0, 0, 0 } },
+        { "building-over-unit", tank, { B_BARRACKS, 58, 1, 0, 0 } },
+        { "unit-over-building", { B_BARRACKS, 43, 1, 0, 0 }, tank },
+        { "high-tier-north", { U_OVERLORD, 54, 0, 0, 0 }, { U_WRAITH, 48, 0, 0, 0 } },
+        { "high-tier-south", { U_OVERLORD, 48, 0, 0, 0 }, { U_WRAITH, 54, 0, 0, 0 } },
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        { "landed-facility-below-tank", { B_SCIENCE_FACILITY, 43, 1, 0, 0 }, tank },
+        { "lifted-facility-above-tank", tank, { B_SCIENCE_FACILITY, 43, 1, 0, 1 } },
+        { "lifted-facility-below-wraith", { B_SCIENCE_FACILITY, 50, 1, 0, 1 },
+          { U_WRAITH, 50, 0, 0, 0 } },
+#endif
     };
     int failures = 0;
 
@@ -446,23 +462,76 @@ test_actor_depth(void)
             fprintf(stderr, "Actor depth %s: %u incorrect of %u overlap pixels\n",
                     cases[n].name, incorrect, overlap);
             ++failures;
+        } else {
+            printf("Actor depth %s: %u overlap pixels match\n", cases[n].name, overlap);
         }
     }
     return failures;
+}
+
+static void
+test_building_flight_layer(void)
+{
+    setup_depth_profile(R_TER);
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    int x = -1, y = -1;
+    for (int yy = 32; yy < WORLD_H - 32 && x < 0; yy += 16)
+        for (int xx = 32; xx < WORLD_W - 32; xx += 16)
+            if (can_place(B_SCIENCE_FACILITY, xx, yy) &&
+                !terrain_blocked((xx - 8) / 16, (yy - 8) / 16) &&
+                !terrain_blocked((xx + 8) / 16, (yy - 8) / 16) &&
+                !terrain_blocked((xx - 8) / 16, (yy + 8) / 16) &&
+                !terrain_blocked((xx + 8) / 16, (yy + 8) / 16)) {
+                x = xx; y = yy; break;
+            }
+    assert(x >= 0);
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    int facility = spawn_build(SIDE, B_SCIENCE_FACILITY, x, y, 0);
+    assert(facility >= 0 && sc64_building_world_layer((unsigned)facility) == 4);
+    assert(race_bc_facility_lift(facility));
+    assert(race_bc_facility_land(facility, x, y));
+    assert(sc64_building_world_layer((unsigned)facility) == 12);
+    race_bc_facility_flight_tick();
+    assert(sc64_building_world_layer((unsigned)facility) == 4);
+    b[facility].alive = 0;
+    invalidate_path_grid();
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    race_mode = 0;
+    race_selected_mission = 11;
+    int command = spawn_build(SIDE, B_COMMAND, x, y, 0);
+    assert(command >= 0 && sc64_building_world_layer((unsigned)command) == 4);
+    assert(race_late_lift(command));
+    int lx = -1, ly = -1;
+    for (int yy = 64; yy < WORLD_H - 64 && lx < 0; yy += 32)
+        for (int xx = 64; xx < WORLD_W - 64; xx += 32)
+            if (race_late_landing_site(command, xx, yy)) {
+                lx = xx; ly = yy; break;
+            }
+    assert(lx >= 0 && race_late_flight_order(command, lx, ly, 1));
+    assert(sc64_building_world_layer((unsigned)command) == 12);
+    for (int i = 0; i < WORLD_W * 3 && race_late_airborne(command); ++i) {
+        ++frame;
+        race_late_flight_tick();
+    }
+    assert(b[command].x == lx && b[command].y == ly &&
+           sc64_building_world_layer((unsigned)command) == 4);
+#endif
 }
 
 static int
 test_selection_depth(void)
 {
     static u8 ring[FB_SIZE], background[FB_SIZE], unit[FB_SIZE], building[FB_SIZE], pair[FB_SIZE];
-    const DepthActor empty = { -1, 0, 0, 0 };
+    const DepthActor empty = { -1, 0, 0, 0, 0 };
     const struct {
         const char *name;
         int race, ring_in_front;
         DepthActor unit, building;
     } cases[] = {
-        { "Overlord over Hatchery", R_ZERG, 1, { U_OVERLORD, 50, 0, 0 }, { B_HATCHERY, 50, 1, 0 } },
-        { "Tank behind Barracks", R_TER, 0, { U_TANK, 50, 0, 0 }, { B_BARRACKS, 58, 1, 0 } },
+        { "Overlord over Hatchery", R_ZERG, 1, { U_OVERLORD, 50, 0, 0, 0 }, { B_HATCHERY, 50, 1, 0, 0 } },
+        { "Tank behind Barracks", R_TER, 0, { U_TANK, 50, 0, 0, 0 }, { B_BARRACKS, 58, 1, 0, 0 } },
     };
     int failures = 0;
 
@@ -526,6 +595,7 @@ main(void)
 #endif
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
     failures += test_actor_depth();
+    test_building_flight_layer();
     failures += test_selection_depth();
 #endif
     if (failures) fprintf(stderr, "Race no-clear coverage failures: %d\n", failures);
