@@ -122,7 +122,7 @@ endif
 Z10_FACT_DIR := build/generated/z10-facts
 Z10_FACT_HEADER := $(Z10_FACT_DIR)/sc64_fact_tables_generated.h
 Z10_FACT_FLAGS = $(if $(filter 1,$(Z10_FACT_TABLES)),-DSC64_FACT_TABLES -I$(Z10_FACT_DIR))
-Z10_FACT_REFERENCE_FLAGS = $(filter -D% -I%,$(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS))
+Z10_FACT_REFERENCE_FLAGS = $(filter -D% -I%,$(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS))
 Z10_FACT_SIGNATURE = $(subst ','"'"',$(strip $(Z10_FACT_TABLES) $(Z10_FACT_REFERENCE_FLAGS)))
 Z10_FACT_CONFIG := $(if $(shell test -f build/z10-facts-config && printf '%s\n' '$(Z10_FACT_SIGNATURE)' | cmp -s - build/z10-facts-config && printf matched),,force-z10-facts-rebuild)
 $(Z10_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) $(ZERG_Z10_CANONICAL_INPUTS) Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-facts-config $(Z10_FACT_CONFIG) | build
@@ -137,7 +137,7 @@ build/z10-facts-config: force-z10-facts-config | build
 	@printf '%s\n' '$(Z10_FACT_SIGNATURE)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) build/z10-facts-config $(Z10_FACT_CONFIG) $(if $(Z10_FACT_FLAGS),$(Z10_FACT_HEADER)) | build
-	$(CC) $(Z10_FACT_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+	$(CC) $(Z10_FACT_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@

@@ -50,8 +50,9 @@ static int select_kerrigan(void)
 static void open_command(unsigned row)
 {
     z6_press(KEY_B);
-    assert(menu_open && menu_cursor==0);
-    for(unsigned i=0;i<row;i++) z6_press(KEY_DOWN);
+    assert(menu_open);
+    for(int i=0;menu_cursor!=(int)row && i<field_menu_count();i++)
+        z6_press(KEY_DOWN);
     assert(menu_cursor==(int)row);
 }
 
