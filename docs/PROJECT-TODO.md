@@ -19,35 +19,59 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Normal race cartridges after the shared depth fix.** The
+- **Normal race cartridge win and save qualification.** All ten Protoss
+  missions now win from HOME and after fresh SRAM reloads on one exact
+  normal P10 build. The
   [release 25e9e8b9 matrix](audits/2026-11-13-normal-campaign-matrix.md#release-25e9e8b9-race-replays)
   ties Z2–Z6 to one Z10 ROM and P5 to one P10 ROM. Z2 and P5 match paused
   saves and fresh continuations. Z3–Z6 match all 627 uninterrupted
-  checkpoints. Prioritize fresh cuts in those routes and the remaining
-  same-cartridge campaigns. The
+  checkpoints. All ten Zerg missions now win after fresh loads on one
+  [Storm-depth Z10 cartridge](audits/2026-11-13-normal-campaign-matrix.md#z1-and-z3z6-on-the-storm-depth-release).
+  Z6 restores two queued impacts, and Z7 resumes after reselecting
+  its Hatchery. Z8's three known battlefield pixel differences remain
+  in the replay gate. The
   [nine custom checks](audits/2026-11-13-normal-campaign-matrix.md#two-opponent-custom-games)
   match ordinary starts and fresh SRAM continuation with each AI count
   on all three race cartridges. Complete long custom wins and check
   hardware timing.
-- **Refresh early campaign tapes.** Current P1–P3 win after
+- **Keep campaign tapes current.** Current P1–P3 win after
   [fresh saves and updated ordinary endings](audits/2026-11-13-normal-campaign-matrix.md#early-protoss-current-endings).
-  Preserve the new ending inputs, update the stale checkpoint tails,
-  and re-record the
-  [Z7 trace](audits/2026-11-13-normal-campaign-matrix.md#z7-retained-tape-check)
-  from the first divergent battle. The old commands reset twice and
-  end in defeat. The archived Z7 save still loads through victory.
-  Use new independently observed victory and SRAM receipts.
+  Preserve the new ending inputs and update the stale checkpoint tails.
+  The [new Z7 tape](audits/2026-11-13-normal-campaign-matrix.md#current-z7-home-win)
+  wins from HOME at frame 228,128 with all 271 checkpoints matched.
+  The [current Z10 fresh-load proof](audits/2026-11-13-normal-campaign-matrix.md#z7-fresh-save-through-victory-on-the-storm-depth-release)
+  matches all 254 remaining checks after one ordinary A press restores
+  the Hatchery selection. It averages 12.66 main-loop updates per
+  emulated second. Keep this route in the speed and save regression gate.
 - **Measure the remaining slow updates.** The refined eager route queue
   lowers the current Z8 peak from 12.10 to 11.67 million guest cycles with
   matching route fields and framebuffer samples. Two P10 route spikes
   improve 0.86% and 2.45%. Keep the queue opt-in while checking the
   remaining RAM guards and sustained P10 simulation and draw costs.
-  Inlined Terran Building reads cut the tested T6 save and load stalls
-  by 9.76–11.19%. Paired T1, T4, T7 and T10 campaigns match their fresh
-  loads and journals through victory. Continue the remaining journal
-  cases and measure hardware against the 30 fps goal.
+  Inlined Terran Building reads now ship on normal Terran and cut the
+  tested T6 save and load stalls by 9.76–11.19%. All ten normal mission
+  pairs match their fresh loads, victories and 32 KiB journals, and
+  the composed link reproduces the qualified bytes. Measure hardware
+  against the 30 fps goal.
   [Route queue](https://github.com/ggu/starcraft-gba/pull/636)
   [Building decoder](https://github.com/ggu/starcraft-gba/pull/638)
+- **P10 battle draw cost.** The
+  [packed Overmind frame](audits/2026-11-21-p10-packed-overmind.md)
+  ships in ordinary P10 and cuts the sampled late window by 1.53%,
+  with both indexed pages, palette and world matching through victory.
+  In a separate normal three-AI Blood Bath match the Nexus byte blit
+  costs 84–90 thousand guest cycles. Measure the existing packed Nexus
+  choice in that lobby, and continue sharing the slow simulation and
+  route windows in the release gates.
+- **Match worker economy against the N64.** The
+  [paired northwest and southwest Blood Bath run](audits/2026-11-19-n64-skirmish-ai.md#matched-northwest-and-southwest-worker-comparison)
+  uses the same human and CPU hall coordinates on both machines. The GBA
+  wallet gains 472–544 minerals over the bracketed opening where the
+  native HUD gains 268. The opt-in 102-update mining wait reduces
+  that GBA gain to 320–352 and passes a fresh active-wait save.
+  Trace patch occupancy, travel and unloading and rerun the campaign
+  and CPU economy gates before normal activation.
+  [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
 - **Current cartridge campaign saves.** [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge
