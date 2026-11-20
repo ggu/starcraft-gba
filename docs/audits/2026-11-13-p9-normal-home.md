@@ -105,3 +105,18 @@ authored Hive kill and encodes and decodes its dead row.
 | Normal ARM link | `787f8017e89f492e58b30a924f7643fdef961cdee1925798f09763378dd39b84` |
 | Physical replay and fresh result load | `c9a6137dbc5b2020d94b571494c1ad59187422746c2e69c44eb8dd8dedc54485` |
 | Victory and fresh-load SRAM exports | `5efb8db7b9f4b5f75d1e91ad36550ecd626c7e8df0ea7fb22f6d51978e6b06a2` |
+
+### Interceptor pulse-depth release
+
+The normal P10 link on `64192d4e` verifies the 40 prepared inputs and
+retains the release RAM endpoints. The same physical controller suffix
+matches all 30 named gameplay checkpoints and all 31 palette and
+indexed-page captures from the first repair. The frame-95,737 victory
+writes the same sequence-2 journal bytes. Fresh HOME L restores the
+result and re-exports those bytes after eight neutral updates.
+
+| Retained evidence | SHA-256 |
+| --- | --- |
+| Normal P10 ROM | `81e018081beec7bf65f44dfc2cc4c4daae49b8aa1dfc515e38ea6e4bfad763ff` |
+| Normal ARM link | `5a1843a00aee1e452fe83d5eee13f782fa5cbb194d288627b6f8be1a5ba6b60b` |
+| Physical replay and fresh result load | `8df6b0df32bff8e4d075c531e8fe12de12e70080f4d08ab8ebac0bf778fd5b7d` |
