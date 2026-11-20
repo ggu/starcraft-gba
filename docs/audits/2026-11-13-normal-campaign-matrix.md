@@ -292,6 +292,33 @@ suffix averages 12.66 main-loop updates per emulated second.
 The qualification receipt SHA-256 is
 `583655bed5a332e819a57ad1bc46f73e7afdb4f0cb15709feb9ef787336ca17a`.
 
+### Z2 and Z8–Z10 on the same Z10 cartridge
+
+The remaining four ordinary HOME runs produce pause journals on
+the same `aa3636ed…` cartridge. Fresh HOME L resumes each through
+victory. Z9 and Z10 restore the same world fingerprints and compare
+the full post-load checkpoint records against the retained previous
+release. Both pause journals match their earlier export byte for byte.
+
+| Mission | Current pause frame | Victory frame | Matched checks | Receipt SHA-256 |
+| --- | ---: | ---: | --- | --- |
+| Z2 | 3,240 | 8,164 | 9 checkpoint observations | `cf64213f4a4c897267ca70ecbab67e05456184f0d8927da00e76dc44699b8b1e` |
+| Z8 | 16,659 | 45,468 | 47 shared world samples, 30 after load | `a7099979f57835d158a96d38f96d1a9be94c26a60dbac460e584235950cf268b` |
+| Z9 | 6,069 | 72,628 | 29 after load | `0f6bdc2d6dee719bf9336a81434ee2534bf0c77f880129e69faf01717e223a22` |
+| Z10 | 2,526 | 50,193 | 20 after load | `b1bcbe9a07d41db245d31426a4a6cc83f6c84d84862968270af5e737b1f6b662` |
+
+Z8 retains three battlefield pixel differences after reload. The changed
+pixel positions and palette indices match the earlier A/B, and HUD,
+palette, fog and world samples agree between the current paired runs.
+The pixel comparison receipt SHA-256 is
+`6c65e2f2763ea885e8cf515a3c95e284ad3bbf645dda07f53e31be27e13ca00d`.
+
+Together these checks cover ordinary pause and fresh victory in all ten
+Zerg missions on one normal cartridge. The Terran reader's composed
+preprocessor comparison matches Z10, P10 and Showcase. The subsequent
+packed Overmind selection applies to the normal P10 recipe. The decoded
+world and video checks above belong to the pinned normal Z10 ARM ROM.
+
 ### Two-opponent custom games
 
 The same release also starts two named AI opponents with the second
