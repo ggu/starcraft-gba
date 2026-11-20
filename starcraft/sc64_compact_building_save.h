@@ -41,6 +41,7 @@ sc64_packed_building_put(Sc64PackedBuildingSave *row, unsigned *bit,
     return 1;
 }
 
+#ifndef SC64_COMPACT_BUILDING_FIXED_READER
 static int
 sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
                          unsigned width, u32 *value)
@@ -48,6 +49,7 @@ sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
     return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
                                       bit, width, value);
 }
+#endif
 
 /* All values below are bounded by the current game representation: map
  * coordinates are at most 2047, max HP/shields at most 131071 (100000 is the
@@ -131,21 +133,33 @@ sc64_building_save_decode(Building *out, const Sc64PackedBuildingSave *row)
     if (!out || !row) return 0;
     memset(&decoded, 0, sizeof(decoded));
     if (sc64_packed_building_is_zero(row)) { *out = decoded; return 1; }
-#define SC64_GET(width, dst) do { if (!sc64_packed_building_get(row, &bit, (width), &v)) return 0; (dst) = (int)v; } while (0)
+#ifdef SC64_COMPACT_BUILDING_FIXED_READER
+#define SC64_BUILDING_READ(width, value) do { \
+    _Static_assert((width) > 0 && (width) <= 32, "packed building field width"); \
+    if (bit > SC64_PACKED_BUILDING_SAVE_USED_BITS - (width) || \
+        (bit & 7u) + (width) > 32) return 0; \
+    (value) = sc64_save_read_bits_fixed(row->bytes, bit, (width)); \
+    bit += (width); \
+} while (0)
+#else
+#define SC64_BUILDING_READ(width, value) do { \
+    if (!sc64_packed_building_get(row, &bit, (width), &(value))) return 0; \
+} while (0)
+#endif
+#define SC64_GET(width, dst) do { SC64_BUILDING_READ((width), v); (dst) = (int)v; } while (0)
     SC64_GET(11, decoded.x); SC64_GET(11, decoded.y);
-    if (!sc64_packed_building_get(row, &bit, 18, &v)) return 0;
+    SC64_BUILDING_READ(18, v);
     decoded.hp = (int)v - SC64_PACKED_BUILDING_HP_BIAS;
     SC64_GET(17, decoded.maxhp);
     SC64_GET(3, decoded.owner); SC64_GET(6, decoded.type); SC64_GET(1, decoded.alive);
     for (unsigned i = 0; i < 5; ++i) SC64_GET(6, decoded.queue[i]);
     SC64_GET(3, decoded.queue_head); SC64_GET(3, decoded.queue_count);
     SC64_GET(16, decoded.queue_progress);
-    if (!sc64_packed_building_get(row, &bit, 16, &build_progress)) return 0;
+    SC64_BUILDING_READ(16, build_progress);
     decoded.build_progress = (int)build_progress - 1;
     SC64_GET(1, decoded.under_construction); SC64_GET(7, decoded.level);
     SC64_GET(17, decoded.shield);
-    if (!sc64_packed_building_get(row, &bit, 9, &raw_type) ||
-        !sc64_packed_building_get(row, &bit, 9, &raw_owner)) return 0;
+    SC64_BUILDING_READ(9, raw_type); SC64_BUILDING_READ(9, raw_owner);
     decoded.raw_type = (int)raw_type - 1; decoded.raw_owner = (int)raw_owner - 1;
     SC64_GET(16, decoded.flags); SC64_GET(2, decoded.larva);
     SC64_GET(9, decoded.larva_timer); SC64_GET(11, decoded.shield_remainder);
@@ -156,7 +170,8 @@ sc64_building_save_decode(Building *out, const Sc64PackedBuildingSave *row)
         decoded.level > 127 || decoded.raw_type > 255 ||
         decoded.raw_owner > 255 || decoded.larva > 3 ||
         decoded.shield_remainder > 1279 || decoded.build_progress < -1) return 0;
-    if (!sc64_packed_building_get(row, &bit, 1, &v)) return 0;
+    SC64_BUILDING_READ(1, v);
+#undef SC64_BUILDING_READ
     decoded.type |= (int)v << 6;
     if (decoded.type >= SC_RB_COUNT) return 0;
     /* Seven spare bits are reserved and must remain zero, as must any future
