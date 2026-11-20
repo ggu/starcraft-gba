@@ -47,6 +47,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   is 215–235 GBA updates. Nearest footprint perimeter projection
   reproduces two of four native arrival points. Resolve tangential
   approach selection and temporary contention before activating it.
+  Combining formation and wait moves the first GBA credit to 198
+  updates. The [longer native comparison](audits/2026-11-21-blood-bath-income-windows.md)
+  measures 168 minerals in the later window, compared with 312 stock
+  and 200 combined. The combined trial reloads during mining and
+  matches the next 240 updates. Prioritize patch occupancy and depot
+  approach before wider balance changes.
 
 - **Normal race cartridge win and save qualification.** All ten Protoss
   missions win after fresh pause loads on the
@@ -60,10 +66,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z6 restores two queued impacts, and Z7 resumes after reselecting
   its Hatchery. Z8's three known battlefield pixel differences remain
   in the replay gate. The
-  [nine custom checks](audits/2026-11-13-normal-campaign-matrix.md#two-opponent-custom-games)
-  match ordinary starts and fresh SRAM continuation with each AI count
-  on all three race cartridges. Complete long custom wins and check
-  hardware timing.
+  [current normal skirmish matrix](audits/2026-11-21-current-skirmish-matrix.md)
+  covers 1,134 ordinary starts across both maps, including every named
+  three-row lineup with one to three CPUs and all closed-seat positions.
+  All 54 sampled fresh SRAM continuations match. Complete long custom
+  wins and check hardware timing.
 - **Keep campaign tapes current.** Current P1–P3 win after
   [fresh saves and updated ordinary endings](audits/2026-11-13-normal-campaign-matrix.md#early-protoss-current-endings).
   Preserve the new ending inputs and update the stale checkpoint tails.
