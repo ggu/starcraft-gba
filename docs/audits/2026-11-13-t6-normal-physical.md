@@ -104,3 +104,36 @@ python3 tools/sc64_t9_normal_replay.py --chapter 6 --save-tick 19659 \
 | Victory SRAM and fresh readback | `af0fa049ba02103ef3944a3f8f324b45c9eb0abc5b8db23318d70969713a87bc` |
 | T6 replay and both journal checks | `de8db15b15b9b551cf9285cdc79beba35ab0e21523b437443ca1c5ab844c3041` |
 | T10 regression | `5d80269aed0f6a5315e9b23340dc63931094f404e24995e50c2ce61a4dd5b991` |
+
+
+## Compact unit read timing
+
+The normal Terran ROM at `cd833c8c` reads each field of its 38-byte
+compact unit rows one bit at a time. Trial `8bc3c7ce` calls the
+shared bounded byte reader. Every record keeps the same wire format.
+The writer, semantic validators and older-bank fallback use the
+same paths.
+
+The two ARM builds use the same prepared inputs and retain the same
+RAM endpoints. Both load the verified frame 19,466 pause bank through
+HOME and run the next 4,190 ordinary gameplay calls with the same input
+and dialogue handling. All 27 actor, selection and dialogue observations
+match. Each produces the exact previously verified victory image,
+retains the original first bank, and re-exports the same SRAM from
+the frozen-result load.
+
+| Measured update | Control cycles | Trial cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| HOME load of pause journal | 39,232,491 | 30,514,031 | 22.22% |
+| Victory autosave with the pause bank present | 54,160,869 | 40,885,763 | 24.51% |
+| HOME load of frozen victory | 41,585,079 | 32,874,369 | 20.95% |
+
+The table measures complete emulator updates. It captures three different
+save operations and leaves hardware timing separate. Compile-time and
+sanitizer checks cover old unit rows, 10,000 round trips, malformed
+owner and reserved bits, the other compact codecs and journal fallback.
+Qualify the reader on the composed release across all profiles and
+measure the remaining work inside the victory update.
+
+The replay comparison receipt SHA-256 is
+`8c76801a0d3753b742bc0da11448a33a5e39ba9318f2d1eb3997e21b79f41aea`.
