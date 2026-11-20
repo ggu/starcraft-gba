@@ -155,7 +155,6 @@ sc64_depth_pop(u32 *heap, unsigned *size)
 #ifdef SC64_PROJECTILE_DEPTH
 _Static_assert(MAX_TRACERS <= 255 && MAX_UNITS + MAX_BUILDINGS <= 32767,
                "attacker image lists must hold every trace and actor");
-_Static_assert(MAX_TRACERS <= 32, "the flight trail mask must hold every trace");
 _Static_assert(DEPTH_FLIGHT_TRAIL_BASE + MAX_TRACERS <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every projectile slot");
 
@@ -285,7 +284,7 @@ sc64_draw_depth_ordered_actors(void)
 {
     u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + MAX_RACE_GEYSERS
 #ifdef SC64_PROJECTILE_DEPTH
-             + MAX_TRACERS * 3
+             + MAX_TRACERS * 2
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
              + SC64_BC_SHOT_LIMIT
 #endif
@@ -339,7 +338,6 @@ sc64_draw_depth_ordered_actors(void)
      * draw turn. Use the actor key directly for both image and body. */
     u8 image_heads[MAX_UNITS + MAX_BUILDINGS], image_next[MAX_TRACERS];
     int have_images = 0;
-    u32 flight_trails = 0;
     for (unsigned remaining = MAX_TRACERS; remaining; --remaining) {
         unsigned i = remaining - 1;
         const Sc64TraceSlot *slot = &sc64_trace_slots[i];
@@ -360,11 +358,6 @@ sc64_draw_depth_ordered_actors(void)
 #endif
             int y = layer <= 4 ? sc64_trace_world_y(i) : 0;
             sc64_depth_push(heap, &size, layer, y, DEPTH_PROJECTILE, i);
-            if (sc64_depth_separate_flight_trails(slot, layer)) {
-                flight_trails |= 1u << i;
-                sc64_depth_push(heap, &size, layer + 1, 0, DEPTH_PROJECTILE,
-                                DEPTH_FLIGHT_TRAIL_BASE + i);
-            }
         }
         Sc64AttackSpriteDraw draw;
         if (slot->attack_sprite_layer && sc64_attack_sprite_draw_state(i, &draw))
@@ -494,7 +487,14 @@ sc64_draw_depth_ordered_actors(void)
 #endif
             else {
                 unsigned parts = SC64_TRACE_PROJECTILE;
-                if (flight_trails & (1u << i)) parts |= SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+                unsigned layer = key >> DEPTH_LAYER_BITS;
+                if (sc64_depth_separate_flight_trails(&sc64_trace_slots[i], layer)) {
+                    /* The trail group sorts after the parent and reuses
+                     * its vacated heap entry. */
+                    sc64_depth_push(heap, &size, layer + 1, 0, DEPTH_PROJECTILE,
+                                    DEPTH_FLIGHT_TRAIL_BASE + i);
+                    parts |= SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+                }
                 draw_tracer((int)i, parts);
             }
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
