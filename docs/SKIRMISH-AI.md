@@ -9,9 +9,10 @@ is unchanged.
 
 The planner is an authored approximation. The timing and size of each
 race's first offensive follow measurements of the StarCraft 64 computer
-players. The Zerg opening also targets four paid Sunken Colonies based on
-two native Blood Bath matches.
-[First-wave audit](audits/2026-11-19-n64-skirmish-ai.md) · [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
+players. The Blood Bath openings also target four paid Zerg Sunken
+Colonies and a paid Protoss Shield Battery after 15 Probes and two
+completed Gateways, based on the native matches.
+[First-wave audit](audits/2026-11-19-n64-skirmish-ai.md) · [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md) · [Protoss opening Battery audit](audits/2026-11-20-protoss-battery-opening.md)
 
 ## What the opponents do
 
