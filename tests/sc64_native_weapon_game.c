@@ -351,6 +351,104 @@ static void test_stationary_projectile_depth(void)
     }
 }
 
+static void test_attached_attacker_depth(void)
+{
+    static _Alignas(4) u8 shooter_without_muzzle[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 muzzle_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 blocker_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        int type, raw, shooter_y, blocker_dy, blocker_front;
+    } cases[] = {
+        { U_TANK, 5, 54, -3, 0 },
+        { U_TANK, 5, 54, 3, 1 },
+        { U_WRAITH, 8, 54, 0, 1 },
+        { U_WRAITH, 8, 2, 0, 1 },
+        { U_WRAITH, 8, 106, 0, 1 },
+    };
+
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_SIEGE_TANK, 30, 40, 30);
+    assert(sc64_unit_world_layer(&u[shooter]) == 4);
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 30, 0, -1));
+    assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_trace_profile((u32)tracers[0].color);
+    assert(profile && profile->attack_image == 254);
+    update_tracers(); /* The new trace starts one update before age zero. */
+    while (tracers[0].life > 1 && sc64_weapon_source_vfx_source_tick(
+               (unsigned)(sc64_tracer_duration(0) - tracers[0].life)) < 2)
+        update_tracers();
+    assert(tracers[0].life && sc64_trace_slots[0].release_life);
+
+    /* This siege muzzle is a palette remap. Compare both paint orders at
+     * pixels changed by the attached image, excluding body-only overlap.
+     * The shooter moved after firing began, so the muzzle must follow it. */
+    u[shooter].x = 112;
+    int blocker = make_unit(SIDE, U_TANK, 5, u[shooter].x, 54);
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        u[shooter].y = cases[n].shooter_y;
+        u[blocker].type = cases[n].type;
+        u[blocker].raw_type = cases[n].raw;
+        u[blocker].y = u[shooter].y + cases[n].blocker_dy;
+        unsigned overlap = 0;
+        for (int dx = -24; dx <= 24 && !overlap; ++dx) {
+            u[blocker].x = u[shooter].x + dx;
+            begin_depth_frame();
+            draw_unit(&u[blocker]);
+            draw_unit(&u[shooter]);
+            capture_depth_frame(shooter_without_muzzle);
+            draw_tracer(0, SC64_TRACE_ATTACKER_IMAGE);
+            capture_depth_frame(muzzle_in_front);
+            begin_depth_frame();
+            draw_unit(&u[shooter]);
+            draw_tracer(0, SC64_TRACE_ATTACKER_IMAGE);
+            draw_unit(&u[blocker]);
+            capture_depth_frame(blocker_in_front);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += muzzle_in_front[i] != shooter_without_muzzle[i] &&
+                           muzzle_in_front[i] != blocker_in_front[i];
+        }
+        assert(overlap && "the attached muzzle must overlap the blocker at its live anchor");
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        const u8 *expected = cases[n].blocker_front ? blocker_in_front : muzzle_in_front;
+        assert(!memcmp(pair, expected, BATTLEFIELD_BYTES));
+        printf("PASS attached siege muzzle at Y%d against raw %d at Y%d, %u overlap pixels\n",
+               u[shooter].y, cases[n].raw, u[blocker].y, overlap);
+    }
+
+    u[blocker].alive = 0;
+    u[shooter].y = 54;
+    u[shooter].owner = ENEMY;
+    memset(visible, 0, sizeof(visible));
+    assert(!currently_visible(u[shooter].x, u[shooter].y));
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    assert(!framebuffer_has_battlefield_pixels());
+    assert_hud_untouched();
+
+    /* Reuse the very same slot, raw type and anchor during wind-up. */
+    u[shooter].alive = 0;
+    assert(make_unit(SIDE, U_SIEGE_TANK, 30, 112, 54) == shooter);
+    assert(tracers[0].life && sc64_trace_slots[0].release_life);
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    capture_depth_frame(pair);
+    clear_tracers();
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    capture_depth_frame(shooter_without_muzzle);
+    assert(!memcmp(pair, shooter_without_muzzle, BATTLEFIELD_BYTES));
+}
+
 static void test_projectile_release_layer(void)
 {
     reset_world();
@@ -567,6 +665,7 @@ int main(void)
     test_moving_projectile_overlap();
     test_ground_projectile_world_y();
     test_stationary_projectile_depth();
+    test_attached_attacker_depth();
     test_projectile_release_layer();
 #endif
     puts("PASS native weapon source engine integration");

@@ -177,11 +177,10 @@ The native `sprol` and `sproluselo` handlers pass parent elevation plus
 one. `highsprol` and `sprul` pass parent minus one. `spruluselo` passes
 the parent layer. Record them separately from the fixed-low path and from
 image attachments. The GBA still uses the previous paint passes for these
-death children, and attacker weapon image overlays still paint above the
-queue. For the latter, use the Tank muzzle image over a ground sprite and
-under a Wraith, then retest a hidden and a recycled shooter. Report exact
-same-layer ties separately because the GBA uses kind and slot where the
-native queue uses the turret flag and sprite ID.
+death children. Use the [attacker image cases](#attacker-image-depth) for
+attached weapon flashes. Report exact same-layer ties separately because
+the GBA uses kind and slot where the native queue uses the turret flag
+and sprite ID.
 
 ### Dynamic depth harness
 
@@ -289,13 +288,12 @@ the source release tick, then holds the result. If an actor disappears
 during wind-up, the attack-init snapshot supplies the depth. Reusing its
 slot cannot redirect the depth sample to the new occupant. Layers 0–4 use
 the projectile's current world anchor, including fixed-position effects.
-The projectile and its current visual
-children draw together. Shooter overlays still use
-their separate pass. Death effects, spell pools and Interceptor pulses
-also need their own depth comparisons, as do independently spawned impact
-and trail sprites. The existing queue slot order breaks GBA projectile
-ties. The experimental Mode 0 renderer still separates cached static art
-from dynamic actors.
+The projectile and its current visual children draw together. The
+shooter's attached images draw in its actor pass. Independently spawned
+shooter sprites, impact and trail sprites, spell pools and Interceptor
+pulses need their own depth comparisons. The existing queue slot order
+breaks GBA projectile ties. The experimental Mode 0 renderer still
+separates cached static art from dynamic actors.
 
 The native constructor writes the sprite elevation before it dispatches
 on weapon behavior. The behavior table load at `0x80008814` and jump at
@@ -377,6 +375,63 @@ cycles per advancing gameplay call come to 1,024,346 versus 1,025,307 in
 the control, a difference of 0.09%. This measures emulated guest cycles.
 The comparison receipt SHA-256 is
 `41e74a51fbdda1892a41c108454d9c90d20bc655c4cbb6d7ed1a42fd90f56648`.
+
+### Attacker image depth
+
+The USA Siege Tank's ground attack uses `imgoluselo` (13) at source tick 1.
+The opcode handler at `0x80012240` resolves the LO offset and passes the
+current image and its owning sprite to the image attachment routine at
+`0x80011b08`. The 116-byte handler at ROM offset `0x12e40` has SHA-256
+`a2caafe03b35e6e3bdeef66d1efb9c0ee3b2cad0511193a1b9bae5eeac289b8e`.
+The normal Tank uses `imgol` (8). Both flashes share their parent sprite's
+depth. In the retained Blood Bath capture at step 26877 the siege hull
+and turret share anchor (672,782) and elevation 4. The turret flag places
+the turret ahead of the hull and other ordinary sprites at that same Y.
+The native observation establishes the sort and attachment rules. A
+framebuffer witness for the active flash remains open.
+
+The shared Mode 4 renderer draws attached attack images in the source
+unit or building's existing queue turn and at its current world anchor.
+An underlay goes before the body and an overlay after it. Attachments
+follow the body's visibility and expire visually on source death or slot
+reuse. These references are transient. The separately spawned sprite
+events retain their existing pass and timeline. The GBA still uses a
+composite Tank, so the native turret tie at exactly the same Y remains
+an explicit case for future work.
+
+The prepared Showcase native weapon fixture passes with ASan and UBSan.
+The palette-remap oracle compares both paint orders and matches the full
+battlefield frame. It finds 6 distinguishing pixels for the north Tank,
+1 for the south Tank, and 2 for the Wraith. The upper and lower HUD edge
+cases find 1 and 2, respectively, with no HUD changes. A hidden shooter
+and a same-type replacement in its slot also pass. The fixture exercises
+all 66 source profiles and keeps the released projectile cases.
+
+The normal Terran, Z10, P10 and Showcase ARM products pass ROM header,
+SRAM signature and RAM guards with the same prepared inputs. IWRAM stays
+at its prior endpoints. EWRAM adds 128 bytes for the transient references
+and part masks. The ARM build receipt SHA-256 is
+`7d43d240da73ddb09da5df0416d20ca406887d619fcf5c2933c5e19595f00d09`.
+An ordinary Showcase Siege Line replay matches all 24 samples of world
+state, HUD pixels on both pages and palette over 120 advancing updates.
+Three sampled battlefield frames differ. This run consumes 119,809,410
+guest cycles versus 119,300,827 in the previously qualified control
+(+0.43%). The replay receipt SHA-256 is
+`527026608267a14c92778e9d0b5dc8389e3fecf1e6e2efab4a2e7d47dcf4345e`.
+
+| Case ID | Replay setup | Expected result |
+| --- | --- | --- |
+| `attacker-muzzle-ground-and-air` | Issue an ordinary Tank or Siege Tank attack. Pause on the muzzle frame before release. Place a ground actor at distinct world Y just north, then south, and repeat with a Wraith. Use a fixed camera, both framebuffer pages and both actor creation orders. | The flash covers the north actor. The south actor and the Wraith cover the flash. Compare nonempty masks where the flash and blocker have distinct opaque pixels, excluding pixels owned by the shooter body alone. |
+| `attacker-muzzle-live-owner` | Follow the firing source across a fog boundary and move the camera across both HUD bands. Lose the shooter during the effect and replace it in the same slot with the same type and position. Include an attacking structure. | The flash uses the source's current anchor. It disappears with a hidden, dead or replaced source. The independent bullet continues on its existing timeline and no actor image changes a HUD pixel. |
+| `attacker-muzzle-turret-tie` | Pause on the native siege muzzle with a layer-4 ordinary sprite at the same world Y. Record the hull, turret and blocking sprite keys. | The native turret flag breaks the equal-Y tie. Track the GBA composite-art approximation separately from tests with distinct world Y. |
+
+Run these cuts from campaign, Custom Game and Showcase. Record the ROM
+commit, tape hash, world anchors, effective layer, page, clip rows,
+overlap count and wrong-pixel count. Keep native captures local. Same-layer
+sprite-ID ties and separate spawned sprite layers need their own witnesses.
+An image still follows the coarse viewport admission of its parent. Add a
+cut with an offscreen parent whose image extends into the field before
+changing that admission rule.
 
 ### Interceptor flight overlap
 

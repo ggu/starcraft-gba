@@ -63,13 +63,34 @@ draw_tracer(int i, unsigned parts)
 #endif
         if(!profile) profile=sc64_weapon_source_profile_lookup(
             key.actor_raw,key.weapon_id,key.target_air,key.variant);
-        if (parts == SC64_TRACE_ATTACKER && (!profile || !profile->overlay_count)) return;
+        if (!(parts & SC64_TRACE_PROJECTILE) && (!profile || !profile->overlay_count)) return;
+        int actor_x = tracers[i].x0, actor_y = tracers[i].y0;
+#ifdef SC64_PROJECTILE_DEPTH
+        if ((parts & SC64_TRACE_ATTACKER_IMAGE) && !(parts & ~SC64_TRACE_ATTACKER_IMAGE)) {
+            int ref = sc64_trace_slots[i].attacker_plus1 - 1;
+            if (ref < 0 || !target_alive(ref)) return;
+            int raw;
+            if (ref < MAX_UNITS) {
+                const Unit *q = &u[ref];
+                raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+            } else {
+                const Building *q = &b[ref - MAX_UNITS];
+                raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
+            }
+            if (raw != key.actor_raw) return;
+            actor_x = target_x(ref);
+            actor_y = target_y(ref);
+        }
+#endif
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
         diag_lookup+=gba_clock()-dt; dt=gba_clock();
 #endif
 #ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
-        if (!sc64_weapon_source_vfx_anchor_may_be_visible(
-                tracers[i].x0, tracers[i].y0, camx, camy) &&
+        /* Projectile endpoints bound the old launch path. A live image
+         * may still enter the clip from an entirely different position. */
+        if ((parts & ~SC64_TRACE_ATTACKER_IMAGE) &&
+            !sc64_weapon_source_vfx_anchor_may_be_visible(
+                actor_x, actor_y, camx, camy) &&
             !sc64_weapon_source_vfx_anchor_may_be_visible(
                 tracers[i].x1, tracers[i].y1, camx, camy) &&
             sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
@@ -88,7 +109,7 @@ draw_tracer(int i, unsigned parts)
         int age=sc64_tracer_duration(i)-tracers[i].life;
         sc64_weapon_source_vfx_draw_trace_parts(key,profile,
             tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
-            tracers[i].life,(unsigned)(age<0?0:age),prepared,parts);
+            tracers[i].life,(unsigned)(age<0?0:age),prepared,parts,actor_x,actor_y);
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
         diag_raster+=gba_clock()-dt;
 #endif
@@ -109,6 +130,24 @@ draw_tracer(int i, unsigned parts)
         tracers[i].x0-camx,tracers[i].y0-camy+12,
         tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
 }
+
+#ifdef SC64_PROJECTILE_DEPTH
+static void
+sc64_draw_attacker_images(unsigned first, const u8 *next, unsigned part)
+{
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    u32 start = gba_clock();
+#endif
+    for (unsigned node = first; node; node = next[node - 1]) {
+        unsigned i = node - 1;
+        if (sc64_trace_slots[i].attacker_parts & part)
+            draw_tracer((int)i, part);
+    }
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_tracer_cycles += gba_clock() - start;
+#endif
+}
+#endif
 
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
 static void
@@ -150,8 +189,12 @@ draw_tracers_pass(int after_world)
     for (int i = 0; i < MAX_TRACERS; ++i) {
         if (!tracers[i].life) continue;
 #ifdef SC64_PROJECTILE_DEPTH
-        if (after_world && sc64_trace_slots[i].bullet_layer) {
-            draw_tracer(i, SC64_TRACE_ATTACKER);
+        const Sc64TraceSlot *slot = &sc64_trace_slots[i];
+        if (after_world && (slot->bullet_layer || slot->attacker_plus1)) {
+            unsigned parts = slot->bullet_layer ? 0 : SC64_TRACE_PROJECTILE;
+            parts |= slot->attacker_plus1 ?
+                slot->attacker_parts & SC64_TRACE_ATTACKER_SPRITE : SC64_TRACE_ATTACKER;
+            if (parts) draw_tracer(i, parts);
             continue;
         }
 #endif
