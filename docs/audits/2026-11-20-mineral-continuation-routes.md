@@ -57,3 +57,26 @@ The Z10 selector's stack frame grows by eight bytes. The linker's IWRAM
 and EWRAM endpoints remain `0x03004d88` and `0x02037ef8`.
 The route cache can warm in a different order. Future target-selection
 changes should compare the full tape and sample the same hotspot.
+
+
+## Three-AI cartridge save smoke
+
+Ordinary buttons launch Blood Bath with Terran, Zerg and Protoss in the
+three independent computer seats on all four products. The player is
+Terran on the Terran build, Zerg on Z10, and Protoss on P10 and Showcase.
+START and B at frame 361 write 32 KiB SRAM. HOME L in fresh processes
+restores the named world. All four control and candidate pairs produce
+byte-identical journals and matching named worlds after 240 more updates.
+This smoke covers the lobby and save path. Mineral depletion is covered
+by the HOST fixtures and the Z8 replay above.
+
+The smoke receipt SHA-256 is
+`a4f69ac4ec3926e475c93e05b6fe9b33949d5ec63ada4e0823ca2310a8b3e76c`.
+
+## Remaining slow updates
+
+In the promoted Z8 replay, call 33,800 advances to frame 32,984 and takes
+12,264,221 loop cycles, including 11,287,595 in orders. Call 26,346
+advances to frame 25,672 and takes 9,850,769 loop cycles, including
+8,901,634 in orders. The pause-save and victory calls take 25.38M and
+60.13M loop cycles. Sample orders and the journal path independently.

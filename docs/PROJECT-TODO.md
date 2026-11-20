@@ -37,7 +37,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   recorded busy draw windows for renderer work. The
   [instruction profile](audits/2026-11-12-z8-normal-physical.md#instruction-attribution-of-the-z8-stall)
   attributes 90.89% of frame 21,667 to 16 mineral continuation route
-  fills. Prioritize eligible-field selection and its cache behavior.
+  fills. The [nearest-first selector](audits/2026-11-20-mineral-continuation-routes.md)
+  cuts that stall by 87.9% while preserving the full Z8 replay checks.
+  All four builds retain their RAM margins and match the control on a
+  three-AI Blood Bath save and load. Profile the remaining orders peaks
+  at calls 26,346 and 33,800 and the separate result-journal stall.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run
