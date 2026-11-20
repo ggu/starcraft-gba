@@ -130,3 +130,53 @@ The campaign comparison receipt SHA-256 is
 `1c1b4b4b5ddb043e04f674368b1905453aef892c8806b777a600e553d7b5538b`.
 The three-AI receipt SHA-256 is
 `e0ba425c919e495cdee46740636b9829acde9c07612a213e97837c669dedb00f`.
+
+## Opt-in fixed-width compact Unit reader
+
+`SC64_COMPACT_UNIT_FIXED_READER` uses the existing field sequence and
+running bit cursor. GCC propagates the positions and widths through the
+straight-line assignments. The decoder reads only the bytes each field
+spans. The encoder, 38-byte wire row, all-zero slot, 303-bit field length,
+reserved padding check, field validation and final assignment after
+successful validation retain the existing behavior. Journal tags,
+checksums and candidate selection use the existing load path.
+
+The normal and opt-in ASan/UBSan builds pass the existing 10,000-row
+fixture. A differential using the production 56-byte Unit layout
+compares 300,307 unaligned wire and dimension cases. Both readers accept
+the same 4,834 cases and produce byte-identical outputs. Rejected inputs
+leave the output sentinel unchanged. The compact ZP and Guardian wire
+fixtures also pass with the opt-in flag. A standalone ARM7TDMI Thumb
+object matches the original object byte-for-byte with the flag off.
+With the flag on, it uses the same code as the evaluated explicit-offset
+form and removes calls to the generic compact Unit bit getter.
+
+The paired, pre-word-packing Terran control uses compiled source
+`afffebec` from the #627 result-save audit. The opt-in cartridge
+uses the same recipe and inputs and keeps the same EWRAM and IWRAM
+endpoints. All 27 observations in the 4,190-call T6 suffix match.
+Both versions export identical victory SRAM and frozen-result readback.
+[T6 journal timing](2026-11-13-t6-normal-physical.md).
+
+| T6 event | Control guest cycles | Fixed reader guest cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| HOME load from pause | 28,727,633 | 24,091,076 | 16.14% |
+| Result autosave | 37,255,972 | 30,193,003 | 18.96% |
+| HOME load from victory | 31,093,497 | 26,454,592 | 14.92% |
+
+A full ordinary T6 run from HOME also matches all 42 checkpoints,
+including nine after a fresh HOME load. The pause, victory and frozen
+readback SRAM files match the retained full replay byte-for-byte. The
+private driver uses a 48 MiB disk reserve for its bounded outputs.
+This opt-in result measures emulated guest cycles. Combined
+normal-build checks with aligned route-word packing and the other
+profiles remain open.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Pre-word-packing control ROM | `01240c5e95c1f0e648028dad75005e3185904c02e6c9b0577aa368d14e7958f3` |
+| Control ELF | `85aa28c9206b11cd9baebdc9f33d8d9bf6de49fa624146480c1cf351d87dbc10` |
+| Fixed-reader ROM | `277c302b87ae06437d5c9e2ee95b538cd30782297f2632be716f9244d4778563` |
+| Fixed-reader ELF | `e437be5747bfd59caaab2299614e46dd2d4d71585cce09a57a4d052a10590b3c` |
+| Paired timing receipt | `0f9a44cf1157742ec9259283d84e14206c78b2166cec5185f4cd407d3ef208f3` |
+| Full T6 replay receipt | `923cf831e5839f05f08a558b2b4279a7eddb9eb60b460531f32c3ce7f94f63fc` |
