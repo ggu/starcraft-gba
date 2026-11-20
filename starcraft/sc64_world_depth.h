@@ -244,7 +244,7 @@ sc64_draw_depth_ordered_actors(void)
     for (unsigned i = 0; i < MAX_MINERALS; ++i) {
         if (m[i].amount <= 0) continue;
         int x = m[i].x - camx, y = m[i].y - camy + 12;
-        if (x > -6 && x < 245 && y > 7 && y < 123 &&
+        if (mineral_in_view(&m[i], x, y) &&
             currently_visible(m[i].x, m[i].y))
             sc64_depth_push(heap, &size, 4, m[i].y, DEPTH_MINERAL, i);
     }
