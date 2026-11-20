@@ -46,6 +46,8 @@ build/test-sc64-facility-frontiers-point-tail: $(FACILITY_FIFO_DEPS) | build
 	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_FACILITY_FRONTIERS_PROBE -DSC64_ROUTE_LINEAR_FLOOD_PROBE -DSC64_ROUTE_POINT_POINTER_PROBE -DSC64_ROUTE_POINT_TAIL_PROBE $< -o $@
 build/test-sc64-facility-full-wide: $(FACILITY_FIFO_DEPS) | build
 	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_FACILITY_FRONTIERS_PROBE -DSC64_ROUTE_LINEAR_FLOOD_PROBE -DSC64_ROUTE_POINT_POINTER_PROBE -DSC64_ROUTE_POINT_TAIL_PROBE -DSC64_ROUTE_WIDE_DEPOT_FULL $< -o $@
+build/test-sc64-facility-wide-iwram: $(FACILITY_FIFO_DEPS) | build
+	$(CLANG) $(FACILITY_FIFO_HOST_FLAGS) -DSC64_FACILITY_FRONTIERS_PROBE -DSC64_ROUTE_LINEAR_FLOOD_PROBE -DSC64_ROUTE_POINT_POINTER_PROBE -DSC64_ROUTE_POINT_TAIL_PROBE -DSC64_ROUTE_WIDE_DEPOT_FULL -DSC64_ROUTE_LINEAR_POINTER_FIFO_PROBE -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE -DSC64_ROUTE_IWRAM_FIFO_PROBE $< -o $@
 .PHONY: test-sc64-facility-fifo
 test-sc64-facility-fifo: build/test-sc64-facility-fifo-base build/test-sc64-facility-fifo-probe build/test-sc64-facility-fifo-overflow build/test-sc64-facility-frontiers build/test-sc64-facility-frontiers-point-tail build/test-sc64-facility-full-wide
 	./build/test-sc64-facility-fifo-base

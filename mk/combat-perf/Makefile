@@ -152,7 +152,7 @@ build/test-sc64-route-iwram-fifo: $(ROUTE_KEEP_TEST_DEPS) | build
 build/test-sc64-route-iwram-spill: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_IWRAM_FIFO_FLAGS) -DSC64_ROUTE_IWRAM_FIFO_PROBE -DSC64_ROUTE_IWRAM_FIFO_CAP=16 $< -o $@
 .PHONY: test-sc64-route-iwram-fifo
-test-sc64-route-iwram-fifo: build/test-sc64-route-iwram-base build/test-sc64-route-iwram-fifo build/test-sc64-route-iwram-spill
+test-sc64-route-iwram-fifo: build/test-sc64-route-iwram-base build/test-sc64-route-iwram-fifo build/test-sc64-route-iwram-spill build/test-sc64-facility-wide-iwram
 	./build/test-sc64-route-iwram-base --emit build/route-iwram-base.ref
 	./build/test-sc64-route-iwram-fifo --emit build/route-iwram-fifo.ref
 	./build/test-sc64-route-iwram-spill --emit build/route-iwram-spill.ref
@@ -160,6 +160,7 @@ test-sc64-route-iwram-fifo: build/test-sc64-route-iwram-base build/test-sc64-rou
 	cmp build/route-iwram-base.ref build/route-iwram-spill.ref
 	cmp build/route-iwram-base.ref.state build/route-iwram-fifo.ref.state
 	cmp build/route-iwram-base.ref.state build/route-iwram-spill.ref.state
+	./build/test-sc64-facility-wide-iwram
 
 build/test-sc64-route-point-pointer: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_POINTER_FLAGS) -DSC64_ROUTE_POINT_POINTER_PROBE $< -o $@
