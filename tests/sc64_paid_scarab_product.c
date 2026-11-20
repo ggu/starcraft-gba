@@ -793,6 +793,8 @@ static void campaign_read(const char *path)
            race_paid_scarab_stock(rv));
 }
 
+#endif /* HAVE_SERVICE */
+
 /* The old-save check: build the same file against the unchanged tree. */
 static void t_old_write(const char *path)
 {
@@ -812,8 +814,10 @@ static void t_old_write(const char *path)
     }
     puts("old-write: Reaver saved by the base code");
 }
+#ifdef HAVE_SERVICE
 static void t_old_read(const char *path)
 {
+
 #ifdef HAVE_SERVICE
     char side[512]; FILE *f; int r, x, y, m;
     snprintf(side, sizeof side, "%s.state", path);
