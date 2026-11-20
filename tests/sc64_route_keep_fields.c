@@ -822,6 +822,48 @@ static void check_empty_linear_goals(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
+static void check_sparse_linear_pack(void)
+{
+    const int sizes[] = { 1, 361, 384, 385, MAP_CELLS };
+    const int goal = MAP_CELLS - 1;
+    race_cols = race_rows = 128;
+    for (unsigned i = 0; i < sizeof(sizes) / sizeof(*sizes); ++i) {
+        const int size = sizes[i];
+        memset(desired, 0, sizeof(desired));
+        for (int j = 0; j < size; ++j) {
+            int cell = size == 361 ? goal - j % 19 - j / 19 * 128 : goal - j;
+            desired[cell] = 1;
+        }
+        if (size != MAP_CELLS) desired[0] = 1;
+        sc64_routes_reset();
+        build_path_grid();
+        int slot = sc64_route_slot_for(goal, -1);
+        assert(slot >= 0);
+        assert(sc64_route_fill_linear(sc64_route_field[slot], goal) == size);
+        reference_bfs(&oracle[POOL], goal);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+
+    /* A blocked goal may seed disjoint components, including diagonal cells. */
+    memset(desired, 0, sizeof(desired));
+    int blocked = 40 + 40 * 128;
+    desired[blocked - 129] = desired[blocked + 129] = 1;
+    sc64_routes_reset();
+    build_path_grid();
+    int slot = sc64_route_slot_for(blocked, -1);
+    assert(slot >= 0);
+    assert(sc64_route_fill_linear(sc64_route_field[slot], blocked) == 2);
+    reference_bfs(&oracle[POOL], blocked);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+    puts("Sparse linear packing matches canonical BFS at map edges and across the cutoff.");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -830,6 +872,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--sparse-linear-only")) {
+        check_sparse_linear_pack();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-pointer-only")) {
         check_single_retained_point();
