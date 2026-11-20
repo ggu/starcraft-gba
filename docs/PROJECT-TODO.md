@@ -62,7 +62,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [T9 on normal Terran](audits/2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result)
   loads from frame 35,363 and wins with Kerrigan alive. All 51 checkpoints
   match, including 12 after load. The second bank reloads the frozen
-  victory and re-exports identical SRAM. Apply the same check to T10.
+  victory and re-exports identical SRAM.
+  [T10 on normal Terran](audits/2026-11-13-t10-normal-physical.md#november-20-fresh-sram-and-result-autosave)
+  loads from frame 2,276 and wins with Raynor alive and the Ion Cannon
+  destroyed. All six checkpoints match. A third emulator restores
+  the frozen result and exports identical SRAM. Continue with a current
+  save and result check for T7.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
