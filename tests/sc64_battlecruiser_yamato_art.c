@@ -53,7 +53,8 @@ static void check_charge_order(int caster, int foreground, unsigned charge_frame
 static void check_charge_view_edges(int caster)
 {
     Unit *ship = &u[caster];
-    const int cameras[][2] = {{ship->x + 16, 0}, {0, ship->y + 6}};
+    /* Frame 3 of the charge extends beyond the clipped hull. */
+    const int cameras[][2] = {{ship->x + 22, 0}, {0, ship->y + 21}};
     ship->selected = 1;
     ship->work_timer = 2;
     for (unsigned edge = 0; edge < sizeof(cameras) / sizeof(cameras[0]); ++edge) {

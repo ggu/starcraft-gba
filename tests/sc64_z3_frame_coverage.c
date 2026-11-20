@@ -475,6 +475,65 @@ test_actor_depth(void)
     return failures;
 }
 
+#ifdef SC64_UNIT_FACING
+static int
+test_tank_turret_depth(void)
+{
+    static u8 expected[FB_SIZE], wrong_order[FB_SIZE], actual[FB_SIZE];
+    int failures = 0;
+
+    for (int sieged = 0; sieged <= 1; ++sieged) {
+        setup_depth_profile(R_TER);
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        camx = camy = 0;
+        int tank = spawn_unit(SIDE, sieged ? U_SIEGE_TANK : U_TANK, 96, 54);
+        int goliath = spawn_unit(SIDE, U_GOLIATH, 99, 54);
+        assert(tank >= 0 && goliath > tank);
+        assert(sc64_unit_world_layer(&u[tank]) == 4);
+        assert(sc64_unit_world_layer(&u[goliath]) == 4);
+
+        for (int south = 0; south <= 1; ++south) {
+            u[goliath].y = 54 + south;
+            for (int reversed = 0; reversed <= 1; ++reversed) {
+                u8 *out = reversed ? wrong_order : expected;
+                gfx_begin(C_BLACK);
+                gfx_set_clip_y(12, 120);
+                assert(sc64_facing_blit(sieged ? 30u : 5u, 0, 96, 66));
+                if (south == reversed) draw_unit(&u[goliath]);
+                assert(sc64_facing_blit(sieged ? 31u : 6u, 0, 96, 66));
+                if (south != reversed) draw_unit(&u[goliath]);
+                capture(out);
+                gfx_end();
+            }
+
+            for (unsigned page = 0; page < 2; ++page) {
+                gfx_begin(C_BLACK);
+                gfx_set_clip_y(12, 120);
+                sc64_draw_depth_ordered_actors();
+                capture(actual);
+                gfx_end();
+                unsigned distinct = 0, incorrect = 0;
+                for (unsigned i = 0; i < FB_SIZE; ++i) {
+                    distinct += expected[i] != wrong_order[i];
+                    incorrect += expected[i] != actual[i];
+                }
+                if (!distinct || incorrect) {
+                    fprintf(stderr, "Tank turret depth (sieged %d, south %d, page %u): "
+                            "%u wrong pixels, %u distinguishing\n",
+                            sieged, south, page, incorrect, distinct);
+                    ++failures;
+                } else {
+                    printf("Tank turret depth (sieged %d, south %d, page %u): "
+                           "%u distinguishing pixels match\n", sieged, south, page, distinct);
+                }
+            }
+        }
+    }
+    return failures;
+}
+#endif
+
 static int
 test_scv_foundation_depth(void)
 {
@@ -674,6 +733,9 @@ main(void)
 #endif
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
     failures += test_actor_depth();
+#ifdef SC64_UNIT_FACING
+    failures += test_tank_turret_depth();
+#endif
     failures += test_scv_foundation_depth();
     test_building_flight_layer();
     failures += test_selection_depth();

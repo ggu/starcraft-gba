@@ -26,9 +26,9 @@ Overlords cover the Hatchery rim, and a Probe covers the southeast Nexus lip.
 
 The GBA Mode 4 painter uses those elevation and Y rules for units, buildings
 and resources. The static lookup matches all 228 entries in the pinned N64
-unit table. Composite turrets remain with their hull. GBA actor kind and
-slot resolve exact ties as a deterministic approximation of the native
-sprite-ID tie. Native depth changes for special states still need individual
+unit table. [Tank turrets have their own draw turn](2026-11-21-native-depth-followup.md)
+in both modes. GBA actor kind and slot resolve remaining exact ties.
+Native depth changes for special states still need individual
 checks. The change covers world actors in the shared campaign, skirmish and
 Showcase renderer. See the projectile section for moving weapon sprite
 coverage and the remaining passes that need separate depth references.
@@ -734,10 +734,11 @@ The shared Mode 4 renderer draws attached attack images in the source
 unit or building's existing queue turn and at its current world anchor.
 An underlay goes before the body and an overlay after it. Attachments
 follow the body's visibility and expire visually on source death or slot
-reuse. These references are transient. The separately spawned sprite
-events retain their existing pass and timeline. The GBA still uses a
-composite Tank, so the native turret tie at exactly the same Y remains
-an explicit case for future work.
+reuse. These references are transient. The Tank's two prepared muzzle
+overlays now draw in the matching turret turn. See the
+[follow-up cases](2026-11-21-native-depth-followup.md#replay-cases)
+for the equal-Y mask, the live native flash cut and the remaining Goliath
+turret gap.
 
 The prepared Showcase native weapon fixture passes with ASan and UBSan.
 The palette-remap oracle compares both paint orders and matches the full

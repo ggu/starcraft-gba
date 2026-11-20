@@ -11538,8 +11538,12 @@ static void draw_yamato_charge(const Unit *q);
 #endif
 
 static void
-draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *next)
+draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *next,
+                      int *turret_lift)
 {
+#ifndef SC64_UNIT_FACING
+    (void)turret_lift;
+#endif
 #ifndef SC64_PROJECTILE_DEPTH
     (void)first;
     (void)next;
@@ -11654,7 +11658,7 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
     if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
     else
 #endif
-    if (sprite && sc64_facing_draw(q, facing_raw, x, y, walk)) {}
+    if (sprite && sc64_facing_draw_parts(q, facing_raw, x, y, walk, turret_lift)) {}
     else
 #endif
     if (sprite) {
@@ -11739,7 +11743,8 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
 after_unit_body:
 #endif
 #ifdef SC64_PROJECTILE_DEPTH
-    if (first) sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_OVER);
+    if (first && (!turret_lift || *turret_lift < 0))
+        sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_OVER);
 #endif
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
     if (sc64_race_is_battlecruiser(q->type)) draw_yamato_charge(q);
@@ -11771,7 +11776,7 @@ after_unit_body:
 static void
 draw_unit_pass(Unit *q, int selection_pass)
 {
-    draw_unit_with_images(q, selection_pass, 0, 0);
+    draw_unit_with_images(q, selection_pass, 0, 0, 0);
 }
 
 static void

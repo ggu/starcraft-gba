@@ -74,8 +74,9 @@ enum {
     DEPTH_SLOT_BITS = 10,
     DEPTH_SLOT_MASK = (1 << DEPTH_SLOT_BITS) - 1,
     DEPTH_KIND_MASK = 7,
-    DEPTH_Y_BITS = DEPTH_SLOT_BITS + 3,
-    DEPTH_WORLD_Y_BITS = 14,
+    DEPTH_TURRET_BIT = 1 << (DEPTH_SLOT_BITS + 3),
+    DEPTH_Y_BITS = DEPTH_SLOT_BITS + 4,
+    DEPTH_WORLD_Y_BITS = 13,
     DEPTH_LAYER_BITS = DEPTH_Y_BITS + DEPTH_WORLD_Y_BITS,
 };
 
@@ -85,31 +86,34 @@ _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
                MAX_RACE_GEYSERS <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every actor slot");
 _Static_assert(DEPTH_STORM <= DEPTH_KIND_MASK, "painter keys must hold every kind");
+#ifdef SC64_UNIT_FACING
+_Static_assert(MAX_UNITS * 2 <= DEPTH_SLOT_MASK + 1,
+               "turret keys must hold the hull's slot and stride lift");
+#endif
 
 enum { DEPTH_ATTACK_SPRITE_BASE = MAX_TRACERS
 #if defined(SC64_PROJECTILE_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
                                  + SC64_BC_SHOT_LIMIT
 #endif
 };
-#ifdef SC64_P7_PROJECTILES_ENABLED
-enum { DEPTH_INTERCEPTOR_BASE = DEPTH_ATTACK_SPRITE_BASE
 #ifdef SC64_PROJECTILE_DEPTH
-                               + MAX_TRACERS
+enum { DEPTH_FLIGHT_TRAIL_BASE = DEPTH_ATTACK_SPRITE_BASE + MAX_TRACERS };
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+enum { DEPTH_INTERCEPTOR_BASE =
+#ifdef SC64_PROJECTILE_DEPTH
+                               DEPTH_FLIGHT_TRAIL_BASE + MAX_TRACERS
+#else
+                               DEPTH_ATTACK_SPRITE_BASE
 #endif
 };
 _Static_assert(DEPTH_INTERCEPTOR_BASE + SC64_POOL_CAPACITY <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every projectile slot");
 #endif
 
-/* Ground depth uses the world anchor. Air ties use kind and slot.
- * Camera position and animation offsets leave this ordering stable. */
 static void
-sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
-                unsigned kind, unsigned slot)
+sc64_depth_push_key(u32 *heap, unsigned *size, u32 key)
 {
-    unsigned row = layer <= 4 ? (unsigned)limit(y, 0, (1 << DEPTH_WORLD_Y_BITS) - 1) : 0;
-    u32 key = (layer << DEPTH_LAYER_BITS) | (row << DEPTH_Y_BITS) |
-              (kind << DEPTH_SLOT_BITS) | slot;
     unsigned at = (*size)++;
     while (at) {
         unsigned parent = (at - 1) / 2;
@@ -118,6 +122,18 @@ sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
         at = parent;
     }
     heap[at] = key;
+}
+
+/* Ground depth uses the world anchor. The turret bit sorts after all
+ * ordinary sprites at the same elevation and Y. Kind and slot break ties. */
+static void
+sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
+                unsigned kind, unsigned slot)
+{
+    unsigned row = layer <= 4 ? (unsigned)limit(y, 0, (1 << DEPTH_WORLD_Y_BITS) - 1) : 0;
+    u32 key = (layer << DEPTH_LAYER_BITS) | (row << DEPTH_Y_BITS) |
+              (kind << DEPTH_SLOT_BITS) | slot;
+    sc64_depth_push_key(heap, size, key);
 }
 
 static u32
@@ -139,8 +155,21 @@ sc64_depth_pop(u32 *heap, unsigned *size)
 #ifdef SC64_PROJECTILE_DEPTH
 _Static_assert(MAX_TRACERS <= 255 && MAX_UNITS + MAX_BUILDINGS <= 32767,
                "attacker image lists must hold every trace and actor");
-_Static_assert(DEPTH_ATTACK_SPRITE_BASE + MAX_TRACERS <= DEPTH_SLOT_MASK + 1,
+_Static_assert(DEPTH_FLIGHT_TRAIL_BASE + MAX_TRACERS <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every projectile slot");
+
+/* These prepared moving projectiles use SPROL for their flight trails.
+ * The child gets parent elevation plus one at birth. Above layer 4,
+ * its fixed birth anchor affects raster placement but no longer sorts by Y. */
+static int
+sc64_depth_separate_flight_trails(const Sc64TraceSlot *slot, unsigned layer)
+{
+    if (layer < 4 || layer >= 31 || !slot->profile_plus1) return 0;
+    const Sc64WeaponSourceAttackProfile *profile =
+        &sc64_weapon_source_profiles[slot->profile_plus1 - 1u];
+    const unsigned image = profile->projectile_image;
+    return image == 528 || image == 529 || image == 532;
+}
 
 /* A projectile at a ground layer shares the same world-Y tie as actors.
  * Use the current projectile anchor, including the fixed anchor of a
@@ -401,14 +430,37 @@ sc64_draw_depth_ordered_actors(void)
             draw_storm_marker(&storms->storm[i]);
             break;
 #endif
-        case DEPTH_UNIT:
-            if (u[i].selected) draw_unit_pass(&u[i], 1);
+        case DEPTH_UNIT: {
+#ifdef SC64_UNIT_FACING
+            if (key & DEPTH_TURRET_BIT) {
+                unsigned hull = i >> 1;
+                sc64_facing_draw_tank_turret(hull, i & 1);
 #ifdef SC64_PROJECTILE_DEPTH
-            draw_unit_with_images(&u[i], 0, have_images ? image_heads[i] : 0, image_next);
+                /* Both Tank firing flashes attach to the turret image. */
+                if (have_images && image_heads[hull])
+                    sc64_draw_attacker_images(image_heads[hull], image_next,
+                                              SC64_TRACE_ATTACKER_OVER);
+#endif
+                break;
+            }
+#endif
+            if (u[i].selected) draw_unit_pass(&u[i], 1);
+            int turret_lift = -1;
+#ifdef SC64_PROJECTILE_DEPTH
+            draw_unit_with_images(&u[i], 0, have_images ? image_heads[i] : 0,
+                                  image_next, &turret_lift);
 #else
-            draw_unit(&u[i]);
+            draw_unit_with_images(&u[i], 0, 0, 0, &turret_lift);
+#endif
+#ifdef SC64_UNIT_FACING
+            /* The hull already left the heap. Its turret takes that
+             * capacity, so a full queue needs no extra storage. */
+            if (turret_lift >= 0)
+                sc64_depth_push_key(heap, &size, (key & ~DEPTH_SLOT_MASK) |
+                                    DEPTH_TURRET_BIT | (i << 1) | (unsigned)turret_lift);
 #endif
             break;
+        }
 #if defined(SC64_PROJECTILE_DEPTH) || defined(SC64_P7_PROJECTILES_ENABLED)
         case DEPTH_PROJECTILE: {
 #ifdef SC64_P7_PROJECTILES_ENABLED
@@ -421,7 +473,10 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             u32 start = gba_clock();
 #endif
-            if (i >= DEPTH_ATTACK_SPRITE_BASE) {
+            if (i >= DEPTH_FLIGHT_TRAIL_BASE) {
+                draw_tracer((int)(i - DEPTH_FLIGHT_TRAIL_BASE),
+                            SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS);
+            } else if (i >= DEPTH_ATTACK_SPRITE_BASE) {
                 Sc64AttackSpriteDraw draw;
                 if (sc64_attack_sprite_draw_state(i - DEPTH_ATTACK_SPRITE_BASE, &draw))
                     sc64_weapon_source_vfx_draw_image(draw.image, 0, draw.age,
@@ -430,8 +485,18 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
             else if (i >= MAX_TRACERS) draw_yamato_flight(i - MAX_TRACERS);
 #endif
-            else
-                draw_tracer((int)i, SC64_TRACE_PROJECTILE);
+            else {
+                unsigned parts = SC64_TRACE_PROJECTILE;
+                unsigned layer = key >> DEPTH_LAYER_BITS;
+                if (sc64_depth_separate_flight_trails(&sc64_trace_slots[i], layer)) {
+                    /* The trail group sorts after the parent and reuses
+                     * its vacated heap entry. */
+                    sc64_depth_push(heap, &size, layer + 1, 0, DEPTH_PROJECTILE,
+                                    DEPTH_FLIGHT_TRAIL_BASE + i);
+                    parts |= SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+                }
+                draw_tracer((int)i, parts);
+            }
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             diag_tracer_cycles += gba_clock() - start;
 #endif
