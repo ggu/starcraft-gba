@@ -116,39 +116,50 @@ static int sc64_p6_count_snapshot_begin(Sc64P6CountSnapshot *snapshot,
     }
     if (!snapshot->cached_rows) return 0;
 
+    /* Resolve the source selectors before scanning the actors. Only
+     * CurrentPlayer depends on the live owner, including after a rescue. */
+    u32 owner_rows[12][2] = {{0}};
+    for (unsigned raw_owner = 0; raw_owner < 12; ++raw_owner) {
+        u32 selectors = snapshot->selectors;
+        while (selectors) {
+            unsigned selector = (unsigned)__builtin_ctz(selectors);
+            u32 rows = snapshot->selector_rows[selector];
+            selectors &= selectors - 1u;
+            if (sc64_p6_world_owner_matches(ctx, selector, (int)raw_owner, RESCUABLE) > 0)
+                owner_rows[raw_owner][0] |= rows;
+            if (sc64_p6_world_owner_matches(ctx, selector, (int)raw_owner, SIDE) > 0)
+                owner_rows[raw_owner][1] |= rows;
+        }
+    }
+
     for (unsigned category = 0; category < 2; ++category) {
         int building = (int)category;
         unsigned limit = building ? MAX_BUILDINGS : MAX_UNITS;
         for (unsigned slot = 0; slot < limit; ++slot) {
-            int alive, raw, raw_owner, live_owner, x, y;
+            int raw, raw_owner, live_owner, x, y;
             if (building) {
-                alive = b[slot].alive;
-                if (!alive) continue;
+                if (!b[slot].alive) continue;
+                raw_owner = b[slot].raw_owner; live_owner = b[slot].owner;
+            } else {
+                if (!u[slot].alive) continue;
+                raw_owner = u[slot].raw_owner; live_owner = u[slot].owner;
+            }
+            if ((unsigned)raw_owner >= 12u) {
+                snapshot->fallback_rows |= snapshot->cached_rows;
+                continue;
+            }
+            u32 actor_rows = owner_rows[raw_owner][live_owner == SIDE] &
+                             snapshot->cached_rows & ~snapshot->fallback_rows;
+            if (!actor_rows) continue;
+            if (building) {
                 raw = b[slot].raw_type >= 0 ? b[slot].raw_type :
                       sc64_race_raw_building(b[slot].type);
-                raw_owner = b[slot].raw_owner; live_owner = b[slot].owner;
                 x = b[slot].x; y = b[slot].y;
             } else {
-                alive = u[slot].alive;
-                if (!alive) continue;
                 raw = u[slot].raw_type >= 0 ? u[slot].raw_type :
                       sc64_race_raw_unit(u[slot].type);
-                raw_owner = u[slot].raw_owner; live_owner = u[slot].owner;
                 x = u[slot].x; y = u[slot].y;
             }
-            /* Resolve each distinct source selector once per actor. Most
-               P6 Bring rows share CurrentPlayer, so hostile actors need not
-               repeat that same owner test for every objective rectangle. */
-            u32 actor_rows=0, selectors=snapshot->selectors;
-            while (selectors) {
-                unsigned selector=(unsigned)__builtin_ctz(selectors);
-                u32 rows=snapshot->selector_rows[selector] & snapshot->cached_rows;
-                int owner_match=sc64_p6_world_owner_matches(ctx,selector,raw_owner,live_owner);
-                selectors &= selectors-1u;
-                if (owner_match<0) snapshot->fallback_rows |= rows;
-                else if (owner_match) actor_rows |= rows;
-            }
-            actor_rows &= ~snapshot->fallback_rows;
             if (raw<0) continue;
             while (actor_rows) {
                 unsigned row=(unsigned)__builtin_ctz(actor_rows);

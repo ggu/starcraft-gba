@@ -101,7 +101,9 @@ static void assert_matches_fullscan_reference(unsigned iteration)
         /* Keep the full-scan dist2 safely inside int range while exercising
            signed compact positions and dense near/far actor distributions. */
         q->x=(s16)((int)(next_random()%2400u)-300);
-        q->y=(s16)((int)(next_random()%2400u)-300);
+        /* Alternate through the normal Y bands and the signed fallback. */
+        q->y=(s16)(iteration & 1 ? (int)(next_random()%2048u) :
+                                (int)(next_random()%2400u)-300);
         q->hp=q->maxhp=1000;
         q->order=(next_random()%7u)==0?ORDER_ATTACK_MOVE:ORDER_IDLE;
         q->target=(s16)(next_random()%MAX_UNITS);
@@ -117,7 +119,6 @@ static void assert_matches_fullscan_reference(unsigned iteration)
         invincible_buildings[i]=(u8)(next_random()%2u);
     }
     assert_current_world_matches_fullscan_reference();
-    (void)iteration;
 }
 
 static void exact_radius_cases(void)
