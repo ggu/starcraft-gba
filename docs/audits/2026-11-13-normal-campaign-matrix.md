@@ -86,6 +86,48 @@ Aggregate sweep receipt SHA-256
 The normal default build reproduces the replayed ROM byte for byte.
 [Decoder activation](2026-11-20-packed-save-byte-reads.md#normal-terran-activation-with-aligned-route-packing)
 
+## Terran campaign on the shared-depth release
+
+All ten Terran missions reach victory on the normal `83edffe8` Terran
+ROM. The ordinary-button mGBA replays start from HOME, read the
+briefing, save in the pause menu and continue from a fresh HOME load.
+All 636 distinct sampled ticks and the retained dialogue checks match
+the prior full sweep. The pause and victory journals match their prior
+bytes. A third emulator restores the frozen victory for each mission
+and re-exports the same 32 KiB SRAM after eight neutral updates.
+
+| Mission | Pause → victory frame | Sampled ticks | Replay receipt SHA-256 |
+| --- | ---: | ---: | --- |
+| T1 Wasteland | 6,214 → 10,120 | 12 | `203de1f4ef8acaebc0ab1557f04c65170c3b2c2971912faf2d3062681d8d629c` |
+| T2 Backwater Station | 18,204 → 29,366 | 31 | `2e8f5b6370006ee38245f5b4eeb57c7fb47ff60c8030a29aa50b3ef74ad614e6` |
+| T3 Desperate Alliance | 26,993 → 54,000 | 56 | `72fdf7e32db0cc2bb1650c13fa33936f61da8de4875de1990a395961f97bc476` |
+| T4 The Jacobs Installation | 4,968 → 8,911 | 10 | `7f1f3d46d9fddb6135725751611b37b67a5898eb99a100a94ccd1702f407d408` |
+| T5 Revolution | 72,076 → 126,331 | 148 | `5faa732936e510c30e542bb1f98c73ef30ea14f26f202f56d893b04f74804c30` |
+| T6 Norad II | 19,466 → 23,536 | 42 | `142f444a8da9fa3cecc154b85e8c72be61c88306871dbbf25a2834ab950ba14e` |
+| T7 The Trump Card | 2,289 → 3,931 | 12 | `9aba3dfd29397af7f7a376553d80d47eeeae2334dcb667eddb718da027a88075` |
+| T8 The Big Push | 2,568 → 139,216 | 268 | `10b79e26a4944aee5e4329472b9b2392eed0dc46258aab421620207dcb4f291b` |
+| T9 New Gettysburg | 35,363 → 47,266 | 51 | `4400817322ddde9d327a10ec79f41b6044baf2691614584840ce99077a80fbb0` |
+| T10 The Hammer Falls | 2,276 → 3,361 | 6 | `e4230a6a632eaf3be206659932d73d1d3dd85ed1e0c00e7a21680bde53a0e5ec` |
+
+The tested ROM SHA-256 is
+`682c223e1b984c88ce362fa93309d006e6dd80416ef111a50d34c6a4eabd2df9`.
+The aggregate receipt SHA-256 is
+`814371d650a32d97fa67a11ff6cc85039533d8c045b92a0355a505ee2a5cf226`.
+
+### The Hammer Falls on the rendering follow-up
+
+The `13de558d` release adds turret, missile-trail and unit-edge depth
+changes. Its normal Terran ROM SHA-256 is
+`526a3329d85cc5b207088b0f7da681410ea3c5bbebd5b76c073ab6a807fd3701`.
+On this ROM, T10 matches all six sampled ticks, its briefing and in-game
+dialogue, and the frame-3,361 victory with Raynor alive and the Ion
+Cannon destroyed. The pause, victory and fresh readback images match
+their `83edffe8` bytes. The full sweep above applies to the prior ROM.
+[Rendering follow-up](2026-11-21-native-depth-followup.md#combined-verification)
+
+The focused replay receipt SHA-256 is
+`af9a633c46f9b697b5769cf5b7a8e4ea4fba93de641a33bb9b6e7551255be7d1`.
+
 ## Word-packed Z10 and P10 cartridges
 
 The prior ordinary-input HOME routes and fresh-process reloads pass on
