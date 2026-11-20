@@ -117,11 +117,13 @@ static void detector_identity_owner_liveness_and_ranges(void)
     u[hero].x=1000; u[hero].y=1000;
     assert(!race_z6_cloaked_target_attackable(hero));
     assert(!race_can_attack(U_MARINE,hero));
+    assert(!sc64_auto_target_candidate_allowed(U_MARINE,hero,ENEMY,1));
 
     int observer=add_observer(SIDE,3,1000,1000);
     assert(!race_z6_cloaked_target_attackable(hero)); /* Allied detector. */
     u[observer].owner=ENEMY; u[observer].raw_owner=1;
     assert(race_z6_cloaked_target_attackable(hero));
+    assert(sc64_auto_target_candidate_allowed(U_MARINE,hero,ENEMY,1));
     u[observer].x=u[hero].x+156;
     assert(race_z6_cloaked_target_attackable(hero)); /* Inclusive box-distance edge. */
     u[observer].x=u[hero].x+157;
@@ -146,6 +148,7 @@ static void detector_identity_owner_liveness_and_ranges(void)
     race_z6.cloak.active=0;
     assert(race_z6_cloaked_target_attackable(hero));
     assert(race_can_attack(U_MARINE,hero));
+    assert(sc64_auto_target_candidate_allowed(U_MARINE,hero,ENEMY,1));
 }
 
 static void save_roundtrip_and_candidate_rejection(void)

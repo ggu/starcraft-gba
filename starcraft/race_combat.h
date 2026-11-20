@@ -13,10 +13,18 @@ race_can_attack(int attacker,int target) {
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
     if(target<MAX_UNITS&&SC64_TRANSPORT_LOADED(&u[target]))return 0;
 #ifdef SC64_Z5_CLOAK_ENABLED
+#ifdef SC64_TARGET_POLICY_PROBE
+    if (race_z5.cloak.active && !race_z5_cloaked_target_attackable(target)) return 0;
+#else
     if (!race_z5_cloaked_target_attackable(target)) return 0;
 #endif
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
+#ifdef SC64_TARGET_POLICY_PROBE
+    if (race_z6.cloak.active && !race_z6_cloaked_target_attackable(target)) return 0;
+#else
     if (!race_z6_cloaked_target_attackable(target)) return 0;
+#endif
 #endif
 #ifdef SC64_T4_RUNTIME
     if(target<MAX_UNITS) {

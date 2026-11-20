@@ -2315,6 +2315,9 @@ static void race_z8_note_unit_spawn(int slot, int owner, int type);
 static void race_z8_note_building_spawn(int slot, int owner, int type);
 static void race_z8_note_product_building(int building);
 static int race_z8_unit_hidden_from_side(int unit);
+#ifdef SC64_TARGET_POLICY_PROBE
+static u8 race_z8_hidden_any;
+#endif
 #endif
 #ifdef SC64_Z9_RUNTIME
 #define SC64_Z9_GLOBAL_ID 20
@@ -4394,6 +4397,20 @@ sc64_auto_target_candidate_allowed(int attacker, int target, int owner,
         if (tx < 0 || ty < 0 || tx >= WORLD_W || ty >= WORLD_H ||
             !currently_visible(tx, ty)) return 0;
     }
+#if defined(SC64_TARGET_POLICY_PROBE) && !defined(SC64_P7_OBSERVER_ENABLED) && \
+    !defined(SC64_P6_COMBAT_ENABLED) && !defined(SC64_T6_RUNTIME) && \
+    ((defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+     defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT))
+    /* In these profiles the wrappers add only the Scourge rule and the
+     * Z8 visibility test. Keep the wrapper for specialized attackers. */
+    if (attacker != U_SCOURGE) {
+#ifdef SC64_Z8_RUNTIME
+        if (owner == SIDE && race_z8_hidden_any && race_z8_unit_hidden_from_side(target))
+            return 0;
+#endif
+        return race_can_attack(attacker, target);
+    }
+#endif
     return SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner);
 }
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
