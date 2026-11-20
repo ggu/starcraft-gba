@@ -184,7 +184,8 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
             int layer = death_vfx_world_layer(row, piece);
             if (layer < 0) continue;
             int world_y = row->y;
-            if (piece->flags & SC64_DEATH_SOURCE_FIXED_LOW) world_y += piece->y;
+            if (piece->flags & (SC64_DEATH_SOURCE_FIXED_LOW | SC64_DEATH_SOURCE_DETACHED_SPRITE))
+                world_y += piece->y;
             sc64_depth_push(heap, size, (unsigned)layer, world_y, DEPTH_DEATH,
                             i * SC64_DEATH_SOURCE_MAX_LAYERS + j);
         }

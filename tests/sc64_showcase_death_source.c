@@ -31,7 +31,8 @@ static unsigned compare_source_pass(int under)
             unsigned frame;
 #ifdef SC64_DEATH_WORLD_DEPTH
             if ((layer->flags & SC64_DEATH_SOURCE_FIXED_LOW) ||
-                (e->actor_layer_plus1 && (layer->flags & SC64_DEATH_SOURCE_ACTOR_SPRITE))) continue;
+                (e->actor_layer_plus1 && (layer->flags &
+                 (SC64_DEATH_SOURCE_ACTOR_SPRITE | SC64_DEATH_SOURCE_DETACHED_SPRITE)))) continue;
 #endif
             if ((layer->flags & SC64_DEATH_SOURCE_UNDER) != under ||
                 !sc64_death_source_layer_frame(layer, age, &frame)) continue;
@@ -127,6 +128,15 @@ static void test_death_depth(void)
         { 52, -3, U_TANK, 5, 4, 1, 7 },
         { 52,  3, U_TANK, 5, 4, 0, 7 },
         { 52,  0, U_WRAITH, 5, 4, 0, 7 },
+        /* Each gas structure spawns a separate burst one tier above itself. */
+        { 52,  3, U_TANK, 5, 5, 1, 110 },
+        { 52,  0, U_WRAITH, 5, 5, 0, 110 },
+        {  1,  0, U_WRAITH, 5, 5, 0, 110 },
+        { 106, 0, U_WRAITH, 5, 5, 0, 110 },
+        { 52,  3, U_TANK, 5, 5, 1, 149 },
+        { 52,  0, U_WRAITH, 5, 5, 0, 157 },
+        /* The Queen's attached image outlasts its detached sprite body. */
+        { 52,  0, U_WRAITH, 5, 19, 1, 45 },
     };
     for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
         game_init();
@@ -138,20 +148,42 @@ static void test_death_depth(void)
         camx = camy = 0;
         int y = cases[n].y;
         int raw = cases[n].victim_raw;
-        int victim = spawn_unit(SIDE, raw == 7 ? U_SCV : U_ZERGLING, 96, y);
-        assert(victim >= 0);
-        u[victim].raw_type = raw;
+        int burst_image = 0;
+        if (raw == 110 || raw == 149 || raw == 157) {
+            int type = raw == 110 ? B_REFINERY : raw == 149 ? B_EXTRACTOR : B_ASSIMILATOR;
+            int victim = spawn_build(SIDE, type, 96, y, 0);
+            assert(victim >= 0);
+            b[victim].raw_type = raw;
+            death_vfx_scan();
+            b[victim].hp = 0;
+            b[victim].alive = 0;
+            burst_image = raw == 110 ? 334 : raw == 149 ? 60 : 215;
+        } else {
+            int type = raw == 7 ? U_SCV : raw == 45 ? U_QUEEN : U_ZERGLING;
+            int victim = spawn_unit(SIDE, type, 96, y);
+            assert(victim >= 0);
+            u[victim].raw_type = raw;
+            death_vfx_scan();
+            u[victim].hp = 0;
+            u[victim].alive = 0;
+            if (raw == 45) burst_image = 58;
+        }
         death_vfx_scan();
-        u[victim].hp = 0;
-        u[victim].alive = 0;
-        death_vfx_scan();
-        assert(death_vfx[0].source && death_vfx[0].actor_layer_plus1 == 5);
+        assert(death_vfx[0].source &&
+               death_vfx[0].actor_layer_plus1 == (raw == 45 ? 19 : 5));
         frame += cases[n].elapsed;
 
         u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];
         unsigned size = 0;
         sc64_depth_push_deaths(keys, &size);
         assert(size == 1 && (keys[0] >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        if (burst_image) {
+            const Sc64DeathSource *art = sc64_death_source(raw);
+            unsigned index = (keys[0] & DEPTH_SLOT_MASK) % SC64_DEATH_SOURCE_MAX_LAYERS;
+            assert(art && index < art->layer_count);
+            assert(art->layers[index].image_id == burst_image &&
+                   (art->layers[index].flags & SC64_DEATH_SOURCE_DETACHED_SPRITE));
+        }
         capture_death_overlap(effect_pixels);
 
         int actor = spawn_unit(SIDE, cases[n].type, 96, y + cases[n].dy);

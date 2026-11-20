@@ -381,7 +381,9 @@ def death_source_input_ready(path: Path) -> bool:
         return False
     return (re.search(r"^#define\s+SC64_DEATH_SOURCE_BANK_VERSION\s+2u?\s*$",
                       text, re.MULTILINE) is not None and
-            re.search(r"^#define\s+SC64_DEATH_SOURCE_METADATA_VERSION\s+1u?\s*$",
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_METADATA_VERSION\s+2u?\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_DEPTH_LAYERS\s+[1-8]u?\s*$",
                       text, re.MULTILINE) is not None and
             re.search(r"^#define\s+SC64_DEATH_SOURCE_PIXEL_BYTES\s+[1-9]\d*u?\s*$",
                       text, re.MULTILINE) is not None and
