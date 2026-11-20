@@ -41,7 +41,11 @@ sc64_packed_building_put(Sc64PackedBuildingSave *row, unsigned *bit,
     return 1;
 }
 
+#ifdef SC64_COMPACT_BUILDING_FIXED_READER
+static inline __attribute__((always_inline)) int
+#else
 static int
+#endif
 sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
                          unsigned width, u32 *value)
 {

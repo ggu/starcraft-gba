@@ -2,9 +2,19 @@
 #ifndef SC64_SAVE_BITS_H
 #define SC64_SAVE_BITS_H
 
+#if defined(SC64_LATE_TERRAN_STORAGE) && \
+    !defined(SC64_COMPACT_BUILDING_LEGACY_READER) && \
+    !defined(SC64_COMPACT_BUILDING_FIXED_READER)
+#define SC64_COMPACT_BUILDING_FIXED_READER 1
+#endif
+
 /* Packed save fields are least-significant bit first. Read only the bytes
  * spanned by the field, including fields at the end of an unaligned row. */
-static inline int
+static inline
+#ifdef SC64_COMPACT_BUILDING_FIXED_READER
+__attribute__((always_inline))
+#endif
+int
 sc64_save_read_bits(const u8 *bytes, unsigned row_bits, unsigned *bit,
                     unsigned width, u32 *value)
 {
