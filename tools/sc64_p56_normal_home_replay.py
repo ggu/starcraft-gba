@@ -80,11 +80,11 @@ def run(args):
     stop, edges, checks, briefs, modals = plan(json.loads(args.trace.read_text()), args.pages.read_text(), mission)
     cut = args.fresh_save_call
     if cut is not None:
-        require(mission == 25 and cut in checks and checks[cut]["screen"] == 1
+        require(mission in (23, 25) and cut in checks and checks[cut]["screen"] == 1
                 and checks[cut]["mode"] == 0 and checks[cut]["kind"] == "periodic"
                 and all(not tick <= cut <= tick + 2 for tick in modals)
                 and next(mask for tick, mask in reversed(edges) if tick < cut) == 0,
-                "fresh SRAM cut must be a neutral P6 field checkpoint")
+                "fresh SRAM cut must be a neutral P4 or P6 field checkpoint")
     if args.plan:
         return dict(calls=stop, checks=len(checks), briefing=len(briefs), dialogue=len(modals))
     require(args.out and shutil.disk_usage(args.out.parent).free >= int(5.25 * 2**30), "need new output and 5.25 GiB")
@@ -161,7 +161,8 @@ def run(args):
         return result
 
     def persisted_world():
-        return dict(world=g.state(), p6=r.read(g.sym["race_p6"], g.sizes["race_p6"]),
+        scenario = f"race_p{n}"
+        return dict(world=g.state(), scenario=r.read(g.sym[scenario], g.sizes[scenario]),
                     controls=observe())
 
     caps = {i for i in range(500, stop, 500)} | set(checks) | set(briefs)
@@ -228,7 +229,7 @@ def run(args):
                 loaded = persisted_world()
                 require(scalar("race_selected_mission") == mission
                         and all(loaded[key] == saved[key] for key in saved),
-                        "fresh HOME L changed the saved P6 world, controls or trigger state")
+                        "fresh HOME L changed the saved world, controls or trigger state")
                 r.set_keys(0)
                 offset = r.completed - cut
                 edges = [(t + offset, mask) for t, mask in edges if t >= cut]
@@ -247,7 +248,7 @@ def run(args):
         require_unchanged(files, hashes)
         if cut is not None:
             require(journal and hashlib.sha256(save_path.read_bytes()).hexdigest() == journal["sha256"],
-                    "P6 save changed during continuation")
+                    "SRAM changed during continuation")
         cycles = prior_cycles + r.clock() - timing_start
         result = dict(result="won", mission=mission, calls=stop, cycles=cycles, updates_per_second=stop*16777216/cycles,
                       observations=observations, terminal=terminal, briefing=briefing_seen, dialogue=dialogue_seen, sha256=hashes)
@@ -272,6 +273,6 @@ if __name__ == "__main__":
         cli.add_argument("--" + name + "-sha256", required=True)
     cli.add_argument("--out", type=Path)
     cli.add_argument("--plan", action="store_true")
-    cli.add_argument("--fresh-save-call", type=int, help="pause, save, and reload at a neutral P6 checkpoint")
+    cli.add_argument("--fresh-save-call", type=int, help="pause, save, and reload at a neutral P4 or P6 checkpoint")
     cli.add_argument("--quiet-guest", action="store_true", help="discard emulator log chatter")
     print(json.dumps(run(cli.parse_args()), indent=2))
