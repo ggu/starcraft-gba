@@ -95,11 +95,7 @@ static void continued_field_rank(int block_nearest)
     assert(worker_continue_minerals(&u[w]));
     assert(u[w].target == (block_nearest ? 1 : 3));
 #ifdef SC64_IMPORTED_MISSION
-#ifdef SC64_MINERAL_FIRST_NEAREST_PROBE
     assert(sc64_route_builds - builds == (block_nearest ? 2u : 1u));
-#else
-    assert(sc64_route_builds - builds == (block_nearest ? 2u : 3u));
-#endif
 #endif
 }
 
