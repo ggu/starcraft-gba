@@ -728,3 +728,12 @@ visibility work. Measure overlap, clipped pixels and both framebuffer
 pages again when using an existing word-packed frame in more cases.
 The profiler receipt SHA-256 is
 `fccac7948620da38231cd87f7e86c3bf42192e54f087b4f511c8fbb573a60368`.
+
+An opt-in test lets clipped death sprites use existing packed-word
+frames. The current P10 replay preserves 17 world, palette and two-page
+samples and 161 cached-field hashes through victory. Its late active
+window averages 0.14% fewer guest cycles. At calls 45,466 and 45,467,
+three and one draws use the clipped word path. A single indexed draw
+still costs about 116,000 cycles at each sample. Keep the existing path
+as the default. For larger savings check coverage of those expensive
+indexed frames and the separate building blit.
