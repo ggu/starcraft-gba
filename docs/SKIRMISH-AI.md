@@ -246,7 +246,7 @@ why:
 | Carrier and Interceptors in the Terran, Zerg and Showcase ROMs | Not compiled there, so a Protoss opponent in those ROMs never trains Carriers (see [Carriers in the other ROMs](CARRIER-PROJECTILES.md#carriers-in-the-other-roms)). The Protoss ROM does train them, above. |
 | Unit morphs: Lurker, Guardian, Devourer, Archon | Not available. The Hive and Greater Spire morphs have no payoff and are skipped. |
 | Siege Mode transition and Siege research | Tanks fight in Tank Mode only. |
-| Bunker loading by computer players | Opponents do not build Bunkers. |
+| Bunker loading by computer players | Opponents do not build or staff Bunkers. [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md) |
 | Comsat Station, Nuclear Silo, Covert Ops, Physics Lab, Valkyrie, Corsair | Unmapped or unavailable in the catalog adapter. |
 | Per-owner fog of war | Opponents have full knowledge of hostile actors (see above). |
 
