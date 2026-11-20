@@ -61,6 +61,58 @@ and acknowledgment calls above.
 | T1 HOST tape | `5b6fc3b6af2ad1206f587f35de4587d26ed567a1e98e93d487b4ec758a29ee38` |
 | T2 HOST tape | `48074d9c15899db45034e9e741d82fdf095fe08d6df5504d963250bb79c1b022` |
 
+## November 20 T2 fresh SRAM and result autosave
+
+Backwater Station uses the normal Terran ROM built from `b2087fac`.
+The campaign replay source is based on `856668b3`, which has the same
+compiled inputs. The observer begins at HOME, reveals all eight
+briefing pages and plays 29,380 gameplay calls from the original T2
+tape. The trace counts seven earlier HOME inputs separately.
+
+At gameplay call 18,213, frame 18,204, worker slot 67 is selected.
+Start pauses and B saves bank 0. A fresh emulator presses L at HOME
+and restores the observed world, campaign and Backwater trigger
+state, selection and cursor. The camera derived from that cursor
+matches at this cut.
+
+All 29 tape checkpoints plus launch and victory match. Twelve
+observations follow the fresh load. The observer acknowledges 12
+authored gameplay pages with the simulation frame held. At frame
+29,366, Raynor survives in slot 56 and the Infested Command Center
+is gone. The Backwater outcome and primary objective record a win.
+Terran retains 14 Marines, three Firebats, three SCVs, 1,164 minerals
+and 200 gas. The game writes bank 1 and preserves bank 0. A third
+emulator loads the frozen result with all 18 selected slots intact
+and exports byte-identical SRAM. The shared observer also replays T1
+on this cartridge and reproduces both of its saved journals.
+
+The timed portion covers 29,446 controller calls and averages
+666,900 guest cycles per main loop, or 25.16 emulated updates per
+second. The largest measured update is 27,537,912 cycles. The counts
+include UI, rendering, save and load. Physical GBA performance
+remains unmeasured.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 2 --save-tick 18213 \
+  --trace "$T2_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `80cf073bd02d580b127ccfd710feaf65bf0e2c285a27c2d6411d452fb3200576` |
+| Matching ELF | `4ea80a38436e943fc9ca6f41812be27152a5abcb8e431ec07d7cabacd2fb87b1` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `48074d9c15899db45034e9e741d82fdf095fe08d6df5504d963250bb79c1b022` |
+| Replay harness | `de24ef805e862593f27ed2ae0045b49577ebcc7223b0ccc631baed7c5ff6f35c` |
+| Shared unit checkpoint observer | `d2838373c2bc9e822bf712ec053c0dfcdad02a8ca6a099f7f5e4d020e3f42648` |
+| Pause SRAM | `c51c27561d5b60f97b289603991c962de5f4fb6f3f529b23b5b798936ed72ca8` |
+| Victory SRAM and fresh readback | `0b90174a29f4502a026a8e99dfe8aca3c1a4b027aa87fb3e36ee956614eb7094` |
+| T2 replay and both journal checks | `721535989a87ffe08f0c6557d0fd006b6478d2d259bc820c7756702ad7a030f9` |
+| T1 regression | `67283fa918311ee86feff81bf3a5e5d20f4697ae668b7e0a46b839e3a3729f1e` |
+
 ## November 20 T1 fresh SRAM and result autosave
 
 The replay uses the normal Terran death-depth cartridge from
