@@ -14,10 +14,14 @@ static int race_bc_facility_fields_valid(const Building *q,unsigned ww,unsigned 
     return q->build_progress>=24 && q->queue_progress>=24 &&
         (unsigned)q->build_progress<ww-24 && (unsigned)q->queue_progress<wh-24;
 }
+static int race_bc_facility_in_flight(const Building *q)
+{
+    return (q->flags & 4) && sc64_race_raw_building(q->type) == 116;
+}
 static int race_bc_facility_airborne(int slot)
 {
-    return slot>=0 && slot<MAX_BUILDINGS && b[slot].alive &&
-        (b[slot].flags&4)!=0 && sc64_race_raw_building(b[slot].type)==116;
+    return (unsigned)slot < MAX_BUILDINGS && b[slot].alive &&
+           race_bc_facility_in_flight(&b[slot]);
 }
 static int race_bc_facility_landing_site(int slot,int x,int y)
 {

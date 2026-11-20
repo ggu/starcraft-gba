@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check T7, T9 or T10 on a normal Terran ROM using physical buttons."""
+"""Check T7 through T10 on a normal Terran ROM using physical buttons."""
 import argparse
 import hashlib
 import json
@@ -22,6 +22,8 @@ from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta,
 
 INNER_TAG, OUTER_TAG = 0x72435442, 0x76435442
 T7_DIALOGUE = {1: (1, 2), 682: (661, 1), 4189: (3931, 1)}
+T8_DIALOGUE = {1404: (1321, 1)}
+T8_LAST_ASSAULT = 143122
 T9_DIALOGUE = {1: (1, 4), 47969: (47251, 9)}
 T7_FIELDS = (
     "frame", "screen", "won", "lost", "mission", "faults", "phase",
@@ -37,6 +39,9 @@ T10_FIELDS = ("frame", "screen", "won", "lost", "mission", "faults", "phase",
               "objective_flags", "race_completed", "hostile_buildings",
               "ion_cannon_slot", "ion_cannon_alive", "hero_slot", "hero_raw",
               "hero_alive", "minerals", "gas")
+T8_FIELDS = tuple(name for name in T10_FIELDS if name not in (
+    "ion_cannon_slot", "ion_cannon_alive", "hero_slot", "hero_raw",
+))
 
 
 def load_late_trace(path, chapter, fields, stop, expected_ticks):
@@ -58,7 +63,8 @@ def load_late_trace(path, chapter, fields, stop, expected_ticks):
             raise ValueError(f"T{chapter} observations disagree at {tick}")
         observations[tick] = row
         labels.setdefault(tick, []).append(row["kind"])
-    if not expected_ticks <= observations.keys() or (chapter == 7 and len(rows) != 15):
+    expected_rows = {7: 15, 8: 272}
+    if not expected_ticks <= observations.keys() or len(rows) != expected_rows.get(chapter, len(rows)):
         raise ValueError(f"T{chapter} trace is missing a checkpoint from the qualified route")
     transitions = [(tick - launch + 1, held) for tick, held in reference["inputs"] if tick >= launch]
     if transitions and transitions[0][0] == 1:
@@ -105,7 +111,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("trace", "rom", "elf", "runner", "out"):
         parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--chapter", type=int, choices=(7, 9, 10), default=9)
+    parser.add_argument("--chapter", type=int, choices=(7, 8, 9, 10), default=9)
     parser.add_argument("--save-tick", type=int, required=True,
                         help="neutral completed gameplay tick for pause, save and fresh HOME load")
     args = parser.parse_args()
@@ -118,11 +124,13 @@ def main():
     mission = chapter + 3
     briefing_pages, dialogue_cuts, stop, compared = {
         7: (17, T7_DIALOGUE, 4189, T7_FIELDS),
+        8: (9, T8_DIALOGUE, 143260, T8_FIELDS),
         9: (9, T9_DIALOGUE, 47984, COMPARED),
         10: (14, {1: (1, 4)}, 3446, T10_FIELDS),
     }[chapter]
     qualified_ticks = {
         7: {0, 1, 2, 347, 1000, 1264, 2000, 2200, 2334, 3000, 4000, 4189},
+        8: {0, 120, 332, 507, 1645, 5795, 143260, *range(1000, 143260, 1000)},
         10: {0, 120, 1000, 2000, 3000, 3446},
     }
     plan = load_trace(args.trace) if chapter == 9 else load_late_trace(
@@ -177,7 +185,7 @@ def main():
             state["hero_slot"] = hero["slot"] if hero else -1
             state["hero_raw"] = hero["raw_type"] if hero else -1
             state["ion_cannon_slot"] = cannon["slot"] if cannon else -1
-        else:
+        elif chapter == 9:
             state["selected_building"] = n("selected_building")
             state["selection"] = len(selected_units())
         return state
@@ -211,6 +219,7 @@ def main():
         point = dict(tick=tick, **{k: observed[k] for k in compared})
         if chapter == 7:
             assert expected["tracked_carrier"] == last_carrier_slot
+        if chapter in (7, 8):
             point["labels"] = plan["labels"][tick]
         checkpoints.append(point)
         print("Matched", tick, expected["kind"], observed["frame"], flush=True)
@@ -235,10 +244,11 @@ def main():
         g.step(KEY_START)
         assert (n("screen"), n("frame"), n("race_selected_mission")) == (1, 0, mission)
 
-    def acknowledge(tick):
-        frame, limit = dialogue_cuts[tick]
+    def acknowledge(tick, frame, limit, allow_fewer=False):
         for _ in range(limit):
             count, page, armed, row = modal()
+            if allow_fewer and count == 0:
+                break
             assert 0 < count <= 13 and not armed and row < 256 and n("frame") == frame
             held = g.rsp.held
             key = KEY_START if held & KEY_A else KEY_A
@@ -250,6 +260,11 @@ def main():
         assert modal()[0] == 0
 
     briefing, dialogue, checkpoints = [], [], []
+    # T8's six victory pages are triggered once the last hostile building
+    # falls. Inspect each update after the last observed assault order so
+    # added physical acknowledgements cannot swallow a tape transition.
+    t8_final_cuts = range(T8_LAST_ASSAULT + 1, stop + 1) if chapter == 8 else ()
+    dialogue_count = 7 if chapter == 8 else sum(count for _, count in dialogue_cuts.values())
     try:
         assert n("screen") == n("frame") == g.front_field("page") == 0
         before = timing_snapshot(g.rsp, g.sym, g.sizes)
@@ -257,14 +272,18 @@ def main():
         compare(0)
         offset = g.rsp.completed
         edges = [(t + offset, mask) for t, mask in transitions]
-        for tick in sorted(set(plan["observations"]) | set(dialogue_cuts) | {cut}):
+        for tick in sorted(set(plan["observations"]) | set(dialogue_cuts) | {cut} | set(t8_final_cuts)):
             if not tick:
                 continue
             if shutil.disk_usage(args.out).free < disk_reserve:
                 raise RuntimeError(f"replay requires {disk_reserve >> 20} MiB free")
             g.rsp.play_to(tick + offset, edges)
             if tick in dialogue_cuts:
-                acknowledge(tick)
+                acknowledge(tick, *dialogue_cuts[tick])
+                offset = g.rsp.completed - tick
+                edges = [(t + offset, mask) for t, mask in transitions if t >= tick]
+            elif tick in t8_final_cuts and modal()[0]:
+                acknowledge(tick, n("frame"), dialogue_count - len(dialogue), allow_fewer=True)
                 offset = g.rsp.completed - tick
                 edges = [(t + offset, mask) for t, mask in transitions if t >= tick]
             else:
@@ -309,7 +328,7 @@ def main():
                 print("Fresh load", tick, n("frame"), flush=True)
         _verify_terminal(plan, observed)
         assert len(briefing) == briefing_pages
-        assert len(dialogue) == sum(count for _, count in dialogue_cuts.values())
+        assert len(dialogue) == dialogue_count
         assert len(checkpoints) == len(plan["observations"])
         timing = join_timing(prefix, timing_delta(before, timing_snapshot(g.rsp, g.sym, g.sizes), g.rsp.completed))
         final_state = persisted()

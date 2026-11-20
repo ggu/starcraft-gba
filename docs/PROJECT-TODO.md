@@ -71,7 +71,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores the loaded Dropship at frame 2,289 and wins with Kerrigan
   alive and the Emitter delivered. All 15 observation labels match,
   and the result bank restores the selected unit and re-exports
-  identical SRAM. Continue with a current save and result check for T8.
+  identical SRAM.
+  [T8 on normal Terran](audits/2026-11-13-t8-normal-physical.md#november-20-fresh-sram-and-result-autosave)
+  resumes after relocation and worker landing at frame 2,568. All 272
+  observation labels match, including 265 after the load. The Norad II
+  survives, all hostile buildings are destroyed, and the frozen result
+  re-exports identical SRAM. Apply the same gate to T6 next.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
@@ -2011,6 +2016,12 @@ AI wallets and full-match behavior remain unverified.
   after target loss. The siege overlap case compares both draw orders
   to account for palette remapping. Verify separate effects and exact
   sprite-ID ties with their own opaque overlap captures.
+- Add the [death sprite depth cases](audits/2026-11-19-world-depth.md#death-sprite-depth)
+  to ordinary-input replay coverage. The shared queue sorts source unit
+  collapse frames, direct Death attachments and opcode-17 corpses and
+  rubble. Check same-Y ties,
+  detached child opcodes, attacker muzzle attachments and special-effect
+  pools with separate native and GBA overlap witnesses.
 - Verify all four delivered products and the extra Z7/Z10 qualification builds
   when shared changes affect them. Keep generated inputs pinned and unchanged;
   serialize native builds, tests and emulation and reserve their output space.

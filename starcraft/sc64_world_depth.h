@@ -31,16 +31,14 @@ static unsigned
 sc64_building_world_layer(unsigned slot)
 {
     const Building *q = &b[slot];
-    /* Native liftoff puts the building between ground units and flyers.
-     * Use the live flight state, including during travel to a landing site. */
-    if (q->flags & 4) {
+    /* The destruction scan can still read the flight flag after the actor
+     * is marked dead. Landing clears that flag and restores ground depth. */
 #ifdef SC64_TERRAN_LATE_RUNTIME
-        if (race_late_airborne((int)slot)) return 12;
+    if (race_late_building_in_flight(q)) return 12;
 #endif
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
-        if (race_bc_facility_airborne((int)slot)) return 12;
+    if (race_bc_facility_in_flight(q)) return 12;
 #endif
-    }
     int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
     return sc64_world_actor_layer(raw, 4);
 }
@@ -69,6 +67,7 @@ sc64_unit_world_layer(const Unit *q)
 
 enum {
     DEPTH_MINERAL, DEPTH_GEYSER, DEPTH_BUILDING, DEPTH_UNIT, DEPTH_PROJECTILE,
+    DEPTH_DEATH,
     DEPTH_SLOT_BITS = 10,
     DEPTH_SLOT_MASK = (1 << DEPTH_SLOT_BITS) - 1,
     DEPTH_KIND_MASK = 7,
@@ -154,12 +153,70 @@ sc64_trace_world_y(unsigned i)
 }
 #endif
 
+#ifdef SC64_DEATH_WORLD_DEPTH
+_Static_assert(SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_MAX_LAYERS <= DEPTH_SLOT_MASK + 1 &&
+               SC64_DEATH_SOURCE_DEPTH_LAYERS <= SC64_DEATH_SOURCE_MAX_LAYERS,
+               "painter keys must hold every source death layer");
+
+static void __attribute__((noinline))
+sc64_depth_push_deaths(u32 *heap, unsigned *size)
+{
+    u32 now = death_vfx_now();
+    for (unsigned i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+        Sc64DeathVfx effect;
+        death_vfx_load_row((int)i, &effect);
+        const Sc64DeathVfx *row = &effect;
+#else
+        const Sc64DeathVfx *row = &death_vfx[i];
+#endif
+        if (!row->source || sc64_death_vfx_expired(row, now)) continue;
+        int x = row->x - camx, y = row->y - camy + 12;
+        if (!death_vfx_in_view(row, x, y)) continue;
+        const Sc64DeathSource *art = sc64_death_source(row->raw);
+        u32 age = sc64_death_vfx_age_su(row->birth, now);
+        for (unsigned j = 0; j < art->layer_count; ++j) {
+            const Sc64DeathSourceLayer *piece = &art->layers[j];
+            if (age < piece->start_su || age >= piece->end_su) continue;
+            int layer = death_vfx_world_layer(row, piece);
+            if (layer < 0) continue;
+            int world_y = row->y;
+            if (piece->flags & SC64_DEATH_SOURCE_FIXED_LOW) world_y += piece->y;
+            sc64_depth_push(heap, size, (unsigned)layer, world_y, DEPTH_DEATH,
+                            i * SC64_DEATH_SOURCE_MAX_LAYERS + j);
+        }
+    }
+}
+
+static void __attribute__((noinline))
+sc64_depth_draw_death(unsigned slot)
+{
+    unsigned index = slot / SC64_DEATH_SOURCE_MAX_LAYERS;
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    Sc64DeathVfx effect;
+    death_vfx_load_row((int)index, &effect);
+    const Sc64DeathVfx *row = &effect;
+#else
+    const Sc64DeathVfx *row = &death_vfx[index];
+#endif
+    const Sc64DeathSource *art = sc64_death_source(row->raw);
+    const Sc64DeathSourceLayer *piece = &art->layers[slot % SC64_DEATH_SOURCE_MAX_LAYERS];
+    unsigned frame_index;
+    if (sc64_death_source_layer_frame(piece, sc64_death_vfx_age_su(row->birth, death_vfx_now()),
+                                     &frame_index))
+        death_vfx_draw_source_layer(piece, row->x - camx, row->y - camy + 12, frame_index);
+}
+#endif
+
 static void __attribute__((noinline))
 sc64_draw_depth_ordered_actors(void)
 {
     u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + MAX_RACE_GEYSERS
 #ifdef SC64_PROJECTILE_DEPTH
              + MAX_TRACERS
+#endif
+#ifdef SC64_DEATH_WORLD_DEPTH
+             + SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_DEPTH_LAYERS
 #endif
              ];
     unsigned size = 0;
@@ -203,6 +260,9 @@ sc64_draw_depth_ordered_actors(void)
         }
     }
 #endif
+#ifdef SC64_DEATH_WORLD_DEPTH
+    sc64_depth_push_deaths(heap, &size);
+#endif
     while (size) {
         u32 key = sc64_depth_pop(heap, &size);
         unsigned i = key & DEPTH_SLOT_MASK;
@@ -217,6 +277,11 @@ sc64_draw_depth_ordered_actors(void)
             draw_building_art(&b[i]);
             draw_building_overlay(&b[i]);
             break;
+#ifdef SC64_DEATH_WORLD_DEPTH
+        case DEPTH_DEATH:
+            sc64_depth_draw_death(i);
+            break;
+#endif
         case DEPTH_UNIT:
             if (u[i].selected) draw_unit_pass(&u[i], 1);
             draw_unit(&u[i]);

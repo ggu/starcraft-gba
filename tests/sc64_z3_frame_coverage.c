@@ -551,6 +551,28 @@ test_building_flight_layer(void)
     assert(sc64_building_world_layer((unsigned)facility) == 12);
     race_bc_facility_flight_tick();
     assert(sc64_building_world_layer((unsigned)facility) == 4);
+#ifdef SC64_DEATH_WORLD_DEPTH
+    assert(race_bc_facility_lift(facility));
+    death_vfx_reset();
+    death_vfx_scan();
+    b[facility].hp = 0;
+    destroy_building(facility, ENEMY);
+    assert(!race_bc_facility_airborne(facility));
+    death_vfx_scan();
+    assert(death_vfx[0].source && death_vfx[0].actor_layer_plus1 == 13);
+    frame += 5;
+    memset(visible, 0xff, sizeof(visible));
+    camx = x - 96;
+    camy = y - 52;
+    u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];
+    unsigned size = 0;
+    sc64_depth_push_deaths(keys, &size);
+    assert(size == 2);
+    assert((sc64_depth_pop(keys, &size) >> DEPTH_LAYER_BITS) == 1);
+    assert((sc64_depth_pop(keys, &size) >> DEPTH_LAYER_BITS) == 12);
+    puts("PASS destroyed lifted Facility: rubble layer 1, attached burst layer 12");
+    death_vfx_reset();
+#endif
     b[facility].alive = 0;
     invalidate_path_grid();
 #endif
