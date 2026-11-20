@@ -198,4 +198,48 @@ The far reader now compiles its shared oracle separately, preserving
 the profile's ordinary point movement. `make test-sc64-route-point-far-read`
 runs the same sanitizer checks both ways. The second fixture asserts
 at compile time that the ordinary movement optimization stays off.
-Normal Z10 ARM qualification remains pending.
+
+## Current Z10 ARM replay
+
+The control uses the normal Z10 release recipe with
+`SC64_ROUTE_DECAY_FREQ`. The candidate at `7b479aa3` adds the seven
+route flags and uses the same prepared death bank as the control.
+The control and candidate ROM SHA-256 prefixes are `b3408cd4dbb885bc`
+and `a8416f160bb138b2`. The candidate passes the normal Z10 header
+and save signature checks. Its IWRAM ends at `0x03004ec8` and EWRAM at
+`0x02038328`, leaving 312 and 23,768 bytes below the linker guards.
+The exact far reader and ordinary point-slot movement both link.
+The ordinary monotone next-step solver and its movement-mode slot
+wrapper are absent from the linked image.
+
+Load the retained Z8 ordinary pause SRAM from HOME using L. It starts
+at controller call 17,122, simulation frame 16,659. Follow the recorded
+controller inputs and acknowledge the same three modal boxes at
+calls 27,625, 27,746, and 27,894 without advancing the world.
+Continue through call 33,900. This comparison samples live units,
+buildings, resources, walkability, fog, and route metadata at 17
+boundaries. Both raw indexed pages, the active page selector, and
+the palette also match at all 17 boundaries. Frames and logical
+route counters match at all 203 timed updates.
+
+| Guest cycles | Current Z10 | Route trial |
+| --- | ---: | ---: |
+| Mean full loop | 1,684,685 | 1,555,372 |
+| Full loop p95 | 3,318,260 | 3,322,776 |
+| Peak full loop, call 33,800 | 12,282,072 | 11,023,609 |
+| Mean orders | 788,548 | 658,488 |
+| Peak orders, call 33,800 | 11,306,982 | 10,038,740 |
+
+The three timed windows are calls 26,330–26,370, 31,050–31,090, and
+33,780–33,900. They come from a selected busy suffix of the full
+campaign. Mean full-loop cost drops 7.68% and p95 rises 0.14%.
+The paired comparison SHA-256 begins `12a3bf7845d278091`.
+
+A second pair uses read-only entry breakpoints during those same
+windows. World, pixel, timing, and logical-counter receipts match the
+ordinary physical-input replay. The control enters 94 linear fills.
+The candidate enters three linear fills and attempts the local
+certificate 103 times. Both enter the cached weapon-range reader at
+the same 17 calls. No candidate call enters the distant-read helper,
+so the forced-wall test remains the only timing proof for that
+branch. The observer comparison SHA-256 begins `4e0e4b53b5e79c6a`.
