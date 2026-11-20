@@ -1,5 +1,33 @@
 # World depth regression cases
 
+The USA N64 renderer sorts visible sprites back to front by elevation. For
+elevations 0 through 4 it sorts by ascending world Y within each elevation.
+Higher elevations ignore Y. A turret flag and a sprite ID break remaining
+ties. The target picker calls the same depth helper.
+
+The layer values come from the 228-byte elevation column at offset 4068 in
+BOLT section `00C/001`. The section SHA-256 is
+`54356d7585c66cd463346996444fd208336eaacf6335d30eb2688aa73c9cb2df`.
+The USA ROM SHA-256 is
+`e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020`.
+The retained Wasteland observer capture at step 7121 has RAM SHA-256
+`d30d79bcd796c4c535c2667875da309a045bfe482bba9720ba01eb5f92951b9b`.
+Its helper at `0x80122750` feeds the render queue at `0x80045f48`, which
+drains back to front at `0x80120460`. The depth helper is also present at
+ROM offset `0xE6440` (64 bytes, SHA-256
+`f9a75923b37bbc55602345e4b1d20c0449c4ac922d8548afd203089c010cfaf1`).
+In native gameplay footage the
+Overlords cover the Hatchery rim, and a Probe covers the southeast Nexus lip.
+
+The GBA Mode 4 painter uses those elevation and Y rules for units, buildings
+and resources. The static lookup matches all 228 entries in the pinned N64
+unit table. Composite turrets remain with their hull. GBA actor kind and
+slot resolve exact ties as a deterministic approximation of the native
+sprite-ID tie. Native depth changes for special states still need individual
+checks. The change covers world actors in the shared campaign, skirmish and
+Showcase renderer. See the projectile section for moving weapon sprite
+coverage and the remaining passes that need separate depth references.
+
 ## Visibility and building overlay cost
 
 The shared Mode 4 queue now skips objects that the fog test would reject
@@ -32,34 +60,6 @@ The comparison receipt SHA-256 is
 `9f801806018fbe1e960bf8c004329fc017906f58830bdc946583dc275b7040ff`.
 The custom replay receipt SHA-256 is
 `e72ce8250143c07c5c9b55e4bb4bbabe64b22ca4992987cd50ff7439c911a672`.
-
-The USA N64 renderer sorts visible sprites back to front by elevation. For
-elevations 0 through 4 it sorts by ascending world Y within each elevation.
-Higher elevations ignore Y. A turret flag and a sprite ID break remaining
-ties. The target picker calls the same depth helper.
-
-The layer values come from the 228-byte elevation column at offset 4068 in
-BOLT section `00C/001`. The section SHA-256 is
-`54356d7585c66cd463346996444fd208336eaacf6335d30eb2688aa73c9cb2df`.
-The USA ROM SHA-256 is
-`e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020`.
-The retained Wasteland observer capture at step 7121 has RAM SHA-256
-`d30d79bcd796c4c535c2667875da309a045bfe482bba9720ba01eb5f92951b9b`.
-Its helper at `0x80122750` feeds the render queue at `0x80045f48`, which
-drains back to front at `0x80120460`. The depth helper is also present at
-ROM offset `0xE6440` (64 bytes, SHA-256
-`f9a75923b37bbc55602345e4b1d20c0449c4ac922d8548afd203089c010cfaf1`).
-In native gameplay footage the
-Overlords cover the Hatchery rim, and a Probe covers the southeast Nexus lip.
-
-The GBA Mode 4 painter uses those elevation and Y rules for units, buildings
-and resources. The static lookup matches all 228 entries in the pinned N64
-unit table. Composite turrets remain with their hull. GBA actor kind and
-slot resolve exact ties as a deterministic approximation of the native
-sprite-ID tie. Native depth changes for special states still need individual
-checks. The change covers world actors in the shared campaign, skirmish and
-Showcase renderer. See the projectile section for moving weapon sprite
-coverage and the remaining passes that need separate depth references.
 
 ## Harness cases
 
