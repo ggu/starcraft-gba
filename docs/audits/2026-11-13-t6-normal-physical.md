@@ -36,3 +36,71 @@ physical GBA speed or fresh SRAM continuation.
 
 - Host tape SHA-256: `59e1aa7c6524c9cf1b17d31b57858ee0e2d28c8bd0b16ee10dc3233722556bfe`.
 - Physical receipt SHA-256: `6bf6180b590954b836430cd23da435bcb7da4b76bfb3780a675fac4a49ef8ecd`.
+
+## November 20 fresh SRAM and result autosave
+
+The normal Terran build for `cd833c8c` uses the same controller tape.
+The observer opens Norad II from HOME, reveals all 15 briefing pages and
+deploys with Start. It reads checkpoints and feeds ordinary GBA buttons
+through the port-free mGBA observer. At tape call 19,659, frame 19,466,
+Raynor is in the first Dropship and no unit or building is selected.
+Start opens the pause menu and B saves the live game in journal bank 0.
+A fresh process presses L at HOME to load the same observed world,
+mission state and cursor. The camera reconstructed from that cursor
+matches at this cut.
+
+The next tape sample presses L to select the Dropship. Continuing
+directly from HOME suppresses that edge because the load itself used L.
+The observer pauses with Start, releases it, and resumes with Start.
+This samples the release of L without advancing the saved simulation.
+The uninterrupted and corrected fresh paths select slot 5 on tape call
+19,661 and reach the source goal at the same coordinates with the same
+remaining health on call 20,543. This is a controller replay correction.
+
+The run replays 23,849 gameplay calls and acknowledges all 13 authored
+dialogue pages. All 42 observations match, including nine after the
+reload. The checkpoint observer verifies 34 recorded state values and
+checks the campaign and per-player trigger clocks. The HOST tape leaves
+the Starport and Control Tower indices unset. The guest observes those
+buildings in slots 74 and 75 after production.
+
+At frame 23,536, Raynor and both Dropships are in source location 2,
+Norad survives, and the primary objective and completion bits are set
+without trigger faults. The second journal record is valid and the
+original pause record remains byte-identical. A third process loads the
+frozen win with Dropship slot 6 still selected and exports identical
+SRAM. A separate T10 check with the same ROM and observer restores
+frame 2,276 and reloads the frozen victory at frame 3,361.
+
+The T6 run averages 1,092,086 guest cycles per main loop, or 15.36
+emulated updates per second across 23,952 controller calls. This includes
+presentation, menus, save and load. Physical GBA performance remains
+unmeasured.
+
+An observer sampling individual updates measured the peak on the result
+autosave at tape call 23,849 and frame 23,536. It used 24,630,198 guest
+cycles on the uninterrupted route and 54,160,869 guest cycles on the
+fresh route with the pause record present. These counts cover the whole
+update. Attribution within the journal path still needs an instruction
+profile.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 6 --save-tick 19659 \
+  --trace "$T6_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `8abd3e731fd6db1c1c0ff449ea1426d4214213f0990c5613a3b7158b3eb611c4` |
+| Matching ELF | `357b901bdb96d325fe4388650ad2ea5d97b7ce801a7a8de14f278a913ce2e2db` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `59e1aa7c6524c9cf1b17d31b57858ee0e2d28c8bd0b16ee10dc3233722556bfe` |
+| Replay harness | `d0ad3fa7b8f692330dbe93711f25cf59ffe5b34af825fd2eded744538c9f097c` |
+| Checkpoint observer | `0b13fc5abebb43f4760ca54e16187191b46e7df42b7a9c109e09146994a27e8c` |
+| Pause SRAM | `f6bab6c2cdde4397e90621f1045aca1a01b6631ea87aa8dc8fb6d2778b636a1c` |
+| Victory SRAM and fresh readback | `af0fa049ba02103ef3944a3f8f324b45c9eb0abc5b8db23318d70969713a87bc` |
+| T6 replay and both journal checks | `de8db15b15b9b551cf9285cdc79beba35ab0e21523b437443ca1c5ab844c3041` |
+| T10 regression | `5d80269aed0f6a5315e9b23340dc63931094f404e24995e50c2ce61a4dd5b991` |

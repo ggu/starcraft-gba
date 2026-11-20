@@ -106,7 +106,7 @@ enum {
 #ifdef RACE_AI_CARRIERS
     AK_CARRIER, AK_FLEET,
 #endif
-    AK_BATTERY,
+    AK_BATTERY, AK_BUNKER,
     AK_COUNT
 };
 
@@ -119,7 +119,7 @@ static const unsigned char race_ai_raw_key[256] = {
     [106] = AK_COMMAND + 1, [109] = AK_DEPOT + 1, [110] = AK_REFINERY + 1,
     [111] = AK_BARRACKS + 1, [112] = AK_ACADEMY + 1, [113] = AK_FACTORY + 1,
     [114] = AK_STARPORT + 1, [120] = AK_MACHINE_SHOP + 1, [122] = AK_ENG_BAY + 1,
-    [123] = AK_ARMORY + 1, [124] = AK_TURRET + 1,
+    [123] = AK_ARMORY + 1, [124] = AK_TURRET + 1, [125] = AK_BUNKER + 1,
     [131] = AK_HATCHERY + 1, [132] = AK_LAIR + 1, [133] = AK_HIVE + 1,
     [142] = AK_POOL + 1, [135] = AK_DEN + 1, [139] = AK_EVO + 1, [141] = AK_SPIRE + 1,
     [143] = AK_CREEP + 1, [146] = AK_SUNKEN + 1, [144] = AK_SPORE + 1,
@@ -291,6 +291,10 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             /* Loaded passengers still count against supply. */
             if (q->owner == owner) {
                 const Sc64RaceUnitRule *ur = sc64_race_unit_rule(q->type);
+#ifdef SC64_SHARED_BUNKER
+                /* The garrison also uses the owner's actual actor slots. */
+                if (q->target >= MAX_UNITS) ++c->units;
+#endif
                 if (ur && ur->race == c->race) {
                     c->supply_used += unit_slot_supply(q);
                     c->supply_cap += sc64_race_unit_supply_provided(q->type);
@@ -357,7 +361,11 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
                 if (r && r->race == c->race && r->supply_provided)
                     ++c->pending_supply;
             }
-        } else if (race_ai_armed(q->type)) {
+        }
+#ifdef SC64_SHARED_BUNKER
+        else if (q->order == ORDER_BOARD && q->target >= MAX_UNITS) continue;
+#endif
+        else if (race_ai_armed(q->type)) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(q->type);
             int supply = r ? r->supply : 0;
             ++c->army; c->army_supply += supply;
@@ -865,13 +873,19 @@ enum {
     RACE_AI_IF_AIR = 1, RACE_AI_IF_LATE = 2, RACE_AI_IF_RICH = 4,
     RACE_AI_ZERG_OPENING_DEFENSE = 8,
     RACE_AI_PROTOSS_OPENING_BATTERY = 16,
+    RACE_AI_TERRAN_OPENING_BUNKER = 32,
     /* The first Creep Colony in the two unmodified Blood Bath runs
      * appeared from native frame 3,725. Use the same source clock. */
     RACE_AI_FIRST_CREEP = 3725 * 5 / 4,
     /* Two native Gateway openings start a Battery from frame 4,047,
      * before the first Assimilator seen at 6,197. */
     RACE_AI_FIRST_BATTERY = 4047 * 5 / 4,
-    RACE_AI_BATTERY_OPENING_END = 6197 * 5 / 4
+    RACE_AI_BATTERY_OPENING_END = 6197 * 5 / 4,
+    /* Last existing native sample without the Bunker in each opening. */
+    RACE_AI_FIRST_BUNKER = 6922 * 5 / 4,
+    RACE_AI_FIRST_BUNKER_MIXED = 8002 * 5 / 4,
+    /* First native Factory observed in the earlier, solo opening. */
+    RACE_AI_BUNKER_OPENING_END = 8834 * 5 / 4
 };
 
 /* Ordered development plans. raw is the stock raw ID; count is the wanted
@@ -901,6 +915,16 @@ static const RaceAiStep race_ai_terran_plan[] = {
     { RACE_AI_STEP_BUILD, 122, 1, 16, RACE_AI_IF_LATE },
     { RACE_AI_STEP_DEFENSE, 124, 1, 16, RACE_AI_IF_LATE },
 };
+
+#ifdef SC64_SHARED_BUNKER
+static const RaceAiStep race_ai_terran_bunker_opening[] = {
+    { RACE_AI_STEP_BUILD, 111, 1, 9, 0 },
+    { RACE_AI_STEP_GAS,   110, 1, 11, 0 },
+    { RACE_AI_STEP_BUILD, 111, 2, 13, 0 },
+    { RACE_AI_STEP_BUILD, 112, 1, 15, 0 },
+    { RACE_AI_STEP_DEFENSE, 125, 1, 17, RACE_AI_TERRAN_OPENING_BUNKER },
+};
+#endif
 
 /* A Hatchery's larva queue is serial in these products, so Zerg production
  * capacity comes from additional Hatcheries rather than from bank size. */
@@ -954,6 +978,22 @@ static const Sc64SkirmishRecord *race_ai_record(const RaceAiCensus *c, int raw)
     return race_skirmish_build_record(c->owner, raw);
 }
 
+static int race_ai_blood_bath_ffa(void)
+{
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (race_skirmish_melee) return 0;
+#endif
+    return race_skirmish_map == SC64_MAP_BLOOD_BATH;
+}
+
+static int race_ai_first_bunker(void)
+{
+    if (race_human == R_TER && race_bots == 3 && race_bot_races[0] == R_ZERG &&
+        race_bot_races[1] == R_TER && race_bot_races[2] == R_PROTOSS)
+        return RACE_AI_FIRST_BUNKER_MIXED;
+    return RACE_AI_FIRST_BUNKER;
+}
+
 /* The first producer that can take this addon or morph now: ready for the
  * record, and for an addon a placeable footprint, a free building slot and
  * a unit exit the addon would not seal. Checked before any reservation, so
@@ -1002,6 +1042,11 @@ static int race_ai_start_defense(RaceAiCensus *c, int raw, int opening)
     int ax = c->hx + (WORLD_W / 2 - c->hx) / 8, ay = c->hy + (WORLD_H / 2 - c->hy) / 8;
     const Sc64RaceBuildingRule *rule = type < 0 ? 0 : sc64_race_building_rule(type);
     if (!rule) return 0;
+    if (raw == 125) {
+        /* Native opening Bunkers guard the approach into the base. */
+        ax = (c->hx + WORLD_W / 2) / 2;
+        ay = (c->hy + WORLD_H / 2) / 2;
+    }
     if (c->race == R_ZERG) {
         const Sc64SkirmishRecord *r = race_ai_record(c, raw);
         int parent = r && r->kind == SC64_SK_BUILDING_MORPH ? race_ai_attach_parent(c, r) : -1;
@@ -1058,10 +1103,7 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
     else if (c->race == R_PROTOSS) {
         /* Leave the opening once a paid foundation is placed, even when it
          * has yet to finish warping in. A walking Probe is only a reservation. */
-        if (race_skirmish_map == SC64_MAP_BLOOD_BATH &&
-#ifdef SC64_NATIVE_MELEE_STARTS
-            !race_skirmish_melee &&
-#endif
+        if (race_ai_blood_bath_ffa() &&
             frame < RACE_AI_BATTERY_OPENING_END && worker_target >= 15 && !c->enemy_air &&
             !c->battery_placed && !race_ai_count(c, AK_ASSIMILATOR) &&
             !race_ai_count(c, AK_CORE) && race_ai_record(c, 172)) {
@@ -1072,6 +1114,15 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             steps = (int)(sizeof race_ai_protoss_plan / sizeof *plan);
         }
     }
+#ifdef SC64_SHARED_BUNKER
+    else if (race_ai_blood_bath_ffa() && frame < RACE_AI_BUNKER_OPENING_END && c->patches &&
+             (race_ai_count(c, AK_SCV) >= 18 || worker_target >= 17) &&
+             !c->enemy_air && !c->have[AK_BUNKER] &&
+             !race_ai_count(c, AK_FACTORY) && race_ai_record(c, 125)) {
+        plan = race_ai_terran_bunker_opening;
+        steps = (int)(sizeof race_ai_terran_bunker_opening / sizeof *plan);
+    }
+#endif
     else { plan = race_ai_terran_plan; steps = (int)(sizeof race_ai_terran_plan / sizeof *plan); }
     if (c->buildings >= race_ai_building_cap()) return;
     if (!c->depots) { (void)race_ai_hall(c, 1); return; }
@@ -1087,6 +1138,9 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         if ((step->flags & RACE_AI_ZERG_OPENING_DEFENSE) && frame < RACE_AI_FIRST_CREEP) continue;
         if ((step->flags & RACE_AI_PROTOSS_OPENING_BATTERY) &&
             (frame < RACE_AI_FIRST_BATTERY || c->have[AK_GATEWAY] < 2 || c->have[AK_PROBE] < 15)) continue;
+        if ((step->flags & RACE_AI_TERRAN_OPENING_BUNKER) &&
+            (frame < race_ai_first_bunker() || c->have[AK_BARRACKS] < 2 || !c->have[AK_ACADEMY] ||
+             c->have[AK_SCV] < 17 || race_ai_count(c, AK_SCV) < 18)) continue;
         if ((step->flags & RACE_AI_IF_RICH) && race_owner_minerals(c->owner) < 600) continue;
         type = sc64_race_building_from_raw(step->raw);
         rule = type >= 0 ? sc64_race_building_rule(type) : 0;
@@ -1404,6 +1458,9 @@ static int race_ai_movable_army(const Unit *q, int owner)
 {
     if (!q->alive || q->owner != owner || SC64_TRANSPORT_LOADED(q) ||
         sc64_race_is_worker(q->type) || !race_ai_armed(q->type)) return 0;
+#ifdef SC64_SHARED_BUNKER
+    if (q->order == ORDER_BOARD && q->target >= MAX_UNITS) return 0;
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_unit_actor_flags(q->type) &&
         !(sc64_game_unit_actor_flags(q->type) & SC64_GAME_ACTOR_MOVABLE)) return 0;
@@ -1613,6 +1670,32 @@ static void race_ai_scout(RaceAiCensus *c)
     }
 }
 
+#ifdef SC64_SHARED_BUNKER
+static void __attribute__((noinline)) race_ai_staff_bunker(const RaceAiCensus *c)
+{
+    int slot, target, reserved = 0, best = -1, best_d = 0x7fffffff;
+    if (c->race != R_TER || !c->have[AK_BUNKER] || !race_ai_blood_bath_ffa()) return;
+    for (slot = 0; slot < MAX_BUILDINGS; ++slot)
+        if (b[slot].owner == c->owner && race_bunker_carrier_valid(slot)) break;
+    if (slot == MAX_BUILDINGS) return;
+    target = sc64_bunker_target_encode(MAX_UNITS, MAX_BUILDINGS, slot);
+    if (target < 0) return;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        const Unit *q = &u[i];
+        int d;
+        if (!q->alive || q->owner != c->owner) continue;
+        if (q->target == target && (q->order == ORDER_BOARD || SC64_TRANSPORT_LOADED(q))) {
+            if (++reserved >= SC64_BUNKER_CAPACITY) return;
+        }
+        if ((q->type != U_MARINE && q->type != U_FIREBAT) ||
+            (q->order != ORDER_IDLE && q->order != ORDER_MOVE)) continue;
+        d = dist2(q->x, q->y, b[slot].x, b[slot].y);
+        if (d < best_d && race_bunker_passenger_valid(q, c->owner)) { best = i; best_d = d; }
+    }
+    if (best >= 0) (void)race_bunker_request_board(best, slot);
+}
+#endif
+
 static void __attribute__((noinline)) race_ai_plan(int owner)
 {
     RaceAiCensus c;
@@ -1627,6 +1710,9 @@ static void __attribute__((noinline)) race_ai_plan(int owner)
     if (!c.depots || !race_ai_supply(&c)) race_ai_develop(&c);
     race_ai_produce(&c);
     race_ai_military(&c);
+#ifdef SC64_SHARED_BUNKER
+    race_ai_staff_bunker(&c);
+#endif
     race_ai_scout(&c);
 }
 

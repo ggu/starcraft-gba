@@ -1539,6 +1539,58 @@ static int opening_battery(void)
     return ok;
 }
 
+#ifdef SC64_SHARED_BUNKER
+/* Observe a paid forward Bunker and ordinary same-owner boarding at full capacity. */
+static int opening_bunker(void)
+{
+    int owner = -1, slot = -1, staffed = -1;
+    int workers = 0, barracks = 0, academy = 0, distance = 0, forward = 0;
+    for (int i = 0; i < race_bots; ++i)
+        if (race_owner_identity(race_bot_owner_ids[i]) == R_TER) {
+            owner = race_bot_owner_ids[i];
+            break;
+        }
+    if (!race_ai_blood_bath_ffa() || race_human != R_TER || owner < 0) return 0;
+    audit_start();
+    const OwnerAudit *paid = &ledger.o[owner];
+    while (screen == SCREEN_PLAY && frame < RACE_AI_FIRST_WAVE_TERRAN &&
+           (staffed < 0 || paid->made[113] < 0)) {
+        input(0);
+        if (paid->made[125] == frame) {
+            RaceAiCensus census;
+            race_ai_census(owner, &census);
+            workers = census.have[AK_SCV];
+            barracks = census.have[AK_BARRACKS];
+            academy = census.have[AK_ACADEMY];
+            for (int i = 0; i < MAX_BUILDINGS; ++i)
+                if (b[i].alive && b[i].owner == owner && b[i].type == B_BUNKER) {
+                    slot = i;
+                    distance = dist2(b[i].x, b[i].y, census.hx, census.hy);
+                    forward = dist2(b[i].x, b[i].y, WORLD_W / 2, WORLD_H / 2) <
+                        dist2(census.hx, census.hy, WORLD_W / 2, WORLD_H / 2);
+                    break;
+                }
+        }
+        if (staffed < 0 && slot >= 0 && paid->done[125] >= 0 &&
+            race_bunker_cargo_space(slot) == SC64_BUNKER_CAPACITY) staffed = frame;
+    }
+    int last_start = race_bots == 1 ? 7151 : 8271;
+    int last_done = race_bots == 1 ? 7578 : 8737;
+    int ok = paid->made[125] > race_ai_first_bunker() && paid->made[125] <= last_start * 5 / 4 &&
+        paid->done[125] > paid->made[125] && paid->done[125] <= last_done * 5 / 4 &&
+        paid->made[113] > paid->done[125] && staffed > paid->done[125] &&
+        paid->made_n[125] == 1 && workers >= 17 && barracks == 2 && academy == 1 &&
+        forward && distance >= 275 * 275 && distance <= 400 * 400 &&
+        !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+    printf("{\"kind\":\"opening-bunker\",\"owner\":%d,\"bunker_start\":%d,\"bunker_done\":%d,"
+           "\"staffed\":%d,\"factory\":%d,\"workers\":%d,\"barracks\":%d,\"academy\":%d,"
+           "\"distance_squared\":%d,\"ok\":%d}\n",
+           owner, paid->made[125], paid->done[125], staffed, paid->made[113],
+           workers, barracks, academy, distance, ok);
+    return ok;
+}
+#endif
+
 /* ---- Economy raid. In a mirrored match (the planner also drives the human
  * owner, so the match reaches the engine's own result), the first opponent's
  * economy is hit mid-game through hit_target: 0, every worker dies; 1, its
@@ -1967,6 +2019,9 @@ int main(int argc, char **argv)
     int builder = -1, workers = -1, ai_sunken = 0, sunken_legacy = 0;
     int threats = 0, repowering = -1, airpin = -1, noore = -1;
     int wave = 0, defense = 0, battery = 0, raiding = -1;
+#ifdef SC64_SHARED_BUNKER
+    int bunker = 0;
+#endif
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -1995,6 +2050,9 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--first-wave")) wave = 1;
         else if (!strcmp(argv[i], "--opening-defense")) defense = 1;
         else if (!strcmp(argv[i], "--opening-battery")) battery = 1;
+#ifdef SC64_SHARED_BUNKER
+        else if (!strcmp(argv[i], "--opening-bunker")) bunker = 1;
+#endif
         else if (!strcmp(argv[i], "--raid") && i + 1 < argc) raiding = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
@@ -2015,6 +2073,9 @@ int main(int argc, char **argv)
     if (wave) return first_wave() ? 0 : 18;
     if (defense) return opening_defense() ? 0 : 20;
     if (battery) return opening_battery() ? 0 : 21;
+#ifdef SC64_SHARED_BUNKER
+    if (bunker) return opening_bunker() ? 0 : 22;
+#endif
     if (raiding >= 0) return raid(raiding, ticks) ? 0 : 19;
     if (resume_at < 0 && !resume_morph) {
         audit_start();
