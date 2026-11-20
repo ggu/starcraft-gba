@@ -2,23 +2,13 @@
 #ifndef SC64_SAVE_BITS_H
 #define SC64_SAVE_BITS_H
 
-/* Known field positions let the compiler omit unused byte loads. The caller
- * checks the row bounds and that the field spans no more than four bytes. */
-static inline __attribute__((always_inline)) u32
-sc64_save_read_bits_fixed(const u8 *bytes, unsigned bit, unsigned width)
-{
-    unsigned index = bit >> 3;
-    unsigned shift = bit & 7u;
-    u32 value = bytes[index];
-    if (shift + width > 8) value |= (u32)bytes[index + 1] << 8;
-    if (shift + width > 16) value |= (u32)bytes[index + 2] << 16;
-    if (shift + width > 24) value |= (u32)bytes[index + 3] << 24;
-    return width == 32 ? value : (value >> shift) & (((u32)1 << width) - 1);
-}
-
 /* Packed save fields are least-significant bit first. Read only the bytes
  * spanned by the field, including fields at the end of an unaligned row. */
-static inline int
+static inline
+#ifdef SC64_COMPACT_BUILDING_FIXED_READER
+__attribute__((always_inline))
+#endif
+int
 sc64_save_read_bits(const u8 *bytes, unsigned row_bits, unsigned *bit,
                     unsigned width, u32 *value)
 {

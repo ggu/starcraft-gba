@@ -43,25 +43,15 @@ sc64_packed_building_put(Sc64PackedBuildingSave *row, unsigned *bit,
 
 #ifdef SC64_COMPACT_BUILDING_FIXED_READER
 static inline __attribute__((always_inline)) int
-sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
-                         unsigned width, u32 *value)
-{
-    unsigned start = *bit;
-    if (!width || width > 32 || start > SC64_PACKED_BUILDING_SAVE_USED_BITS - width ||
-        (start & 7u) + width > 32) return 0;
-    *value = sc64_save_read_bits_fixed(row->bytes, start, width);
-    *bit = start + width;
-    return 1;
-}
 #else
 static int
+#endif
 sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
                          unsigned width, u32 *value)
 {
     return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
                                       bit, width, value);
 }
-#endif
 
 /* All values below are bounded by the current game representation: map
  * coordinates are at most 2047, max HP/shields at most 131071 (100000 is the

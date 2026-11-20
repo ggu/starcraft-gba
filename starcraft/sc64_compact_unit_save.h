@@ -64,7 +64,22 @@ sc64_packed_unit_put(Sc64PackedUnitSave *row, unsigned *bit,
     return 1;
 }
 
-#ifndef SC64_COMPACT_UNIT_FIXED_READER
+#ifdef SC64_COMPACT_UNIT_FIXED_READER
+/* The decode sequence gives the compiler a constant position and width for
+ * each field. Byte loads also work for unaligned rows. */
+static inline __attribute__((always_inline)) u32
+sc64_packed_unit_get_fixed(const Sc64PackedUnitSave *row, unsigned offset,
+                           unsigned width)
+{
+    unsigned index = offset >> 3;
+    unsigned shift = offset & 7u;
+    u32 value = row->bytes[index];
+    if (shift + width > 8) value |= (u32)row->bytes[index + 1] << 8;
+    if (shift + width > 16) value |= (u32)row->bytes[index + 2] << 16;
+    if (shift + width > 24) value |= (u32)row->bytes[index + 3] << 24;
+    return width == 32 ? value : (value >> shift) & (((u32)1 << width) - 1);
+}
+#else
 static int
 sc64_packed_unit_get(const Sc64PackedUnitSave *row, unsigned *bit,
                      unsigned width, u32 *value)
@@ -186,7 +201,7 @@ SC64_COMPACT_DECODE(Unit *out, const Sc64PackedUnitSave *row,
 #define SC64_UNIT_GET(width, dst) do { \
     _Static_assert((width) > 0 && (width) <= 32, "packed unit field width"); \
     if (bit > 303u - (width) || (bit & 7u) + (width) > 32) return 0; \
-    (dst) = (int)sc64_save_read_bits_fixed(row->bytes, bit, (width)); \
+    (dst) = (int)sc64_packed_unit_get_fixed(row, bit, (width)); \
     bit += (width); \
 } while (0)
 #else
