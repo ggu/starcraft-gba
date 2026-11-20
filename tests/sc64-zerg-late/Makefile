@@ -123,7 +123,7 @@ verify-zerg-z10: build/StarCraft-Zerg-Z10-Transport1-GBA.gba
 zerg-z10: verify-zerg-z10
 
 build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_SIGHT_ROW_LUT_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS -DSC64_Z7_VISIBILITY_SPARSE_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-sight-packed-rows
 test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
 	./build/test-sc64-z10-sight-packed-rows

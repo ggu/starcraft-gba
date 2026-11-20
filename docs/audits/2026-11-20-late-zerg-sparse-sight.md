@@ -47,7 +47,11 @@ frame 17,301. All 32 sampled custom states match, including source counts,
 fog, minimap, actors, resources, both pages and palette. These measurements
 use emulated ARM cycles. Dense Z7 still averages about 7.6 advancing
 updates per emulated second. Orders alone take about 1.37 million cycles
-per advancing call in that window. [Packed sight release audit](2026-11-12-packed-sight-rows.md)
+per advancing call in that window. Among calls with a preceding route
+counter sample, the 119 updates with zero new routes still average
+1.51 million full-update cycles. The 185 updates with one new route
+average 2.10 million. A 30 fps update has about 559,000 cycles available.
+[Packed sight release audit](2026-11-12-packed-sight-rows.md)
 
 ## Fresh SRAM
 
