@@ -120,3 +120,9 @@ result and re-exports those bytes after eight neutral updates.
 | Normal P10 ROM | `81e018081beec7bf65f44dfc2cc4c4daae49b8aa1dfc515e38ea6e4bfad763ff` |
 | Normal ARM link | `5a1843a00aee1e452fe83d5eee13f782fa5cbb194d288627b6f8be1a5ba6b60b` |
 | Physical replay and fresh result load | `8df6b0df32bff8e4d075c531e8fe12de12e70080f4d08ab8ebac0bf778fd5b7d` |
+
+The normal P10 recipe on `b127c1c0` with this repair regenerates the
+exact cartridge used by the Interceptor-release replay. The 40 pinned
+inputs, header, linked payload and RAM endpoints pass again. The
+composition receipt SHA-256 is
+`b856004427cb59a0be966066e82da065472e32a62242a55632c7f0875da690a4`.

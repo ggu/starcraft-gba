@@ -107,7 +107,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Trace patch occupancy, travel and unloading and rerun the campaign
   and CPU economy gates before normal activation.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
-- **Current cartridge campaign saves.** [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
+- **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
+  writes a new journal at the actual victory. A fresh HOME load
+  restores RESULT and re-exports the same 32 KiB SRAM. The other
+  campaign result journals still need a common current-build gate.
+  [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge
   loads the earlier frame-121 journal and matches its 120-update continuation.
