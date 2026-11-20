@@ -18,7 +18,8 @@ static u16 prior_keys;
 static unsigned host_ticks;
 static FILE *trace;
 static int trace_first = 1;
-static int outpost_witness;
+static int combined_arms_witness;
+static int blood_bath_witness;
 
 enum build_state { BUILD_NONE, BUILD_PENDING, BUILD_FOUNDATION };
 static struct {
@@ -111,7 +112,7 @@ static int select_unit(int slot)
         unsigned guard = 0;
         /* A worker may move while the cursor travels. Follow its current
          * position and click only while the UI would select that worker. */
-        while (u[slot].alive && selection_target() != slot && guard++ < 6000u &&
+        while (u[slot].alive && selection_target() != slot && guard++ < (blood_bath_witness ? 850u : 6000u) &&
                host_ticks < match_limit && screen == SCREEN_PLAY && !won && !lost) {
             int dx = u[slot].x - cx, dy = u[slot].y - cy;
             if (abs(dx) <= 1 && abs(dy) <= 1) break;
@@ -138,7 +139,7 @@ static int select_building(int slot)
     if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive || b[slot].owner != SIDE) return 0;
     if (menu_open) tap(KEY_B);
     if (mode != MODE_NORMAL) tap(KEY_B);
-    if (outpost_witness && selected_building == slot) {
+    if (combined_arms_witness && selected_building == slot) {
         move_cursor(b[slot].x, b[slot].y);
         return selected_building == slot;
     }
@@ -151,7 +152,7 @@ static int select_building(int slot)
 static void move_cursor(int x, int y)
 {
     unsigned guard = 0;
-    while ((abs(cx - x) > 1 || abs(cy - y) > 1) && guard++ < 6000u && host_ticks < match_limit && screen == SCREEN_PLAY &&
+    while ((abs(cx - x) > 1 || abs(cy - y) > 1) && guard++ < (blood_bath_witness ? 850u : 6000u) && host_ticks < match_limit && screen == SCREEN_PLAY &&
            !won && !lost) {
         int dx = x - cx, dy = y - cy;
         u16 held = (abs(dx) >= 4 && (abs(dy) >= 4 || abs(dy) <= 1)) ||
@@ -168,7 +169,7 @@ static void move_cursor(int x, int y)
 static void clear_building_selection(void)
 {
     if (selected_building < 0) return;
-    if (outpost_witness) { tap(KEY_SELECT); return; }
+    if (combined_arms_witness) { tap(KEY_SELECT); return; }
     move_cursor(900, 700);
     input(KEY_L);
     unsigned guard = 0;
@@ -227,15 +228,58 @@ static int closest_hostile_building(void)
 {
     int best = -1, best_distance = 0x7fffffff;
     int sx = race_base_x[0], sy = race_base_y[0];
+    if (blood_bath_witness) {
+        int lead = -1, furthest = -1;
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_MARINE) continue;
+            int d = dist2(sx, sy, u[i].x, u[i].y);
+            if (d > furthest) { furthest = d; lead = i; }
+        }
+        if (lead >= 0) { sx = u[lead].x; sy = u[lead].y; }
+    }
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && owners_hostile(SIDE, b[i].owner)) {
         int d = dist2(sx, sy, b[i].x, b[i].y);
+        /* Clear the main base and its nearby defenses before the west expansion. */
+        if (blood_bath_witness && b[i].x < WORLD_W / 2 - 12)
+            d += 4 * WORLD_W * WORLD_W;
         if (d < best_distance) { best_distance = d; best = i; }
     }
     return best;
 }
 
+static int choose_blood_bath_site(int type, int *out_x, int *out_y)
+{
+    int best_distance = 0x7fffffff, found = 0;
+    int center_x = type == B_BARRACKS ? 208 : type == B_DEPOT ? 224 : 128;
+    int center_y = type == B_BARRACKS ? 176 : type == B_DEPOT ? 48 : 248;
+    /* The northwest opening needs room for trained units to leave their
+     * producer and for workers to reach the income line. Keep the center
+     * aisle open and leave gaps between adjacent building footprints. */
+    for (int y = 24; y < 320; y += 16)
+        for (int x = 40; x < 400; x += 16) {
+            if ((x < 144 && y > 60 && y < 184) || (y > 72 && y < 168)) continue;
+            int site_x = x, site_y = y;
+#ifdef SC64_FIELD_CONTROLS
+            field_ui_site(type, &site_x, &site_y);
+#endif
+            if (!race_can_site(SIDE, type, site_x, site_y) || !can_place(type, site_x, site_y)) continue;
+            int clear = 1;
+            for (int i = 0; i < MAX_BUILDINGS; ++i)
+                if (b[i].alive && b[i].owner == SIDE &&
+                    dist2(site_x, site_y, b[i].x, b[i].y) < 48 * 48) {
+                    clear = 0;
+                    break;
+                }
+            if (!clear) continue;
+            int d = dist2(center_x, center_y, site_x, site_y);
+            if (d < best_distance) { best_distance = d; *out_x = site_x; *out_y = site_y; found = 1; }
+        }
+    return found;
+}
+
 static int choose_build_site(int type, int *out_x, int *out_y)
 {
+    if (blood_bath_witness) return choose_blood_bath_site(type, out_x, out_y);
     int best_distance = 0x7fffffff, found = 0;
     for (int ring = 0; ring < 3; ++ring)
         for (int y = race_base_y[0] - 96 - ring * 32; y <= race_base_y[0] + 96 + ring * 32; y += 16)
@@ -433,7 +477,7 @@ static void terran_support(unsigned *next)
         return;
     }
     if (!has_support_request(B_ACADEMY) && minerals >= 150) type = B_ACADEMY;
-    else if (!has_support_request(B_BUNKER) && minerals >= 100) type = B_BUNKER;
+    else if (!blood_bath_witness && !has_support_request(B_BUNKER) && minerals >= 100) type = B_BUNKER;
     if (type >= 0 && choose_build_site(type, &x, &y)) {
         (void)place_terran_support(type, x, y);
         return;
@@ -456,6 +500,30 @@ static void terran_support(unsigned *next)
             move_cursor(b[refinery].x, b[refinery].y);
             tap(KEY_A);
         }
+    }
+}
+
+static void terran_economy(unsigned *next)
+{
+    if (host_ticks < *next) return;
+    *next = host_ticks + 120;
+    for (int worker = 0; worker < MAX_UNITS; ++worker) {
+        if (!u[worker].alive || u[worker].owner != SIDE || u[worker].type != U_SCV ||
+            u[worker].order != ORDER_IDLE || u[worker].carry || !select_unit(worker)) continue;
+        (void)order_selected_worker_to_visible_minerals(worker, move_cursor, tap);
+        break;
+    }
+    if (count_units(SIDE, U_SCV) >= 12 || minerals < 50 || supply_used >= supply_cap) return;
+    for (int producer = 0; producer < MAX_BUILDINGS; ++producer) {
+        if (!b[producer].alive || b[producer].owner != SIDE || b[producer].type != B_COMMAND ||
+            !building_complete(producer) || b[producer].queue_count != 0 || !select_building(producer)) continue;
+        int minerals_before = minerals, gas_before = gas;
+        tap(KEY_A);
+        if (b[producer].queue_count > 0)
+            trace_record("{\"kind\":\"action\",\"action\":\"queue\",\"host_tick\":%u,\"frame\":%d,\"producer\":%d,\"type\":%d,\"minerals_before\":%d,\"minerals_after\":%d,\"gas_before\":%d,\"gas_after\":%d}",
+                         host_ticks, frame, producer, U_SCV, minerals_before, minerals,
+                         gas_before, gas);
+        break;
     }
 }
 
@@ -493,7 +561,9 @@ static int attack_order(int x, int y)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
             u[i].type != U_OVERLORD) { seed = i; break; }
-    if (seed < 0 || !select_unit(seed)) return 0;
+    if (seed < 0) return 0;
+    if (blood_bath_witness) clear_building_selection();
+    else if (!select_unit(seed)) return 0;
     tap(KEY_R);
     if (selected_count() <= 0) return 0;
     if (!choose_menu_command(MENU_ATTACK)) return 0;
@@ -578,11 +648,13 @@ int main(int argc, char **argv)
     if (argc == 7 && !set_named_bot_races(argv[6])) goto invalid_args;
     const char *witness = getenv("SC64_SKIRMISH_COMBINED_ARMS");
     if (witness && strcmp(witness, "1") == 0) {
-        if (option_map != 0 || option_human != R_TER || option_bots != 1 || option_bot_races[0] != R_ZERG) {
-            fprintf(stderr, "combined-arms witness requires Outpost, Terran and one Zerg CPU\n");
+        if ((option_map != 0 && option_map != 1) || option_human != R_TER ||
+            option_bots != 1 || option_bot_races[0] != R_ZERG) {
+            fprintf(stderr, "combined-arms witness requires Terran and one Zerg CPU on Outpost or Blood Bath\n");
             return 2;
         }
-        outpost_witness = 1;
+        combined_arms_witness = 1;
+        blood_bath_witness = option_map == 1;
     }
     trace = fopen(trace_path, "w");
     if (!trace) { perror(trace_path); return 2; }
@@ -600,15 +672,16 @@ int main(int argc, char **argv)
             race_base_x[2], race_base_y[2], race_base_x[3], race_base_y[3]);
 
     unsigned next_production = 1800, next_attack = 4200, next_report = 3000;
-    unsigned next_depot = 0, next_support = 0;
+    unsigned next_depot = 0, next_support = 0, next_economy = 200;
     while (host_ticks < match_limit && screen == SCREEN_PLAY && !won && !lost) {
         input(0);
-        if (outpost_witness && combat_build.complete && combat_build.type == B_BARRACKS &&
-            count_buildings(SIDE, B_BARRACKS) < 2 && minerals >= 150)
+        if (blood_bath_witness) terran_economy(&next_economy);
+        if (combined_arms_witness && combat_build.complete && combat_build.type == B_BARRACKS &&
+            count_buildings(SIDE, B_BARRACKS) < (blood_bath_witness ? 5 : 2) && minerals >= 150)
             combat_build.state = BUILD_NONE;
-        if (outpost_witness && host_ticks >= next_depot && combat_build.complete &&
-            combat_build.type == B_BARRACKS && supply_cap < 52 &&
-            supply_used >= supply_cap - 12 && minerals >= 100) {
+        if (combined_arms_witness && host_ticks >= next_depot && combat_build.complete &&
+            combat_build.type == B_BARRACKS && supply_cap < (blood_bath_witness ? 170 : 52) &&
+            supply_used >= supply_cap - (blood_bath_witness ? 14 : 12) && minerals >= 100) {
             int x = 0, y = 0;
             for (int worker = 0; worker < MAX_UNITS; ++worker)
                 if (build_worker_available(worker, SIDE, U_SCV) &&
@@ -620,7 +693,7 @@ int main(int argc, char **argv)
                     break;
                 }
         }
-        if (outpost_witness) terran_support(&next_support);
+        if (combined_arms_witness) terran_support(&next_support);
         const Sc64RaceBuildingRule *combat_building = sc64_race_building_rule(human_combat_building());
         if (combat_build.state == BUILD_NONE && combat_building && minerals >= combat_building->minerals && host_ticks >= 1200) {
             int barracks_requested = build_barracks();
@@ -628,15 +701,15 @@ int main(int argc, char **argv)
                     host_ticks, barracks_requested, count_buildings(SIDE, human_combat_building()));
         }
         if (host_ticks >= next_production && ((combat_build.state == BUILD_FOUNDATION &&
-            combat_build.complete) || (outpost_witness && count_buildings(SIDE, B_BARRACKS) > 0))) {
+            combat_build.complete) || (combined_arms_witness && count_buildings(SIDE, B_BARRACKS) > 0))) {
             int producer = -1;
             for (int i = 0; i < MAX_BUILDINGS; ++i)
                 if (b[i].alive && b[i].owner == SIDE && b[i].type == human_producer_type() &&
-                    building_complete(i) && b[i].queue_count < (outpost_witness ? 2 : 5) &&
+                    building_complete(i) && b[i].queue_count < (combined_arms_witness ? 2 : 5) &&
                     (option_human != R_ZERG || b[i].larva > 0)) { producer = i; break; }
             if (producer >= 0 && minerals >= 50 && select_building(producer)) {
                 int wanted = human_combat_unit();
-                if (outpost_witness && has_building(SIDE, B_ACADEMY) && gas >= 25 && minerals >= 50) {
+                if (combined_arms_witness && has_building(SIDE, B_ACADEMY) && gas >= 25 && minerals >= 50) {
                     int marines = count_units(SIDE, U_MARINE), medics = count_units(SIDE, U_MEDIC);
                     int firebats = count_units(SIDE, U_FIREBAT);
                     if (marines >= 4 && medics * 5 < marines) wanted = U_MEDIC;
@@ -660,11 +733,11 @@ int main(int argc, char **argv)
                                  host_ticks, frame, producer, wanted, minerals_before, minerals,
                                  gas_before, gas);
             }
-            next_production = outpost_witness ? host_ticks + 60 : next_production + 900;
+            next_production = combined_arms_witness ? host_ticks + 60 : next_production + 900;
         }
         if (host_ticks >= next_attack) {
             int threat = -1, threat_distance = 180 * 180;
-            if (outpost_witness)
+            if (combined_arms_witness)
                 for (int i = 0; i < MAX_UNITS; ++i) {
                     if (!u[i].alive || !owners_hostile(SIDE, u[i].owner) ||
                         sc64_race_is_worker(u[i].type) || !currently_visible(u[i].x, u[i].y)) continue;
@@ -674,14 +747,15 @@ int main(int argc, char **argv)
             int target = closest_hostile_building();
             if (threat >= 0 && count_units(SIDE, U_MARINE) >= 3)
                 (void)attack_order(u[threat].x, u[threat].y);
-            else if (target >= 0 && (!outpost_witness || count_units(SIDE, U_MARINE) >= 14 ||
+            else if (target >= 0 && (!combined_arms_witness || count_units(SIDE, U_MARINE) >= (blood_bath_witness ? 30 : 14) ||
                      (count_units(SIDE, U_MARINE) >= 4 && count_units(ENEMY, -1) == 0))) {
                 fprintf(stderr, "human attack order tick%u target slot%d owner%d type%d xy%d,%d combat%d\n",
                         host_ticks, target, b[target].owner, b[target].type, b[target].x, b[target].y,
                         count_units(SIDE, human_combat_unit()));
                 (void)attack_order(b[target].x, b[target].y);
             }
-            next_attack = outpost_witness ? host_ticks + 600 : next_attack + 2400;
+            if (combined_arms_witness) next_attack = host_ticks + (blood_bath_witness ? 1100u : 600u);
+            else next_attack += 2400;
         }
         if (host_ticks >= next_report) {
             write_progress();

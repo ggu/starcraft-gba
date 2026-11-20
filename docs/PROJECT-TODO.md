@@ -836,6 +836,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   result. The current opt-in Terran replay also saves after CPU retirement
   and preserves four surviving human SCVs as neutral through defeat. Native
   mobile survivors and competitive CPU retirement still need a live witness.
+  The [normal Terran Blood Bath win](audits/2026-11-21-blood-bath-terran-win.md)
+  covers blank HOME, actual paid infantry and buildings, and an ordinary
+  victory against one named Zerg AI. The same 186 checkpoints match on
+  the sparse-route release and the Terran Carrier candidate. Broaden
+  the ordinary human route to more races and opponent counts.
   [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
@@ -2025,6 +2030,13 @@ prioritization used existing N64 evidence and current source. Later focused
 N64 observations and GBA comparisons are scoped in the audits linked above.
 Parallel work is appropriate where source ownership and
 the serialized native-test lock permit it.
+
+The Terran Carrier candidate adds 5.13% mean guest cycles on the paired
+normal Terran-versus-Zerg win with zero Carriers. The sparse-route
+control matches the earlier timing exactly. Reduce the empty Carrier
+training and movement passes while preserving the shared clock and
+released projectiles. Keep the active human and CPU Carrier save
+checks on the optimized candidate.
 
 | ID | Priority / state | TODO and reason | Completion evidence required |
 | --- | --- | --- | --- |
