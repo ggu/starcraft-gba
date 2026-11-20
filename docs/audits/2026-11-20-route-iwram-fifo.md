@@ -162,8 +162,28 @@ with the lowest 256 guard bytes unchanged. These are read-only observations
 from this replay. The A/B receipt SHA-256 is
 `c02e88a03efef7eca8b398289bff7cc1716ddd69a449d09280d98d7e48ce24a7`.
 
-The refined ring stays opt-in. The next paired replay is P10, with orders
-spikes at calls 43,604 and 45,231 and render spikes at 45,466–45,467. Qualify
-the remaining normal links and stack guards before enabling the option. Keep
-both spill cases in the test matrix and confirm the Showcase margin with the
-refined source.
+## Refined ring on the released P10 baseline
+
+The current P10 pair resumes from HOME at call 37,705 and wins at game
+frame 46,057. Seventeen world, palette and page samples match, including
+161 resident route-field hashes. All 114 timed rows match their frames,
+logical builds and hits.
+
+| Emulated cycles | Release | Refined ring | Reduction |
+| --- | ---: | ---: | ---: |
+| Route-heavy call 43,604 | 3,556,890 | 3,526,188 | 0.86% |
+| Route-heavy call 45,231 | 4,710,409 | 4,595,198 | 2.45% |
+| 95th percentile of sampled updates | 3,179,218 | 3,133,262 | 1.45% |
+
+The sampled mean drops 0.09%. The largest paired increase is 11,353
+cycles at call 45,238. The two renderer-heavy calls 45,466 and 45,467
+change by +5 and −343 cycles respectively. Both guests record stack
+writes as deep as 4,632 system bytes and 296 IRQ bytes. The candidate
+ends IWRAM at `0x03004e50`, with 432 bytes before the guard, and EWRAM
+at the release's `0x0203b52c`. The comparison receipt SHA-256 is
+`5a3828cacf6fe9c91e1496d59b703b7a81327bb4fc2e69d766770c76b9c16581`.
+
+The refined ring stays opt-in. Qualify the remaining normal links and
+stack paths, confirm the Showcase margin with the refined source, and
+keep both spill cases in the test matrix. The near-flat render samples
+and small P10 mean change leave sustained simulation and draw work open.
