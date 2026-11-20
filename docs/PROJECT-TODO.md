@@ -138,7 +138,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cuts the Norad II result autosave by 24.51% with a prior pause bank
   present. The pause and frozen-result loads drop 22.22% and 20.95%.
   The original pause bank and complete victory SRAM match byte for
-  byte. Validate the composed source and profile the remaining
+  byte. The composed links retain all four RAM limits and the normal
+  Terran active and staffed Bunker saves. Profile the remaining
   victory stall.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)

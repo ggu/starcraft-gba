@@ -132,8 +132,14 @@ The table measures complete emulator updates. It captures three different
 save operations and leaves hardware timing separate. Compile-time and
 sanitizer checks cover old unit rows, 10,000 round trips, malformed
 owner and reserved bits, the other compact codecs and journal fallback.
-Qualify the reader on the composed release across all profiles and
-measure the remaining work inside the victory update.
+The composed ARM gate at `727c766f` preserves the ROM and RAM
+guards on all four profiles. Z10, P10 and Showcase are byte-identical
+to the `6ea84a03` controls. Normal Terran produces identical
+32 KiB journals during active Bunker construction and with four
+passengers loaded. Both fresh HOME continuations match their control
+worlds, resource banks and assignments through 600 updates. The ARM
+matrix receipt SHA-256 is
+`4a7b1cbb885a3c2f36df264b4060a650ecfef1b78a1b23e292fe5b1961c2201a`.
 
 The replay comparison receipt SHA-256 is
 `8c76801a0d3753b742bc0da11448a33a5e39ba9318f2d1eb3997e21b79f41aea`.
