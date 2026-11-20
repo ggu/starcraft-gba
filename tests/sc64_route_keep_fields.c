@@ -1203,6 +1203,71 @@ static void check_empty_linear_goals(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+static void check_point_cold_certificate(void)
+{
+    int certified = 0, declined = 0, blocked_goals = 0;
+    race_cols = race_rows = 128;
+    for (int i = 0; i < 256; ++i) {
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            desired[cell] = (u8)(aux_rn(100) < 80);
+        int gx = aux_rn(128), gy = aux_rn(128);
+        int ox = limit(gx + aux_rn(17) - 8, 0, 127);
+        int oy = limit(gy + aux_rn(17) - 8, 0, 127);
+        int goal = gy * MAP_COLS + gx, origin = oy * MAP_COLS + ox;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        int slot = sc64_route_slot_for(goal, origin);
+        assert(slot >= 0);
+        Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        if (!prefix || prefix->count != SC64_POINT_CERTIFIED_ONLY) {
+            ++declined;
+            continue;
+        }
+        ++certified;
+        blocked_goals += !desired[goal];
+        reference_bfs(&oracle[POOL], goal);
+        assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        for (int cell = 0; cell < MAP_CELLS; ++cell) {
+            int direction = sc64_route_get(slot, cell);
+            if (direction != SC64_ROUTE_UNREACHABLE) {
+                assert(direction == oracle[POOL].dir[cell]);
+                if (direction) {
+                    const int step[] = {0, 1, -1, MAP_COLS, -MAP_COLS};
+                    assert(sc64_route_get(slot, cell + step[direction]) != SC64_ROUTE_UNREACHABLE);
+                }
+            }
+        }
+        u32 before = state_hash();
+        SC64_ROUTE_EXACT(slot);
+        assert(!sc64_point_prefix_find(slot) && before == state_hash());
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    assert(certified > 30 && declined > 30 && blocked_goals > 5);
+
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    const int goal = 32 + 32 * MAP_COLS;
+    const int slot = sc64_route_slot_for(goal, goal + 1);
+    assert(sc64_point_prefix_find(slot)->count == SC64_POINT_CERTIFIED_ONLY);
+    const u32 before = state_hash();
+    sc64_point_prefix_require(slot, goal + 2 * MAP_COLS);
+    assert(sc64_point_prefix_find(slot)->count == SC64_POINT_CERTIFIED_ONLY);
+    assert(sc64_route_near_root_reaches(slot, goal + 2 * MAP_COLS, goal + MAP_COLS, goal));
+    assert(sc64_route_get(slot, goal + 2 * MAP_COLS) == 4 && before == state_hash());
+    sc64_point_prefix_require(slot, goal + 30 * MAP_COLS);
+    assert(!sc64_point_prefix_find(slot) && sc64_route_get(slot, goal + 30 * MAP_COLS) == 4);
+    assert(before == state_hash());
+    printf("Cold certificate covers %d shortest paths, %d blocked goals and %d declines.\n",
+           certified, blocked_goals, declined);
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -1211,6 +1276,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    if (argc == 2 && !strcmp(argv[1], "--point-certificate-only")) {
+        check_point_cold_certificate();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-near-distance-only")) {
         check_point_near_distance();
