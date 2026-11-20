@@ -40,14 +40,24 @@ $(error CANONICAL_TARGET_INDEX must be 0 or 1)
 endif
 endif
 CANONICAL_TARGET_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_INDEX)),-DSC64_TARGET_BULK_REBUILD_PROBE -DSC64_TARGET_FAST_LINK_PROBE)
-CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_INDEX)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
+# Skip inactive cloak policies and exact redundant target checks.
+CANONICAL_TARGET_POLICY ?= 1
+ifneq ($(CANONICAL_TARGET_POLICY),0)
+ifneq ($(CANONICAL_TARGET_POLICY),1)
+$(error CANONICAL_TARGET_POLICY must be 0 or 1)
+endif
+endif
+CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY)
+CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:
 force-canonical-target-index-rebuild:
 build/canonical-target-index-config: force-canonical-target-index-config | build
-	@printf '%s\n' '$(CANONICAL_TARGET_INDEX)' > $@.tmp
+	@printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z8-game: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
 
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.

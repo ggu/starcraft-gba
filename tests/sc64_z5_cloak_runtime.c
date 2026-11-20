@@ -21,8 +21,9 @@ static int selected_hero(void)
 static void open_command(unsigned row)
 {
     press(KEY_B);
-    assert(menu_open && menu_cursor == 0);
-    for (unsigned i = 0; i < row; ++i) press(KEY_DOWN);
+    assert(menu_open);
+    for (int i = 0; menu_cursor != (int)row && i < field_menu_count(); ++i)
+        press(KEY_DOWN);
     assert(menu_cursor == (int)row);
 }
 

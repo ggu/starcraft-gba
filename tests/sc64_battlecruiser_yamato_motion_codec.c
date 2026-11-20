@@ -15,15 +15,25 @@ int main(void) {
         a.speed=(NEXT()&1u)?8533:0; a.turn_rate=(uint16_t)(NEXT()&511u);
         a.heading=(uint8_t)(NEXT()>>24); a.velocity_direction=(uint8_t)(NEXT()>>24);
         a.lifetime=(uint8_t)(NEXT()>>24); a.turning=(uint8_t)(NEXT()>>31);
+        a.draw_layer=(uint8_t)(NEXT()%(SC64_BC_YAMATO_MAX_DRAW_LAYER+1u));
         assert(sc64_bc_motion_pack(&row,&a) && sc64_bc_motion_unpack(&row,&b));
         assert(a.x_q8==b.x_q8 && a.y_q8==b.y_q8 &&
                a.destination_x==b.destination_x && a.destination_y==b.destination_y &&
                a.speed==b.speed && a.turn_rate==b.turn_rate && a.heading==b.heading &&
                a.velocity_direction==b.velocity_direction && a.lifetime==b.lifetime &&
-               a.turning==b.turning);
+               a.turning==b.turning && a.draw_layer==b.draw_layer);
     }
     Sc64BcMotionFields bad={.speed=1};
     Sc64BcYamatoShot original=row;
     assert(!sc64_bc_motion_pack(&row,&bad) && !memcmp(&row,&original,sizeof row));
+    bad.speed=0;
+    bad.draw_layer=SC64_BC_YAMATO_MAX_DRAW_LAYER+1u;
+    assert(!sc64_bc_motion_pack(&row,&bad) && !memcmp(&row,&original,sizeof row));
+    row.motion=(original.motion&0x1fffffu)|(31u<<21);
+    assert(!sc64_bc_motion_unpack(&row,&bad));
+    row.motion=(original.motion&0x1fffffu)|(1u<<26);
+    assert(!sc64_bc_motion_unpack(&row,&bad));
+    row.motion=original.motion&0x1fffffu;
+    assert(sc64_bc_motion_unpack(&row,&bad) && bad.draw_layer==0);
     puts("private 20-byte Yamato flight field codec: 100000 round trips pass");
 }

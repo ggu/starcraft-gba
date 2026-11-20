@@ -16,36 +16,62 @@ PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_T
 	$(if $(filter 1,$(CANONICAL_CONTACT_COINCIDENT)),-DSC64_CONTACT_EARLY_AXIS_IWRAM_PROBE) \
 	$(if $(filter -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED,$(CFLAGS) $(PROTOSS_P10_BASE_FLAGS)),-DSC64_P7_DETECTOR_RANGE_CULL_PROBE)
 PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCENARIO_HEADER)
-# The depth painter redraws completed buildings each frame. Pack only the
-# Hatchery frame so the other building art keeps the ordinary byte path.
+# The depth painter redraws completed buildings each frame. Each packed
+# frame can be built independently.
 P10_HATCHERY_WORDS ?= 1
+P10_OVERMIND_WORDS ?= 1
+P10_NEXUS_WORDS ?= 1
 ifneq ($(P10_HATCHERY_WORDS),0)
 ifneq ($(P10_HATCHERY_WORDS),1)
 $(error P10_HATCHERY_WORDS must be 0 or 1)
 endif
 endif
+ifneq ($(P10_OVERMIND_WORDS),0)
+ifneq ($(P10_OVERMIND_WORDS),1)
+$(error P10_OVERMIND_WORDS must be 0 or 1)
+endif
+endif
+ifneq ($(P10_NEXUS_WORDS),0)
+ifneq ($(P10_NEXUS_WORDS),1)
+$(error P10_NEXUS_WORDS must be 0 or 1)
+endif
+endif
 P10_HATCHERY_WORD_DIR := build/generated/p10-hatchery-words
+P10_BOTH_WORD_DIR := build/generated/p10-hatchery-overmind-words
+P10_ALL_WORD_DIR := build/generated/p10-hatchery-overmind-nexus-words
 P10_HATCHERY_WORD_HEADER := $(P10_HATCHERY_WORD_DIR)/sc64_building_words_generated.h
+P10_BOTH_WORD_HEADER := $(P10_BOTH_WORD_DIR)/sc64_building_words_generated.h
+P10_ALL_WORD_HEADER := $(P10_ALL_WORD_DIR)/sc64_building_words_generated.h
 P10_HATCHERY_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_HATCHERY_WORD_DIR)
-P10_HATCHERY_DRAW_FLAGS = $(CFLAGS) $(PROTOSS_P10_FLAGS)
-P10_HATCHERY_CAN_PACK = $(and $(filter -DSC64_UNIT_WORD_SPRITES,$(P10_HATCHERY_DRAW_FLAGS)),$(filter -DGBA_SPRITE_WORDS,$(P10_HATCHERY_DRAW_FLAGS)))
-P10_HATCHERY_BUILD_FLAGS = $(if $(and $(filter 1,$(P10_HATCHERY_WORDS)),$(P10_HATCHERY_CAN_PACK)),$(P10_HATCHERY_WORD_FLAGS))
+P10_BOTH_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_BOTH_WORD_DIR)
+P10_ALL_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_ALL_WORD_DIR)
+P10_BUILDING_DRAW_FLAGS = $(CFLAGS) $(PROTOSS_P10_FLAGS)
+P10_BUILDING_CAN_PACK = $(and $(filter -DSC64_UNIT_WORD_SPRITES,$(P10_BUILDING_DRAW_FLAGS)),$(filter -DGBA_SPRITE_WORDS,$(P10_BUILDING_DRAW_FLAGS)))
+P10_BUILDING_WORD_NAMES := $(strip \
+	$(if $(filter 1,$(P10_HATCHERY_WORDS)),hatchery) \
+	$(if $(filter 1,$(P10_OVERMIND_WORDS)),overmind) \
+	$(if $(filter 1,$(P10_NEXUS_WORDS)),nexus))
+P10_BUILDING_WORD_EMPTY :=
+P10_BUILDING_WORD_SPACE := $(P10_BUILDING_WORD_EMPTY) $(P10_BUILDING_WORD_EMPTY)
+P10_BUILDING_WORD_DIR := build/generated/p10-$(subst $(P10_BUILDING_WORD_SPACE),-,$(P10_BUILDING_WORD_NAMES))-words
+P10_BUILDING_WORD_HEADER = $(if $(and $(P10_BUILDING_WORD_NAMES),$(P10_BUILDING_CAN_PACK)),$(P10_BUILDING_WORD_DIR)/sc64_building_words_generated.h)
+P10_BUILDING_WORD_FLAGS = $(if $(P10_BUILDING_WORD_HEADER),-DSC64_BUILDING_WORDS_PROBE -I$(P10_BUILDING_WORD_DIR))
 P10_HATCHERY_CONFIG := build/p10-hatchery-words-config
 .PHONY: force-p10-hatchery-words-config
 $(P10_HATCHERY_CONFIG): force-p10-hatchery-words-config | build
-	@printf '%s\n' '$(if $(P10_HATCHERY_BUILD_FLAGS),1,0)' > $@.tmp
+	@printf '%s\n' '$(if $(P10_BUILDING_WORD_HEADER),$(P10_BUILDING_WORD_DIR),0)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
-$(P10_HATCHERY_WORD_HEADER): $(filter %/sc64_race_sprites_generated.h,$(PROTOSS_P10_INPUTS)) tools/sc64_building_words.py tools/sc64_unit_facing.py | build
+build/generated/p10-%-words/sc64_building_words_generated.h: $(filter %/sc64_race_sprites_generated.h,$(PROTOSS_P10_INPUTS)) tools/sc64_building_words.py tools/sc64_unit_facing.py | build
 	mkdir -p $(dir $@)
-	$(PYTHON) tools/sc64_building_words.py $< --frame hatchery > $@.tmp
+	$(PYTHON) tools/sc64_building_words.py $< $(foreach frame,$(subst -, ,$*),--frame $(patsubst overmind,overmind_with_shell,$(frame))) > $@.tmp
 	mv $@.tmp $@
 $(P10_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
 	mkdir -p $(P10_FACT_V2_DIR)
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES) $(P9_CAMPAIGN_DEFINES) $(P10_CAMPAIGN_DEFINES)) $(SC64_RELEASE_TRANSPORT_FLAGS) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT tools/sc64_fact_tables_gen.c -o build/sc64-p10-fact-v2-gen
 	./build/sc64-p10-fact-v2-gen > $@.tmp
 	mv $@.tmp $@
-build/starcraft-protoss-p10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_CONFIG) $(if $(P10_HATCHERY_BUILD_FLAGS),$(P10_HATCHERY_WORD_HEADER)) common/gba.ld Makefile mk/combat-perf/Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
-	$(CC) $(P10_HATCHERY_BUILD_FLAGS) $(CFLAGS) $(PROTOSS_P10_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10.map -lgcc -o $@
+build/starcraft-protoss-p10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_CONFIG) $(P10_BUILDING_WORD_HEADER) common/gba.ld Makefile mk/combat-perf/Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
+	$(CC) $(P10_BUILDING_WORD_FLAGS) $(CFLAGS) $(PROTOSS_P10_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-P10-Transport1-GBA.gba: build/starcraft-protoss-p10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -64,11 +90,19 @@ test-protoss: test-protoss-p7 test-sc64-protoss-p10
 # P10 mission run (start-up program, objectives and a pause-menu save that
 # reloads in a fresh process and continues identically).
 P10_HOST_DIR := build/p10-host
-.PHONY: test-sc64-p10-hatchery-words-pixels
+.PHONY: test-sc64-p10-hatchery-words-pixels test-sc64-p10-overmind-words-pixels test-sc64-p10-nexus-words-pixels
 test-sc64-p10-hatchery-words-pixels: build/test-sc64-p10-hatchery-words-pixels
 	./build/test-sc64-p10-hatchery-words-pixels
 build/test-sc64-p10-hatchery-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_WORD_HEADER) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
 	$(CLANG) $(P10_HATCHERY_WORD_FLAGS) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_HATCHERY_WORDS_EXPECTED $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-p10-overmind-words-pixels: build/test-sc64-p10-overmind-words-pixels
+	./build/test-sc64-p10-overmind-words-pixels
+build/test-sc64-p10-overmind-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_BOTH_WORD_HEADER) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P10_BOTH_WORD_FLAGS) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_HATCHERY_OVERMIND_WORDS_EXPECTED $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-p10-nexus-words-pixels: build/test-sc64-p10-nexus-words-pixels
+	./build/test-sc64-p10-nexus-words-pixels
+build/test-sc64-p10-nexus-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_ALL_WORD_HEADER) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P10_ALL_WORD_FLAGS) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_HATCHERY_OVERMIND_NEXUS_WORDS_EXPECTED $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-p10-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-sc64-p10-carried-profile
@@ -139,3 +173,10 @@ $(eval $(call P10_ARM_ROM,replay-prefix,-DP10_REPLAY_PREFIX,Replay-Prefix))
 $(eval $(call P10_ARM_ROM,replay-resume,-DP10_REPLAY_RESUME,Replay-Resume))
 .PHONY: sc64-p10-arm-replay
 sc64-p10-arm-replay: build/StarCraft-Protoss-P10-Replay.gba build/StarCraft-Protoss-P10-Replay-Prefix.gba build/StarCraft-Protoss-P10-Replay-Resume.gba
+
+.PHONY: test-sc64-unit-edge-crop
+build/test-sc64-unit-edge-crop: tests/sc64_unit_edge_crop.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_BUILDING_WORD_HEADER) $(P7_INTERCEPTOR_FLIGHT_SOURCES) common/gba.h common/gba.c Makefile mk/protoss-p10/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P10_BUILDING_WORD_FLAGS) $(PROTOSS_P10_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-unit-edge-crop: build/test-sc64-unit-edge-crop
+	./build/test-sc64-unit-edge-crop
+test-sc64-protoss-p10: test-sc64-unit-edge-crop

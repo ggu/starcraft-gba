@@ -160,11 +160,28 @@ it stores the same impact packet in the seven reserved bits of each packed
 building row. A four-byte `P6I1` suffix distinguishes this form. Loading
 validates the packet and clears those bits before normal world validation.
 
-A save attempted with more pending impacts than the product can store is
+A save during play with more pending impacts than the product can store is
 refused before SRAM changes, showing SAVE FAILED. The impacts land within
 about a second of play. Pending rows are restored exactly, so a resumed game
 resolves them on the same updates as the uninterrupted run. The fixtures and
 the two-process ARM checks below verify this.
+
+Completed victory and defeat saves omit the generic pending-impact block.
+Loading a completed journal opens the result screen with simulation stopped.
+Hits due on the final update are already reflected in the saved world.
+The live queue is preserved through result presentation.
+
+On the November 20 normal P10 ROM, a prepared active save starts with eight
+pending impacts. Two Dragoons release normally on the next update. A
+scheduled hit destroys the last enemy building at frame 2, leaving nine
+impacts queued. The old ROM displays victory but its SRAM still contains
+the earlier active game. The fixed ROM has the same frame, final world and
+nine live impacts. Its new journal loads the victory world with an empty
+impact queue. The paired read-only mGBA receipt SHA-256 is
+`7a63b538ba32108ec9d5c79c2f2bf281afa3743636d2fa62d9217b100f896140`.
+The previous ROM also loads the fixed ROM's completed journal.
+All four production HOST vectors also pass win and loss cases with a full
+32-row live queue. Z10 and P10 continue to reject an oversized active save.
 
 Real play stays well under these limits. In the T10 replay and in neutral
 three-bot skirmishes, at most 4–6 impacts were pending at once; only the

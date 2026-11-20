@@ -116,7 +116,7 @@ composite_source_sprite(u8 *pixels, const Sc64SpriteFrame *sprite,
         }
 }
 
-static void
+static unsigned
 test_late_building(const LateBuildingCase *test)
 {
     const Sc64SpriteFrame *source =
@@ -149,11 +149,23 @@ test_late_building(const LateBuildingCase *test)
     composite_source_sprite(expected, source, building.x, building.y + 12);
     assert(memcmp(actual, expected, sizeof(actual)) == 0);
 
-    /* Only a selected building shows its ring and vitals. The frame covers the
-       far arc, and the near arc and vitals sit on top of it. */
+    /* Only a selected building shows its ring and vitals. */
     int screen_x = building.x - camx;
     int screen_y = building.y - camy + 12;
     int sprite_y = screen_y - source->canvas_h / 2 + source->offset_y;
+    int rx = source->w / 2 + 2, ry = (rx * 3 + 2) / 5;
+    int ring_y = sprite_y + source->h + 1 - ry;
+    u8 color = selection_color(building.owner);
+    unsigned covered = 0;
+#ifdef SC64_WORLD_DEPTH
+    /* Require a distinguishing overlap where the old near arc could paint
+       over opaque body art. */
+    gfx_begin(C_BLACK);
+    draw_selection_ellipse(screen_x, ring_y, rx, ry, color, SELECTION_NEAR, 0);
+    capture(actual);
+    for (unsigned i = 0; i < sizeof(actual); ++i)
+        covered += actual[i] == color && expected[i] != C_BLACK && expected[i] != color;
+#endif
     gfx_begin(C_BLACK);
     draw_building_overlay(&building);
     capture(actual);
@@ -163,33 +175,134 @@ test_late_building(const LateBuildingCase *test)
     b[0] = building;
     selected_building = 0;
     gfx_begin(C_BLACK);
+#ifdef SC64_WORLD_DEPTH
+    sc64_draw_depth_ordered_actors();
+#else
     draw_building_art(&b[0]);
     draw_building_overlay(&b[0]);
+#endif
     capture(actual);
     selected_building = -1;
 
     gfx_begin(C_BLACK);
-    int rx = source->w / 2 + 2, ry = (rx * 3 + 2) / 5;
-    draw_selection_ellipse(screen_x, sprite_y + source->h + 1 - ry, rx, ry,
-                           selection_color(building.owner), SELECTION_FAR, 0);
+#ifdef SC64_WORLD_DEPTH
+    draw_selection_ellipse(screen_x, ring_y, rx, ry, color, SELECTION_RING, 0);
+#else
+    draw_selection_ellipse(screen_x, ring_y, rx, ry, color, SELECTION_FAR, 0);
+#endif
     draw_building_art(&building);
-    draw_selection_ellipse(screen_x, sprite_y + source->h + 1 - ry, rx, ry,
-                           selection_color(building.owner), SELECTION_NEAR, 0);
+#ifndef SC64_WORLD_DEPTH
+    draw_selection_ellipse(screen_x, ring_y, rx, ry, color, SELECTION_NEAR, 0);
+#endif
     draw_actor_vitals(screen_x, sprite_y + source->h + 3,
                       source->w > 46 ? 46 : source->w, building.hp,
                       building.maxhp, building.shield,
                       sc64_actor_max_shields(building.type, 1), 0, 0);
     capture(expected);
     assert(memcmp(actual, expected, sizeof(actual)) == 0);
+    return covered;
 }
+
+#ifdef SC64_WORLD_DEPTH
+static void
+capture_world(u8 *pixels)
+{
+    gfx_begin(C_BLACK);
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(12, 120);
+#endif
+    sc64_draw_depth_ordered_actors();
+    capture(pixels);
+    gfx_end();
+}
+
+static void
+test_world_building_ring(void)
+{
+    static u8 ring[sizeof(actual)], flyer[sizeof(actual)];
+    Building *armory = &b[0];
+    *armory = (Building){ .x = 120, .y = 80, .owner = SIDE, .type = B_ARMORY,
+                         .raw_type = 123, .alive = 1, .maxhp = 1000, .hp = 1000 };
+    const Sc64SpriteFrame *source = sc64_race_building_art_sprite(123);
+    assert(source);
+    int rx = source->w / 2 + 2, ry = (rx * 3 + 2) / 5;
+    int bottom = armory->y + 12 - source->canvas_h / 2 + source->offset_y + source->h;
+    int ring_y = bottom + 1 - ry;
+    const u8 color = selection_color(armory->owner);
+    selected_building = 0;
+    camx = camy = 0;
+    gfx_begin(C_BLACK);
+    draw_selection_ellipse(armory->x, ring_y, rx, ry, color, SELECTION_RING, 0);
+    capture(ring);
+    gfx_end();
+    capture_world(expected);
+
+    armory->alive = 0;
+    assert(spawn_unit(SIDE, U_WRAITH, armory->x, bottom + 1 - 12) == 0);
+    capture_world(flyer);
+    armory->alive = 1;
+    capture_world(actual);
+
+    unsigned overlap = 0;
+    for (unsigned i = 0; i < sizeof(actual); ++i) {
+        if (ring[i] != color || expected[i] != color || flyer[i] == C_BLACK || flyer[i] == color)
+            continue;
+        assert(actual[i] == flyer[i]);
+        ++overlap;
+    }
+    assert(overlap);
+    u[0].alive = 0;
+
+    armory->y = 160;
+    ring_y += 80;
+    const int reference_y = 64;
+    gfx_begin(C_BLACK);
+    draw_selection_ellipse(armory->x, reference_y, rx, ry, color, SELECTION_RING, 0);
+    capture(ring);
+    gfx_end();
+    const int edges[] = {12, 119};
+    for (unsigned edge = 0; edge < sizeof(edges) / sizeof(edges[0]); ++edge) {
+        camy = ring_y - edges[edge];
+        selected_building = -1;
+        capture_world(expected);
+        selected_building = 0;
+        capture_world(actual);
+
+        unsigned hidden = 0, visible = 0;
+        for (unsigned i = 0; i < sizeof(actual); ++i) {
+            int y = (int)(i / 240);
+            int source_y = y - edges[edge] + reference_y;
+            int on_ring = (unsigned)source_y < 160 && ring[source_y * 240 + i % 240] == color;
+            if (y < 12 || y >= 120) {
+                hidden += on_ring;
+                assert(actual[i] == expected[i]);
+#ifdef GBA_SCENE_CLIP
+                assert(actual[i] == C_BLACK);
+#endif
+            } else if (on_ring && expected[i] != color && actual[i] == color) {
+                ++visible;
+            }
+        }
+        assert(hidden && visible);
+    }
+    puts("selected Armory ring respects Wraith overlap and both HUD edges");
+}
+#endif
 
 int
 main(void)
 {
     test_full_terran_roster();
     assert(sc64_race_building_art_sprite(106) == sc64_race_unit_sprite(106));
+    unsigned covered = 0;
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
-        test_late_building(&cases[i]);
+        covered += test_late_building(&cases[i]);
+#ifdef SC64_WORLD_DEPTH
+    assert(covered);
+    test_world_building_ring();
+#else
+    (void)covered;
+#endif
     puts("late Terran buildings match source frames and vital alignment");
     return 0;
 }

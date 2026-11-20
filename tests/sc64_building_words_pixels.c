@@ -40,6 +40,13 @@ int main(void)
     }
 #ifdef SC64_HATCHERY_WORDS_EXPECTED
     assert(count == 120 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery);
+#elif defined(SC64_HATCHERY_OVERMIND_WORDS_EXPECTED)
+    assert(count == 240 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery &&
+           sc64_building_word_sources[1] == &sc64_race_sprite_overmind_with_shell);
+#elif defined(SC64_HATCHERY_OVERMIND_NEXUS_WORDS_EXPECTED)
+    assert(count == 360 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery &&
+           sc64_building_word_sources[1] == &sc64_race_sprite_overmind_with_shell &&
+           sc64_building_word_sources[2] == &sc64_race_sprite_nexus);
 #else
     assert(count == 1800);
 #endif

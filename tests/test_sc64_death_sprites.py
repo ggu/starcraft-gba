@@ -73,6 +73,8 @@ class CompileTests(unittest.TestCase):
         layers = self.compile(death, {2: {0: overlay}, 3: {0: remnant}})
         self.assertEqual([l["image_id"] for l in layers], [10, 20, 30])
         actor, explosion, rest = layers
+        self.assertEqual([(l["actor_sprite"], l["fixed_low"]) for l in layers],
+                         [(True, False), (True, False), (False, True)])
         self.assertEqual(actor["steps"], [[3, 2], [4, 3]])
         self.assertEqual((actor["start"], actor["end"], actor["under"]), (0, 5, True))
         self.assertEqual(explosion["steps"], [[0, 2], [1, 2]])
@@ -97,6 +99,40 @@ class CompileTests(unittest.TestCase):
         rand_layer = self.compile(rand_wait)[0]
         self.assertEqual(rand_layer["steps"], [[1, 6]])
         self.assertEqual(rand_layer["end"], 6)
+
+    def test_detached_elevation_inherits_the_spawning_sprites_layer(self):
+        normal = op(0, ("H", 1)) + op(5, ("B", 2))
+        ordinary = (15, 16, 17, 19, 20, 21)
+        for opcode, expected in zip(ordinary, (1, -1, 0, 0, -1, 1)):
+            args = [("H", 5)]
+            if opcode == 21:
+                args += [("B", 0)]
+            else:
+                args += [("b", -2), ("b", 3)]
+            death = normal + op(opcode, *args) + op(22)
+            with self.subTest(opcode=opcode):
+                root, child = self.compile(death, {3: {0: normal + op(22)}})
+                self.assertIsNone(root["detached_elevation_offset"])
+                self.assertEqual(child["detached_elevation_offset"], expected)
+                self.assertEqual(child["fixed_low"], opcode == 17)
+                self.assertEqual((child["x"], child["y"]),
+                                 (0, 0) if opcode in (19, 21) else (-2, 3))
+
+        self.sprite_image[6] = 20
+        nested = normal + op(15, ("H", 6), ("b", 1), ("b", -3)) + op(22)
+        for opcode, expected in ((15, (False, 2)), (17, (True, 1))):
+            death = normal + op(opcode, ("H", 5), ("b", 2), ("b", 4)) + op(22)
+            parts = self.compile(death, {2: {0: normal + op(22)}, 3: {0: nested}})
+            self.assertEqual((parts[2]["fixed_low"], parts[2]["detached_elevation_offset"]),
+                             expected)
+            self.assertEqual((parts[2]["x"], parts[2]["y"]), (3, 1))
+
+        overlay = normal + op(8, ("H", 20), ("b", 1), ("b", 0)) + op(22)
+        death = normal + op(15, ("H", 5), ("b", 2), ("b", 4)) + op(22)
+        _, sprite, image = self.compile(
+            death, {2: {0: normal + op(22)}, 3: {0: overlay}})
+        self.assertEqual(image["detached_elevation_offset"], 1)
+        self.assertEqual(image["y"], sprite["y"])
 
     def test_zero_and_invalid_waits_fail_closed(self):
         for wait in (op(5, ("B", 0)), op(6, ("B", 0), ("B", 0)),
@@ -205,7 +241,7 @@ class HeaderTests(unittest.TestCase):
             self.assertEqual(text.count("Sc64DeathSourceLayer sc64_death_layers_"), 2)
             self.assertIn("{ 0u, 3u },", text)
             self.assertIn("#define SC64_DEATH_SOURCE_BANK_VERSION 2u", text)
-            self.assertIn("#define SC64_DEATH_SOURCE_METADATA_VERSION 1u", text)
+            self.assertIn("#define SC64_DEATH_SOURCE_METADATA_VERSION 2u", text)
             self.assertIn("#define SC64_DEATH_SOURCE_PIXEL_BYTES 4u", text)
             self.assertIn("#define SC64_DEATH_SOURCE_WORD_METADATA 1u", text)
             self.assertIn(f"#define SC64_DEATH_SOURCE_WORD_BYTES {mod.word_payload_bytes(sources, images)}u", text)

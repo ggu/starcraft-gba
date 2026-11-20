@@ -5,6 +5,11 @@ elevations 0 through 4 it sorts by ascending world Y within each elevation.
 Higher elevations ignore Y. A turret flag and a sprite ID break remaining
 ties. The target picker calls the same depth helper.
 
+The native queue compares unsigned keys. Its elevation starts at bit 27,
+the ground sprite anchor Y at bit 14, and the turret flag at bit 13.
+The native sprite pool index occupies the low bits. Capture sprite Y
+directly from the sprite record when a unit's simulation position differs.
+
 The layer values come from the 228-byte elevation column at offset 4068 in
 BOLT section `00C/001`. The section SHA-256 is
 `54356d7585c66cd463346996444fd208336eaacf6335d30eb2688aa73c9cb2df`.
@@ -20,14 +25,72 @@ In native gameplay footage the
 Overlords cover the Hatchery rim, and a Probe covers the southeast Nexus lip.
 
 The GBA Mode 4 painter uses those elevation and Y rules for units, buildings
-and resources. Composite turrets remain with their hull. GBA actor kind and
-slot resolve exact ties as a deterministic approximation of the native
-sprite-ID tie. Native depth changes for special states still need individual
+and resources. The static lookup matches all 228 entries in the pinned N64
+unit table. [Tank turrets have their own draw turn](2026-11-21-native-depth-followup.md)
+in both modes. GBA actor kind and slot resolve remaining exact ties.
+Native depth changes for special states still need individual
 checks. The change covers world actors in the shared campaign, skirmish and
-Showcase renderer. Target picking, free-standing effects, HUD and the
-experimental tile/OAM renderer need separate coverage.
+Showcase renderer. See the projectile section for moving weapon sprite
+coverage and the remaining passes that need separate depth references.
+
+The native sprite ID is the slot in one 36-byte sprite pool at `0x80207c70`.
+The observer matched `base + 36 * id` for 73 live actor sprites in an
+ordinary Blood Bath opening and 278 in the retained late-game capture.
+The allocator at `0x8011fde8` takes the head of one FIFO free list.
+The destruction path at `0x801207a4` returns a slot to the tail after
+its last image disappears. The next two free IDs in the ordinary
+northwest Blood Bath opening were 2126 and 2125. In the late step 31138
+capture they were 265 and 1768. Depending on reuse, either creation
+order can win a tie. Record the actual IDs and last-image retirement
+when checking exact ties across actors and independent effects.
+
+For the tie oracle, T10 observer step 18,228 has layer-18 Wraiths
+`2108` at (3096,240) and `2086` at (3120,272). The northern Wraith
+sorts in front. The same cut has a layer-4 Barracks `1951` at (192,1808)
+and a Goliath `1931` at (112,1808). The Barracks sorts in front at the
+same Y. The GBA kind tie puts the Goliath in front. These are key-order
+witnesses. Use an isolated opaque pixel mask to verify visible foreground.
+The sort reads the native sprite anchor at `+0x16`. The moving Drone in
+the step 31,138 capture shows why the unit's simulation coordinate is an
+insufficient substitute for that anchor.
+
+## Visibility and building overlay cost
+
+The shared Mode 4 queue now skips objects that the fog test would reject
+in the paint pass. Friendly unit and building visibility keeps its
+existing treatment. Construction and selection resolve building
+footprints when they need them. Weapon, damage, and other overlays use
+their own frames and anchors. The depth key and pixel order remain the
+same.
+
+Paired normal Z10 and P10 replays on release `9ee056c2` match sampled
+world state, palette and both indexed pages. Z8 has 21 matching samples
+and P10 has four through the result screen. Each Z8 timed sample also
+matches the frame and route counters.
+
+| Replay window | Main-loop mean cycles | Actor and effect mean cycles |
+| --- | ---: | ---: |
+| Z8 calls 17,400–17,480 | 1,101,537 → 1,099,631 | 125,554 → 123,198 |
+| Z8 calls 31,050–31,250 | 1,593,060 → 1,589,338 | 482,107 → 478,790 |
+| Z8 calls 42,000–42,203 | 1,587,927 → 1,574,512 | 660,949 → 647,109 |
+| P10 calls 45,218–45,275 | 2,018,288 → 2,006,353 | 359,837 → 346,210 |
+
+Across these windows, the mean drops by 0.17% to 0.84%. All four normal
+products keep their RAM endpoints. Ordinary custom replays cover
+one middle-seat opponent on the compact map and three named opponents
+on Blood Bath. Each pair matches resolved seats, world state, palette,
+and both indexed pages at 120 and 360 updates. The Terran, Z7 and P10
+framebuffer fixtures and Showcase weapon fixture pass under sanitizers.
+
+The comparison receipt SHA-256 is
+`9f801806018fbe1e960bf8c004329fc017906f58830bdc946583dc275b7040ff`.
+The custom replay receipt SHA-256 is
+`e72ce8250143c07c5c9b55e4bb4bbabe64b22ca4992987cd50ff7439c911a672`.
 
 ## Harness cases
+
+The [selected building and detached attack sprite cuts](2026-11-21-world-depth-overlaps.md#replay-cases)
+extend this checklist with native witnesses and required overlap masks.
 
 For each case, render five frames with one fixed camera and the same
 terrain, palette and animation tick. Draw the empty scene, each actor by
@@ -44,8 +107,9 @@ pinned sprites and are allowed to change when the private art is regenerated.
 | `ground-by-y` | Tank at (96,50) and Goliath at (96,56), both layer 4 | Goliath in both unit slot orders | 115/115 |
 | `building-over-unit` | Tank at (96,50), Barracks at (96,58), both layer 4 | Barracks | 459/459 |
 | `unit-over-building` | Barracks at (96,43), Tank at (96,50), both layer 4 | Tank | 380/380 |
-| `air-tiers-ignore-y` | Move a Wraith north and south across a Carrier or Overlord, layers 18 and 16 | Wraith during overlap | Future replay |
+| `air-tiers-ignore-y` | Place a Wraith six pixels north and then south of an Overlord, layers 18 and 16 | Wraith in both slot and Y orders | Terran HOST fixture |
 | `camera-and-hud` | Scroll an overlapping pair past screen rows 12 and 119 while flipping framebuffer pages | Foreground stays stable, HUD rows stay clear of actor pixels | Future paired replay |
+| `mineral-edge-depth` | Move mineral anchors to screen positions (-10,66), (249,66), (120,3), and (120,130). Compare visible and hidden center fog at each edge, all three art styles and both pages. Pair with a Probe on either side of the patch's world Y and a Wraith. | Visible crop pixels remain in the queue at layer 4. The greater world Y wins the Probe overlap. The Wraith covers the patch, and both HUD bands match the empty scene. | 6, 32 and 44 distinguishing overlap pixels in the P10 host fixture |
 | `selected-overlap` | Select the Overlord above a Hatchery and the Tank behind a Barracks | Overlord ring over the Hatchery, Overlord body over its own ring, Barracks over the Tank ring | 15, 14 and 29 distinguishable pixels |
 
 The old renderer flipped all 192 Wraith/Tank pixels on unit slot swap and
@@ -55,6 +119,11 @@ source. The current canonical Terran framebuffer test is
 `build/test-sc64-terran-full-frame`. Add campaign and skirmish replay cases
 for picking the topmost actor and for dynamic layers such as workers against
 resources or Interceptors around Carriers.
+
+The shared Mode 4 mineral culler now admits the prepared sprite crop
+whenever it intersects the playfield. Its center still supplies the
+visibility sample and its world Y still supplies the layer-4 depth key.
+The P10 `test-sc64-geyser-art` fixture covers the edge positions above.
 
 In native Challenger melee, a selected Overlord moves across the Hatchery.
 The cursor is away from the overlap. At observer step 3920 the Overlord's
@@ -71,6 +140,752 @@ The terrain cache now holds background and fog. Profile counters attribute
 the sorted actor pass, including buildings, to `sc64_unit_draw_cycles`.
 For before/after comparisons sum building and unit draw counters and compare
 the combined cost with background and full-update timings.
+
+### Death sprite depth
+
+The authenticated USA N64 order dispatcher calls the ordinary Death routine
+at `0x8012c3bc`. That routine starts animation 1 on the actor's existing
+sprite and preserves its live elevation at entry. The 280-byte function at
+ROM offset `0xf00ac` has SHA-256
+`c34b5423cecba28d75020590fd0d100f89e3937a369363c7d92cac2b2db1b1fc`.
+A retained capture at native game frame 26,877 has a dying SCV at (46,1260)
+with HP zero, order zero and sprite ID `0x066c`. Its sprite is in render row
+39 with elevation 4 and sort key `0x213b066c`. The normalized RAM SHA-256 is
+`c564005d460558a307f550955a5ffd86dc88fc53cfb1fa4e6ff6b167ce6e6134`.
+The SCV Death script uses `imgol` to add image 332. Native sprite
+`0x802163a0` has that image at the head of its image list, and the image
+points back to the same sprite and shares its key.
+
+The N64 IScript handler for opcode 17 (`lowsprul`) passes fixed elevation 1
+to the independent sprite constructor. The 68-byte handler at ROM offset
+`0x13238` has SHA-256
+`8a258b2707f64dd1a8d60f14561de2f027dcd906b9c2ed09d7d5b153b0aec14a`.
+Two Hydralisk remnants in the frame 26,877 render list have image 32 and
+elevation 1. Two Marine remnants with image 241 also have elevation 1 at
+frame 19,444 (RAM SHA-256
+`0924c9a329824371d7271968eb0b16ca1eaccceae76b54c44ca66a741866bac1`).
+
+The shared Mode 4 painter queues the source actor's own collapse frames
+and direct `imgol` Death attachments at the actor's captured elevation and
+world Y. Independently spawned opcode-17 corpses and rubble use elevation 1
+and their own anchors. The bank records both classes apart from the
+under/over bit. The prepared bank has 157 actor profiles with main-image
+or direct attachment frames and 84 with at least one fixed-low layer.
+The destruction scan reads lift state from the retained building flag.
+The existing off-screen and fog rules apply. Depth data occupies the same
+20-byte transient row and clears with the effect pool. Prepared builds
+require the current depth metadata. Regenerate the local bank with
+`./dev sc64 prepare --rom PATH --profile PROFILE`.
+
+| Case ID | Required overlap and checks |
+| --- | --- |
+| `death-root-ground-by-y` | Isolate a Zergling collapse at layer 4 and a Tank at a slightly smaller or larger world Y. Require the larger Y to win every distinguishing pixel in each pair. Repeat with a Marine or Hydralisk and capture its native Death image, sprite ID and elevation. |
+| `death-attachment-depth` | Compare the SCV's attached image 332 against a Tank north and south of its anchor, then against a Wraith. Use the SCV sprite key for the native attachment. Repeat with a lifted Facility, whose burst sorts at 12 and whose rubble sorts at 1. |
+| `death-root-under-flyer` | Place a Wraith above the collapse and move the camera past both HUD bands. Require the flyer to cover the root on each Mode 4 page and zero HUD changes. |
+| `death-remnant-low` | Advance past the collapse to the independent corpse or rubble phase. Verify layer 1 at the remnant's own anchor and require a layer-4 survivor to cover it. Include building rubble and two layer-1 sprites at different world Y values. |
+| `death-source-retained-depth` | Recycle the victim slot before the collapse ends and draw both products from the same camera. Require the effect to keep its death snapshot, exclude hidden effects and confirm that fresh SRAM load clears cosmetic entries. |
+
+Use `make test-sc64-showcase-death-source` with the current private bank for
+the isolated pixel checks. Add ordinary-input cuts from a battle in campaign,
+Custom Game and Showcase. Record frame, screen page, actor and effect anchor,
+layer, and distinguishing and wrong-pixel counts. Keep capture data local.
+
+The Showcase sanitizer fixture matches all 2,110 distinguishing pixels
+across nine SCV and Zergling overlaps, including both HUD edges. The Terran
+fixture confirms a lifted Facility's layer-12 attachment and independent
+layer-1 rubble after destruction. All four normal ARM profiles pass header
+and SRAM checks with unchanged IWRAM and EWRAM endpoints. The painter stack
+frame adds 192 to 200 bytes, with a 2,784-byte maximum across these builds.
+Normal Custom Game launch checks match the prior release's gameplay,
+palette and both indexed pages at calls 60 and 120. These samples precede
+combat. The ARM matrix receipt SHA-256 is
+`c47baa6654c6b0d69a8bca16233b87204aa174eef46d87651393d1860f38c5c5`.
+
+An ordinary Showcase Siege Line replay advances 120 updates after unpause.
+All 24 sampled world states, displayed pages, HUD bands and palettes match.
+The battlefield differs in nine samples with active death effects. The first
+four of those samples have 13 effects born immediately after unpause. Total
+emulator cycles rise from 116,932,815 to 119,300,827 (+2.03%). The measured
+cost is specific to this emulator replay. The detailed receipt SHA-256 is
+`874b311ac6e6d14b6ecd383c37ef852f569eba16e5fc1d11c3e40749597267d2`.
+
+#### Detached death sprite replay cuts
+
+The USA ROM's sprite-spawn handlers read the parent's live elevation.
+`sprol` and `sproluselo` add one, `highsprol` and `sprul` subtract
+one, and `spruluselo` passes it through. The child gets its own sprite
+record and anchor. The common spawn wrapper at ROM offset `0x128f4`
+matches retained native RAM. Its 120-byte SHA-256 is
+`8ad52e8696f17392798b811c3576690294c9f1b3ccbfbd9044aef73f23fd85b5`.
+This rule is established from the native code and authenticated animation
+scripts. A live native framebuffer cut for these deaths is still pending.
+
+The prepared bank contains six drawable actor scripts that use `sprol`
+in Death. Refinery, Extractor and Assimilator bursts sort at 5. Queen,
+Matriarch and Devourer bursts sort at 19. Their second image joins the
+detached sprite at source age 2, draws over its main image while both
+exist, and keeps that sprite's layer after its main image ends at age 3.
+The shared painter takes the original live actor layer from the death
+snapshot. The importer caps the queue by the greatest number of
+concurrent layers, which is two per effect for the prepared bank.
+
+| Priority | Case ID | Replay cuts and expected foreground |
+| --- | --- | --- |
+| 1 | `death-detached-gas-burst` | Destroy a Refinery, Extractor and Assimilator. At a visible burst tick, overlap a layer-4 Tank south of the source and a layer-18 Wraith at the source. The burst covers the Tank and the Wraith covers the burst. |
+| 1 | `death-detached-air-overlay` | Overlap a Wraith with a dying Queen, Matriarch or Devourer. Capture source ages 0, 2, 3 and the last overlay tick. The burst and its second image cover the Wraith. At age 3 the second image remains on top after the first image expires. |
+| 2 | `death-detached-hud-page-flip` | Scroll the Refinery/Wraith overlap across rows 12 and 119. Repeat across both indexed pages and check every HUD row. Carry the replay through pause and fresh save load, then confirm the old cosmetic burst is gone. |
+
+The Showcase HOST overlap fixture checks all three gas structures, the
+Queen's second image, and both HUD edges. It compares 1,769 distinguishing
+pixels across the seven new cases. For ordinary-input coverage, save both
+GBA page hashes, the active page, the palette, source age, each live
+elevation and world anchor, foreground overlap count, and wrong-pixel
+count. In N64 capture, record the parent and child sprite IDs and the
+active child image IDs. Keep the captures local. Compare each platform
+within its own scale and palette. Exact depth ties still need a native
+sprite-ID witness. Use the [attacker image cases](#attacker-image-depth)
+for weapon attachments.
+
+Terran, Z10, P10 and Showcase all link and pass ROM header and SRAM
+signature checks with the same IWRAM and EWRAM endpoints as `9b46188e`.
+The compiler dependency lists select the regenerated bank in every
+profile. Its indexed pixel and packed-word arrays match the prior bank.
+Moving the source renderer into its header leaves the preprocessed game
+source identical on all four profiles and produces the same Showcase ROM.
+An exact `9b46188e` Showcase comparison on ordinary Siege Line input
+matches the world, both indexed pages, active page, HUD and palette at
+24 cuts during 120 updates of Zergling combat. Emulator cycles move from
+119,809,410 to 119,851,039 (+0.035%).
+The paired receipt SHA-256 is
+`7678e721cf271b4da1c686166e3a905223df3326340e992f7b221f5aea4993ef`.
+
+### Dynamic depth harness
+
+The native painter reads the **live** elevation byte at sprite offset
+`0x0d`. Rechecking the owned USA ROM and the local N64 observer RAM confirms
+that takeoff writes 12 at `0x8014bb9c` (ROM `0x10f88c`) and landing writes 4
+at `0x8014b7e8` (ROM `0x10f4d8`). The ordinary-input [Blood Bath lift
+capture](2026-11-13-n64-blood-bath-airborne-last-building.md) identifies the
+same Command Center before and after takeoff. The layer stores establish the
+depth rule, while the retained controller run documents the visible takeoff.
+The independent Blood Bath observer RAM from step 4230 has SHA-256
+`bcacbc2bc25e1a0f4b0321654ff28b42e98788e81dfc40869dfb5c2ceb3d58f1`.
+Its depth helper and layer stores match the owned ROM byte for byte.
+
+The shared GBA painter derives building elevation from the live flight
+predicates. Layer 12 goes in front of ground actors regardless of world Y
+and behind ordinary flyers at 16 or above. Landing restores the building's
+ground depth. The change uses the existing campaign and shared Science
+Facility flight state, with no additional save data.
+
+The Terran framebuffer fixture passes under ASan and UBSan. The Terran,
+Zerg, Protoss and Showcase ARM links preserve the IWRAM and EWRAM endpoints
+from `81f62111` with the same prepared inputs. Frame replay and hardware
+timing remain open for the flight overlap.
+
+| Priority | Case ID | Setup and expected result | Status |
+| --- | --- | --- | --- |
+| 1 | `building-liftoff-depth` | Move a Science Facility from grounded to airborne and back. Use a Tank whose Y is just south of the Facility. The Tank covers it on the ground and the Facility covers the Tank in flight. Repeat with a Wraith covering the airborne Facility. | Terran HOST checks cover 396 pixels for each Tank overlap and 223 for the Wraith. HOST flight transitions cover both the Science Facility and late Terran Command Center. Ordinary-input ARM lift and land replay pending. |
+| 1 | `airborne-save-depth` | Save after issuing Land but before arrival. In a fresh session, sample the same overlap at load, during flight and after touchdown. Require layer 12 until the live flight flag clears and the same winning pixels as uninterrupted play. | The normal Terran T8 replay verifies the live state and depth inputs after reload. Add an on-screen overlap fixture and repeat with a shared Science Facility in Custom Game. Include Showcase if the scene supports lift and save. |
+| 1 | `air-tiers-ignore-y` | Preserve the Wraith/Overlord pixel result as the actors cross both viewport boundaries. Flip both framebuffer pages and require no actor pixels on HUD rows 0–11 and 120–159. | HOST isolated overlap passes. Ordinary-input page-flip replay pending. |
+| 1 | `scv-foundation-depth` | At a paid Terran foundation, compare an SCV north of the foundation as it approaches, attaches, works and completes. The foundation covers the idle SCV at layer 4. The working SCV at layer 5 covers the foundation. | See the [SCV foundation overlap](#scv-foundation-overlap). |
+| 1 | `interceptor-flight-depth` | Compare launch (15), attack (17), early and late far return (15 or 17), and final approach (14) against a Carrier at 16. Cover both actor slot orders and confirm docked children are hidden. | The Protoss framebuffer and save fixture covers the GBA runtime. Ordinary-input N64 and ARM overlap captures remain open. |
+| 1 | `effect-crosses-actor-depth` | Capture a moving bullet fired at a ground target (layer 5) crossing a ground actor (4), a flying building (12) and a flyer (16 or 18). Repeat for a flyer target, using its live layer plus one. Sample after the target moves, lifts or dies. For point-target fire use the shooter's live layer plus one. | Use the [projectile replay cuts](#projectile-replay-cuts). |
+| 1 | `storm-point-depth` | Cast at open ground with ground and air units crossing the storm. Repeat at a HUD edge and through a fresh save load. | The shared queue draws the three campaign adapters' point-Storm markers at layer 5. See [point-Storm cuts](#point-storm-cuts). |
+| 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
+| 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
+| 2 | `burrow-sprite-depth` | In a supported encounter, capture a unit before burrow, at layer 1 underground, and after it returns to its base layer. Compare the body and the anchor used by any shot or death effect. | The shared painter, projectile depth snapshot and source death snapshot read the existing burrow flag. The Showcase HOST collapse overlap passes. Capture the native body and a supported campaign burrow transition with ordinary input. |
+| 2 | `nuke-target-dot-depth` | In a nuclear strike preview, capture the blinking target dot against a Tank and a Wraith. Record the Ghost's layer and the spawned dot's layer. | The shared queue puts the layer-5 dot above the Tank and below the Wraith. See [nuclear target-dot cuts](#nuclear-target-dot-cuts). |
+
+For replay receipts record the product, source commit, controller tape hash,
+world anchors, effective layers, active page, clip rows, overlap count and
+wrong-pixel count. For native dynamic actors also record the actor and
+sprite addresses and their captured layer. Keep native screenshots and
+memory dumps local. Compare the isolated GBA masks within each version's
+palette. The N64 and GBA use different pixel scales and palettes.
+
+#### Burrowed collapse
+
+The authenticated USA ROM writes `1` to the sprite elevation byte at
+`0x80156624` (ROM `0x11a314`) and restores the base layer at `0x80156a30`
+(ROM `0x11a720`). The 32-byte windows starting 12 bytes before the stores
+have SHA-256 `fb9423afd5176d78a656e8f99ad63560e88473cd2e4847657df16fe5e0b27fa7`
+and `29fcd3c3efc2445fadb9312f478a89152b867a9c7ea26db575fc339bfd0cd5d2`.
+The GBA resolves elevation from the persisted instance flag, which is still
+available after the death scan sees the unit become inactive. This covers
+depth of existing visuals and keeps each campaign's visibility rules.
+
+| Case ID | Replay cuts and expected result |
+| --- | --- |
+| `burrow-collapse-depth` | At world (96,52), compare a raised and a buried Zergling's source collapse against a Tank at (96,49). Sample the same collapse age. The raised collapse (4) covers the Tank and the Tank (4) covers the buried collapse (1). Use both isolated renders and the pair. |
+| `burrow-release-depth` | In a supported campaign encounter, save before the release trigger and reload through it. Record the last underground and first raised layer, body visibility, attack or death snapshot layer and both indexed pages. The stored flag and active transition determine which layer to expect at each cut. |
+
+`make test-sc64-showcase-death-source` compares 244 distinguishing pixels
+in each collapse setup and preserves the HUD rows. Ordinary-input GBA/N64
+burrow overlap and visibility captures remain open.
+
+#### T8 pending landing and fresh save
+
+The normal Terran ROM linked from `25e9e8b9` enters T8 through HOME with
+two authored airborne Command Centers. Ordinary input issues Land for raw
+106 in slot 86. At frame 473 the building still has flight flag 4, layer
+12 and a pending goal at (1387, 1492). Start/B writes its pause save.
+A fresh HOME load restores the same actor row and goal. All 1,208 paired
+actor-state samples match through touchdown at frame 1,681, where the
+flag and goal clear and the building returns to layer 4. The camera and
+palette match at six render cuts. The fresh selection and active page
+differ, so use this replay for state continuity and add a visible crossing
+for the pixel-ownership oracle. The native Blood Bath capture witnesses
+lift and pending Land. Its native touchdown layer is verified in the ROM
+code above.
+
+The ordinary-input receipt SHA-256 is
+`d61e443713180e3ee8bb5f97c14a66dd25a15f740519e76267567f03327bdf50`.
+
+### Point-Storm cuts
+
+The USA N64 order dispatch for Psionic Storm (order 142, weapon 84)
+reaches the generic spell order at `0x80149c18`. The caster's CastSpell
+script runs opcode 39, which reaches the native bullet constructor at
+`0x80008600`. At `0x800087f0` a point cast takes the caster's sprite
+layer plus one. High Templar, Tassadar and Kerrigan use layer 4. Weapon
+84 uses behavior 3 and starts animation 14 on the existing bullet sprite
+at `0x80008c28`. The animation unhides its image and plays frames without
+changing elevation. The 96 ROM bytes from `0x97d4` match the retained
+native RAM and have SHA-256
+`09cd6957168bb5632031dc884b6d98c289dce4e5177d1099606f186dbc80d7e0`.
+
+P4, P6 and Z6 now draw their existing point-Storm marker in the shared
+Mode 4 queue at layer 5. Their states retain the same position and
+lifetime fields. The GBA cursor still previews the point before the cast.
+Native unit-targeted casts take their elevation from the target and need
+a separate fixture.
+
+| Case ID | Inputs | Expected output |
+| --- | --- | --- |
+| `storm-point-ground-air` | In P4, P6 and Z6, cast at a point and move a layer-4 ground actor, a layer-12 lifted building and a layer-18 flyer across the marker, one at a time. Isolate the marker and body at the same camera. | The Storm covers the ground actor. The building and flyer cover the Storm. Require nonzero distinguishing overlap and zero wrong foreground pixels in each case. |
+| `storm-point-hud-reload` | Save after a cast and resume in a fresh emulator. Move the camera to put the marker against field rows 12 and 119. Advance through both indexed pages and the expiration tick. | The active world anchor and foreground samples agree with uninterrupted play. Both HUD bands stay clear of the marker. Expiration removes the marker from the queue. |
+
+Use `make test-sc64-campaign-spells` for the existing spell control and
+save fixtures and the isolated Storm overlap checks. For each of P4, P6
+and Z6, the sanitizer fixture matches ten distinguishing pixels against
+a Tank and nine against a Wraith. The P6 and Z6 control and SRAM tests
+also pass. For ordinary-input
+cuts record the adapter, caster layer, cast target kind, marker world
+anchor, age at save, live layer and both foreground counts. Record the
+N64 bullet and sprite IDs through the first visible animation tick. The
+native elevation is established by the ROM and retained RAM. An ordinary
+N64 Storm overlap capture is still pending.
+
+The four normal ARM builds pass header and RAM checks with unchanged
+IWRAM and EWRAM endpoints. Terran reproduces its previous ROM bytes.
+An ordinary Siege Line Showcase replay matches the world, palette,
+displayed page and both indexed pages and HUD bands at 24 samples over
+120 combat updates. Guest cycles increase from 119,851,039 to 119,868,520
+(0.015%). That scene has no active Storm, and active-effect timing on
+hardware remains open. The comparison receipt SHA-256 is
+`4de84f1774ae396e425befdb00526ea5c8121ccfd67bf85da9657a5a340798e3`.
+
+In an ordinary Z6 replay on normal Z10, Kerrigan casts at (1857, 1868)
+at frame 21,437. The release and candidate match 25 gameplay
+checkpoints, all three authored pages, the pre-cast framebuffer and both
+HUD bands. Eight active cuts run through the first damage pulse. The
+first cut matches completely. The other seven each replace seven
+cyan marker pixels on the same edge with the foreground art's palette
+indices. The gameplay samples match through the damage pulse. Use the
+HOST overlap fixture for isolated actor ownership and the normal replay
+for the live crossing.
+
+The Z6 comparison receipt SHA-256 is
+`79b356de5710544e9740087125ee0c0ed5de1dd6e4ed2ac6983b9bfcc28da1d3`.
+
+### Nuclear target-dot cuts
+
+The USA ROM reads the Ghost sprite's elevation at `0x8014c840`, increments
+it at `0x8014c848` and writes it to the target-dot sprite at `0x8014c84c`.
+The existing T8 replay witnesses the blinking dot and its removal at
+descent. Eligible GBA Ghosts have layer 4 throughout painting. The shared
+queue draws the committed dot at layer 5 with its existing fog rules and
+playfield clip. Its layer follows from the Ghost's fixed layer, including
+after a fresh save load.
+[Native T8 strike](2026-11-12-ghost-nuclear-strike.md)
+
+| Case ID | Inputs | Expected output |
+| --- | --- | --- |
+| `nuke-dot-ground-air` | Pause a committed strike on each visible dot frame. Overlap the dot with an allied or visible enemy Tank, then a Wraith. Reverse unit creation order and shift the camera by a few pixels. | The dot covers the Tank. The Wraith covers the dot. Require a nonzero distinguishing mask in each test and zero wrong foreground pixels. |
+| `nuke-dot-fog-page-flip` | Bring each overlap to HUD rows 12 and 119 and advance through both backbuffers. Repeat for a hostile strike with the target point out of visibility. | The dot respects fog and the field clip. Hash both HUD bands and compare both indexed pages. |
+| `nuke-dot-paint-reload` | Save during painting in the active-strike probe. Load it from HOME in a fresh process and replay through release. Repeat with a canceled strike. | The same phase and target anchor produce the same dot and foreground pixels on reload. Descent and cancellation remove it. |
+
+Use `make test-sc64-nuke-world` with the prepared private bank to check
+layer ownership against both unit types. The Terran sanitizer fixture
+matches all five distinguishing pixels in each overlap and leaves both
+HUD bands unchanged. The ARM world fixture also passes the ordinary
+cast, abort, impact and T8 active-strike SRAM checks. For recorded replays
+use the ordinary cast command in T8 and in Custom Game on the preview
+cartridges.
+
+### Nuclear missile and impact depth
+
+The native missile uses raw 14, sprite 266 and base elevation 18. Retained
+T10 step 18,228 shows that elevation on the missile in Silo approach state,
+with the Silo body itself at elevation 4. The observer state SHA-256 is
+`89e8cb1a135076946f405c374b55a98e753fe986fb4556a4e6822899862fb668`.
+Native order 125 keeps that sprite through ascent, hiding, repositioning,
+descent and impact. The 820-byte order handler at ROM `0x11015c` has
+SHA-256 `e3b46006d2bf1e1d8cd508d6bc65d6f4e1f8dd932240bb47515ac09a2c16fb29`.
+At impact the missile starts SpecialState1. `imgol` adds image 428 to
+its own sprite at layer 18. `sprol` creates independent sprite 267 at
+layer 19, with world Y offset −42 source pixels. The 272-byte `sprol`
+handler at ROM `0x12fe8` has SHA-256
+`54e830122d5d015debaf6b419794df635d852a56142fba988a7e4e220240ab38`.
+
+The GBA preview uses its shared world queue for all four visuals. Each
+flight can contribute two entries when the dot and ascending missile or
+the burst and impact child coexist. The draw state is derived from the
+existing flight fields after a fresh load.
+
+| Case ID | Replay cuts and expected result |
+| --- | --- |
+| `nuke-missile-air-tier` | Capture ascent at the Silo and descent over the target. The layer-18 missile covers a layer-16 Battlecruiser. Use the Silo origin for ascent fog and the target for descent fog. |
+| `nuke-impact-parent-child` | Pause when burst and child frames overlap at the target. Both cover a layer-16 Battlecruiser. The child (`19`) covers a layer-18 Wraith. Record native IDs for the equal-layer Wraith and burst tie and record the child's anchor separately. |
+| `nuke-impact-reload-hud` | Compare the first missile, burst and child cuts after fresh paint- and descent-phase loads. Sample both display pages, both HUD bands, fog at the origin and target, and expiration of each part. Verify the same simulation impact count and damage through reload. |
+
+The active native T8 sprite-row and pixel witness remains open. Capture
+before descent, on the first visible descending body, on SpecialState1's
+first tick and after the burst ends. Record both native sprite IDs and
+layer bytes in addition to the frame hashes.
+
+The Terran HOST world fixture checks ascent and descent against a
+Battlecruiser, ascent against a layer-19 blocker, and the retained
+impact child against a Wraith after the burst ends. It compares explicit
+draw orders on both pages and checks hostile fog and HUD clipping. The
+ARM Terran world fixture passes production, abort, impact, the 200 supply
+boundary, and the T8 paint-phase SRAM round trip.
+Record dot phase, caster and target anchors, effective elevation, active
+page, palette and overlap counts. The pre-cast cursor is UI. The missile
+body and impact sprites still need their own native elevation witnesses.
+
+### SCV foundation overlap
+
+The owned USA ROM raises the builder's live sprite elevation by one when
+placing a Terran foundation or attaching to an unfinished one. The
+stores to sprite offset `0x0d` are at `0x80126854` (ROM `0xea544`)
+and `0x80125e58` (ROM `0xe9b48`). The reset-collision order restores
+the unit type's base elevation at `0x80125cc4` (ROM `0xe99b4`). Both
+attachment paths queue that reset. The SCV therefore uses elevation 5
+during construction and returns to 4 when normal collision resumes.
+[OpenBW construction and collision reset](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L4312-L4489)
+
+The shared GBA Mode 4 painter derives the layer from the existing worker
+order and foundation. A build-pending SCV and an assigned SCV outside
+the engine's 36-pixel work radius keep layer 4. An SCV in work range of
+its live, friendly, unfinished target uses layer 5. Completion or loss
+of the job restores layer 4. The GBA uses its work radius to approximate
+native attachment, with no additional save state.
+
+The Terran framebuffer fixture exercises `scv-foundation-depth` with
+isolated actor masks, a north-side overlap in idle and working states,
+both sides of the work-radius boundary, and a build tick that completes
+the structure. All 149 distinguishing pixels match. The Terran, Z10,
+P10 and Showcase ARM builds preserve their IWRAM and EWRAM endpoints
+from `0b1fbde3`. Normal menu smoke replays match the sampled world,
+palette and both indexed pages after 60 and 120 input calls. These
+smoke samples occur before construction.
+
+For ordinary-input replay, start a Barracks in T1 and in Terran Custom
+Game on all three race ROMs. Retry with a replacement CPU SCV
+approaching an interrupted build in a custom match. Use a Terran build
+scene on Showcase when available. Save during construction and reload
+in a fresh emulator before completion. Check an idle, stopped or
+orphaned SCV at the same anchor. Compare overlap pixels with
+uninterrupted play and check HUD clipping on both pages. The retained
+[native Barracks replay](2026-11-17-native-scv-foundation-interruption.md)
+supplies known working cuts at 9,308 and 9,332 and completed cuts at
+11,844 and 11,900 for a new framebuffer and sprite-layer capture.
+
+### Native bullet depth
+
+The native bullet constructor at ROM `0x93a4` reads the shooter's order
+target. The branches at `0x800087c0` and `0x800087f0` assign the
+bullet's sprite elevation once at creation from the target or shooter
+respectively. The 116 bytes at ROM `0x9394` have SHA-256
+`2824fe5e99a1890914746cb35cdbd74e46bfc84876ee41787561704fd5a81c01`.
+The N64 render traversal at `0x8012036c` walks the sprite row heads at
+`0x801128a0` and submits sprites to the same queue as units. The unmodified
+Blood Bath capture at step 4230 shows a live mining effect in that queue
+with sprite ID 2088 at (1958,284), elevation 5. Its RAM SHA-256 is
+`bcacbc2bc25e1a0f4b0321654ff28b42e98788e81dfc40869dfb5c2ceb3d58f1`.
+The native target-detach routine at `0x8000859c` copies the target position
+and clears the pointer. The sprite retains its existing layer. In a retained
+late-game trace, a bullet at layer 5 outlives its target while its Lurker
+shooter remains at layer 1. The late-game trace used a defeat-suppression
+patch. Its game frame 31138 RAM SHA-256 is
+`3688890b01895af6bd85ecc7eb23cefd26506da8a742ff30dd7fdafd2b30cdbc`.
+[OpenBW bullet creation](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13759-L13769)
+
+The shared GBA Mode 4 painter interleaves source-backed weapon
+sprites with actors. It reads live depth on the first GBA update that reaches
+the source release tick, then holds the result. If an actor disappears
+during wind-up, the attack-init snapshot supplies the depth. Reusing its
+slot cannot redirect the depth sample to the new occupant. Layers 0–4 use
+the projectile's current world anchor, including fixed-position effects.
+The projectile and its current visual children draw together. The
+shooter's attached images draw in its actor pass. Independently spawned
+shooter sprites, impact and trail sprites, spell pools and Interceptor
+pulses need their own depth comparisons. The existing queue slot order
+breaks GBA projectile ties. The experimental Mode 0 renderer still
+separates cached static art from dynamic actors.
+
+The native constructor writes the sprite elevation before it dispatches
+on weapon behavior. The behavior table load at `0x80008814` and jump at
+`0x80008834` follow both elevation writes above. A stationary shell burst
+therefore takes the same target-or-shooter elevation plus one as a flying
+bullet. The Gauss Rifle (weapon 0) and siege cannon (27 and 28) all take
+behavior 2 to `0x800088c0`. At game frame 10,001, a staged native
+Academy capture contains two Gauss Rifle sprites at layer 5 targeting the
+same layer-4 unit. The normalized RAM SHA-256 is
+`da3a833eca8432feb659271d2ac5f5609704b3d0b6f8bfd7602183dff33b6c87`.
+The GBA formerly drew stationary effects in a final pass above
+every actor. Their depth now uses the shared release snapshot and queue.
+An effect keeps its captured anchor under the existing GBA animation
+model. The native behavior-2 launch path at `0x8012a538` calls a helper
+to place the effect within the target's bounds. Use the captured sprite
+anchor for the N64 Y oracle. Exact anchor placement and independent
+child sprites require their own tests.
+
+#### Projectile replay cuts
+
+Use the same five-frame overlap oracle as the actor cases above. Capture
+the isolated projectile part without the shooter's overlays when measuring
+foreground ownership. Run through the normal campaign, Custom Game and
+Showcase entry points. Record the product, source hash, tape hash, scene,
+camera, trace slot, target or shooter ref, source and GBA release ticks,
+that actor's layer, captured projectile layer, active page and both overlap
+counts. Store ROM-derived pixels and memory locally.
+
+| ID | Setup | Expected outcome |
+| --- | --- | --- |
+| `ground-shot-through-flyer` | Pause a shot across a ground unit, then repeat it across a lifted building and a flyer. Repeat with reverse actor creation order. | At layer 5 the shot covers the ground unit. Layer 12 and higher sprites cover the shot. |
+| `air-shot-over-ground` | Fire at a flyer backed by a ground unit and sample the projectile's flight. | The projectile takes the target's layer plus one and covers the ground actor. |
+| `ground-shot-by-moving-y` | Fire diagonally at a layer-3 Bunker. At the same animation step, put a Tank north of the projectile anchor, then south. | The layer-4 projectile covers the north Tank and passes behind the south Tank. |
+| `stationary-shot-depth` | Fire a sieged Tank at a layer-3 Bunker, pause on a visible impact phase, then repeat with a Tank three GBA pixels north or south of the impact or with a Wraith over it. Sample after target removal. Use the native weapon behavior and sprite anchor to identify the matching N64 effect. | The layer-4 impact covers the north Tank. The south Tank and layer-18 Wraith cover it. The released effect keeps its layer when the Bunker disappears. Compare both draw orders directly when the source splash remaps underlying palette colors. |
+| `shot-release-depth` | Change target layer during wind-up, change it again during flight, then remove the target or recycle its slot. For a point shot change the shooter's layer during wind-up. | The projectile uses the release tick's actor layer and keeps it through flight. A slot recycled during wind-up leaves the attack-init snapshot in effect. |
+| `projectile-hud-page-flip` | Shift the camera so the flight intersects screen rows 12 and 119. Step two page flips with the cursor out of the overlap. | Terrain, bodies and projectiles are clipped to the field. HUD pixels are identical in both paired comparisons. The N64 oracle checks foreground UI without requiring GBA-specific row coordinates. |
+| `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
+| `independent-effect-depth` | Capture muzzle, projectile body, trail, impact and corpse or shadow on separate native animation ticks against the same covering actor. Repeat with a special-service projectile. | Record the native sprite ID and elevation when each independent sprite exists. Use the parent sprite's depth for image attachments and derive a separate oracle for independently spawned sprites. |
+| `yamato-charge-flight-impact-depth` | In Terran, P10 and Showcase, record Yamato charge, flight, trail and impact against a lifted building and a flyer. | Compare the charge with the caster layer, the flight and attached impact with the release layer, and the detached trail one layer below. Record a separate overlap mask for each phase. |
+| `interceptor-pulse-depth` | In P10, capture a shot from a launched Interceptor against both ground and air targets. Sample target loss and a fresh save load in flight. | The marker joins the world queue with its launch layer. See [Interceptor pulse restore](#interceptor-pulse-restore). |
+
+#### Yamato charge attachment
+
+The verified Battlecruiser CastSpell script (body image 218, script 66,
+PC `0x6c94`) attaches image 543 with `imgolorig` on its own sprite. The
+GBA now draws the manual and automatic charge within the caster's turn
+at layer 16. The destination-dependent glow can change the caster art
+and any already painted pixels. A foreground Wraith at layer 18 covers
+the glow. Test both an onscreen caster and a caster just outside the
+playfield whose glow extends into it.
+
+| Case ID | Replay cuts and expected result |
+| --- | --- |
+| `yamato-charge-overlap` | Sample manual charging and automatic release with a Wraith over the glow. Compare body → charge → Wraith to the actual queue. Reverse the two draw turns and require a different overlap. |
+| `yamato-charge-viewport` | Repeat with the caster just beyond a field edge and the glow in view. Sample both indexed pages and HUD bands. When the caster or charge is hidden, its image must respect the same actor visibility rule. |
+
+The Terran sanitizer fixture checks 121 distinguishing pixels for the
+manual charge and 217 for the release glow. The selected offscreen
+caster cases match 223 pixels at the left edge and 413 at the top edge,
+including an untouched HUD and no stray selection ring.
+
+#### Yamato flight, trail and impact
+
+In the USA ROM, weapon 30 takes moving behavior 0 from the table at
+`0x800cdd68`. The common constructor at `0x800087c0` captures the
+target's sprite elevation plus one before that dispatch. Target removal
+at `0x8000859c` clears the reference and preserves the projectile layer.
+Flight uses image 541. IScript `sprul` creates trail sprite 351 with
+image 542 one layer below its parent. Impact image 544 attaches to the
+projectile sprite and inherits its layer. This reference comes from the
+native constructor and scripts. A live N64 Yamato overlap capture is open.
+
+Terran, P10 and Showcase send all three parts through the shared Mode 4
+queue. Flight and impact use the saved release layer. Targeting a Bunker
+gives layer 4, an ordinary ground unit 5, a lifted building 13, and a
+Wraith 19. A trail uses one
+layer below with its own world anchor. The 20-byte flight record stores
+the captured layer in motion bits 21–25. Older rows read as zero. On
+those rows, use the surviving target's current layer plus one, or 17 if
+the target is gone, until the next movement tick stores that value.
+Older executables reject rows written with a nonzero layer. The trail
+and impact use the transient tracer pool and clear on reload.
+
+Run the five-frame overlap oracle with a fixed camera and animation tick.
+For a destination-dependent shade, compare actual pixels with expected
+composition and reversed composition, using only pixels those two
+compositions distinguish. Store the profile, ROM digest, input tape
+digest, camera, page, source and GBA ticks, phase, target presence, layer,
+world anchor, distinguishing pixel count and wrong-pixel count.
+
+| Case ID | Replay setup | Expected result |
+| --- | --- | --- |
+| `yamato-ground-flight-impact` | Launch at a layer-4 actor and stage each phase over a Tank, then a Wraith. Repeat with the blocker created before and after the target. | Flight and impact at 5 cover the Tank and pass behind the Wraith. The color-remapping impact matches the sorted composition. |
+| `yamato-trail-ground-y` | Sample a layer-4 trail on the same effect tick with a Tank north and then south of its trail anchor. Repeat near both HUD bands and on both indexed pages. | The larger world sprite Y is foreground. The HUD bands match the effect-free reference. |
+| `yamato-live-target-release` | In Custom Game, lift a target before release in one run and after release in a second. Destroy it or reuse its slot during flight. | A pre-release lift produces flight layer 13 and trail layer 12. A post-release lift or removal preserves the original release layer and the impact inherits it. |
+| `yamato-release-depth-reload` | Save an active flight in the pause menu. Resume from HOME in a fresh process and compare with uninterrupted input. Repeat after destroying the target and with a predecessor save. | The live flight anchor, release layer, subsequent trail and impact, and damage match. Predecessor rows use the documented fallback. Pre-save transient trails are excluded from the first reload image comparison. |
+| `native-pool-id-tie` | Sample the T10 Barracks/Goliath exact-Y tie and the two equal-elevation Wraiths at different Y. Also capture a Siege hull and turret with a third overlapping sprite. | The native unsigned greater key wins. Keep the exact tie case open for the GBA until it has a shared sprite-ID lifetime and individual turret draw turns. |
+
+The native weapon-79 Interceptor pulse also uses moving behavior 0.
+Its [launch-layer and restore checks](#interceptor-pulse-restore)
+cover the shared depth queue and saved projectile row.
+
+The Terran, Protoss and Showcase sanitizer fixtures match the shared
+queue and the complete effects pass for flight, trail and impact. The
+opposite render order changes 172 and 122 flight pixels, 172 and 150
+trail pixels, and 179 and 78 impact pixels. All expected pixels and both
+HUD bands match. A separate fixture checks 100,000 motion-row round trips
+and rejects invalid depth values and reserved bits. Each of the three
+Yamato profiles also saves two airborne shots and continues them in a
+fresh host process. Fresh readers accept real predecessor saves and
+preserve all 11 observed gameplay states through impact.
+
+The four normal cartridge builds pass the existing memory, header and
+payload checks. Ordinary ARM Custom Game inputs cover the compact map
+and Blood Bath across one, two and three CPUs. Each product plays 360
+updates, saves through pause and reproduces the following 240 updates
+from fresh SRAM. These opening runs check shared composition and save
+integrity. The staged fixtures supply the Yamato overlap witnesses.
+
+#### Shared renderer cartridge smoke
+
+Terran, Z10, P10 and Showcase pass the header, payload, SRAM signature
+and unchanged RAM endpoint checks against `bf846b88` with pinned local
+inputs. Showcase Siege Line has 24 matching cuts over 120 advancing
+updates, comparing world state, palette, both indexed pages and HUD
+bands. The cycle count moves from 119,868,520 to 119,287,017. Ordinary
+P10 Blood Bath with three named CPUs matches world state, seats, palette
+and both indexed pages at 60, 120 and 360 updates. The paired cycle count
+moves from 202,803,414 to 202,528,343. These replays do not contain an
+active nuclear strike or Yamato cast. The focused fixtures above verify
+foreground changes during those effects.
+
+The Showcase comparison receipt SHA-256 is
+`be1ad4f91b54246543c4df7265c7edef9c56569427514d3dd50f4217b7a1c5f2`.
+The P10 comparison receipt SHA-256 is
+`b3f01752a3ec67f3d607bde8a74a1ca4f742f674e54b76698b4544640de4a96e`.
+
+#### Projectile host coverage
+
+Run `make test-sc64-native-weapon-game` with the prepared weapon bank. The
+Showcase sanitizer fixture exercises all 66 source weapon profiles and
+isolates the palette-indexed moving Dragoon projectile at fixed ages. The
+ground shot covers the Tank on all 47 distinguishing pixels and goes
+behind the Wraith on all 28. An air shot covers the Wraith on all 28.
+Boundary clips preserve both HUD bands and match 8 upper-edge and 38
+lower-edge overlap pixels. The diagonal, layer-4 shot matches 48 pixels
+on each side of a Tank's anchor. The fixture also verifies the SCV's
+wind-up layer change, shooter fallback for a point shot and a target slot
+reused before release. The stationary case replays the same siege splash
+in both explicit paint orders and matches all 14 distinguishing pixels
+in each of its three setups. It runs the production queue and post-world
+pass and checks both HUD bands. The four normal ARM products link with the
+same RAM endpoints as `06353a5d`. Their ordinary Custom Game startup
+samples match both indexed pages, palette, and world at 60 and 120 updates.
+The Showcase Siege Line also matches both indexed pages, palette and
+world at 24 samples over 120 advancing updates after the ordinary menu
+chord. The run uses 116,541,162 emulated cycles versus 116,108,952 in the
+control, an increase of 0.37%. The comparison receipt SHA-256 is
+`2af496b84e91b948dfad6dd4314e617e8437434520424b2463ce8dc38c3530db`.
+The overlap fixture supplies the changed pixel-order evidence. Paired
+ordinary-input N64/GBA siege overlap captures remain pending.
+
+#### Projectile cartridge coverage
+
+Against release `6720a2fb`, the current Terran, Z10, P10 and Showcase ROMs
+pass header, SRAM signature and RAM guards. IWRAM endpoints are unchanged.
+EWRAM grows by 120–128 bytes, and the painter's bounded stack array reserves
+up to 128 additional bytes. Ordinary Custom Game inputs produce matching
+indexed pages, palette and world fingerprints at 60 and 120 updates on all
+four products. Smoke receipt SHA-256 is
+`29f45efa2d2aaee32c5e012339ea62003dec87ff6cc84b68956d4698b01d23f4`.
+
+The full Z8 ARM controller replay completes 46,487 calls. All 47 world
+checkpoints and 24 sampled two-page framebuffer pairs match the control.
+The overlap oracle above covers the foreground differences directly. Mean
+cycles per advancing gameplay call come to 1,024,346 versus 1,025,307 in
+the control, a difference of 0.09%. This measures emulated guest cycles.
+The comparison receipt SHA-256 is
+`41e74a51fbdda1892a41c108454d9c90d20bc655c4cbb6d7ed1a42fd90f56648`.
+
+### Attacker image depth
+
+The USA Siege Tank's ground attack uses `imgoluselo` (13) at source tick 1.
+The opcode handler at `0x80012240` resolves the LO offset and passes the
+current image and its owning sprite to the image attachment routine at
+`0x80011b08`. The 116-byte handler at ROM offset `0x12e40` has SHA-256
+`a2caafe03b35e6e3bdeef66d1efb9c0ee3b2cad0511193a1b9bae5eeac289b8e`.
+The normal Tank uses `imgol` (8). Both flashes share their parent sprite's
+depth. The retained defeat-suppressed Blood Bath observer at step 26877
+shows the siege hull and turret sharing anchor (672,782) and elevation 4.
+The turret flag places the turret ahead of the hull and other ordinary
+sprites at that same Y.
+The native observation establishes the sort and attachment rules. A
+framebuffer witness for the active flash remains open.
+
+The shared Mode 4 renderer draws attached attack images in the source
+unit or building's existing queue turn and at its current world anchor.
+An underlay goes before the body and an overlay after it. Attachments
+follow the body's visibility and expire visually on source death or slot
+reuse. These references are transient. The Tank's two prepared muzzle
+overlays now draw in the matching turret turn. See the
+[follow-up cases](2026-11-21-native-depth-followup.md#replay-cases)
+for the equal-Y mask, the live native flash cut and the remaining Goliath
+turret gap.
+
+The prepared Showcase native weapon fixture passes with ASan and UBSan.
+The palette-remap oracle compares both paint orders and matches the full
+battlefield frame. It finds 6 distinguishing pixels for the north Tank,
+1 for the south Tank, and 2 for the Wraith. The upper and lower HUD edge
+cases find 1 and 2, respectively, with no HUD changes. A hidden shooter
+and a same-type replacement in its slot also pass. The fixture exercises
+all 66 source profiles and keeps the released projectile cases.
+
+The normal Terran, Z10, P10 and Showcase ARM products pass ROM header,
+SRAM signature and RAM guards with the same prepared inputs. IWRAM stays
+at its prior endpoints. EWRAM adds 128 bytes for the transient references
+and part masks. The ARM build receipt SHA-256 is
+`7d43d240da73ddb09da5df0416d20ca406887d619fcf5c2933c5e19595f00d09`.
+An ordinary Showcase Siege Line replay matches all 24 samples of world
+state, HUD pixels on both pages and palette over 120 advancing updates.
+Three sampled battlefield frames differ. This run consumes 119,809,410
+guest cycles versus 119,300,827 in the previously qualified control
+(+0.43%). The replay receipt SHA-256 is
+`527026608267a14c92778e9d0b5dc8389e3fecf1e6e2efab4a2e7d47dcf4345e`.
+
+| Case ID | Replay setup | Expected result |
+| --- | --- | --- |
+| `attacker-muzzle-ground-and-air` | Issue an ordinary Tank or Siege Tank attack. Pause on the muzzle frame before release. Place a ground actor at distinct world Y just north, then south, and repeat with a Wraith. Use a fixed camera, both framebuffer pages and both actor creation orders. | The flash covers the north actor. The south actor and the Wraith cover the flash. Compare nonempty masks where the flash and blocker have distinct opaque pixels, excluding pixels owned by the shooter body alone. |
+| `attacker-muzzle-live-owner` | Follow the firing source across a fog boundary and move the camera across both HUD bands. Lose the shooter during the effect and replace it in the same slot with the same type and position. Include an attacking structure. | The flash uses the source's current anchor. It disappears with a hidden, dead or replaced source. The independent bullet continues on its existing timeline and no actor image changes a HUD pixel. |
+| `attacker-muzzle-turret-tie` | Pause on the native siege muzzle with a layer-4 ordinary sprite at the same world Y. Record the hull, turret and blocking sprite keys. | The native turret flag breaks the equal-Y tie. Track the GBA composite-art approximation separately from tests with distinct world Y. |
+
+Run these cuts from campaign, Custom Game and Showcase. Record the ROM
+commit, tape hash, world anchors, effective layer, page, clip rows,
+overlap count and wrong-pixel count. Keep native captures local. Same-layer
+sprite-ID ties and separate spawned sprite layers need their own witnesses.
+An image still follows the coarse viewport admission of its parent. Add a
+cut with an offscreen parent whose image extends into the field before
+changing that admission rule.
+
+### Interceptor flight overlap
+
+The owned USA ROM uses three writes to sprite offset `0x0d`. At release
+`0x801282e4` (ROM `0xebfd4`) writes parent elevation minus one. At attack
+ascent `0x801287ec` (ROM `0xec4dc`) adds two to the child elevation. At
+final approach `0x80128990` (ROM `0xec680`) writes parent elevation
+minus two. The live depth helper uses that byte. Carrier and Gantrithor
+both use elevation 16 in the native table. The far return has no elevation
+write. That leaves two valid far-return depths according to when the
+return started.
+
+The shared painter now reads those live flight phases in any Mode 4
+build with Interceptor flight enabled. The existing saved child order
+state stores the ascent history for far return. New saves keep the two
+histories through reload. Older saves already in far return lack that
+history and use 15 until approach. An older build cannot read a new
+Interceptor row saved during post-ascent far return. The record size and
+other order states stay the same.
+
+Run `make build/test-sc64-protoss-canonical-p7-save` with prepared
+inputs and then execute that binary. The fixture drives launch, both
+far-return histories, reload, approach and dock through the actual child
+order and save routines. Its indexed-frame samples isolate both actors at
+the same screen anchor, reverse their slots, and compare opaque overlap
+pixels from the world painter. Both history cases produce 87 or 92
+distinguishable pixels per capture. The HUD bands remain clear.
+
+Against release `13184991`, all four normal ARM builds pass ROM header
+and SRAM signature checks with the same IWRAM and EWRAM endpoints.
+Terran, Z10 and Showcase are byte-identical. The P10 ROM SHA-256 is
+`8a19f47f8030fc80511c16fdef7887e52e90ba4ab661308c00dace82916c8ca5`.
+Ordinary-input smoke replays match both indexed pages, palette and
+sampled world at 60 and 120 calls on all four products. The host fixture
+exercises Interceptor overlap.
+
+The Terran, Z10 and Showcase Carrier previews also link with valid
+headers and within their RAM guards. The ordinary controller chord and
+scene menu reach the Showcase preview's Carrier battle. Over 450 updates,
+the first observed docked, launch, early far return, attack, approach and
+late far return states occur at frames 2, 60, 75, 80, 87 and 90.
+The observer records both indexed pages and the palette at each first
+observation. The receipt SHA-256 is
+`d60671fd05299b37f13cb06fd21a3b0866428ba9a2a935291a37caa01022a527`. These are state and frame captures. The isolated-host mask
+provides the pixel-ownership check.
+
+For the ordinary-input harness, record these cuts in Protoss campaign
+and custom games, then repeat in the Terran, Zerg and Showcase Carrier
+previews. Capture the first release, the first ascent, a far-return cut
+for each history, the first approach cut, and dock. Compare the visible
+indexed page and the isolated actor mask at a fixed camera. At each
+far-return cut save via the pause menu, load via HOME in a fresh process,
+and replay the tail through docking. The full Carrier service is enabled
+in regular Protoss and the Terran, Zerg and Showcase previews. The N64
+test should sample the child's sprite elevation and owner, both anchors,
+and the finished framebuffer for each cut.
+
+### Interceptor pulse restore
+
+The moving marker uses the unit-targeted bullet rule above. At launch it
+records the target's live layer plus one. Target death, slot reuse and a
+saved projectile's flight do not recompute that layer. The marker follows
+the existing motion, fog and lifetime rules. Older saved shots lack a
+launch layer and keep their earlier draw order for the rest of the shot.
+
+The fixed and compact pool codecs keep their row count and packet sizes.
+The fixed form uses a header flag and five reserved row bits. The compact
+form uses a header flag and packs five bits into the upper bits of the two
+destination fields and the source-owner field. These fields already fit
+in 12, 12 and 3 bits, respectively, in completed gameplay. Unflagged
+packets retain their original layout and wider generic field ranges.
+The codecs reject unknown flags and invalid layers before changing the
+destination arena. Retiring a projectile clears its stored layer.
+Earlier cartridges reject the flagged packet version.
+
+The Protoss HOST fixture takes a layer-5 ground shot and a layer-19 air
+shot through target loss, a journal save, an arena reset and a load. On
+both indexed pages the ground shot covers three Marine pixels and is
+covered by three Wraith pixels. The air shot covers all three Wraith
+pixels. The asset-free codec fixture also fills all 100 slots and checks
+every supported layer, the legacy sentinel and invalid packet rejection.
+
+The ordinary P10 Eye of the Storm replay resumes a predecessor journal
+at frame 36,761. At frame 37,589, controller START and B save an active
+layer-5 shot in slot 1. The new bank keeps the predecessor bank byte for
+byte. A fresh emulator restores the same flight row from HOME and
+matches all 36 neutral updates through impact, retirement and slot
+reuse. The target falls from 35 to 23 HP at frame 37,595. Both writers
+produce the same 32 KiB SRAM. The replay receipt SHA-256 is
+`10b638ada2c3ff4b8cc75e4d336565d317d47eb5ee90b3b0ff11523694d21c02`.
+
+A staged P10 battle with up to ten active pulses matches all 21 sampled
+world states, normalized projectile arenas, palettes and indexed pages.
+Over 1,000 updates, mean guest cycles move from 1,139,998 to 1,143,158
+(0.28%). The 518 active-pulse updates move from 1,169,470 to 1,175,392
+(0.51%). Peak cycles grow by 0.09%. The candidate's system stack uses
+4,260 changed bytes. It keeps 7,260 bytes above the intact 256-byte
+guard. The emulator timing and stack receipt SHA-256 is
+`ce0f46b904076e8567dcd884eb47797d8173241f54f8d19d38afeef229da3ee4`.
+
+Terran, Z10 and Showcase link with the same memory and payload guards.
+Each matches its release's Custom Game state and exact SRAM through
+the 360-update pause and 240-update fresh continuation. Their normal
+profiles exclude the Carrier projectile service. The comparison receipt
+SHA-256 is
+`45abd249d5ccf78c13aba9f94f07dd9efbad51d06eb2bb4574a9ec655630a647`.
+
+For the ARM harness, record launch layer, target and shooter references,
+current world anchor, active page, both HUD bands, and opaque overlap
+counts. Capture before and after a moving target changes elevation and
+after the original target is removed. Add an active detached-shot reload
+on the compact-save Carrier preview profiles. The exact N64 weapon-79
+framebuffer cut and crowded hardware timing remain open.
 
 ### Cache and clip regressions
 
@@ -242,3 +1057,36 @@ changed ring pixels. The ordinary P7 sample checks the wider scene.
 
 The selected-ring P7 receipt SHA-256 is
 `c909430793b05122a7ccd6e7c5180e2dac03e22d70d0eb2a2cfdf110b8cd4745`.
+
+## Current P10 sprite cost
+
+The exact normal `25e9e8b9` P10 resumes from HOME at controller
+call 37,705. The instruction profiler matches the release's world,
+palette and both indexed pages at route-heavy call 45,231 and
+renderer-heavy calls 45,466 and 45,467. The last two updates build
+zero new route fields.
+
+| Direct cycles | Call 45,466 | Call 45,467 |
+| --- | ---: | ---: |
+| Full guest update | 2,526,746 | 3,250,803 |
+| Depth painter inclusive | 585,114 | 583,306 |
+| Depth painter self | 50,860 | 51,095 |
+| All indexed byte sprite blits | 300,651 | 302,313 |
+| Source death byte blits | 126,925 | 121,449 |
+| One building byte blit | 102,025 | 102,029 |
+| Visibility row spans | 166,843 | 163,268 |
+
+Prioritize the large indexed building and death frames and persistent
+visibility work. Measure overlap, clipped pixels and both framebuffer
+pages again when using an existing word-packed frame in more cases.
+The profiler receipt SHA-256 is
+`fccac7948620da38231cd87f7e86c3bf42192e54f087b4f511c8fbb573a60368`.
+
+An opt-in test lets clipped death sprites use existing packed-word
+frames. The current P10 replay preserves 17 world, palette and two-page
+samples and 161 cached-field hashes through victory. Its late active
+window averages 0.14% fewer guest cycles. At calls 45,466 and 45,467,
+three and one draws use the clipped word path. A single indexed draw
+still costs about 116,000 cycles at each sample. Keep the existing path
+as the default. For larger savings check coverage of those expensive
+indexed frames and the separate building blit.

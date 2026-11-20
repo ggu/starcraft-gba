@@ -97,3 +97,69 @@ non-destructive reload and the expected result autosave. This is one
 specific mid-mission save, not arbitrary-save coverage.
 
 - Fresh-load receipt SHA-256: `ce8eb0d3fad5ab4797f1613fa589e34aeeddd0286e23c20ec59e2252607aa84a`.
+
+
+## November 20 shared mineral routing build
+
+The normal P10 build with shared nearest-mineral selection wins the
+current controller route from HOME in 47,266 ordinary calls. The
+controller uses the same build flags under ASan and UBSan. The ARM replay
+matches 20 checkpoints, ten briefing pages and 14 authored dialogue
+pages. The pause save and unpause occur in the same process. At frame
+46,129 the Overmind is gone, Zeratul, the Gantrithor and Hyperion are
+alive and human-owned, and the P10 objective and completion bits are set.
+There are zero unsupported mission actions.
+
+The measured rate is 10.53 calls per emulated second. The same ROM also
+passes the [fresh load and result autosave](#fresh-load-and-result-autosave-on-the-merged-build)
+below.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal P10 ROM | `bbba4fa1cf2a49d0994f7a3bc800b0e7a4f614830a1e379bb5802ff0e22e97e0` |
+| Matching ELF | `dd13057e1fd570b36c3c8e65b592a2e0b1ff613df55b0cfe1fc83b4e79ae25a1` |
+| Regenerated controller tape | `d331b46adbb941be4d25b75959e494b5f91b638a2478e9fd7170dc171cb9d3d5` |
+| Full ARM receipt | `d236963d02e20955e3583d5a8cf81fab32bb69ce1b58e5af8cbeeb993ab187b4` |
+
+
+### Fresh load and result autosave on the merged build
+
+On release `916bb897`, the normal P10 ROM writes its first 32 KiB journal
+through the pause menu at frame 36,761. The SRAM image matches the
+sanitized HOST controller's journal byte for byte. The sequence-one bank
+has outer tag `0x7643505f` and a 16,322-byte payload. The other bank is
+erased.
+
+Run `tools/sc64_p10_normal_replay.py` with the current controller trace,
+matching ROM and ELF, and `--fresh-save`. The observer exports the pause
+SRAM after 37,704 completed calls. A fresh emulator starts at HOME and L
+replaces the tape's unpause press. Its named world, controls and complete
+P10 persistent block match the saved state. The next neutral call advances
+to frame 36,762.
+
+All 20 gameplay checkpoints match, including six after fresh load. All
+ten briefing and 14 dialogue pages match. The frame 46,129 result keeps
+Zeratul, the Gantrithor and the Hyperion alive and player-owned. The primary
+objective and campaign completion bits are set with zero unsupported
+actions. The fresh-load run averages 10.53 calls per emulated second.
+
+The victory autosave preserves the first bank and writes a checksum-valid
+sequence-two bank with its own 16,308-byte payload. A third emulator loads
+victory through HOME L, restores the terminal world, controls and P10
+persistent block, and keeps simulation frozen across eight neutral
+updates. The generic impact queue is empty. Export from this third process
+matches the victory image byte for byte.
+
+A separate custom-game stress replay on the same ROM starts with eight
+pending impacts, reaches ten after one update and wins at frame two with
+nine still queued. It writes a new validated bank and reloads the frozen
+result with an empty queue. Its exported SRAM matches the earlier
+[terminal-impact fix](../IMPACT-EVENTS.md#save-and-load) byte for byte.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| Pause SRAM | `5b793b5a8b3ecef2cec5af326a4a1dd8bb593d6dd6cafd648c57cd62d2bef2fb` |
+| Victory SRAM and fresh readback | `4fbb2dc29e8496e3e105a38f4eecc3d02074692259baa224b3ca34040672365b` |
+| Full replay and both journal checks | `7086611cfd7735ebee71a08c44251c7f6899074749dbe9baef715787e0c40294` |
+| Pending-impact custom stress receipt | `ef48de518604ddbe33593edbd02923998994754acd8f3dabbb48b543502358e1` |

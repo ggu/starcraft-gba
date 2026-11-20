@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Exact opt-in compositor for the linear point and facility route probes.
-CANONICAL_ROUTE_LINEAR_WORD_PACK ?= 0
+# Pack aligned linear point and facility fields with whole-word stores.
+CANONICAL_ROUTE_LINEAR_WORD_PACK ?= 1
 ifneq ($(words $(CANONICAL_ROUTE_LINEAR_WORD_PACK)),1)
 $(error CANONICAL_ROUTE_LINEAR_WORD_PACK must be 0 or 1)
 endif

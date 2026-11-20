@@ -90,13 +90,12 @@ sc64_facing_fire(const Unit *q, int tx, int ty)
     SC64_FACING_SET(slot, sc64_facing_direction(tx - q->x, ty - q->y));
 }
 
-/* Called before drawing a visible unit: face where it is going. */
-static void
-sc64_facing_track(const Unit *q)
+/* Return the next direction, or -1 when the facing stays unchanged. */
+static int
+sc64_facing_order_direction(const Unit *q)
 {
-    int slot = (int)(q - u), dx, dy;
-    if (slot < 0 || slot >= MAX_UNITS || q->order == ORDER_IDLE) return;
-    if (q->cd && q->order == ORDER_ATTACK_TARGET) return;
+    int dx, dy;
+    if (q->order == ORDER_IDLE || (q->cd && q->order == ORDER_ATTACK_TARGET)) return -1;
     if (sc64_race_unit_flying(q->type)) {
         dx = q->tx - q->x;
         dy = q->ty - q->y;
@@ -104,8 +103,18 @@ sc64_facing_track(const Unit *q)
         dx = q->path_x - q->x;
         dy = q->path_y - q->y;
     }
-    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return;
-    SC64_FACING_SET(slot, sc64_facing_direction(dx, dy));
+    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return -1;
+    return sc64_facing_direction(dx, dy);
+}
+
+/* Called before drawing a visible unit: face where it is going. */
+static void
+sc64_facing_track(const Unit *q)
+{
+    int slot = (int)(q - u);
+    if ((unsigned)slot >= MAX_UNITS) return;
+    int direction = sc64_facing_order_direction(q);
+    if (direction >= 0) SC64_FACING_SET(slot, direction);
 }
 
 static void
@@ -197,7 +206,8 @@ sc64_walk_blit(const Sc64SpriteFrame *pose, unsigned raw, unsigned step, int dir
  * the sieged hull has a single frame. Muzzle/impact effects remain with the
  * stock VFX renderer. Returns 0 when no facing art exists for this unit. */
 static int
-sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
+sc64_facing_draw_parts(const Unit *q, int raw, int x, int y, int walk,
+                       int *turret_lift)
 {
     int dir, slot = (int)(q - u);
     if (raw < 0) return 0;
@@ -213,9 +223,16 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
         else
 #endif
         if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y - lift)) return 0;
-        if (!sc64_facing_blit(sieged ? 31u : 6u, dir, x, y - lift)) return 0;
-        return 1;
+        unsigned turret = sieged ? 31u : 6u;
+        if (turret_lift) {
+            if (!sc64_unit_facing_frames((unsigned short)turret)) return 0;
+            *turret_lift = lift;
+            return 1;
+        }
+        return sc64_facing_blit(turret, dir, x, y - lift);
     }
+#else
+    (void)turret_lift;
 #endif
 #ifdef SC64_UNIT_WALK_FRAMES
     /* A flyer's source cycle is its wingbeat or pulse, which continues
@@ -231,6 +248,23 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
 #endif
     return sc64_facing_blit((unsigned)raw, dir, x, y - SC64_WALK_LIFT(walk));
 }
+
+static inline int
+sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
+{
+    return sc64_facing_draw_parts(q, raw, x, y, walk, 0);
+}
+
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_RACES)
+static void
+sc64_facing_draw_tank_turret(unsigned slot, int lift)
+{
+    const Unit *q = &u[slot];
+    sc64_facing_blit(q->type == U_SIEGE_TANK ? 31u : 6u,
+                     sc64_facing[slot] & SC64_FACING_MASK,
+                     q->x - camx, q->y - camy + 12 - lift);
+}
+#endif
 
 #define SC64_FACING_FIRE(q, target) sc64_facing_fire((q), target_x(target), target_y(target))
 #endif

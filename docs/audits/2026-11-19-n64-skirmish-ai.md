@@ -28,7 +28,7 @@ Five matches were recorded:
 | 2 | Zerg, Terran and Protoss computers | 1,069 to 38,267 | Stopped. Defeat was disabled, see below |
 | 3 | Zerg computer only | 92 to 14,854 | Human defeated |
 | 4 | Terran computer only | 531 to 10,025 | Human defeated |
-| 5 | Protoss computer only | 471 to 9,317 | Human defeated |
+| 5 | Protoss computer only | 471 to 9,499 | Human's last building gone at 9,317 |
 
 Run 2 used one private memory edit so the match would outlast the passive
 human: the shared defeat condition (`Command at most 0 buildings`) was
@@ -54,14 +54,88 @@ Game frames, with the worker count at that moment in parentheses.
 | First production building | Barracks at 1,391 to 1,394 (7 SCVs), before the first Supply Depot at 1,908 to 2,065 (8) | Spawning Pool at 3,236 to 3,372 (11 Drones), after a second Hatchery at 2,737 to 2,935 (11) | Gateway at 2,301 to 2,486 (10 Probes) and a second at 3,049 to 3,076 (12); or, in run 2, a second Nexus at 2,513 (7) and a Forge at 4,683 (11) |
 | Gas | Refinery at 2,935 to 3,076 (10 to 11) | Extractor at 3,616 to 3,816 (11 to 12) | Assimilator at 6,197 to 6,407 (17), or 9,602 (24) with the Cannon opening |
 | Next steps | Second Barracks 3,564 to 3,818; Academy 4,848 to 5,124; Factory 8,834 to 12,807 | Hydralisk Den 6,499 to 6,634; Lair 7,705 to 7,861 | Third Gateway 5,762 to 5,764; Cybernetics Core 9,317 to 12,550 |
-| Static defense before the first wave | Bunker at 7,151 to 8,271 (run 2: 793 native pixels in front of the base) | Two Creep Colonies at 3,725 to 4,263, four Sunken Colonies by 6,001 to 6,417, in all three runs | Shield Battery at 4,047 to 4,229; or 11 Photon Cannons by 8,845 |
+| Static defense before the first wave | Bunker at 7,151 to 8,271 (run 2: 793 native pixels in front of the base) | Two Creep Colonies at 3,725 to 4,263, four Sunken Colonies by 6,001 to 6,417, in all three runs | Shield Battery at 4,047 to 4,229 in the unmodified runs. The defeat-suppressed run has 10 placed Cannons at 8,845, of which eight are complete. |
 | Workers at game frame 8,000 | 17 to 20 | 16 | 18 to 22 |
 | Town halls | One until a second Command Center at 18,748 (run 2) | Two through 38,000 in run 2 (the second 326 pixels from the first); a third at 13,998 in run 3 | Second Nexus at 2,513 and a third at 13,075 on the dead human's start (run 2); one through the end of runs 1 and 5 |
 | After losses (run 2) | A destroyed Comsat Station was started again 289 frames later | | Destroyed Photon Cannons were started again 1,002 and 1,465 frames later |
 
-The Protoss opening differs between run 2 and runs 1 and 5, so the game
-chooses among builds. The Zerg opening was the same within 200 frames in
-all three runs, and the two Gateway openings within 190.
+The Zerg openings remain within 200 frames across the three captures. The
+two unmodified Protoss Gateway openings remain within 190 frames. Run 2
+shows a distinct sequence, reproduced on the restored lobby below.
+The selector for that sequence remains unknown.
+
+### Protoss Cannon opening
+
+In defeat-suppressed run 2, Protoss owner 3 starts at `(1760, 240)`. Its
+second Nexus precedes its first Pylon. A Forge and several Cannons precede
+its first Gateway and gas. Each interval gives the last sample without
+the event and the first sample with it.
+
+| Event | Native game frames | First-sample state |
+| --- | ---: | --- |
+| Second Nexus placed | (2,316, 2,513] | Seven completed Probes |
+| First Pylon placed | (2,513, 2,723] | Second Nexus still building |
+| Forge placed | (4,484, 4,683] | Two completed Nexus structures and two completed Pylons, 11 completed Probes and two in production |
+| First Cannon placed | (4,914, 5,331] | At `(1408, 192)` with completed Forge, 13 completed Probes and two in production |
+| First Cannon completed | (5,961, 6,185] | Four Cannons placed |
+| Four Cannons completed | (6,817, 7,060] | Five Cannons placed |
+| First Gateway placed | (8,190, 8,302] | 22 completed Probes, nine Cannons placed and six complete |
+| First Assimilator placed | (9,339, 9,602] | 11 Cannons placed and ten complete |
+| 11 Cannons completed | (10,169, 10,308] | 12 Cannons placed |
+
+All four owners still have a live building at each sampled point through
+10,764. The human's final building disappears in `(10,764, 10,984]`.
+The first Core at 11,285 and first Battery at 11,416 come from the
+continued match after the human's final building disappears. The earlier
+Cannon and economy sequence also comes from the patched run.
+
+The unmodified solo run 5 uses the same Protoss start and instead opens
+with Gateways and a Battery. It has no Forge or Cannon through 9,499.
+In the unmodified mixed run 1, the first Cannon appears in
+`(13,062, 13,309]`, after the Gateway/Battery opening and after the
+first Forge and Core foundations. This is a late Cannon in that run.
+
+The retained census SHA-256 values are
+`860333e92dd842386f19af44acc57d1083979d15666c835144e52807ee519576`
+for run 2, `9ab2e19766f935ad5c30c2c78cb51eda3967c0b6a2724f025ac63e092f5b4ca6`
+for run 1, and `81247f8f94c472f2d70754a32b7d2634354420171bddf025b2146c11afc58c4c`
+for run 5. The [Terran Bunker audit](2026-11-20-terran-bunker-opening.md#factory-timing)
+records the same runs' Factory timing where a Terran computer is present.
+
+#### Unmodified restored-lobby run
+
+The authenticated USA ROM ran in ares from the retained Blood Bath Free
+for All lobby, with a Terran human and Zerg, Terran and Protoss computers.
+The controller started the match with Start and remained neutral after
+launch. Emulator fast-forward and save-state hotkeys only controlled
+observation. This run applied no defeat suppression or other guest
+edits. The seat rotation yielded a Protoss computer at owner 0,
+the passive Terran at owner 1, Zerg at owner 2, and the Terran
+computer at owner 3.
+
+| Event for Protoss owner 0 | Native game frames |
+| --- | ---: |
+| Second Nexus placed | (2,654, 2,720] |
+| First Pylon placed | (2,720, 2,789] |
+| Forge placed | (4,412, 4,484] |
+| First Cannon placed | (5,137, 5,209] |
+| First Cannon completed | (6,000, 6,073] |
+| Four Cannons completed | (8,226, 8,305] |
+
+The Forge foundation appears before the second Nexus is complete.
+The first Cannon has a completed Forge, two Nexuses and two Pylons,
+with 14 completed Probes and one in production. The 160 samples run
+from frame 107 to 11,312. They show up to five complete Cannons and
+no Gateway, Assimilator, Core or Battery for this owner. The passive
+Terran's Command Center is still registered in the final census.
+The next save-state tap did not produce a complete sample, so the
+run provides no match-result observation.
+
+The restored lobby state SHA-256 is
+`c1597d39bf99476c804635b6cbf36c4901a518f8f4f678bbf2a33e94108d9364`.
+The new census SHA-256 is
+`841841ee5e3ec0fe02118ca7e1f3b1b25c9efe6aeead03b185f4663d1c23c049`.
+Pair more clean starts across seats before selecting the GBA opening.
 
 ### First offensive
 
@@ -85,6 +159,61 @@ Medians: Protoss 8,505, Terran 9,865, Zerg 13,780 (its third value is only
 known to be later than 14,055), and 46 to 50 supply held across the eight
 waves. In run 2 the Terran computer's second wave left 3,600 frames after
 its first (13,634, 17 to 22 units).
+
+### Current Blood Bath worker cadence samples
+
+Two fresh ares runs use the same retained solo-Zerg Blood Bath lobby,
+ordinary Start and passive human Terran. The first assigns the human
+to owner 2. All of that owner's actors are gone at the frame-4,010
+sample and the observer ends there. The second assigns owner 1 and
+starts its Command Center at source coordinates (288, 1808). Four
+SCVs survive through the last sample at frame 4,245. All four start
+gathering without controller orders in both accepted opening samples.
+
+The second native run's mineral observation word used in the methods
+above rises from 48 to 723 between frames 41 and 4,245. A mid-run
+gameplay screenshot shows four supply used and 274 minerals. The GBA
+normal Terran at `25e9e8b9` starts a solo-Zerg Blood Bath with four
+SCVs and a Command Center at (64, 120), equivalent to source
+coordinates (128, 240). Its human bank rises from 50 to 1,506 between
+updates 1 and 5,281, corresponding to 4,224 source-frame intervals at
+the engine's 1.25 scale.
+
+The observed increases are about 0.161 and 0.345 minerals per
+source-frame interval. The two samples use different starts and
+mineral paths. Pair the base geometry and confirm the native HUD
+bank at the sampled frames before changing the gather rules. Ordinary
+normal GBA uses the legacy fixed start order in this lobby. Record
+short-distance contacts and matching attack timings as part of the
+native-start preview qualification.
+
+The paired local evidence index SHA-256 is
+`fcd444c53c2308435590ef8dfad15263ca1ca08d912851569a81e659377e69e8`.
+
+### Matched northwest and southwest worker comparison
+
+A new unmodified ares run of the same solo-Zerg lobby places the human
+Command Center at (128, 240) and the CPU Hatchery at (288, 1808).
+Ordinary GBA Custom Game inputs close the other opponent seats and
+select Zerg in the third row. The normal Terran cartridge resolves base
+IDs 0 and 3 and starts its halls at equivalent coordinates. The human
+stays passive and keeps all four SCVs in both runs.
+
+Two captured N64 gameplay HUDs show 206 and 474 minerals. Save-state
+reads around each screenshot bracket the capture calls at native frames
+916–951 and 2,397–2,431. The display gains 268 minerals. GBA samples
+bracketing the same windows using the nominal 1.25 update ratio read
+346–378 and 850–890 minerals. The wallet increases by 472–544, about
+1.76–2.03 times the N64 display gain in this matched opening.
+
+The previously monitored N64 RAM word was 227–236 and 529–535 at these
+same cuts. Use the visible HUD for the current comparison. Trace the
+actual credited amount and each SCV's patch choice, travel, harvest, and
+unload before changing gather cadence. The current test fixes the start
+geometry and measures the displayed economy for this opening.
+
+The matched local receipt SHA-256 is
+`fc754de650296c8dc7f2d47f3213643de9307251332a0bb60e279b0969641940`.
 
 ## The same lobbies on the GBA build, before the change
 

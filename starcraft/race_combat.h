@@ -13,10 +13,18 @@ race_can_attack(int attacker,int target) {
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
     if(target<MAX_UNITS&&SC64_TRANSPORT_LOADED(&u[target]))return 0;
 #ifdef SC64_Z5_CLOAK_ENABLED
+#ifdef SC64_TARGET_POLICY_PROBE
+    if (race_z5.cloak.active && !race_z5_cloaked_target_attackable(target)) return 0;
+#else
     if (!race_z5_cloaked_target_attackable(target)) return 0;
 #endif
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
+#ifdef SC64_TARGET_POLICY_PROBE
+    if (race_z6.cloak.active && !race_z6_cloaked_target_attackable(target)) return 0;
+#else
     if (!race_z6_cloaked_target_attackable(target)) return 0;
+#endif
 #endif
 #ifdef SC64_T4_RUNTIME
     if(target<MAX_UNITS) {
@@ -188,7 +196,7 @@ static void GBA_HOT race_tick_defenses(void) {
         if(best>=0){if(!hit_stock_building_target(q,best,damage))continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
+            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type),best))
 #endif
             add_tracer(q->x,q->y,u[best].x,u[best].y,sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress=cooldown;}
@@ -366,7 +374,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
             if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
+            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type),best))
 #endif
             add_tracer(q->x, q->y, u[best].x, u[best].y, sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress = cooldown;
@@ -427,7 +435,7 @@ static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
             if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
+            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type),best))
 #endif
             add_tracer(q->x, q->y, u[best].x, u[best].y, sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress = cooldown;
@@ -516,7 +524,7 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
             if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type)))
+            if(!sc64_source_building_vfx(q,u[best].x,u[best].y,sc64_race_unit_flying(u[best].type),best))
 #endif
             add_tracer(q->x, q->y, u[best].x, u[best].y, sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress = cooldown;

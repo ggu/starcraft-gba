@@ -2758,8 +2758,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active()) {
-        if (!race_t6_save_pack(&race_data.t6, &race_t6) ||
-            !race_t6_save_candidate_valid(&race_data, race_cols, race_rows SC64_GCTX_ARG))
+        /* Candidate validation also checks this exact copy of the live state. */
+        race_data.t6 = race_t6;
+        if (!race_t6_save_candidate_valid(&race_data, race_cols, race_rows SC64_GCTX_ARG))
             return 0;
     } else
 #endif
@@ -4545,8 +4546,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #ifdef SC64_T6_RUNTIME
     if (!v[0] && v[2] == SC64_T6_GLOBAL_ID) {
-        if (!race_t6_save_candidate_valid(&race_data, width, height SC64_GCTX_ARG) ||
-            !race_t6_save_expand(&plan->expanded.t6, &race_data.t6)) return 0;
+        if (!race_t6_save_candidate_valid(&race_data, width, height SC64_GCTX_ARG))
+            return 0;
+        plan->expanded.t6 = race_data.t6;
         plan->expanded_t6_valid = 1;
     } else
 #endif
@@ -5314,7 +5316,15 @@ static int race_load_game(void) {
             b[i].hp = b[i].maxhp = 100000;
 #endif
 #endif
-/* Historical completed saves predate fractional burn and attacker storage.
+#if !defined(SC64_P7_TYPED_COMPACT_ENABLED) && !defined(SC64_Z7_DERIVED_SAVE)
+    /* Older rows with an explicit cap have already passed wire validation.
+     * Raise the completed Sunken's cap and preserve its saved current HP. */
+    for (int i=0; i<MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].type==B_SUNKEN_COLONY && !b[i].under_construction &&
+            b[i].maxhp==300)
+            b[i].maxhp=SC64_SUNKEN_COLONY_HP;
+#endif
+    /* Historical completed saves predate fractional burn and attacker storage.
      * Initialize their previously unused Terran shield word explicitly; zero
      * would otherwise falsely credit player zero for an environmental death. */
     if (!plan.building_damage_marker)

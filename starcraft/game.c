@@ -816,9 +816,10 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_death_source.h"
 #include "sc64_death_sprites_generated.h"
 #if !defined(SC64_DEATH_SOURCE_BANK_VERSION) || SC64_DEATH_SOURCE_BANK_VERSION != 2 || \
-    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 1 || \
+    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 2 || \
+    !defined(SC64_DEATH_SOURCE_DEPTH_LAYERS) || SC64_DEATH_SOURCE_DEPTH_LAYERS == 0 || \
     !defined(SC64_DEATH_SOURCE_PIXEL_BYTES) || SC64_DEATH_SOURCE_PIXEL_BYTES == 0
-#error "Regenerate source death art with tools/sc64_death_sprites.py (bank v2)"
+#error "Regenerate source death art with tools/sc64_death_sprites.py (sprite depth metadata v2)"
 #endif
 #ifdef SC64_UNIT_WORD_SPRITES
 #if !defined(SC64_DEATH_SOURCE_WORD_METADATA) || SC64_DEATH_SOURCE_WORD_METADATA != 1 || \
@@ -1100,6 +1101,7 @@ _Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
 #define SC64_PENDING_BUILD_ORDER(o) 0
 #endif
 #define SC64_BUILD_WORKER_ORDER(o) ((o) == ORDER_BUILD || SC64_PENDING_BUILD_ORDER(o))
+enum { BUILD_WORK_RANGE = 36 };
 #ifdef SC64_NYDUS_ENABLED
 #define SC64_NYDUS_ORDER(o) ((o) == ORDER_NYDUS_ENTER)
 #else
@@ -1186,13 +1188,11 @@ static int race_p4_storm_menu_available(void);
 static int race_p4_storm_cast_selected(int x, int y);
 static void race_p4_storm_initialize_source_units(void);
 static void race_p4_storm_init_actor(int i);
-static void race_p4_storm_draw(void);
 #endif
 #ifdef SC64_P6_STORM_ENABLED
 static int race_p6_storm_menu_available(void);
 static int race_p6_storm_cast_selected(int x, int y);
 static void race_p6_storm_initialize_source_units(void);
-static void race_p6_storm_draw(void);
 #endif
 
 typedef struct {
@@ -1409,6 +1409,17 @@ typedef struct {
 typedef struct {
     int x, y;
 } Geyser;
+#if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION) && \
+    !defined(SC64_TILE_RENDERER) && !defined(SC64_DISABLE_WORLD_DEPTH)
+#define SC64_WORLD_DEPTH 1
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_WEAPON_SOURCE_VFX)
+#define SC64_PROJECTILE_DEPTH 1
+#endif
+#if defined(SC64_WORLD_DEPTH) && !defined(SC64_DEATH_VFX_DISABLED) && \
+    defined(SC64_DEATH_SOURCE_DEPTH_LAYERS) && SC64_DEATH_SOURCE_DEPTH_LAYERS > 0
+#define SC64_DEATH_WORLD_DEPTH 1
+#endif
 typedef struct {
 #ifdef SC64_RACES
     /* RaceSave omits tracers; race maps are at most 128 cells per side. */
@@ -1529,16 +1540,29 @@ static Tracer tracers[MAX_TRACERS];
 /* Presentation values derived from a tracer's packed identity and captured
  * endpoints, which stay fixed until add_tracer replaces the slot. Never saved:
  * a load or clear empties them and each is recomputed from the stored tracer
- * on first use, exactly as before. 8 bytes per slot. */
+ * on first use, exactly as before. */
 typedef struct {
     u16 root;          /* sqrt(dx^2+dy^2) of the launch->target vector */
     u16 flight;        /* motion flight ticks */
     u16 duration;      /* 0 = unknown */
     u8 profile_plus1;  /* bank profile index + 1, 0 = unknown */
-    u8 motion_valid;   /* root/flight/profile_plus1 describe the stored tracer */
+#ifdef SC64_PROJECTILE_DEPTH
+    u8 bullet_layer;   /* zero for traces without a detached bullet */
+    u16 release_life;  /* nonzero until the first visible source release tick */
+    s16 depth_ref;     /* live target or point shot's source until release */
+    s16 attacker_plus1; /* zero if untracked, negative once its slot is reused */
+    u8 attacker_parts;
+    u8 attack_sprite_layer;
+    u16 attack_sprite_plus1;
+    u16 attack_sprite_birth_life;
+    s16 attack_sprite_x, attack_sprite_y;
+#endif
 } Sc64TraceSlot;
 #ifdef SC64_WEAPON_SOURCE_VFX
 static Sc64TraceSlot sc64_trace_slots[MAX_TRACERS];
+#ifdef SC64_PROJECTILE_DEPTH
+static void sc64_trace_forget_ref(int ref);
+#endif
 static inline void sc64_trace_slots_reset(void)
 {
     memset(sc64_trace_slots, 0, sizeof(sc64_trace_slots));
@@ -2077,6 +2101,7 @@ static void race_bc_parent_detach(int slot);
 static int race_bc_parent_addon_constructing(int slot);
 static void race_bc_parent_relink(int slot);
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+static int race_bc_facility_in_flight(const Building *q);
 static int race_bc_facility_airborne(int slot);
 static int race_bc_facility_landing_site(int slot,int x,int y);
 static int race_bc_facility_lift(int slot);
@@ -2128,6 +2153,7 @@ static int race_t5_unit_product_available(int owner, int raw_owner, int type);
 #ifdef SC64_T6_RUNTIME
 static Sc64T6MissionState race_t6;
 #ifdef SC64_TERRAN_LATE_RUNTIME
+static int race_late_building_in_flight(const Building *q);
 static int race_late_airborne(int slot);
 static int race_late_lift(int slot);
 static int race_late_flight_order(int slot, int x, int y, int land);
@@ -2281,6 +2307,9 @@ static void race_z8_note_unit_spawn(int slot, int owner, int type);
 static void race_z8_note_building_spawn(int slot, int owner, int type);
 static void race_z8_note_product_building(int building);
 static int race_z8_unit_hidden_from_side(int unit);
+#ifdef SC64_TARGET_POLICY_PROBE
+static u8 race_z8_hidden_any;
+#endif
 #endif
 #ifdef SC64_Z9_RUNTIME
 #define SC64_Z9_GLOBAL_ID 20
@@ -2389,6 +2418,10 @@ static void race_p7_projectile_clear_dead_references(void);
 static void race_p7_projectile_source_tick(void);
 static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
+#ifdef SC64_WORLD_DEPTH
+static void race_p7_projectile_push_depth(u32 *heap, unsigned *size);
+static void race_p7_projectile_draw_depth(unsigned id);
+#endif
 static int race_p7_projectile_encode(u8 *packet);
 static int race_p7_projectile_restore(const u8 *packet
 #if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
@@ -2485,6 +2518,7 @@ static int race_p7_carrier_training_queue_owner(int carrier);
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
 static int race_p7_interceptor_flight_carrier_order(int carrier);
+static unsigned race_p7_interceptor_flight_layer(const Unit *q);
 #endif
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED
@@ -2528,7 +2562,6 @@ static int race_z6_cloaked_target_attackable(int target);
 #ifdef SC64_Z6_STORM_ENABLED
 static int race_z6_storm_menu_available(void);
 static int race_z6_storm_cast_selected(int x,int y);
-static void race_z6_storm_draw(void);
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
 static int race_z5_consume_issue_selected(int x, int y);
@@ -2559,11 +2592,18 @@ static const Sc64SpriteFrame *mission_building_sprite(int type);
 static int race_owner_supply(int owner),race_owner_supply_capacity(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 #ifdef SC64_SHARED_NUKE_PROBE
+enum { SC64_NUKE_FLIGHT_LIMIT = 8, SC64_NUKE_MAX_DRAW_PARTS = 2 };
 enum { NUKE_MENU_NONE, NUKE_MENU_ARM, NUKE_MENU_CANCEL_ARM, NUKE_MENU_CAST,
        NUKE_MENU_ABORT, NUKE_MENU_ARMED };
 enum { NUKE_TOAST_WARNING = 16, NUKE_TOAST_ARMED, NUKE_TOAST_ABORTED,
        NUKE_TOAST_EMPTY, NUKE_TOAST_OCCUPIED };
-static void race_nuke_reset(void), race_nuke_tick(void), race_nuke_draw(void);
+static void race_nuke_reset(void), race_nuke_tick(void);
+#ifdef SC64_WORLD_DEPTH
+static void sc64_depth_push_nuke_effects(u32 *heap, unsigned *size);
+static void race_nuke_draw_part(unsigned slot);
+#else
+static void race_nuke_draw(void);
+#endif
 static void race_nuke_forget_building(int slot);
 static int race_nuke_parent_slot(int addon, unsigned parent_raw);
 static void race_nuke_relink_neutral_addon(int parent);
@@ -3041,6 +3081,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(i);
 #endif
+#ifdef SC64_PROJECTILE_DEPTH
+    sc64_trace_forget_ref(i);
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_clear_slot(i);
 #endif
@@ -3260,6 +3303,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(MAX_UNITS + i);
+#endif
+#ifdef SC64_PROJECTILE_DEPTH
+    sc64_trace_forget_ref(MAX_UNITS + i);
 #endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
@@ -4317,34 +4363,7 @@ static int sc64_z8_can_attack_from(int attacker, int target, int owner)
 #define SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner) \
     SC64_CAN_ATTACK_FROM((attacker), (target), (owner))
 #endif
-static int __attribute__((noinline))
-sc64_auto_target_candidate_allowed(int attacker, int target, int owner,
-                                   int source_owner)
-{
-    int tx, ty;
-    (void)source_owner;
-    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_HIDDEN(&u[target]))
-        return 0;
-#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
-    /* Constructors set the source invincibility flag. Keep it a live-world
-     * property so an explicit trigger override can still change it. */
-    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_CHILD(&u[target]) &&
-        invincible_units[target]) return 0;
-#endif
-    if (owner == SIDE) {
-        if (target < 0) return 0;
-        if (target < MAX_UNITS) {
-            tx = u[target].x; ty = u[target].y;
-        } else {
-            int bi = target - MAX_UNITS;
-            if (bi < 0 || bi >= MAX_BUILDINGS) return 0;
-            tx = b[bi].x; ty = b[bi].y;
-        }
-        if (tx < 0 || ty < 0 || tx >= WORLD_W || ty >= WORLD_H ||
-            !currently_visible(tx, ty)) return 0;
-    }
-    return SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner);
-}
+#include "sc64_auto_target_policy.h"
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 static void
 sc64_target_hostility_snapshot(void)
@@ -4957,6 +4976,36 @@ static int sc64_bc_yamato_visual_tag(unsigned style,unsigned heading)
 { return (int)((style<<8)|((heading&31u)<<3)|sc64_bc_yamato_visual_phase()); }
 #endif
 
+#ifdef SC64_WORLD_DEPTH
+static unsigned sc64_building_world_layer(unsigned slot);
+static unsigned sc64_unit_world_layer(const Unit *q);
+#endif
+
+#ifdef SC64_PROJECTILE_DEPTH
+/* The high bit lets a tracer participate at elevation zero. */
+#define SC64_TRACE_EXPLICIT_DEPTH 0x80u
+
+static unsigned
+sc64_trace_actor_layer(int ref)
+{
+    return ref < MAX_UNITS ? sc64_unit_world_layer(&u[ref]) :
+        sc64_building_world_layer((unsigned)(ref - MAX_UNITS));
+}
+
+static void __attribute__((noinline))
+sc64_trace_forget_ref(int ref)
+{
+    for (unsigned i = 0; i < MAX_TRACERS; ++i) {
+        Sc64TraceSlot *slot = &sc64_trace_slots[i];
+        if (!tracers[i].life) continue;
+        if (slot->attacker_plus1 == ref + 1) slot->attacker_plus1 = -1;
+        if (slot->release_life && slot->depth_ref == ref) {
+            /* The attack-init snapshot still describes the original actor. */
+            slot->depth_ref = -1;
+        }
+    }
+}
+#endif
 #include "sc64_trace_duration.h"
 
 #ifdef SC64_WEAPON_SOURCE_VFX
@@ -4978,8 +5027,8 @@ sc64_source_effect_direction(int dx,int dy)
 }
 
 static int __attribute__((noinline))
-sc64_source_emit(int raw,int slot_plus1,int weapon,int air,
-                 int x0,int y0,int x1,int y1)
+sc64_source_emit(int raw,int source,int weapon,int air,
+                 int x0,int y0,int x1,int y1,int target)
 {
     if(raw<0 || raw>=228 || weapon<0 || weapon>=130) return 0;
     unsigned variant=raw>=106 ? 2u : (raw==83 && weapon==82) ? 1u : 0u;
@@ -4989,20 +5038,48 @@ sc64_source_emit(int raw,int slot_plus1,int weapon,int air,
     unsigned count=profile->weapon_count==2 ? 2u : 1u;
     for(unsigned shot=0;shot<count;++shot) {
         Sc64WeaponSourceVfxKey key = {
-            .actor_raw=(uint8_t)raw,.actor_slot_plus1=(uint8_t)slot_plus1,
+            .actor_raw=(uint8_t)raw,
+            .actor_slot_plus1=(unsigned)source<MAX_UNITS ? (uint8_t)(source+1) : 0,
             .weapon_id=(uint8_t)weapon,
             .direction=(uint8_t)sc64_source_effect_direction(x1-x0,y1-y0),
             .target_air=(uint8_t)!!air,.variant=(uint8_t)(variant?variant:shot)
         };
         uint32_t packed;
-        if(sc64_weapon_source_vfx_pack(key,&packed))
-            add_tracer(x0,y0,x1,y1,(int)packed);
+        if (!sc64_weapon_source_vfx_pack(key,&packed)) continue;
+        int slot = add_tracer(x0,y0,x1,y1,(int)packed);
+#ifdef SC64_PROJECTILE_DEPTH
+        if (slot >= 0) {
+            const Sc64WeaponSourceAttackProfile *shot_profile = shot == 0 ? profile :
+                sc64_weapon_source_profile_lookup(key.actor_raw,key.weapon_id,
+                                                  key.target_air,key.variant);
+            Sc64TraceSlot *trace = &sc64_trace_slots[slot];
+            if ((unsigned)source < MAX_UNITS + MAX_BUILDINGS) {
+                trace->attacker_parts = (u8)sc64_trace_attacker_parts(shot_profile, trace);
+                if (trace->attacker_parts) trace->attacker_plus1 = (s16)(source + 1);
+                sc64_trace_schedule_attack_sprite(trace, tracers[slot].life);
+            }
+            if (shot_profile && shot_profile->projectile_image) {
+                unsigned release = sc64_weapon_source_vfx_first_gba_age(
+                    sc64_weapon_source_trace_release_ticks(shot_profile));
+                int ref = target >= 0 ? target : source;
+                if ((unsigned)ref < MAX_UNITS + MAX_BUILDINGS &&
+                    release < (unsigned)(tracers[slot].life - 1)) {
+                    trace->bullet_layer = (u8)(sc64_trace_actor_layer(ref) + 1);
+                    trace->depth_ref = (s16)ref;
+                    trace->release_life = (u16)(tracers[slot].life - 1 - release);
+                }
+            }
+        }
+#else
+        (void)slot;
+        (void)target;
+#endif
     }
     return 1;
 }
 
 static int
-sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
+sc64_source_unit_vfx(Unit *q,int x1,int y1,int air,int target)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     Sc64StockAttack attack;
@@ -5010,16 +5087,16 @@ sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
     if(sc64_stock_attack_select(raw,air,&attack)) weapon=attack.weapon_id;
     else if(raw==83 && !air) weapon=82; /* Existing Reaver/Scarab adapter. */
     else return 0;
-    return sc64_source_emit(raw,(int)(q-u)+1,weapon,air,q->x,q->y,x1,y1);
+    return sc64_source_emit(raw,(int)(q-u),weapon,air,q->x,q->y,x1,y1,target);
 }
 
 static int
-sc64_source_building_vfx(const Building *q,int x1,int y1,int air)
+sc64_source_building_vfx(const Building *q,int x1,int y1,int air,int target)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
     Sc64StockAttack attack;
     return sc64_stock_attack_select(raw,air,&attack) &&
-        sc64_source_emit(raw,0,attack.weapon_id,air,q->x,q->y,x1,y1);
+        sc64_source_emit(raw,MAX_UNITS+(int)(q-b),attack.weapon_id,air,q->x,q->y,x1,y1,target);
 }
 #endif
 
@@ -8186,25 +8263,40 @@ enum { SC64_MINERAL_SEARCH_RADIUS = 192 };
 static int __attribute__((noinline))
 worker_continue_minerals(Unit *q)
 {
-    int best = -1, best_d = SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS + 1;
+    const int distance_limit = SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS + 1;
+    int best = -1, best_d = distance_limit;
     int origin_x, origin_y;
     if (q->target < 0 || q->target >= MAX_MINERALS) return 0;
     origin_x = m[q->target].x;
     origin_y = m[q->target].y;
-    for (int i = 0; i < MAX_MINERALS; ++i) {
-        int d, nx, ny;
-        if (m[i].amount <= 0 || m[i].x < 0 || m[i].y < 0 ||
-            m[i].x >= WORLD_W || m[i].y >= WORLD_H) continue;
-        if (q->owner == SIDE) {
-            int cell = m[i].x / 16 + (m[i].y / 16) * MAP_COLS;
-            if (!SC64_GRID_GET(explored, cell) && !SC64_GRID_GET(visible, cell))
+    /* Rank in slot order before routing. A reachable minimum wins; on a
+     * miss, repeat the original scan without the unreachable minimum. */
+    int known_miss = -1;
+    do {
+        for (int i = 0; i < MAX_MINERALS; ++i) {
+            int d, nx, ny;
+            if (i == known_miss) continue;
+            if (m[i].amount <= 0 || m[i].x < 0 || m[i].y < 0 ||
+                m[i].x >= WORLD_W || m[i].y >= WORLD_H) continue;
+            if (q->owner == SIDE) {
+                int cell = m[i].x / 16 + (m[i].y / 16) * MAP_COLS;
+                if (!SC64_GRID_GET(explored, cell) && !SC64_GRID_GET(visible, cell))
+                    continue;
+            }
+            d = dist2(origin_x, origin_y, m[i].x, m[i].y);
+            if (d >= best_d) continue;
+            if (known_miss >= 0 && !path_next_tile(q->x, q->y, m[i].x, m[i].y, &nx, &ny))
                 continue;
+            best = i;
+            best_d = d;
         }
-        d = dist2(origin_x, origin_y, m[i].x, m[i].y);
-        if (d >= best_d) continue;
-        if (!path_next_tile(q->x, q->y, m[i].x, m[i].y, &nx, &ny)) continue;
-        best = i; best_d = d;
-    }
+        int nx, ny;
+        if (known_miss >= 0 || best < 0 ||
+            path_next_tile(q->x, q->y, m[best].x, m[best].y, &nx, &ny)) break;
+        known_miss = best;
+        best = -1;
+        best_d = distance_limit;
+    } while (1);
     if (best < 0) return 0;
     q->target = best;
     q->tx = m[best].x; q->ty = m[best].y;
@@ -9056,7 +9148,7 @@ tick_combat(Unit * q, int target)
 #endif
 #endif
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying))
+            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying,target))
 #endif
             add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
 	#ifdef SC64_RACES
@@ -9446,7 +9538,8 @@ target_lists_unavailable:
 	    }
 	    /* SCVs work from the footprint edge; center distance includes the
 	     * building collision radius, so a 36px work radius avoids path wedges. */
-	    if (dist2(q->x, q->y, b[q->target].x, b[q->target].y) > 36 * 36) {
+	    if (dist2(q->x, q->y, b[q->target].x, b[q->target].y) >
+                BUILD_WORK_RANGE * BUILD_WORK_RANGE) {
 		move_toward(q, b[q->target].x, b[q->target].y);
 	    }
 #ifdef SC64_CONSTRUCTION_HP
@@ -9740,9 +9833,22 @@ update_tracers(void)
     /* Combat launches before this end-of-update step, like tracers. */
     race_impact_tick();
 #endif
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (tracers[i].life)
-	    tracers[i].life--;
+    for (i = 0; i < MAX_TRACERS; i++) {
+        if (!tracers[i].life) continue;
+        --tracers[i].life;
+#ifdef SC64_PROJECTILE_DEPTH
+        Sc64TraceSlot *slot = &sc64_trace_slots[i];
+        if (slot->release_life && tracers[i].life == slot->release_life) {
+            int ref = slot->depth_ref;
+            if (ref >= 0 && target_alive(ref))
+                slot->bullet_layer = (u8)(sc64_trace_actor_layer(ref) + 1);
+            slot->release_life = 0;
+        }
+        if (slot->attack_sprite_birth_life &&
+            tracers[i].life == slot->attack_sprite_birth_life)
+            sc64_trace_birth_attack_sprite(slot);
+#endif
+    }
 }
 
 #ifndef SC64_DEATH_VFX_DISABLED
@@ -9811,9 +9917,18 @@ death_vfx_spawn_slot(Sc64DeathVfx *pool, int slot, int x, int y, int owner)
         source = 1;
     }
 #endif
-    sc64_death_vfx_spawn(pool, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
-                         x, y, death_vfx_extent(slot, raw), &timing, source,
-                         owner_color(owner));
+    int effect = sc64_death_vfx_spawn(pool, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
+                                      x, y, death_vfx_extent(slot, raw), &timing, source,
+                                      owner_color(owner));
+#ifdef SC64_DEATH_WORLD_DEPTH
+    if (source && effect >= 0) {
+        unsigned layer = building ? sc64_building_world_layer((unsigned)(slot - MAX_UNITS)) :
+                                    sc64_unit_world_layer(&u[slot]);
+        pool[effect].actor_layer_plus1 = layer + 1;
+    }
+#else
+    (void)effect;
+#endif
 }
 
 /* Observe alive-to-dead transitions with non-positive HP after a simulation
@@ -11094,6 +11209,17 @@ draw_construction_image(unsigned short image_id, unsigned short frame_index,
 #endif
 #endif
 
+#ifdef SC64_HAS_SPRITES
+static inline int
+resource_sprite_in_view(const Sc64SpriteFrame *sprite, int x, int y)
+{
+    int left = x - sprite->canvas_w / 2 + sprite->offset_x;
+    int top = y - sprite->canvas_h / 2 + sprite->offset_y;
+    return left < 240 && left + sprite->w > 0 &&
+           top < 120 && top + sprite->h > 12;
+}
+#endif
+
 /* Use the same footprint in the painter and its cached-object key. Geyser
  * art can remain visible when its center has left the playfield. */
 static int
@@ -11101,12 +11227,7 @@ geyser_in_view(int x, int y)
 {
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_geyser_sprite();
-    if (sprite) {
-        int left = x - sprite->canvas_w / 2 + sprite->offset_x;
-        int top = y - sprite->canvas_h / 2 + sprite->offset_y;
-        return left < 240 && left + sprite->w > 0 &&
-               top < 120 && top + sprite->h > 12;
-    }
+    if (sprite) return resource_sprite_in_view(sprite, x, y);
 #endif
     return x > 0 && x < 240 && y > 12 && y < 120;
 }
@@ -11407,15 +11528,35 @@ static int sc64_cocoon_world_visible(int x,int y)
 
 #include "sc64_actor_draw_view.h"
 
+#ifdef SC64_PROJECTILE_DEPTH
+static void sc64_draw_attacker_images(unsigned first, const u8 *next, unsigned part);
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+static void draw_yamato_charge(const Unit *q);
+#endif
+
 static void
-draw_unit_pass(Unit * q, int selection_pass)
+draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *next,
+                      int *turret_lift)
 {
+#ifndef SC64_UNIT_FACING
+    (void)turret_lift;
+#endif
+#ifndef SC64_PROJECTILE_DEPTH
+    (void)first;
+    (void)next;
+#endif
     if (SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q)) return;
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
-    if (!sc64_unit_anchor_in_view(q, x, y)) return;
+    int body_in_view = sc64_unit_body_anchor_in_view(q, x, y);
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    if (!body_in_view && (selection_pass || !sc64_unit_charge_anchor_in_view(q, x, y))) return;
+#else
+    if (!body_in_view) return;
+#endif
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
@@ -11438,6 +11579,12 @@ draw_unit_pass(Unit * q, int selection_pass)
     unsigned actor_flags = sc64_game_unit_actor_flags(q->type);
     if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    if (!body_in_view) {
+        draw_yamato_charge(q);
+        return;
+    }
 #endif
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
@@ -11485,6 +11632,9 @@ draw_unit_pass(Unit * q, int selection_pass)
     }
     int walk = sc64_walk_track(q);
     int body_y = y - SC64_WALK_LIFT(walk);
+#ifdef SC64_PROJECTILE_DEPTH
+    if (first) sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_UNDER);
+#endif
 #if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES) && defined(SC64_UNIT_FACING)
     if (sc64_race_ordinary_ghost(q->type) && race_nuke_draw_ghost((int)(q - u), x, body_y))
         goto after_unit_body;
@@ -11506,7 +11656,7 @@ draw_unit_pass(Unit * q, int selection_pass)
     if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
     else
 #endif
-    if (sprite && sc64_facing_draw(q, facing_raw, x, y, walk)) {}
+    if (sprite && sc64_facing_draw_parts(q, facing_raw, x, y, walk, turret_lift)) {}
     else
 #endif
     if (sprite) {
@@ -11590,6 +11740,13 @@ draw_unit_pass(Unit * q, int selection_pass)
 #if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_HAS_SPRITES) && defined(SC64_UNIT_FACING)
 after_unit_body:
 #endif
+#ifdef SC64_PROJECTILE_DEPTH
+    if (first && (!turret_lift || *turret_lift < 0))
+        sc64_draw_attacker_images(first, next, SC64_TRACE_ATTACKER_OVER);
+#endif
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+    if (sc64_race_is_battlecruiser(q->type)) draw_yamato_charge(q);
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
@@ -11615,194 +11772,27 @@ after_unit_body:
 }
 
 static void
+draw_unit_pass(Unit *q, int selection_pass)
+{
+    draw_unit_with_images(q, selection_pass, 0, 0, 0);
+}
+
+static void
 draw_unit(Unit * q)
 {
     draw_unit_pass(q, 0);
 }
 
-#define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
-#include "sc64_weapon_vfx_render.h"
-#undef SC64_WEAPON_VFX_VISIBLE
-#ifdef SC64_TANK_SOURCE_VFX
-#include "sc64_tank_source_vfx_render.h"
-#endif
-
-#ifdef SC64_WEAPON_SOURCE_VFX
-#include "sc64_weapon_source_vfx_render.h"
-#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-#include "sc64_yamato_raster_adapter.h"
-#endif
-#endif
-
-
-static void
-draw_tracers(void)
-{
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-    u32 diag_start=gba_clock();
-    diag_lookup=diag_cull=diag_raster=diag_motion=diag_actor=diag_projectile=diag_children=0;
-#endif
-#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-    for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
-        const Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
-        if (shot->state==SC64_BC_SHOT_CHARGING && shot->caster<MAX_UNITS && u[shot->caster].alive) {
-            int f=sc64_yamato_raster_charge_frame(shot->age);
-            if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[shot->caster].x,u[shot->caster].y);
-        } else if (shot->state==SC64_BC_SHOT_FLIGHT) {
-            Sc64BcMotionFields m;
-            if (sc64_bc_motion_unpack(shot,&m))
-                sc64_yamato_raster_draw(541,0,(((unsigned)m.heading+4u)>>3)&31u,(int)(m.x_q8/512u),(int)(m.y_q8/512u));
-        }
-    }
-    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_is_battlecruiser(u[i].type) &&
-        u[i].order==ORDER_ATTACK_TARGET && (u[i].work_timer&7)>0 && (u[i].work_timer&7)<=6) {
-        int f=sc64_yamato_raster_charge_frame(50u-((unsigned)u[i].work_timer&7u));
-        if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[i].x,u[i].y);
-    }
-#endif
-    for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
-#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
-        int ys=sc64_weapon_vfx_style(tracers[i].color);
-        if (ys==SC64_YAMATO_TRAIL_STYLE || ys==SC64_YAMATO_IMPACT_STYLE) {
-            int age=sc64_tracer_duration(i)-tracers[i].life;
-            unsigned p=(unsigned)tracers[i].color&7u;
-            unsigned source_age=(unsigned)(age<=0?0:age-1);
-            source_age-= (source_age+p)/5u;
-            if (ys==SC64_YAMATO_TRAIL_STYLE && source_age<6u)
-                sc64_yamato_raster_draw(542,(source_age/2u)*17u,
-                                         ((unsigned)tracers[i].color>>3)&31u,tracers[i].x0,tracers[i].y0);
-            if (ys==SC64_YAMATO_IMPACT_STYLE && source_age<28u)
-                sc64_yamato_raster_draw(544,source_age/2u,0,tracers[i].x0,tracers[i].y0);
-            continue;
-        }
-#endif
-#ifdef SC64_WEAPON_SOURCE_VFX
-        if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
-            uint32_t packed=(uint32_t)tracers[i].color;
-            Sc64WeaponSourceVfxKey key;
-            if (!sc64_weapon_source_vfx_unpack(packed,&key)) continue;
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            u32 dt=gba_clock();
-#endif
-            const Sc64WeaponSourceAttackProfile *profile=0;
-            Sc64WeaponSourceMotion slot_motion;
-            const Sc64WeaponSourceMotion *prepared=0;
-            if (!sc64_trace_slots[i].motion_valid) sc64_trace_slot_prepare(i,key);
-            if (sc64_trace_slots[i].motion_valid) {
-                const Sc64TraceSlot *ts=&sc64_trace_slots[i];
-                profile=&sc64_weapon_source_profiles[ts->profile_plus1-1u];
-                slot_motion.distance=(uint64_t)ts->root<<9;
-                slot_motion.flight=ts->flight;
-                prepared=&slot_motion;
-            }
-#if defined(SC64_TRACE_PROFILE_INDEX_CACHE) && defined(SC64_TRACE_DURATION_CACHE)
-            if(!profile) {
-                unsigned cached=sc64_trace_durations[i]>>8;
-                profile=sc64_trace_cached_profile(cached,key);
-            }
-#endif
-            if(!profile) profile=sc64_weapon_source_profile_lookup(
-                key.actor_raw,key.weapon_id,key.target_air,key.variant);
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            diag_lookup+=gba_clock()-dt; dt=gba_clock();
-#endif
-#ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
-            if (!sc64_weapon_source_vfx_anchor_may_be_visible(
-                    tracers[i].x0, tracers[i].y0, camx, camy) &&
-                !sc64_weapon_source_vfx_anchor_may_be_visible(
-                    tracers[i].x1, tracers[i].y1, camx, camy) &&
-                sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
-                    key,profile,
-                    tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
-                    camx, camy)) {
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-                diag_cull+=gba_clock()-dt;
-#endif
-                continue;
-            }
-#endif
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            diag_cull+=gba_clock()-dt; dt=gba_clock();
-#endif
-            int age=sc64_tracer_duration(i)-tracers[i].life;
-            sc64_weapon_source_vfx_draw_trace_motion(key,profile,
-                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
-                tracers[i].life,(unsigned)(age<0?0:age),prepared);
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-            diag_raster+=gba_clock()-dt;
-#endif
-            continue;
-        }
-#endif
-        int style=sc64_weapon_vfx_style(tracers[i].color);
-        /* Legacy original-art saves may contain an untagged tracer color. */
-        if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
-#ifdef SC64_TANK_SOURCE_VFX
-        if (style==SC64_TANK_SOURCE_TANK || style==SC64_TANK_SOURCE_SIEGE) {
-            sc64_private_tank_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
-                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,tracers[i].life);
-            continue;
-        }
-#endif
-        sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
-            tracers[i].x0-camx,tracers[i].y0-camy+12,
-            tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
-    }
-#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
-    diag_tracer_cycles=gba_clock()-diag_start;
-#endif
-}
+#include "sc64_tracer_draw.h"
 
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx_render.h"
-#ifdef SC64_DEATH_SOURCE_ART
-/* Clip source frames to the battlefield rows above the cached lower HUD. */
-static void
-death_vfx_blit(const Sc64SpriteFrame *s, int cx, int cy)
+static inline int
+death_vfx_in_view(const Sc64DeathVfx *row, int x, int y)
 {
-    int x = cx - s->canvas_w / 2 + s->offset_x;
-    int y = cy - s->canvas_h / 2 + s->offset_y, h = s->h;
-    const u8 *pixels = s->pixels;
-    if (y < 12) {
-        int skip = 12 - y;
-        if (skip >= h) return;
-        pixels += skip * s->w; h -= skip; y = 12;
-    }
-    if (y + h > 120) h = 120 - y;
-    if (h > 0) gfx_blit_sprite(x, y, s->w, h, pixels);
+    return x >= -64 && x <= 304 && y >= -52 && y <= 172 &&
+           currently_visible(row->x, row->y);
 }
-
-static int
-death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
-{
-    const Sc64DeathSource *art = sc64_death_source(e->raw);
-    if (!sc64_death_source_valid(art)) return 0;
-    for (unsigned i = 0; i < art->layer_count; ++i) {
-        const Sc64DeathSourceLayer *layer = &art->layers[i];
-        unsigned frame_index;
-        if (layer->under != under ||
-            !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
-        const Sc64SpriteFrame *sprite =
-            sc64_death_image_frame(layer->image_id, (unsigned short)frame_index);
-        if (sprite) {
-#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_DEATH_INDEXED_REMNANTS)
-            const GbaSpriteWordFrame *words =
-                sc64_death_image_word_frame(layer->image_id,(unsigned short)frame_index);
-            int left=x+layer->x-sprite->canvas_w/2+sprite->offset_x;
-            int top=y+layer->y-sprite->canvas_h/2+sprite->offset_y;
-            /* Packed collapse/remnant frames use the word compositor and no extra
-             * RAM. The indexed fallback explicitly clips partial HUD-edge
-             * frames even in builds without the scene-clip API. */
-            if (words && top>=12 && top+(int)sprite->h<=120)
-                gfx_blit_sprite_words(left,top,words);
-            else
-#endif
-                death_vfx_blit(sprite, x + layer->x, y + layer->y);
-        }
-    }
-    return 1;
-}
-#endif
 
 /* under=1 draws remnants and collapse frames beneath units; under=0 draws
  * explosions above them. Effects in unseen cells stay hidden, as units do. */
@@ -11828,7 +11818,7 @@ draw_death_vfx(int under)
          * collapse frames draw beneath units from the start. */
         if (under ? !row->source && age < row->remnant_start : age >= row->burst_su) continue;
         int x = row->x - camx, y = row->y - camy + 12;
-        if (x < -64 || x > 304 || y < -52 || y > 172 || !currently_visible(row->x, row->y)) continue;
+        if (!death_vfx_in_view(row, x, y)) continue;
 #ifdef SC64_DEATH_SOURCE_ART
         if (row->source && death_vfx_draw_source(row, x, y, age, under)) continue;
 #endif
@@ -12181,7 +12171,7 @@ draw_building_ring(const Building *q,int x,int bottom,int sprite_w,int parts,
                            selection_color(q->owner), parts, cover);
 }
 
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) && !defined(SC64_WORLD_DEPTH)
 #ifdef SC64_HAS_SPRITES
 /* draw_building_art leaves these out of the static pass. */
 static int
@@ -12200,7 +12190,7 @@ building_art_is_static(const Building *q)
     return 1;
 }
 #endif
-#else
+#elif !defined(SC64_IMPORTED_MISSION)
 /* The far arc of a directly drawn building, ahead of its art. */
 static void
 draw_building_far_arc(const Building *q)
@@ -12223,8 +12213,12 @@ draw_building_overlay(Building *q)
 #endif
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
         return;
+    int selected = selected_building >= 0 && q == &b[selected_building];
 #ifdef SC64_HAS_SPRITES
-    const Sc64SpriteFrame *sprite = building_art_sprite(q);
+    /* Selection and construction use the footprint. Other overlays use
+     * their own frames at the building anchor. */
+    const Sc64SpriteFrame *sprite =
+        selected || q->under_construction ? building_art_sprite(q) : 0;
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 12;
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 12;
     int sprite_w = sprite ? sprite->w : 24;
@@ -12232,8 +12226,7 @@ draw_building_overlay(Building *q)
 #else
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
 #endif
-    int selected = selected_building >= 0 && q == &b[selected_building];
-#ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_IMPORTED_MISSION) && !defined(SC64_WORLD_DEPTH)
     /* This runs before the dynamic art below, which then covers the arc as
      * direct drawing does. Only finished art is already in the static cache. */
     if (selected) {
@@ -12362,7 +12355,9 @@ draw_building_overlay(Building *q)
     }
 #endif
     if (selected) {
+#ifndef SC64_WORLD_DEPTH
         draw_building_ring(q, x, sprite_y + sprite_h, sprite_w, SELECTION_NEAR, 0);
+#endif
         int vitals_y = sprite_y + sprite_h + 3;
 #ifdef SC64_RACES
         if (q->under_construction) vitals_y += 3;
@@ -13504,6 +13499,21 @@ static unsigned race_shared_trigger_obligations(void);
 #endif
 #endif
 #include "race_campaign_adapter.h"
+#ifdef SC64_STORM_RENDER
+static const Sc64PsionicStormState *race_storm_for_draw(void)
+{
+#ifdef SC64_P4_STORM_ENABLED
+    if (race_p4_active()) return &race_p4.storm;
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_active()) return &race_p6.storm;
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+    if (race_z6_active()) return &race_z6.storm;
+#endif
+    return 0;
+}
+#endif
 #include "sc64_z8_game_bridge.h"
 #ifdef SC64_P9_RUNTIME
 /* P9 builds dispatch the shared-service hooks between P8 and P9 (see

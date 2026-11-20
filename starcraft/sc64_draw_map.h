@@ -6,12 +6,25 @@
 #if defined(SC_ORIGINAL_SKIRMISH) && !defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SOFT_FOG) && !defined(SC64_IMPORTED_MISSION)
 #include "frontier_terrain.h"
 #endif
+
+static inline int
+mineral_in_view(const Mineral *mineral, int x, int y)
+{
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
+    const Sc64SpriteFrame *sprite = mission_mineral_sprite(mineral->style);
+    if (sprite) return resource_sprite_in_view(sprite, x, y);
+#else
+    (void)mineral;
+#endif
+    return x > -6 && x < 245 && y > 7 && y < 123;
+}
+
 static inline void
 draw_map_mineral(int i)
 {
     if (m[i].amount <= 0) return;
     int x = m[i].x - camx, y = m[i].y - camy + 12;
-    if (x <= -6 || x >= 245 || y <= 7 || y >= 123 ||
+    if (!mineral_in_view(&m[i], x, y) ||
         !currently_visible(m[i].x, m[i].y)) return;
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
@@ -55,6 +68,23 @@ draw_map_static_objects(void)
 #endif
 #endif
 }
+
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
+#define SC64_STORM_RENDER 1
+static const Sc64PsionicStormState *race_storm_for_draw(void);
+
+static void draw_storm_marker(const Sc64PsionicStorm *storm)
+{
+    int x = storm->x - camx, y = storm->y - camy + 12;
+    int r = SC64_STORM_RADIUS_GBA_PX;
+    gfx_line(x, y-r, x+r, y, C_CYAN);
+    gfx_line(x+r, y, x, y+r, C_CYAN);
+    gfx_line(x, y+r, x-r, y, C_CYAN);
+    gfx_line(x-r, y, x, y-r, C_CYAN);
+    gfx_line(x-2, y, x+2, y, C_WHITE);
+    gfx_line(x, y-2, x, y+2, C_WHITE);
+}
+#endif
 
 #ifdef SC64_WORLD_DEPTH
 #include "sc64_world_depth.h"
@@ -386,6 +416,9 @@ sc64_tile_background_done:
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(1);
 #endif
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    sc64_tracer_profile_reset();
+#endif
 #ifdef SC64_WORLD_DEPTH
     sc64_draw_depth_ordered_actors();
 #else
@@ -399,21 +432,19 @@ sc64_tile_background_done:
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(0);
 #endif
-    draw_tracers();
-#ifdef SC64_SHARED_NUKE_PROBE
+    draw_tracers_pass(1);
+#if defined(SC64_SHARED_NUKE_PROBE) && !defined(SC64_WORLD_DEPTH)
     race_nuke_draw();
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
-#ifdef SC64_P4_STORM_ENABLED
-    race_p4_storm_draw();
-#endif
-#ifdef SC64_P6_STORM_ENABLED
-    race_p6_storm_draw();
-#endif
-#ifdef SC64_Z6_STORM_ENABLED
-    race_z6_storm_draw();
+#if defined(SC64_STORM_RENDER) && !defined(SC64_WORLD_DEPTH)
+    const Sc64PsionicStormState *storms = race_storm_for_draw();
+    if (storms)
+        for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
+            if (storms->storm[i].active)
+                draw_storm_marker(&storms->storm[i]);
 #endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_unit_draw_cycles = gba_clock() - profile_stage_start;

@@ -1018,10 +1018,36 @@ static int damage_building(int slot, int amount)
     return b[slot].alive ? b[slot].hp : 0;
 }
 
-static int morph_expected(int hp)
+static int sunken_legacy_hp(void)
 {
-    hp += 300 - 400;
-    return hp < 1 ? 1 : hp > 300 ? 300 : hp;
+    static const int saved_hp[] = { 300, 117, 357 };
+    int slots[sizeof(saved_hp) / sizeof(saved_hp[0])];
+    for (unsigned i = 0; i < sizeof(saved_hp) / sizeof(saved_hp[0]); ++i) {
+        int x, y;
+        /* A Sunken uses the Creep Colony's site and is normally morphed there. */
+        if (!human_site(B_CREEP_COLONY, &x, &y)) return 0;
+        int slot = spawn_build(SIDE, B_SUNKEN_COLONY, x, y, 0);
+        if (slot < 0 || b[slot].maxhp != 400) return 0;
+        slots[i] = slot;
+        b[slot].raw_type = sc64_race_raw_building(B_SUNKEN_COLONY);
+        invalidate_path_grid();
+        b[slot].hp = saved_hp[i];
+#if !defined(SC64_P7_TYPED_COMPACT_ENABLED) && !defined(SC64_Z7_DERIVED_SAVE)
+        /* Typed and derived wire rows hold only the current HP. */
+        if (saved_hp[i] <= 300) b[slot].maxhp = 300;
+#endif
+    }
+    for (int pass = 0; pass < 2; ++pass) {
+        if (!save_through_pause() || !reload_saved()) return 0;
+        for (unsigned i = 0; i < sizeof(saved_hp) / sizeof(saved_hp[0]); ++i) {
+            const Building *colony = &b[slots[i]];
+            if (!colony->alive || colony->type != B_SUNKEN_COLONY ||
+                colony->under_construction || colony->maxhp != 400 ||
+                colony->hp != saved_hp[i]) return 0;
+        }
+    }
+    puts("Sunken saves retain 300, 117 and 357 current HP at a 400 HP cap");
+    return 1;
 }
 
 static int morph_hp(int scenario)
@@ -1050,7 +1076,7 @@ static int morph_hp(int scenario)
         b[creep].hp != start_hp || race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY)
         goto done;
     for (int t = 0; t < 120; ++t) input(0);
-    if (scenario == 1) damage_building(creep, 350); /* BW: survives with 50 */
+    if (scenario == 1) damage_building(creep, 350);
     if (scenario == 3) damage_building(creep, 60);  /* 50 hit points: destroyed */
     if (scenario == 4) damage_building(creep, 30);
     during_hp = b[creep].alive ? b[creep].hp : 0; during_max = b[creep].maxhp;
@@ -1080,7 +1106,7 @@ static int morph_hp(int scenario)
         ok = !alive && during_hp == 0 && charged == 50 && sc64_race_raw_building(final_type) == 143;
     else
         ok = alive && completed_at >= 0 && charged == 50 && final_type == B_SUNKEN_COLONY &&
-            final_max == 300 && final_hp == morph_expected(during_hp) && during_max == 400 &&
+            final_max == 400 && final_hp == during_hp && during_max == 400 &&
             (scenario != 1 || (during_hp > 0 && during_hp <= 100)) &&
             (scenario != 2 || during_hp == start_hp);
 done:
@@ -1138,7 +1164,7 @@ static int ai_sunken_save(void)
     if (pool < 0 || creep < 0) return 0;
     race_minerals[owner] += 50;
     race_ai_census(owner, &c);
-    if (!race_ai_start_defense(&c, 146) || !b[creep].under_construction ||
+    if (!race_ai_start_defense(&c, 146, 0) || !b[creep].under_construction ||
         race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY) return 0;
     for (int t = 0; t < 120; ++t) input(0);
     hit_target(MAX_UNITS + creep, 30, U_MARINE, SIDE);
@@ -1154,7 +1180,7 @@ static int ai_sunken_save(void)
     for (int t = 0; t < 400; ++t) input(0);
     resumed = world_hash();
     ok = reference == resumed && b[creep].alive && b[creep].type == B_SUNKEN_COLONY &&
-        b[creep].hp == morph_expected(hp);
+        b[creep].hp == hp && b[creep].maxhp == 400;
     printf("{\"kind\":\"ai-sunken-save\",\"hp\":%d,\"reference\":\"%08x\",\"resumed\":\"%08x\",\"ok\":%d}\n", hp, reference, resumed, ok);
     return ok;
 }
@@ -1444,6 +1470,126 @@ static int first_wave(void)
            owner, race, gate, at, sent, army, supply, RACE_AI_WAVE_SUPPLY, all_in, peak_before, ok);
     return ok;
 }
+
+/* Native Blood Bath openings field four paid Sunkens before the first wave.
+ * Keep the replay in the ordinary lobby and include real worker arrival,
+ * foundation placement and completion in the spending audit. */
+static int opening_defense(void)
+{
+    int owner = first_bot(), four = -1;
+    if (race_skirmish_map != 1 || race_human != R_TER ||
+        race_owner_identity(owner) != R_ZERG) return 0;
+    audit_start();
+    while (screen == SCREEN_PLAY && frame < 8640 && four < 0) {
+        int completed = 0;
+        input(0);
+        for (int i = 0; i < MAX_BUILDINGS; ++i)
+            if (b[i].alive && b[i].owner == owner && b[i].type == B_SUNKEN_COLONY &&
+                !b[i].under_construction) ++completed;
+        if (completed == 4) four = frame;
+    }
+    const OwnerAudit *paid = &ledger.o[owner];
+    int ok = paid->made[143] >= RACE_AI_FIRST_CREEP && paid->made[143] <= 5520 &&
+        paid->made[146] >= paid->done[142] && paid->done[146] >= paid->made[146] &&
+        paid->done[146] <= 6480 && four >= 0 && four < RACE_AI_FIRST_WAVE_ZERG &&
+        paid->made_n[143] == 4 && paid->made_n[146] == 4 &&
+        !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+    printf("{\"kind\":\"opening-defense\",\"owner\":%d,\"creep_start\":%d,"
+           "\"first_sunken\":%d,\"four_sunkens\":%d,\"creep_paid\":%d,\"sunken_paid\":%d,\"ok\":%d}\n",
+           owner, paid->made[143], paid->done[146], four, paid->made_n[143], paid->made_n[146], ok);
+    return ok;
+}
+
+/* Observe the Gateway opening without granting a Pylon, Probe or minerals. */
+static int opening_battery(void)
+{
+    int owner = -1, probes = 0, gateways = 0, powered = 0;
+    for (int i = 0; i < race_bots; ++i)
+        if (race_owner_identity(race_bot_owner_ids[i]) == R_PROTOSS) {
+            owner = race_bot_owner_ids[i];
+            break;
+        }
+    if (race_skirmish_map != SC64_MAP_BLOOD_BATH || race_human != R_TER || owner < 0) return 0;
+
+    audit_start();
+    const OwnerAudit *paid = &ledger.o[owner];
+    while (screen == SCREEN_PLAY && frame < 9000) {
+        input(0);
+        if (paid->made[172] == frame) {
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (u[i].alive && u[i].owner == owner && u[i].type == U_PROBE) ++probes;
+            for (int i = 0; i < MAX_BUILDINGS; ++i) {
+                if (!b[i].alive || b[i].owner != owner) continue;
+                if (b[i].type == B_GATEWAY && !b[i].under_construction) ++gateways;
+                if (sc64_battery_raw_building(&b[i]) == 172)
+                    powered = race_battery_site_powered(owner, b[i].x, b[i].y);
+            }
+        }
+        if (paid->done[172] >= 0 && paid->made[157] >= 0 && paid->made[164] >= 0) break;
+    }
+    int ok = paid->made[172] >= RACE_AI_FIRST_BATTERY && paid->made[172] <= 4229 * 5 / 4 &&
+        paid->done[172] > paid->made[172] && paid->done[172] <= 4776 * 5 / 4 &&
+        paid->made[157] > paid->made[172] && paid->made[164] > paid->made[172] &&
+        paid->made_n[172] == 1 && probes == 15 && gateways == 2 && powered &&
+        !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+    printf("{\"kind\":\"opening-battery\",\"owner\":%d,\"battery_start\":%d,\"battery_done\":%d,"
+           "\"assimilator\":%d,\"cybernetics\":%d,\"probes\":%d,\"gateways\":%d,\"powered\":%d,\"ok\":%d}\n",
+           owner, paid->made[172], paid->done[172], paid->made[157], paid->made[164],
+           probes, gateways, powered, ok);
+    return ok;
+}
+
+#ifdef SC64_SHARED_BUNKER
+/* Observe a paid forward Bunker and ordinary same-owner boarding at full capacity. */
+static int opening_bunker(void)
+{
+    int owner = -1, slot = -1, staffed = -1;
+    int workers = 0, barracks = 0, academy = 0, distance = 0, forward = 0;
+    for (int i = 0; i < race_bots; ++i)
+        if (race_owner_identity(race_bot_owner_ids[i]) == R_TER) {
+            owner = race_bot_owner_ids[i];
+            break;
+        }
+    if (!race_ai_blood_bath_ffa() || race_human != R_TER || owner < 0) return 0;
+    audit_start();
+    const OwnerAudit *paid = &ledger.o[owner];
+    while (screen == SCREEN_PLAY && frame < RACE_AI_FIRST_WAVE_TERRAN &&
+           (staffed < 0 || paid->made[113] < 0)) {
+        input(0);
+        if (paid->made[125] == frame) {
+            RaceAiCensus census;
+            race_ai_census(owner, &census);
+            workers = census.have[AK_SCV];
+            barracks = census.have[AK_BARRACKS];
+            academy = census.have[AK_ACADEMY];
+            for (int i = 0; i < MAX_BUILDINGS; ++i)
+                if (b[i].alive && b[i].owner == owner && b[i].type == B_BUNKER) {
+                    slot = i;
+                    distance = dist2(b[i].x, b[i].y, census.hx, census.hy);
+                    forward = dist2(b[i].x, b[i].y, WORLD_W / 2, WORLD_H / 2) <
+                        dist2(census.hx, census.hy, WORLD_W / 2, WORLD_H / 2);
+                    break;
+                }
+        }
+        if (staffed < 0 && slot >= 0 && paid->done[125] >= 0 &&
+            race_bunker_cargo_space(slot) == SC64_BUNKER_CAPACITY) staffed = frame;
+    }
+    int last_start = race_bots == 1 ? 7151 : 8271;
+    int last_done = race_bots == 1 ? 7578 : 8737;
+    int ok = paid->made[125] > race_ai_first_bunker() && paid->made[125] <= last_start * 5 / 4 &&
+        paid->done[125] > paid->made[125] && paid->done[125] <= last_done * 5 / 4 &&
+        paid->made[113] > paid->done[125] && staffed > paid->done[125] &&
+        paid->made_n[125] == 1 && workers >= 17 && barracks == 2 && academy == 1 &&
+        forward && distance >= 275 * 275 && distance <= 400 * 400 &&
+        !paid->low && !paid->high && !paid->supply_bad && !paid->model_errors;
+    printf("{\"kind\":\"opening-bunker\",\"owner\":%d,\"bunker_start\":%d,\"bunker_done\":%d,"
+           "\"staffed\":%d,\"factory\":%d,\"workers\":%d,\"barracks\":%d,\"academy\":%d,"
+           "\"distance_squared\":%d,\"ok\":%d}\n",
+           owner, paid->made[125], paid->done[125], staffed, paid->made[113],
+           workers, barracks, academy, distance, ok);
+    return ok;
+}
+#endif
 
 /* ---- Economy raid. In a mirrored match (the planner also drives the human
  * owner, so the match reaches the engine's own result), the first opponent's
@@ -1870,8 +2016,12 @@ int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1, commit = -1;
-    int builder = -1, workers = -1, ai_sunken = 0, threats = 0, repowering = -1, airpin = -1, noore = -1;
-    int wave = 0, raiding = -1;
+    int builder = -1, workers = -1, ai_sunken = 0, sunken_legacy = 0;
+    int threats = 0, repowering = -1, airpin = -1, noore = -1;
+    int wave = 0, defense = 0, battery = 0, raiding = -1;
+#ifdef SC64_SHARED_BUNKER
+    int bunker = 0;
+#endif
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -1887,6 +2037,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
         else if (!strcmp(argv[i], "--morph-hp") && i + 1 < argc) morph = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--ai-sunken-save")) ai_sunken = 1;
+        else if (!strcmp(argv[i], "--sunken-legacy-hp")) sunken_legacy = 1;
         else if (!strcmp(argv[i], "--threat-census")) threats = 1;
         else if (!strcmp(argv[i], "--addon") && i + 1 < argc) addon = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--commit") && i + 1 < argc) commit = atoi(argv[++i]);
@@ -1897,6 +2048,11 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--air-pin") && i + 1 < argc) airpin = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--no-ore") && i + 1 < argc) noore = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--first-wave")) wave = 1;
+        else if (!strcmp(argv[i], "--opening-defense")) defense = 1;
+        else if (!strcmp(argv[i], "--opening-battery")) battery = 1;
+#ifdef SC64_SHARED_BUNKER
+        else if (!strcmp(argv[i], "--opening-bunker")) bunker = 1;
+#endif
         else if (!strcmp(argv[i], "--raid") && i + 1 < argc) raiding = atoi(argv[++i]);
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
@@ -1905,6 +2061,7 @@ int main(int argc, char **argv)
     if (recover >= 0) return recovery(recover) ? 0 : 7;
     if (morph >= 0) return morph_hp(morph) ? 0 : 8;
     if (ai_sunken) return ai_sunken_save() ? 0 : 13;
+    if (sunken_legacy) return sunken_legacy_hp() ? 0 : 8;
     if (threats) return threat_census() ? 0 : 14;
     if (addon >= 0) return addon_feasibility(addon) ? 0 : 9;
     if (commit >= 0) return forced_commit(commit) ? 0 : 10;
@@ -1914,6 +2071,11 @@ int main(int argc, char **argv)
     if (airpin >= 0) return air_pin(airpin) ? 0 : 16;
     if (noore >= 0) return no_ore(noore) ? 0 : 17;
     if (wave) return first_wave() ? 0 : 18;
+    if (defense) return opening_defense() ? 0 : 20;
+    if (battery) return opening_battery() ? 0 : 21;
+#ifdef SC64_SHARED_BUNKER
+    if (bunker) return opening_bunker() ? 0 : 22;
+#endif
     if (raiding >= 0) return raid(raiding, ticks) ? 0 : 19;
     if (resume_at < 0 && !resume_morph) {
         audit_start();

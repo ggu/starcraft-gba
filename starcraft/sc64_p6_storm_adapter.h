@@ -254,25 +254,6 @@ static int race_p6_storm_tick(int user_paused)
 #endif
 }
 
-static void race_p6_storm_draw(void)
-{
-    if (!race_p6_active()) return;
-    for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i) {
-        const Sc64PsionicStorm *effect = &race_p6.storm.storm[i];
-        int x, y, r;
-        if (!effect->active) continue;
-        x = effect->x - camx;
-        y = effect->y - camy + 12;
-        r = SC64_STORM_RADIUS_GBA_PX;
-        gfx_line(x, y-r, x+r, y, C_CYAN);
-        gfx_line(x+r, y, x, y+r, C_CYAN);
-        gfx_line(x, y+r, x-r, y, C_CYAN);
-        gfx_line(x-r, y, x, y-r, C_CYAN);
-        gfx_line(x-2, y, x+2, y, C_WHITE);
-        gfx_line(x, y-2, x, y+2, C_WHITE);
-    }
-}
-
 #undef SC64_P6_STORM_APPLY
 
 #endif

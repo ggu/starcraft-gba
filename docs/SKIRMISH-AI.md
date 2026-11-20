@@ -7,11 +7,13 @@ planner in [`race_skirmish_ai.h`](../starcraft/race_skirmish_ai.h). The
 original-art skirmish planner in `skirmish_ai.h` is a different, older mode and
 is unchanged.
 
-The planner is an authored approximation. It is not a decoded StarCraft 64 AI
-script, and its build orders are not claims about the original game. One part
-is calibrated to the original: when each race starts its first offensive and
-how much army it gathers first follow measurements of the StarCraft 64
-computer players ([audit](audits/2026-11-19-n64-skirmish-ai.md)).
+The planner is an authored approximation. The timing and size of each
+race's first offensive follow measurements of the StarCraft 64 computer
+players. The Blood Bath openings also target four paid Zerg Sunken
+Colonies, a paid Protoss Shield Battery after 15 Probes and two completed
+Gateways, and one Terran Bunker before Factory, based on the native
+matches.
+[First-wave audit](audits/2026-11-19-n64-skirmish-ai.md) · [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md) · [Protoss opening Battery audit](audits/2026-11-20-protoss-battery-opening.md)
 
 ## What the opponents do
 
@@ -85,13 +87,13 @@ rule tables.
 | --- | --- | --- |
 | Terran | Barracks ×3, Refinery ×2, Factory ×2 with Machine Shops, Academy, Engineering Bay, Missile Turrets, Armory, Starport, Command Center | Marines and Firebats; Siege Tanks (Tank Mode) from Factories with a Machine Shop, otherwise Vultures; Goliaths after the Armory, favored against air; Wraiths |
 | Zerg | Spawning Pool, up to five Hatcheries, Extractor ×2, Hydralisk Den, Lair (morph), Evolution Chamber, Spire, Creep Colonies morphed into Spore and Sunken Colonies | Zerglings, Hydralisks (favored against air or after eight Zerglings), Mutalisks, Scourge against air |
-| Protoss | Gateway ×4, Assimilator ×2, Cybernetics Core, Forge, Photon Cannons, Stargate, Fleet Beacon (Protoss ROM only, see below), Nexus | Zealots and Dragoons (Dragoons favored against air), Scouts, and in the Protoss ROM Carriers |
+| Protoss | Gateway ×4, Assimilator ×2, Cybernetics Core, Forge, Photon Cannons, Stargate, Fleet Beacon (Carrier-enabled ROMs), Nexus | Zealots and Dragoons (Dragoons favored against air), Scouts, and Carriers on Z10 and P10 |
 
-### Carriers (Protoss ROM)
+### Carriers
 
-The Protoss ROM compiles the Carrier service, so a Protoss opponent uses the
-same paid products the human does. Other ROMs compile none of it and their
-opponents keep the plan above (their bytes are unchanged).
+The normal Z10 and P10 ROMs give Protoss opponents the same paid Carrier
+and Interceptor products available to the human. Terran and Showcase
+exercise the service in their separate Carrier previews.
 
 - **Fleet Beacon.** A plan step, after the second Assimilator, once the bank
   holds 600 minerals (`RACE_AI_IF_RICH`) and the Stargate stands. The step
@@ -242,10 +244,10 @@ why:
 | Per-owner weapon and armor upgrades: the planner never starts research. In the Protoss P10 product a human Protoss researches at a Forge and Cybernetics Core, and the engine already pays, ticks, saves and applies levels for any Protoss owner, but no computer opponent issues the command (see [the research audit](audits/2026-11-11-protoss-research-sram/README.md)). Elsewhere unit levels apply only to the human. | No Forge, Cybernetics Core, Engineering Bay, Evolution Chamber or Armory research. Those buildings are built only for defenses and unit prerequisites. |
 | Medic healing, Queen spells, High Templar, Science Vessel, Defiler and Dark Templar products | Not trained. They have no working ordinary combat role in custom games. |
 | Reaver (Scarab ammunition), Arbiter, Observer, Shuttle and Ultralisk ordinary production (producer `255` or explicitly rejected) | Not trained. Robotics, Templar and Ultralisk Cavern paths are omitted. |
-| Carrier and Interceptors in the Terran, Zerg and Showcase ROMs | Not compiled there, so a Protoss opponent in those ROMs never trains Carriers (see [Carriers in the other ROMs](CARRIER-PROJECTILES.md#carriers-in-the-other-roms)). The Protoss ROM does train them, above. |
+| Carrier and Interceptors in the regular Terran, Z9 and Showcase ROMs | The service is available in the separate Terran and Showcase previews. The normal Z10 and P10 ROMs train Carriers as described above. |
 | Unit morphs: Lurker, Guardian, Devourer, Archon | Not available. The Hive and Greater Spire morphs have no payoff and are skipped. |
 | Siege Mode transition and Siege research | Tanks fight in Tank Mode only. |
-| Bunker loading by computer players | Opponents do not build Bunkers. |
+| Bunker loading by computer players | Terran opponents build and staff one opening Bunker on Blood Bath Free for All. Other lobbies still use the ordinary planner. [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md) |
 | Comsat Station, Nuclear Silo, Covert Ops, Physics Lab, Valkyrie, Corsair | Unmapped or unavailable in the catalog adapter. |
 | Per-owner fog of war | Opponents have full knowledge of hostile actors (see above). |
 

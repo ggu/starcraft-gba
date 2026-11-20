@@ -33,7 +33,7 @@ With prepared inputs in a clean build tree:
 
 ```sh
 python3 -m unittest discover -s tests -p test_sc64_z7_sight_spans.py
-make LATE_ZERG_PACKED_SIGHT=1 verify-zerg-z10
+make LATE_ZERG_PACKED_SIGHT=1 LATE_ZERG_SPARSE_SIGHT=0 verify-zerg-z10
 ```
 
 ## Current split-cache cartridge
