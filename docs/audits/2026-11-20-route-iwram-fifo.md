@@ -113,8 +113,8 @@ pop. An eligible initial frontier has at least four free entries, and a
 finished batch always has room for at least one more entry, so equal cursors
 mean the queue is empty. The transfer preserves dequeue order on wrap.
 
-`make test-sc64-route-iwram-fifo` passes all 386,646 point and wide facility
-checks with ASan and UBSan. A new 128×128 corridor tree has one ordinary
+`make test-sc64-route-iwram-fifo` passes 386,646 point queries and the wide
+facility checks with ASan and UBSan. A new 128×128 corridor tree has one ordinary
 goal, 5,953 reachable cells and a peak scalar frontier of 1,024. The real
 512-entry ring spills after 2,878 pops. The 16-entry test ring spills after
 318 pops. Both produce the independent oracle's direction at every cell.
@@ -136,9 +136,34 @@ route suffix drops from 1,148 to 1,132 bytes. Once the ring unwinds, the EWRAM
 driver plus batch loop need 84 bytes. Receipt SHA-256 is
 `099ce55565ee03de8722274fd477d44aaac6cba8ba81d150bdb8a9ac71e7fbbc`.
 
-The refined ring stays opt-in. Recheck all four normal links and stack
-guards on the merged base. The next paired replays cover the Z8 peak at
-call 33,800 and P10 calls 43,604 and 45,231 for orders plus 45,466–45,467 for
-rendering. Capture route bytes, world state, both pages and the cycle tails.
-Keep the legal single-goal spill and the artificial many-seed stress in the
-test matrix. The tiny IWRAM savings need confirmation on the Showcase link.
+## Refined ring on the released Z10 baseline
+
+Against release `25e9e8b9`, runtime `f35cd710` passes a second fresh physical
+Z8 A/B from call 17,122 through 33,900. The release ROM is `8da84f1c…` and the
+opt-in ROM is `96153fce…`. All 17 checkpoints match the sampled world state,
+palette, both indexed pages and 200 resident route-field hashes. All 203
+timed updates agree on the frame and logical route counts.
+
+| Emulated cycles | Release | Refined ring |
+| --- | ---: | ---: |
+| Peak update 33,800, game frame 32,984 | 12,096,420 | 11,671,151 |
+| Orders on that update | 11,120,397 | 10,698,159 |
+| Mean of 52 updates with new logical routes | 2,780,246 | 2,721,108 |
+| 95th percentile of those 52 updates | 8,493,670 | 8,211,348 |
+| Mean of all 203 timed updates | 1,678,755 | 1,663,654 |
+| 95th percentile of all 203 timed updates | 3,267,477 | 3,198,823 |
+
+The worst update drops by 425,269 cycles (3.52%). The largest paired increase
+is 11,728 cycles at call 33,803. The candidate passes the header, ELF payload
+and RAM guards. IWRAM ends at `0x03004db8`, adding 48 bytes and leaving 584
+bytes before the guard. EWRAM ends unchanged at `0x02037f78`. Both guests
+show system and IRQ stack writes as deep as 4,492 and 296 bytes respectively,
+with the lowest 256 guard bytes unchanged. These are read-only observations
+from this replay. The A/B receipt SHA-256 is
+`c02e88a03efef7eca8b398289bff7cc1716ddd69a449d09280d98d7e48ce24a7`.
+
+The refined ring stays opt-in. The next paired replay is P10, with orders
+spikes at calls 43,604 and 45,231 and render spikes at 45,466–45,467. Qualify
+the remaining normal links and stack guards before enabling the option. Keep
+both spill cases in the test matrix and confirm the Showcase margin with the
+refined source.
