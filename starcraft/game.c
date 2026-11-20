@@ -5056,8 +5056,7 @@ sc64_source_emit(int raw,int source,int weapon,int air,
             const Sc64WeaponSourceAttackProfile *shot_profile = shot == 0 ? profile :
                 sc64_weapon_source_profile_lookup(key.actor_raw,key.weapon_id,
                                                   key.target_air,key.variant);
-            if (shot_profile && shot_profile->projectile_image &&
-                !sc64_weapon_source_bullet_is_stationary(shot_profile->weapon_bullet_type)) {
+            if (shot_profile && shot_profile->projectile_image) {
                 Sc64TraceSlot *trace = &sc64_trace_slots[slot];
                 unsigned release = sc64_weapon_source_vfx_first_gba_age(
                     sc64_weapon_source_trace_release_ticks(shot_profile));

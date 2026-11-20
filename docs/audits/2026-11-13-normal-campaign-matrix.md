@@ -13,7 +13,7 @@ physical GBA check or all routes through a mission.
 | T6 | [HOME win](2026-11-13-t6-normal-physical.md) | Fixed the controller's direct menu write and route observer. |
 | T7 | [HOME win](2026-11-13-t7-t9-normal-physical.md) | All 15 checkpoints matched. |
 | T8 | [HOME win](2026-11-13-t8-normal-physical.md) | All 272 checkpoints matched. |
-| T9 | [HOME win](2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) | All 51 checkpoints matched. |
+| T9 | [HOME win](2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) | [November 20 fresh SRAM and result autosave](2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result) match all 51 checkpoints and restore the frozen victory in a third process. |
 | T10 | [HOME win](2026-11-13-t10-normal-physical.md) | Raynor alive; Ion Cannon destroyed. |
 | Z1–Z2 | [Z1 HOME win](2026-11-13-z1-normal-home.md), [Z2 HOME win](2026-11-13-z2-normal-home.md) | Briefings and authored pages acknowledged. |
 | Z3 | [HOME win](2026-11-13-z3-current-home.md) | All 465 observations also match on staged `c906058`; Chrysalis retains all 250 HP. |
