@@ -77,19 +77,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   route and recurring order costs before tuning sight again.
   [Sparse sight audit](audits/2026-11-20-late-zerg-sparse-sight.md)
 
+- **Terran opening Bunker.** Qualify one paid Bunker before Factory on
+  Blood Bath Free for All. Then qualify the linked AI garrison and its
+  continuation from SRAM. Native cargo pointers confirm four passengers.
+  [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md)
+
 - **Native skirmish opening defenses.** The shared Zerg planner now
   builds four paid Sunkens by update 8,305 in both qualified Blood Bath
   lobbies. The normal Terran ROM restores the active morph from SRAM.
   The native fourth completion is about 650 to 800 updates earlier,
   and the mixed ARM workload takes 5.4% more cycles in the sampled
-  late opening. Compare Terran Bunkers and Protoss Battery or Cannon
-  openings. The shared Sunken rule now uses the native 400 HP cap.
+  late opening. Protoss now places a paid Shield Battery after 15 Probes
+  and two completed Gateways in the same lobbies. Compare its later gas
+  and Core timing, Terran Bunkers and the distinct Protoss Cannon opening.
+  The shared Sunken rule now uses the native 400 HP cap.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored
   current HP of older colonies and complete an older pending morph at
   400 HP. Qualify Zealot HP and shields (80 each) against profile
   overrides and the existing unit save representations.
   [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
+  [Protoss opening Battery audit](audits/2026-11-20-protoss-battery-opening.md)
 
 - **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
   reproduced stale SRAM after a normal P10 victory with nine pending
@@ -126,6 +134,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T4 victory, a Showcase scene and the dense Z7 prefix. Showcase has
   72 bytes below the IWRAM link guard. Keep the optical cache and
   combined primary/fallback mask trials out of the normal builds.
+  The [short-path certificate trial](https://github.com/ggu/starcraft-gba/pull/616)
+  cuts the P10 late-battle peak by 42.5% and the mean by 2.1% across
+  58 ordinary updates. Keep it opt-in pending all four RAM links,
+  distant cached-read timing and fresh journal checks. A two-pop
+  FIFO trial raised the sampled Z8 peak by 2.2%. Keep the single-pop loop.
   [The composed resumable point-route trial](https://github.com/ggu/starcraft-gba/pull/576)
   remains opt-in. A [compressed range read](audits/2026-11-16-resumable-frontier-budget.md#cached-range-read-on-a-compressed-wide-grid)
   cuts a forced 128-by-128 stall from 1,086,782 to 252,139 cycles. All 86
