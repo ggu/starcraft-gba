@@ -1,6 +1,6 @@
 # P10 short-path certificate trial
 
-## Native controller replay
+## P10 ARM controller replay
 
 The current source release `f6869829` has the same cartridge runtime as the
 P10 control built from `00fd8efd`. Use the [late P10 pause save and
