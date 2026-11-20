@@ -41,6 +41,24 @@ turret separate turns in both modes. The turret reuses the capacity vacated
 by the hull. The world queue still uses GBA kind and slot for exact ties
 after the turret flag. Goliath still needs independent raw 4 turret art.
 
+## Missile trails
+
+Native IScript opcode 15 reads the parent elevation at `0x800124d0`
+and adds one at `0x800124dc`. The spawn wrapper at `0x80011cf4`
+allocates its own sprite. The opcode window at ROM offset `0x130d0`
+has SHA-256
+`cb7451368de2aa76f64b68fc3c6ed62bb9e15341b7d805158ed6cba526a27710`.
+The Goliath missile in the Terran 10 state has anchor (3213, 3382).
+Its confirmed child anchors are (3213, 3361) and (3212, 3367).
+
+Supported Wraith, Goliath and Vulture projectiles paint their detached
+flight trails one elevation above the released bullet. Same-trace
+children on high layers share one heap entry, with their separately
+authored birth positions and lifetimes. Attached images stay in the
+parent turn. Per-child ties against other sprites at the same depth,
+ground-level children, and children that carry into later phases
+remain separate parity cases.
+
 ## Replay cases
 
 Freeze the camera, palette, unit pose and effect tick. Capture an empty frame,
@@ -57,7 +75,7 @@ both indexed pages, and check that both HUD bands match the empty frame.
 | `goliath-turret-same-y` | Start from the native Goliath/Barracks key witness above. Require opaque overlap and both independently visible turret and hull pixels before comparing. | Native keys captured. GBA turret art and matching renderer case pending. |
 | `pool-id-exact-tie` | Use two SCVs with equal layer and Y, then two Wraiths with equal air layer and different Y. Record the real pool IDs and at least one destruction and reuse. Use the same sample for foreground picking. | Native keys captured. A shared GBA sprite-ID lifetime and exact pixel witnesses remain open. |
 | `aircraft-crop-past-anchor` | Place Wraith and Carrier anchors at screen (-9, 66), (248, 66), (120, 9), and (120, 126), with camera clear of map boundaries. Draw visible cropped art in depth order and check the Wraith over the Carrier at an opaque overlap. Repeat hostile in fog, and suppress an actor wholly outside the playfield. | N64 horizontal row admission at ROM 0xe405c selects visible sprites without a center-X test. A separate native vertical and opaque edge cut is pending. |
-| `moving-missile-sprite-child` | Capture the Goliath/Wraith missile or Vulture grenade while a trail sprite is live. Put a layer-5 point Storm on the child and a higher-layer flyer across it. The child covers Storm and the flyer covers both. Trace independent fixed birth anchors through flight. | The native Terran 10 capture has parent sprite 345/image 529, ID 528, layer 5, and two live child sprites 309/image 422, IDs 527/526, layer 6. Native and GBA overlap pixels remain open. |
+| `moving-missile-sprite-child` | Capture the Goliath/Wraith missile or Vulture grenade while a trail sprite is live. Put a layer-5 point Storm on the child and a higher-layer flyer across it. The child covers Storm and the flyer covers both. Trace independent fixed birth anchors through flight. | Native Terran 10 key witness has parent sprite 345/image 529, ID 528, layer 5, and two live child sprites 309/image 422, IDs 527/526, layer 6. Showcase HOST passes the Storm, Wraith and HUD comparisons for all three projectiles. Ordinary-input and native overlap pixels remain open. |
 
 Record per cut the source, ROM and input digests, mode, camera, animation
 tick, actor and effect anchors, effective keys, native sprite IDs when
