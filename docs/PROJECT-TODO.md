@@ -76,7 +76,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   resumes after relocation and worker landing at frame 2,568. All 272
   observation labels match, including 265 after the load. The Norad II
   survives, all hostile buildings are destroyed, and the frozen result
-  re-exports identical SRAM. Apply the same gate to T6 next.
+  re-exports identical SRAM.
+  [T6 on normal Terran](audits/2026-11-13-t6-normal-physical.md#november-20-fresh-sram-and-result-autosave)
+  saves with Raynor aboard the first Dropship at frame 19,466. The
+  fresh route delivers Raynor and two Dropships, with Norad alive.
+  All 42 observations match, and the frozen result re-exports identical
+  SRAM. The 54.16-million-cycle result autosave is the slowest update.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
@@ -148,12 +153,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   72 bytes below the IWRAM link guard. Keep the optical cache and
   combined primary/fallback mask trials out of the normal builds.
   The [short-path certificate trial](https://github.com/ggu/starcraft-gba/pull/616)
-  cuts the P10 late-battle peak by 42.5% and the mean by 2.1% across
-  58 ordinary updates. The cold certificate links on all four products.
-  Its forced distant read falls from 1,087,475 to 70,103 cycles with a
-  separate opt-in proof for a unique separator crossing. Other geometry
-  can still trigger a full fill. Qualify the combined flags on all four
-  profiles, real busy reads, and fresh journals before activation.
+  cuts the current P10 late-battle peak by 42.42% and the mean by
+  2.11% across 58 ordinary updates after a fresh load. The current Z10
+  trial restores Z8 and samples 203 busy updates. Mean cycles fall
+  7.68%, peak falls 10.25%, and p95 rises 0.14%. Sampled world, route
+  counters and video match in each pair. The measured P10 and Z10
+  range readers have zero visits to the separate far helper. Its
+  1,087,475-to-70,103-cycle result comes from a forced read. Keep the
+  flags opt-in for further normal-profile links, busy far reads and
+  journal continuations. A separate exact-cache scan trial on Z8
+  matched 21 sampled states and saved less than 0.01% mean cycles
+  across 486 timed calls. Focus on the larger route fills.
   A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the
   single-pop loop. The [shared render cull](audits/2026-11-19-world-depth.md#visibility-and-building-overlay-cost)
   cuts mean loop cost by 0.17% to 0.84% across four Z8 and P10 windows,
