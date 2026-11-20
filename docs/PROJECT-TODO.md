@@ -824,7 +824,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms an airborne building still counts. GBA skirmish needs a
   shared Terran lift/land service with compatible save validation and
   correct depot, add-on, collision and air-target behavior.
-  A passive replay did not reach elimination. [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
+  A [live final-building comparison](audits/2026-11-21-blood-bath-live-results.md)
+  now witnesses defeat in two unmodified N64 Free for All launches and in the
+  current Terran GBA ROM, including ordinary pause and fresh load through
+  result. The current opt-in Terran replay also saves after CPU retirement
+  and preserves four surviving human SCVs as neutral through defeat. Native
+  mobile survivors and competitive CPU retirement still need a live witness.
+  [Draft #445](https://github.com/ggu/starcraft-gba/pull/445)
   tests retirement and neutral cargo on HOST. Its final victory now waits
   for deferred retirement, including a surviving Battlecruiser fixture.
   [Draft #566](https://github.com/ggu/starcraft-gba/pull/566) qualifies the

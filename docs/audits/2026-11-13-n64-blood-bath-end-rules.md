@@ -12,6 +12,8 @@ native handlers, using three authenticated opening RAM samples per mode.
 The paired launches and their visual lobby evidence are in the
 [Blood Bath opening audit](2026-11-12-n64-blood-bath-opening.md#paired-blood-bath-launches).
 We did not drive either match to a result screen in these captures.
+Two later [ordinary-input Free for All runs](2026-11-21-blood-bath-live-results.md)
+reached published human defeat after the last building was destroyed.
 
 | Single-player mode | Observer manifest SHA-256 | Opening opponent counts derived from the native rule, CPU 0 / CPU 1 / CPU 2 / human 3 |
 | --- | --- | --- |
