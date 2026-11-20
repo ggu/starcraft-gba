@@ -173,17 +173,34 @@ patch. Its game frame 31138 RAM SHA-256 is
 `3688890b01895af6bd85ecc7eb23cefd26506da8a742ff30dd7fdafd2b30cdbc`.
 [OpenBW bullet creation](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13759-L13769)
 
-The shared GBA Mode 4 painter interleaves source-backed moving weapon
+The shared GBA Mode 4 painter interleaves source-backed weapon
 sprites with actors. It reads live depth on the first GBA update that reaches
 the source release tick, then holds the result. If an actor disappears
 during wind-up, the attack-init snapshot supplies the depth. Reusing its
 slot cannot redirect the depth sample to the new occupant. Layers 0–4 use
-the moving projectile's world Y. The projectile and its current visual
+the projectile's current world anchor, including fixed-position effects.
+The projectile and its current visual
 children draw together. Shooter overlays still use
-their separate pass. Stationary effects, special-service projectile pools,
-independently spawned impact and trail sprites, and exact native sprite-ID
-ties need their own depth comparisons. The existing queue slot order
-breaks GBA projectile ties.
+their separate pass. Death effects, spell pools and Interceptor pulses
+also need their own depth comparisons, as do independently spawned impact
+and trail sprites. The existing queue slot order breaks GBA projectile
+ties. The experimental Mode 0 renderer still separates cached static art
+from dynamic actors.
+
+The native constructor writes the sprite elevation before it dispatches
+on weapon behavior. The behavior table load at `0x80008814` and jump at
+`0x80008834` follow both elevation writes above. A stationary shell burst
+therefore takes the same target-or-shooter elevation plus one as a flying
+bullet. The Gauss Rifle (weapon 0) and siege cannon (27 and 28) all take
+behavior 2 to `0x800088c0`. At game frame 10,001, a retained native
+Academy replay contains two Gauss Rifle sprites at layer 5 targeting the
+same layer-4 unit. The normalized RAM SHA-256 is
+`da3a833eca8432feb659271d2ac5f5609704b3d0b6f8bfd7602183dff33b6c87`.
+The GBA formerly drew stationary effects in a final pass above
+every actor. Their depth now uses the shared release snapshot and queue.
+An effect keeps its captured anchor under the existing GBA animation
+model. Native target tracking and independent child sprites require
+their own tests.
 
 #### Projectile replay cuts
 
@@ -200,6 +217,7 @@ counts. Store ROM-derived pixels and memory locally.
 | `ground-shot-through-flyer` | Pause a shot across a ground unit, then repeat it across a lifted building and a flyer. Repeat with reverse actor creation order. | At layer 5 the shot covers the ground unit. Layer 12 and higher sprites cover the shot. |
 | `air-shot-over-ground` | Fire at a flyer backed by a ground unit and sample the projectile's flight. | The projectile takes the target's layer plus one and covers the ground actor. |
 | `ground-shot-by-moving-y` | Fire diagonally at a layer-3 Bunker. At the same animation step, put a Tank north of the projectile anchor, then south. | The layer-4 projectile covers the north Tank and passes behind the south Tank. |
+| `stationary-shot-depth` | Fire a sieged Tank at a layer-3 Bunker, pause on a visible impact phase, then repeat with a Tank three GBA pixels north or south of the impact or with a Wraith over it. Sample after target removal. Use the native weapon behavior and sprite anchor to identify the matching N64 effect. | The layer-4 impact covers the north Tank. The south Tank and layer-18 Wraith cover it. The released effect keeps its layer when the Bunker disappears. Compare both draw orders directly when the source splash remaps underlying palette colors. |
 | `shot-release-depth` | Change target layer during wind-up, change it again during flight, then remove the target or recycle its slot. For a point shot change the shooter's layer during wind-up. | The projectile uses the release tick's actor layer and keeps it through flight. A slot recycled during wind-up leaves the attack-init snapshot in effect. |
 | `projectile-hud-page-flip` | Shift the camera so the flight intersects screen rows 12 and 119. Step two page flips with the cursor out of the overlap. | Terrain, bodies and projectiles are clipped to the field. HUD pixels are identical in both paired comparisons. The N64 oracle checks foreground UI without requiring GBA-specific row coordinates. |
 | `projectile-load-hit-once` | Save with a queued hit, then load in a fresh process. Repeat with the target obscured during the shot. | Cosmetic traces clear on RaceSave load. The persisted damage resolves once, using the existing eligibility and impact rules. |
@@ -216,7 +234,14 @@ Boundary clips preserve both HUD bands and match 8 upper-edge and 38
 lower-edge overlap pixels. The diagonal, layer-4 shot matches 48 pixels
 on each side of a Tank's anchor. The fixture also verifies the SCV's
 wind-up layer change, shooter fallback for a point shot and a target slot
-reused before release.
+reused before release. The stationary case replays the same siege splash
+in both explicit paint orders and matches all 14 distinguishing pixels
+in each of its three setups. It runs the production queue and post-world
+pass and checks both HUD bands. The four normal ARM products link with the
+same RAM endpoints as `06353a5d`. Their ordinary Custom Game startup
+samples match both indexed pages, palette, and world at 60 and 120 updates.
+The startup samples precede combat. Paired ordinary-input N64/GBA
+siege overlap captures remain pending.
 
 #### Projectile cartridge coverage
 
