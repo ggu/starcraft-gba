@@ -40,8 +40,9 @@ python3 tools/sc64_skirmish_normal_replay.py \
   --rom-sha256 "$NORMAL_TERRAN_SHA256" --output /tmp/sc64-outpost-check
 ```
 
-Choose a new output directory per run. The host option is limited to this
-map, race and opponent and leaves the default matrix policy unchanged.
+Choose a new output directory per run. This command selects the Outpost
+policy for Terran against one Zerg CPU. The same option supports the
+[Blood Bath check](2026-11-21-blood-bath-terran-win.md).
 
 | Input | SHA-256 |
 | --- | --- |
