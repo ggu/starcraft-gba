@@ -11,7 +11,7 @@ physical GBA check or all routes through a mission.
 | T3–T4 | [HOME wins](2026-11-13-t3-t4-normal-physical.md) | Fresh SRAM and hardware still separate. |
 | T5 | [HOME win](2026-11-13-t5-normal-physical.md#exact-november-13-kodak-cartridge) | All 150 observations matched and both heroes survived. |
 | T6 | [HOME win](2026-11-13-t6-normal-physical.md) | Fixed the controller's direct menu write and route observer. |
-| T7 | [HOME win](2026-11-13-t7-t9-normal-physical.md) | All 15 checkpoints matched. |
+| T7 | [HOME win](2026-11-13-t7-t9-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t7-t9-normal-physical.md#november-20-t7-fresh-sram-and-result-autosave) resume with the Emitter's carrier aboard the Dropship and match all 15 observation labels. |
 | T8 | [HOME win](2026-11-13-t8-normal-physical.md) | All 272 checkpoints matched. |
 | T9 | [HOME win](2026-11-13-t7-t9-normal-physical.md#t9-new-gettysburg) | [November 20 fresh SRAM and result autosave](2026-11-13-t7-t9-normal-physical.md#november-20-current-terran-fresh-sram-and-result) match all 51 checkpoints and restore the frozen victory in a third process. |
 | T10 | [HOME win](2026-11-13-t10-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t10-normal-physical.md#november-20-fresh-sram-and-result-autosave) match all six checkpoints, with Raynor alive and the Ion Cannon destroyed. |

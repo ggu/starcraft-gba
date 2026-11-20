@@ -66,8 +66,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [T10 on normal Terran](audits/2026-11-13-t10-normal-physical.md#november-20-fresh-sram-and-result-autosave)
   loads from frame 2,276 and wins with Raynor alive and the Ion Cannon
   destroyed. All six checkpoints match. A third emulator restores
-  the frozen result and exports identical SRAM. Continue with a current
-  save and result check for T7.
+  the frozen result and exports identical SRAM.
+  [T7 on normal Terran](audits/2026-11-13-t7-t9-normal-physical.md#november-20-t7-fresh-sram-and-result-autosave)
+  restores the loaded Dropship at frame 2,289 and wins with Kerrigan
+  alive and the Emitter delivered. All 15 observation labels match,
+  and the result bank restores the selected unit and re-exports
+  identical SRAM. Continue with a current save and result check for T8.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
