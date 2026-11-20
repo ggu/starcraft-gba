@@ -86,13 +86,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   route and recurring order costs before tuning sight again.
   [Sparse sight audit](audits/2026-11-20-late-zerg-sparse-sight.md)
 
-- **Terran opening Bunker.** The shared Blood Bath Free for All planner
-  builds one paid Bunker before Factory and boards four infantry. The
-  mixed replay on all four normal profiles restores all four identities
-  and banks from SRAM and matches 600 more updates. Factory placement
-  still comes earlier than in the native openings. Qualify the next
-  economy and tech phases, and test garrison replacement under attack.
-  [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md)
+- **Terran opening Bunker.** The shared planner places one paid Bunker
+  after the Academy and before the Factory in the two observed Blood
+  Bath Free for All lobbies. All four normal ROMs restore both the
+  active SCV assignment and the four loaded passengers, then match
+  600 updates from uninterrupted play. P10’s measured mixed windows
+  average 1.01 and 1.18 million guest cycles per update. Compare later
+  Factory timing, first boarding and staffing after losses.
+  [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md#current-release-with-death-depth)
 
 - **Native skirmish opening defenses.** The shared Zerg planner now
   builds four paid Sunkens by update 8,305 in both qualified Blood Bath

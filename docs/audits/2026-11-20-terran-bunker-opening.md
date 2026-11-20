@@ -179,3 +179,28 @@ combat and cargo codec fixtures.
 | GBA mixed control observer receipt | `1be779b75bef20b20ed38a4dfd5f77cca2b831a7154684d89bdfcf44853f2c9d` |
 | GBA Terran ARM Bunker cartridge | `1420ec734293ad760b4da5b12feebab5c1c172925863dc2183c25b708b70fb54` |
 | GBA Terran mixed ARM opening and fresh garrison continuation | `7cedceaf92800b5dd915297b148c2fea9a0975b42263378eedbcef7efffe44d4` |
+
+
+## Current release with death depth
+
+Composed runtime `eb409168` adds the AI changes to release `cd833c8c`.
+Terran, Z10, P10 and Showcase link with the current death-depth bank
+and unchanged RAM endpoints. Each normal ROM enters the mixed Free
+for All lobby with the same named opponents and reaches both of these
+ordinary-input save cuts.
+
+| Profile | Active SCV foundation | Four loaded passengers | Mean cycles per update after foundation / staffing |
+| --- | ---: | ---: | ---: |
+| Terran | 10,261 | 11,137 | 863,324 / 986,684 |
+| Z10 | 10,261 | 11,149 | 913,185 / 1,090,323 |
+| P10 | 10,261 | 11,149 | 1,007,523 / 1,177,222 |
+| Showcase | 10,261 | 11,137 | 948,006 / 1,121,416 |
+
+Each 32 KiB journal restores the observed world and resource banks
+through an ordinary HOME L press in a fresh emulator. The active cut
+retains the SCV assignment and the staffed cut restores all four
+passengers. Both match the next 600 updates from uninterrupted play.
+The staffed observations also match the earlier Bunker replay across
+all four products. Cycle counts are for the 600-update emulator
+windows after each cut. The build and replay manifest SHA-256 is
+`96cb299ef2b3a625420e235f9d4c65e8a6a148afda1d3d844e128afe631dd197`.
