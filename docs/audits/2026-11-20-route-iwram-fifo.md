@@ -183,7 +183,40 @@ ends IWRAM at `0x03004e50`, with 432 bytes before the guard, and EWRAM
 at the release's `0x0203b52c`. The comparison receipt SHA-256 is
 `5a3828cacf6fe9c91e1496d59b703b7a81327bb4fc2e69d766770c76b9c16581`.
 
-The refined ring stays opt-in. Qualify the remaining normal links and
-stack paths, confirm the Showcase margin with the refined source, and
-keep both spill cases in the test matrix. The near-flat render samples
-and small P10 mean change leave sustained simulation and draw work open.
+## Refined Showcase and Terran cartridges
+
+The refined source passes header, payload and RAM checks for all four
+normal products against release `25e9e8b9`. Each adds 48 IWRAM bytes and
+leaves its EWRAM endpoint unchanged.
+
+| Product | IWRAM end | Bytes before guard | EWRAM end |
+| --- | --- | ---: | --- |
+| Terran | `0x030048d8` | 1,832 | `0x02038e5c` |
+| Z10 | `0x03004db8` | 584 | `0x02037f78` |
+| P10 | `0x03004e50` | 432 | `0x0203b52c` |
+| Showcase | `0x03004fe8` | 24 | `0x02039068` |
+
+The Showcase pair opens Siege Line with the normal controls and runs 120
+updates. All 24 samples match the world, fog, palette, display page, both
+indexed pages and HUD. Both start with 25 units and end with 18. The replay
+takes 119,851,039 release cycles and 119,845,058 refined cycles. Both observe
+4,768 system and 296 IRQ stack bytes, with the low 256 guard bytes unchanged.
+The 64×64 scene produces no route builds, so it covers compatibility with
+the option present. The link and replay receipts are
+`2296ceb212ec5afa63319e47936a1b3ee95ec4ddd9c712d24b48a6fa9190507d` and
+`e4e28c01f67d6ceb41f0ec7784b6707176ed864289ad911c643eaad560cba86e`.
+
+The Terran pair loads the retained late T6 pause journal through HOME at
+game frame 19,466. It reaches frame 20,320 after 884 recorded input calls on
+the 96×96 map. The loaded state and all 14 continuation samples match world,
+palette, both pages and 29 resident route-field hashes. Both encounter three
+logical route builds. Continuation takes 883,819,694 release cycles and
+883,819,979 refined cycles. Both observe 4,931 system and 296 IRQ stack bytes,
+with the low 256 guard bytes unchanged. The link and replay receipts are
+`92ed200bf954c8af9c8a8a7b0c363d2c656f5aca35a1aa5fa99e0f48e6edab88` and
+`1f5b7165f70a20c43881c8a527fe34de050535a413970308b6f2e3d3e3b37439`.
+
+The refined ring stays opt-in. Keep the two spill cases in the test matrix
+and recheck the 24-byte Showcase guard as the runtime changes. The bounded
+replays measure emulated cycles and observed stack use. Sustained simulation,
+draw work and physical-cartridge timing remain open.
