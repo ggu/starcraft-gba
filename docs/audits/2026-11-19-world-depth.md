@@ -331,6 +331,19 @@ displayed page and both indexed pages and HUD bands at 24 samples over
 hardware remains open. The comparison receipt SHA-256 is
 `4de84f1774ae396e425befdb00526ea5c8121ccfd67bf85da9657a5a340798e3`.
 
+In an ordinary Z6 replay on normal Z10, Kerrigan casts at (1857, 1868)
+at frame 21,437. The release and candidate match 25 gameplay
+checkpoints, all three authored pages, the pre-cast framebuffer and both
+HUD bands. Eight active cuts run through the first damage pulse. The
+first cut matches completely. The other seven each replace seven
+cyan marker pixels on the same edge with the foreground art's palette
+indices. The gameplay samples match through the damage pulse. Use the
+HOST overlap fixture for isolated actor ownership and the normal replay
+for the live crossing.
+
+The Z6 comparison receipt SHA-256 is
+`79b356de5710544e9740087125ee0c0ed5de1dd6e4ed2ac6983b9bfcc28da1d3`.
+
 ### Nuclear target-dot cuts
 
 The USA ROM reads the Ghost sprite's elevation at `0x8014c840`, increments
