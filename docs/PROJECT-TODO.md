@@ -82,10 +82,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fresh route delivers Raynor and two Dropships, with Norad alive.
   All 42 observations match, and the frozen result re-exports identical
   SRAM. The 54.16-million-cycle result autosave is the slowest update.
-  [T4 on normal Terran](audits/2026-11-13-t3-t4-normal-physical.md#november-20-t4-fresh-sram-and-result-autosave)
+  [T4 on normal Terran](audits/2026-11-13-t3-t4-normal-physical.md#current-packed-reader-release)
   restores the selected unit at frame 4,968 and wins with Raynor alive.
   All ten observations match, and a third emulator reloads the frozen
   victory with byte-identical SRAM.
+  [T1 on normal Terran](audits/2026-11-13-t1-t2-normal-physical.md#current-packed-reader-release)
+  restores Raynor after rescue at frame 6,214 and wins with ten Marines.
+  All 12 observations match, and the frozen result re-exports identical
+  SRAM. The route averages 29.28 emulated updates per second.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
@@ -145,8 +149,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   byte. The composed links retain all four RAM limits and the normal
   Terran active and staffed Bunker saves. The original victory
   profile attributes 5.90 million cycles to four immutable program
-  validations. Reuse validated program data within the adapter call
-  and time the current release's remaining victory work.
+  validations. Factoring the duplicate source-level check within
+  the adapter leaves timing flat because the compiler already
+  combines it. Check repeated validation of the same mission state
+  within each journal operation and preserve the independent
+  validation of both banks.
 
 - **P10 cycle budget (2026-11-20)**. The [released early collision rejection](audits/2026-11-19-p10-steering-budget.md)
   matches gameplay in P7 and three-AI Blood Bath. P7 saves 1.74% mean
@@ -171,8 +178,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   counters and video match in each pair. The measured P10 and Z10
   range readers have zero visits to the separate far helper. Its
   1,087,475-to-70,103-cycle result comes from a forced read. Keep the
-  flags opt-in for further normal-profile links, busy far reads and
-  journal continuations. A separate exact-cache scan trial on Z8
+  flags opt-in. All four combinations now pass their normal link
+  guards across the qualified revisions. Terran and Showcase also
+  match both mixed three-AI Blood Bath saves and both fresh
+  600-update continuations. The 128×128 Z9 observed range calls are
+  short cache misses. Bound the synchronous fill after a declined
+  distant proof, then compare worst update and p95 to the eager
+  control. A separate exact-cache scan trial on Z8
   matched 21 sampled states and saved less than 0.01% mean cycles
   across 486 timed calls. Focus on the larger route fills.
   A two-pop FIFO trial raised the sampled Z8 peak by 2.2%. Keep the
