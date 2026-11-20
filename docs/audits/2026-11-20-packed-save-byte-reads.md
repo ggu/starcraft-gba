@@ -236,3 +236,89 @@ cycles. The packed-building getter is the next direct bit-reader
 cost. Use the same fixed-width differential and byte-identical
 journal checks if testing that row. The stack receipt SHA-256 is
 `74b16ec56a73e38499d4e441effe1fc00c7b65187c1ddcb07acd5499bdafe54a`.
+
+## Inlined packed Building reads on the detached-depth release
+
+The opt-in `SC64_COMPACT_BUILDING_FIXED_READER` inlines the existing
+shared reader at the known Building field positions. The checked spans,
+decoded fields, reserved-bit test and output commit stay in the same
+order. The candidate keeps the established Unit decoder and reuses the
+existing byte reader. Disabling the option reproduces the release
+`25e9e8b9` Terran ROM byte for byte.
+
+The asset-free sanitizer fixtures pass for both codecs and both Building
+settings. A differential against the release decoder checks 150,001
+unaligned rows, including 467 accepted rows. All 149,534 rejected rows
+leave the caller's destination untouched in both builds.
+
+The paired normal T6 test starts in a fresh process with Raynor aboard
+a Dropship at frame 19,466. It observes the same 27 controller and
+dialogue cuts, wins at frame 23,536 with Raynor and two Dropships at
+extraction, and reloads the frozen result through a second fresh
+title. Both runs export identical 32 KiB victory journals and
+result readbacks, including the unchanged first pause bank.
+
+| Event | Release guest cycles | Candidate guest cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Paused-game title load | 24,091,103 | 21,508,948 | 10.72% |
+| Victory autosave update | 30,193,167 | 26,815,427 | 11.19% |
+| Frozen-result title load | 26,454,610 | 23,872,479 | 9.76% |
+
+The candidate links with the same IWRAM and EWRAM endpoints as the
+release. This measures specific save and load stalls in emulation.
+Hardware timing remains open.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Release Terran ROM | `c9845065be3e4ec276ac4a94b12762c6eae79cdc835f8ffaa7d431bcc70c7cb1` |
+| Candidate Terran ROM | `a07978856d278f636a881de0244cf12548472fff36d0f8b0ae11b4b2140c8345` |
+| Paired timing evidence | `b9c6cf96c020b0b5847312da18d1b0aed8fddc18e28870f7147e81fa4a007bab` |
+| Victory and result readback SRAM | `af0fa049ba02103ef3944a3f8f324b45c9eb0abc5b8db23318d70969713a87bc` |
+
+### Four additional current Terran campaigns
+
+The same control and candidate start from HOME, save from the pause
+menu, load through a fresh title, win and restore the frozen result in
+a third process. All observed controls, briefing and dialogue, gameplay
+checkpoints and victory selection match. Each pause, victory and
+frozen-result readback is a byte-identical 32 KiB journal across the two
+cartridges.
+
+| Mission | Observed ticks | Pause frame | Victory frame |
+| --- | ---: | ---: | ---: |
+| T1 | 12 | 6,214 | 10,120 |
+| T4 | 10 | 4,968 | 8,911 |
+| T7 | 12 | 2,289 | 3,931 |
+| T10 | 6 | 2,276 | 3,361 |
+
+The aggregate qualification receipt SHA-256 is
+`bd3c3c12012592c3bcf234c2a32e4dda349bfa69f40baebfb16f2d63b17bf740`.
+
+### Normal late Terran activation
+
+The normal late Terran recipe enables the fixed Building reader and
+reproduces the tested opt-in ROM SHA-256 above without that command-line
+flag. The legacy reader remains available for comparisons. The normal
+link receipt SHA-256 is
+`bef941c724569843e6673777c397bc9bc3d5ae6234e9594fb143225392908d86`.
+
+The remaining normal controller pairs cover T2, T3, T5, T8 and T9, plus a
+full T6 run starting from HOME. Each retains its mission and dialogue
+checkpoints, restores its pause journal through a fresh process, reaches
+victory and re-exports the frozen result through a third process. All
+three 32 KiB journals per mission match byte for byte. The six-route
+receipt SHA-256 is
+`027b784c0d19c5e7f8f6b6683be74b5e64f49786629a296ba64b78b98acc462c`.
+
+| Mission | Pause frame | Victory frame | Matching checkpoints |
+| --- | ---: | ---: | ---: |
+| T2 | 18,204 | 29,366 | 31 |
+| T3 | 26,993 | 54,000 | 56 |
+| T5 | 72,076 | 126,331 | 148 |
+| T6 | 19,466 | 23,536 | 42 |
+| T8 | 2,568 | 139,216 | 268 |
+| T9 | 35,363 | 47,266 | 51 |
+
+Together the paired normal ARM runs cover all ten Terran missions. The
+timed T6 suffix isolates the reader's effect on save and load. It does
+not measure sustained gameplay throughput on hardware.
