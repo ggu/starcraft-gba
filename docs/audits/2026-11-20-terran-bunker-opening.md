@@ -148,6 +148,42 @@ SRAM byte for byte. The combined source is `0cfbc84d`. The comparison
 manifest SHA-256 is
 `3ebd3fc0aef8ab7dbd703ff1ecac892b8cd24ae8f22aa0204b2a2acd3d173654`.
 
+## Factory timing
+
+The first Factory (raw 113) is under construction when it first appears
+in each census. The lower bound is the last sample without it, and the
+upper bound is the first sample showing it. The GBA column applies the
+same 5/4 clock conversion, rounded down at each boundary.
+
+| Blood Bath census | Native Factory placement | GBA clock window | Qualified GBA placement |
+| --- | ---: | ---: | ---: |
+| Unmodified solo Terran, run 4, owner 2 | (8,688, 8,834] | (10,860, 11,042] | 9,589, HOST |
+| Unmodified mixed, run 1, owner 0 | (12,550, 12,807] | (15,687, 16,008] | 11,125, normal ARM |
+| Defeat-suppressed mixed, run 2, owner 2 | (9,865, 10,037] | (12,331, 12,546] | |
+
+All three first-placement samples have 20 completed SCVs and one in
+production, two completed Barracks, five completed Supply Depots, a
+completed Refinery, an Academy, and a Bunker. Each Bunker and Academy
+is complete. No Machine Shop, Starport, Vulture, or Tank appears in
+those samples. The first offensive meets the census wave criterion
+one sample earlier in runs 4 and 2 and in the same sample in run 1.
+These cuts establish order and timing brackets. The production policy
+and its relation to the first offensive remain unverified.
+
+The mixed keepalive owner starts at `(128, 240)`, as in the clean solo
+run. The clean mixed owner starts at `(1760, 1808)`. Run 2's Factory
+placement precedes the sampled loss of the human's final building at
+10,984. Its timing is additional evidence from a modified run. Use
+the two unmodified windows for the first GBA comparison.
+
+The current GBA Factory starts 1,271 updates before the clean solo
+window's lower bound and 4,562 before the clean mixed bound. Compare
+delaying the first Factory in the matching Bunker openings while
+retaining normal paid placement, garrison, and first-wave behavior.
+Keep ordinary tech development available when pressure or losses
+interrupt the opening. The [project TODO](../PROJECT-TODO.md#current-integration-priorities)
+lists the Factory replay cases.
+
 ## Regression cases
 
 With prepared inputs, run

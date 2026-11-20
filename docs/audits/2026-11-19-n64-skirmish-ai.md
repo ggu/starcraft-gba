@@ -28,7 +28,7 @@ Five matches were recorded:
 | 2 | Zerg, Terran and Protoss computers | 1,069 to 38,267 | Stopped. Defeat was disabled, see below |
 | 3 | Zerg computer only | 92 to 14,854 | Human defeated |
 | 4 | Terran computer only | 531 to 10,025 | Human defeated |
-| 5 | Protoss computer only | 471 to 9,317 | Human defeated |
+| 5 | Protoss computer only | 471 to 9,499 | Human's last building gone at 9,317 |
 
 Run 2 used one private memory edit so the match would outlast the passive
 human: the shared defeat condition (`Command at most 0 buildings`) was
@@ -54,14 +54,56 @@ Game frames, with the worker count at that moment in parentheses.
 | First production building | Barracks at 1,391 to 1,394 (7 SCVs), before the first Supply Depot at 1,908 to 2,065 (8) | Spawning Pool at 3,236 to 3,372 (11 Drones), after a second Hatchery at 2,737 to 2,935 (11) | Gateway at 2,301 to 2,486 (10 Probes) and a second at 3,049 to 3,076 (12); or, in run 2, a second Nexus at 2,513 (7) and a Forge at 4,683 (11) |
 | Gas | Refinery at 2,935 to 3,076 (10 to 11) | Extractor at 3,616 to 3,816 (11 to 12) | Assimilator at 6,197 to 6,407 (17), or 9,602 (24) with the Cannon opening |
 | Next steps | Second Barracks 3,564 to 3,818; Academy 4,848 to 5,124; Factory 8,834 to 12,807 | Hydralisk Den 6,499 to 6,634; Lair 7,705 to 7,861 | Third Gateway 5,762 to 5,764; Cybernetics Core 9,317 to 12,550 |
-| Static defense before the first wave | Bunker at 7,151 to 8,271 (run 2: 793 native pixels in front of the base) | Two Creep Colonies at 3,725 to 4,263, four Sunken Colonies by 6,001 to 6,417, in all three runs | Shield Battery at 4,047 to 4,229; or 11 Photon Cannons by 8,845 |
+| Static defense before the first wave | Bunker at 7,151 to 8,271 (run 2: 793 native pixels in front of the base) | Two Creep Colonies at 3,725 to 4,263, four Sunken Colonies by 6,001 to 6,417, in all three runs | Shield Battery at 4,047 to 4,229 in the unmodified runs. The defeat-suppressed run has 10 placed Cannons at 8,845, of which eight are complete. |
 | Workers at game frame 8,000 | 17 to 20 | 16 | 18 to 22 |
 | Town halls | One until a second Command Center at 18,748 (run 2) | Two through 38,000 in run 2 (the second 326 pixels from the first); a third at 13,998 in run 3 | Second Nexus at 2,513 and a third at 13,075 on the dead human's start (run 2); one through the end of runs 1 and 5 |
 | After losses (run 2) | A destroyed Comsat Station was started again 289 frames later | | Destroyed Photon Cannons were started again 1,002 and 1,465 frames later |
 
-The Protoss opening differs between run 2 and runs 1 and 5, so the game
-chooses among builds. The Zerg opening was the same within 200 frames in
-all three runs, and the two Gateway openings within 190.
+The Zerg openings remain within 200 frames across the three captures. The
+two unmodified Protoss Gateway openings remain within 190 frames. Run 2
+shows a distinct sequence. The selector for that sequence remains unknown.
+
+### Protoss Cannon opening
+
+In defeat-suppressed run 2, Protoss owner 3 starts at `(1760, 240)`. Its
+second Nexus precedes its first Pylon. A Forge and several Cannons precede
+its first Gateway and gas. Each interval gives the last sample without
+the event and the first sample with it.
+
+| Event | Native game frames | First-sample state |
+| --- | ---: | --- |
+| Second Nexus placed | (2,316, 2,513] | Seven completed Probes |
+| First Pylon placed | (2,513, 2,723] | Second Nexus still building |
+| Forge placed | (4,484, 4,683] | Two completed Nexus structures and two completed Pylons, 11 completed Probes and two in production |
+| First Cannon placed | (4,914, 5,331] | At `(1408, 192)` with completed Forge, 13 completed Probes and two in production |
+| First Cannon completed | (5,961, 6,185] | Four Cannons placed |
+| Four Cannons completed | (6,817, 7,060] | Five Cannons placed |
+| First Gateway placed | (8,190, 8,302] | 22 completed Probes, nine Cannons placed and six complete |
+| First Assimilator placed | (9,339, 9,602] | 11 Cannons placed and ten complete |
+| 11 Cannons completed | (10,169, 10,308] | 12 Cannons placed |
+
+All four owners still have a live building at each sampled point through
+10,764. The human's final building disappears in `(10,764, 10,984]`.
+The first Core at 11,285 and first Battery at 11,416 come from the
+continued match after the human's final building disappears. The earlier
+Cannon and economy sequence also comes from the patched run. Whether the
+unmodified game would reach the same opening remains unverified.
+
+The unmodified solo run 5 uses the same Protoss start and instead opens
+with Gateways and a Battery. It has no Forge or Cannon through 9,499.
+In the unmodified mixed run 1, the first Cannon appears in
+`(13,062, 13,309]`, after the Gateway/Battery opening and after the
+first Forge and Core foundations. This is a late Cannon in that run.
+Use a fresh unmodified Blood Bath capture to verify the distinct
+expansion opening and its selection before enabling a GBA strategy
+that reproduces it.
+
+The retained census SHA-256 values are
+`860333e92dd842386f19af44acc57d1083979d15666c835144e52807ee519576`
+for run 2, `9ab2e19766f935ad5c30c2c78cb51eda3967c0b6a2724f025ac63e092f5b4ca6`
+for run 1, and `81247f8f94c472f2d70754a32b7d2634354420171bddf025b2146c11afc58c4c`
+for run 5. The [Terran Bunker audit](2026-11-20-terran-bunker-opening.md#factory-timing)
+records the same runs' Factory timing where a Terran computer is present.
 
 ### First offensive
 
