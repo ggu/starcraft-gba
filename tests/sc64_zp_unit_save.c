@@ -55,6 +55,34 @@ static uint32_t next_random(void)
     rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng;
 }
 
+static void compare_all_field_boundaries(void)
+{
+    Sc64ZpPackedUnitSave row;
+    const unsigned bits = sizeof(row) * 8u;
+    for (unsigned sample = 0; sample < 16; ++sample) {
+        for (unsigned i = 0; i < sizeof(row); ++i)
+            row.bytes[i] = (u8)next_random();
+        for (unsigned start = 0; start <= bits + 1; ++start) {
+            for (unsigned width = 0; width <= 33; ++width) {
+                unsigned pos = start;
+                u32 value = 0x12345678u;
+                if (!width || width > 32 || start + width > bits) {
+                    assert(!sc64_zp_unit_get(&row, &pos, width, &value));
+                    assert(pos == start && value == 0x12345678u);
+                    continue;
+                }
+                u32 expected = 0;
+                for (unsigned i = 0; i < width; ++i) {
+                    unsigned bit = start + i;
+                    expected |= (u32)((row.bytes[bit >> 3] >> (bit & 7u)) & 1u) << i;
+                }
+                assert(sc64_zp_unit_get(&row, &pos, width, &value));
+                assert(pos == start + width && value == expected);
+            }
+        }
+    }
+}
+
 static void randomized_differential(void)
 {
     for (unsigned i = 0; i < 20000; ++i) {
@@ -131,6 +159,7 @@ static void zero_slots_and_world_bounds(void)
 int main(void)
 {
     same_fields_roundtrip();
+    compare_all_field_boundaries();
     randomized_differential();
     rejects_invalid_paths_and_decode_atomically();
     zero_slots_and_world_bounds();
