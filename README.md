@@ -104,3 +104,5 @@ Preserve existing file-level copyright and license notices. Third-party material
 ## Validation
 
 The [validation record](docs/VALIDATION.md) lists available automated checks and hardware-testing status. Physical GBA testing is not claimed unless a result is recorded there.
+
+The [four-cartridge route check](docs/audits/2026-11-13-route-linear-word-pack.md#four-profile-default-qualification) includes ordinary mixed three-AI Blood Bath pause saves and fresh loads on Terran, Z10, P10, and Showcase.
