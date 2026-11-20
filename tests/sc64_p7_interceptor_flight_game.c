@@ -210,6 +210,106 @@ static void test_shield_retreat_and_hangar_rows(void)
     assert(race_p7_carrier_training_live_world_valid());
 }
 
+#ifdef SC64_WORLD_DEPTH
+static void capture_interceptor_overlap(u8 *pixels, Unit carrier, Unit child)
+{
+    memset(u, 0, sizeof(u));
+    u[0] = carrier; u[1] = child;
+    camx = carrier.x - 96;
+    camy = carrier.y - 38;
+    gfx_begin(C_BLACK);
+    gfx_set_clip_y(12, 120);
+    sc64_draw_depth_ordered_actors();
+    for (int y = 0; y < 160; ++y)
+        for (int x = 0; x < 240; ++x)
+            pixels[y * 240 + x] = gfx_test_pixel(x, y);
+    gfx_end();
+}
+
+static void check_interceptor_overlap(int carrier_slot, int child_slot, int child_front)
+{
+    static Unit before[MAX_UNITS];
+    static u8 pixels[5][240 * 160];
+    Unit carrier = u[carrier_slot], child = u[child_slot];
+    Unit no_actor = carrier;
+    no_actor.alive = 0;
+    int old_camx = camx, old_camy = camy;
+    memcpy(before, u, sizeof(u));
+    /* Keep the same art and camera while isolating each sprite. */
+    child.x = carrier.x; child.y = carrier.y;
+    capture_interceptor_overlap(pixels[0], no_actor, no_actor);
+    capture_interceptor_overlap(pixels[1], carrier, no_actor);
+    capture_interceptor_overlap(pixels[2], no_actor, child);
+    capture_interceptor_overlap(pixels[3], carrier, child);
+    capture_interceptor_overlap(pixels[4], child, carrier);
+    unsigned overlap = 0;
+    for (unsigned i = 0; i < sizeof(pixels[0]); ++i) {
+        if (i / 240 < 12 || i / 240 >= 120)
+            assert(pixels[3][i] == C_BLACK && pixels[4][i] == C_BLACK);
+        if (pixels[1][i] == pixels[0][i] || pixels[2][i] == pixels[0][i] ||
+            pixels[1][i] == pixels[2][i]) continue;
+        ++overlap;
+        assert(pixels[3][i] == pixels[child_front ? 2 : 1][i]);
+        assert(pixels[4][i] == pixels[child_front ? 2 : 1][i]);
+    }
+    assert(overlap);
+    memcpy(u, before, sizeof(u));
+    camx = old_camx; camy = old_camy;
+    printf("Interceptor depth %u: %u overlap pixels match\n",
+           race_p7_interceptor_flight_layer(&child), overlap);
+}
+#endif
+
+static void test_interceptor_depth(void)
+{
+    for (int ascended = 0; ascended <= 1; ++ascended) {
+        int target, carrier = arena(&target, 100);
+        assert(race_p7_flight_release(carrier, target));
+        int child = find_state(carrier, SC64_P7_INTERCEPTOR_OUTSIDE);
+        assert(child >= 0);
+        assert(race_p7_interceptor_flight_layer(&u[child]) == 15);
+#ifdef SC64_WORLD_DEPTH
+        assert(sc64_world_actor_layer(sc64_unit_art_raw(&u[carrier]), 4) == 16);
+        check_interceptor_overlap(carrier, child, 0);
+#endif
+        race_p7_flight_child_tick(child);
+        assert(race_p7_interceptor_flight_layer(&u[child]) == 15);
+        if (ascended) {
+            for (unsigned t = 0; t < 15; ++t) race_p7_flight_child_tick(child);
+            assert(race_p7_interceptor_flight_layer(&u[child]) == 17);
+#ifdef SC64_WORLD_DEPTH
+            check_interceptor_overlap(carrier, child, 1);
+#endif
+        }
+        race_p7_flight_place(&u[child], u[carrier].x + 50, u[carrier].y);
+        u[child].shield = 9;
+        race_p7_flight_child_tick(child);
+        assert(u[child].order == ORDER_MOVE);
+        int saved_order_state = u[child].path_retry;
+        unsigned return_layer = ascended ? 17 : 15;
+        assert(race_p7_interceptor_flight_layer(&u[child]) == return_layer);
+        assert(race_save_game());
+        u[child].path_retry = 1;
+        assert(race_load_game());
+        assert(u[child].path_retry == saved_order_state);
+        race_p7_flight_child_tick(child);
+        assert(race_p7_interceptor_flight_layer(&u[child]) == return_layer);
+#ifdef SC64_WORLD_DEPTH
+        check_interceptor_overlap(carrier, child, ascended);
+#endif
+        race_p7_flight_place(&u[child], u[carrier].x + 14, u[carrier].y);
+        race_p7_flight_child_tick(child);
+        assert(race_p7_interceptor_flight_layer(&u[child]) == 14);
+#ifdef SC64_WORLD_DEPTH
+        check_interceptor_overlap(carrier, child, 0);
+#endif
+        race_p7_flight_place(&u[child], u[carrier].x + 4, u[carrier].y);
+        race_p7_flight_child_tick(child);
+        assert(sc64_p7_carrier_child_state(&u[child]) == SC64_P7_INTERCEPTOR_INSIDE);
+        assert(!target_alive(child));
+    }
+}
+
 static void test_parent_death_detaches(void)
 {
     int target, carrier = arena(&target, 100);
@@ -286,6 +386,9 @@ static void test_save_rejection(void)
     bad = good;
     bad.version = 0x53435030u + 30u;
     reject_without_live_mutation(&bad, 0x53435030u + 30u);
+    /* Remove the synthetic foreign-tag record before restoring the fixture.
+     * The normal first-write guard protects valid records of other profiles. */
+    save_test_corrupt_latest(sizeof(bad), bad.version);
     write_candidate_record(&good); assert(race_load_game());
 }
 
@@ -358,10 +461,11 @@ int main(void)
     assert(SC64_RACE_SAVE_GENERATION == 43u && sizeof(RaceSave) == 16292u + SC64_BC_SAVE_EXTRA_BYTES);
     test_launch_attack_and_return();
     test_shield_retreat_and_hangar_rows();
+    test_interceptor_depth();
     test_parent_death_detaches();
     test_save_rejection();
     test_game_updates();
     test_profile_matrix();
-    puts("PASS Interceptor launch cadence, flight, projectile attacks, shield retreat, return/dock, Carrier death, save continuity, 11 rejections, game updates and 18 skirmish setups");
+    puts("PASS Interceptor launch cadence, flight, projectile attacks, shield retreat, return/dock, live depth and save continuity, Carrier death, 11 rejections, game updates and 18 skirmish setups");
     return 0;
 }

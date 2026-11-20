@@ -2493,6 +2493,7 @@ static int race_p7_carrier_training_queue_owner(int carrier);
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
 static int race_p7_interceptor_flight_carrier_order(int carrier);
+static unsigned race_p7_interceptor_flight_layer(const Unit *q);
 #endif
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED

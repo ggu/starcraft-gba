@@ -124,7 +124,15 @@ sc64_draw_depth_ordered_actors(void)
         if (!sc64_unit_anchor_in_view(q, x, y)) continue;
         int raw = sc64_unit_art_raw(q);
         unsigned fallback = sc64_race_unit_flying(q->type) ? 16u : 4u;
-        sc64_depth_push(heap, &size, sc64_world_actor_layer(raw, fallback), q->y, DEPTH_UNIT, i);
+        unsigned layer;
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        if (q->type == U_P7_INTERCEPTOR) {
+            if (SC64_CARRIER_STATE_HIDDEN(q)) continue;
+            layer = race_p7_interceptor_flight_layer(q);
+        } else
+#endif
+            layer = sc64_world_actor_layer(raw, fallback);
+        sc64_depth_push(heap, &size, layer, q->y, DEPTH_UNIT, i);
     }
     while (size) {
         u32 key = sc64_depth_pop(heap, &size);

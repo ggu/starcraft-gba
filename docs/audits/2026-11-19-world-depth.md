@@ -20,7 +20,8 @@ In native gameplay footage the
 Overlords cover the Hatchery rim, and a Probe covers the southeast Nexus lip.
 
 The GBA Mode 4 painter uses those elevation and Y rules for units, buildings
-and resources. Composite turrets remain with their hull. GBA actor kind and
+and resources. The static lookup matches all 228 entries in the pinned N64
+unit table. Composite turrets remain with their hull. GBA actor kind and
 slot resolve exact ties as a deterministic approximation of the native
 sprite-ID tie. Native depth changes for special states still need individual
 checks. The change covers world actors in the shared campaign, skirmish and
@@ -101,9 +102,10 @@ timing remain open for the flight overlap.
 | 1 | `building-liftoff-depth` | Move a Science Facility from grounded to airborne and back. Use a Tank whose Y is just south of the Facility. The Tank covers it on the ground and the Facility covers the Tank in flight. Repeat with a Wraith covering the airborne Facility. | Terran HOST checks cover 396 pixels for each Tank overlap and 223 for the Wraith. HOST flight transitions cover both the Science Facility and late Terran Command Center. Ordinary-input ARM lift and land replay pending. |
 | 1 | `airborne-save-depth` | Save after issuing Land but before arrival. In a fresh session, sample the same overlap at load, during flight and after touchdown. Require layer 12 until the live flight flag clears and the same winning pixels as uninterrupted play. | Pending. Use a late Terran Command Center and a shared Science Facility in Custom Game. Include Showcase if the scene supports lift and save. |
 | 1 | `air-tiers-ignore-y` | Preserve the Wraith/Overlord pixel result as the actors cross both viewport boundaries. Flip both framebuffer pages and require no actor pixels on HUD rows 0–11 and 120–159. | HOST isolated overlap passes. Ordinary-input page-flip replay pending. |
-| 2 | `interceptor-flight-depth` | Capture launch, attack, approach and dock beside a Carrier. The native Carrier body is 16. Its visible Interceptor starts at 15, rises to 17 after the attack ascent, stays at the previous layer during far return, and drops to 14 on final approach. Docked children are hidden. Save and reload both early and late far-return cases. | Native layer writes found at `0x801282e4`, `0x801287ec`, and `0x80128990`. GBA still uses the raw Interceptor layer and needs to retain pre- or post-ascent state on far return. |
+| 1 | `interceptor-flight-depth` | Compare launch (15), attack (17), early and late far return (15 or 17), and final approach (14) against a Carrier at 16. Cover both actor slot orders and confirm docked children are hidden. | The Protoss framebuffer and save fixture covers the GBA runtime. Ordinary-input N64 and ARM overlap captures remain open. |
 | 2 | `effect-crosses-actor-depth` | Capture the same ground projectile crossing opaque pixels of ground and air actors, with animation tick and sight fixed. Verify projectile and impact layers independently before changing a pass. Include a landing shadow and a low remnant. | Pending native frame pairs. Free-standing GBA weapon effects still draw after the actor pass. |
 | 2 | `opaque-pick-depth` | Reuse the overlap mask for selection. A over opaque foreground pixels selects the visible eligible actor, and A on transparent pixels follows the ordinary fallback. Include exact ground Y ties, equal air layers and a lifted building. | Challenger Overlord/Hatchery reference and opt-in GBA results in draft [#587](https://github.com/ggu/starcraft-gba/pull/587). Native sprite-ID ties and broader poses need separate witnesses. |
+| 2 | `same-anchor-sprite-id` | Capture same-layer, same-Y SCVs with distinguishable opaque pixels. The native sprite ID breaks the tie when both turret bits are clear. | Blood Bath observer step 4230 has stacked layer-4 SCVs at (1940, 293) with sprite IDs 0x858 and 0x857. The native key puts 0x858 in front. Pixel ownership remains open. |
 
 For replay receipts record the product, source commit, controller tape hash,
 world anchors, effective layers, active page, clip rows, overlap count and
@@ -111,6 +113,62 @@ wrong-pixel count. For native dynamic actors also record the actor and
 sprite addresses and their captured layer. Keep native screenshots and
 memory dumps local. Compare the isolated GBA masks within each version's
 palette. The N64 and GBA use different pixel scales and palettes.
+
+### Interceptor flight overlap
+
+The owned USA ROM uses three writes to sprite offset `0x0d`. At release
+`0x801282e4` (ROM `0xebfd4`) writes parent elevation minus one. At attack
+ascent `0x801287ec` (ROM `0xec4dc`) adds two to the child elevation. At
+final approach `0x80128990` (ROM `0xec680`) writes parent elevation
+minus two. The live depth helper uses that byte. Carrier and Gantrithor
+both use elevation 16 in the native table. The far return has no elevation
+write. That leaves two valid far-return depths according to when the
+return started.
+
+The shared painter now reads those live flight phases in any Mode 4
+build with Interceptor flight enabled. The existing saved child order
+state stores the ascent history for far return. New saves keep the two
+histories through reload. Older saves already in far return lack that
+history and use 15 until approach. An older build cannot read a new
+Interceptor row saved during post-ascent far return. The record size and
+other order states stay the same.
+
+Run `make build/test-sc64-protoss-canonical-p7-save` with prepared
+inputs and then execute that binary. The fixture drives launch, both
+far-return histories, reload, approach and dock through the actual child
+order and save routines. Its indexed-frame samples isolate both actors at
+the same screen anchor, reverse their slots, and compare opaque overlap
+pixels from the world painter. Both history cases produce 87 or 92
+distinguishable pixels per capture. The HUD bands remain clear.
+
+Against release `13184991`, all four normal ARM builds pass ROM header
+and SRAM signature checks with the same IWRAM and EWRAM endpoints.
+Terran, Z10 and Showcase are byte-identical. The P10 ROM SHA-256 is
+`8a19f47f8030fc80511c16fdef7887e52e90ba4ab661308c00dace82916c8ca5`.
+Ordinary-input smoke replays match both indexed pages, palette and
+sampled world at 60 and 120 calls on all four products. The host fixture
+exercises Interceptor overlap.
+
+The Terran, Z10 and Showcase Carrier previews also link with valid
+headers and within their RAM guards. The ordinary controller chord and
+scene menu reach the Showcase preview's Carrier battle. Over 450 updates,
+the first observed docked, launch, early far return, attack, approach and
+late far return states occur at frames 2, 60, 75, 80, 87 and 90.
+The observer records both indexed pages and the palette at each first
+observation. The receipt SHA-256 is
+`d60671fd05299b37f13cb06fd21a3b0866428ba9a2a935291a37caa01022a527`. These are state and frame captures. The isolated-host mask
+provides the pixel-ownership check.
+
+For the ordinary-input harness, record these cuts in Protoss campaign
+and custom games, then repeat in the Terran, Zerg and Showcase Carrier
+previews. Capture the first release, the first ascent, a far-return cut
+for each history, the first approach cut, and dock. Compare the visible
+indexed page and the isolated actor mask at a fixed camera. At each
+far-return cut save via the pause menu, load via HOME in a fresh process,
+and replay the tail through docking. The full Carrier service is enabled
+in regular Protoss and the Terran, Zerg and Showcase previews. The N64
+test should sample the child's sprite elevation and owner, both anchors,
+and the finished framebuffer for each cut.
 
 ### Cache and clip regressions
 
