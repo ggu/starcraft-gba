@@ -177,6 +177,14 @@ build/test-sc64-route-point-prefix: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route
 	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) $< -o $@
 build/test-sc64-route-point-prefix-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
 	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
+build/test-sc64-route-compressed-point: tests/sc64_route_compressed_point.c starcraft/sc64_route_compressed_point.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-route-compressed-point-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_route_compressed_point.h starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_COMPRESSED_RANGE_PROBE $< -o $@
+.PHONY: test-sc64-route-compressed-point
+test-sc64-route-compressed-point: build/test-sc64-route-compressed-point build/test-sc64-route-compressed-point-range
+	./$<
+	./build/test-sc64-route-compressed-point-range
 .PHONY: test-sc64-route-point-prefix
 test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64-route-point-prefix-range build/test-sc64-route-point-tail-baseline
 	./$< --point-prefix-only

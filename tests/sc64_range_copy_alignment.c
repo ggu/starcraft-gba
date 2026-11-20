@@ -32,7 +32,7 @@ enum { MAP_CELLS = 128 * 128 };
 #define SC64_GRID_GET(grid, cell) ((grid)[cell] != 0)
 #define SC64_GRID_SET(grid, cell, value) ((grid)[cell] = (u8)((value) != 0))
 #endif
-static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
+_Alignas(u32) static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 static u16 bfs_queue[MAP_CELLS];
 static int path_grid_valid;
 static int frame;
@@ -193,9 +193,26 @@ static void test_point_prefix_with_range_planes(void)
     int slot = sc64_route_slot_for(goal, goal + 1);
     assert(slot >= 0 && sc64_point_prefix_find(slot));
     u32 builds = sc64_route_builds, hits = sc64_route_hits, clock = sc64_route_clock;
+#ifdef SC64_ROUTE_COMPRESSED_RANGE_PROBE
+    Sc64PointPrefix parked = *sc64_point_prefix_find(slot);
+    static u8 field[6144], tail[6144];
+    memcpy(field, sc64_route_field[slot], sizeof(field));
+    memcpy(tail, (u8 *)bfs_queue + sizeof(bfs_queue) - sizeof(tail), sizeof(tail));
+#endif
     assert(sc64_range_cached_point_step(1608, 1608, 520, 520, &nx, &ny));
-    assert(nx == 1608 && ny == 1592 && !sc64_point_prefix_find(slot));
+    assert(nx == 1608 && ny == 1592);
     assert(sc64_route_builds == builds && sc64_route_hits == hits && sc64_route_clock == clock);
+#ifdef SC64_ROUTE_COMPRESSED_RANGE_PROBE
+    assert(sc64_point_prefix_find(slot));
+    assert(!memcmp(&parked, sc64_point_prefix_find(slot), sizeof(parked)));
+    assert(!memcmp(field, sc64_route_field[slot], sizeof(field)));
+    assert(!memcmp(tail, (u8 *)bfs_queue + sizeof(bfs_queue) - sizeof(tail), sizeof(tail)));
+    SC64_ROUTE_EXACT(slot);
+    assert(sc64_route_fill(0, goal));
+    assert(!memcmp(sc64_route_field[0], sc64_route_field[slot], sizeof(field)));
+    puts("PASS compressed cached point leaves field, frontier and scratch tail intact");
+#endif
+    assert(!sc64_point_prefix_find(slot));
 
     int first_plane = sc64_range_route_reduced_slots();
     int second = goal + 20;

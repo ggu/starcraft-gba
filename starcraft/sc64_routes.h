@@ -110,6 +110,11 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "second exact-hit cutoff requires resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_COMPRESSED_RANGE_PROBE) && \
+    (!defined(SC64_ROUTE_POINT_PREFIX_PROBE) || !defined(SC64_RANGE_WORK) || \
+     SC64_ROUTE_GRID_CELLS_PER_BYTE != 8 || __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__)
+#error "compressed range reads require little-endian packed point prefixes"
+#endif
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
@@ -2698,7 +2703,13 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 #endif
 
 #if defined(SC64_RANGE_WORK) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
-/* Only read an existing point field. Never initiate or resume a flood. */
+#ifdef SC64_ROUTE_COMPRESSED_RANGE_PROBE
+#include "sc64_route_compressed_point.h"
+/* Keep the packed 128x128 field tail and saved walkability clear. */
+_Static_assert(sizeof(bfs_queue) >= 6144 + 2 * SC64_COMPRESSED_LIMIT * sizeof(u16),
+               "compressed point query must fit the BFS scratch head");
+#endif
+/* Read an existing point field. A parked prefix may require completion. */
 static int __attribute__((noinline))
 sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
 {
@@ -2722,6 +2733,15 @@ sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
         slot = i; break;
     }
     if (slot < 0) return 0;
+#ifdef SC64_ROUTE_COMPRESSED_RANGE_PROBE
+    if (MAP_COLS == SC64_COMPRESSED_SIDE && MAP_ROWS == SC64_COMPRESSED_SIDE &&
+        sc64_point_prefix_find(slot) && !SC64_ROUTE_LAZY(slot) &&
+        sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE) {
+        direction = sc64_compressed_point_direction(path_walkable, (unsigned)cell,
+                                                     (unsigned)goal, bfs_queue);
+        if (direction >= 0) goto resolve_direction;
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
     sc64_point_prefix_require(slot, cell);
 #endif
@@ -2731,6 +2751,9 @@ sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
         sc64_route_exact(slot);
 #endif
     direction = sc64_route_get(slot, cell);
+#ifdef SC64_ROUTE_COMPRESSED_RANGE_PROBE
+resolve_direction:
+#endif
     if (direction == SC64_ROUTE_UNREACHABLE && !SC64_GRID_GET(path_walkable, cell)) {
         if (!sc64_route_blocked_start(slot, col, row, goal, &col, &row)) return 0;
     } else if (direction == SC64_ROUTE_UNREACHABLE) return 0;

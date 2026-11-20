@@ -1751,6 +1751,9 @@ _Alignas(u32) static u8 visible[SC64_GRID_STORAGE_BYTES];
 #else
 static u8 visible[SC64_GRID_STORAGE_BYTES];
 #endif
+#ifdef SC64_ROUTE_COMPRESSED_RANGE_PROBE
+_Alignas(u32)
+#endif
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #ifdef SC64_Z8_RUNTIME
