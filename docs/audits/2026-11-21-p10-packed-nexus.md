@@ -43,13 +43,24 @@ physical cycles even though both draw the Nexus faster.
 | 180 | 90,162 | 36,932 |
 | 240 | 89,954 | 36,933 |
 
-The three cuts use hardware breakpoints immediately around the draw
+The three cuts use debugger breakpoints immediately around the draw
 calls. The control observer checks the Nexus pixel pointer and live
 return addresses on the guest stack. The candidate observer checks
 the dedicated branch loading the Nexus word frame.
 
+## Default build
+
+The default recipe on `bf846b88` produces a ROM byte-for-byte equal to
+the measured candidate. The ROM SHA-256 is
+`4c834e2ae4880f640b53a2570e8befa968ad697ea724b3f8664c87d0194487ee`.
+Both ARM links verify the same 40 inputs, cartridge header and ELF
+payload. The flag-off recipe selects the exact Hatchery-and-Overmind
+header from the control. All eight switch combinations resolve to their
+corresponding bank paths.
+
 | Retained private receipt | SHA-256 |
 | --- | --- |
 | Candidate link | `dd8b399488f9c351d00b71e4140da7a8bb09de74837e81da1e9351d89dcf4153` |
+| Default link | `15bcf5ce84138db66ba368b2299e3f2fc054fb95c872633c2ae1d3442dbf12cb` |
 | Ordinary Blood Bath comparison | `251d282b228a2b657b981b6385788a261825e0f39805dae78809e4b9138c82a3` |
 | Nexus call attribution | `ade9423e0d903323ed305ba7c170295cb4cee7b06b9e84c532e5a07f4093e55d` |
