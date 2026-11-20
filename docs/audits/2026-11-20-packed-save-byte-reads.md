@@ -168,9 +168,8 @@ A full ordinary T6 run from HOME also matches all 42 checkpoints,
 including nine after a fresh HOME load. The pause, victory and frozen
 readback SRAM files match the retained full replay byte-for-byte. The
 private driver uses a 48 MiB disk reserve for its bounded outputs.
-This opt-in result measures emulated guest cycles. Combined
-normal-build checks with aligned route-word packing and the other
-profiles remain open.
+This opt-in measurement predates the aligned route-word packing default
+and uses emulated guest cycles.
 
 | Input or receipt | SHA-256 |
 | --- | --- |
@@ -180,3 +179,32 @@ profiles remain open.
 | Fixed-reader ELF | `e437be5747bfd59caaab2299614e46dd2d4d71585cce09a57a4d052a10590b3c` |
 | Paired timing receipt | `0f9a44cf1157742ec9259283d84e14206c78b2166cec5185f4cd407d3ef208f3` |
 | Full T6 replay receipt | `923cf831e5839f05f08a558b2b4279a7eddb9eb60b460531f32c3ce7f94f63fc` |
+
+## Normal Terran activation with aligned route packing
+
+The released Terran control rebuilt from `603755a7` matches ROM
+`1ff78b901e13b6af59d89ab93634b0c04eea3d05694b5092893fa34082e2d1f9`.
+Adding fixed-width decoding to that recipe produces
+`4b66e7e8be4b3655aded09c1adaf56836fe4f18b4856b6684d092489ad5e2cf7`.
+The ordinary late Terran codec now selects the fixed reader by default.
+The normal production recipe, with no opt-in compiler flag, reproduces
+the tested candidate ROM byte for byte. The explicit
+`SC64_COMPACT_UNIT_LEGACY_READER` setting reproduces the control ROM.
+These settings leave the wire format and both bank validation paths
+intact.
+
+On the combined release, all 27 observed T6 suffix states match and
+the two builds export identical victory and fresh-result SRAM. The
+observed timings are the same as in the table above. The mixed
+three-opponent Blood Bath replay matches all 35 named samples,
+both pause journals, and both fresh 600-update continuations. This
+includes the active Bunker foundation and four loaded passengers.
+
+Terran keeps IWRAM `0x030048a8` and EWRAM `0x02038e5c`. The linked
+Z10, P10 and Showcase ROMs remain byte-identical to the released
+word-packed products, including when the codec flag is passed in
+their qualification recipes. The combined receipt SHA-256 is
+`9c7221662961da0ab25d9900cb6e669899771ff553ce97128bb640ead6719b2a`.
+The default and legacy Terran identity receipts are
+`d30aac01132a613fdd816a44405fab05f31d166255adb70d232538361de42542`
+and `ee1198c120bac61775ab896da684e23ff522d9f65d800404f828544a59e75c0f`.

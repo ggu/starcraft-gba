@@ -51,3 +51,26 @@ On the [November 17 regular P10 ROM](2026-11-17-protoss-early-replays.md),
 P2–P6 also win from HOME, and P1 wins after a fresh SRAM load.
 The tested P2/P3 saves diverge on that revision. Both saved routes win
 after [repeat-command persistence entered the normal P10 build](2026-11-18-saved-repeat-command.md#early-protoss-campaign-continuation).
+
+## Current Z10 and P10 cartridges
+
+The prior ordinary-input HOME routes and fresh-process reloads pass on
+the normal word-packed products. Both retain the earlier complete
+checkpoint and dialogue observations and export byte-identical 32 KiB
+pause SRAM. The fixed-width Terran reader leaves these two ROMs
+byte-identical to the word-packed release.
+
+| Mission | Pause and victory frames | Matched observations | Outcome |
+| --- | ---: | ---: | --- |
+| Z2 Egression | 3,240 → 8,164 | 9 | The Chrysalis survives aboard carrier slot 18 with objective flags 17. |
+| P5 Choosing Sides | 2,700 → 5,057 | 7 | A Shuttle returns in flight and Tassadar survives at extraction. |
+
+Z10 ROM SHA-256
+`970cd016b85715f89aca663de16ab5f56ccff2396d594132d9e42901a5f798c9`.
+Z2 receipt SHA-256
+`517ec92b6b039bafed454e560bc4dce7449635afa1c043d20d81fd4d57dc822e`.
+P10 ROM SHA-256
+`769293f4122db540e803a137f349d3988469787dad81bdbe148c7f4f1e0c6fae`.
+P5 receipt SHA-256
+`20d29a445368e1d63de49ff5a5e139676da97fd56725bceadf59539983ae6ecc`.
+The remaining Zerg and Protoss missions need this same-cartridge pass.
