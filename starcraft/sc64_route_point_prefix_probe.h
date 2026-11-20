@@ -4,6 +4,11 @@
 
 static int sc64_route_fill(int slot, int goal);
 
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+#include "sc64_route_point_certificate.h"
+enum { SC64_POINT_CERTIFIED_ONLY = 255 };
+#endif
+
 static Sc64PointPrefix *sc64_point_prefix_find(int slot)
 {
     unsigned id = sc64_point_prefix_index[slot];
@@ -92,6 +97,19 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
 #endif
     Sc64PointPrefix *prefix = sc64_point_prefix_free();
     if (!prefix) return sc64_route_fill(slot, goal);
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    if (sc64_point_certificate(slot, origin, goal, 1)) {
+        sc64_point_prefix_discard(prefix);
+        prefix->goal = (u16)goal;
+        prefix->slot = (u8)slot;
+        prefix->count = SC64_POINT_CERTIFIED_ONLY;
+        sc64_point_prefix_index[slot] = (u8)(prefix - sc64_point_prefixes + 1);
+        SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
+        SC64_ROUTE_PF(slot) = 0;
+        SC64_ROUTE_KEEP_COUNT(FILL);
+        return 0;
+    }
+#endif
     const int stride = cols + SC64_LINEAR_PAD;
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
@@ -149,6 +167,12 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 {
     Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
     if (!prefix) return 0;
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    if (prefix->count == SC64_POINT_CERTIFIED_ONLY) {
+        (void)sc64_route_fill(slot, sc64_route_goal[slot]);
+        return 1;
+    }
+#endif
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
     const int cap = sc64_route_linear_queue_cap(cols, rows);
     u8 *field = sc64_route_field[slot];
@@ -221,6 +245,19 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
     return 1;
 }
 
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+static int sc64_point_certificate_require(int slot, int cell)
+{
+    Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+    if (!prefix || prefix->count != SC64_POINT_CERTIFIED_ONLY) return 0;
+    if ((unsigned)cell >= (unsigned)(MAP_COLS * MAP_ROWS) ||
+        (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+         !sc64_point_certificate(slot, cell, prefix->goal, 0)))
+        (void)sc64_route_fill(slot, prefix->goal);
+    return 1;
+}
+#endif
+
 #ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
 static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 {
@@ -231,6 +268,9 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
  * still require the complete field, and a second miss cannot repark. */
 static void sc64_point_prefix_require_exact_hit(int slot, int origin)
 {
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    if (sc64_point_certificate_require(slot, origin)) return;
+#endif
     if (sc64_point_prefix_find(slot) &&
         ((unsigned)origin >= (unsigned)(MAP_COLS * MAP_ROWS) ||
          sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE)) {
@@ -243,6 +283,9 @@ static void sc64_point_prefix_require_exact_hit(int slot, int origin)
 
 static void sc64_point_prefix_require(int slot, int cell)
 {
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    if (sc64_point_certificate_require(slot, cell)) return;
+#endif
     if (sc64_point_prefix_find(slot) &&
         (cell < 0 || sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE))
         (void)sc64_point_prefix_complete(slot);
