@@ -21,7 +21,7 @@ physical GBA check or all routes through a mission.
 | Z5 | [HOME win](2026-11-13-z5-kodak-replay.md) | All 55 checkpoints matched, with the source pause and Kerrigan alive. |
 | Z6 | [HOME win](2026-11-13-z6-kodak-replay.md) | All 65 checkpoints matched, including four with Kerrigan aboard the Overlord. |
 | Z7 | [HOME win](2026-11-12-z7-normal-physical.md#uninterrupted-home-on-the-exact-kodak-cartridge), [fresh SRAM win](2026-11-12-z7-normal-physical.md#fresh-sram-on-the-november-13-z10-kodak-cartridge) | All 253 HOME observations and five overlapping save observations matched. Reselect the Hatchery after load. |
-| Z8 | [HOME win](2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge) | Both objective Nexuses destroyed, Kerrigan at full HP; 19 checkpoints matched. |
+| Z8 | [HOME win](2026-11-12-z8-normal-physical.md#exact-november-13-kodak-cartridge) | [November 20 normal Z10 fresh SRAM win](2026-11-12-z8-normal-physical.md#november-20-normal-z10-with-fresh-sram) from frame 16,659, with all 30 shared post-load world checkpoints matching and three outstanding battlefield pixel differences. |
 | Z9 | [HOME win](2026-11-13-z9-normal-physical.md#exact-november-13-kodak-cartridge) | The same Drone carries the crystal home; 32 checkpoints matched. |
 | Z10 | [HOME win](2026-11-13-z10-exact-home.md), [fresh SRAM win](2026-11-13-composed-performance.md) | All 61 shared world checkpoints match between the two routes. |
 | P1 | No complete exact-KODAK receipt here | [HOME win on newer staged P10](2026-11-13-p1-p2-staged-prefixes.md#fresh-controller-routes), 27 matched observations and the rescued hero alive. |

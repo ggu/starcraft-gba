@@ -72,3 +72,38 @@ hardware speed or a fresh save continuation.
 | Replay harness | `c4335751285134f2fe83864ccad228a0503c8a993a96012463f5ac3800f0c73e` |
 | Full physical receipt | `6a5ad24890bbf7ce333ff6b6450d9d0b44542fb653fab3b300b9a09c5a31b6df` |
 | Ordered checkpoints | `3b13b9c953e1af58f2bbec9e452ed078acd4825219c37697202fa2c19457e303` |
+
+## November 20 normal Z10 with fresh SRAM
+
+The regular Z10 ROM with the Sunken health rule wins both from HOME
+without a reload and after a fresh-emulator HOME load at frame 16,659.
+Both runs use 46,487 tape calls and match all 19 retained scalar
+checkpoints. The reload replaces the pause-exit START at call 17,122
+with title-screen L after the tape has written SRAM through the pause
+menu. Both runs win at frame 45,468 with zero unsupported-mission faults.
+
+All 30 shared post-load checkpoints match the result flags, wallet,
+unit array, building array and mineral fields. The 16 shared framebuffer
+cuts after reload have identical palettes and visibility masks. When
+compared by displayed and hidden page, 13 cuts match both pages.
+The displayed page differs at three cuts, with 692, 329 and 193
+different indexed pixels at calls 22,000, 32,000 and 38,000.
+The changed pixels are in the battlefield area. Their cause remains
+open.
+
+Over 45,467 advancing play updates per run, mean loop cost is
+1,025,307 guest cycles without the load and 1,025,157 with it.
+Those means represent 16.36 and 16.37 updates per emulated second.
+The first run averages 485,086 draw cycles and 279,867 orders cycles.
+This Z8 route is below 30 fps in the emulator and hardware timing
+remains open.
+
+| Pinned input or receipt | SHA-256 |
+| --- | --- |
+| Z10 ROM | `1d356f0bcb2e14491e6fa0e5ecc2414e0e09730f0b141878d813b33de02bc763` |
+| Controller tape | `b3d9f36b4f7a33b70dfbf12fc4437f7c5c42ca1c86876b5610cabf7324d5b4eb` |
+| Port-free observer | `ff2c5a8b1f6764ed399d8a1b59df6ffde135ae2cd01a6d67500684b8429d23b7` |
+| Pause SRAM | `bf99add2606817dc705ba1c03d5a15ca8f72a6133c2e8b1b73915b2606f130d4` |
+| Uninterrupted receipt | `764572ad403651e59227dc25dd28d346ac41691d47e7c6b29a8ff128c10ec63e` |
+| Fresh-load receipt | `3afbb7b70bf3a0197d13e5bf4b658c8d6c7da6d1994c60e1d8833af5f4cb6d20` |
+| World checkpoint comparison | `7806a0659f5e59f7593d0e2dc0b75d578c0fbd458ede3f42e9fe704ad833c2a8` |

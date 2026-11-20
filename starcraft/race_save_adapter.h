@@ -5206,7 +5206,15 @@ static int race_load_game(void) {
             b[i].hp = b[i].maxhp = 100000;
 #endif
 #endif
-/* Historical completed saves predate fractional burn and attacker storage.
+#if !defined(SC64_P7_TYPED_COMPACT_ENABLED) && !defined(SC64_Z7_DERIVED_SAVE)
+    /* Older rows with an explicit cap have already passed wire validation.
+     * Raise the completed Sunken's cap and preserve its saved current HP. */
+    for (int i=0; i<MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].type==B_SUNKEN_COLONY && !b[i].under_construction &&
+            b[i].maxhp==300)
+            b[i].maxhp=SC64_SUNKEN_COLONY_HP;
+#endif
+    /* Historical completed saves predate fractional burn and attacker storage.
      * Initialize their previously unused Terran shield word explicitly; zero
      * would otherwise falsely credit player zero for an environmental death. */
     if (!plan.building_damage_marker)

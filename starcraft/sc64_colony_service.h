@@ -21,9 +21,8 @@
  * that clock, matching OpenBW's incomplete-morph behavior. Call the pre hook
  * immediately before it and the post hook immediately after it. The pre
  * hook snapshots current HP in the otherwise-unused queue_progress field;
- * the post hook changes identity only after generic completion and applies
- * the Sunken native HP delta or preserves Spore HP. No shield field is used and no storage
- * is added.
+ * the post hook changes identity after generic completion and retains
+ * current HP because both target colonies share the Creep Colony's cap.
  */
 
 #if defined(SC64_Z7_COLONY_DEFENSE_ENABLED) && !defined(SC64_Z7_RUNTIME)
@@ -36,7 +35,6 @@
 #define SC64_Z7_SUNKEN_RAW 146
 #define SC64_Z7_SPORE_RAW 144
 #define SC64_Z7_CREEP_HP 400
-#define SC64_Z7_SUNKEN_HP 300
 #define SC64_Z7_SPORE_HP 400
 #define SC64_Z7_SUNKEN_MORPH_TICKS ((300 * 5 + 3) / 4)
 #define SC64_Z7_SPORE_MORPH_TICKS ((300 * 5 + 3) / 4)
@@ -163,20 +161,18 @@ static int race_colony_post_building_tick(void)
         if (!race_colony_morph_state_valid(q)) return 0;
         if (!q->under_construction) {
             int spore=(q->flags & SC64_Z7_SPORE_MORPH_FLAG)!=0;
-            int target_hp=spore ? SC64_Z7_SPORE_HP : SC64_Z7_SUNKEN_HP;
+            int target_hp=spore ? SC64_Z7_SPORE_HP : SC64_SUNKEN_COLONY_HP;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
             unsigned current;
             int hp_q8;
             if (!sc64_pr_q8_actor_hp(MAX_UNITS+i,&current)) return 0;
             hp_q8=(int)current+(target_hp-SC64_Z7_CREEP_HP)*256;
-            /* Clamp the authoritative value, not its displayed ceiling:
-             * 100.5 -> Sunken must stop at 1 HP rather than retain .5 HP. */
-            if (hp_q8<256) hp_q8=256;
+            if (hp_q8<256 && (hp_q8<=0 || spore)) hp_q8=256;
             if (hp_q8>target_hp*256) hp_q8=target_hp*256;
             if (!sc64_pr_q8_commit_hp(MAX_UNITS+i,(unsigned)hp_q8)) return 0;
 #else
             int hp = spore ? q->queue_progress :
-                q->queue_progress + SC64_Z7_SUNKEN_HP - SC64_Z7_CREEP_HP;
+                q->queue_progress + SC64_SUNKEN_COLONY_HP - SC64_Z7_CREEP_HP;
             if (hp < 1) hp = 1;
             if (hp > target_hp) hp = target_hp;
 #endif
