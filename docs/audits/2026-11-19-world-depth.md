@@ -102,6 +102,7 @@ pinned sprites and are allowed to change when the private art is regenerated.
 | `unit-over-building` | Barracks at (96,43), Tank at (96,50), both layer 4 | Tank | 380/380 |
 | `air-tiers-ignore-y` | Place a Wraith six pixels north and then south of an Overlord, layers 18 and 16 | Wraith in both slot and Y orders | Terran HOST fixture |
 | `camera-and-hud` | Scroll an overlapping pair past screen rows 12 and 119 while flipping framebuffer pages | Foreground stays stable, HUD rows stay clear of actor pixels | Future paired replay |
+| `mineral-edge-depth` | Move mineral anchors to screen positions (-10,66), (249,66), (120,3), and (120,130). Compare visible and hidden center fog at each edge, all three art styles and both pages. Pair with a Probe on either side of the patch's world Y and a Wraith. | Visible crop pixels remain in the queue at layer 4. The greater world Y wins the Probe overlap. The Wraith covers the patch, and both HUD bands match the empty scene. | 6, 32 and 44 distinguishing overlap pixels in the P10 host fixture |
 | `selected-overlap` | Select the Overlord above a Hatchery and the Tank behind a Barracks | Overlord ring over the Hatchery, Overlord body over its own ring, Barracks over the Tank ring | 15, 14 and 29 distinguishable pixels |
 
 The old renderer flipped all 192 Wraith/Tank pixels on unit slot swap and
@@ -111,6 +112,11 @@ source. The current canonical Terran framebuffer test is
 `build/test-sc64-terran-full-frame`. Add campaign and skirmish replay cases
 for picking the topmost actor and for dynamic layers such as workers against
 resources or Interceptors around Carriers.
+
+The shared Mode 4 mineral culler now admits the prepared sprite crop
+whenever it intersects the playfield. Its center still supplies the
+visibility sample and its world Y still supplies the layer-4 depth key.
+The P10 `test-sc64-geyser-art` fixture covers the edge positions above.
 
 In native Challenger melee, a selected Overlord moves across the Hatchery.
 The cursor is away from the overlap. At observer step 3920 the Overlord's
@@ -624,6 +630,23 @@ The native weapon-79 Interceptor pulse also uses moving behavior 0.
 It should use target elevation plus one at release and retain that layer
 after detach. Its GBA marker is still drawn after the world queue and
 its saved projectile row needs a compatible way to retain launch depth.
+
+The Terran, Protoss and Showcase sanitizer fixtures match the shared
+queue and the complete effects pass for flight, trail and impact. The
+opposite render order changes 172 and 122 flight pixels, 172 and 150
+trail pixels, and 179 and 78 impact pixels. All expected pixels and both
+HUD bands match. A separate fixture checks 100,000 motion-row round trips
+and rejects invalid depth values and reserved bits. Each of the three
+Yamato profiles also saves two airborne shots and continues them in a
+fresh host process. Fresh readers accept real predecessor saves and
+preserve all 11 observed gameplay states through impact.
+
+The four normal cartridge builds pass the existing memory, header and
+payload checks. Ordinary ARM Custom Game inputs cover the compact map
+and Blood Bath across one, two and three CPUs. Each product plays 360
+updates, saves through pause and reproduces the following 240 updates
+from fresh SRAM. These opening runs check shared composition and save
+integrity. The staged fixtures supply the Yamato overlap witnesses.
 
 #### Shared renderer cartridge smoke
 

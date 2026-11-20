@@ -2161,7 +2161,9 @@ AI wallets and full-match behavior remain unverified.
   poses and compose with live flight depth before enabling it by default.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
-  modes and the legacy static-clip fixture.
+  modes and the legacy static-clip fixture. Include
+  [mineral-edge-depth](audits/2026-11-19-world-depth.md#harness-cases)
+  at both HUD edges and both sides of the camera.
 - Use the [dynamic depth harness cases](audits/2026-11-19-world-depth.md#dynamic-depth-harness)
   for the next rendering qualification. Start with lift, landing and the
   mid-flight save boundary, then add
