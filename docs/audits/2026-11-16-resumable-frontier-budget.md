@@ -287,8 +287,23 @@ The paired replay is uninterrupted.
 The mean gain on this full route is 0.42%. The 33,800 movement spike
 is 9.9% shorter. The route and reserved range-plane sanitizer checks
 pass. Z10 IWRAM ends at `0x03004ec8` and EWRAM at `0x02038328`, both
-within their guards. Recheck the forced P10 cached range read and the
-other current products' memory margins before general activation.
+within their guards. Terran, P10 and Showcase also pass the current
+five-flag links. All four profiles build successfully with 72 bytes or
+more below the IWRAM ceiling. Three-AI Blood Bath smoke pairs write the
+same pause journals and match the named world 240 updates past a fresh
+HOME load. The cross-profile build and save receipts have SHA-256
+`13eb58c2fa4379f1dc2934b9f16ddbd32853c2283ac092a47d3e47fc6c9e0608` and
+`2c69b7a22387a51834fa9226d5ee1aad0e29673dd5ee00c2117237ed8d94d911`.
+
+The current forced P10 long-wall ARM fixture returns `(1608, 1624)` and
+records one logical build and zero hits with either variant. The release
+fills the whole field in 1,087,127 cycles and reads the cached step in
+1,228 cycles. The five-flag preview parks the field in 103,404 cycles,
+then spends 1,086,880 completing it on the cached read. This reproduces
+the deferred range stall on the current code. The result SHA-256 is
+`0dbd4113fd903e1e5d91ff4d23fbfa794d83272ead9c2272e068b94e55e80861`.
+The second exact-hit flag still needs a normal selector entry and the
+cached-read cost needs a solution that can apply on real terrain.
 
 The trial ROM SHA-256 is
 `3b9e27ac57008b2a852a7cffc44802c252d85115289717ce810b9f6c570f78a6`.

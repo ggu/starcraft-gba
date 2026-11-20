@@ -44,8 +44,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   attribute the two remaining orders peaks to movement route floods and
   the result stall to save validation. The [current Z8 point-prefix trial](audits/2026-11-16-resumable-frontier-budget.md#z8-check-on-the-current-mineral-routing-release)
   matches the release world and pixels while lowering the movement peak
-  by 9.9%. The forced P10 range read and remaining memory margins need
-  current checks. Qualify shared candidate row decoding separately.
+  by 9.9%. All four current ARM builds and three-AI save smokes pass.
+  The forced P10 cached read still defers a million-cycle full flood.
+  Address that path on real terrain before normal activation. Qualify
+  shared candidate row decoding separately.
   [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
   wins from a fresh load at frame 65,700 with both heroes alive.
   All 146 checkpoints match, including 71 after the load. The run
