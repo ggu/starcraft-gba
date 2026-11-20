@@ -120,7 +120,8 @@ and 0.9% in Protoss Cross Fire. The Showcase receipt SHA-256 is
 The native unsigned key uses the sprite pool ID for exact ties after
 elevation, ground anchor Y, and the turret flag. Native allocation and
 retirement can reuse a slot, and the GBA still uses actor kind and slot for
-many ties and draws Tank turrets with their hull. Preserve the T10
+many ties. [Tank turrets use a separate draw turn](2026-11-21-native-depth-followup.md).
+Preserve the T10
 same-Y Barracks/Goliath and equal-elevation Wraith key witnesses and add
 a third actor overlapping the Siege hull and turret. Those records
 establish key ordering. The native opaque foreground and an exact GBA

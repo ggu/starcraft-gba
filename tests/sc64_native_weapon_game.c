@@ -362,6 +362,9 @@ static void test_attached_attacker_depth(void)
     } cases[] = {
         { U_TANK, 5, 54, -3, 0 },
         { U_TANK, 5, 54, 3, 1 },
+#ifdef SC64_UNIT_FACING
+        { U_GOLIATH, 3, 54, 0, 0 },
+#endif
         { U_WRAITH, 8, 54, 0, 1 },
         { U_WRAITH, 8, 2, 0, 1 },
         { U_WRAITH, 8, 106, 0, 1 },
@@ -397,8 +400,17 @@ static void test_attached_attacker_depth(void)
         for (int dx = -24; dx <= 24 && !overlap; ++dx) {
             u[blocker].x = u[shooter].x + dx;
             begin_depth_frame();
-            draw_unit(&u[blocker]);
-            draw_unit(&u[shooter]);
+#ifdef SC64_UNIT_FACING
+            if (cases[n].raw == 3) {
+                assert(sc64_facing_blit(30, 0, u[shooter].x, u[shooter].y + 12));
+                draw_unit(&u[blocker]);
+                sc64_facing_draw_tank_turret((unsigned)shooter, 0);
+            } else
+#endif
+            {
+                draw_unit(&u[blocker]);
+                draw_unit(&u[shooter]);
+            }
             capture_depth_frame(shooter_without_muzzle);
             draw_tracer(0, SC64_TRACE_ATTACKER_IMAGE);
             capture_depth_frame(muzzle_in_front);
