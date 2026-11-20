@@ -74,3 +74,50 @@ Keep the flag opt-in until the four normal profiles link with their
 stack margins, the dense Z7/Z8/Z9 and skirmish replays pass, and
 late range readers confirm that deferred full fills stay bounded in
 practice. Qualify fresh candidate save and result banks separately.
+
+## Release `9ee056c2` follow-up
+
+Paired control and certificate builds for all four normal profiles
+pass the linker guards and header checks. The certificate itself
+runs from ROM. Showcase also keeps the prefix expansion in ROM and
+retains its original IWRAM end at `0x03004fb8`. The other three
+profiles use 320 additional IWRAM bytes for the prefix expansion.
+All four use 1,072 additional EWRAM bytes for the deferred fields.
+
+| Candidate profile | IWRAM bytes below guard | EWRAM bytes below guard |
+| --- | ---: | ---: |
+| Terran | 1,560 | 19,956 |
+| Z10 | 312 | 23,768 |
+| P10 | 160 | 10,020 |
+| Showcase | 72 | 19,432 |
+
+The guarded-link receipt SHA-256 begins `41c31c2ed882e2d2`.
+
+The forced P10 ARM case uses a 128×128 open grid with a vertical
+wall at column 64 from rows 8 through 122 and one opening at row
+110. It builds a point slot from the tile immediately right of
+the goal at (32,32). Next it asks `sc64_range_cached_point_step`
+for a nearby origin at (32,34) and a distant origin at (100,100).
+The direct path from the distant origin is blocked.
+
+| Guest cycles | Control | Prefix only | Certificate |
+| --- | ---: | ---: | ---: |
+| Cold point slot | 1,087,129 | 103,404 | 15,303 |
+| Nearby cached read | 1,240 | 1,086,881 | 5,954 |
+| Distant cached read | 1,228 | 1,317 | 1,087,475 |
+| Combined | 1,089,597 | 1,191,602 | 1,108,732 |
+
+The prefix completes during the nearby read. The certificate
+serves that read while the slot stays deferred, then completes it
+synchronously during the distant read. Both returned steps,
+logical build and hit counts, age, clock, goal, and all 6,144
+packed bytes match across the three builds. The field SHA-256
+begins `9419296f2efeb40e` and the receipt begins `3425ac9ec8d89d08`.
+These are forced reader costs. The genuine P10 controller gain
+above measures a different workload.
+
+Keep the certificate opt-in. The distant cached read alone takes
+1.94 times the 561,792-cycle update budget for 30 fps. Activation
+still needs a bound on distant cached reads that preserves their
+returned step and timing of orders, broader dense-battle replays,
+and fresh candidate save/result reloads.
