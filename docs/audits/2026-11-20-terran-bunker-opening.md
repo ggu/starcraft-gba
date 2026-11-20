@@ -159,6 +159,7 @@ same 5/4 clock conversion, rounded down at each boundary.
 | --- | ---: | ---: | ---: |
 | Unmodified solo Terran, run 4, owner 2 | (8,688, 8,834] | (10,860, 11,042] | 9,589, HOST |
 | Unmodified mixed, run 1, owner 0 | (12,550, 12,807] | (15,687, 16,008] | 11,125, normal ARM |
+| Unmodified restored mixed lobby, owner 3 | (9,887, 9,970] | (12,358.75, 12,462.5] | Different seat rotation |
 | Defeat-suppressed mixed, run 2, owner 2 | (9,865, 10,037] | (12,331, 12,546] | |
 
 All three first-placement samples have 20 completed SCVs and one in
@@ -216,6 +217,16 @@ combat and cargo codec fixtures.
 | GBA Terran ARM Bunker cartridge | `1420ec734293ad760b4da5b12feebab5c1c172925863dc2183c25b708b70fb54` |
 | GBA Terran mixed ARM opening and fresh garrison continuation | `7cedceaf92800b5dd915297b148c2fea9a0975b42263378eedbcef7efffe44d4` |
 
+
+The [unmodified restored-lobby census](2026-11-19-n64-skirmish-ai.md#unmodified-restored-lobby-run)
+shows Terran owner 3's Bunker foundation in `(7,120, 7,194]` and its first
+completion in `(7,619, 7,692]`. At the Factory foundation it has two
+complete Barracks and a complete Academy, Bunker and Refinery, five
+complete Supply Depots and 19 complete SCVs with none in production.
+The two unmodified mixed lobbies share the race roster and differ in
+seat rotation and first Factory timing. Use the opening state and
+actual opponents reached when qualifying a strategy. The later clean
+mixed window is specific to its captured opening.
 
 ## Current release with death depth
 

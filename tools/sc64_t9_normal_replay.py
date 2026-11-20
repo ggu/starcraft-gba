@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check T1–T4 and T6–T10 on a normal Terran ROM using physical buttons."""
+"""Check Terran campaign saves on a normal ROM using physical buttons."""
 import argparse
 import hashlib
 import json
@@ -18,6 +18,7 @@ from sc64_skirmish_sram_continuation import (
 )
 import sc64_t1_normal_replay as t1
 import sc64_t4_controller_replay as t4
+import sc64_t5_controller_replay as t5
 from sc64_t9_arm_replay import COMPARED, load_trace
 from sc64_terran_controller_replay import (
     _compare_trace_row, _find_raw_actor, _snapshot, _verify_terminal, validate_trace,
@@ -35,6 +36,7 @@ T3_FIELDS = ("elapsed", "remaining", "killed", "outcome", "objective", "phase", 
              "lost", "screen", "side_units", "enemy_units", "side_buildings",
              "enemy_buildings", "side_ore", "side_gas", "enemy_ore", "enemy_gas", "sent", "waves")
 T4_FIELDS = t4.TRACE_STATE_FIELDS + ("actor_slot", "race_mode", "race_selected_mission")
+T5_FIELDS = (*t5.OBS_FIELDS, *t5.OPTIONAL_OBS_FIELDS, "phase", "human_outcome", "race_completed")
 T7_DIALOGUE = {1: (1, 2), 682: (661, 1), 4189: (3931, 1)}
 T8_DIALOGUE = {1404: (1321, 1)}
 T8_LAST_ASSAULT = 143122
@@ -189,6 +191,21 @@ def load_t3_trace(path, stop):
                 initial=(reference["initial_units"], reference["initial_buildings"]))
 
 
+def load_t5_trace(path, stop):
+    reference = t5.validate_trace(json.loads(path.read_text()), 256)
+    launch = reference["start_tick"]
+    if reference["stop_tick"] - launch != stop or reference["input_count"] != 7393:
+        raise ValueError("T5 requires the qualifying paid-air controller route")
+    rows = (reference["start"], *reference["checkpoints"], reference["final"])
+    observations = {}
+    for row in rows:
+        observations.setdefault(row["source_host_tick"], []).append(row)
+    if len(rows) != 162 or any(tick not in observations for tick in (0, 52686, 53550, 73391, stop)):
+        raise ValueError("T5 trace is missing a checkpoint from the qualifying route")
+    return dict(transitions=[(tick - launch + 1, held) for tick, held in reference["inputs"] if tick >= launch],
+                observations=observations, final=reference["final"], stop=stop)
+
+
 def observe_t7_carrier(game, state, last_slot):
     # The carrier can die before the objective trigger. Follow the slot first
     # witnessed carrying the emitter, then read its dead row at the result.
@@ -227,7 +244,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("trace", "rom", "elf", "runner", "out"):
         parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--chapter", type=int, choices=(1, 2, 3, 4, 6, 7, 8, 9, 10), default=9)
+    parser.add_argument("--chapter", type=int, choices=range(1, 11), default=9)
     parser.add_argument("--save-tick", type=int, required=True,
                         help="neutral completed gameplay tick for pause, save and fresh HOME load")
     args = parser.parse_args()
@@ -239,6 +256,8 @@ def main():
         files += (Path(t1.__file__),)
     elif args.chapter == 4:
         files += (Path(t4.__file__),)
+    elif args.chapter == 5:
+        files += (Path(t5.__file__),)
     elif args.chapter in (6, 7):
         files += (Path(__file__).with_name("sc64_terran_controller_replay.py"),)
     pins = input_hashes(files)
@@ -246,12 +265,14 @@ def main():
     mission = chapter + 3
     mission_symbols = {1: ("race_campaign",), 2: ("race_campaign", "backwater"),
                        3: ("race_campaign", "race_t3", "race_t3_buildings_killed"),
-                       4: ("race_t4",), 6: ("race_t6",)}.get(chapter, ("race_late",))
+                       4: ("race_t4",), 5: ("race_campaign", "race_t5"),
+                       6: ("race_t6",)}.get(chapter, ("race_late",))
     briefing_pages, dialogue_cuts, stop, compared = {
         1: (9, {}, 10144, T1_FIELDS),
         2: (8, {}, 29380, T2_FIELDS),
         3: (15, {}, 54000, T3_FIELDS),
         4: (8, {}, 8943, T4_FIELDS),
+        5: (9, {}, 127883, T5_FIELDS),
         6: (15, {}, 23849, T6_FIELDS),
         7: (17, T7_DIALOGUE, 4189, T7_FIELDS),
         8: (9, T8_DIALOGUE, 143260, T8_FIELDS),
@@ -272,6 +293,8 @@ def main():
         plan = load_t3_trace(args.trace, stop)
     elif chapter == 4:
         plan = load_t4_trace(args.trace, stop)
+    elif chapter == 5:
+        plan = load_t5_trace(args.trace, stop)
     elif chapter == 9:
         plan = load_trace(args.trace)
     else:
@@ -288,11 +311,12 @@ def main():
     if not 1 < cut < stop or cut in dialogue_cuts or next(
             held for index, held in reversed(transitions) if index < cut) != 0:
         parser.error("--save-tick must be a neutral live gameplay tick")
-    next_held = dict(transitions).get(resume_tick, 0)
+    tape_masks = dict(transitions)
+    next_held = tape_masks.get(resume_tick, 0)
     if next_held & KEY_L and next_held & KEY_START:
         parser.error("--save-tick cannot precede a joint L and Start press")
     # Each route keeps only three 32 KiB SRAM images and small JSON receipts.
-    disk_reserve = (48 if chapter in (1, 2, 3) else 256) << 20
+    disk_reserve = (48 if chapter in (1, 2, 3, 5) else 256) << 20
     if shutil.disk_usage(args.out.parent).free < disk_reserve:
         raise RuntimeError(f"replay requires {disk_reserve >> 20} MiB free")
     _, save_layout = dwarf_struct_layout(args.elf, "RaceSave")
@@ -321,6 +345,10 @@ def main():
         t4_layouts = (race_bank_profile(args.elf, g.sizes),
                       *(dwarf_struct(args.elf, name) for name in
                         ("Sc64RaceCampaignState", "Sc64T4RuntimeState", "Sc64T4TriggerState")))
+    elif chapter == 5:
+        t5_layouts = (race_bank_profile(args.elf, g.sizes),
+                      *(dwarf_struct(args.elf, name) for name in
+                        ("Sc64RaceCampaignState", "Sc64T5RuntimeState", "Sc64T4TriggerState")))
 
     def n(name):
         assert 0 < g.sizes[name] <= 4
@@ -388,6 +416,8 @@ def main():
                         phase=campaign["phase"], objective_flags=campaign["objective_flags"])
         if chapter == 4:
             return t4.t4_snapshot(g.rsp, g.sym, g.sizes, *t4_layouts)
+        if chapter == 5:
+            return t5.t5_snapshot(g.rsp, g.sym, g.sizes, *t5_layouts)
         state = _snapshot(g.rsp, g.sym, g.sizes, args.elf, mission)
         if chapter == 7:
             last_carrier_slot = observe_t7_carrier(g, state, last_carrier_slot)
@@ -424,6 +454,20 @@ def main():
     def compare(tick):
         expected = plan["observations"][tick]
         observed = observe()
+        if chapter == 5:
+            try:
+                for row in expected:
+                    t5.compare_observation(row, observed, f"T5 tick {tick} {row['kind']}")
+            except RuntimeError as error:
+                (args.out / "divergence.json").write_text(json.dumps(
+                    dict(tick=tick, error=str(error), expected=expected,
+                         observed={k: observed[k] for k in compared}), indent=2) + "\n")
+                raise
+            point = dict(tick=tick, **{k: observed[k] for k in compared},
+                         labels=[row["kind"] for row in expected])
+            print("Matched", tick, ",".join(point["labels"]), observed["frame"], flush=True)
+            checkpoints.append(point)
+            return observed
         if chapter == 4:
             assert (observed["race_mode"], observed["race_selected_mission"]) == (0, mission)
             t4.compare_observation(expected, observed, f"T4 tick {tick}")
@@ -484,11 +528,10 @@ def main():
     # T8's six victory pages are triggered once the last hostile building
     # falls. Inspect each update after the last observed assault order so
     # added physical acknowledgements cannot swallow a tape transition.
-    # The retained T1–T4 and T6 tapes omit physical dialogue boundaries.
-    dialogue_scan = ({1: range(1, stop + 1), 2: range(1, stop + 1), 3: range(1, stop + 1),
-                      4: range(1, stop + 1), 6: range(1, stop + 1),
-                      8: range(T8_LAST_ASSAULT + 1, stop + 1)}.get(chapter, ()))
-    dialogue_count = {1: 8, 2: 12, 3: 6, 4: 11, 6: 13, 8: 7}.get(
+    # The retained T1–T6 tapes omit physical dialogue boundaries.
+    dialogue_scan = (range(1, stop + 1) if chapter <= 6 else
+                     range(T8_LAST_ASSAULT + 1, stop + 1) if chapter == 8 else ())
+    dialogue_count = {1: 8, 2: 12, 3: 6, 4: 11, 5: 48, 6: 13, 8: 7}.get(
         chapter, sum(count for _, count in dialogue_cuts.values()))
     try:
         assert n("screen") == n("frame") == g.front_field("page") == 0
@@ -505,7 +548,10 @@ def main():
                 continue
             if shutil.disk_usage(args.out).free < disk_reserve:
                 raise RuntimeError(f"replay requires {disk_reserve >> 20} MiB free")
-            g.rsp.play_to(tick + offset, edges)
+            if chapter == 5:
+                g.step(tape_masks.get(tick - 1, g.rsp.held))
+            else:
+                g.rsp.play_to(tick + offset, edges)
             if tick in dialogue_cuts:
                 acknowledge(tick, *dialogue_cuts[tick])
                 offset = g.rsp.completed - tick
@@ -521,7 +567,7 @@ def main():
             if tick == cut:
                 assert n("screen") == 1 and n("mode") == n("menu_open") == g.rsp.held == 0
                 assert n("selected_building") == -1
-                if chapter not in (1, 2, 4, 6):
+                if chapter not in (1, 2, 4, 5, 6):
                     assert not selected_units()
                 if chapter == 1:
                     assert observe()["raynor_owner"] == 0
@@ -536,7 +582,7 @@ def main():
                 g.rsp.export_sram()
                 pause_image = pause_path.read_bytes()
                 pause = journal(pause_image, 0, n("frame"), 0)
-                if chapter in (1, 2, 4, 6):
+                if chapter in (1, 2, 4, 5, 6):
                     pause["selected_units"] = saved["controls"]["selected_units"]
                 if chapter == 1:
                     pause["tape_resume_tick"] = resume_tick
@@ -581,10 +627,15 @@ def main():
             assert (observed["side_units"], observed["side_buildings"], observed["waves"]) == (16, 10, 11)
         elif chapter == 4:
             t4.verify_final(plan["final"], observed)
+        elif chapter == 5:
+            t5.verify_final(plan["final"], observed)
         else:
             _verify_terminal(plan, observed)
         assert len(briefing) == briefing_pages
-        assert len(dialogue) == dialogue_count
+        if chapter == 5:
+            assert 0 < len(dialogue) <= dialogue_count
+        else:
+            assert len(dialogue) == dialogue_count
         assert len(checkpoints) == len(plan["observations"])
         timing = join_timing(prefix, timing_delta(before, timing_snapshot(g.rsp, g.sym, g.sizes), g.rsp.completed))
         final_state = persisted()

@@ -61,7 +61,8 @@ Game frames, with the worker count at that moment in parentheses.
 
 The Zerg openings remain within 200 frames across the three captures. The
 two unmodified Protoss Gateway openings remain within 190 frames. Run 2
-shows a distinct sequence. The selector for that sequence remains unknown.
+shows a distinct sequence, reproduced on the restored lobby below.
+The selector for that sequence remains unknown.
 
 ### Protoss Cannon opening
 
@@ -86,17 +87,13 @@ All four owners still have a live building at each sampled point through
 10,764. The human's final building disappears in `(10,764, 10,984]`.
 The first Core at 11,285 and first Battery at 11,416 come from the
 continued match after the human's final building disappears. The earlier
-Cannon and economy sequence also comes from the patched run. Whether the
-unmodified game would reach the same opening remains unverified.
+Cannon and economy sequence also comes from the patched run.
 
 The unmodified solo run 5 uses the same Protoss start and instead opens
 with Gateways and a Battery. It has no Forge or Cannon through 9,499.
 In the unmodified mixed run 1, the first Cannon appears in
 `(13,062, 13,309]`, after the Gateway/Battery opening and after the
 first Forge and Core foundations. This is a late Cannon in that run.
-Use a fresh unmodified Blood Bath capture to verify the distinct
-expansion opening and its selection before enabling a GBA strategy
-that reproduces it.
 
 The retained census SHA-256 values are
 `860333e92dd842386f19af44acc57d1083979d15666c835144e52807ee519576`
@@ -104,6 +101,41 @@ for run 2, `9ab2e19766f935ad5c30c2c78cb51eda3967c0b6a2724f025ac63e092f5b4ca6`
 for run 1, and `81247f8f94c472f2d70754a32b7d2634354420171bddf025b2146c11afc58c4c`
 for run 5. The [Terran Bunker audit](2026-11-20-terran-bunker-opening.md#factory-timing)
 records the same runs' Factory timing where a Terran computer is present.
+
+#### Unmodified restored-lobby run
+
+The authenticated USA ROM ran in ares from the retained Blood Bath Free
+for All lobby, with a Terran human and Zerg, Terran and Protoss computers.
+The controller started the match with Start and remained neutral after
+launch. Emulator fast-forward and save-state hotkeys only controlled
+observation. This run applied no defeat suppression or other guest
+edits. The seat rotation yielded a Protoss computer at owner 0,
+the passive Terran at owner 1, Zerg at owner 2, and the Terran
+computer at owner 3.
+
+| Event for Protoss owner 0 | Native game frames |
+| --- | ---: |
+| Second Nexus placed | (2,654, 2,720] |
+| First Pylon placed | (2,720, 2,789] |
+| Forge placed | (4,412, 4,484] |
+| First Cannon placed | (5,137, 5,209] |
+| First Cannon completed | (6,000, 6,073] |
+| Four Cannons completed | (8,226, 8,305] |
+
+The Forge foundation appears before the second Nexus is complete.
+The first Cannon has a completed Forge, two Nexuses and two Pylons,
+with 14 completed Probes and one in production. The 160 samples run
+from frame 107 to 11,312. They show up to five complete Cannons and
+no Gateway, Assimilator, Core or Battery for this owner. The passive
+Terran's Command Center is still registered in the final census.
+The next save-state tap did not produce a complete sample, so the
+run provides no match-result observation.
+
+The restored lobby state SHA-256 is
+`c1597d39bf99476c804635b6cbf36c4901a518f8f4f678bbf2a33e94108d9364`.
+The new census SHA-256 is
+`841841ee5e3ec0fe02118ca7e1f3b1b25c9efe6aeead03b185f4663d1c23c049`.
+Pair more clean starts across seats before selecting the GBA opening.
 
 ### First offensive
 
