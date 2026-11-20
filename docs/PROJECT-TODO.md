@@ -19,6 +19,32 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Normal race cartridges after the shared depth fix.** The
+  [release 25e9e8b9 matrix](audits/2026-11-13-normal-campaign-matrix.md#release-25e9e8b9-race-replays)
+  ties Z2–Z6 to one Z10 ROM and P5 to one P10 ROM. Z2 and P5 match paused
+  saves and fresh continuations. Z3–Z6 match all 627 uninterrupted
+  checkpoints. Prioritize fresh cuts in those routes and the remaining
+  same-cartridge campaigns. The
+  [nine custom checks](audits/2026-11-13-normal-campaign-matrix.md#two-opponent-custom-games)
+  match ordinary starts and fresh SRAM continuation with each AI count
+  on all three race cartridges. Complete long custom wins and check
+  hardware timing.
+- **Refresh early campaign tapes.** Current P1–P3 win after
+  [fresh saves and updated ordinary endings](audits/2026-11-13-normal-campaign-matrix.md#early-protoss-current-endings).
+  Preserve the new ending inputs, update the stale checkpoint tails,
+  and refresh the
+  [Z7 trace](audits/2026-11-13-normal-campaign-matrix.md#z7-retained-tape-check)
+  from the first divergent battle. Use new independently observed
+  victory and SRAM receipts for those routes.
+- **Measure the remaining slow updates.** The refined eager route queue
+  lowers the current Z8 peak from 12.10 to 11.67 million guest cycles with
+  matching route fields and framebuffer samples. Keep the
+  [route queue](https://github.com/ggu/starcraft-gba/pull/636) opt-in
+  while checking P10 bottlenecks and stack headroom.
+  [Inlined Terran Building reads](https://github.com/ggu/starcraft-gba/pull/638)
+  cut the tested T6 save and load stalls by 9.76–11.19% with identical SRAM.
+  Run the remaining journal cases and keep targeting sustained
+  simulation cost for the 30 fps goal.
 - **Current cartridge campaign saves.** [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge

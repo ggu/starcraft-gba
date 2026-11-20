@@ -86,7 +86,7 @@ Aggregate sweep receipt SHA-256
 The normal default build reproduces the replayed ROM byte for byte.
 [Decoder activation](2026-11-20-packed-save-byte-reads.md#normal-terran-activation-with-aligned-route-packing)
 
-## Current Z10 and P10 cartridges
+## Word-packed Z10 and P10 cartridges
 
 The prior ordinary-input HOME routes and fresh-process reloads pass on
 the normal word-packed products. Both retain the earlier complete
@@ -111,3 +111,102 @@ P10 ROM SHA-256
 P5 receipt SHA-256
 `20d29a445368e1d63de49ff5a5e139676da97fd56725bceadf59539983ae6ecc`.
 The remaining Zerg and Protoss missions need this same-cartridge pass.
+
+## Release 25e9e8b9 race replays
+
+These are ordinary-button mGBA runs on the normal release with detached
+death sprite depth. Each starts in HOME. The Z2 and P5 runs save in the
+pause menu and continue through a fresh title-L boot. Their saved
+32 KiB journals and all covered observations match the earlier normal
+ROMs. The Z3–Z6 runs are uninterrupted wins on the same Z10 ROM.
+
+| Mission | Save → victory frame or uninterrupted result | Matched observations | Terminal check |
+| --- | ---: | ---: | --- |
+| Z2 Egression | 3,240 → 8,164 | 9 | Chrysalis aboard carrier slot 18, objective flags 17 |
+| Z3 The New Dominion | 136,588 | 465 | Chrysalis alive at 250 HP, five hostile actors |
+| Z4 Agent of the Swarm | 34,984 | 42 | Kerrigan survives, all 14 authored page cuts freeze |
+| Z5 The Amerigo | 48,347 | 55 | Kerrigan survives and A acknowledges the source pause at frame 46,895 |
+| Z6 The Dark Templar | 56,913 | 65 | Four cargo checkpoints match and Kerrigan wins alive and unloaded |
+| P5 Choosing Sides | 2,700 → 5,057 | 7 | The Shuttle resumes in flight and Tassadar survives at extraction |
+
+The uninterrupted Z3, Z4 and Z5 routes average 22.16, 17.89 and 18.97
+main-loop calls per emulated second, including menu, presentation and
+authored dialogue. Physical GBA timing and fresh SRAM cuts on the
+exact Z3–Z6 routes remain open.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Z10 ROM | `8da84f1c4deebb5dc33fb25130f7689ca82356639f0ae26691b45ae5e426a7ad` |
+| P10 ROM | `5a52775d44b39ba542bfb58c92aa5365426a47086490dce985023969844e0d78` |
+| Z2 | `0d8ec40b164ce5ae7f752978860c4356025850955a3bb4b9a3e3f85b103d4c93` |
+| Z3 | `314e390bc9b52e31f218ed474ad85ec1b5eed371b1ea8a4a4dc21915d71bc9a5` |
+| Z4 | `8e8995f530e70ba2d280400a85bdad9df7be97a7c9a220fc6bc4b179afba1a67` |
+| Z5 | `450ab4fc7b4e78b5fb4f647d67a360026899727f613f1cfb5eb4b40cb818bf78` |
+| Z6 | `25eafc98778d92c8af677cb3bc8fedf52f5cf5c00f0a71ec6aba2a1d8daab3d2` |
+| P5 | `aa7116e6905e94ad419c89fb2f436a5890510f14659ef9160e782c29f9b2a087` |
+
+### Early Protoss current endings
+
+The earlier P1 and P2 tapes restore their paused journals through fresh
+title-L at frames 448 and 372. Uninterrupted play has the same first
+scalar divergence as playback from each save. The exact pre-depth P10
+also reproduces the P2 divergence at call 26,000 with the same pause
+journal. P3's first divergence arrives at call 23,572 before its save
+at frame 23,993. Its existing pause restores with the expected world.
+
+| Mission | Result on current P10 | Witness |
+| --- | --- | --- |
+| P1 First Strike | Victory at frame 28,270, Fenix alive. After the archived inputs and a neutral tail, R selects the army and Attack Move destroys the last enemy Hydralisk Den. | `4d4fd79f87621527ee18073299445decfa757f29af25a1c59d10a541e63f7e93` |
+| P2 Into the Flames | Victory at frame 33,876, Fenix alive and all Cerebrates destroyed. The ending needs 68 additional ordinary updates, including acknowledgement of two authored pages. | `b474d20f61623cc6f34189e69cfda69261488ff8094915693af923c65a9a693b` |
+| P3 Higher Ground | Victory at frame 49,263 after the fresh frame-23,993 reload. Two ordinary Attack Move orders after the archived input and neutral tail clear the final Force 2 structures, with both enemy banks empty. | `f19ff4692b875281fc63d979cb9fae661290d9a1b06b035b1796706677ab9ba5` |
+
+All three wins use ordinary controls throughout and include the
+ending acknowledgements. Their older sampled world counts differ. Use
+the observed mission objective and victory state for these new routes.
+
+### Z7 retained tape check
+
+Two fresh HOME runs on this Z10 match the first 131 archived observations
+through call 48,237. Both first diverge at call 48,728 and frame 47,460.
+The player has 55 units where the old tape expects 57, and the enemy has
+50 buildings where it expects 49. A current uninterrupted result and
+current-writer pause cut remain open.
+
+A separate compatibility replay reads the archived transport journal
+through ordinary title-L. A reselects the Hatchery, all five semantic
+checkpoints match, and the run wins at frame 194,998 after 9,132 calls.
+The input journal is byte-identical. Raw building banks and some display
+pages differ across the writer and reader ROMs. The compatibility
+receipt SHA-256 is
+`f3c54f1d246146bc3ba81b68d8e95b38db5df2f18a628f3bad836104b835a9e7`.
+
+### Two-opponent custom games
+
+The same release also starts two named AI opponents with the second
+seat closed on all three race cartridges. Each run uses ordinary
+buttons for map, race, opponents and pause save. The fresh title-L
+process restores the same game at frame 2,001 and matches 600 more
+advancing updates against uninterrupted play. The resolved seats,
+starting bases and 32 KiB save match.
+
+| Cartridge and map | AI seats 1 and 3 | Receipt SHA-256 |
+| --- | --- | --- |
+| Terran, compact map | Protoss and Zerg | `1535f0c152a897499e6f109659ce3c6d43303a20135fa5193f9a1a55d4817781` |
+| Z10, Blood Bath | Terran and Protoss | `c95824880c2bc857020874ba124aa3c6c57e9024842e1d0ec3f320fc8915d924` |
+| P10, Blood Bath | Zerg and Terran | `26c50397135fbc1d0b41c833a55eea3b624d6db016912c6c422e2edd478b3b2e` |
+
+The six additional cases fill the same ordinary-input pause and continuation
+checks for one and three AIs. The combined nine cases exercise both maps
+and all three human race choices on each cartridge. Each single-opponent
+case occupies only the middle seat. Each three-opponent case includes one
+AI of every race. These are opening and persistence checks. Full match
+outcomes and the rest of the combinations remain open.
+
+| Cartridge | One AI, human race and map | Three AIs, human race and map |
+| --- | --- | --- |
+| Terran | Protoss, Blood Bath | Zerg, Blood Bath |
+| Z10 | Terran, compact map | Protoss, compact map |
+| P10 | Zerg, compact map | Terran, Blood Bath |
+
+The aggregate receipt SHA-256 is
+`40c9ee9f0983b2eebd76987d453c5f78a7e647d1b327984e6ea1f0f89547b761`.
