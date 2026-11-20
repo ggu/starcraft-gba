@@ -141,6 +141,14 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
         !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
+#ifdef SC64_WORLD_DEPTH
+    /* The unit-targeted native bullet captures the target sprite's elevation
+     * plus one at creation. Detaching either reference keeps this snapshot. */
+    unsigned target_layer = target < MAX_UNITS ? sc64_unit_world_layer(&u[target]) :
+        sc64_building_world_layer((unsigned)(target - MAX_UNITS));
+    if (target_layer < SC64_PROJECTILE_MAX_LAYER)
+        row.launch_layer_plus1 = (u8)(target_layer + 2u);
+#endif
 #if defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_CUSTOM_CARRIER_PROBE)
 #ifndef SC64_POOL_STRICT_ACQUIRE
     if (!sc64_compact_pool_acquire_live(&race_p7_projectiles,SC64_COMPACT_PROJECTILE_CAP,
@@ -211,6 +219,52 @@ static void race_p7_projectile_tick_if_due(void)
         race_p7_projectile_source_tick();
 }
 
+static int race_p7_projectile_marker_position(const Sc64ProjectileRow *row, int *x, int *y)
+{
+    if (row->state >= 2) return 0;
+    int world_x = row->x_q8_source >= 0 ? row->x_q8_source / 512 :
+        -(int)((511u + (unsigned)(-row->x_q8_source)) / 512u);
+    int world_y = row->y_q8_source >= 0 ? row->y_q8_source / 512 :
+        -(int)((511u + (unsigned)(-row->y_q8_source)) / 512u);
+    if (world_x < 0 || world_y < 0 || world_x >= WORLD_W || world_y >= WORLD_H ||
+        !currently_visible(world_x, world_y)) return 0;
+    *x = world_x - camx;
+    *y = world_y - camy + 12;
+    return *x >= 1 && *x < 239 && *y >= 13 && *y < 119;
+}
+
+static void race_p7_projectile_marker_draw(int x, int y)
+{
+    /* The marker follows the actual moving row while source art is pending. */
+    gfx_rect(x - 1, y, 3, 1, C_GOLD);
+    gfx_pixel(x, y, C_WHITE);
+}
+
+#ifdef SC64_WORLD_DEPTH
+static void race_p7_projectile_push_depth(u32 *heap, unsigned *size)
+{
+    u8 id = sc64_pool_active_head(&race_p7_projectiles);
+    for (unsigned count = 0; id != SC64_END && count < SC64_POOL_CAPACITY; ++count) {
+        Sc64ProjectileRow row;
+        int x, y;
+        if (!sc64_pool_get_row(&race_p7_projectiles, id, &row)) return;
+        if (row.launch_layer_plus1 && race_p7_projectile_marker_position(&row, &x, &y))
+            sc64_depth_push(heap, size, row.launch_layer_plus1 - 1u, y + camy - 12,
+                            DEPTH_PROJECTILE, DEPTH_INTERCEPTOR_BASE + id);
+        id = row.next_link;
+    }
+}
+
+static void race_p7_projectile_draw_depth(unsigned id)
+{
+    Sc64ProjectileRow row;
+    int x, y;
+    if (sc64_pool_get_row(&race_p7_projectiles, (u8)id, &row) &&
+        race_p7_projectile_marker_position(&row, &x, &y))
+        race_p7_projectile_marker_draw(x, y);
+}
+#endif
+
 static void race_p7_projectile_draw(void)
 {
     u8 id=sc64_pool_active_head(&race_p7_projectiles);
@@ -218,19 +272,13 @@ static void race_p7_projectile_draw(void)
     while (id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
         Sc64ProjectileRow row;
         if (!sc64_pool_get_row(&race_p7_projectiles,id,&row)) return;
-        int x=row.x_q8_source>=0?row.x_q8_source/512:
-              -(int)((511u+(unsigned)(-row.x_q8_source))/512u);
-        int y=row.y_q8_source>=0?row.y_q8_source/512:
-              -(int)((511u+(unsigned)(-row.y_q8_source))/512u);
-        if (row.state<2 && x>=0 && y>=0 && x<WORLD_W && y<WORLD_H &&
-            currently_visible(x,y)) {
-            x-=camx; y=y-camy+12;
-            if (x>=1 && x<239 && y>=13 && y<119) {
-                /* Authored marker until the source projectile image bank is
-                 * imported. Its position comes from the actual moving row. */
-                gfx_rect(x-1,y,3,1,C_GOLD); gfx_pixel(x,y,C_WHITE);
-            }
-        }
+        int x, y;
+#ifdef SC64_WORLD_DEPTH
+        /* Older saves have no authenticated launch elevation. */
+        if (!row.launch_layer_plus1)
+#endif
+        if (race_p7_projectile_marker_position(&row, &x, &y))
+            race_p7_projectile_marker_draw(x, y);
         id=row.next_link;
     }
 }

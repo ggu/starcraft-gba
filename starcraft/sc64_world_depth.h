@@ -86,6 +86,16 @@ _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
                "painter keys must hold every actor slot");
 _Static_assert(DEPTH_STORM <= DEPTH_KIND_MASK, "painter keys must hold every kind");
 
+#ifdef SC64_P7_PROJECTILES_ENABLED
+enum { DEPTH_INTERCEPTOR_BASE = MAX_TRACERS
+#if defined(SC64_PROJECTILE_DEPTH) && defined(SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT)
+                              + SC64_BC_SHOT_LIMIT
+#endif
+};
+_Static_assert(DEPTH_INTERCEPTOR_BASE + SC64_POOL_CAPACITY <= DEPTH_SLOT_MASK + 1,
+               "painter keys must hold every projectile slot");
+#endif
+
 /* Ground depth uses the world anchor. Air ties use kind and slot.
  * Camera position and animation offsets leave this ordering stable. */
 static void
@@ -230,6 +240,9 @@ sc64_draw_depth_ordered_actors(void)
              + SC64_BC_SHOT_LIMIT
 #endif
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+             + SC64_POOL_CAPACITY
+#endif
 #ifdef SC64_DEATH_WORLD_DEPTH
              + SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_DEPTH_LAYERS
 #endif
@@ -311,6 +324,9 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_DEATH_WORLD_DEPTH
     sc64_depth_push_deaths(heap, &size);
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    if (race_protoss_services_active()) race_p7_projectile_push_depth(heap, &size);
+#endif
 #ifdef SC64_SHARED_NUKE_PROBE
     sc64_depth_push_nuke_effects(heap, &size);
 #endif
@@ -368,8 +384,15 @@ sc64_draw_depth_ordered_actors(void)
             draw_unit(&u[i]);
 #endif
             break;
-#ifdef SC64_PROJECTILE_DEPTH
+#if defined(SC64_PROJECTILE_DEPTH) || defined(SC64_P7_PROJECTILES_ENABLED)
         case DEPTH_PROJECTILE: {
+#ifdef SC64_P7_PROJECTILES_ENABLED
+            if (i >= DEPTH_INTERCEPTOR_BASE) {
+                race_p7_projectile_draw_depth(i - DEPTH_INTERCEPTOR_BASE);
+                break;
+            }
+#endif
+#ifdef SC64_PROJECTILE_DEPTH
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             u32 start = gba_clock();
 #endif
@@ -380,6 +403,7 @@ sc64_draw_depth_ordered_actors(void)
                 draw_tracer((int)i, SC64_TRACE_PROJECTILE);
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             diag_tracer_cycles += gba_clock() - start;
+#endif
 #endif
             break;
         }
