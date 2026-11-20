@@ -114,7 +114,7 @@ ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_gener
 # The standard Z10 cartridge can use the qualified custom Carrier journal.
 # Keep a reversible stock comparison with an independent fact-table cache.
 include mk/carrier-release/flags/Makefile
-Z10_CARRIER_RELEASE ?= 0
+Z10_CARRIER_RELEASE ?= 1
 ifneq ($(Z10_CARRIER_RELEASE),0)
 ifneq ($(Z10_CARRIER_RELEASE),1)
 $(error Z10_CARRIER_RELEASE must be 0 or 1)

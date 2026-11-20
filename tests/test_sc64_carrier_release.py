@@ -88,6 +88,8 @@ class CarrierReleaseTest(unittest.TestCase):
         names = ("Z10_CARRIER_FLAGS", "Z10_ARM_SOURCES", "Z10_FACT_FLAGS",
                  "Z10_FACT_REFERENCE_FLAGS")
         [selector] = self.release_flags("SC64_CARRIER_RELEASE_FLAGS")
+        [default] = self.release_flags("Z10_CARRIER_FLAGS")
+        self.assertEqual(default, selector)
         for policy in ("0", "1"):
             with self.subTest(target_policy=policy):
                 shared = (f"CANONICAL_TARGET_POLICY={policy}",)

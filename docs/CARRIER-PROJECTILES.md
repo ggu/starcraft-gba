@@ -610,8 +610,8 @@ Keep the probe disabled in the standard build.
 
 ### Shared release selector
 
-The Carrier release candidate is opt-in. From a tree with the prepared
-inputs, use the same selector for each supported product:
+The separate Carrier preview targets are opt-in. From a tree with the
+prepared inputs, use the same selector for each supported product:
 
 ```sh
 make -f Makefile -f mk/carrier-release/Makefile carrier-release-plan
@@ -623,7 +623,8 @@ Set `SC64_CARRIER_RELEASE_PROFILE` to `terran`, `zerg-z10`, `showcase`
 or `protoss-p10` to run only that row; the default for these explicit
 targets is `all`. The first three write their existing preview filenames.
 Protoss uses the regular P10 artifact and the existing Gantrithor test.
-The ordinary targets and their feature flags remain unchanged.
+The regular Z10 target uses the same capability through its separate
+[build option](#normal-z10-cartridge).
 
 The single `SC64_CARRIER_RELEASE` compile capability is applied through
 `SC64_CARRIER_RELEASE_FLAGS`, which includes the selector header in every
@@ -694,6 +695,77 @@ on the exact guarded ARM candidate before changing defaults:
 The asset-free selector test checks the actual Make profile flags and
 dispatch. Its prepared HOST target runs the existing per-product tests;
 neither check constitutes the full ARM activation matrix above.
+
+#### Normal Z10 cartridge
+
+The normal Z10 cartridge enables the custom Carrier service. It uses the
+existing Z10 compact journal and keeps the ordinary campaign tag and
+actor IDs. The old custom formats remain readable. The first compact save
+after loading a stock journal preserves the old bank.
+
+Run `make Z10_CARRIER_RELEASE=0 verify-zerg-z10` for the previous normal
+build vector. Use a separate copy of the SRAM image for the comparison.
+An executable compiled with that option reads the earlier stock tags;
+the compact custom tag requires Carrier support. Keep a stock save when
+testing both build vectors. The normal ROM name, game code and SRAM size
+are unchanged. Z9, Terran, Showcase and P10 keep their existing builds.
+
+The enabled build generates its actor facts in
+`build/generated/z10-facts-carrier`. It keeps the normal packed building
+reader and target index options, including the automatic targeting
+policy. The generated actor tables pass 2,019 comparisons for all 50 unit
+types and 63 building types. With `CANONICAL_TARGET_POLICY=0`, the packaged
+ARM ROM matches the manually qualified Carrier vector byte for byte
+(`2b4938db52548a4db4172d8199e1e4f226056fe2cb94939c6092617027bb8285`).
+With the normal target policy enabled, the packaged SHA-256 is
+`92f4de77b123cde7002699fd80dc7427290a84bcb595007c10a02f1be2ff9376`.
+Both links pass header and payload checks and end at IWRAM
+`0x03004d60` and EWRAM `0x02039b30`.
+
+The ordinary ARM controller starts from blank SRAM on Outpost as a
+Protoss human against one Zerg opponent. Three Probes gather gas. The
+Stargate queues a Carrier at frame 12,346 and charges 350 minerals and
+250 gas. The selected Carrier pays 25 minerals for its Interceptor at
+frame 14,977. At frame 16,095 the player's Interceptor (slot 65) has an
+active layer-5 pulse. START/B writes a 14,114-byte payload including the
+30-byte versioned projectile packet. Fresh HOME L restores the named
+world and complete arena at that frame.
+
+The same 70-call physical retreat leaves the Interceptor docked at
+frame 16,122 with 40 HP and 40 shields in both runs. Both START/B writes
+preserve the active-flight bank and put a 14,081-byte record in the next
+bank. The two complete SRAM images match. A third boot restores the
+docked actor and empty projectile list. The controller tape SHA-256 is
+`cca77cf23bb05886b42e83283dcfac07ddb41b5baaabcd55764825188e1c0138`.
+The active and docked SRAM digests are
+`af65031f3d9ff9093a7f4c6b8b88d039459ef1246bd34cffb8ca94bacd394461`
+and `ddf503b5a2f99d4bb79ec6b55bc6652daed3a8e1a7fb6761da6e102db47fd354`.
+The tape and SRAM evidence stay local.
+
+The target policy on and off builds also load the same retained,
+ordinary Blood Bath match with Zerg, Terran and Protoss computer seats.
+They save a newly launched depth-bearing pulse at frame 17,305 and match
+180 arena updates and 12 world, two-page, and palette cuts after fresh
+load. Mean uninterrupted guest cycles drop from 881,612 to 879,732 in
+that window. Fresh stack clearance was at least 6,524 bytes above the
+existing guard. This window remains above the 30 fps cycle budget.
+
+All ten campaign chapters pass opening, pause save, fresh load,
+byte-identical payload re-save and 60 matched continuation updates.
+Both maps pass mixed and sparse custom openings, and the compact
+reader migrates an ordinary stock journal from the preceding release.
+In a separate negative test, a detached copy of the newer compact bank
+contains an out-of-range launch layer and a recomputed checksum. A fresh
+guest chooses the intact stock predecessor. With no predecessor, the same
+invalid record leaves HOME unchanged. All SRAM inputs re-export byte
+for byte. The local qualification index SHA-256 is
+`7c7e13a6301776bc5eaa0a90f08654762f8374cb3759d3e37ff8ad112a8d8b28`.
+
+The campaign checks cover opening and save compatibility. Full current
+mission replays, sustained dense skirmishes and physical cartridge frame
+timings require separate runs.
+
+#### Earlier selector links
 
 On release `bb348edd`, all three selector-on ARM links passed the
 ordinary memory guards and their packaged ROMs matched the direct
