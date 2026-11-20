@@ -208,3 +208,9 @@ their qualification recipes. The combined receipt SHA-256 is
 The default and legacy Terran identity receipts are
 `d30aac01132a613fdd816a44405fab05f31d166255adb70d232538361de42542`
 and `ee1198c120bac61775ab896da684e23ff522d9f65d800404f828544a59e75c0f`.
+
+The source-boundary check, doctor, asset-free build and full default
+suite pass locally. The Python suite runs 1,166 tests with 35 optional
+cases skipped in its isolated asset-free checkout. The prepared Terran
+sanitizer lane separately executes the full campaign targets and the
+T6 and bank-validation fixtures. It passes all 33 cases from 30 binaries.

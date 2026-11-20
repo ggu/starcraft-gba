@@ -60,13 +60,16 @@ checkpoint and dialogue observations and export byte-identical 32 KiB
 pause SRAM. The fixed-width Terran reader leaves these two ROMs
 byte-identical to the word-packed release.
 
-| Mission | Pause and victory frames | Matched observations | Outcome |
+| Mission | Start or pause → victory frame | Matched observations | Outcome |
 | --- | ---: | ---: | --- |
+| Z1 Among the Ruins | HOME → 50,669 | 51 | The Chrysalis survives with 30 Hydralisks. |
 | Z2 Egression | 3,240 → 8,164 | 9 | The Chrysalis survives aboard carrier slot 18 with objective flags 17. |
 | P5 Choosing Sides | 2,700 → 5,057 | 7 | A Shuttle returns in flight and Tassadar survives at extraction. |
 
 Z10 ROM SHA-256
 `970cd016b85715f89aca663de16ab5f56ccff2396d594132d9e42901a5f798c9`.
+Z1 receipt SHA-256
+`282295d22c1b60ff11ca081aa9e3aab5102e295090cb6f7f2767bdfacf09df06`.
 Z2 receipt SHA-256
 `517ec92b6b039bafed454e560bc4dce7449635afa1c043d20d81fd4d57dc822e`.
 P10 ROM SHA-256

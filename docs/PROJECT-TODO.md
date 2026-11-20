@@ -105,9 +105,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   ten Terran missions now have a fresh-load and result check on their
   documented normal Terran builds. A sweep on a single current ROM
   is still pending.
-  [Z2 and P5 on the current word-packed cartridges](audits/2026-11-13-normal-campaign-matrix.md#current-z10-and-p10-cartridges)
-  match their full observations and byte-identical pause SRAM through
-  a fresh process. Continue the other missions on those same ROM hashes.
+  [Z1, Z2 and P5 on the current word-packed cartridges](audits/2026-11-13-normal-campaign-matrix.md#current-z10-and-p10-cartridges)
+  match their full observations. Z2 and P5 also match their pause SRAM
+  through a fresh process. Continue the other missions on those same ROM
+  hashes and add a Z1 pause cut.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
