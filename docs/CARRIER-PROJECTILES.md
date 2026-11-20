@@ -737,8 +737,39 @@ the previous normal ROM byte for byte.
 | Stock migration | `b3293c4365c82f9320bd258d5a8fea11cde22de55a7b447cd4c72ca0ba456e9a` |
 | T10 victory | `83b7dd4590f0dee64db24a2f8dd20c2e2bca368ad765ac5ec8fb4259889c0296` |
 
-Physical GBA timing, stack high-water during sustained play, and a full
-ten-mission ARM replay on this cartridge remain open.
+##### With sparse route packing
+
+The default Carrier and sparse route flags link together with the same
+38 prepared inputs and the same RAM endpoints as the Carrier-only link.
+Both Custom Game maps pass mixed and sparse openings, saves, reloads and
+restarts. The enabled ROM reads a journal from the exact Carrier-disabled
+sparse-route ROM, then writes the compact successor and preserves its older
+bank. T1 and T10 also pass ordinary opening and fresh continuation.
+
+The same human tape reproduces the active and docked journals and the
+byte-exact immediate re-saves. The three-AI match repeats both payments,
+the complete saved arena, and 192 matching arena updates after fresh
+load. The mixed battle interval takes the same 168,283,107 guest cycles
+with sparse packing enabled. The lowest changed stack bytes sampled
+after fresh load are `0x03006a9c` for system and `0x03007e78` for IRQ,
+6,812 and 120 bytes above their guard boundaries. This watermark tracks
+the tested memory writes and does not record the stack pointer on every
+instruction.
+
+The paired sparse ROMs complete ordinary T10 at frame 3,361 and match
+all six observed gameplay states and three SRAM images. Mean work is
+1,026,885 guest cycles without Carrier and 1,038,855 with it (+1.17%).
+Physical GBA timing and a full ten-mission ARM replay remain open.
+
+| Exact local evidence | SHA-256 |
+| --- | --- |
+| Default Terran ROM with Carrier and sparse routing | `d9a2bd5f2d5255b4b9424239dc8fed187b89062cb97fe35206d12b12ff5ca255` |
+| Carrier-disabled sparse-route ROM | `c32005c76a2346f287b7ecb7eb101d220b14a7448eea5a5dcce18f948ebd75d1` |
+| Mixed battle, journal and stack watermark | `d42242ac02b7b1ac09bd742ae1d533dee156a3a9f2fa9849f2f597cd718ed2c9` |
+| Human lifecycle | `2dc11bdff944c7a32afc43d4c06375e3ff6ea19f503f165210c863c16ccf32b1` |
+| Stock migration | `d062c85c4f917e9ba360f2e05f73e23251d46bd5d0e8f4a3bc8876e0cbabe495` |
+| T10 without Carrier | `539057803029fcffe08877d478181b593ebc8db1fa2b63ea2abe9f39eb500d63` |
+| T10 with Carrier | `5bf986c78c094181f0f6be9da22ca023279abd29429ccb71b2db6c6404de2a61` |
 
 #### Normal Z10 cartridge
 
