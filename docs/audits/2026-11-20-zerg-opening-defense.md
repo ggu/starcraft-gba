@@ -83,6 +83,14 @@ authenticated BOLT section `00C/001`. The current GBA profile uses 300.
 Keep the HP and save-boundary check separate from this opening comparison
 so the timing and combat effects can be measured independently.
 
+The comparison of that HP column against all 228 rows of the PC-derived
+table finds two whole-HP differences. The other differences are twelve
+zero-HP entries with a native value of one Q8 unit. The second whole-HP
+difference is Zealot, at 80 in the native table and 100 in the PC-derived
+table. Completed native Zealots reach 80 HP in both the mixed and
+Protoss-only Blood Bath censuses. Qualifying a change requires checking
+the actual profile overrides and the saved HP representations.
+
 ## Regression cases
 
 With the prepared profile inputs, build

@@ -43,8 +43,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The native fourth completion is about 650 to 800 updates earlier,
   and the mixed ARM workload takes 5.4% more cycles in the sampled
   late opening. Compare Terran Bunkers and Protoss Battery or Cannon
-  openings. Separately qualify the native 400 HP Sunken rule against
-  the GBA's 300 HP morph and save behavior.
+  openings. Separately qualify native HP for Sunkens (400) and
+  Zealots (80). Check the profile overrides, the Sunken morph and
+  existing save compatibility before changing either value.
   [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
 
 - **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
