@@ -214,12 +214,13 @@ sc64_facing_draw_parts(const Unit *q, int raw, int x, int y, int walk,
         else
 #endif
         if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y - lift)) return 0;
+        unsigned turret = sieged ? 31u : 6u;
         if (turret_lift) {
+            if (!sc64_unit_facing_frames((unsigned short)turret)) return 0;
             *turret_lift = lift;
             return 1;
         }
-        if (!sc64_facing_blit(sieged ? 31u : 6u, dir, x, y - lift)) return 0;
-        return 1;
+        return sc64_facing_blit(turret, dir, x, y - lift);
     }
 #else
     (void)turret_lift;
