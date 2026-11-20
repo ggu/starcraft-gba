@@ -112,9 +112,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Bath Free for All lobbies. All four normal ROMs restore both the
   active SCV assignment and the four loaded passengers, then match
   600 updates from uninterrupted play. P10’s measured mixed windows
-  average 1.01 and 1.18 million guest cycles per update. Compare later
-  Factory timing, first boarding and staffing after losses.
+  average 1.01 and 1.18 million guest cycles per update. Compare first
+  boarding and staffing after losses. Add `terran-factory-solo` and
+  `terran-factory-mixed` to the matching Blood Bath replays. Extend the
+  mixed fixture beyond the first-wave cutoff through update 16,008.
+  Target the unmodified Factory windows after the paid Bunker and
+  Academy complete, and compare the worker count, first-wave orders,
+  and spending. Repeat from a fresh pause save after the Bunker fills,
+  and check that the other map and early air or economy-loss fallbacks
+  can still develop normally.
   [Terran opening Bunker audit](audits/2026-11-20-terran-bunker-opening.md#current-release-with-death-depth)
+  [Factory timing evidence](audits/2026-11-20-terran-bunker-opening.md#factory-timing)
 
 - **Native skirmish opening defenses.** The shared Zerg planner now
   builds four paid Sunkens by update 8,305 in both qualified Blood Bath
@@ -122,8 +130,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The native fourth completion is about 650 to 800 updates earlier,
   and the mixed ARM workload takes 5.4% more cycles in the sampled
   late opening. Protoss now places a paid Shield Battery after 15 Probes
-  and two completed Gateways in the same lobbies. Compare its later gas
-  and Core timing and the distinct Protoss Cannon opening.
+  and two completed Gateways in the same lobbies. Add
+  `protoss-battery-tech` to the unmodified solo and mixed comparisons.
+  Record the gas and Core foundations, and verify the paid Battery
+  and pause-save continuation. For `protoss-cannon-opening-native`,
+  repeat unmodified Blood Bath starts and record the first Nexus
+  expansion, Pylon, Forge, Cannon, Gateway, and Assimilator before any
+  player loses their final building. Compare the first-wave timing
+  after verifying the opening and its selector.
   The shared Sunken rule now uses the native 400 HP cap.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored
@@ -132,6 +146,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   overrides and the existing unit save representations.
   [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
   [Protoss opening Battery audit](audits/2026-11-20-protoss-battery-opening.md)
+  [Native Cannon census](audits/2026-11-19-n64-skirmish-ai.md#protoss-cannon-opening)
 
 - **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
   reproduced stale SRAM after a normal P10 victory with nine pending
