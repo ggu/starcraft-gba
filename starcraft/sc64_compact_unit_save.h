@@ -3,6 +3,13 @@
 
 #include "sc64_save_bits.h"
 
+/* Late Terran journals use fixed-width reads in campaign and Custom Game.
+ * Keep the scalar implementation available for paired codec checks. */
+#if defined(SC64_LATE_TERRAN_STORAGE) && \
+    !defined(SC64_COMPACT_UNIT_LEGACY_READER) && !defined(SC64_COMPACT_UNIT_FIXED_READER)
+#define SC64_COMPACT_UNIT_FIXED_READER 1
+#endif
+
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
 #endif
