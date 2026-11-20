@@ -8,7 +8,7 @@ physical GBA check or all routes through a mission.
 | Mission | Exact November 13 KODAK ROM | Closest other evidence or next check |
 | --- | --- | --- |
 | T1 | [HOME win](2026-11-13-t1-t2-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t1-t2-normal-physical.md#november-20-t1-fresh-sram-and-result-autosave) restore the rescued Raynor and replay through the ten-Marine victory. |
-| T2 | [HOME win](2026-11-13-t1-t2-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t1-t2-normal-physical.md#november-20-t2-fresh-sram-and-result-autosave) restore the selected worker and verify the frozen victory with Raynor alive. |
+| T2 | [HOME win](2026-11-13-t1-t2-normal-physical.md) | [Fresh SRAM and result autosave on the composed build](2026-11-13-t1-t2-normal-physical.md#composed-attacker-depth-and-journal-build) restore the selected worker and verify the frozen victory with Raynor alive. |
 | T3 | [HOME win](2026-11-13-t3-t4-normal-physical.md) | Fresh SRAM and hardware still separate. |
 | T4 | [HOME win](2026-11-13-t3-t4-normal-physical.md) | [November 20 fresh SRAM and result autosave](2026-11-13-t3-t4-normal-physical.md#current-packed-reader-release) retain the selected unit and restore the frozen win with Raynor alive. |
 | T5 | [HOME win](2026-11-13-t5-normal-physical.md#exact-november-13-kodak-cartridge) | All 150 observations matched and both heroes survived. |

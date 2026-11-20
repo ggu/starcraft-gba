@@ -113,6 +113,22 @@ python3 tools/sc64_t9_normal_replay.py --chapter 2 --save-tick 18213 \
 | T2 replay and both journal checks | `721535989a87ffe08f0c6557d0fd006b6478d2d259bc820c7756702ad7a030f9` |
 | T1 regression | `67283fa918311ee86feff81bf3a5e5d20f4697ae668b7e0a46b839e3a3729f1e` |
 
+### Composed attacker depth and journal build
+
+The normal Terran ROM with compiled source `afffebec` repeats the
+same T2 route. All 31 observations, the briefing, the 12 field
+acknowledgments, the saved selection and the frozen victory selection
+match the packed-reader run. Both SRAM banks and the third process's
+readback match byte-for-byte. The composed run averages 667,181
+guest cycles per controller call, or 25.15 emulated updates per
+second, and peaks at 27,533,310 cycles.
+
+| Composed input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `01240c5e95c1f0e648028dad75005e3185904c02e6c9b0577aa368d14e7958f3` |
+| Matching ELF | `85aa28c9206b11cd9baebdc9f33d8d9bf6de49fa624146480c1cf351d87dbc10` |
+| T2 fresh load and result replay | `be4be31c4983d43733c593a40595cc5025bba8658395417636f2da09a74eac67` |
+
 ## November 20 T1 fresh SRAM and result autosave
 
 The replay uses the normal Terran death-depth cartridge from

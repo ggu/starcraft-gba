@@ -90,7 +90,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores Raynor after rescue at frame 6,214 and wins with ten Marines.
   All 12 observations match, and the frozen result re-exports identical
   SRAM. The route averages 29.28 emulated updates per second.
-  [T2 on normal Terran](audits/2026-11-13-t1-t2-normal-physical.md#november-20-t2-fresh-sram-and-result-autosave)
+  [T2 on normal Terran](audits/2026-11-13-t1-t2-normal-physical.md#composed-attacker-depth-and-journal-build)
   restores the selected worker at frame 18,204 and destroys the Infested
   Command Center with Raynor alive. All 31 observations match. A third
   emulator reloads the frozen result and exports identical SRAM.
