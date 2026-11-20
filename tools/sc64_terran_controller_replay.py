@@ -678,7 +678,7 @@ def _snapshot(rsp, sym: dict, sizes: dict, elf: Path, mission: int) -> dict:
                 goal_actor = units[state["emitter_slot"]]
                 state["emitter_at_goal"] = int(
                     goal_actor["alive"] and goal_actor["raw_type"] == 217 and
-                    _point_in_source_location(goal_actor["x"], goal_actor["y"], bounds))
+                    _emitter_overlaps_source_location(goal_actor["x"], goal_actor["y"], bounds))
             else:
                 state["emitter_at_goal"] = 0
     elif emitter:
@@ -769,11 +769,13 @@ def _source_location_bounds(rsp, elf: Path, sym: dict, scenario_symbol: str,
                  for name in ("left", "top", "right", "bottom"))
 
 
-def _point_in_source_location(x: int, y: int,
-                              bounds: tuple[int, int, int, int]) -> bool:
-    """Use the T7 runner's half-scale, left/top-inclusive point test."""
+def _emitter_overlaps_source_location(x: int, y: int,
+                                     bounds: tuple[int, int, int, int]) -> bool:
+    """Apply the T7 runner's half-open rectangle overlap in source pixels."""
     left, top, right, bottom = bounds
-    return left <= x * 2 < right and top <= y * 2 < bottom
+    # The raw 217 actor fact specifies 16 pixels left/up and 15 right/down.
+    return (left < x * 2 + 16 and x * 2 - 16 < right and
+            top < y * 2 + 16 and y * 2 - 16 < bottom)
 
 
 if __name__ == "__main__":
