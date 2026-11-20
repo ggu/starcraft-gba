@@ -242,8 +242,13 @@ in each of its three setups. It runs the production queue and post-world
 pass and checks both HUD bands. The four normal ARM products link with the
 same RAM endpoints as `06353a5d`. Their ordinary Custom Game startup
 samples match both indexed pages, palette, and world at 60 and 120 updates.
-The startup samples precede combat. Paired ordinary-input N64/GBA
-siege overlap captures remain pending.
+The Showcase Siege Line also matches both indexed pages, palette and
+world at 24 samples over 120 advancing updates after the ordinary menu
+chord. The run uses 116,541,162 emulated cycles versus 116,108,952 in the
+control, an increase of 0.37%. The comparison receipt SHA-256 is
+`2af496b84e91b948dfad6dd4314e617e8437434520424b2463ce8dc38c3530db`.
+The overlap fixture supplies the changed pixel-order evidence. Paired
+ordinary-input N64/GBA siege overlap captures remain pending.
 
 #### Projectile cartridge coverage
 
