@@ -368,24 +368,31 @@ race_p6_combat_burrow_center_may_reach(int qx, int qy, int tx, int ty)
 }
 
 #ifdef SC64_P6_BURROW_GROUPED
-_Static_assert(MAX_UNITS <= 256,
-               "P6 grouped burrow targets use byte-sized unit slots");
+enum {
+    SC64_P6_BURROW_BAND_SHIFT = 7,
+    SC64_P6_BURROW_BANDS = 16,
+    SC64_P6_BURROW_BAND_HEIGHT = SC64_P6_BURROW_BANDS << SC64_P6_BURROW_BAND_SHIFT,
+    SC64_P6_BURROW_END = 0xffff,
+};
+_Static_assert(MAX_UNITS <= SC64_P6_BURROW_END, "P6 burrow chains require a free sentinel");
+
 static int
-race_p6_combat_burrow_release_one(int slot, const u8 *target_slots,
-                                  unsigned target_count)
+race_p6_combat_burrow_release_one(int slot, const u16 *band_heads,
+                                  const u16 *next_target)
 {
     Unit *q = &u[slot];
-    for (unsigned n = 0; n < target_count; ++n) {
-        int j = target_slots[n];
-        if (j == slot) continue;
-        if (!race_p6_combat_burrow_center_may_reach(q->x, q->y,
-                                                     u[j].x, u[j].y))
-            continue;
-        if (dist2(q->x, q->y, u[j].x, u[j].y) <= 96 * 96) {
-            q->flags &= (u16)~2u;
-            q->order = ORDER_ATTACK_MOVE;
-            q->target = -1;
-            return 1;
+    int first = limit(q->y - 96, 0, SC64_P6_BURROW_BAND_HEIGHT - 1) >> SC64_P6_BURROW_BAND_SHIFT;
+    int last = limit(q->y + 96, 0, SC64_P6_BURROW_BAND_HEIGHT - 1) >> SC64_P6_BURROW_BAND_SHIFT;
+    for (int band = first; band <= last; ++band) {
+        for (unsigned j = band_heads[band]; j != SC64_P6_BURROW_END; j = next_target[j]) {
+            if (!race_p6_combat_burrow_center_may_reach(q->x, q->y, u[j].x, u[j].y))
+                continue;
+            if (dist2(q->x, q->y, u[j].x, u[j].y) <= 96 * 96) {
+                q->flags &= (u16)~2u;
+                q->order = ORDER_ATTACK_MOVE;
+                q->target = -1;
+                return 1;
+            }
         }
     }
     return 0;
@@ -424,14 +431,13 @@ race_p6_combat_burrow_release_tick(void)
     int released = 0;
     if (!race_p6_active()) return 0;
 #ifdef SC64_P6_BURROW_GROUPED
-    /* Group by the burrower's owner, building an ascending list of alive,
-       hostile targets once per owner. Releasing one actor changes only its
-       flags/order/target; target eligibility depends on immutable-for-this-
-       call alive/position/owner fields, and there are no callbacks here. */
-    u8 target_slots[MAX_UNITS];
+    /* The release only asks whether any live hostile is in range.
+     * Group by Y band to skip distant targets. Position, alive status
+     * and ownership are stable throughout the pass. */
+    u16 band_heads[SC64_P6_BURROW_BANDS], next_target[MAX_UNITS];
     for (int j = 0; j < MAX_UNITS; ++j) {
-        if (u[j].alive &&
-            (u[j].owner < SIDE || u[j].owner > 4)) {
+        if (u[j].alive && (u[j].owner < SIDE || u[j].owner > 4 ||
+            (unsigned)u[j].y >= SC64_P6_BURROW_BAND_HEIGHT)) {
             for (int i = 0; i < MAX_UNITS; ++i) {
                 if (!race_p6_combat_unit_burrowed(i)) continue;
                 released += race_p6_combat_burrow_release_one_fullscan(i);
@@ -440,7 +446,6 @@ race_p6_combat_burrow_release_tick(void)
         }
     }
     for (int owner = SIDE; owner <= 4; ++owner) {
-        unsigned target_count = 0;
         int has_burrower = 0;
         for (int i = 0; i < MAX_UNITS; ++i) {
             if (u[i].owner == owner && race_p6_combat_unit_burrowed(i)) {
@@ -449,15 +454,18 @@ race_p6_combat_burrow_release_tick(void)
             }
         }
         if (!has_burrower) continue;
+        for (unsigned band = 0; band < SC64_P6_BURROW_BANDS; ++band)
+            band_heads[band] = SC64_P6_BURROW_END;
         for (int j = 0; j < MAX_UNITS; ++j) {
-            if (u[j].alive && race_p6_owners_hostile(owner, u[j].owner))
-                target_slots[target_count++] = (u8)j;
+            if (!u[j].alive || !race_p6_owners_hostile(owner, u[j].owner)) continue;
+            unsigned band = (unsigned)u[j].y >> SC64_P6_BURROW_BAND_SHIFT;
+            next_target[j] = band_heads[band];
+            band_heads[band] = (u16)j;
         }
         for (int i = 0; i < MAX_UNITS; ++i) {
             if (u[i].owner != owner || !race_p6_combat_unit_burrowed(i))
                 continue;
-            released += race_p6_combat_burrow_release_one(i, target_slots,
-                                                           target_count);
+            released += race_p6_combat_burrow_release_one(i, band_heads, next_target);
         }
     }
 #else

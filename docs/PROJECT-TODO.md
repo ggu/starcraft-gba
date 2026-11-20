@@ -23,6 +23,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge
   loads the earlier frame-121 journal and matches its 120-update continuation.
+  [P6 trigger and burrow changes](audits/2026-11-20-p6-runtime-cost.md)
+  reduce full-route cycles by 16.66% with the same SRAM and victory
+  checkpoints. The route still averages 15.75 calls per emulated second.
   Continue applying the normal-ROM gate to the remaining
   [campaign entries](audits/2026-11-13-normal-campaign-matrix.md).
 

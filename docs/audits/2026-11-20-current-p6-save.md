@@ -29,6 +29,10 @@ This route averages 13.12 recorded calls per emulated second, including the
 briefing and other UI calls. Hardware timing and other save cuts remain
 open.
 
+The [P6 runtime update](2026-11-20-p6-runtime-cost.md) repeats this complete
+route with the same SRAM and named checkpoints at 15.75 recorded calls per
+emulated second.
+
 ## Earlier P10 save
 
 The same ROM also loads the [November 6 frame-121 journal](2026-11-06-early-protoss-save/README.md)
