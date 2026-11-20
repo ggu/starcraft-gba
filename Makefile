@@ -1856,7 +1856,7 @@ race-campaigns: verify-terran verify-zerg verify-protoss
 terran: verify-terran
 zerg: verify-zerg
 protoss: verify-protoss
-include mk/carrier-release/terran-normal/Makefile
+include mk/terran-normal/Makefile
 build/StarCraft-Terran-Transport1-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN 10' SCT8

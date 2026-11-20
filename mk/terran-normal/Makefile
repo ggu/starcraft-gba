@@ -19,6 +19,6 @@ build/terran-carrier-config: force-terran-carrier-config | build
 	@printf '%s\n' '$(TERRAN_CARRIER_RELEASE)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
-build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.ld Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile mk/carrier-release/terran-normal/Makefile build/terran-carrier-config $(TERRAN_CARRIER_CONFIG) | build
+build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.ld Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile mk/terran-normal/Makefile build/terran-carrier-config $(TERRAN_CARRIER_CONFIG) | build
 	$(CC) $(TERRAN_CARRIER_FLAGS) $(CFLAGS) $(TERRAN_ROM_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(TERRAN_ARM_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
 	$(SIZE) $@
