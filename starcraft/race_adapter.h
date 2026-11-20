@@ -105,6 +105,15 @@ static int race_bot_index(int owner)
     return -1;
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+static int race_skirmish_retired_owner(unsigned mask, int owner)
+{
+    for (int rank = 0; rank < 3; ++rank)
+        if (owner == race_bot_owner_ids[rank]) return !!(mask & (1u << rank));
+    return 0;
+}
+#endif
+
 static int race_skirmish_owner_base(int owner)
 {
     int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : owner == 4 ? 3 : -1;
@@ -1863,6 +1872,7 @@ static void race_skirmish_init(void)
     memset(race_player, 0xff, sizeof(race_player));
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
     race_skirmish_geometry();
+    race_skirmish_reset_elimination();
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     death_vfx_reset();
     memset(geysers, 0, sizeof(geysers));
@@ -2001,14 +2011,189 @@ static void race_tick_ai(void)
     race_ai_tick();
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int sc64_p7_carrier_child_docked(int type, unsigned flags);
+static int race_p7_carrier_training_candidate_valid(const Unit *actors, int count);
+#endif
+
+/* These actors are coupled to separately stored service records. Hold the
+ * entire owner transition until the linked case is supported; do not
+ * expose overlapping loaded passengers or publish half a transfer. */
+static int race_skirmish_neutral_transfer_ready(const Unit *q)
+{
+#ifdef SC64_TRANSPORT_RUNTIME
+    if (SC64_TRANSPORT_LOADED(q)) {
+        int carrier = q->target;
+        if (!race_transport_carrier_valid(carrier) || u[carrier].owner != q->owner ||
+            !race_transport_retirement_carrier_type(&u[carrier]) ||
+            q->x != u[carrier].x || q->y != u[carrier].y) return 0;
+    }
+#endif
+    if (SC64_SCARAB_CHILD(q)) return 0;
+#ifdef SC64_EGG_RUNTIME
+    if (q->type == SC64_EGG_ACTOR) return 0;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (SC64_P7_CARRIER_PARENT_TYPE(q->type) && q->carry) return 0;
+    if (SC64_CARRIER_CHILD_SCRIPTED(q) &&
+        !sc64_p7_carrier_child_docked(q->type, (unsigned)q->flags)) return 0;
+#endif
+#ifdef SC64_SCARAB_AUTONOMOUS_PROBE
+    if (sc64_race_raw_unit(q->type) == 83) return 0;
+#endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (sc64_race_ordinary_ghost(q->type)) return 0;
+#endif
+    return 1;
+}
+
+static int race_skirmish_transfer_survivors(int owner)
+{
+#ifdef SC64_SHARED_TRANSPORT
+    int research = sc64_sk_transport_owner_index(owner);
+    int ventral = 0;
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    u8 cargo[MAX_UNITS] = {0};
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    unsigned battlecruiser_tech = sc64_battlecruiser_tech_bits;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    int has_carrier_group = 0;
+#endif
+    /* Validate every survivor and stage shared capabilities before mutating
+     * any actor or sidecar. Retirement publishes only after this commit. */
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        const Unit *q = &u[i];
+        if (!q->alive || q->owner != owner) continue;
+        if (!race_skirmish_neutral_transfer_ready(q)) return 0;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        has_carrier_group |= SC64_P7_CARRIER_PARENT_TYPE(q->type) || SC64_CARRIER_CHILD_SCRIPTED(q);
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+        if (research >= 0 && race_skirmish_transport_tech.owner[research].researched &&
+            race_transport_overlord_identity(q)) ventral = 1;
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
+        if (SC64_TRANSPORT_LOADED(q)) {
+            int space = race_transport_passenger_space(q);
+            if (space < 0 || cargo[q->target] + space > SC64_TRANSPORT_DROPSHIP_SPACE)
+                return 0;
+            cargo[q->target] += (u8)space;
+        }
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        if (sc64_race_is_battlecruiser(q->type)) {
+            int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, owner, q->raw_owner);
+            if (key < 0 || (q->raw_type != -1 && q->raw_type != 12)) return 0;
+            int reactor = sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,
+                                                     (unsigned)key, SC64_BC_TECH_REACTOR);
+            if (q->carry < 0 || q->carry > sc64_battlecruiser_energy_cap(reactor)) return 0;
+            /* Keep saved energy legal in the preview's neutral tech slot. */
+            if (reactor)
+                (void)sc64_battlecruiser_tech_complete(&battlecruiser_tech, NEUTRAL, SC64_BC_TECH_REACTOR);
+        }
+#endif
+    }
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    /* Validate ranks and links, including children owned by other players. */
+    if (has_carrier_group && !race_p7_carrier_training_candidate_valid(u, MAX_UNITS)) return 0;
+#endif
+
+#ifdef SC64_SHARED_TRANSPORT
+    race_skirmish_neutral_ventral |= (u8)ventral;
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    sc64_battlecruiser_tech_bits = (u16)battlecruiser_tech;
+#endif
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (!q->alive || q->owner != owner) continue;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+        /* Drop the former owner's unreleased cast. An existing projectile
+         * keeps its launch owner, target and motion independently. */
+        if (sc64_race_is_battlecruiser(q->type))
+            sc64_bc_shot_caster_gone(sc64_bc_shots, (unsigned)i);
+#endif
+        q->owner = NEUTRAL;
+        q->raw_owner = 11;
+        q->selected = 0;
+        if (!SC64_TRANSPORT_LOADED(q)) {
+            q->order = ORDER_IDLE;
+            q->target = -1;
+        }
+        if (!SC64_CARRIER_CHILD_SCRIPTED(q)) q->build = -1;
+        q->tx = q->path_x = q->x;
+        q->ty = q->path_y = q->y;
+        q->work_timer = q->path_timer = q->path_retry = 0;
+        if (sc64_race_is_worker(q->type)) {
+            q->carry = 0;
+#ifdef SC64_WORKER_CARGO_KIND
+            sc64_worker_cargo_clear(q);
+            sc64_worker_gather_pending_set(q, 0);
+#endif
+        }
+#ifdef SC64_IMPACT_EVENTS
+        race_impact_clear_target(i);
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+        race_p7_projectile_clear_references(i);
+#endif
+#ifdef SC64_DIRECT_ATTACK
+        sc64_direct_attack_clear_references(i);
+#endif
+    }
+#ifdef SC64_TRANSPORT_RUNTIME
+    race_transport_changed();
+#endif
+    return 1;
+}
+#endif
+
 static void race_skirmish_outcome(void)
 {
     int i, human_buildings = 0, enemy_buildings = 0;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    unsigned enemy_with_buildings = 0;
+#endif
     if (!race_mode || won || lost) return;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
         if (b[i].owner == SIDE) ++human_buildings;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+        else {
+            int rank = race_bot_index(b[i].owner);
+            if (rank < 0) continue;
+            ++enemy_buildings;
+            enemy_with_buildings |= 1u << rank;
+        }
+#else
         else if (race_bot_index(b[i].owner) >= 0) ++enemy_buildings;
+#endif
     }
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (race_skirmish_map == SC64_MAP_BLOOD_BATH && race_skirmish_start_order) {
+        if (!human_buildings) {
+            /* The result screen stops play even if a linked actor makes
+             * transferring this entire owner impossible in the preview. */
+            (void)race_skirmish_transfer_survivors(SIDE);
+        } else {
+            const unsigned previously_eliminated = race_skirmish_eliminated;
+            unsigned occupied = 0;
+            for (int rank = 0; rank < race_bots && rank < 3; ++rank) {
+                const unsigned bit = 1u << rank;
+                occupied |= bit;
+                if (!((enemy_with_buildings | race_skirmish_eliminated) & bit) &&
+                    race_skirmish_transfer_survivors(race_bot_owner_ids[rank]))
+                    race_skirmish_eliminated |= (u8)bit;
+            }
+            /* Victory evaluates the owners published before this pass. A
+             * newly retired opponent still counts for the current pass. */
+            if ((previously_eliminated & occupied) != occupied) return;
+        }
+    }
+#endif
     if (!human_buildings) { lost = 1; screen = SCREEN_RESULT; result_timer = 0; }
     else if (!enemy_buildings) { won = 1; screen = SCREEN_RESULT; result_timer = 0; }
 }

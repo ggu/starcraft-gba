@@ -77,6 +77,14 @@ static unsigned sc64_p7_carrier_child_state(const Unit *child)
                        SC64_P7_CARRIER_STATE_SHIFT : 0;
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+static int sc64_p7_carrier_child_docked(int type, unsigned flags)
+{
+    return type == U_P7_INTERCEPTOR && (flags & SC64_P7_CARRIER_STATE_MASK) ==
+        (SC64_P7_INTERCEPTOR_INSIDE << SC64_P7_CARRIER_STATE_SHIFT);
+}
+#endif
+
 static unsigned sc64_p7_carrier_child_rank(const Unit *child)
 {
     return child ? ((unsigned)child->flags & SC64_P7_CARRIER_RANK_MASK) >>
@@ -327,6 +335,10 @@ static int race_p7_carrier_training_can_queue_owner(int carrier)
     if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier))
         return 0;
     parent = &u[carrier];
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    if (race_mode && race_skirmish_start_order && parent->owner == NEUTRAL && parent->raw_owner == 11)
+        return 0;
+#endif
     return parent->carry >= 0 && parent->carry < SC64_P7_CARRIER_QUEUE_LIMIT &&
         race_owner_minerals(parent->owner) >= SC64_P7_INTERCEPTOR_COST &&
         sc64_p7_carrier_count_children(carrier, &inside, &training) &&
