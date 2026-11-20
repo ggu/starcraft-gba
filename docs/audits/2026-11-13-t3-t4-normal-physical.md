@@ -98,3 +98,20 @@ python3 tools/sc64_t9_normal_replay.py --chapter 4 --save-tick 4991 \
 | Victory SRAM and fresh readback | `a3d129b4805acc78b8b6ca72422585d0b47ef7d8a21885dc80728706d078c9b1` |
 | Replay and both journal checks | `29bfc1ed61f6b0fe34697c8c00989d5614ec71ac0e81a8361c203b64e0fffdc2` |
 | T10 regression | `7385746eb7904fcf48d76a655d3de34bc2583adb7b0c31c8167ac78626609200` |
+
+
+### Current packed-reader release
+
+The normal Terran ROM built from `b2087fac` repeats the same Jacobs
+Installation route. All ten observations match through the fresh
+load at frame 4,968 and victory at frame 8,911. The pause, victory
+and fresh result readback files are each byte-identical to the
+death-depth run. The current release `fb6968c2` uses the same
+compiled inputs. The 9,009 controller calls average 719,693 cycles
+or 23.31 emulated updates per second.
+
+The ROM and ELF SHA-256 values are
+`80cf073bd02d580b127ccfd710feaf65bf0e2c285a27c2d6411d452fb3200576`
+and `4ea80a38436e943fc9ca6f41812be27152a5abcb8e431ec07d7cabacd2fb87b1`.
+The comparison receipt SHA-256 is
+`fb0fb317d670cc484a1c515a49978a8376dec0140db27493e1ebd6a7d1fe5837`.
