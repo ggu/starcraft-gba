@@ -32,8 +32,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now wins after a fresh load at frame 16,659. All 30 post-load world
   samples match, with three battlefield framebuffer differences still
   open. The route averages 16.36 advancing updates per emulated second.
-  Target draw and orders cost on that route and qualify a fresh P4
-  continuation on normal P10 next.
+  The [Z8 attack-pose index trial](audits/2026-11-12-z8-normal-physical.md#attack-pose-lookup-timing)
+  matches gameplay and video but raises mean cycles by 0.41%. Use the
+  recorded busy draw windows for renderer work. The
+  [instruction profile](audits/2026-11-12-z8-normal-physical.md#instruction-attribution-of-the-z8-stall)
+  attributes 90.89% of frame 21,667 to 16 mineral continuation route
+  fills. Prioritize eligible-field selection and its cache behavior.
+  [P4 on normal P10](audits/2026-11-13-p3-p4-home-preparation.md#november-20-p4-fresh-sram-victory)
+  wins from a fresh load at frame 65,700 with both heroes alive.
+  All 146 checkpoints match, including 71 after the load. The run
+  averages 15.19 calls per emulated second on the current P10.
+  P9 still has a gap between
+  its normal HOME win and its earlier replacement-loop save replay.
 
 - **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
   cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
