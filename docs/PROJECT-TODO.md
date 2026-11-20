@@ -86,7 +86,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores the selected unit at frame 4,968 and wins with Raynor alive.
   All ten observations match, and a third emulator reloads the frozen
   victory with byte-identical SRAM.
-  [T1 on normal Terran](audits/2026-11-13-t1-t2-normal-physical.md#november-20-t1-fresh-sram-and-result-autosave)
+  [T1 on normal Terran](audits/2026-11-13-t1-t2-normal-physical.md#current-packed-reader-release)
   restores Raynor after rescue at frame 6,214 and wins with ten Marines.
   All 12 observations match, and the frozen result re-exports identical
   SRAM. The route averages 29.28 emulated updates per second.

@@ -120,3 +120,21 @@ python3 tools/sc64_t9_normal_replay.py --chapter 1 --save-tick 6222 \
 | Victory SRAM and fresh readback | `111f48fc4c566ade3dbc4d3bb5b2829827c55266e77027966cb64c08e8e5c381` |
 | Replay and both journal checks | `91d5b371472c7148222a96499ae843833eb3cfe3299a51dbb57a45b7ba3ee276` |
 | T10 regression | `fc3c52647470848023ddf2aa724737433fc2a5b8ac8ca184b56774ed13ae633d` |
+
+
+### Current packed-reader release
+
+The exact normal Terran ROM at release `b2087fac` reproduces all 12
+observations, the nine briefing pages and all eight gameplay dialogue
+pages. The pause, victory and frozen-result re-export are byte-identical
+to the death-depth run. The 10,195-call replay averages 572,156 guest
+cycles, or 29.32 emulated updates per second. Its peak is 25,053,520
+cycles. This measures emulator work including presentation waits and
+UI.
+
+The ROM SHA-256 is
+`80cf073bd02d580b127ccfd710feaf65bf0e2c285a27c2d6411d452fb3200576`.
+The corresponding ELF SHA-256 is
+`4ea80a38436e943fc9ca6f41812be27152a5abcb8e431ec07d7cabacd2fb87b1`.
+The replay receipt SHA-256 is
+`4551342f881a6bb80ed4ecb9f3ce96aac2dcf747761e5e543450e02596ec45c0`.
