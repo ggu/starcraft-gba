@@ -29,6 +29,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Continue applying the normal-ROM gate to the remaining
   [campaign entries](audits/2026-11-13-normal-campaign-matrix.md).
 
+- **Late Zerg sight cost.** Sparse sight rows cut dense Z7 full-update
+  cycles by 5.44% and late three-AI Blood Bath cycles by 0.84%. The Z7
+  fresh load still wins at frame 194,998, and both versions emit the same
+  Z9 save after 600 updates on a 128×128 map. Dense Z7 still spends
+  about 1.37 million cycles per advancing update on orders. Prioritize
+  route and recurring order costs before tuning sight again.
+  [Sparse sight audit](audits/2026-11-20-late-zerg-sparse-sight.md)
+
+- **Native skirmish opening defenses.** Compare the first Zerg Creep
+  Colony, first and fourth completed Sunkens, and first offensive on
+  Blood Bath against both retained unmodified N64 runs. The native
+  first Sunken appeared at frames 4,881 and 4,933. The shared GBA
+  planner currently delays Sunken production until update 18,000.
+  Include the paid morph and mid-morph save fixture in the comparison.
+  [N64 skirmish AI audit](audits/2026-11-19-n64-skirmish-ai.md)
+
 - **Result journal under combat load.** The [completed-journal check](IMPACT-EVENTS.md#save-and-load)
   reproduced stale SRAM after a normal P10 victory with nine pending
   impacts. The shared writer now saves the completed result with the

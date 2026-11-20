@@ -18,6 +18,10 @@
 #if defined(SC64_Z7_VISIBILITY_PACKED_ROWS) && !defined(SC64_Z7_VISIBILITY_ROW_CONTEXT)
 #error "SC64_Z7_VISIBILITY_PACKED_ROWS requires SC64_Z7_VISIBILITY_ROW_CONTEXT"
 #endif
+#if defined(SC64_Z7_VISIBILITY_SPARSE_ROWS) && \
+    (!defined(SC64_Z7_VISIBILITY_PACKED_ROWS) || defined(SC64_SHARED_SPAN_TABLES))
+#error "SC64_Z7_VISIBILITY_SPARSE_ROWS requires the Z7 packed row path"
+#endif
 
 #ifdef SC64_Z7_SOURCE_SIGHT
 #include "sc64_z7_source_sight.h"
@@ -801,10 +805,85 @@ sc64_z7_visibility_same_phase_footprint(int ox, int oy, int nx, int ny, int radi
            sc64_z7_visibility_phase_class[index][((ny & 15) << 4) | (nx & 15)];
 }
 #endif
+
+#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+#include "sc64_sight_row_mask_generated.h"
+
+static inline __attribute__((always_inline)) void
+sc64_visibility_row_delta(int row, int old_first, int old_last,
+                          int new_first, int new_last);
+
+/* Reversing a move does not change which rows differ. Anchor the mask at the
+ * endpoint with lower Y (then lower X), even when a move crosses a tile. */
+static inline unsigned
+sc64_z7_visibility_sparse_mask(unsigned radius_index, int ox, int oy, int nx, int ny,
+                               int *first_row)
+{
+    if ((ox | oy | nx | ny) < 0 || MAP_COLS > 255) return ~0u;
+    int dx = nx - ox, dy = ny - oy;
+    if ((unsigned)dx + 2u > 4u || (unsigned)dy + 2u > 4u) return ~0u;
+    if (dy < 0 || (!dy && dx < 0)) {
+        ox = nx;
+        oy = ny;
+        dx = -dx;
+        dy = -dy;
+    }
+    *first_row = oy / 16 - SC64_SIGHT_ROW_BIAS;
+    if (!dx && !dy) return 0;
+    unsigned step = dy ? (unsigned)((dy - 1) * 5 + dx + 4) : (unsigned)(dx - 1);
+    return sc64_z7_sight_sparse_masks[radius_index * 12 + step][(oy & 15) * 16 + (ox & 15)];
+}
+
+static int __attribute__((noinline))
+sc64_z7_visibility_try_sparse(int ox, int oy, int nx, int ny, int radius)
+{
+    unsigned radius_offset = (unsigned)radius - 64u;
+    if (radius_offset > 112u || (radius_offset & 15u)) return 0;
+    unsigned index = radius_offset >> 4;
+    int row;
+    unsigned mask = sc64_z7_visibility_sparse_mask(index, ox, oy, nx, ny, &row);
+    if (mask == ~0u) return 0;
+    if (row < 0) {
+        mask >>= -row;
+        row = 0;
+    }
+    if (!mask) return 1;
+
+    const u8 *old_rows = sc64_z7_sight_packed_rows[index][(oy & 15) * 16 + (ox & 15)];
+    const u8 *new_rows = sc64_z7_sight_packed_rows[index][(ny & 15) * 16 + (nx & 15)];
+    int old_col = ox / 16, new_col = nx / 16;
+    int old_base = oy / 16 - SC64_SIGHT_ROW_BIAS;
+    int new_base = ny / 16 - SC64_SIGHT_ROW_BIAS;
+    while (mask) {
+        if (!(mask & 255u)) {
+            row += 8;
+            mask >>= 8;
+            continue;
+        }
+        if (!(mask & 15u)) { row += 4; mask >>= 4; }
+        if (!(mask & 3u)) { row += 2; mask >>= 2; }
+        if (!(mask & 1u)) { ++row; mask >>= 1; }
+        if (row >= MAP_ROWS) break;
+        unsigned old_span = sc64_visibility_unpack_row(old_rows, old_col, (unsigned)(row - old_base));
+        unsigned new_span = sc64_visibility_unpack_row(new_rows, new_col, (unsigned)(row - new_base));
+        if (old_span != new_span)
+            sc64_visibility_row_delta(row, old_span & 255u, old_span >> 8,
+                                      new_span & 255u, new_span >> 8);
+        ++row;
+        mask >>= 1;
+    }
+    return 1;
+}
+#endif
+
 static void __attribute__((noinline))
 sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
                               int radius)
 {
+#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+    if (sc64_z7_visibility_try_sparse(old_x, old_y, new_x, new_y, radius))
+        return;
+#endif
 #ifdef SC64_Z7_VISIBILITY_PHASE_REJECT
     if (sc64_z7_visibility_same_phase_footprint(old_x, old_y, new_x, new_y, radius))
         return;
