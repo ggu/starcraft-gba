@@ -29,8 +29,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [live eligibility fast path](audits/2026-11-21-z7-late-order-budget.md#live-target-eligibility-fast-path)
   cuts mean guest cycles by 5.38% and 6.17% in the two late windows on
   the shared-depth release. It preserves the sampled route and gameplay
-  results. Prioritize the short isolated field builds and profile the
-  remaining zero-build orders before widening the route experiments.
+  results. [Sparse packing for short isolated fields](audits/2026-11-21-z7-sparse-route-packing.md)
+  cuts the two late window means by 2.55% and 2.70% on the current
+  renderer and Carrier build, with all four normal builds qualified.
+  Profile the remaining zero-build orders and measure wider custom maps
+  and busy P10 play on hardware.
   [Immutable actor lookups](audits/2026-11-21-z10-actor-lookups.md)
   cut the full resumed Z7 mean by 1.17% and the two late windows by
   1.52% and 1.57%, with matching images, SRAM and campaign result.

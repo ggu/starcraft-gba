@@ -198,6 +198,19 @@ test-sc64-route-linear-word-pack: build/test-sc64-route-linear-ref build/test-sc
 	cmp build/route-linear-word-ref.state build/route-linear-word-candidate.state
 	cmp build/route-linear-word-ref.state build/route-linear-word-overflow.state
 
+ROUTE_LINEAR_SPARSE_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE
+build/test-sc64-route-linear-sparse-ref: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_SPARSE_FLAGS) $< -o $@
+build/test-sc64-route-linear-sparse: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_SPARSE_FLAGS) -DSC64_ROUTE_LINEAR_SPARSE_PACK_PROBE $< -o $@
+.PHONY: test-sc64-route-linear-sparse
+test-sc64-route-linear-sparse: build/test-sc64-route-linear-sparse-ref build/test-sc64-route-linear-sparse
+	./build/test-sc64-route-linear-sparse --sparse-linear-only
+	./build/test-sc64-route-linear-sparse-ref --emit build/route-linear-sparse-ref
+	./build/test-sc64-route-linear-sparse --emit build/route-linear-sparse-probe
+	cmp build/route-linear-sparse-ref build/route-linear-sparse-probe
+	cmp build/route-linear-sparse-ref.state build/route-linear-sparse-probe.state
+
 # Randomized differential test of the incremental walkability update against
 # the whole-grid rebuild it replaces, over the footprint kinds of each product
 # family. The -full builds run the same scenarios with the update disabled.

@@ -1968,6 +1968,23 @@ sc64_route_fill_linear(u8 *field, int goal)
     }
     tail = sc64_route_expand_linear(dense, tail, stride, cap);
     if (tail < 0) return tail;
+#ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
+    /* A completed small component has little to pack. A compaction would
+     * require at least cap - 3 discoveries, so this queue still contains
+     * each visited tile, in its original position. */
+    if (cols == SC64_LINEAR_WIDE_COLS && tail <= 384 && tail <= cap - 4) {
+        sc64_route_field_clear(field);
+        for (int i = 0; i < tail; ++i) {
+            const int at = bfs_queue[i];
+            /* The padded interior has columns 4..131 and stride 136.
+             * 136 * 241 = 32768 + 8, with no carry through row 128. */
+            const int dense_row = (int)(((unsigned)at * 241u) >> 15);
+            const int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
+            sc64_route_put_new(field, cell, dense[at]);
+        }
+        return tail;
+    }
+#endif
     sc64_route_pack_linear(field, dense, cols, rows, stride);
     return tail;
 }
@@ -1975,6 +1992,11 @@ sc64_route_fill_linear(u8 *field, int goal)
 #endif
 #if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) && !defined(SC64_ROUTE_DENSE_FLOOD)
 #error "linear flood probe requires the active-stride packed-grid dense helpers"
+#endif
+#if defined(SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE) && \
+    (!defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || !defined(SC64_ROUTE_NEW_CELL) || \
+     !defined(SC64_ROUTE_WORD_CLEAR))
+#error "sparse linear packing requires the wide linear flood and fresh packed writes"
 #endif
 
 #if defined(SC64_ROUTE_WIDE_DEPOT_FULL) && \
