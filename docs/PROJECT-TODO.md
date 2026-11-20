@@ -27,6 +27,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 1.53% across the full resume and raises early peak cost by 10.61%.
   Keep it opt-in and address the nearby-root completions and inactive
   campaign target checks first.
+  [Immutable actor lookups](audits/2026-11-21-z10-actor-lookups.md)
+  cut the full resumed Z7 mean by 1.17% and the two late windows by
+  1.50% and 1.56%, with matching images, SRAM and campaign result. The
+  geometric-first query raises full-run cost by 0.22%. Use the measured
+  combat-only facts probe for the next exact combined comparison.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
