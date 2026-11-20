@@ -145,3 +145,39 @@ The save receipt SHA-256 is
 `6a56a77d0a10b2eee6e281f8d103b755f3ec8285c3d1b70f5e831caf5c2b5d6c`;
 the physical SRAM SHA-256 is
 `a07d7611ec5f986332872270b163779ef1f220560577e6eaf92b5cefea691c1b`.
+
+## November 20 P4 fresh SRAM victory
+
+The sanitizer HOME controller regenerates the 130,239-call route on
+`6720a2fb`. The normal P10 ROM starts at HOME in an empty mGBA process.
+At call 66,029 the input is neutral and both heroes have been rescued.
+START pauses at frame 65,700 and B writes sequence one of the normal
+32 KiB SRAM journal. The reader checks the record checksum, inner and
+outer versions, mission and frame. The second bank remains erased.
+
+HOME L in a fresh process restores the same named gameplay state,
+controls and complete P4 runtime state. All 146 controller checkpoints
+match, including 71 after the load. All seven briefing pages and 13
+field dialogue pages match. The saved bytes are stable through the
+remaining inputs. Both heroes reach extraction alive and owned by the
+player at victory on frame 129,310. The campaign completion bit is set
+and the mission reports zero unsupported actions and trigger faults.
+
+The complete run averages 15.21 controller calls per emulated second,
+including HOME and dialogue input. Physical GBA timing remains open.
+
+In a prepared tree, build `build/px-p4-normal-home` and run it with a
+unique `--attempt-tag`. The controller writes the winning tape to
+`.local/sc64/`. Capture standard error for its authored page log.
+Use both files with the pinned normal P10 ROM, ELF and observer in
+`tools/sc64_p56_normal_home_replay.py --mission 23 --fresh-save-call 66029`.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal P10 ROM | `2735a1b4832ab4030e8f55a8a348fef7f51b3b7e8a29774f1109ac375931192c` |
+| Matching ELF | `136952c78337e9b8bc562219ce47b60bcdaad4bc70322e79140a1f3e69a9bcb7` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| Regenerated controller tape | `dfdcbebc764006875b71ff5645da9ea9e5abb09ff63fc5f017af3e686371d069` |
+| Authored page log | `d4754eac6f547e4e41e4c9a8b3736c28d2a4def7f68bf4b2385f23cdaa3fcd` |
+| Pause SRAM | `d9af44b01f34e652eea0ee5e4e13a659647a6bb816ac19559afa2d74106403bf` |
+| Fresh-process victory receipt | `b3a856e85fb50d8dbe533411a5c2b5873529f2cbd9b91f140f324660e6cf2632` |
