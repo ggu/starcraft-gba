@@ -134,6 +134,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T4 victory, a Showcase scene and the dense Z7 prefix. Showcase has
   72 bytes below the IWRAM link guard. Keep the optical cache and
   combined primary/fallback mask trials out of the normal builds.
+  The [short-path certificate trial](https://github.com/ggu/starcraft-gba/pull/616)
+  cuts the P10 late-battle peak by 42.5% and the mean by 2.1% across
+  58 ordinary updates. Keep it opt-in pending all four RAM links,
+  distant cached-read timing and fresh journal checks. A two-pop
+  FIFO trial raised the sampled Z8 peak by 2.2%. Keep the single-pop loop.
   [The composed resumable point-route trial](https://github.com/ggu/starcraft-gba/pull/576)
   remains opt-in. A [compressed range read](audits/2026-11-16-resumable-frontier-budget.md#cached-range-read-on-a-compressed-wide-grid)
   cuts a forced 128-by-128 stall from 1,086,782 to 252,139 cycles. All 86
