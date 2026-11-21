@@ -56,8 +56,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   In 16 current P10 zero-new-build samples, campaign defense
   indexing and targeting use 84,015 cycles per update (5.32%).
   Four follow-up cuts show 86–88% of visited list nodes in cells
-  with no hostile owners. Measure the owner-mask shortcut against
-  exact target order, eligibility, unit removal and both maps.
+  with no hostile owners. The opt-in owner-mask trial saves 0.80%
+  across the full P10 tail on the earlier controls release and
+  is flat in the sampled Z10 Blood Bath replay. Both randomized
+  host differentials pass. Qualify the current composition,
+  Z10 campaign, other map and stack before deciding on promotion.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -72,8 +75,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   active viewport before using this case to qualify a shared ID policy.
   [PR #696](https://github.com/ggu/starcraft-gba/pull/696) fixes an
   observed GBA foreground selection mismatch at two opaque same-layer
-  flyers. Exercise more candidate bodies and an ordinary native
-  viewport overlap. See the [flyer replay cases](audits/2026-11-22-two-flyer-picker.md).
+  flyers. The [cross-layer fixture](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
+  extends the painter order to a visible Wraith above an Overlord.
+  Exercise more candidate bodies and an ordinary native viewport
+  overlap.
   The [moving flyer double-tap case](audits/2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window)
   verifies the foreground single tap and same-type grouping when
   the overlap changes between A edges. The native same-Y Zergling
@@ -138,18 +143,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and six route cache cuts match the earlier corrected build.
 
 - **Current three-cartridge playtest.** The
-  [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)
-  passes 54 ordinary starts and fresh SRAM continuations on the exact
-  Terran, Z10 and P10 cartridges. It covers both maps, all human races,
-  and one to three independently selected CPU seats. The
-  [earlier 1,134-case matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
-  covers every physical seat and named race assignment at launch. The
-  local Storage folder `StarCraft-GBA-2026-11-21-depth-continuity` holds
-  the race ROMs, Showcase and their verified checksums. SD readback,
-  physical frame pacing and broader native campaign verification remain open.
-  The [packed sprite release](audits/2026-11-22-packed-sprite-transfer.md#page-clip-and-build-checks)
-  passes a fresh full 1,134-case seat matrix and 54 ordinary SRAM
-  continuations on its own exact race ROMs.
+  [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
+  passes all 1,134 ordinary Custom Game launches on the exact
+  Terran, Z10 and P10 cartridges. It covers both maps, every human
+  race and all arrangements of one to three named CPU rivals.
+  The separate 54-case matrix passes fresh HOME save continuation.
+  SD readback, physical frame pacing and broader native campaign
+  verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
