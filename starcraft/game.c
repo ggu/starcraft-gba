@@ -2522,6 +2522,7 @@ static unsigned race_p7_carrier_training_child_count(int carrier);
 #define SC64_P7_CARRIER_PARENT_TYPE(t) ((t) == U_P7_CARRIER)
 #endif
 static int sc64_p7_carrier_parent_type(int type);
+static unsigned sc64_p7_carrier_type_capacity(int type);
 static int race_p7_carrier_training_queue_owner(int carrier);
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
@@ -13041,8 +13042,11 @@ sc64_hud_race_keys(int *values,int first)
     if (values[8]>1) values[12]=0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_protoss_services_active() && sc64_p7_carrier_parent_type(u[first].type))
-        values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
+    if (first >= 0 && race_protoss_services_active() && sc64_p7_carrier_parent_type(u[first].type)) {
+        unsigned children = race_p7_carrier_training_child_count(first);
+        unsigned pending = (unsigned)u[first].carry;
+        values[20] |= (int)((children | (pending << 4)) << 8);
+    }
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (first >= 0 && race_z5_cloak_actor(&u[first]))
