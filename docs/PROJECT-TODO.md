@@ -168,8 +168,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   wallet gains 472–544 minerals over the bracketed opening where the
   native HUD gains 268. The opt-in 102-update mining wait reduces
   that GBA gain to 320–352 and passes a fresh active-wait save.
-  Trace patch occupancy, travel and unloading and rerun the campaign
-  and CPU economy gates before normal activation.
+  [Native patch queues](audits/2026-11-21-native-mineral-service-queue.md)
+  now show one worker in service and FIFO handoffs in an ordinary
+  four-seat Blood Bath. Qualify a saved service policy, the remaining
+  depot travel and unloading, and campaign and CPU economy before
+  normal activation.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
 - **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
   writes a new journal at the actual victory. A fresh HOME load
