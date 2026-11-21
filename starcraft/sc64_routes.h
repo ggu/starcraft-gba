@@ -1771,6 +1771,100 @@ static inline u32 sc64_dense_pack4(const u8 *p)
     return (v | (v >> 10)) & 0xfffu;
 }
 
+#ifdef SC64_ROUTE_FACILITY_HOT64
+static inline __attribute__((always_inline)) u8 *sc64_dense64_grid(void)
+{
+    uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + SC64_DENSE_CELLS) + 3u) &
+        ~(uintptr_t)3u;
+    u8 *dense = (u8 *)(void *)scratch;
+    const u8 *walk = path_walkable;
+    memset(dense, 15, SC64_DENSE_STRIDE);
+    memset(dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE, 15, SC64_DENSE_STRIDE);
+    for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
+        u8 *row = dense + y * SC64_DENSE_STRIDE;
+        const u32 border = 0x0f0f0f0fu;
+        __builtin_memcpy(__builtin_assume_aligned(row, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(row + 68, 4), &border, 4);
+        for (int x = 4; x < 68; x += 8) {
+            u32 bits = *walk++;
+            __builtin_memcpy(__builtin_assume_aligned(row + x, 4),
+                             &sc64_dense_words[bits & 15u], 4);
+            __builtin_memcpy(__builtin_assume_aligned(row + x + 4, 4),
+                             &sc64_dense_words[bits >> 4], 4);
+        }
+    }
+    return dense;
+}
+
+static inline int sc64_dense64_offset(int cell)
+{
+    return (cell & 63) + 4 + ((cell >> 6) + 1) * SC64_DENSE_STRIDE;
+}
+
+static inline __attribute__((always_inline)) int
+sc64_dense64_seed(u8 *dense, int goal)
+{
+    const int start = sc64_dense64_offset(goal);
+    int tail = 0;
+    if (dense[start] == 7u) {
+        dense[start] = 0;
+        bfs_queue[tail++] = (u16)start;
+    } else {
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            int seed = start + dy * SC64_DENSE_STRIDE + dx;
+            if (dense[seed] != 7u) continue;
+            dense[seed] = 0;
+            bfs_queue[tail++] = (u16)seed;
+        }
+    }
+    return tail;
+}
+
+static int GBA_HOT __attribute__((noinline))
+sc64_dense64_expand(u8 *dense, int tail)
+{
+    int head = 0;
+    while (head < tail) {
+        int c = bfs_queue[head++];
+#define SC64_DENSE_STEP(offset, direction) \
+        if (dense[c + (offset)] == 7u) { \
+            dense[c + (offset)] = direction; \
+            bfs_queue[tail++] = (u16)(c + (offset)); \
+        }
+        SC64_DENSE_STEP(-1, 1)
+        SC64_DENSE_STEP(1, 2)
+        SC64_DENSE_STEP(-SC64_DENSE_STRIDE, 3)
+        SC64_DENSE_STEP(SC64_DENSE_STRIDE, 4)
+#undef SC64_DENSE_STEP
+    }
+    return tail;
+}
+
+static inline __attribute__((always_inline)) void
+sc64_dense64_pack(u8 *field, const u8 *dense)
+{
+    for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
+        const u8 *row = dense + y * SC64_DENSE_STRIDE;
+        for (int x = 4; x < 68; x += 8) {
+            u32 pair = sc64_dense_pack4(row + x) |
+                       sc64_dense_pack4(row + x + 4) << 12;
+            *field++ = (u8)pair;
+            *field++ = (u8)(pair >> 8);
+            *field++ = (u8)(pair >> 16);
+        }
+    }
+}
+
+static int __attribute__((noinline))
+sc64_route_fill_dense(u8 *field, int goal)
+{
+    u8 *dense = sc64_dense64_grid();
+    int tail = sc64_dense64_expand(dense, sc64_dense64_seed(dense, goal));
+    sc64_dense64_pack(field, dense);
+    return tail;
+}
+
+#else
 static int GBA_HOT __attribute__((noinline))
 sc64_route_fill_dense(u8 *field, int goal)
 {
@@ -1832,6 +1926,7 @@ sc64_route_fill_dense(u8 *field, int goal)
     }
     return tail;
 }
+#endif
 #if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || defined(SC64_ROUTE_FACILITY_FIFO_PROBE)
 enum { SC64_LINEAR_COLS = 96, SC64_LINEAR_WIDE_COLS = 128, SC64_LINEAR_MAX_ROWS = 128,
        SC64_LINEAR_PAD = 8, SC64_LINEAR_WIDE_QUEUE_LIMIT = 6144 };
@@ -3473,7 +3568,11 @@ sc64_route_facility_discover(u8 *field, u8 *available, unsigned cell, int direct
 
 /* Use the parked frontier's exact packed field and visited grid. The
  * origin test precedes the next whole pop, including on resumed work. */
+#if defined(SC64_ROUTE_FACILITY_HOT64) && !defined(GBA_HOST)
+static int __attribute__((section(".iwram"),long_call,noinline))
+#else
 static int __attribute__((noinline))
+#endif
 sc64_route_expand_facility_64(u8 *field, u8 *available, const u8 *origin_byte,
                               unsigned origin_mask, int *head_out, int tail)
 {
