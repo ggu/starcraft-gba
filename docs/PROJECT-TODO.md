@@ -61,6 +61,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   on the refreshed Z10 continuation. The sampled custom means
   are flat. The two late Z7 means rise 0.41% and 0.44%.
   Each tape retains its sampled state.
+  The [persistent Command validation trial](audits/2026-11-22-persistent-command-validation.md)
+  saves 0.71% on the exact P10 tail with matching sampled state; qualify
+  the other cartridges and physical timing before release.
   The [current target-index attribution](audits/2026-11-22-campaign-defense-owner-masks.md#remaining-order-cost)
   identifies target searches and cell insertion as recurring costs.
   The [armed type lookup](audits/2026-11-22-armed-type-targeting.md)
