@@ -16,7 +16,8 @@ endif
 ifneq ($(filter $(CANONICAL_TERRAN_BUILDING_WORDS),0 1),$(CANONICAL_TERRAN_BUILDING_WORDS))
 $(error CANONICAL_TERRAN_BUILDING_WORDS must be 0 or 1)
 endif
-sc64_can_pack_building_words = $(and $(filter -DSC64_UNIT_WORD_SPRITES,$(1)),$(if $(filter -DSC64_TILE_RENDERER,$(1)),,1))
+sc64_defines = $(filter -D$(1) -D$(1)=%,$(2))
+sc64_can_pack_building_words = $(and $(call sc64_defines,SC64_UNIT_WORD_SPRITES,$(1)),$(if $(call sc64_defines,SC64_TILE_RENDERER,$(1)),,1))
 
 # Size cached route fields to the active map, so the fixed route bank holds
 # more of them on maps smaller than 128 by 128 (56 on the 64-by-64 custom

@@ -42,7 +42,7 @@ build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(TERRAN_ARM_SOURCES) $(
 	$(SIZE) $@
 
 .PHONY: test-sc64-terran-building-words-pixels
-build/test-sc64-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TERRAN_BUILDING_WORD_BANK) common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile | build
+build/test-sc64-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) $(TERRAN_BUILDING_WORD_BANK) common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_BUILDING_WORD_FLAGS) -DSC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
 test-sc64-terran-building-words-pixels: build/test-sc64-terran-building-words-pixels
 	./$<

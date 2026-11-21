@@ -48,6 +48,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Combat facts add about 2% in those late windows and 0.085% across the
   full tape. Keep that second option off and prioritize the repeated
   route failures and expensive permissions in the busiest updates.
+  The current sparse-route capture averages 2.09M and 2.05M cycles for
+  zero-build updates in the two late windows. Orders account for 1.15M
+  and 1.10M of those means. Re-profile the five retained zero-build cuts
+  and compare an exact indexed query that carries invariant ground/air
+  permissions and the candidate's existing coordinates into live policy
+  checks. Keep the scalar permission path as an independent oracle and
+  preserve cloak, fog, containment, invincibility and target tie order.
+  [Spatial index retention](https://github.com/ggu/starcraft-gba/pull/590)
+  raises the dense p95. Keep the
+  [short-route proof](https://github.com/ggu/starcraft-gba/pull/616)
+  workload separate and check its peaks against the latest release.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral

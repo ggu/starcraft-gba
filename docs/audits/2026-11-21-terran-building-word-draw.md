@@ -186,4 +186,18 @@ readback SRAM match the Carrier control. Mean cycle cost decreases from
 1,038,845 to 1,018,820 on this tape. The private receipt SHA-256 is
 `a8b825dec7d521a59eb0cf91e11b1bdd1241cc97ed4538beac2d924b5ff56140`.
 
+The packed P10 finale matches 20 named observations and all 24
+briefing and dialogue pages. The fresh load at frame 36,761 leads to
+the same victory at 46,129 and matches the full pause and victory
+journals and immediate result readback. Mean cycle cost falls from
+1,630,920 to 1,607,611. The private comparison SHA-256 is
+`a35fc91162c784faa832fbb1743b77419f582c41ac90e8141b8b4f7020f9c3a6`.
+
+The packed Z10 finale wins at frame 50,193 from HOME and from a fresh
+load of its own frame-2,526 pause journal. The pause bytes, 22 HOME
+and 20 fresh observations, dialogue and crystal transfers match #663.
+Mean whole-tape cost changes by less than 0.005% in both runs. The
+private comparison SHA-256 is
+`3450f6eb35f16548d4bf683361ba0565d61536526925066267a05870b7011954`.
+
 Physical GBA timing and longer cross-race Custom Game wins remain open.

@@ -37,7 +37,7 @@ verify-showcase: build/StarCraft-Showcase-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --showcase
 
 .PHONY: test-sc64-showcase-terran-building-words-pixels
-build/test-sc64-showcase-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(SHOWCASE_BUILDING_WORD_BANK) common/gba.c $(COMMON_HEADERS) Makefile mk/showcase/Makefile | build
+build/test-sc64-showcase-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) $(UNIT_FACING_INPUTS) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) $(SHOWCASE_BUILDING_WORD_BANK) common/gba.c $(COMMON_HEADERS) Makefile mk/showcase/Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_BUILDING_WORD_FLAGS) -DSC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 test-sc64-showcase-terran-building-words-pixels: build/test-sc64-showcase-terran-building-words-pixels
 	./$<

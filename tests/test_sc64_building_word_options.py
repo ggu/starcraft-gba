@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Check the shared building compositor selection without game assets."""
 
+import os
 from pathlib import Path
 import subprocess
 import unittest
@@ -29,6 +30,7 @@ class BuildingWordOptionsTest(unittest.TestCase):
         return subprocess.run(
             ['make', '-s', '-f', 'Makefile', '-f', '-', *settings, 'print-building-banks'],
             input=recipe, cwd=ROOT, text=True, capture_output=True, check=False,
+            env={'PATH': os.environ.get('PATH', os.defpath)},
         )
 
     def banks(self, *settings):
@@ -50,5 +52,7 @@ class BuildingWordOptionsTest(unittest.TestCase):
 
     def test_incompatible_renderers_skip_the_shared_extension(self):
         self.assertEqual(self.banks('CFLAGS=-DSC64_TILE_RENDERER'), ('', 'generated', '', ''))
+        self.assertEqual(self.banks('CFLAGS=-DSC64_TILE_RENDERER=1'), ('', 'generated', '', ''))
         self.assertEqual(self.banks('SHOWCASE_UNIT_WORD_FLAGS=')[-1], '')
         self.assertEqual(self.banks('TERRAN_UNIT_WORD_FLAGS=')[0], '')
+        self.assertEqual(self.banks('SHOWCASE_UNIT_WORD_FLAGS=-DSC64_UNIT_WORD_SPRITES=1'), PACKED)
