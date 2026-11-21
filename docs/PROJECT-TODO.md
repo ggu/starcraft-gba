@@ -49,6 +49,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   selection-outline trial matches the same replay and saves 0.12%
   on the full tail. Keep the Command trial separate until it passes
   the four-product memory, Custom Game and save checks.
+  Count actual full-field completions on the corrected tapes,
+  including updates with no new route build. At P10 call 39,774,
+  FIFO expansion uses 663,684 of 863,785 full-fill cycles. The
+  current ARM loop reads the stride from a register. Qualify a
+  fixed-stride 128-column loop against the same FIFO order, packed
+  field and compaction rules before changing route scheduling.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -66,9 +72,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   flyers. Exercise more candidate bodies and an ordinary native
   viewport overlap. See the [flyer replay cases](audits/2026-11-22-two-flyer-picker.md).
   The [moving flyer double-tap case](audits/2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window)
-  captures the change in selected units after two A edges. Keep
-  foreground single-click picking and verify same-type grouping
-  when the overlap changes between edges.
+  verifies the foreground single tap and same-type grouping when
+  the overlap changes between A edges. The native same-Y Zergling
+  row visits sprite 438 directly before 1418. Match its image
+  frames and camera to the screenshot before asserting pixel order.
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
@@ -119,11 +126,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   parked-depot releases match both pages, camera and palette. The earlier
   raster difference against `d664d71c` remains unexplained. Native mission
   behavior and physical timing remain separate qualification work.
-  The older Z7 victory tape now misses its terminal win on both the
-  current control and collision-bucket build. The first replay
-  difference is an overlapping Mutalisk selection at call 16,376.
-  The Extractor loss appears later. Verify the corrected double tap
-  and record a current winning path.
+  The shared double-tap fix restores the original Z7 route at the
+  overlapping Mutalisk selection around call 16,376. The combined
+  Wasteland and control build wins at frame 228,128 and reads back
+  the same victory journal from HOME. All 254 world, ten display
+  and six route cache cuts match the earlier corrected build.
 
 - **Current three-cartridge playtest.** The
   [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)
