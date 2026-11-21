@@ -2015,6 +2015,7 @@ static void race_tick_ai(void)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int sc64_p7_carrier_child_docked(int type, unsigned flags);
 static int race_p7_carrier_training_candidate_valid(const Unit *actors, int count);
+static void race_p7_carrier_refund_queue(Unit *parent);
 #endif
 
 /* These actors are coupled to separately stored service records. Hold the
@@ -2035,7 +2036,6 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
     if (q->type == SC64_EGG_ACTOR) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (SC64_P7_CARRIER_PARENT_TYPE(q->type) && q->carry) return 0;
     if (SC64_CARRIER_CHILD_SCRIPTED(q) &&
         !sc64_p7_carrier_child_docked(q->type, (unsigned)q->flags)) return 0;
 #endif
@@ -2111,6 +2111,10 @@ static int race_skirmish_transfer_survivors(int owner)
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        if (SC64_P7_CARRIER_PARENT_TYPE(q->type) && q->carry)
+            race_p7_carrier_refund_queue(q);
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
         /* Drop the former owner's unreleased cast. An existing projectile
          * keeps its launch owner, target and motion independently. */
