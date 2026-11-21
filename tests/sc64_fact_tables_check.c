@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include "race_rules.h"
 #include "sc64_game_actor_facts.h"
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+#include "sc64_combat_facts.h"
+#endif
 
 #ifndef SC64_FACT_TABLES
 #error "Build this oracle with SC64_FACT_TABLES"
@@ -46,6 +49,17 @@ static void unit(int type)
            !!(reference & SC64_GAME_ACTOR_HIDDEN), "hidden", type);
     expect(sc64_game_unit_selectable(type) == policy(reference, SC64_GAME_ACTOR_SELECTABLE),
            "selectable", type);
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+    unsigned combat = sc64_combat_target_facts(type);
+    expect(!!(combat & SC64_COMBAT_HIDDEN) == !!(reference & SC64_GAME_ACTOR_HIDDEN),
+           "combat hidden", type);
+    expect(!!(combat & SC64_COMBAT_FLYING) == !!sc64_race_unit_flying_reference(type),
+           "combat flying", type);
+    expect(sc64_combat_ground_weapon(type) == (sc64_race_unit_damage(type) > 0),
+           "ground weapon", type);
+    expect(sc64_combat_air_weapon(type) == sc64_race_unit_can_attack_air(type),
+           "air weapon", type);
+#endif
 }
 
 static void building(int type)

@@ -146,10 +146,18 @@ endif
 ifeq ($(filter 0 1,$(Z10_FACT_TABLES)),)
 $(error Z10_FACT_TABLES must be 0 or 1)
 endif
+# Combat eligibility can use the same generated bank on the normal Z10 path.
+Z10_COMBAT_FACTS ?= 1
+ifneq ($(Z10_COMBAT_FACTS),0)
+ifneq ($(Z10_COMBAT_FACTS),1)
+$(error Z10_COMBAT_FACTS must be 0 or 1)
+endif
+endif
+Z10_COMBAT_FACT_FLAGS := $(if $(and $(filter 1,$(Z10_FACT_TABLES)),$(filter 1,$(Z10_COMBAT_FACTS))),-DSC64_COMBAT_FACT_TABLE_PROBE)
 Z10_FACT_DIR := build/generated/z10-facts$(if $(Z10_CARRIER_FLAGS),-carrier)
 Z10_FACT_HEADER := $(Z10_FACT_DIR)/sc64_fact_tables_generated.h
-Z10_FACT_FLAGS = $(if $(filter 1,$(Z10_FACT_TABLES)),-DSC64_FACT_TABLES -I$(Z10_FACT_DIR))
-Z10_FACT_REFERENCE_FLAGS = $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(filter -D% -I%,$(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS)) $(Z10_CARRIER_FLAGS)
+Z10_FACT_FLAGS = $(if $(filter 1,$(Z10_FACT_TABLES)),-DSC64_FACT_TABLES -I$(Z10_FACT_DIR) $(Z10_COMBAT_FACT_FLAGS))
+Z10_FACT_REFERENCE_FLAGS = $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(filter -D% -I%,$(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS)) $(Z10_CARRIER_FLAGS) $(Z10_COMBAT_FACT_FLAGS)
 Z10_FACT_SIGNATURE = $(subst ','"'"',$(strip $(Z10_FACT_TABLES) $(Z10_FACT_REFERENCE_FLAGS)))
 Z10_FACT_CONFIG := $(if $(shell test -f build/z10-facts-config && printf '%s\n' '$(Z10_FACT_SIGNATURE)' | cmp -s - build/z10-facts-config && printf matched),,force-z10-facts-rebuild)
 $(Z10_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) $(ZERG_Z10_CANONICAL_INPUTS) Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile tests/sc64-zerg-late/Makefile build/z10-facts-config $(Z10_FACT_CONFIG) | build

@@ -65,19 +65,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rises 0.71%. Position reuse alone stays within 0.05% of stock across
   the Z7 and Z8 windows. Lazy weapon checks cut the Z8 increase to 0.18%.
   [Immutable combat facts](audits/2026-11-21-indexed-target-query.md#immutable-combat-facts)
-  cut the current Z10 late means by 2.76% and 3.13%, with near-neutral
-  early Z7 and Z8 means and matching state. Qualify the exact normal Z10
-  recipe and Custom Game. Check P10 with its V2 actor and sight bank
-  before porting the optimization to its recipe.
+  cut the Z10 late means by 2.76% and 3.13%, with matching state.
+  The [normal Z10 qualification](audits/2026-11-21-z10-combat-facts-release.md)
+  also verifies the rollback link and both maps with one to three AI
+  seats, three human races and matching fresh continuation. The normal
+  Z7 pair matches all 254 fresh-load replay checks and the victory
+  journal at frame 228,128. A P10 V2
+  candidate matches combat and victory journals but saves only 0.074%
+  in the campaign sample. Prioritize larger shared order and route costs.
   The separate [point-certificate trial](audits/2026-11-21-z8-current-point-certificate.md)
   matches 668 live ARM route answers and improves the sampled Z8 mean
   and peak. The retry removes an 856,694-cycle stall at Z8 call 33,900.
   [Sparse cold-prefix packing](audits/2026-11-21-z8-current-point-certificate.md#sparse-packing-after-a-cold-prefix-exhausts-its-component)
   cuts call 33,852 by 120,735 cycles relative to that trial. The sampled
   mean and p95 are now below packed stock. Test bounded demand from the
-  nearby-root reader at call 26,357, where finishing a different parked
-  field adds 993,135 cycles before the reader declines. Keep the route
-  flags opt-in during current mixed-profile qualification.
+  nearby-root reader at call 26,357 saves 731,494 cycles in an opt-in
+  trial. Its retained extra frontier saturates the four ordinary rows
+  and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
+  restores both cuts and takes 8.21% fewer cycles on average than packed
+  stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
+  Compare other campaigns and busy Custom Games on current builds before
+  changing the normal route flags.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
@@ -902,9 +910,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   between retirement and victory. Qualify the ARM boundary and native
   countdown. An opt-in Battlecruiser survivor transfer also passes mixed
   cargo and Yamato HOST save tests. Empty and docked Carrier groups
-  now pass the P10 HOST transfer and save tests. Qualify compact saves,
-  queued and launched fighters, native technology and shot behavior,
-  the other coupled survivors, and simultaneous outcomes before enabling.
+  now pass the P10 HOST transfer and save tests. The [current preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-hangar-retirement-current-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md)
+  passes the Z10 and P10 HOST suites for paid queue refunds and neutral
+  cargo. Z10 also resumes an ordinary active compact journal on ARM.
+  Verify a positive retired-seat compact journal on ARM, launched
+  fighters, the other coupled survivors, and simultaneous outcomes.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results

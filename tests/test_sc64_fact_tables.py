@@ -130,6 +130,27 @@ class FactTablesTest(unittest.TestCase):
                                                 stdout=subprocess.PIPE).stdout
                         self.assertIn(b"fact tables exact:", result)
 
+    def test_opt_in_combat_facts_match_and_require_generated_payload(self):
+        probe = "SC64_COMBAT_FACT_TABLE_PROBE"
+        with tempfile.TemporaryDirectory(prefix="sc64-combat-facts-") as directory:
+            for name in ("all_race_roster", "zp_z7_egg", "p7_shared_scourge", "p7_move_profile"):
+                flags = CONFIGS[name]
+                with self.subTest(configuration=name):
+                    table_dir = generate(self.compiler, flags + (probe,), directory, name)
+                    built, check = compile_program(
+                        self.compiler, CHECK, flags + ("SC64_FACT_TABLES", probe),
+                        directory, name + "-check", ("-I", str(table_dir)))
+                    self.assertEqual(built.returncode, 0, built.stderr.decode())
+                    subprocess.run([str(check)], check=True, cwd=ROOT,
+                                   stdout=subprocess.PIPE)
+            legacy = generate(self.compiler, flags, directory, "without-combat-payload")
+            built, _ = compile_program(
+                self.compiler, CHECK, flags + ("SC64_FACT_TABLES", probe),
+                directory, "mismatch", ("-I", str(legacy)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"Regenerate fact tables with SC64_COMBAT_FACT_TABLE_PROBE",
+                          built.stderr)
+
     def test_tables_reject_a_build_with_different_gates(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-gate-") as directory:
             table_dir = generate(self.compiler, CONFIGS["zp_p7"], directory, "zp_p7")
