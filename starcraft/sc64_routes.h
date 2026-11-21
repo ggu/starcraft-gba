@@ -1626,16 +1626,22 @@ static int sc64_route_origin_ready(int slot, int origin, int origin_walkable)
 #endif
 
 #ifdef SC64_ROUTE_NEW_CELL
-/* Only a fresh full flood may call this: each destination's three bits are
- * still 111, and the borrowed visited grid prevents a second write. */
-static void GBA_HOT __attribute__((noinline))
-sc64_route_put_new(u8 *field, int cell, int direction)
+/* The destination's three bits are still 111. The borrowed visited grid
+ * prevents a second write, including after a parked flood resumes. */
+static inline __attribute__((always_inline)) void
+sc64_route_put_new_bits(u8 *field, int cell, int direction)
 {
     u32 bit=(u32)cell*3u;
     unsigned byte=bit>>3, shift=bit&7u;
     unsigned clear=(7u^(unsigned)direction)<<shift;
     field[byte]&=(u8)~clear;
     if(shift>5u)field[byte+1]&=(u8)~(clear>>8);
+}
+
+static void GBA_HOT __attribute__((noinline))
+sc64_route_put_new(u8 *field, int cell, int direction)
+{
+    sc64_route_put_new_bits(field, cell, direction);
 }
 #endif
 
@@ -3448,6 +3454,43 @@ static void sc64_facility_frontier_park(Sc64FacilityFrontier *p, const u8 *field
     p->discovered = (u16)total;
     memcpy(p->pending, bfs_queue + head, (size_t)pending * sizeof(*bfs_queue));
 }
+
+#if defined(SC64_ROUTE_PACK3) && defined(SC64_ROUTE_NEW_CELL)
+#define SC64_ROUTE_FACILITY_64_FUSED 1
+static inline __attribute__((always_inline)) int
+sc64_route_facility_discover(u8 *field, u8 *available, unsigned cell, int direction, int tail)
+{
+    u8 *byte = &available[cell >> 3];
+    unsigned mask = 1u << (cell & 7u);
+    unsigned bits = *byte;
+    if (bits & mask) {
+        *byte = (u8)(bits ^ mask);
+        sc64_route_put_new_bits(field, (int)cell, direction);
+        bfs_queue[tail++] = (u16)cell;
+    }
+    return tail;
+}
+
+/* Use the parked frontier's exact packed field and visited grid. The
+ * origin test precedes the next whole pop, including on resumed work. */
+static int __attribute__((noinline))
+sc64_route_expand_facility_64(u8 *field, u8 *available, const u8 *origin_byte,
+                              unsigned origin_mask, int *head_out, int tail)
+{
+    enum { side = SC64_FACILITY_FRONTIER_SIDE };
+    int head = 0;
+    while (head < tail && (*origin_byte & origin_mask) == origin_mask) {
+        unsigned cell = bfs_queue[head++];
+        unsigned col = cell & (side - 1u);
+        if (col != 0) tail = sc64_route_facility_discover(field, available, cell - 1, 1, tail);
+        if (col < side - 1u) tail = sc64_route_facility_discover(field, available, cell + 1, 2, tail);
+        if (cell >= side) tail = sc64_route_facility_discover(field, available, cell - side, 3, tail);
+        if (cell < side * (side - 1)) tail = sc64_route_facility_discover(field, available, cell + side, 4, tail);
+    }
+    *head_out = head;
+    return tail;
+}
+#endif
 #endif
 
 /* Depot fields use a separate key namespace and all reachable deposit cells
@@ -3675,6 +3718,13 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     }
 #ifdef SC64_FACILITY_FRONTIERS
 facility_expand:
+#endif
+#ifdef SC64_ROUTE_FACILITY_64_FUSED
+    if (frontier) {
+        tail = sc64_route_expand_facility_64(new_field, facility_walkable,
+                                            origin_byte, origin_mask, &head, tail);
+        complete = head == tail;
+    } else
 #endif
     while (head < tail) {
 #ifdef SC64_DEPOT_BOUNDED

@@ -275,6 +275,13 @@ int main(void)
     run_map(128, 128);
     run_map(80, 48);
 #ifdef SC64_FACILITY_FRONTIERS
+    /* Exercise the same seed, blocked-origin, perimeter and random cases
+     * with the exact 64x64 configuration that can park a field. */
+    fixture_cols = fixture_rows = 64;
+    sc64_facility_frontiers_begin();
+    assert(sc64_facility_frontiers);
+    run_map(64, 64);
+    sc64_facility_frontiers = 0;
     check_interleaved_frontiers();
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
     check_frontiers_after_wide_tail();
