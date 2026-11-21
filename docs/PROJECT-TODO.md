@@ -2287,6 +2287,8 @@ AI wallets and full-match behavior remain unverified.
 - Add the [shared depth cases](audits/2026-11-21-shared-world-depth-regressions.md#replay-cases)
   for live Goliath turret overlap, body-only banks and active-camera sprite
   pool reuse. Capture the ore-return attachment and independent mining effect.
+  Extend the nested-death overlap fixture to ordinary-input replay and
+  capture last-image retirement.
 - Add the [native depth follow-up cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
   by case ID. Start with same-Y Tank hull, turret and firing flash, then
   cover the separate Goliath turret and capture native pool-ID reuse.

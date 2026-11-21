@@ -144,7 +144,7 @@ static void test_death_depth(void)
         { 52,  0, U_WRAITH, 3, 16, 0, 42, 0 },
         { 52,  0, U_WRAITH, 5, 16, 0, 42, 0 },
         { 52,  0, U_TANK,   5, 16, 1, 42, 0 },
-        /* At source age 69, one original sprite holds two images while
+        /* At source age 69, the Overmind's sprite holds two images while
          * the newly spawned rubble retains its own layer-one key. */
         { 52,  0, U_WRAITH, 87, 4, 0, 147, 0 },
     };
@@ -160,6 +160,7 @@ static void test_death_depth(void)
         int raw = cases[n].victim_raw;
         int burst_image = 0;
         if (raw == 110 || raw == 147 || raw == 149 || raw == 157) {
+            /* Showcase uses a staged building slot for the P10-only art. */
             int type = raw == 110 ? B_REFINERY : raw == 147 ? B_HATCHERY :
                        raw == 149 ? B_EXTRACTOR : B_ASSIMILATOR;
             int victim = spawn_build(SIDE, type, 96, y, 0);
