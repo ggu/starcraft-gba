@@ -41,7 +41,18 @@ Cover different types, a second click outside either bound, fogged
 or hostile actors, and retirement and reuse of the remembered slot.
 Compare native overlap and repeat-selection inputs separately.
 
+The shared input fix compares the second picked actor's selection
+type after checking that the remembered actor remains live, owned,
+selected and eligible. It preserves the original timing and
+distance bounds and the foreground result of the first click.
+With the fix, call 16,376 still selects slot 104 and call 16,378
+groups slots 100 and 104. Both remain selected entering attack mode
+at 16,382. The asset-free sanitizer fixtures exercise matching and
+differing types, expiration, dead and reused actors, a changed type
+and a change in ownership.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Pre-fix click pair | `655230d7740fb389a42d06d4b0104910d5812384ae0ba5930eead7312f958469` |
 | Current click pair | `3db26ef336bbc93564235bbec07bb052a6b5797163f823895058652641b7584b` |
+| Pre-fix, current and corrected ordinary click comparison | `73310720e933762c7ddf22d4e1987ed5b11684defe02d6083e45790783b1b89d` |
