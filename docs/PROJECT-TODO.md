@@ -100,6 +100,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   local Storage folder `StarCraft-GBA-2026-11-21-depth-continuity` holds
   the race ROMs, Showcase and their verified checksums. SD readback,
   physical frame pacing and broader native campaign verification remain open.
+  The [packed sprite release](audits/2026-11-22-packed-sprite-transfer.md#page-clip-and-build-checks)
+  passes a fresh full 1,134-case seat matrix and 54 ordinary SRAM
+  continuations on its own exact race ROMs.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
@@ -222,8 +225,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   damage tracking before adding writes to the painter's hot path.
   The [packed sprite compositor](audits/2026-11-22-packed-sprite-transfer.md)
   lowers that mean to 832,982 cycles and frees 64 bytes of static
-  IWRAM code on each normal profile. Profile the byte sprite and
-  projectile paths for larger sustained savings. The
+  IWRAM code on each normal profile. The separate byte sprite trial
+  saves another 2,143 cycles on Blood Bath. Prioritize projectile
+  drawing and the exact collision lifecycle for larger sustained
+  savings. The
   [point-route origin census](audits/2026-11-21-blood-bath-point-origin.md)
   links all four fills at update 2,055 to stale-donor gate
   failures. Both local certificates decline all four. A full-width
