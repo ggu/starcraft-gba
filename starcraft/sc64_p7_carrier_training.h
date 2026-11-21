@@ -88,6 +88,12 @@ static int sc64_p7_carrier_child_docked(int type, unsigned flags)
         (SC64_P7_INTERCEPTOR_INSIDE << SC64_P7_CARRIER_STATE_SHIFT);
 }
 
+static int sc64_p7_carrier_child_training(const Unit *child)
+{
+    return child->type == U_P7_INTERCEPTOR &&
+        sc64_p7_carrier_child_state(child) == SC64_P7_INTERCEPTOR_TRAINING;
+}
+
 /* Call after the whole surviving roster and its hangar graphs validate.
  * The native ownership transfer cancels unstarted orders for the old owner. */
 static void race_p7_carrier_refund_queue(Unit *parent)
@@ -549,6 +555,17 @@ static void race_p7_carrier_training_clear_slot(int slot)
                                      race_p7_projectile_clear_references);
     }
 }
+
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+/* An ordinary native skirmish defeat visits the newer child before the
+ * older parent. The child is already neutral when the parent cancels
+ * active training and pays the refund to the child's current owner. */
+static void race_p7_carrier_cancel_retiring_trainee(int child)
+{
+    race_p7_carrier_training_clear_slot(child);
+    race_add_owner_resources(NEUTRAL, SC64_P7_INTERCEPTOR_COST, 0);
+}
+#endif
 
 static int race_p7_carrier_training_source_tick(void)
 {

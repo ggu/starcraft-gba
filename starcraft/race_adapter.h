@@ -2014,8 +2014,10 @@ static void race_tick_ai(void)
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int sc64_p7_carrier_child_docked(int type, unsigned flags);
+static int sc64_p7_carrier_child_training(const Unit *child);
 static int race_p7_carrier_training_candidate_valid(const Unit *actors, int count);
 static void race_p7_carrier_refund_queue(Unit *parent);
+static void race_p7_carrier_cancel_retiring_trainee(int child);
 #endif
 
 /* These actors are coupled to separately stored service records. Hold the
@@ -2037,7 +2039,8 @@ static int race_skirmish_neutral_transfer_ready(const Unit *q)
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (SC64_CARRIER_CHILD_SCRIPTED(q) &&
-        !sc64_p7_carrier_child_docked(q->type, (unsigned)q->flags)) return 0;
+        !sc64_p7_carrier_child_docked(q->type, (unsigned)q->flags) &&
+        !sc64_p7_carrier_child_training(q)) return 0;
 #endif
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
     if (sc64_race_raw_unit(q->type) == 83) return 0;
@@ -2112,6 +2115,10 @@ static int race_skirmish_transfer_survivors(int owner)
         Unit *q = &u[i];
         if (!q->alive || q->owner != owner) continue;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        if (sc64_p7_carrier_child_training(q)) {
+            race_p7_carrier_cancel_retiring_trainee(i);
+            continue;
+        }
         if (SC64_P7_CARRIER_PARENT_TYPE(q->type) && q->carry)
             race_p7_carrier_refund_queue(q);
 #endif

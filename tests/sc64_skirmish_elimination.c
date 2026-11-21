@@ -214,12 +214,18 @@ static void check_docked_carrier_retirement(void)
     const unsigned early_rank = sc64_p7_carrier_child_rank(&u[gap]);
     const unsigned late_rank = sc64_p7_carrier_child_rank(&u[second]);
     assert(early_rank != late_rank);
+    race_add_owner_resources(owner, SC64_P7_INTERCEPTOR_COST, 0);
     const int ore = race_owner_minerals(owner), vespene = race_owner_gas(owner);
     const int neutral_bank = race_owner_minerals(NEUTRAL);
     assert(race_p7_carrier_training_queue_owner(carrier));
+    const int trainee = race_p7_carrier_training_start(carrier);
+    assert(trainee >= 0 && sc64_p7_carrier_child_training(&u[trainee]));
+    assert(race_p7_carrier_training_queue_owner(carrier));
     assert(race_p7_carrier_training_queue_owner(empty));
     assert(u[carrier].carry == 1 && u[empty].carry == 1);
-    const int paid_bank = ore - 2 * SC64_P7_INTERCEPTOR_COST;
+    const int paid_bank = ore - 3 * SC64_P7_INTERCEPTOR_COST;
+    const int retired_bank = ore - SC64_P7_INTERCEPTOR_COST;
+    const int neutral_refund = neutral_bank + SC64_P7_INTERCEPTOR_COST;
     assert(race_owner_minerals(owner) == paid_bank);
 
 #ifdef SC64_TRANSPORT_RUNTIME
@@ -247,13 +253,22 @@ static void check_docked_carrier_retirement(void)
     assert(race_owner_minerals(owner) == paid_bank && race_owner_gas(owner) == vespene);
     sc64_p7_carrier_child_set_rank(&u[second], late_rank);
 
+    int remaining = u[trainee].work_timer;
+    u[trainee].work_timer = 0;
+    memcpy(before, u, sizeof(u));
+    race_skirmish_outcome();
+    assert(!race_skirmish_eliminated && !memcmp(before, u, sizeof(u)));
+    assert(race_owner_minerals(owner) == paid_bank && race_owner_minerals(NEUTRAL) == neutral_bank);
+    u[trainee].work_timer = remaining;
+
     race_skirmish_outcome();
     assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 4);
     assert(u[carrier].alive && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11 &&
            u[empty].alive && u[empty].owner == NEUTRAL && u[empty].raw_owner == 11);
     assert(!u[carrier].carry && !u[empty].carry &&
-           race_owner_minerals(owner) == ore && race_owner_gas(owner) == vespene &&
-           race_owner_minerals(NEUTRAL) == neutral_bank);
+           race_owner_minerals(owner) == retired_bank && race_owner_gas(owner) == vespene &&
+           race_owner_minerals(NEUTRAL) == neutral_refund);
+    assert(!u[trainee].alive && u[trainee].build == -1);
     assert(race_p7_carrier_training_child_count(carrier) == 2 &&
            !race_p7_carrier_training_child_count(empty));
 
@@ -267,12 +282,10 @@ static void check_docked_carrier_retirement(void)
            u[empty].alive && u[empty].owner == NEUTRAL && u[empty].raw_owner == 11 &&
            u[carrier].order == ORDER_IDLE && u[empty].order == ORDER_IDLE);
     assert(!u[carrier].carry && !u[empty].carry &&
-           race_owner_minerals(owner) == ore && race_owner_gas(owner) == vespene &&
-           race_owner_minerals(NEUTRAL) == neutral_bank);
-    race_minerals[NEUTRAL] = SC64_P7_INTERCEPTOR_COST;
+           race_owner_minerals(owner) == retired_bank && race_owner_gas(owner) == vespene &&
+           race_owner_minerals(NEUTRAL) == neutral_refund && !u[trainee].alive);
     assert(!race_p7_carrier_training_queue_owner(carrier) &&
            !race_p7_carrier_training_queue_owner(empty));
-    race_minerals[NEUTRAL] = neutral_bank;
     for (int i = 0; i < 8; ++i) game_update(0, 0);
     assert(u[gap].alive && u[gap].owner == NEUTRAL && u[gap].raw_owner == 11 &&
            u[gap].build == carrier && sc64_p7_carrier_child_rank(&u[gap]) == early_rank &&
@@ -285,6 +298,33 @@ static void check_docked_carrier_retirement(void)
     assert(race_save_game());
 }
 
+static void check_human_trainee_retirement(void)
+{
+    launch_as(0, R_PROTOSS);
+    const int ship = spawn_unit(SIDE, U_P7_CARRIER, 500, 500);
+    const int original = race_owner_minerals(SIDE);
+    const int neutral = race_owner_minerals(NEUTRAL);
+    assert(ship >= 0 && race_p7_carrier_training_queue_owner(ship));
+    const int trainee = race_p7_carrier_training_start(ship);
+    assert(trainee >= 0 && race_p7_carrier_training_queue_owner(ship));
+    assert(race_owner_minerals(SIDE) == original - 2 * SC64_P7_INTERCEPTOR_COST);
+    destroy_building(building_of(SIDE), ENEMY);
+    game_update(0, 0);
+    assert(!won && lost && screen == SCREEN_RESULT);
+    assert(u[ship].alive && u[ship].owner == NEUTRAL && u[ship].raw_owner == 11 &&
+           !u[ship].carry && !u[trainee].alive);
+    assert(race_owner_minerals(SIDE) == original - SC64_P7_INTERCEPTOR_COST &&
+           race_owner_minerals(NEUTRAL) == neutral + SC64_P7_INTERCEPTOR_COST);
+    assert(race_save_game());
+    game_init(); prior_keys = 0;
+    input(KEY_L);
+    assert(!won && lost && screen == SCREEN_RESULT &&
+           u[ship].alive && u[ship].owner == NEUTRAL && !u[trainee].alive);
+    assert(race_owner_minerals(SIDE) == original - SC64_P7_INTERCEPTOR_COST &&
+           race_owner_minerals(NEUTRAL) == neutral + SC64_P7_INTERCEPTOR_COST);
+}
+
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static void check_fenced_final_result(int human_defeat)
 {
     launch(0);
@@ -292,38 +332,48 @@ static void check_fenced_final_result(int human_defeat)
     const int ship = spawn_unit(owner, type, 500, 500);
     const int survivor = spawn_unit(owner, U_MARINE, 480, 500);
     assert(ship >= 0 && survivor >= 0 && race_p7_carrier_training_queue_owner(ship));
-    assert(race_skirmish_neutral_transfer_ready(&u[ship]));
-    const int trainee = race_p7_carrier_training_start(ship);
-    assert(trainee >= 0 && !race_skirmish_neutral_transfer_ready(&u[trainee]));
-    assert(race_p7_carrier_training_queue_owner(ship));
+    assert(race_p7_carrier_training_stock(ship, 1) == 1);
+    assert(race_p7_flight_release(ship, worker_of(SIDE)));
+    int launched = -1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].type == U_P7_INTERCEPTOR && u[i].build == ship)
+            launched = i;
+    assert(launched >= 0 && !race_skirmish_neutral_transfer_ready(&u[launched]));
     const int paid_bank = race_owner_minerals(owner);
+    const int neutral_bank = race_owner_minerals(NEUTRAL);
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner != SIDE && b[i].owner != owner)
             destroy_building(i, SIDE);
-    game_update(0, 0);
+    race_skirmish_outcome();
     assert(!won && !lost && race_skirmish_eliminated == (7 ^ bit));
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == owner) destroy_building(i, SIDE);
-    game_update(0, 0);
+    race_skirmish_outcome();
     assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == (7 ^ bit));
     assert(u[ship].owner == owner && u[survivor].owner == owner && owners_hostile(SIDE, owner));
-    assert(u[ship].carry == 1 && race_owner_minerals(owner) == paid_bank);
+    assert(u[ship].carry == 1 && race_owner_minerals(owner) == paid_bank &&
+           race_owner_minerals(NEUTRAL) == neutral_bank);
     if (human_defeat) {
         for (int i = 0; i < MAX_BUILDINGS; ++i)
             if (b[i].alive && b[i].owner == SIDE) destroy_building(i, owner);
-        game_update(0, 0);
+        race_skirmish_outcome();
         assert(!won && lost && screen == SCREEN_RESULT && race_skirmish_eliminated == (7 ^ bit));
     } else {
         hit_target(ship, 5000, U_MARINE, SIDE);
-        assert(!u[ship].alive);
-        game_update(0, 0);
+        assert(!u[ship].alive && u[launched].alive &&
+               sc64_p7_carrier_child_state(&u[launched]) == SC64_P7_INTERCEPTOR_DETACHED);
+        race_skirmish_outcome();
+        assert(!won && !lost && race_skirmish_eliminated == (7 ^ bit));
+        race_p7_flight_kill(launched);
+        race_skirmish_outcome();
         assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 7);
         assert(u[survivor].alive && u[survivor].owner == NEUTRAL &&
                !owners_hostile(SIDE, NEUTRAL));
-        game_update(0, 0);
+        race_skirmish_outcome();
         assert(won && !lost && screen == SCREEN_RESULT && race_skirmish_eliminated == 7);
     }
 }
+#endif
 #endif
 
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -656,8 +706,11 @@ int main(void)
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     check_docked_carrier_retirement();
+    check_human_trainee_retirement();
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     check_fenced_final_result(0);
     check_fenced_final_result(1);
+#endif
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     check_battlecruiser_retirement(SC64_BC_SHOT_APPROACH);
