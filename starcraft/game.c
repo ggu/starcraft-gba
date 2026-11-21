@@ -4212,11 +4212,15 @@ move_toward(Unit * q, int tx, int ty)
 #if defined(SC64_CONTACT_CACHE)
 	int fresh;
 	unsigned blocked = SC64_STEER_MASK(q, speed, &fresh);
-	for (i = 0; i < 8; i++) {
+	unsigned open = ~blocked & 0xffu;
+	for (i = 0; open; ++i, open >>= 1) {
+	    if (!(open & 1u)) continue;
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
-	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
-		!(blocked & (1u << i))) { best = i; best_cost = cost; }
+	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell)) {
+		best = i;
+		best_cost = cost;
+	    }
 	}
 	SC64_STEER_REMEMBER(q, speed, blocked, best, fresh);
 #elif defined(SC64_COLLISION_STEER_LIST)
