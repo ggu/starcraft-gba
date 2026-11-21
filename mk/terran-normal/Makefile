@@ -12,7 +12,7 @@ TERRAN_CARRIER_SOURCES := $(if $(TERRAN_CARRIER_FLAGS),$(P7_INTERCEPTOR_FLIGHT_S
 TERRAN_PROJECTILE_SOURCES := $(filter starcraft/sc64_interceptor_%.c,$(STARCRAFT))
 TERRAN_ARM_SOURCES := $(filter-out $(TERRAN_PROJECTILE_SOURCES),$(STARCRAFT)) $(TERRAN_CARRIER_SOURCES) $(TERRAN_PROJECTILE_SOURCES)
 # Optional packed art for the three stock Terran base structures.
-TERRAN_BUILDING_WORDS ?= 0
+TERRAN_BUILDING_WORDS ?= $(CANONICAL_TERRAN_BUILDING_WORDS)
 ifneq ($(TERRAN_BUILDING_WORDS),0)
 ifneq ($(TERRAN_BUILDING_WORDS),1)
 $(error TERRAN_BUILDING_WORDS must be 0 or 1)
@@ -20,7 +20,7 @@ endif
 endif
 TERRAN_BUILDING_WORD_DIR := build/generated/terran-base-building-words
 TERRAN_BUILDING_WORD_BANK := $(TERRAN_BUILDING_WORD_DIR)/sc64_building_words_generated.h
-TERRAN_BUILDING_WORD_INPUTS := $(if $(filter 1,$(TERRAN_BUILDING_WORDS)),$(TERRAN_BUILDING_WORD_BANK))
+TERRAN_BUILDING_WORD_INPUTS := $(if $(and $(filter 1,$(TERRAN_BUILDING_WORDS)),$(call sc64_can_pack_building_words,$(CFLAGS) $(TERRAN_ROM_FLAGS))),$(TERRAN_BUILDING_WORD_BANK))
 TERRAN_BUILDING_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(TERRAN_BUILDING_WORD_DIR)
 
 $(TERRAN_BUILDING_WORD_BANK): $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
@@ -28,7 +28,7 @@ $(TERRAN_BUILDING_WORD_BANK): $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h
 	$(PYTHON) tools/sc64_building_words.py $< --frame command_center --frame barracks --frame supply_depot > $@.tmp
 	mv $@.tmp $@
 
-TERRAN_NORMAL_OPTIONS := $(TERRAN_CARRIER_RELEASE) $(TERRAN_BUILDING_WORDS)
+TERRAN_NORMAL_OPTIONS := $(TERRAN_CARRIER_RELEASE) $(if $(TERRAN_BUILDING_WORD_INPUTS),1,0)
 TERRAN_NORMAL_CONFIG := $(if $(shell test -f build/terran-normal-config && printf '%s\n' '$(TERRAN_NORMAL_OPTIONS)' | cmp -s - build/terran-normal-config && printf matched),,force-terran-normal-rebuild)
 .PHONY: force-terran-normal-config force-terran-normal-rebuild
 force-terran-normal-config:

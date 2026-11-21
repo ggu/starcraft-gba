@@ -106,7 +106,7 @@ Z10_BUILDING_WORDS ?= 1
 ifneq ($(filter $(Z10_BUILDING_WORDS),0 1),$(Z10_BUILDING_WORDS))
 $(error Z10_BUILDING_WORDS must be 0 or 1)
 endif
-Z10_TERRAN_BUILDING_WORDS ?= 0
+Z10_TERRAN_BUILDING_WORDS ?= $(CANONICAL_TERRAN_BUILDING_WORDS)
 ifneq ($(words $(filter 0 1,$(Z10_TERRAN_BUILDING_WORDS))),1)
 $(error Z10_TERRAN_BUILDING_WORDS must be 0 or 1)
 endif
@@ -118,7 +118,7 @@ Z10_BUILDING_WORDS_FLAGS = $(if $(filter 1,$(Z10_BUILDING_WORDS)),-DSC64_BUILDIN
 Z10_TERRAN_BUILDING_WORD_DIR := build/generated/z10-terran-building-words
 Z10_TERRAN_BUILDING_WORD_HEADER := $(Z10_TERRAN_BUILDING_WORD_DIR)/sc64_building_words_generated.h
 # The extra bank must precede the normal -Ibuild/generated.
-Z10_TERRAN_BUILDING_WORD_INCLUDE := $(if $(and $(Z10_BUILDING_WORDS_FLAGS),$(filter 1,$(Z10_TERRAN_BUILDING_WORDS))),-I$(Z10_TERRAN_BUILDING_WORD_DIR))
+Z10_TERRAN_BUILDING_WORD_INCLUDE := $(if $(and $(Z10_BUILDING_WORDS_FLAGS),$(filter 1,$(Z10_TERRAN_BUILDING_WORDS)),$(call sc64_can_pack_building_words,$(CFLAGS) $(ZERG_Z10_CANONICAL_FLAGS))),-I$(Z10_TERRAN_BUILDING_WORD_DIR))
 Z10_SELECTED_BUILDING_WORD_HEADER := $(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),$(Z10_TERRAN_BUILDING_WORD_HEADER),$(SC64_BUILDING_WORDS_HEADER))
 Z10_BUILDING_WORDS_KEY := $(Z10_BUILDING_WORDS)$(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),-terran)
 Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS_KEY)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)

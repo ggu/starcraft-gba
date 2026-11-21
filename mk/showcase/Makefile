@@ -1,7 +1,7 @@
 # Showcase ROM and HOST suite. Included by the top-level Makefile after SHOWCASE_FLAGS.
 SHOWCASE_FLAGS += -DSC64_TYPED_UNIT_CHUNK_READER
 
-SHOWCASE_TERRAN_BUILDING_WORDS ?= 0
+SHOWCASE_TERRAN_BUILDING_WORDS ?= $(CANONICAL_TERRAN_BUILDING_WORDS)
 ifneq ($(SHOWCASE_TERRAN_BUILDING_WORDS),0)
 ifneq ($(SHOWCASE_TERRAN_BUILDING_WORDS),1)
 $(error SHOWCASE_TERRAN_BUILDING_WORDS must be 0 or 1)
@@ -9,19 +9,20 @@ endif
 endif
 SHOWCASE_BUILDING_WORD_DIR := build/generated/showcase-terran-base-building-words
 SHOWCASE_BUILDING_WORD_BANK := $(SHOWCASE_BUILDING_WORD_DIR)/sc64_building_words_generated.h
-SHOWCASE_BUILDING_WORD_INPUTS := $(if $(filter 1,$(SHOWCASE_TERRAN_BUILDING_WORDS)),$(SHOWCASE_BUILDING_WORD_BANK))
+SHOWCASE_BUILDING_WORD_INPUTS := $(if $(and $(filter 1,$(SHOWCASE_TERRAN_BUILDING_WORDS)),$(call sc64_can_pack_building_words,$(CFLAGS) $(SHOWCASE_FLAGS))),$(SHOWCASE_BUILDING_WORD_BANK))
 SHOWCASE_BUILDING_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(SHOWCASE_BUILDING_WORD_DIR)
 $(SHOWCASE_BUILDING_WORD_BANK): .local/sc64/p7/generated/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
 	mkdir -p $(dir $@)
 	$(PYTHON) tools/sc64_building_words.py $< --frame command_center --frame barracks --frame supply_depot > $@.tmp
 	mv $@.tmp $@
 
-SHOWCASE_BUILDING_WORD_CONFIG := $(if $(shell test -f build/showcase-building-words-config && printf '%s\n' '$(SHOWCASE_TERRAN_BUILDING_WORDS)' | cmp -s - build/showcase-building-words-config && printf matched),,force-showcase-building-words-rebuild)
+SHOWCASE_BUILDING_WORD_ENABLED := $(if $(SHOWCASE_BUILDING_WORD_INPUTS),1,0)
+SHOWCASE_BUILDING_WORD_CONFIG := $(if $(shell test -f build/showcase-building-words-config && printf '%s\n' '$(SHOWCASE_BUILDING_WORD_ENABLED)' | cmp -s - build/showcase-building-words-config && printf matched),,force-showcase-building-words-rebuild)
 .PHONY: force-showcase-building-words-config force-showcase-building-words-rebuild
 force-showcase-building-words-config:
 force-showcase-building-words-rebuild:
 build/showcase-building-words-config: force-showcase-building-words-config | build
-	@printf '%s\n' '$(SHOWCASE_TERRAN_BUILDING_WORDS)' > $@.tmp
+	@printf '%s\n' '$(SHOWCASE_BUILDING_WORD_ENABLED)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(SHOWCASE_BUILDING_WORD_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile mk/showcase/Makefile build/showcase-building-words-config $(SHOWCASE_BUILDING_WORD_CONFIG) | build
