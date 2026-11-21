@@ -41,15 +41,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   live render rows. Extend campaign opening and event timing
   coverage. Use the active Blood Bath combat witness to qualify opaque
   overlaps and pool-ID reuse in new ordinary-input cuts.
+  The [native Blood Bath production witness](audits/2026-11-21-native-blood-bath-lurker.md)
+  follows three Zerg CPU Hydralisks through Lurker Egg and Lurker in
+  their original slots. Qualify the missing Custom Game research
+  and AI morph path with per-owner payment, supply and save checks.
 
 - **Campaign verification.** The [preceding ordinary HOME sweep](audits/2026-11-21-released-campaign-continuations.md)
   covers T1–T10, Z1–Z5, Z10, P1–P5 and P10 through victory
-  and fresh result readback. The updated depth build repeats T1,
-  Z2, Z5 and P5 with matching gameplay and journal evidence,
-  then qualifies Z6 with a pending-impact pause and P6 with
-  113 matched checkpoints. Continue with Z7–Z9 and P7–P9,
-  then refresh the exact-build
-  coverage. Check physical timing separately.
+  and fresh result readback. The [late campaign sweep](audits/2026-11-21-late-campaign-home-sweep.md)
+  adds Z7–Z9 and P7–P9 on the attached-depth ROMs, completing
+  the 30-mission victory and fresh result-readback sweep across
+  the two release sets. The attached-depth ROMs now have 24
+  exact-build routes. Refresh T5, T8, T9, Z1, Z3 and P4 and trace the display
+  difference at Z7 call 154,198. Native mission behavior and
+  physical timing remain separate qualification work.
 
 - **Current three-cartridge playtest.** The
   [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)
@@ -178,9 +183,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   links all four fills at update 2,055 to stale-donor gate
   failures. Both local certificates decline all four. A full-width
   FIFO can reach the requesting origins after 685–1,662 of the
-  2,795 pops per fill. Prioritize a resumable full-width trial with
-  the stale-donor and exact-read paths covered. Measure its cost
-  alongside path-grid rebuilds and steady painter cost.
+  2,795 pops per fill. The [resumable and placement trials](audits/2026-11-21-dense64-prefix-and-placement.md)
+  find that many parked fields soon materialize. Peak improves
+  with Thumb facility-loop placement, about 4.85% on Blood Bath and
+  15.28% in the sampled Outpost window. Mean changes are small and
+  both p95 measurements rise. Keep production placement and focus
+  the next sustained-load investigation on order work, path-grid
+  rebuilds and the steady painter cost.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
