@@ -359,6 +359,7 @@ static void test_flight_trail_depth(void)
     static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
     static const struct { unsigned raw, weapon, air, image; } cases[] = {
         { 2, 4, 0, 532 }, { 8, 15, 1, 528 }, { 3, 8, 1, 529 },
+        { 70, 74, 1, 521 },
     };
     const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
     const unsigned child = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS;
@@ -370,18 +371,27 @@ static void test_flight_trail_depth(void)
         memset(&race_p4.storm, 0, sizeof(race_p4.storm));
         Sc64PsionicStorm *storm = &race_p4.storm.storm[0];
 
-        /* Use the native observed layer-5 missile plane and isolate one
-         * emitter even when its weapon normally launches a pair. */
-        int target = make_unit(ENEMY, U_SCV, 7, 208, 54);
-        assert(sc64_source_emit(cases[n].raw, -1, cases[n].weapon, cases[n].air,
-                                32, 54, 208, 54, target));
+        /* Use the observed layer-5 missile plane for the Storm overlaps.
+         * Scout air fire targets a Dropship for a layer-17 missile. */
+        int scout = cases[n].raw == 70;
+        int target = make_unit(ENEMY, scout ? U_DROPSHIP : U_SCV,
+                               scout ? 11 : 7, 208, 54);
+        if (scout) {
+            int shooter = make_unit(SIDE, U_SCOUT, 70, 32, 54);
+            assert(sc64_source_unit_vfx(&u[shooter], 208, 54, 1, target));
+            u[shooter].alive = 0;
+        } else {
+            assert(sc64_source_emit(cases[n].raw, -1, cases[n].weapon, cases[n].air,
+                                    32, 54, 208, 54, target));
+        }
         for (unsigned i = 1; i < MAX_TRACERS; ++i) tracers[i].life = 0;
         const Sc64TraceSlot *slot = &sc64_trace_slots[0];
         const Sc64WeaponSourceAttackProfile *profile =
             sc64_weapon_source_trace_profile((u32)tracers[0].color);
         assert(profile && profile->projectile_image == cases[n].image);
         while (slot->release_life && tracers[0].life > 1) update_tracers();
-        assert(slot->bullet_layer == 5);
+        unsigned layer = scout ? 17 : 5;
+        assert(slot->bullet_layer == layer);
         u[target].alive = 0;
         unsigned pixel = BATTLEFIELD_BYTES;
         while (tracers[0].life > 1 && pixel == BATTLEFIELD_BYTES) {
@@ -409,28 +419,50 @@ static void test_flight_trail_depth(void)
 
         storm->x = (int)(pixel % 240u);
         storm->y = (int)(pixel / 240u);
-        storm->active = 1;
-        begin_depth_frame();
-        draw_tracer(0, parent);
-        draw_storm_marker(storm);
-        draw_tracer(0, child);
-        capture_depth_frame(expected);
-        begin_depth_frame();
-        draw_tracer(0, SC64_TRACE_PROJECTILE);
-        draw_storm_marker(storm);
-        capture_depth_frame(pair);
-        assert(expected[pixel] != pair[pixel]);
-        begin_depth_frame();
-        sc64_draw_depth_ordered_actors();
-        draw_tracers_pass(1);
-        capture_depth_frame(pair);
-        assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+        storm->active = !scout;
+        int blocker = scout ? make_unit(SIDE, U_WRAITH, 8, storm->x, storm->y) : -1;
+        if (scout) assert(sc64_unit_world_layer(&u[blocker]) == layer + 1);
+        unsigned overlaps = 0;
+        for (int dx = -8; dx <= 8 && !overlaps; ++dx) {
+            if (scout) u[blocker].x = storm->x + dx;
+            begin_depth_frame();
+            draw_tracer(0, parent);
+            if (scout) draw_unit(&u[blocker]);
+            else draw_storm_marker(storm);
+            draw_tracer(0, child);
+            capture_depth_frame(expected);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            if (scout) draw_unit(&u[blocker]);
+            else draw_storm_marker(storm);
+            capture_depth_frame(pair);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlaps += expected[i] != pair[i];
+        }
+        assert(overlaps);
+        unsigned pages = 0;
+        for (unsigned page = 0; page < 2; ++page) {
+            begin_depth_frame();
+            pages |= 1u << gfx_backbuffer_index();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            capture_depth_frame(pair);
+            assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+            if (!page) gfx_end();
+        }
+        assert(pages == 3);
         unsigned source_age = sc64_weapon_source_vfx_source_tick(
             (unsigned)(sc64_tracer_duration(0) - tracers[0].life));
         unsigned flight_start = sc64_weapon_source_trace_release_ticks(profile) +
             sc64_weapon_source_trace_startup_ticks(profile);
-        printf("PASS source flight trail image %u over a layer-5 Storm at tick %u (flight [%u,%u))\n",
-               cases[n].image, source_age, flight_start, flight_start + slot->flight);
+        printf("PASS source flight trail image %u layer %u over layer %u at tick %u "
+               "(flight [%u,%u)), %u order-sensitive pixels on both pages\n",
+               cases[n].image, layer + 1, scout ? layer + 1 : layer, source_age,
+               flight_start, flight_start + slot->flight, overlaps);
+        if (scout) {
+            u[blocker].alive = 0;
+            continue;
+        }
 
         if (n == 0) {
             int blocker = make_unit(SIDE, U_WRAITH, 8, storm->x, storm->y);

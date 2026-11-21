@@ -138,6 +138,10 @@ sc64_depth_key(unsigned layer, int y, unsigned kind, unsigned slot)
            (kind << DEPTH_SLOT_BITS) | slot;
 }
 
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+#include "sc64_foreground_pick.h"
+#endif
+
 static void
 sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
                 unsigned kind, unsigned slot)
@@ -178,7 +182,7 @@ sc64_depth_projectile_child_part(const Sc64TraceSlot *slot, unsigned layer)
         /* The glaive and spore Death scripts each spawn one image 512
          * sprite with zero offset at the captured impact position. */
         return SC64_TRACE_ONLY_IMPACT_CHILD;
-    case 528: case 529: case 532:
+    case 521: case 528: case 529: case 532:
         /* A flight group uses several anchors. Group only when the
          * child elevation is above the ground Y range. */
         return layer >= 4 ? SC64_TRACE_ONLY_FLIGHT_TRAILS : 0;
