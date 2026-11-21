@@ -1,5 +1,12 @@
 # StarCraft GBA goal and prioritized TODOs
 
+
+- **Z7 physical replay qualification.** The corrected rendered HOST controller
+  wins at frame 267,585; its bounded prefix matches 62 ARM observations
+  through call 24,000 on #708. The exact full tape replay on #711 remains
+  in progress; do not treat the HOST win as a current ARM terminal result.
+  See the [route observer audit](audits/2026-11-22-z7-route-observer-purity.md).
+
 Updated: 2026-11-22. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
