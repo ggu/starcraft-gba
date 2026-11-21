@@ -68,7 +68,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cut the Z10 late means by 2.76% and 3.13%, with matching state.
   The [normal Z10 qualification](audits/2026-11-21-z10-combat-facts-release.md)
   also verifies the rollback link and both maps with one to three AI
-  seats, three human races and matching fresh continuation. A P10 V2
+  seats, three human races and matching fresh continuation. The normal
+  Z7 pair matches all 254 fresh-load replay checks and the victory
+  journal at frame 228,128. A P10 V2
   candidate matches combat and victory journals but saves only 0.074%
   in the campaign sample. Prioritize larger shared order and route costs.
   The separate [point-certificate trial](audits/2026-11-21-z8-current-point-certificate.md)

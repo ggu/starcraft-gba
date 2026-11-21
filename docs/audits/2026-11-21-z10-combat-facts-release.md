@@ -50,10 +50,20 @@ three controller-acknowledged modal boundaries, and the frame and
 logical route counters for 203 timed advancing updates. Mean cycles
 fall from 1,696,432 to 1,694,349 (0.12%).
 
-The [prior dense Z7 pair](2026-11-21-indexed-target-query.md#immutable-combat-facts)
-uses the preceding release renderer and save policy. Its late cycle
-means drop 2.76% and 3.13% with the same named gameplay and display
-checkpoints and full pause journal.
+The exact normal Z7 pair starts each ROM from blank HOME, writes the
+same frame-5,641 pause journal, and resumes in a fresh emulator. An
+ordinary A press reselects the Hatchery. The 254 world checks, ten
+display cuts, six route-cache cuts and sampled logical counters match
+through victory at frame 228,128. Both write the same victory journal,
+restore RESULT with fresh HOME L, and export that journal byte for byte.
+
+| Z7 tape calls | Mean cycles, rollback → combat facts | p95 cycles, rollback → combat facts |
+| --- | ---: | ---: |
+| 47,758–48,237 | 2,193,528 → 2,193,360 | 3,182,692 → 3,182,885 |
+| 153,812–154,741 | 2,492,987 → 2,424,115 (−2.76%) | 3,766,802 → 3,712,728 |
+| 154,742–155,650 | 2,419,168 → 2,343,482 (−3.13%) | 3,666,292 → 3,595,765 |
+
+The Z7 p95 values use inclusive interpolation on advancing updates.
 
 ## Protoss 10 comparison
 
@@ -78,6 +88,8 @@ The normal P10 recipe keeps its existing configuration.
 | Three-AI Z10 Blood Bath comparison | `83aa0c9ceecd55620cb7371ffd1337a437220783b1d5bcfc46814bf02eff1724` |
 | Additional Z10 lobby and save comparisons | `6335f1bde8a3c4f780bee144a327972562c3ee5f091db3eba4705f82afa688c3` |
 | Current Z8 campaign sample comparison | `7c58ba2257bd8f96dfe78c7aa7b0d2b342389b02a74d30d1bcb3d347c809af69` |
+| Exact Z7 victory and timing comparison | `ba8f40bdcc2de712d4e3bea3505a540ce63fffbf1d6a07ea406dc8b1169f19c2` |
+| Z7 victory and fresh HOME re-export journal | `1acce341f61b2a1e37cadc1e0b304dd63b5b31352789d128fa2d7bf20d6eb627` |
 | P10 opt-in ARM link | `b148dde9067599c17fa8e3fdbdccfacd0f97b50cf47106b496e9a8cbd2a77851` |
 | P10 campaign tail comparison | `d973b5285d93354ba22ee8c0347b927714a82c0682f75e11cdb104957c0aec4d` |
 
