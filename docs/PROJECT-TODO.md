@@ -2051,10 +2051,11 @@ recovers about half the added cost on the paired Terran-versus-Zerg win
 with zero Carriers. The remaining cost is 2.45% versus the sparse-route
 control. Preserve active human and CPU Carrier save checks while
 profiling the residual cost and preparing a normal Showcase build.
-The [completed Terran building blit trial](https://github.com/ggu/starcraft-gba/pull/665)
-cuts mean guest cycles by 8.46% in the ordinary Blood Bath win.
-Qualify visible Terran buildings in the other normal product banks
-before enabling the shared draw path across profiles.
+The [completed building blit release](audits/2026-11-21-terran-building-word-draw.md#shared-release-checks)
+cuts mean guest cycles by 8.46% in the ordinary Blood Bath win and
+5.49–6.68% across the other three production replays. All four normal
+builds match active-building saves and fresh display cuts. Profile the
+remaining order and route costs and measure the release on hardware.
 
 | ID | Priority / state | TODO and reason | Completion evidence required |
 | --- | --- | --- | --- |

@@ -1,12 +1,13 @@
 # Packed Terran base buildings
 
-The optional `TERRAN_BUILDING_WORDS=1` recipe packs the completed Command
-Center, Barracks and Supply Depot from the normal Terran cartridge's
-prepared sprite bank. Their original raw IDs are 106, 111 and 109. The
+The normal products pack the completed Command Center, Barracks and
+Supply Depot from their own prepared sprite banks. Their original raw IDs
+are 106, 111 and 109. The
 shared Mode 4 compositor selects the packed frame by the exact source
 frame pointer and retains the same sprite origin, viewport clip and depth
 turn. Construction, overlays, and other building frames use their
-existing draw paths. The option defaults to zero.
+existing draw paths. Set `CANONICAL_TERRAN_BUILDING_WORDS=0` to compare
+all four normal products against their preceding banks.
 
 ## Ordinary Blood Bath replay
 
@@ -34,7 +35,7 @@ including UI and presentation waits.
 ## Build and check
 
 ```sh
-make TERRAN_BUILDING_WORDS=1 verify-terran
+make verify-terran
 make test-sc64-terran-building-words-pixels
 ```
 
@@ -59,13 +60,13 @@ the authenticated control vector.
 
 ## Normal P10 replay
 
-The optional `P10_TERRAN_BUILDING_WORDS=1` recipe appends the same three
-Terran frames to P10's selected packed building bank. With the normal
+The P10 recipe appends the same three Terran frames to its selected
+packed building bank. With the normal
 Hatchery, Overmind and Nexus flags enabled, the shared sanitizer fixture
 checks all six frame pointers and passes 720 full-screen comparisons.
 
 ```sh
-make P10_TERRAN_BUILDING_WORDS=1 verify-protoss-p10
+make verify-protoss-p10
 make test-sc64-p10-terran-building-words-pixels
 ```
 
@@ -106,13 +107,13 @@ resolving the original three-frame bank to its verified local path.
 
 ## Normal Showcase replay
 
-The optional `SHOWCASE_TERRAN_BUILDING_WORDS=1` recipe derives the three
-Terran frames from Showcase's own prepared bank. Its Command Center
+The Showcase recipe derives the three Terran frames from its own
+prepared bank. Its Command Center
 crop starts one row higher than the Terran and P10 crops. The sanitizer
 fixture verifies the three live pointers and 360 full-frame comparisons.
 
 ```sh
-make SHOWCASE_TERRAN_BUILDING_WORDS=1 verify-showcase
+make verify-showcase
 make test-sc64-showcase-terran-building-words-pixels
 ```
 
@@ -152,9 +153,37 @@ normal Showcase control.
 | Terran Last Stand comparison | `f0210bd82154e61a16f7518a8032b5e048459dd2c6beb8286a943520b72a541a` |
 | Packed candidate link receipt | `b4381e20d4d1d8438c03d2e5db1dce5403a080e90db38aced7d83cdd840036b0` |
 
-## Remaining qualification
+## Shared release checks
 
-The authenticated Z10 frame bank maps the same three raw IDs to 71,968
-packed bytes. It needs its own prepared bank, selected pointer and pixel
-checks, ARM link and stack margins, and ordinary active Terran building
-cuts. Physical GBA timing remains open for the tested builds.
+The [Z10 comparison](2026-11-21-z10-building-word-draw.md) verifies its
+18 selected frame pointers and matches active production in ordinary
+Custom Game. Its production-prefix mean falls 6.68% and its late
+production window falls 11.21%.
+
+The four normal build pairs each start with blank SRAM and drive the same
+ordinary Blood Bath production route. At frame 11,821 the camera shows
+completed base buildings. START and B write the same 32 KiB SRAM in the
+preceding and packed builds of each product. Fresh HOME L restores the
+same world and seat choices. Another 240 neutral updates match the
+uninterrupted world and camera. Between each packed build and its
+control, the fresh and uninterrupted lanes also match both indexed
+display pages, the palette and display register at seven cuts each.
+The re-exported SRAM matches the input journal in all eight guests.
+The private comparison SHA-256 is
+`0495af50f6e37dad904af8b5d0d6f178f4926d1d43e6a4ee44e4cf31538c7d9f`.
+
+The normal and rollback Make recipes reproduce all four qualified ARM
+compiler vectors after resolving the prepared input paths. Regenerating
+each packed bank produces the same bytes used by its linked candidate.
+The generated-bank comparison SHA-256 is
+`6eb57cf09092ba5491cfd39c5559448306bdea277d01e3e8472ae5b6092b93cb`.
+The asset-free demo stays byte-identical.
+
+At the same Terran finale pause at frame 2,276, the packed ROM restores
+its journal in a fresh process and reaches victory at frame 3,361. All
+six named checkpoints and the complete pause, victory and third-launch
+readback SRAM match the Carrier control. Mean cycle cost decreases from
+1,038,845 to 1,018,820 on this tape. The private receipt SHA-256 is
+`a8b825dec7d521a59eb0cf91e11b1bdd1241cc97ed4538beac2d924b5ff56140`.
+
+Physical GBA timing and longer cross-race Custom Game wins remain open.

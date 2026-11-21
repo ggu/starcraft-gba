@@ -35,13 +35,14 @@ full Z10 Custom Game win and physical GBA timing are separate checks.
 ## Build and check
 
 ```sh
-make Z10_TERRAN_BUILDING_WORDS=1 verify-zerg-z10
-make Z10_TERRAN_BUILDING_WORDS=1 test-sc64-z10-building-words-pixels
+make verify-zerg-z10
+make test-sc64-z10-building-words-pixels
 ```
 
-The trial is opt-in and uses a separate generated bank. It leaves
-`Z10_BUILDING_WORDS` in control of the packed compositor. Changing the
-extra bank invalidates the existing Z10 building-word configuration.
+The extra frames use a separate generated bank. Set
+`Z10_TERRAN_BUILDING_WORDS=0` for just the preceding Z10 bank.
+`Z10_BUILDING_WORDS` still controls the packed compositor. Changing
+banks invalidates the existing Z10 building-word configuration.
 
 The normal flag-off ARM rebuild reproduces the authenticated control
 ROM byte for byte. The candidate adds 72,048 text bytes and retains
