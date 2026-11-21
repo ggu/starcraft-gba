@@ -122,6 +122,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point certificates require deferred point fields"
 #endif
+#if defined(SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE) && !defined(SC64_ROUTE_POINT_COLD_CERTIFICATE)
+#error "the blocked-goal retry requires deferred point certificates"
+#endif
 #if defined(SC64_ROUTE_POINT_FAR_READ) && (!defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) || \
     !defined(SC64_RANGE_WORK))
 #error "far point reads require deferred point fields and range work"

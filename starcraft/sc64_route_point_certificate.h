@@ -29,7 +29,16 @@ sc64_point_certificate(int slot, int origin, int goal, int mode)
     const int gap = dx + dy;
     /* A parked field may try a slightly wider proof on a cache hit.
      * Initial insertions keep their existing certification limit. */
-    if (gap > (clear ? MAX_GAP : MAX_RETRY_GAP)) return 0;
+    if (gap > (clear ? MAX_GAP : MAX_RETRY_GAP)) {
+#ifdef SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE
+        /* A blocked goal can have an open seed one cell closer than the
+         * raw goal limit. Keep the wider admission to ordinary retries. */
+        if (mode != SC64_POINT_CERT_RETRY || gap != MAX_RETRY_GAP + 1 ||
+            SC64_GRID_GET(path_walkable, goal)) return 0;
+#else
+        return 0;
+#endif
+    }
 
     const int spread = !SC64_GRID_GET(path_walkable, goal);
     const int margin = MARGIN + (mode == SC64_POINT_CERT_NEAR && !spread);
@@ -74,6 +83,9 @@ sc64_point_certificate(int slot, int origin, int goal, int mode)
             bfs_queue[tail++] = (u16)seed;
         }
     }
+#ifdef SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE
+    if (gap > MAX_RETRY_GAP && lower > MAX_RETRY_GAP) return 0;
+#endif
     const int start = (oy - top + 1) * stride + ox - left + 1;
     const int limit_distance = lower + 2 * margin;
     for (int distance = 0; distance < limit_distance && head < tail && dense[start] == 7;
