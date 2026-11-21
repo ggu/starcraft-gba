@@ -167,6 +167,22 @@ This witnesses ordinary human transfer on the composed Z10 preview.
 The paired receipt SHA-256 is
 `ebf4f9737b0d1b7d76f46cc0b1814a64e15c45ac0ae8131ec8e5431990b766b3`.
 
+With active-training cancellation code included, runtime `c9fdd5f1`
+retains the same `SELZ` RAM endpoints and passes the ROM and payload
+checks using the 41 pinned ARM inputs. The ordinary mixed Blood Bath
+replay again saves a versioned active Interceptor pulse at frame 17,305.
+The fresh HOME L load matches 180 uninterrupted updates and 12 world
+cuts. The two paths leave at least 6,508 measured system-stack bytes
+above the guard. This replay exercises the version-0 predecessor
+journal and an active projectile. The paid trainee and wallet proof
+comes from the sanitizer fixtures above.
+
+| Active-training preview receipt | SHA-256 |
+| --- | --- |
+| ROM | `93ea8d2638c081cba76d4a49c59b8dbf32aea4745af1184354a186a0d8e44171` |
+| ARM vector, input pins and RAM guards | `76b0b99d5292353e871fe880341dfa0a9b10d1d1988fe27a575ab1a2ccf9cada` |
+| Ordinary compact save and continuation | `f48f075475587ddcc0e102b22e8944bc7cd6969d2aeaccec8dd459569622c7b5` |
+
 Keep the build option off for normal products. Still needed are an
 eight-slot Gantrithor retirement fixture, an ordinary active ARM
 retirement with neutral transport cargo, and native CPU retirement
