@@ -16,3 +16,40 @@ On Wasteland runtime `1c958d4`, all four prepared ARM links pass ROM and RAM gua
 | Collision Z10 comparison | `a0bd8990f847501a2dbc8424702249b0559168cd11726416a3ccc7a5fd2e2c03` |
 | Wasteland-base P10 canary tail | `80c6a1a574c34d6b54c8643817ac542315faac8a035bbf6b4cb1893dd02a3ec3` |
 | Wasteland-base Z8 canary | `60e9ae7f86961ab6d0b8fe3930d1d556417346e5d156ab431fb5a8c7cd4fb489` |
+
+## After the moving-flyer controls fix
+
+Against the normal `2152b370` cartridges, the exact P10 pair matches
+the 9,489-call tape through victory, with the same frame and route
+counters on each call, 68 matching world, video, palette and fog
+cuts, and identical SRAM. The full tape costs 15,268,508,594 cycles
+before and 14,986,065,403 after, a 1.85% reduction.
+
+| P10 guest cycles per advancing gameplay update | Control | Cache |
+| --- | ---: | ---: |
+| Mean | 1,596,918 | 1,566,617 |
+| p95 | 2,199,441 | 2,091,101 |
+| Peak | 3,933,136 | 3,938,013 |
+
+The advancing gameplay sample contains 9,295 updates. The Z10
+Blood Bath replay matches all 31 world and video cuts and 16 fresh
+continuation cuts, route histories and SRAM. Its mean is flat at
+825,585 → 825,583 guest cycles.
+
+The four links pass the unchanged static guards. The P10 and Z10
+rollback builds reproduce their control ROM bytes, as do the two
+unaffected Terran and Showcase builds. The instrumented P10
+victory run leaves 6,504 untouched stack bytes. Both Z8 canaries
+leave 7,216 bytes and match fresh-load state over 1,200 updates.
+The four openings, 41 pan cuts per product, and 54 ordinary
+Custom Game starts and fresh HOME continuations pass.
+The full Z7 route reaches victory at frame 228,128. All 254
+world observations, ten video cuts, six route-cache cuts and
+fresh HOME victory readback match the control.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current P10 comparison | `d18a7b92cfa3631613a38ae61f2fd2a00d687ea11be4475ab224baadac7e7197` |
+| Current Z10 Blood Bath comparison | `79431ee0b65e58a66c282d8bae47e852b1b8760b95c5b15a10200d2be32cc1ca` |
+| Current Z7 victory replay | `c3eae4c4df57d14accb88ffae6635f11a99c60e5b22c75153b3fad32c0008492` |
+| Current Custom Game and fresh HOME matrix | `5ef549b181a8c410eec87ab082ccf4edb7020b37d0b9460ed00e7386129ece3d` |

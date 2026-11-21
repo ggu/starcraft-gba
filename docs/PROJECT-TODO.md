@@ -43,18 +43,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   replay cost by 0.78%. Terran Outpost improves 0.48% in mean and
   increases 0.86% at p95 in its busy window. Replay checks match
   collision-sensitive movement and placement, world state and both
-  framebuffer pages. Prioritize the remaining route stalls and
-  Command census costs. A query-local Command trial on top of collision
-  cuts the same Protoss tail mean by 1.85% and p95 by 4.41%. A batched
-  selection-outline trial matches the same replay and saves 0.12%
-  on the full tail. Keep the Command trial separate until it passes
-  the four-product memory, Custom Game and save checks.
+  framebuffer pages. The [query-local Command validation cache](audits/2026-11-22-command-raw-validation-cache.md#after-the-moving-flyer-controls-fix)
+  cuts the exact Protoss tail by 1.85% and its advancing gameplay
+  p95 by 4.93%. The peak rises 0.12%. A batched selection-outline
+  trial matches the same replay and saves 0.12% on the full tail.
   Count actual full-field completions on the corrected tapes,
   including updates with no new route build. At P10 call 39,774,
   FIFO expansion uses 663,684 of 863,785 full-fill cycles. The
-  current ARM loop reads the stride from a register. Qualify a
-  fixed-stride 128-column loop against the same FIFO order, packed
-  field and compaction rules before changing route scheduling.
+  fixed-stride trial keeps the same state and route history but
+  increases the hot P10 call at 38,952 by 23,930 cycles. It also
+  adds 88–96 IWRAM bytes across P10 and Z10. Keep it optional.
+  In 16 current P10 zero-new-build samples, campaign defense
+  indexing and targeting use 84,015 cycles per update (5.32%).
+  Four follow-up cuts show 86–88% of visited list nodes in cells
+  with no hostile owners. Measure the owner-mask shortcut against
+  exact target order, eligibility, unit removal and both maps.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -86,7 +89,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   asynchronous frame callbacks. The
   [fresh Wasteland comparison](audits/2026-11-21-wasteland-opening-cross-platform.md)
   matches 13 actors by type, owner, HP and scaled coordinates, and
-  verifies 10/18 supply and the five-Marine R selection. The native
+  verifies 10/18 supply and the five-Marine R selection. The
+  [ordinary Move case](audits/2026-11-21-wasteland-opening-cross-platform.md#ordinary-group-movement)
+  confirms that both platforms move the selected group. The native
   scenario confirms ten Marines, a completed Barracks and Raynor.
   The GBA checks now require a completed Barracks and count living
   owned buildings for the zero-actor defeat rule. The normal Terran
