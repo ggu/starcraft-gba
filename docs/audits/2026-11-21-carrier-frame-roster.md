@@ -66,6 +66,13 @@ indexed-page cuts. Its busy window covers 800 updates.
 Busy averages exceed the approximately 562,000 guest-cycle budget for
 30 fps. Physical frame pacing remains unverified.
 
+The instruction observer attributes all 33 sampled updates and
+reproduces the 31 world checkpoints on the roster ROM. In the middle
+band, orders account for 251,694 guest cycles, the shared world-depth
+pass for 163,191 and defense targeting for 31,458. The worst sampled
+update still spends 2,435,266 cycles in orders. Prioritize the route
+bursts for long stalls and the large draw passes for recurring cost.
+
 | Local comparison | SHA-256 |
 | --- | --- |
 | Blood Bath | `b35d8a1ee7893ef6ae882c01b1422dee0058e16cdaad8c230f50f79438dc1392` |
@@ -75,3 +82,4 @@ Busy averages exceed the approximately 562,000 guest-cycle budget for
 | Custom Game cross-version journal bytes | `5d712835be0925ae038955194459dd6d4c3a631f9485c27da6cd366fb83a3e1a` |
 | Carrier Approach scene | `f0f008077ed1bde13b147a57a619b110276e0b31e64fb4b05f5e86865370c18b` |
 | Showcase Carrier Custom Game | `c0337bf3b36eb635df9bc1b638a6e5f3a79ea674bd16922e8f19f9209bda4f9a` |
+| Current instruction attribution | `fd76064d8dfa8ec4de155b4ab18e30c152889f4b05b6d98434313c7d244ca29e` |
