@@ -173,6 +173,40 @@ static int race_defense_cooldown_ready(Building *q)
     return 1;
 }
 
+#if defined(SC64_DEFENSE_CUSTOM_CELLS_PROBE) && defined(SC64_DEFENSE_SPATIAL_PROBE) && \
+    (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_ZP_DEFENSE_TARGETS))
+#define SC64_DEFENSE_CUSTOM_CELLS 1
+#endif
+#if defined(SC64_DEFENSE_SPATIAL_PROBE) && \
+    (defined(SC64_ZP_DEFENSE_TARGETS) || defined(SC64_DEFENSE_CUSTOM_CELLS))
+#include "sc64_defense_cells.h"
+#endif
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+_Static_assert(MAX_UNITS < 255, "Custom Game defense lists require byte unit slots");
+static int __attribute__((noinline))
+race_defense_custom_build_cells(RaceDefenseCellLinks *cells)
+{
+    memset(cells->head, 0xff, sizeof(cells->head));
+    for (int j = 0; j < MAX_UNITS; ++j) {
+        const Unit *q = &u[j];
+        if (!q->alive) continue;
+        unsigned x = (unsigned)q->x, y = (unsigned)q->y;
+        if ((unsigned)q->owner >= DEFENSE_OWNER_LIMIT || (x | y) >= DEFENSE_CELL_LIMIT) return 0;
+        int cell = (y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE + (x >> DEFENSE_CELL_SHIFT);
+        cells->next[j] = cells->head[cell];
+        cells->head[cell] = (u8)j;
+    }
+    return 1;
+}
+#endif
+
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+/* Inline one defense pass into both wrappers. The scalar wrapper carries
+ * no spatial scratch, and existing weapon rules stay shared. */
+static inline __attribute__((always_inline)) void
+race_tick_defenses_scan(RaceDefenseCellLinks *cells)
+{
+#else
 #if defined(SC64_P3_DEFENSE_TARGETS) || defined(SC64_TERRAN_LATE_RUNTIME) || \
     defined(SC64_ZP_DEFENSE_TARGETS)
 /* Keep the original full scan as both the fallback for every other mission
@@ -188,7 +222,12 @@ static void GBA_HOT race_tick_defenses_fullscan(void) {
 #else
 static void GBA_HOT race_tick_defenses(void) {
 #endif
+#endif
     RACE_DEFENSE_PYLONS;
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+    int cells_valid = -1;
+    u8 hostile_by_owner[DEFENSE_OWNER_LIMIT] = {0};
+#endif
     for(int i=0;i<MAX_BUILDINGS;i++)if(building_complete(i)) {
         Building *q=&b[i];int ground=0,air=0,range=0,damage=0,cooldown=0;
         switch(q->type) {
@@ -202,6 +241,20 @@ static void GBA_HOT race_tick_defenses(void) {
         }
         if(!race_defense_cooldown_ready(q))continue;
         int best=-1,bestd=range*range;
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+        if (cells && (unsigned)q->owner < DEFENSE_OWNER_LIMIT && cells_valid < 0)
+            cells_valid = race_defense_custom_build_cells(cells);
+        if (cells_valid == 1 && (unsigned)q->owner < DEFENSE_OWNER_LIMIT) {
+            unsigned mask = hostile_by_owner[q->owner];
+            if (!(mask & DEFENSE_HOSTILE_MASK_READY)) {
+                mask = DEFENSE_HOSTILE_MASK_READY;
+                for (int owner = 0; owner < DEFENSE_OWNER_LIMIT; ++owner)
+                    if (owners_hostile(q->owner, owner)) mask |= 1u << owner;
+                hostile_by_owner[q->owner] = (u8)mask;
+            }
+            best = race_defense_target_from_custom_cells(q, ground, air, range, cells, (u8)mask);
+        } else
+#endif
         for(int j=0;j<MAX_UNITS;j++)if(u[j].alive) {
             /* Reject candidates outside the circular weapon radius with the
              * cheaper axis bounds before ownership, flags, and unit-class
@@ -225,20 +278,21 @@ static void GBA_HOT race_tick_defenses(void) {
     }
 }
 
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+static __attribute__((noinline)) void race_tick_defenses_fullscan(void)
+{
+    race_tick_defenses_scan(0);
+}
+
+static __attribute__((noinline)) void race_tick_defenses_custom(void)
+{
+    RaceDefenseCellLinks cells;
+    race_tick_defenses_scan(&cells);
+}
+#endif
+
 #ifdef SC64_ZP_DEFENSE_TARGETS
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
-/* A late mission can have dozens of defenses looking for a short-range
- * target. Group the current unit slots by 256-pixel cells once per defense
- * pass, after trigger/controller mutations. An ordinary 112-pixel search
- * then needs at most four cells. Slot ties remain independent of list order. */
-enum { DEFENSE_CELL_SHIFT = 8, DEFENSE_CELL_SIDE = 8,
-       DEFENSE_CELL_LIMIT = DEFENSE_CELL_SIDE << DEFENSE_CELL_SHIFT };
-
-typedef struct {
-    u8 head[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
-    u8 next[MAX_UNITS], flying[MAX_UNITS];
-} RaceDefenseCells;
-
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_zp_cells(const Building *q, int ground, int air,
                                   int range, const RaceDefenseCells *cells,
@@ -259,7 +313,7 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
     for (int row = top; row <= bottom; ++row) {
         for (int col = left; col <= right; ++col) {
             int cell = row * DEFENSE_CELL_SIDE + col;
-            for (int j = cells->head[cell]; j != 0xff; j = cells->next[j]) {
+            for (int j = cells->links.head[cell]; j != 0xff; j = cells->links.next[j]) {
                 const Unit *target = &u[j];
                 unsigned owner = target->owner;
                 if (!target->alive || owner >= 5 ||
@@ -334,7 +388,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
     }
 
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
-    memset(cells.head, 0xff, sizeof(cells.head));
+    memset(cells.links.head, 0xff, sizeof(cells.links.head));
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         if ((unsigned)u[j].owner >= 5 ||
             (unsigned)u[j].x >= DEFENSE_CELL_LIMIT ||
@@ -345,8 +399,8 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         int cell = (u[j].y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE +
                    (u[j].x >> DEFENSE_CELL_SHIFT);
         cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
-        cells.next[j] = cells.head[cell];
-        cells.head[cell] = (u8)j;
+        cells.links.next[j] = cells.links.head[cell];
+        cells.links.head[cell] = (u8)j;
     }
 #else
     for (int j = 0; j < MAX_UNITS; ++j) {
@@ -472,6 +526,9 @@ static void race_tick_defenses(void) {
     else if (!race_mode)
         race_tick_defenses_zp_targets();
 #endif
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+    else if (race_mode) race_tick_defenses_custom();
+#endif
     else
         race_tick_defenses_fullscan();
 }
@@ -557,13 +614,20 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
 static void race_tick_defenses(void)
 {
     if (race_late_active()) race_tick_defenses_late_targets();
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+    else if (race_mode) race_tick_defenses_custom();
+#endif
     else race_tick_defenses_fullscan();
 }
 #elif defined(SC64_ZP_DEFENSE_TARGETS)
 static void race_tick_defenses(void)
 {
     if (!race_mode) race_tick_defenses_zp_targets();
+#ifdef SC64_DEFENSE_CUSTOM_CELLS
+    else race_tick_defenses_custom();
+#else
     else race_tick_defenses_fullscan();
+#endif
 }
 #endif
 #undef RACE_DEFENSE_POWERED
