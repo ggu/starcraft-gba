@@ -498,3 +498,47 @@ transfer build has the full late Z7 qualification.
 | Trace and captured walkability grid | `c812a402f6a7f5c365d37c3811060e418e9ed88ebf93dc532ad8ee9c331cd911` |
 | Z7 comparison | `dd0c7adf32d4e120afde9380b00b22f4e46e8061337f2873138f9017e0b7e6e9` |
 | Z8 comparison | `5fe67799cd9d35392841cd6ceac233745ff97d450aed95921e24ab482632748c` |
+
+### Skip the cold prefix on proven disconnection
+
+Add `SC64_ROUTE_POINT_COLD_COMPONENT_BYPASS` to the pinned reserved
+build with the nearby-detour fix. It takes the normal eager sparse
+path after a different complete, valid same-grid field proves the
+open goal and origin are disconnected. The victim and partial, stale
+or blocked witnesses are excluded. The trial preserves the route
+field, logical cache order, and counters. It adds no RAM.
+
+The focused sanitizer targets are
+`test-sc64-route-point-cold-component-bypass` and
+`test-sc64-route-point-reserve`. The same-source A/B covers 386,646
+queries and 27,294 resident fields with the same per-query answer and
+cache transcript. Its SHA-256 is
+`86acaa0076c87e87fde81aa312fa2105e550e0a36023fa86d37329b04ef3999c`.
+
+The ordinary Z7 trial reaches victory at frame 228,128. The pause
+journal, victory journal and fresh HOME re-export match the pinned
+release byte for byte. All 254 world cuts, ten display cuts and six
+logical cache cuts match. A separate BFS checks 75 complete samples
+and 4,201 published directions across six partial fields.
+
+| Z7 window | Mean vs. pinned release | p95 vs. pinned release | Peak vs. pinned release |
+| --- | ---: | ---: | ---: |
+| Early dense | −12.89% | −18.94% | −12.90% |
+| Late peak | −2.23% | −2.59% | +0.45% |
+| Late following | −2.55% | −0.08% | −5.10% |
+
+Call 154,198 falls from 5,943,256 cycles in the nearby-detour build
+to 5,822,622. The pinned release takes 5,796,737. The following
+window's p95 also falls from 3,651,187 to 3,592,990. The same-goal
+warm fill at call 154,508 still takes about 3.13 million total cycles.
+Z8 matches all 668 direct answers and 17 world and display cuts.
+Its sampled mean rises 243 cycles from the nearby-detour build.
+Keep the trials opt-in while the remaining Z7 peak and hardware
+timing are open. These timings use emulated guest cycles.
+
+| Cold bypass evidence | SHA-256 |
+| --- | --- |
+| Z10 ROM | `2d5b9b65502aeacffb5b7c8385306dd4709fe23833f2c6e39d95db37221a1e8d` |
+| Full Z7 replay | `1fded1415f950c51bee1c192f292828bace5457c6869a78fb88760a112a177cf` |
+| Z7 comparison | `e67cb904746b54ee07ae70817125c038328b6b43aff4b99c1f32141f191d4d65` |
+| Z8 direct-answer replay | `5f0ebbc1ed99bdb251551fffda61fd3c497295b314350ae956013708c9608411` |
