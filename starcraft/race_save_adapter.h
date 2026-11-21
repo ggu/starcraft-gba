@@ -726,15 +726,21 @@ static int race_combined_egg_candidate_valid(const RaceSave *candidate,unsigned 
     }
     for (unsigned i=0;i<MAX_UNITS;i++) {
         Unit q;if (!SC64_GUARD_DECODE(candidate,i,width,height,&q)) return 0;
-        if (!q.alive) { ++free_slots; if(q.type==SC64_SHARED_EGG_TYPE)return 0; continue; }
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         /* The current training child already occupies a live slot; `carry`
          * is only the additional paid queue, matching the existing service. */
-        if (q.type==U_P7_CARRIER && RACE_PROTOSS_RAW(&q)==SC64_P7_CARRIER_RAW) {
-            if (q.carry<0 || q.carry>=SC64_P7_CARRIER_QUEUE_LIMIT) return 0;
-            committed+=(unsigned)q.carry;
+        if (!sc64_p7_carrier_parent_row_consistent(&q)) return 0;
+        if (sc64_p7_carrier_parent_type(q.type)) {
+            if ((!q.alive && q.carry) || (q.alive && !sc64_p7_carrier_paid_queue_valid(&q))) return 0;
+            if (q.carry) {
+                int owner_slot = 0;
+                while (owner_slot <= candidate->state[4] && owners[owner_slot] != q.owner) ++owner_slot;
+                if (owner_slot > candidate->state[4]) return 0;
+                committed += (unsigned)q.carry;
+            }
         }
 #endif
+        if (!q.alive) { ++free_slots; if(q.type==SC64_SHARED_EGG_TYPE)return 0; continue; }
         if (q.type!=SC64_SHARED_EGG_TYPE) continue;
         if (!sc64_shared_egg_wire_valid(&q,1,race_combined_egg_owner,(void *)candidate)) return 0;
         int raw=sc64_race_raw_unit(q.target),admitted=0;

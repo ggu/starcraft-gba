@@ -28,6 +28,7 @@ enum {
     SC64_P10_MAP_UNITS = 341,
     SC64_P10_HUMAN_SLOT = 1,
     SC64_P10_RESCUABLE_SLOT = 2,
+    SC64_P10_RESCUE_INTERCEPTORS = 4,
     SC64_P10_FRAME_MS = 42,   /* Same source clock as P8 and P9. */
     SC64_P10_PASS_UPDATES = 8, /* Authored trigger-pass cadence. */
     /* Every P10 Transmission plays a sound whose length is not imported;
@@ -583,12 +584,12 @@ static void race_p10_rescue_tick(void)
                 u[i].selected = 0; u[i].target = -1;
                 u[i].order = ORDER_IDLE; u[i].tx = u[i].x; u[i].ty = u[i].y;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                /* The Gantrithor joins with a full hangar; any children it
-                 * already has change hands with it. */
+                /* Preserve the mission's four initial children. Any existing
+                 * children change hands with their parent. */
                 if (sc64_p7_carrier_parent_type(u[i].type)) {
                     race_p7_carrier_training_owner_changed(i);
                     if (!race_p7_carrier_training_child_count(i))
-                        (void)race_p7_carrier_training_stock(i, SC64_P7_CARRIER_CAPACITY);
+                        (void)race_p7_carrier_training_stock(i, SC64_P10_RESCUE_INTERCEPTORS);
                 }
 #endif
                 break;
