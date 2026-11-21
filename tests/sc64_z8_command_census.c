@@ -53,6 +53,26 @@ int main(void)
     assert(screen == SCREEN_PLAY && CENSUS_ACTIVE());
     assert(CENSUS_WORLD.command_count == sc64_z8_game_command_count);
 
+#ifdef SC64_COMMAND_RAW_VALIDATION_CACHE
+    /* Compare the memo with the original validator across every source raw
+     * ID, both actor kinds, malformed owners and compact-coordinate edges. */
+    u8 cache[2][SC64_Z8_RAW_UNIT_LIMIT] = {{0}};
+    const int coordinates[] = {-1, 0, 1, 32767};
+    const int owners[] = {-1, 0, SC64_Z8_SOURCE_OWNER_LIMIT - 1, SC64_Z8_SOURCE_OWNER_LIMIT};
+    for (int building = 0; building < 2; ++building)
+        for (int raw = -1; raw <= SC64_Z8_RAW_UNIT_LIMIT + 1; ++raw)
+            for (unsigned i = 0; i < sizeof coordinates / sizeof *coordinates; ++i)
+                for (unsigned j = 0; j < sizeof coordinates / sizeof *coordinates; ++j)
+                    for (unsigned k = 0; k < sizeof owners / sizeof *owners; ++k) {
+                        int l, t, r, b;
+                        int expected = sc64_z8_game_actor_validate(owners[k], raw,
+                            coordinates[i], coordinates[j], building, &l, &t, &r, &b);
+                        assert(sc64_command_validated_type(cache[building], owners[k], raw,
+                            coordinates[i], coordinates[j], building) == expected);
+                    }
+    puts("Command raw validation matches all compact-coordinate boundary cases");
+#endif
+
     Sc64Z8WorldView world = CENSUS_WORLD;
     const unsigned selectors[] = {0, 1, 2, 7, 8, 12, 13, 17, 18, 19, 20, 21};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
