@@ -42,20 +42,71 @@ fixture verifies that a blocked transfer also leaves a pending paid
 order intact. The P10 receipt SHA-256 is
 `ae8adc4b404de847d7273fc63e60334f3c72d78a111f31c5afbde26b70e199c2`.
 
-The full expanded Z10 Carrier HOST fixture stops earlier, at the
-detached-load preflight assertion in `check_elimination`. The same
-recipe and assertion fail on the unchanged preview `96af35cd` before
-the queue-specific tests. With the fixture entry point limited to
-the three Carrier retirement cases, the same prepared Z10 flags pass
-the wallet, malformed roster, active training and Pause/HOME checks.
+## Compact Z10 save and load
 
-| Z10 HOST receipt | SHA-256 |
+The original Z10 Carrier fixture passed its shared save scratch
+directly from the compact writer to detached preflight. The compact
+writer had already replaced the scratch with encoded journal bytes.
+The fixture now selects the written journal through the production
+candidate loader before checking the detached state. The old fixture
+also fails on the unchanged preview `96af35cd`.
+
+That correction exposed a separate format rejection when a retired
+Zerg owner's researched Overlord remained neutral with cargo. The
+compact envelope checked the legacy transport format before the
+preview decoder could read its existing neutral Ventral Sacs bit.
+Both preview readers now use the same syntax check. It accepts bit
+`0x80` only in transport byte 3 and preserves that byte's human
+completion bit. The ordinary decoder still rejects the preview bit.
+The full candidate validator still checks the resolved match,
+retirement mask and completed research.
+
+The sanitizer fixture verifies `0x80` and `0x81` in byte 3, rejects
+the same byte with reserved bit `0x40` and rejects `0x80` in another
+owner's byte. An actual prepared candidate fails detached preflight
+after clearing either its retirement mask or the retired owner's
+research completion. A fresh load of the original journal preserves
+the neutral Overlord and its carried unit. The fixture also saves and
+reloads after the neutral Overlord dies, and exercises neutral cargo
+on human defeat.
+
+| HOST receipt | SHA-256 |
 | --- | --- |
-| Unchanged preview, full fixture | `5d88435f9ac8625448c9d6094440b2e49ff5418a143232ed4c5a1777c0fdfa42` |
-| Candidate, three Carrier cases | `8620dc0408f455f1595955ebac018442325d98a3ae64bfbfcb1236b018192692` |
+| Z10 with unchanged preview, detached scratch failure | `5d88435f9ac8625448c9d6094440b2e49ff5418a143232ed4c5a1777c0fdfa42` |
+| Z10 with fixture correction only, compact trailer rejection | `e16f703cac0aa83978ea84c96b512cc637abcf8d3f03cbf1fbf62556a68585ab` |
+| Z10 complete ASan/UBSan fixture on composed runtime | `ac628aa0fa10770b720b97e4a1b92101b2edc42f6bd1346393915aab85231ebc` |
+| P10 complete ASan/UBSan fixture on composed runtime | `cd574adec461c29df07c3590613c87ebaa1813008646152ab12ce9934b7d3198` |
 
-The patch applies cleanly in a three-way source check with #667. The
-refund uses the existing Interceptor price and the same preflight graph
-validation that will enforce the composed per-type capacities. Verify
-the merged profile flags, an eight-slot Gantrithor fixture and the
-retirement-to-victory path before qualifying a normal build.
+## Current opt-in ARM check
+
+Runtime `6b40f3a6` composes the preview with `b33a7e9d`,
+including the shared per-type hangar capacities from #667. The single
+Z10 ARM link uses the normal Carrier-enabled compiler vector, the two
+private elimination-preview flags, 41 unchanged input hashes and
+the separate `SELZ` cartridge ID. IWRAM ends at `0x03004e08` and
+EWRAM BSS ends at `0x02039b48`, within both link guards.
+
+The real controller replay loads a prior compact Blood Bath journal
+from HOME with L at frame 17,301. It runs until a versioned active
+Interceptor pulse at 17,305, saves with Start and B, and reads the new
+32 KiB journal on a fresh emulator from HOME. The new bank keeps its
+authenticated versioned packet and pulse layer. The fresh and
+uninterrupted matches agree through 180 arena updates and 12 world
+checkpoints. The preview marker stays clear throughout this replay.
+The positive neutral Ventral Sacs save and malformed-candidate cases
+are covered by the HOST fixtures.
+
+| Private Z10 ARM receipt | SHA-256 |
+| --- | --- |
+| ROM | `a693b47c14e07aa5757083f9bc9a6137edab2db923b1e19514c3afef67bc62f3` |
+| Compiler vector, input hashes and RAM guards | `de052bf6cb4a72199c5a29444708aacfc20f500578baa6bd2dbb94b3e959ba10` |
+| Active compact journal and fresh continuation | `21d9dc6801b0c5b8307e03ad4c63d31c6b089819fcbeb897b55a7e641ca94047` |
+
+Keep the build option off for normal products. Still needed are an
+eight-slot Gantrithor retirement fixture, an ordinary active ARM
+retirement with neutral transport cargo, and native CPU retirement
+with a living survivor. The two retained clean mixed N64 journals
+show only the human building census dropping to zero. The solo
+Terran versus Protoss census ends with the Terran structures gone
+and 14 live Protoss structures, after the Terran mobile count had
+already reached zero.
