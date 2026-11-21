@@ -2,6 +2,10 @@
 #define SC64_RACE_COMBAT_H
 /* Original ground/air weapon eligibility; render coordinates are half of
    the reference's pixels. Scenario invincibility is CHK UNIT flag 0x10. */
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+static inline __attribute__((always_inline)) int
+race_can_attack_internal(int attacker, int target, unsigned weapons)
+#else
 #ifdef SC64_Z6_RUNTIME
 /* One shared ROM eligibility routine avoids repeating the growing source
  * actor/cloak policy in every hot query and preserves the IWRAM reserve. */
@@ -9,7 +13,9 @@ static int __attribute__((noinline))
 #else
 static int
 #endif
-race_can_attack(int attacker,int target) {
+race_can_attack(int attacker,int target)
+#endif
+{
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
     if(target<MAX_UNITS&&SC64_TRANSPORT_LOADED(&u[target]))return 0;
 #ifdef SC64_Z5_CLOAK_ENABLED
@@ -45,19 +51,46 @@ race_can_attack(int attacker,int target) {
         if(u[target].flags&16)return 0;
         if(!race_mode&&race_selected_mission==1&&u[target].type==U_CHRYSALIS&&race_campaign.carrier_unit<MAX_UNITS)return 0;
         if(sc64_race_unit_flying(u[target].type)) {
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+            if (weapons) return (weapons & SC64_TARGET_WEAPON_AIR) != 0;
+#endif
             return sc64_race_unit_can_attack_air(attacker);
         }
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
-    if(target>=MAX_UNITS&&race_bc_facility_airborne(target-MAX_UNITS))
+    if(target>=MAX_UNITS&&race_bc_facility_airborne(target-MAX_UNITS)) {
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+        if (weapons) return (weapons & SC64_TARGET_WEAPON_AIR) != 0;
+#endif
         return attacker<0||sc64_race_unit_can_attack_air(attacker);
+    }
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    if(target>=MAX_UNITS&&race_late_airborne(target-MAX_UNITS))
+    if(target>=MAX_UNITS&&race_late_airborne(target-MAX_UNITS)) {
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+        if (weapons) return (weapons & SC64_TARGET_WEAPON_AIR) != 0;
+#endif
         return attacker<0||sc64_race_unit_can_attack_air(attacker);
+    }
+#endif
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+    if (weapons) return (weapons & SC64_TARGET_WEAPON_GROUND) != 0;
 #endif
     return attacker<0||sc64_race_unit_damage(attacker)>0;
 }
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+static int __attribute__((noinline))
+race_can_attack(int attacker, int target)
+{
+    return race_can_attack_internal(attacker, target, 0);
+}
+
+static int __attribute__((noinline))
+race_can_attack_with_weapons(unsigned weapons, int target)
+{
+    return race_can_attack_internal(0, target, weapons);
+}
+#endif
 #if defined(SC64_P3_DEFENSE_TARGETS) && !defined(SC64_P3_RUNTIME)
 #error "SC64_P3_DEFENSE_TARGETS requires SC64_P3_RUNTIME"
 #endif

@@ -4400,6 +4400,15 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     int best = -1, best_distance = max_distance * max_distance, d;
+#ifdef SC64_INDEXED_TARGET_QUERY
+    const Sc64IndexedTargetQuery query = sc64_indexed_target_query(
+        attacker, owner, SC64_P7_SOURCE_OWNER_VALUE);
+#define SC64_INDEXED_CANDIDATE_ALLOWED() \
+    sc64_indexed_target_candidate_allowed(&query, entity, candidate_x, candidate_y)
+#else
+#define SC64_INDEXED_CANDIDATE_ALLOWED() \
+    sc64_auto_target_candidate_allowed(attacker, entity, owner, SC64_P7_SOURCE_OWNER_VALUE)
+#endif
     int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int col0 = (x - max_distance) / SC64_TARGET_CELL_SIZE;
@@ -4447,10 +4456,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     d = dist2(x, y, candidate_x, candidate_y);
 #ifdef SC64_EGG_RUNTIME
                     if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
-                        if (d < egg_distance &&
-                            sc64_auto_target_candidate_allowed(
-                                attacker, entity, owner,
-                                SC64_P7_SOURCE_OWNER_VALUE)) {
+                        if (d < egg_distance && SC64_INDEXED_CANDIDATE_ALLOWED()) {
                             egg_distance = d;
                             egg_best = entity;
                         }
@@ -4459,15 +4465,14 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
 #endif
                     if (d > best_distance ||
                         (d == best_distance && (best < 0 || entity >= best)) ||
-                        !sc64_auto_target_candidate_allowed(
-                            attacker, entity, owner,
-                            SC64_P7_SOURCE_OWNER_VALUE)) continue;
+                        !SC64_INDEXED_CANDIDATE_ALLOWED()) continue;
                     best_distance = d;
                     best = entity;
                 }
             }
         }
     }
+#undef SC64_INDEXED_CANDIDATE_ALLOWED
 #ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else

@@ -59,8 +59,15 @@ ifneq ($(CANONICAL_TARGET_POLICY),1)
 $(error CANONICAL_TARGET_POLICY must be 0 or 1)
 endif
 endif
-CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE)
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY)
+CANONICAL_TARGET_QUERY ?= 0
+ifneq ($(CANONICAL_TARGET_QUERY),0)
+ifneq ($(CANONICAL_TARGET_QUERY),1)
+$(error CANONICAL_TARGET_QUERY must be 0 or 1)
+endif
+endif
+CANONICAL_TARGET_QUERY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_QUERY)),-DSC64_TARGET_QUERY_PROBE)
+CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE) $(CANONICAL_TARGET_QUERY_FLAGS)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY)$(if $(CANONICAL_TARGET_QUERY_FLAGS),:query)
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:

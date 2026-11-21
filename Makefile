@@ -5823,9 +5823,11 @@ $(eval $(call BC_PROFILE_FIXTURE,workerstop,showcase,SHOWCASE_FLAGS,SHOWCASE_INP
 .PHONY: test-worker-stop-mine
 test-worker-stop-mine: $(foreach p,terran zerg protoss showcase,build/test-bc-workerstop-$(p))
 	@set -e; for p in terran zerg protoss showcase; do ./build/test-bc-workerstop-$$p; done
-$(foreach p,terran zerg protoss showcase,build/test-bc-rowquery-$(p)): tests/sc64_target_nearest_reference.h
+TARGET_ROW_QUERY_TESTS := $(foreach p,terran zerg protoss showcase,build/test-bc-rowquery-$(p))
+$(TARGET_ROW_QUERY_TESTS): tests/sc64_target_nearest_reference.h build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+$(TARGET_ROW_QUERY_TESTS): SHARED_MECHANICS_HOST_FLAGS += $(if $(CANONICAL_TARGET_QUERY_FLAGS),$(CANONICAL_TARGET_POLICY_FLAGS))
 .PHONY: test-target-row-query
-test-target-row-query: $(foreach p,terran zerg protoss showcase,build/test-bc-rowquery-$(p))
+test-target-row-query: $(TARGET_ROW_QUERY_TESTS)
 	@set -e; for p in terran zerg protoss showcase; do ./build/test-bc-rowquery-$$p; done
 .PHONY: test-target-owner-query
 test-target-owner-query: $(foreach p,terran zerg protoss showcase,build/test-bc-targetquery-$(p))

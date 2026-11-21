@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 static void sc64_owner_lists_test_probe(void);
 #define SC64_OWNER_LIST_TEST 1
 #include "../starcraft/game.c"
@@ -49,6 +50,57 @@ static int build_lists_for_fixture(void) {
  target_lists_valid=1; return 1;
 }
 static unsigned random_queries, random_hits, fallback_checks;
+
+#ifdef SC64_INDEXED_TARGET_QUERY
+static void check_indexed_eligibility(void)
+{
+    Unit prior_unit = u[0];
+    Building prior_building = b[0];
+    u8 prior_visibility[sizeof(visible)];
+    memcpy(prior_visibility, visible, sizeof(visible));
+    u[0].owner = b[0].owner = ENEMY;
+    u[0].alive = b[0].alive = 1;
+    u[0].x = b[0].x = 128;
+    u[0].y = b[0].y = 128;
+    b[0].type = B_COMMAND;
+    unsigned checked = 0;
+
+    for (int attacker = -2; attacker <= SC_RU_COUNT; ++attacker) {
+        for (int owner = SIDE; owner <= ENEMY; ++owner) {
+            const Sc64IndexedTargetQuery query = sc64_indexed_target_query(attacker, owner, owner);
+#ifdef SC64_INDEXED_TARGET_WEAPONS
+            assert(!!query.weapons == (attacker >= 0 && attacker < SC_RU_COUNT &&
+                                      attacker != U_SCOURGE));
+#endif
+            for (unsigned state = 0; state < 6; ++state) {
+                u[0].type = state == 1 ? U_WRAITH : U_MARINE;
+                u[0].flags = b[0].flags = state == 2 ? 16 : 0;
+                u[0].order = ORDER_IDLE;
+#ifdef SC64_TRANSPORT_RUNTIME
+                if (state == 3) u[0].order = ORDER_TRANSPORTED;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                if (state == 5) {
+                    u[0].type = U_P7_INTERCEPTOR;
+                    sc64_p7_carrier_child_set_state(&u[0], SC64_P7_INTERCEPTOR_INSIDE);
+                }
+#endif
+                memset(visible, state == 4 ? 0 : 0xff, sizeof(visible));
+                assert(sc64_indexed_target_candidate_allowed(&query, 0, u[0].x, u[0].y) ==
+                       sc64_auto_target_candidate_allowed(attacker, 0, owner, owner));
+                assert(sc64_indexed_target_candidate_allowed(&query, MAX_UNITS, b[0].x, b[0].y) ==
+                       sc64_auto_target_candidate_allowed(attacker, MAX_UNITS, owner, owner));
+                checked += 2;
+            }
+        }
+    }
+    u[0] = prior_unit;
+    b[0] = prior_building;
+    memcpy(visible, prior_visibility, sizeof(visible));
+    printf("live indexed eligibility comparisons=%u\n", checked);
+}
+#endif
+
 static void compare_random_queries(void) {
  static Unit units_before[MAX_UNITS]; static Building buildings_before[MAX_BUILDINGS];
  memcpy(units_before,u,sizeof(u)); memcpy(buildings_before,b,sizeof(b)); unsigned seed_before=seed;
@@ -133,4 +185,19 @@ static void synthetic_worlds(void) {
  printf("synthetic worlds=250 comparisons=%u hits=%u fallback=%u\n",random_queries,random_hits,fallback_checks);
  if(random_queries!=24000 || random_hits==0 || fallback_checks!=500)abort();
 }
-int main(void){gba_init();game_init();race_mode=1;race_human=R_TER;race_bots=2;race_skirmish_map=0;race_bot_races[0]=R_ZERG;race_bot_races[1]=R_PROTOSS;init_state();for(int i=0;i<500;i++)game_update(0,0);printf("real engine frames=%lu target queries=%lu nonempty=%lu\n",probes,queries,hits); if(probes != 500 || queries != 4000 || hits == 0) return 1; synthetic_worlds(); return 0;}
+int main(void)
+{
+    gba_init();
+    game_init();
+    race_mode=1; race_human=R_TER; race_bots=2; race_skirmish_map=0;
+    race_bot_races[0]=R_ZERG; race_bot_races[1]=R_PROTOSS;
+    init_state();
+#ifdef SC64_INDEXED_TARGET_QUERY
+    check_indexed_eligibility();
+#endif
+    for (int i=0; i<500; ++i) game_update(0,0);
+    printf("real engine frames=%lu target queries=%lu nonempty=%lu\n",probes,queries,hits);
+    if(probes != 500 || queries != 4000 || hits == 0) return 1;
+    synthetic_worlds();
+    return 0;
+}
