@@ -68,6 +68,25 @@ and shared production reservations. The ordinary AI's Carrier production
 budget reserves one hull and four child slots. A wider AI hangar rule
 also needs the matching reservation.
 
+## Configurable capacity trial
+
+The shared engine trial accepts a pure `SC64_P7_HANGAR_CAPACITY_FOR_TYPE`
+policy returning a capacity of one to eight for a supported parent. The
+built-in policy uses four and the rescue code supplies its initial child
+count separately. Live admission and decoded save validation use the
+same unit-type policy and the existing serialized rank bits.
+
+The eight-slot HOST fixture exercises five paid orders, rank seven,
+capacity-based AI reservations, distinct HUD keys, and immediate rejection
+of an invalid queue or duplicate rank. It resumes a normal pause journal
+with HOME L in a fresh process and matches 1,500 continuation updates.
+The continuation digest is
+`20ead61f18b4bdba4e8478c43a9732c73668b30531d3b98ea1c19798f42d4ccf`.
+The optional combined journal also rejects five pending orders alongside a
+paired Egg when the live unit pool is one slot short. It accepts and
+restores the journal when the sixth free slot is available. Prepared ARM
+links and ordinary emulator loads remain open for this trial.
+
 ## Harness cuts
 
 | Case ID | Required capture |
