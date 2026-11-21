@@ -149,8 +149,15 @@ in a fresh emulator. The 32 KiB SRAM, world, shot rows, video cuts, and
 36 continuation updates match the prior four-slot run. The comparison
 SHA-256 is
 `7fa781d241036ddbc722c7752618467065f2369bb398b141af13c216b272194f`.
-Terran and Z10 retain the ordinary gameplay evidence above from their
-earlier links. The current four-link receipt index SHA-256 is
+Terran now repeats the paid Carrier and child route on the composed
+ROM. Its frame-16,100 active and frame-16,140 docked saves match both
+prior journals byte for byte, and both restore from fresh HOME.
+Z10 repeats the legacy load and compact frame-17,305 pause. Its full
+journal matches, and 12 world cuts across the next 180 updates agree
+with uninterrupted play. The current Terran and Z10 replay hashes are
+`64085df7c58270d231fdef3722a1e68b3983a7f6b726ea8f3d44bc9107178d78` and
+`eadbcc23bc3f39e753adba74b045ad123f4cdaeec2d1a81e3fe6f53dcca10387`.
+The current four-link receipt index SHA-256 is
 `de79b6098a2d3ff10313b2b3234fbf407fa126608944af265970ae211b6fe3b0`.
 
 ## Harness cuts

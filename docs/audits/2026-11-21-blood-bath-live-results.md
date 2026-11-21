@@ -39,8 +39,47 @@ for the transfer branch and the
 [cadence audit](2026-11-13-n64-blood-bath-result-cadence.md)
 for scan ordering. The late run has no surviving human mobile actors
 at the two retained cuts. The record witnesses the count, kind and
-result changes across 19 native updates. Exact publication and
-survivor transfer still need a closer live witness.
+result changes across 19 native updates. A separate run below resolves
+the one-update publication boundary with a living human survivor.
+
+### Ordinary human survivor transfer
+
+An ares run restored the authenticated ordinary Blood Bath opening and
+sent controller inputs only. During the match, the player used the
+ordinary Move command to withdraw SCV slot 67. The first attempt left
+that worker at (479,93), where it died before the base. After restoring
+the run at step 6,781, the player moved the same worker to (516,51).
+It stayed there with 60 HP. The host used save and per-frame hotkeys to
+inspect the result boundary without modifying guest state.
+
+| Native update | Command Center HP | Human building census | Countdown | Human kind, pending and published result | SCV slot 67 |
+| --- | ---: | ---: | ---: | --- | --- |
+| 9,035 | 38 | 1 | 19 | 2, 0, 0 | Owner 2, 60 HP at (516,51) |
+| 9,044 | 0 | 1 | 9 | 2, 0, 0 | Owner 2, 60 HP at (516,51) |
+| 9,054 | 0 | 1 | 0 | 2, 0, 0 | Owner 2, 60 HP at (516,51) |
+| 9,055 | 0 | 0 | 29 | 10, 2, 2 | Owner 11, 60 HP at (516,51) |
+
+The Command Center is already in its Death order when its HP reads
+zero at 9,044. It is still present as a dying actor at 9,055. The census,
+result, and survivor ownership change in the same sampled native update.
+The worker retains its type, idle order, HP, position and pool slot.
+The three CPU owners retain kind 1 and keep their counts of 9, 13 and 10
+buildings. An independent neutral-input continuation from the earlier
+checkpoint also preserves the transferred worker at step 9,067.
+
+The ordinary GBA opt-in transfer below preserves the same survivor
+fields. Its live building rows and immediate result check differ from
+the native countdown and death census. CPU retirement with a surviving
+actor and multi-owner final-building losses still need native cuts.
+
+| Private survivor-transfer receipt | SHA-256 |
+| --- | --- |
+| Native step 9,044 normalized RDRAM | `64ea1639bf8e5facd1a54a2544bf6332688517e9bceeb2e0dd41346a9d78f218` |
+| Native step 9,054 normalized RDRAM | `1686c449cd0a608ba1de1e6eb89c1bed357c113496aa1ab9ade108549045a8e5` |
+| Native step 9,055 normalized RDRAM | `a2289010c308c25be34e7c42b3f92b829e77dec5b15be40220d47845e02862bc` |
+| Ordinary controller and capture journal | `1e04f770f4a591a06a5a9c32973d227ecd489c1f0fe696fce1f4a1164b6059ea` |
+| Per-frame capture journal | `a746478d382107c3fa9fbd85931808a48953dbb644a52d41f571ffbdbe65f3be` |
+| Authenticated emulator and native input pins | `7eb1ae904d80b49b124f9252502af69c79c7267d0b42739bd2a248b8d4bfed97` |
 
 ## Normal GBA result and fresh load
 
