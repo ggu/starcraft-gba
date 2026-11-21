@@ -518,8 +518,9 @@ cache transcript. Its SHA-256 is
 The ordinary Z7 trial reaches victory at frame 228,128. The pause
 journal, victory journal and fresh HOME re-export match the pinned
 release byte for byte. All 254 world cuts, ten display cuts and six
-logical cache cuts match. A separate BFS checks 75 complete samples
-and 4,201 published directions across six partial fields.
+logical cache cuts match. The 75 complete field samples match the
+release bytes, and an independent BFS checks 4,201 published
+directions across six partial fields.
 
 | Z7 window | Mean vs. pinned release | p95 vs. pinned release | Peak vs. pinned release |
 | --- | ---: | ---: | ---: |
