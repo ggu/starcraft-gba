@@ -39,6 +39,9 @@ open.
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Custom Game camera pan | `356b3078e1ebb4c9386f0bbd2de45b4c4bac8388fc8e967a7f77a47a1b3a1d59` |
 | Custom Game HOME and SRAM matrix | `871a353cd3df3204d1289ef25a20434fa0cff3311c27d42f8e17d03044e0cbe7` |
+| Protoss 10 late campaign and result | `a3b415f7fe44e399e585ebaa502d84152bc627c3c3293856cd1b4ffc02cc52f3` |
+| Terran depth and selection fixture | `58eb6b98d06f1b27a129712d193b70d8a7029a1fcab87ac7d217810bb77acde4` |
+| Showcase depth and death fixture | `0970530ec39164667c815967133cbeff8bcaa476d13bb03205b15bbc72fd0dca` |
 
 ## Shared build and renderer checks
 
@@ -64,6 +67,13 @@ both indexed pages, palette, HUD bands and the text-box queue region.
 Across the three race ROMs, all 54 normal Custom Game launches and
 fresh SRAM continuations pass over both maps, all three human races
 and one to three independently chosen CPU seats.
+
+The retained Protoss 10 controller tape resumes at world update
+36,761 and reaches a victory at update 46,057. All 68 comparisons and
+the complete result SRAM match. Terran HOST depth and foreground
+selection checks pass, including the Tank hull and turret on both
+pages and the SCV on a foundation. Showcase passes five fallback death
+overlap cases on both pages and the Siege Line source-art death case.
 
 The asset-free dirty capture fixture crosses both storage boundaries and
 restores to the other page. It exercises the ordinary three-band cache
