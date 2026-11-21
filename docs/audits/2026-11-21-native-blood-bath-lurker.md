@@ -160,6 +160,16 @@ The normal Z10 build still selects its existing writer. Measure ARM
 stack and pacing, qualify the remaining seat assignments and compare
 uninterrupted and fresh trajectories before activating the combined writer.
 
+The exact opt-in Z10 candidate also passes all 378 normal-menu Custom
+launches across the two maps, all player races and all nonempty CPU
+seat assignments. A separate boot-canary build from the same candidate
+restores the flight/Egg save, advances 100 updates and saves. The
+smallest untouched span above the IWRAM stack guard is 6,528 bytes in
+that run. The launch receipt SHA-256 is
+`2c21e850ad94be8d6e147c6fab10f067ba70a1af51684f0299f1dd8c1da79d56`.
+The diagnostic receipt SHA-256 is
+`f9603ccea0e0dc15bb5fb639ab97c8714637b43107bd634a86a63db9c01b818f`.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Native 23-sample observation | `ef063506548d4ed9f99cca89ecae47efb0ec2ed4221bd1c1545796d97d5f1b58` |

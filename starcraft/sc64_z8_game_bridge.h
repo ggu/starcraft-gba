@@ -199,6 +199,7 @@ sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *
 {
     int completed = sc64_z8_condition_counts_completed(c);
     unsigned count = 0;
+    s8 owner_match[SC64_Z8_SOURCE_OWNER_LIMIT];
 #ifndef SC64_COMMAND_RAW_VALIDATION_CACHE
     int left, up, right, down;
 #else
@@ -207,23 +208,26 @@ sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *
     if (world->actor_at != sc64_z8_game_actor_at ||
         world->actor_count != MAX_UNITS + MAX_BUILDINGS)
         return 0;
+    /* Keep invalid selector results until a live row uses that owner. */
+    for (unsigned owner = 0; owner < SC64_Z8_SOURCE_OWNER_LIMIT; ++owner)
+        owner_match[owner] = (s8)sc64_z8_world_owner_matches(world, c->player,
+                                                            trigger_owner, owner);
 
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         const Unit *q = &u[i];
-        int owner, type;
+        int owner = q->raw_owner, type;
         if (!q->alive) continue;
 #ifdef SC64_COMMAND_RAW_VALIDATION_CACHE
-        type = sc64_command_validated_type(validated[0], q->raw_owner, q->raw_type,
+        type = sc64_command_validated_type(validated[0], owner, q->raw_type,
                                             q->x, q->y, 0);
 #else
-        type = sc64_z8_game_actor_validate(q->raw_owner, q->raw_type,
+        type = sc64_z8_game_actor_validate(owner, q->raw_type,
                     q->x, q->y, 0, &left, &up, &right, &down);
 #endif
         if (type < 0) return -1;
-        owner = sc64_z8_world_owner_matches(world, c->player, trigger_owner,
-                                            (unsigned)q->raw_owner);
-        if (owner < 0) return -1;
-        if (!owner) continue;
+        int match = owner_match[owner];
+        if (match < 0) return -1;
+        if (!match) continue;
         if ((unsigned)q->raw_type >= SC64_Z8_RAW_UNIT_LIMIT) return -1;
         if (c->unit != 229u && c->unit != (unsigned)q->raw_type &&
             (c->unit != 230u || !(sc64_game_unit_actor_flags(type) & SC64_GAME_ACTOR_MEN)))
@@ -236,20 +240,19 @@ sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *
 
     for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
         const Building *q = &b[i];
-        int owner;
+        int owner = q->raw_owner;
         if (!q->alive) continue;
 #ifdef SC64_COMMAND_RAW_VALIDATION_CACHE
-        if (sc64_command_validated_type(validated[1], q->raw_owner, q->raw_type,
+        if (sc64_command_validated_type(validated[1], owner, q->raw_type,
                                         q->x, q->y, 1) < 0)
 #else
-        if (sc64_z8_game_actor_validate(q->raw_owner, q->raw_type,
+        if (sc64_z8_game_actor_validate(owner, q->raw_type,
                     q->x, q->y, 1, &left, &up, &right, &down) < 0)
 #endif
             return -1;
-        owner = sc64_z8_world_owner_matches(world, c->player, trigger_owner,
-                                            (unsigned)q->raw_owner);
-        if (owner < 0) return -1;
-        if (!owner) continue;
+        int match = owner_match[owner];
+        if (match < 0) return -1;
+        if (!match) continue;
         if ((unsigned)q->raw_type >= SC64_Z8_RAW_UNIT_LIMIT) return -1;
         if ((completed && q->under_construction) ||
             (c->unit != 229u && c->unit != 231u && c->unit != (unsigned)q->raw_type))

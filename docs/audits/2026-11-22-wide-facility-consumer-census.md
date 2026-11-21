@@ -63,3 +63,18 @@ result SHA-256 is
 `46635e64af61dbb691a4caf1abf5eb53fc778fa3475ce6fc2279261b43f6b76a`.
 The instrumented ROM SHA-256 is
 `8aa6b4299ad1aaf0c8c84516300496fbde26cd3e7db54efa5c464f90569354b2`.
+
+## One wide frontier trial
+
+The opt-in prototype adds 2,848 bytes of static EWRAM. Its sanitizer
+fixture matches the fresh FIFO across alternating origins, interleaved
+keys, topology invalidation, and capacity fallback. The full P10
+campaign tail matches 68 world, display and fog cuts, all frame and
+route counters, and victory SRAM. Mean game-update cycles fall from
+880,116 to 879,802 (0.036%). Peak loop cycles rise by 2,304. Keep
+this prototype opt-in. Measure actual park and resume counts before
+spending another EWRAM record. Profile simulation and rendering on
+consecutive dense updates that initiate no field work.
+
+The full candidate receipt SHA-256 is
+`300b531a44ff8753f85ab3f86483c6f5edd0e86698950f1dd36185bb24761dfd`.
