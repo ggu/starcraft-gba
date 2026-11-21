@@ -2508,7 +2508,7 @@ static void race_scarab_probe_target_invalidate(int target);
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
 static int race_p7_carrier_training_queue_selected(void);
-static void race_p7_carrier_training_source_tick(void);
+static int race_p7_carrier_training_source_tick(void);
 static void race_p7_carrier_training_frame_tick(void);
 static void race_p7_carrier_training_clear_slot(int slot);
 static void race_p7_carrier_training_end_frame(void);
