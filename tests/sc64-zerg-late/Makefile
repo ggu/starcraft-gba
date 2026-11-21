@@ -147,7 +147,7 @@ ifeq ($(filter 0 1,$(Z10_FACT_TABLES)),)
 $(error Z10_FACT_TABLES must be 0 or 1)
 endif
 # Combat eligibility can use the same generated bank on the normal Z10 path.
-Z10_COMBAT_FACTS ?= 0
+Z10_COMBAT_FACTS ?= 1
 ifneq ($(Z10_COMBAT_FACTS),0)
 ifneq ($(Z10_COMBAT_FACTS),1)
 $(error Z10_COMBAT_FACTS must be 0 or 1)
