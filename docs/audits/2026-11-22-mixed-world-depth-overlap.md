@@ -13,7 +13,7 @@ cover both at the cursor and still be missed. The picker now walks the
 eligible buildings and units together using the same key functions as
 the painter. It preserves the proximity fallback for a transparent
 initial hit or an unverified foreground pose. The shared path applies
-in Campaign, Custom Game and Showcase. The save format is unchanged.
+in Campaign, Custom Game and Showcase.
 
 The N64 uses a shared sprite pool for exact ties. The native Wasteland
 step 121,802 has a layer-4 Barracks (sprite 1078) and an unfinished Marine
@@ -27,14 +27,14 @@ to qualify any tie-policy change.
 
 ## Detached trails at ground elevations
 
-The [native spawn opcode](2026-11-21-native-depth-followup.md#missile-trails)
-allocates a separate child at parent elevation plus one. The GBA drew
+The native spawn opcode allocates a separate child at parent elevation
+plus one. [Native render records](2026-11-21-native-depth-followup.md#missile-trails) The GBA drew
 a low-elevation flight trail in its parent's turn. The shared painter
 now gives each low trail its own key using the birth anchor that the
 art renderer resolves. The parent and each subsequent child free one
 heap entry for the next birth. The added cursor array is 128 bytes on
-normal 32-tracer builds. At elevations above 4, world Y has no effect
-and the existing group draw remains in use.
+normal 32-tracer builds. Trails above elevation 4 share a draw entry
+because the depth key ignores world Y at those elevations.
 
 The prepared Showcase fixture emits a Vulture grenade at a burrow-flagged
 Drone, with a layer-2 projectile and layer-3 trail. The layer-3 Bunker
@@ -80,7 +80,10 @@ failure on `7c463fab` and passes the new case on both pages. The Showcase
 weapon fixture passes under the same sanitizers, including the prior
 high-layer missile, stationary impact, attached muzzle and HUD cases.
 
-The four normal ARM links retain the RAM endpoints of `bf663a2`. From
+The four normal ARM links pass the ROM and static RAM guards. The
+Showcase compiler reports 3,616 bytes for the painter's stack frame,
+up from 3,488 on `bf663a2`, plus 136 bytes for the ground-trail helper
+when active. From
 fresh Outpost launches, ordinary A selects the isolated Hatchery at
 (160, 160), and A on the overlap at (140, 162) selects the Overlord. Run
 these as separate launches so the first selection does not turn the
