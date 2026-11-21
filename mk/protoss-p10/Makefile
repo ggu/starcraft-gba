@@ -21,6 +21,7 @@ PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P
 P10_HATCHERY_WORDS ?= 1
 P10_OVERMIND_WORDS ?= 1
 P10_NEXUS_WORDS ?= 1
+P10_TERRAN_BUILDING_WORDS ?= $(CANONICAL_TERRAN_BUILDING_WORDS)
 ifneq ($(P10_HATCHERY_WORDS),0)
 ifneq ($(P10_HATCHERY_WORDS),1)
 $(error P10_HATCHERY_WORDS must be 0 or 1)
@@ -36,21 +37,29 @@ ifneq ($(P10_NEXUS_WORDS),1)
 $(error P10_NEXUS_WORDS must be 0 or 1)
 endif
 endif
+ifneq ($(P10_TERRAN_BUILDING_WORDS),0)
+ifneq ($(P10_TERRAN_BUILDING_WORDS),1)
+$(error P10_TERRAN_BUILDING_WORDS must be 0 or 1)
+endif
+endif
 P10_HATCHERY_WORD_DIR := build/generated/p10-hatchery-words
 P10_BOTH_WORD_DIR := build/generated/p10-hatchery-overmind-words
 P10_ALL_WORD_DIR := build/generated/p10-hatchery-overmind-nexus-words
+P10_TERRAN_WORD_DIR := build/generated/p10-hatchery-overmind-nexus-command_center-barracks-supply_depot-words
 P10_HATCHERY_WORD_HEADER := $(P10_HATCHERY_WORD_DIR)/sc64_building_words_generated.h
 P10_BOTH_WORD_HEADER := $(P10_BOTH_WORD_DIR)/sc64_building_words_generated.h
 P10_ALL_WORD_HEADER := $(P10_ALL_WORD_DIR)/sc64_building_words_generated.h
+P10_TERRAN_WORD_HEADER := $(P10_TERRAN_WORD_DIR)/sc64_building_words_generated.h
 P10_HATCHERY_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_HATCHERY_WORD_DIR)
 P10_BOTH_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_BOTH_WORD_DIR)
 P10_ALL_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(P10_ALL_WORD_DIR)
 P10_BUILDING_DRAW_FLAGS = $(CFLAGS) $(PROTOSS_P10_FLAGS)
-P10_BUILDING_CAN_PACK = $(and $(filter -DSC64_UNIT_WORD_SPRITES,$(P10_BUILDING_DRAW_FLAGS)),$(filter -DGBA_SPRITE_WORDS,$(P10_BUILDING_DRAW_FLAGS)))
+P10_BUILDING_CAN_PACK = $(and $(call sc64_defines,GBA_SPRITE_WORDS,$(P10_BUILDING_DRAW_FLAGS)),$(call sc64_can_pack_building_words,$(P10_BUILDING_DRAW_FLAGS)))
 P10_BUILDING_WORD_NAMES := $(strip \
 	$(if $(filter 1,$(P10_HATCHERY_WORDS)),hatchery) \
 	$(if $(filter 1,$(P10_OVERMIND_WORDS)),overmind) \
-	$(if $(filter 1,$(P10_NEXUS_WORDS)),nexus))
+	$(if $(filter 1,$(P10_NEXUS_WORDS)),nexus) \
+	$(if $(filter 1,$(P10_TERRAN_BUILDING_WORDS)),command_center barracks supply_depot))
 P10_BUILDING_WORD_EMPTY :=
 P10_BUILDING_WORD_SPACE := $(P10_BUILDING_WORD_EMPTY) $(P10_BUILDING_WORD_EMPTY)
 P10_BUILDING_WORD_DIR := build/generated/p10-$(subst $(P10_BUILDING_WORD_SPACE),-,$(P10_BUILDING_WORD_NAMES))-words
@@ -103,6 +112,11 @@ test-sc64-p10-nexus-words-pixels: build/test-sc64-p10-nexus-words-pixels
 	./build/test-sc64-p10-nexus-words-pixels
 build/test-sc64-p10-nexus-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_ALL_WORD_HEADER) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
 	$(CLANG) $(P10_ALL_WORD_FLAGS) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_HATCHERY_OVERMIND_NEXUS_WORDS_EXPECTED $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-p10-terran-building-words-pixels
+test-sc64-p10-terran-building-words-pixels: build/test-sc64-p10-terran-building-words-pixels
+	./$<
+build/test-sc64-p10-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_TERRAN_WORD_HEADER) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) -DSC64_BUILDING_WORDS_PROBE -I$(P10_TERRAN_WORD_DIR) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P10_TERRAN_BUILDING_WORDS_EXPECTED $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-p10-carried-profile: tests/sc64_promoted_race_profile.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-sc64-p10-carried-profile
