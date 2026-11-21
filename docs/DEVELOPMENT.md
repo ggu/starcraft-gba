@@ -266,8 +266,9 @@ and staged profiles retain their existing flag selections.
 
 The canonical ROM flag sets also add `CANONICAL_CACHE_FLAGS`
 (`SC64_TERRAIN_CACHE_VRAM`, `SC64_HUD_VRAM_BANDS`, `SC64_TERRAIN_ROW_MASKS`,
-`SC64_MINIMAP_RASTER`). The raster's 576-byte buffer stays in that memory-qualified
-group; Showcase and standalone probes keep only `SC64_MINIMAP_BLIT` through
+`SC64_MINIMAP_RASTER`). Z10 takes the raster from the canonical cache group.
+Showcase enables it through its HUD cache options. The raster uses 576
+bytes of EWRAM. Standalone probes can select `SC64_MINIMAP_BLIT` through
 `CANONICAL_MINIMAP_FLAGS`. The caches keep most of the
 saved terrain band in the OBJ tile VRAM that bitmap products leave to data
 (`starcraft/sc64_obj_vram.h` maps that area; the P7 projectile arena comes
