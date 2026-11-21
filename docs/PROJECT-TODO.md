@@ -180,18 +180,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   journal match stock. The traced goal stays partial on each resident cut
   and evicts without an eager refill. Both late means remain over four
   times the 30 fps cycle budget. The
-  [composed route trial](audits/2026-11-21-route-composition-current.md)
-  reduces current Z8 mean cycles by 8.42% and peak cycles by 15.61%.
-  On the current renderer it wins Z7 with matching world and display
-  cuts and both journals. Mean cycles fall 12.88% in the early dense
-  window and about 4% in both late windows. All four links and the
-  sampled T10, P10 and Custom Game continuations pass. Bounded VBlank
-  observations explain the phase shifts in Blood Bath and the earlier
-  dense Z7 pair. Measure broader busy skirmishes, campaign coverage
-  and physical frame pacing before activating this option by default.
-  A [paired Z7 replay on the Carrier release](audits/2026-11-21-route-composition-current.md#carrier-release-z7-windows)
-  confirms the dense and late gains through controller call 155,650.
-  Extend the current pair through victory before promoting it.
+  [composed routes](audits/2026-11-21-route-composition-current.md#normal-cartridge-activation)
+  are enabled on the standard packed builds. The current Z7 pair wins
+  through ordinary inputs with matching world, display and re-exported
+  journals. Mean guest cycles fall 12.84% in the early dense window and
+  about 4% in both late windows. All four links, sampled stack canaries,
+  T10 and P10 victories and 54 Custom Game continuations pass. Earlier
+  VBlank observations explain sampled display phase shifts. Dense
+  campaign loads and busy skirmishes still exceed the 30 fps budget.
+  Prioritize sustained order work and physical frame pacing checks.
 
 - **Busy Blood Bath.** The [current three-CPU profile](audits/2026-11-21-blood-bath-current-profile.md)
   averages 924,956 guest cycles against a 561,792-cycle 30-fps
@@ -216,7 +213,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   15.28% in the sampled Outpost window. Mean changes are small and
   both p95 measurements rise. Keep production placement and focus
   the next sustained-load investigation on order work, path-grid
-  rebuilds and the steady painter cost.
+  rebuilds and the steady painter cost. With composed routes active,
+  the current Thumb facility trial cuts peak Blood Bath cost 5.11%
+  and raises p95 0.60%. It leaves 24 bytes of static IWRAM code margin
+  in Showcase. Keep the placement option experimental.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
