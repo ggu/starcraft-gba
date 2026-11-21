@@ -2284,6 +2284,13 @@ AI wallets and full-match behavior remain unverified.
   to the framebuffer replay harness. Preserve separate masks for the ring,
   the detached sprite and the weapon projectile. Use the native sprite IDs
   for exact-tie cases.
+- Add the [shared depth cases](audits/2026-11-21-shared-world-depth-regressions.md#replay-cases)
+  for live Goliath turret overlap, body-only banks and active-camera sprite
+  pool reuse. Capture the ore-return attachment and independent mining effect.
+  Extend the nested-death overlap fixture to ordinary-input replay and
+  capture last-image retirement. Add ordinary Mutalisk and Spore Colony
+  impact cuts around child birth and expiration. Record the N64 pool IDs
+  at opaque same-layer overlaps.
 - Add the [native depth follow-up cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
   by case ID. Start with same-Y Tank hull, turret and firing flash, then
   cover the separate Goliath turret and capture native pool-ID reuse.

@@ -47,8 +47,8 @@ sc64_unit_body_crop_in_view(const Unit *q, int x, int y)
 #endif
     int raw = sc64_unit_art_raw(q);
 #ifdef SC64_UNIT_FACING
-    int tank = q->type == U_TANK, sieged = q->type == U_SIEGE_TANK;
-    int body_raw = tank ? 5 : sieged ? 30 : raw;
+    unsigned turret = sc64_facing_turret_raw(q, raw);
+    int body_raw = turret == 6 ? 5 : turret == 31 ? 30 : raw;
     const Sc64SpriteFrame *facing = body_raw >= 0 ? sc64_unit_facing_frames((unsigned)body_raw) : 0;
     if (facing) {
         int direction;
@@ -61,13 +61,14 @@ sc64_unit_body_crop_in_view(const Unit *q, int x, int y)
         if (direction < 0) direction = sc64_facing[slot] & SC64_FACING_MASK;
 
 #ifdef SC64_UNIT_WALK_FRAMES
-        const Sc64SpriteFrame *pose = (flying || walk) && !sieged ? sc64_walk_pose((unsigned)body_raw, (int)slot) : 0;
+        const Sc64SpriteFrame *pose = (flying || walk) && turret != 31 ?
+            sc64_walk_pose((unsigned)body_raw, (int)slot) : 0;
         if (pose) {
             if (sc64_unit_frame_in_view(&pose[direction], x, y, 0)) return 1;
-            return tank && sc64_unit_facing_frame_in_view(6, direction, x, y);
+            return turret && sc64_unit_facing_frame_in_view(turret, direction, x, y);
         }
 #endif
-        if ((tank || sieged) && sc64_unit_facing_frame_in_view(sieged ? 31 : 6, direction, x, y - lift))
+        if (turret && sc64_unit_facing_frame_in_view(turret, direction, x, y - lift))
             return 1;
         return sc64_unit_facing_frame_in_view((unsigned)body_raw, direction, x, y - lift);
     }

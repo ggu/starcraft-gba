@@ -538,8 +538,10 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
         if ((parts & SC64_TRACE_ATTACKER) &&
             !(parts & sc64_weapon_source_vfx_attacker_part(overlay->opcode)))
             continue;
-        if ((parts & SC64_TRACE_WITHOUT_FLIGHT_TRAILS) && overlay->opcode == 15u) continue;
-        if ((parts & SC64_TRACE_ONLY_FLIGHT_TRAILS) && overlay->opcode != 15u) continue;
+        if ((parts & (SC64_TRACE_WITHOUT_FLIGHT_TRAILS | SC64_TRACE_WITHOUT_IMPACT_CHILD)) &&
+            overlay->opcode == 15u) continue;
+        if ((parts & (SC64_TRACE_ONLY_FLIGHT_TRAILS | SC64_TRACE_ONLY_IMPACT_CHILD)) &&
+            overlay->opcode != 15u) continue;
         int64_t base_trigger = relative_to_release ? overlay->relative_tick :
                                                     (int64_t)overlay->source_tick;
         uint32_t loop_len = anim->loop_pc != UINT32_MAX &&
@@ -739,6 +741,9 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
     if (only_trails && (!flight_anim || source_age < init_ticks ||
                         source_age - init_ticks >= flight_ticks)) return;
 
+    const int only_impact = (parts & SC64_TRACE_ONLY_IMPACT_CHILD) != 0;
+    if (only_impact && (!death || source_age < init_ticks + flight_ticks)) return;
+
     const Sc64WeaponSourceAnimation *active = init;
     uint32_t local_tick = source_age;
     if (source_age >= init_ticks) {
@@ -780,7 +785,7 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
             draw_image, draw_anim, local_tick, key.direction, &draw_mirror) :
             UINT16_MAX;
     }
-    if (!only_trails && draw_image && draw_frame_id != UINT16_MAX) {
+    if (!only_trails && !only_impact && draw_image && draw_frame_id != UINT16_MAX) {
         const Sc64WeaponSourceFrame *draw_frame =
             sc64_weapon_source_vfx_frame_resolved(draw_image, draw_frame_id);
         if (draw_frame)
@@ -808,7 +813,8 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
         sc64_weapon_source_vfx_draw_overlays_motion(death, death_age, death_age,
             image->image_id, projectile_frame, px, py, key.direction,
             projectile_mirror, 0, p, launch_x, launch_y, x1, y1,
-            moving ? flight_ticks : 0u, &motion, 0);
+            flight_ticks, &motion,
+            parts & (SC64_TRACE_WITHOUT_IMPACT_CHILD | SC64_TRACE_ONLY_IMPACT_CHILD));
     }
 
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
