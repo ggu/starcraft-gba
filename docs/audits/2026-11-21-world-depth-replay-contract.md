@@ -102,6 +102,15 @@ the composed frame. Treat a sprite record flagged `0x04` as metadata.
 Keep the case pending until it captures both ID orders and the free-list
 change through last-image retirement and reuse.
 
+For `same-air-layer-ignore-y`, another exploratory ares continuation
+from a retained Scout checkpoint sampled updates 4,482 and 4,504. The
+layer-18 pair 1973 and 1969 has the higher key on the northern sprite at
+both cuts. Both records lack the draw-admission bit and their projected
+opaque masks are unverified. Qualify the case with a viewport-admitted
+pair. The source input history before this checkpoint is also unverified.
+The local receipt SHA-256 is
+`237ee88cfb9ce8f2ba88ddbb2b50c8be081b2d3d57ffcdc9755080559a385cde`.
+
 ## Mineral work layer
 
 The native Blood Bath step-75 observation records visible SCV mining

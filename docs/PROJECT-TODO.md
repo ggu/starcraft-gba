@@ -74,8 +74,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores a paid Egg, a paid Carrier queue and an active Interceptor
   from one 14,100-byte record. It also rejects malformed newer
   candidates and restores legacy Carrier and transport records.
-  Qualify the format in ordinary HOME on ARM, then test P10 research
-  composition before production activation. Use
+  The isolated ARM fixture also saves an ordinary paid Egg through
+  pause, reloads through HOME, and matches 401 updates through its
+  hatch. Repeat with a live Carrier/Interceptor in the same ARM
+  record, then test P10 research composition before production
+  activation. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 
@@ -216,7 +219,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Mode 4 padding change](audits/2026-11-22-terrain-cache-padding.md)
   frees 2,400 bytes of EWRAM per profile and lowers the current busy
   Z10 replay mean from 842,472 to 840,021 cycles. Measure per-page
-  damage tracking before adding writes to the painter's hot path. The
+  damage tracking before adding writes to the painter's hot path.
+  The [packed sprite compositor](audits/2026-11-22-packed-sprite-transfer.md)
+  lowers that mean to 832,982 cycles and frees 64 bytes of static
+  IWRAM code on each normal profile. Profile the byte sprite and
+  projectile paths for larger sustained savings. The
   [point-route origin census](audits/2026-11-21-blood-bath-point-origin.md)
   links all four fills at update 2,055 to stale-donor gate
   failures. Both local certificates decline all four. A full-width
