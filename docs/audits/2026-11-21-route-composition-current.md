@@ -56,7 +56,7 @@ qualification remain open.
 Set `CANONICAL_ROUTE_POINT_PREFIX=composed` when building a trial
 cartridge. The Makefile expands it to the same 13 probe flags as the Z7
 experiment above and includes the choice in the build key. The default
-remains `0`. The current source with the trial off reproduces the public
+in that revision was `0`. The source with the trial off reproduces the public
 asset-free ROM byte for byte. The focused route sanitizer checks
 pass with the composed flag set, including far-read and range-work
 coverage with all of the composed flags enabled. That check compares
@@ -191,3 +191,72 @@ The exact comparison receipt SHA-256 is
 Continue the current candidate through victory and re-export before
 considering default activation. Timing covers guest cycles in the
 bounded windows.
+
+## Normal cartridge activation
+
+On source release `fcb8d819`, the four route-off ROMs reproduce the
+previous release byte for byte. Terran, Z10, P10 and Showcase now
+select the same 13 composed route flags when their standard packed
+route services are present, including the tail-backed point fields.
+Set `CANONICAL_ROUTE_POINT_PREFIX=0` for a control. The
+previous explicit probe values remain available. The historical Z6
+cartridge still selects its original route mode by default.
+
+All four composed links pass the ROM and RAM guards. Showcase has a
+64-byte static IWRAM margin below the code limit. A stack-canary run
+on the retained P10 campaign tail left 6,504 bytes untouched from
+`0x03005000` through victory with routes off and on. Three-CPU Outpost
+left 7,248 bytes untouched in P10 and 7,568 in Showcase. The first
+Showcase scene left 9,060 bytes untouched. The paired world and
+display samples match in those instrumented workflows.
+
+The T10 full run pauses at frame 2,276 and wins at frame 3,361. Its
+saved, victory and fresh HOME re-export bytes match. The P10 run
+restores from frame 36,761 and reaches victory at frame 46,057. All
+68 paired world and display cuts and the exported SRAM agree.
+
+Both current Z7 runs start from HOME, pause at frame 5,641 and resume
+in a fresh emulator. They follow the full controller tape through call
+231,031 and win at frame 228,128. All 254 sampled world cuts and ten
+paired display cuts agree. The verifier compares 75 complete fields
+and checks 4,201 published directions against independent BFS. The
+pause and victory journals match byte for byte. A third HOME session
+reads and re-exports the same victory journal.
+
+| Z7 window | Advancing updates | Mean change | p95 change | Peak change |
+| --- | ---: | ---: | ---: | ---: |
+| Early dense | 477 | −12.84% | −19.11% | −12.21% |
+| Late peak | 926 | −3.82% | −11.03% | −9.81% |
+| Late following | 905 | −4.26% | −11.85% | −16.43% |
+
+The four ordinary Campaign or Showcase openings match both graphics
+pages, palette and world at frames 61 and 121. All 54 Custom Game
+fresh HOME continuations pass across the race ROMs. A three-CPU
+Blood Bath continuation matches 31 state and display cuts and 16
+fresh-load cuts. Its mean guest cost is 876,142 cycles in the control
+and 876,399 in the composed ROM (+0.03%). Both values exceed the
+561,792-cycle 30 fps budget.
+
+| Current local evidence | SHA-256 |
+| --- | --- |
+| Current full Z7 victory and fresh HOME pair | `fbaff5d892a5887b19654aefeb403232a23db24c6f9b153e48c996f8a24a5746` |
+| T10 ordinary pause, victory and result re-export | `36e1e256de8292868ae71df09e78a3df23f12eb0a48426ec988734dc2e11971d` |
+| P10 ordinary tail and victory | `fd9b30ea87f42155bd1d5ee887d817cfdce1ad59930e8fdd81fdd8dadf56d1a4` |
+| Current stack-canary workflows | `6c1bf977694429f1c8758becb2e0ac6ffd5f8e9f86913e2895d742b72402083b` |
+| All 54 Custom Game continuations | `6f53e60559c038b6c161dd5e0bdfeccbfa4f49a9dd279234ab810350545303b0` |
+| Busy Blood Bath and fresh continuation | `b14bf8b646df33aff9f1cb600f555323e2a9b3f355206820f5e441d8da6d29ea` |
+
+## Facility placement follow-up
+
+The separate Thumb facility trial links alongside composed routes in
+all four products. On Z10 Blood Bath its mean cycle cost falls 0.19%
+and peak falls 5.11%. The p95 rises 0.60%. World, display and the
+fresh continuation agree. In Showcase the combined static IWRAM
+margin is 24 bytes. Its sampled scene and three-CPU Outpost stack
+canaries match the composed-only runs. Keep facility placement opt-in
+while investigating sustained order and terrain costs.
+
+The busy comparison SHA-256 is
+`a98fe6524121cfe55c3ea9c04086b4f9fc9d6a3d29d94e743d8d730d8cf92386`.
+The Showcase stack comparison SHA-256 is
+`b31f80f9c8590d9c594dec27d6fff1858f81036a1554181ffd104f15d62f391a`.

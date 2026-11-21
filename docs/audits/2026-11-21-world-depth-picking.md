@@ -45,6 +45,31 @@ witness from an off-camera key or a staged framebuffer fixture. Use the
 [shared cases](2026-11-21-shared-world-depth-regressions.md#replay-cases)
 for independent attacks, attached death images and mining effects.
 
+## Fresh native Blood Bath depth records
+
+A fresh read-only ares continuation reached native update 17,166 in an
+ordinary Blood Bath fight. Two visible Zerglings share layer 4 and sprite
+Y 142. Sprite 438 at (80,142) has key `0x202381b6`. Sprite 1418 at
+(62,142) has key `0x2023858a` and sorts later. The ordinary turret bit is
+clear on both. At update 17,144, the row at `0x80112cb0` visits sprites
+1330 and 1418 in ascending ID order. Those Zerglings share layer 4 and
+Y 152, with keys `0x20260532` and `0x2026058a`.
+
+At update 17,166, SCV actor 61 has zero HP but retains sprite 2138 at
+(58,107), key `0x201ac85a`. Two image 332 death records still point to
+that sprite. The nearby live Zergling at (89,100) uses sprite 507 and
+key `0x201901fb`. The native row at `0x80112cac` visits 507 then 2138.
+Use this case to test the original sprite's depth through death. The
+render records establish the order and attachment. An opaque pixel mask
+and synchronization between the screenshot callback and state sample
+remain open.
+
+| Local native update 17,166 receipt | SHA-256 |
+| --- | --- |
+| Emulator state | `101daf56c81f976e7e95a970173c1cbeb11d3bf06f090902e86a18e5ab1e4c87` |
+| Read-only trace | `d1dfd0903afb037826d3932bf3123266176ed46c9263299bc0a67ebaf029b2e3` |
+| Emulator framebuffer capture | `d7dc2eb2db54852cc6debd1087f9765a5b853557aebc45694750ab2924423b6d` |
+
 ## Scout missile trail
 
 Scout air weapon 74 launches image 521. Its native flight script uses
