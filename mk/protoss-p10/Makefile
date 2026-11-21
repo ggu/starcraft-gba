@@ -65,6 +65,12 @@ P10_BUILDING_WORD_SPACE := $(P10_BUILDING_WORD_EMPTY) $(P10_BUILDING_WORD_EMPTY)
 P10_BUILDING_WORD_DIR := build/generated/p10-$(subst $(P10_BUILDING_WORD_SPACE),-,$(P10_BUILDING_WORD_NAMES))-words
 P10_BUILDING_WORD_HEADER = $(if $(and $(P10_BUILDING_WORD_NAMES),$(P10_BUILDING_CAN_PACK)),$(P10_BUILDING_WORD_DIR)/sc64_building_words_generated.h)
 P10_BUILDING_WORD_FLAGS = $(if $(P10_BUILDING_WORD_HEADER),-DSC64_BUILDING_WORDS_PROBE -I$(P10_BUILDING_WORD_DIR))
+
+.PHONY: test-carrier-frame-roster
+build/test-carrier-frame-roster: tests/sc64_carrier_roster_regression.c tests/sc64_p7_interceptor_flight_game.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-carrier-frame-roster: build/test-carrier-frame-roster
+	./$<
 P10_HATCHERY_CONFIG := build/p10-hatchery-words-config
 .PHONY: force-p10-hatchery-words-config
 $(P10_HATCHERY_CONFIG): force-p10-hatchery-words-config | build

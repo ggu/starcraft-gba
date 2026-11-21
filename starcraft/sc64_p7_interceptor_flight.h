@@ -383,7 +383,8 @@ static void race_p7_flight_carrier_tick(int carrier)
 static void race_p7_interceptor_flight_source_tick(void)
 {
     if (!race_protoss_services_active()) return;
-    for (int i = 0; i < MAX_UNITS; ++i) {
+    for (int n = 0; n < SC64_CARRIER_CHILD_COUNT; ++n) {
+        int i = (int)SC64_CARRIER_CHILD_SLOT(n);
         unsigned state;
         if (!u[i].alive || u[i].type != U_P7_INTERCEPTOR ||
             RACE_PROTOSS_RAW(&u[i]) != SC64_P7_INTERCEPTOR_RAW) continue;
@@ -392,14 +393,17 @@ static void race_p7_interceptor_flight_source_tick(void)
             state == SC64_P7_INTERCEPTOR_DETACHED)
             race_p7_flight_child_tick(i);
     }
-    for (int i = 0; i < MAX_UNITS; ++i)
+    for (int n = 0; n < SC64_CARRIER_PARENT_COUNT; ++n) {
+        int i = (int)SC64_CARRIER_PARENT_SLOT(n);
         if (sc64_p7_carrier_parent_valid(i)) race_p7_flight_carrier_tick(i);
+    }
 }
 
 /* Every 30 Hz update: fly toward the current waypoint. */
 static void race_p7_interceptor_flight_frame_move(void)
 {
-    for (int i = 0; i < MAX_UNITS; ++i) {
+    for (int n = 0; n < SC64_CARRIER_CHILD_COUNT; ++n) {
+        int i = (int)SC64_CARRIER_CHILD_SLOT(n);
         Unit *q = &u[i];
         unsigned state;
         if (!q->alive || q->type != U_P7_INTERCEPTOR) continue;

@@ -19,6 +19,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Busy match pacing.** The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
+  cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
+  window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
+  peak rises 0.30%. Pursue route stalls, defense queries and the
+  large shared draw passes against the current combined build.
+  Qualify physical frame pacing on all three race cartridges.
+  The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
+  cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
+  preceding release. On top of the Carrier roster the Blood Bath peak
+  falls another 5.09%, while p95 rises 0.32%. Keep it opt-in pending
+  broader combined replays and the Showcase runtime stack watermark.
+
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
   same-slot reuse and in the optional VRAM pool. The real N64 Blood Bath
@@ -48,6 +60,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   follows three Zerg CPU Hydralisks through Lurker Egg and Lurker in
   their original slots. Qualify the missing Custom Game research
   and AI morph path with per-owner payment, supply and save checks.
+  The [follow-on Blood Bath cut](audits/2026-11-21-native-blood-bath-lurker.md#follow-on-egg-observation)
+  narrows a likely Zergling pair hatch to 33 native updates. The ordinary
+  GBA counterpart verifies a queued pair and fresh HOME continuation.
+  Qualify the separate Custom Game Egg actor and use
+  the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
+  for the separate Den research and same-slot morph work.
 
 - **Campaign verification.** All 30 missions now have ordinary HOME
   wins, fresh pause continuations and result readbacks on the same

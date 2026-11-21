@@ -6,6 +6,9 @@
 #if !defined(SC64_P7_PROJECTILES_ENABLED) || (!defined(SC64_P7_ACTORS) && !defined(SC64_TERRAN_CARRIER_PROBE))
 #error "P7 Carrier training requires the typed P7 Interceptor actor profile"
 #endif
+#ifndef SC64_CARRIER_FRAME_ROSTER
+#define SC64_CARRIER_FRAME_ROSTER 1
+#endif
 
 /* Carrier Interceptors are real Unit rows. They stay hidden in the hangar until
  * the flight adapter (sc64_p7_interceptor_flight.h) releases them. */
@@ -530,10 +533,41 @@ static void race_p7_carrier_training_clear_slot(int slot)
     }
 }
 
+#if SC64_CARRIER_FRAME_ROSTER
+/* One transient slot bank: parents grow from the front and children from
+ * the back. Both are traversed in ascending actor-slot order. It is valid
+ * only during frame_tick; direct helper calls retain the original full scan.
+ * End-frame reuses the bank after frame_tick has returned. */
+_Static_assert(!SC64_P7_CARRIER_PARENT_TYPE(U_P7_INTERCEPTOR),
+               "parent and child roster types must be disjoint");
+_Static_assert(MAX_UNITS <= 65536, "roster slots must fit in u16");
+#if MAX_UNITS <= 256
+typedef u8 Sc64CarrierRosterSlot;
+#else
+typedef u16 Sc64CarrierRosterSlot;
+#endif
+static Sc64CarrierRosterSlot sc64_carrier_slots[MAX_UNITS];
+static int sc64_carrier_parent_count, sc64_carrier_child_count;
+static int sc64_carrier_roster_active;
+#define SC64_CARRIER_CHILD_COUNT (sc64_carrier_roster_active ? sc64_carrier_child_count : MAX_UNITS)
+#define SC64_CARRIER_PARENT_COUNT (sc64_carrier_roster_active ? sc64_carrier_parent_count : MAX_UNITS)
+#define SC64_CARRIER_CHILD_SLOT(n) (sc64_carrier_roster_active ? sc64_carrier_slots[MAX_UNITS - 1u - (n)] : (n))
+#define SC64_CARRIER_PARENT_SLOT(n) (sc64_carrier_roster_active ? sc64_carrier_slots[(n)] : (n))
+#else
+#define SC64_CARRIER_CHILD_COUNT MAX_UNITS
+#define SC64_CARRIER_PARENT_COUNT MAX_UNITS
+#define SC64_CARRIER_CHILD_SLOT(n) (n)
+#define SC64_CARRIER_PARENT_SLOT(n) (n)
+#endif
+
 static int race_p7_carrier_training_source_tick(void)
 {
     int has_parent = 0, has_child = 0;
-    for (int i = 0; i < MAX_UNITS; ++i) {
+#if SC64_CARRIER_FRAME_ROSTER
+    if (sc64_carrier_roster_active) has_parent = sc64_carrier_parent_count != 0;
+#endif
+    for (int n = 0; n < SC64_CARRIER_CHILD_COUNT; ++n) {
+        int i = (int)SC64_CARRIER_CHILD_SLOT(n);
         Unit *child = &u[i];
         if (!child->alive) continue;
         if (SC64_P7_CARRIER_PARENT_TYPE(child->type)) has_parent = 1;
@@ -566,9 +600,11 @@ static int race_p7_carrier_training_source_tick(void)
         }
     }
     if (has_parent) {
-        for (int i = 0; i < MAX_UNITS; ++i)
+        for (int n = 0; n < SC64_CARRIER_PARENT_COUNT; ++n) {
+            int i = (int)SC64_CARRIER_PARENT_SLOT(n);
             if (u[i].carry > 0 && sc64_p7_carrier_parent_valid(i))
                 (void)race_p7_carrier_training_start(i);
+        }
     }
     return has_parent || has_child;
 }
@@ -579,16 +615,35 @@ static int race_p7_carrier_training_source_tick(void)
 static void race_p7_carrier_training_frame_tick(void)
 {
     if (!race_protoss_services_active()) return;
+#if SC64_CARRIER_FRAME_ROSTER
+    sc64_carrier_parent_count = sc64_carrier_child_count = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive) continue;
+        if (SC64_P7_CARRIER_PARENT_TYPE(u[i].type))
+            sc64_carrier_slots[sc64_carrier_parent_count++] = (Sc64CarrierRosterSlot)i;
+        else if (u[i].type == U_P7_INTERCEPTOR)
+            sc64_carrier_slots[MAX_UNITS - 1u - sc64_carrier_child_count++] = (Sc64CarrierRosterSlot)i;
+    }
+    sc64_carrier_roster_active = 1;
+#endif
     if (RACE_PROTOSS_SERVICE_CLOCK[0] != 4u) {
         /* If the training pass saw no actors, it could not create a child.
          * The remaining passes would only scan empty Carrier work. */
-        if (!race_p7_carrier_training_source_tick()) return;
+        if (!race_p7_carrier_training_source_tick()) {
+#if SC64_CARRIER_FRAME_ROSTER
+            sc64_carrier_roster_active = 0;
+#endif
+            return;
+        }
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         race_p7_interceptor_flight_source_tick();
 #endif
     }
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     race_p7_interceptor_flight_frame_move();
+#endif
+#if SC64_CARRIER_FRAME_ROSTER
+    sc64_carrier_roster_active = 0;
 #endif
 }
 
@@ -653,12 +708,27 @@ static void race_p7_carrier_training_parent_died(
 static void race_p7_carrier_training_end_frame(void)
 {
     if (!race_protoss_services_active()) return;
+#if SC64_CARRIER_FRAME_ROSTER
+    /* frame_tick has finished; none of its roster consumers are active. */
+    unsigned count = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (u[i].type == U_P7_INTERCEPTOR &&
+            RACE_PROTOSS_RAW(&u[i]) == SC64_P7_INTERCEPTOR_RAW)
+            sc64_carrier_slots[count++] = (Sc64CarrierRosterSlot)i;
+        if (!u[i].alive && SC64_P7_CARRIER_PARENT_TYPE(u[i].type) &&
+            sc64_p7_carrier_parent_row_consistent(&u[i]))
+            race_p7_carrier_training_parent_died(i, race_p7_projectile_clear_references);
+    }
+    for (unsigned k = 0; k < count; ++k) {
+        int i = sc64_carrier_slots[k];
+#else
     for (int i = 0; i < MAX_UNITS; ++i)
         if (!u[i].alive && SC64_P7_CARRIER_PARENT_TYPE(u[i].type) &&
             sc64_p7_carrier_parent_row_consistent(&u[i]))
             race_p7_carrier_training_parent_died(
                 i, race_p7_projectile_clear_references);
     for (int i = 0; i < MAX_UNITS; ++i) {
+#endif
         Unit *child = &u[i];
         unsigned state;
         if (child->type != U_P7_INTERCEPTOR ||
