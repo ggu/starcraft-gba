@@ -127,9 +127,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [composed route trial](https://github.com/ggu/starcraft-gba/pull/677)
   reduces current Z8 mean cycles by 8.42% and peak cycles by 15.61%,
   passes all four links and the sampled T10, P10 and Custom Game
-  continuations. Dense Z7 and busy Blood Bath each have an active
-  framebuffer page discrepancy to inspect across VBlank. Keep this
-  option off for release while checking presentation and hardware timing.
+  continuations. The busy Blood Bath discrepancy is a one-VBlank
+  page-flip phase shift. The rendered page contents and next input
+  sample agree. Keep the option off for release while inspecting the
+  dense Z7 presentation boundary and measuring hardware timing.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
