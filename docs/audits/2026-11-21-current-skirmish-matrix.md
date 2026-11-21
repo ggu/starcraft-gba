@@ -120,3 +120,15 @@ seat mask, start positions and saved world after a fresh HOME load.
 The next 60 updates match uninterrupted play. All re-exported SRAM
 files match their inputs byte for byte. The private Random matrix
 SHA-256 is `11158cac20466a56278373858cee7ec6bf8018b5cf73c7d0c67c457e9367c15c`.
+
+## Packed building release
+
+The three race ROMs from the [packed building release](2026-11-21-terran-building-word-draw.md#shared-release-checks)
+repeat all 2,232 named, Random and Closed lineups from #663. There are
+216 one-opponent, 864 two-opponent and 1,152 three-opponent starts.
+Both maps, each human race, resolved Random races, spawn locations and
+the next 120 gameplay updates match the corresponding #663 cases.
+All 108 sampled journals match #663 byte for byte and restore the same
+world and another 60 updates after a fresh HOME load. Each immediate
+SRAM re-export also matches. The private comparison SHA-256 is
+`44e3b81dae4ca6668e3c08082d0ab794c4e38ace8d1cacf3d0dfc399ee4bb15b`.

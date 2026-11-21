@@ -171,6 +171,9 @@ display pages, the palette and display register at seven cuts each.
 The re-exported SRAM matches the input journal in all eight guests.
 The private comparison SHA-256 is
 `0495af50f6e37dad904af8b5d0d6f178f4926d1d43e6a4ee44e4cf31538c7d9f`.
+Separately, the three packed race ROMs repeat the
+[2,232-launch seat matrix](2026-11-21-current-skirmish-matrix.md#packed-building-release)
+and reproduce all 108 sampled journals and fresh continuations from #663.
 
 The normal and rollback Make recipes reproduce all four qualified ARM
 compiler vectors after resolving the prepared input paths. Regenerating
@@ -199,5 +202,14 @@ and 20 fresh observations, dialogue and crystal transfers match #663.
 Mean whole-tape cost changes by less than 0.005% in both runs. The
 private comparison SHA-256 is
 `3450f6eb35f16548d4bf683361ba0565d61536526925066267a05870b7011954`.
+
+The retained Z8 busy tape also loads its frame-16,659 pause in both
+builds. It matches 17 world and display cuts, all route counters, and
+the three modal boundaries. Across the 203 timed updates, the three
+window means differ by less than 0.01%. The busiest sampled packed
+update consumes 12,056,654 cycles. Use these windows as the current
+baseline for the [short-route trial](https://github.com/ggu/starcraft-gba/pull/616).
+The paired receipt SHA-256 is
+`061b5b57f9c78a0068160e98397a3332bd9c125a545ebd8ad8a5d7438b89d431`.
 
 Physical GBA timing and longer cross-race Custom Game wins remain open.
