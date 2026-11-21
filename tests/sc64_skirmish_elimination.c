@@ -51,6 +51,18 @@ static void launch_as(int melee, int human)
 
 static void launch(int melee) { launch_as(melee, -1); }
 
+static void prepare_written_save(RaceLoadPlan *plan)
+{
+#ifdef SC64_WORKER_CARGO_KIND
+    /* The compact Carrier writer packs into the candidate scratch buffer.
+     * Reopen the journal to get decoded state and its authenticated plan. */
+    GbaSaveSelection selected;
+    assert(race_worker_cargo_select(plan, &selected));
+#else
+    assert(race_load_preflight(plan));
+#endif
+}
+
 static void check_word_policy(int melee, unsigned starts, int legacy, int tagged)
 {
     int race = -1;
@@ -75,8 +87,10 @@ static void check_word_policy(int melee, unsigned starts, int legacy, int tagged
 static void check_elimination(int melee)
 {
     launch(melee);
+    RaceLoadPlan plan = {0};
     const unsigned starts = race_skirmish_start_order;
     assert(race_save_game());
+    prepare_written_save(&plan);
     const int legacy = race_data.state[23];
     game_init(); prior_keys = 0;
     assert(race_load_game() && !race_skirmish_eliminated && race_skirmish_start_order == starts);
@@ -121,6 +135,7 @@ static void check_elimination(int melee)
     assert(u[second_worker].alive && u[second_worker].owner == RESCUABLE &&
            u[second_worker].order == ORDER_MINE && u[second_worker].target >= 0);
     assert(race_save_game());
+    prepare_written_save(&plan);
     const int tagged = race_data.state[23];
     assert(tagged == (legacy | (1 << SC64_SKIRMISH_ELIM_SHIFT)));
     check_word_policy(melee, starts, legacy, tagged);
@@ -131,17 +146,15 @@ static void check_elimination(int melee)
     assert(race_skirmish_eliminated == 1 && race_skirmish_start_order == starts &&
            race_skirmish_melee == (unsigned)melee && u[army].owner == NEUTRAL &&
            u[army].raw_owner == 11 && u[army].x == x && u[army].y == y && !won && !lost);
-    assert(race_save_game() && race_data.state[23] == tagged);
-    {
-        /* Re-tag the still living second CPU as defeated, then run the
-         * detached candidate verifier. Neither live state nor SRAM changes. */
-        RaceLoadPlan plan = {0};
-        assert(race_load_preflight(&plan));
-        race_data.state[23] = tagged | (2 << SC64_SKIRMISH_ELIM_SHIFT);
-        assert(!race_load_preflight(&plan));
-        assert(race_skirmish_eliminated == 1 && u[army].owner == NEUTRAL);
-        assert(race_load_game() && race_data.state[23] == tagged);
-    }
+    assert(race_save_game());
+    prepare_written_save(&plan);
+    assert(race_data.state[23] == tagged);
+    /* Re-tag the still living second CPU as defeated, then validate the
+     * decoded candidate without publishing it. */
+    race_data.state[23] = tagged | (2 << SC64_SKIRMISH_ELIM_SHIFT);
+    assert(!race_load_preflight(&plan));
+    assert(race_skirmish_eliminated == 1 && u[army].owner == NEUTRAL);
+    assert(race_load_game() && race_data.state[23] == tagged);
     assert(building_of(RESCUABLE) >= 0 && building_of(4) >= 0);
 
     tap(KEY_START); assert(screen == SCREEN_PAUSE);
@@ -163,6 +176,7 @@ static void check_elimination(int melee)
     tap(KEY_START);
     assert(screen == SCREEN_PAUSE && frame == retired_frame);
     tap(KEY_B);
+    prepare_written_save(&plan);
     assert(race_data.state[7] == retired_frame && !race_data.state[18] &&
            !race_data.state[19] && ((unsigned)race_data.state[23] & SC64_SKIRMISH_ELIM_BITS) ==
            SC64_SKIRMISH_ELIM_BITS);
@@ -481,6 +495,8 @@ static void check_neutral_ventral(void)
            u[passenger].target == ship && race_transport_cargo_space(ship) == 1 &&
            !race_transport_request_unload(ship, 510, 510));
     assert(race_save_game());
+    RaceLoadPlan plan = {0};
+    prepare_written_save(&plan);
     const int marked = race_data.state[23];
     u8 wire[16];
     Sc64SkTransportTech previous;
