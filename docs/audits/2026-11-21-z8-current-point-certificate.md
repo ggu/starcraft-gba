@@ -476,7 +476,7 @@ under the existing 18-cell admission is 18×18, within the 625-cell
 scratch allocation. The fixture checks the exact 16-step path and
 all its published directions. An 18-step path still uses full
 completion. Cold insertion and ordinary retries retain the two-cell
-margin. The four-run reserve and far-range sanitizer fixtures pass.
+margin. The reserve, certificate and far-read sanitizer checks pass.
 
 | Z7 guest cycles | Shipping Z10 | Free reserve transfer | Nearby certificate |
 | --- | ---: | ---: | ---: |
