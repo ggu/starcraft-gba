@@ -2327,6 +2327,10 @@ AI wallets and full-match behavior remain unverified.
   to the framebuffer replay harness. Capture a completed building crossing
   each viewport edge, then capture opaque native exact ties with sprite ID
   retirement and reuse before changing GBA tie handling.
+- Add the [fallback death depth cuts](audits/2026-11-21-fallback-world-depth.md#replay-cases)
+  to the framebuffer replay harness. Verify ground collapse and aircraft
+  overlap in ordinary play, measure a busy death scene, and check reachable
+  legacy weapon fallbacks for missing depth metadata.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
   modes and the legacy static-clip fixture. Include
