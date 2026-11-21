@@ -593,32 +593,53 @@ test_completed_building_edge_depth(void)
 
 #ifdef SC64_UNIT_FACING
 static int
-test_tank_turret_depth(void)
+test_turret_depth(void)
 {
+    static const struct {
+        const char *name;
+        int type;
+        unsigned hull, turret;
+    } cases[] = {
+        {"Tank", U_TANK, 5, 6},
+        {"Sieged Tank", U_SIEGE_TANK, 30, 31},
+        {"Goliath", U_GOLIATH, 3, 4}
+    };
     static u8 expected[FB_SIZE], wrong_order[FB_SIZE], actual[FB_SIZE];
     int failures = 0;
 
-    for (int sieged = 0; sieged <= 1; ++sieged) {
+    for (unsigned c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
         setup_depth_profile(R_TER);
         memset(u, 0, sizeof(u));
         memset(b, 0, sizeof(b));
         camx = camy = 0;
-        int tank = spawn_unit(SIDE, sieged ? U_SIEGE_TANK : U_TANK, 96, 54);
-        int goliath = spawn_unit(SIDE, U_GOLIATH, 99, 54);
-        assert(tank >= 0 && goliath > tank);
-        assert(sc64_unit_world_layer(&u[tank]) == 4);
-        assert(sc64_unit_world_layer(&u[goliath]) == 4);
+        int hull = spawn_unit(SIDE, cases[c].type, 96, 54);
+        int blocker = spawn_unit(SIDE, U_VULTURE, 99, 54);
+        assert(hull >= 0 && blocker > hull);
+        assert(sc64_unit_world_layer(&u[hull]) == 4);
+        assert(sc64_unit_world_layer(&u[blocker]) == 4);
+#ifdef SC64_DEPTH_SYNTHETIC_TURRET
+        assert(sc64_unit_facing_frames(4));
+#endif
+        if (cases[c].type == U_GOLIATH && !sc64_unit_facing_frames(4)) {
+            int lift = -1;
+            gfx_begin(C_BLACK);
+            assert(sc64_facing_draw_parts(&u[hull], 3, 96, 66, 0, &lift));
+            gfx_end();
+            assert(lift == -1);
+            puts("Goliath depth keeps the body-only facing bank");
+            continue;
+        }
 
         for (int south = 0; south <= 1; ++south) {
-            u[goliath].y = 54 + south;
+            u[blocker].y = 54 + south;
             for (int reversed = 0; reversed <= 1; ++reversed) {
                 u8 *out = reversed ? wrong_order : expected;
                 gfx_begin(C_BLACK);
                 gfx_set_clip_y(12, 120);
-                assert(sc64_facing_blit(sieged ? 30u : 5u, 0, 96, 66));
-                if (south == reversed) draw_unit(&u[goliath]);
-                assert(sc64_facing_blit(sieged ? 31u : 6u, 0, 96, 66));
-                if (south != reversed) draw_unit(&u[goliath]);
+                assert(sc64_facing_blit(cases[c].hull, 0, 96, 66));
+                if (south == reversed) draw_unit(&u[blocker]);
+                assert(sc64_facing_blit(cases[c].turret, 0, 96, 66));
+                if (south != reversed) draw_unit(&u[blocker]);
                 capture(out);
                 gfx_end();
             }
@@ -635,16 +656,48 @@ test_tank_turret_depth(void)
                     incorrect += expected[i] != actual[i];
                 }
                 if (!distinct || incorrect) {
-                    fprintf(stderr, "Tank turret depth (sieged %d, south %d, page %u): "
+                    fprintf(stderr, "%s turret depth (south %d, page %u): "
                             "%u wrong pixels, %u distinguishing\n",
-                            sieged, south, page, incorrect, distinct);
+                            cases[c].name, south, page, incorrect, distinct);
                     ++failures;
                 } else {
-                    printf("Tank turret depth (sieged %d, south %d, page %u): "
-                           "%u distinguishing pixels match\n", sieged, south, page, distinct);
+                    printf("%s turret depth (south %d, page %u): "
+                           "%u distinguishing pixels match\n", cases[c].name, south, page, distinct);
                 }
             }
         }
+#if defined(GBA_SCENE_CLIP) && defined(SC64_HAS_SPRITES)
+        if (cases[c].type == U_GOLIATH) {
+            /* Wider turret crops can remain visible beyond the hull. */
+            int x;
+            for (x = -9; x >= -32; --x) {
+                if (!sc64_unit_facing_frame_in_view(4, 0, x, 66) ||
+                    sc64_unit_facing_frame_in_view(3, 0, x, 66)) continue;
+                camx = 64;
+                u[hull].x = camx + x;
+                u[blocker].alive = 0;
+                SC64_WALK_BITS[hull] = (u8)sc64_walk_ground_key(&u[hull]);
+                gfx_begin(C_BLACK);
+                gfx_set_clip_y(12, 120);
+                assert(sc64_facing_blit(4, 0, x, 66));
+                capture(expected);
+                gfx_end();
+                for (unsigned page = 0; page < 2; ++page) {
+                    gfx_begin(C_BLACK);
+                    gfx_set_clip_y(12, 120);
+                    sc64_draw_depth_ordered_actors();
+                    capture(actual);
+                    gfx_end();
+                    assert(!memcmp(expected, actual, FB_SIZE));
+                }
+                printf("Goliath turret-only crop at X %d matches both pages\n", x);
+                break;
+            }
+#ifdef SC64_DEPTH_SYNTHETIC_TURRET
+            assert(x >= -32); /* A skipped edge cut would give a false pass. */
+#endif
+        }
+#endif
     }
     return failures;
 }
@@ -853,7 +906,7 @@ main(void)
     test_completed_building_edge_depth();
 #endif
 #ifdef SC64_UNIT_FACING
-    failures += test_tank_turret_depth();
+    failures += test_turret_depth();
 #endif
     failures += test_scv_foundation_depth();
     test_building_flight_layer();

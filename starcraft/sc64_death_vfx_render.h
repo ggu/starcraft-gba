@@ -336,6 +336,31 @@ death_vfx_draw_source_layer(const Sc64DeathSourceLayer *layer, int x, int y, uns
 
 #ifdef SC64_DEATH_WORLD_DEPTH
 static inline int
+death_vfx_is_actor_sprite(int raw, const Sc64DeathSourceLayer *piece)
+{
+    if (piece->flags & SC64_DEATH_SOURCE_ACTOR_SPRITE) return 1;
+#if SC64_DEATH_SOURCE_METADATA_VERSION == 2
+    /* The legacy compiler marked only direct imgol attachments. These
+     * nested rows are also images of the original sprite in the USA
+     * Death scripts. Match the existing bank signatures exactly. */
+    if (piece->flags || piece->remnant || piece->x || piece->y) return 0;
+    if (piece->start_su == 2 && piece->end_su == 18) {
+        switch (raw) {
+        case 42: case 44: case 56: case 57:
+            return piece->image_id == 58;
+        case 43: case 55: case 59:
+            return piece->image_id == 59;
+        }
+    }
+    return raw == 147 && piece->image_id == 60 &&
+        piece->start_su == 66 && piece->end_su == 90;
+#else
+    (void)raw;
+    return 0;
+#endif
+}
+
+static inline int
 death_vfx_world_layer(const Sc64DeathVfx *e, const Sc64DeathSourceLayer *piece)
 {
     unsigned flags = piece->flags;
@@ -348,7 +373,7 @@ death_vfx_world_layer(const Sc64DeathVfx *e, const Sc64DeathSourceLayer *piece)
         return base >= 0 ? (int)((unsigned)(base + offset) & 255u) : -1;
     }
     if (flags & SC64_DEATH_SOURCE_FIXED_LOW) return 1;
-    if (flags & SC64_DEATH_SOURCE_ACTOR_SPRITE) return e->actor_layer_plus1 - 1;
+    if (death_vfx_is_actor_sprite(e->raw, piece)) return e->actor_layer_plus1 - 1;
     return -1;
 }
 #endif
