@@ -228,6 +228,7 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
         if (!death_vfx_in_view(row, x, y)) continue;
         const Sc64DeathSource *art = sc64_death_source(row->raw);
         u32 age = sc64_death_vfx_age_su(row->birth, now);
+        int actor_queued = 0;
         for (unsigned j = 0; j < art->layer_count; ++j) {
             const Sc64DeathSourceLayer *piece = &art->layers[j];
             if (age < piece->start_su || age >= piece->end_su) continue;
@@ -236,6 +237,12 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
             int world_y = row->y;
             if (piece->flags & (SC64_DEATH_SOURCE_FIXED_LOW | SC64_DEATH_SOURCE_DETACHED_SPRITE))
                 world_y += piece->y;
+            else {
+                /* All original-sprite images share one painter turn.
+                 * Its first live image represents the group in the heap. */
+                if (actor_queued) continue;
+                actor_queued = 1;
+            }
             sc64_depth_push(heap, size, (unsigned)layer, world_y, DEPTH_DEATH,
                             i * SC64_DEATH_SOURCE_MAX_LAYERS + j);
         }
@@ -255,10 +262,17 @@ sc64_depth_draw_death(unsigned slot)
 #endif
     const Sc64DeathSource *art = sc64_death_source(row->raw);
     const Sc64DeathSourceLayer *piece = &art->layers[slot % SC64_DEATH_SOURCE_MAX_LAYERS];
+    u32 age = sc64_death_vfx_age_su(row->birth, death_vfx_now());
+    int x = row->x - camx, y = row->y - camy + 12;
     unsigned frame_index;
-    if (sc64_death_source_layer_frame(piece, sc64_death_vfx_age_su(row->birth, death_vfx_now()),
-                                     &frame_index))
-        death_vfx_draw_source_layer(piece, row->x - camx, row->y - camy + 12, frame_index);
+    if (sc64_death_source_layer_frame(piece, age, &frame_index))
+        death_vfx_draw_source_layer(piece, x, y, frame_index);
+    if (piece->flags & (SC64_DEATH_SOURCE_FIXED_LOW | SC64_DEATH_SOURCE_DETACHED_SPRITE))
+        return;
+    for (++piece; piece < art->layers + art->layer_count; ++piece)
+        if (death_vfx_is_actor_sprite(row->raw, piece) &&
+            sc64_death_source_layer_frame(piece, age, &frame_index))
+            death_vfx_draw_source_layer(piece, x, y, frame_index);
 }
 #endif
 
