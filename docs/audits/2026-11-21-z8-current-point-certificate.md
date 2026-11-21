@@ -490,11 +490,37 @@ display samples, logical route counters and all 48 commonly
 complete nonstale fields. Z8 matches all 668 answers and 17
 world and display samples. Compared with the transfer, Z8's
 sampled mean rises 55 cycles and its peak rises 426 cycles.
-The new Z10 link retains the same RAM endpoints. Only the earlier
-transfer build has the full late Z7 qualification.
+All four links retain the transfer build's RAM endpoints. Campaign and
+Showcase openings and both Custom Game maps match in world state,
+palette and both indexed pages. The P10 playthrough matches 68
+checkpoints from fresh load through victory and exports the same save.
+Three-CPU Blood Bath matches all 3,600 route-counter samples, 31 world
+cuts and 240 updates after reloading its byte-identical save. Its mean
+is within 0.05% of release.
+
+The full Z7 replay reaches victory at frame 228,128 and reloads the
+result through fresh HOME. Both journals, all 254 world checks and ten
+display checks match release. The replay checks 75 complete field
+samples and independently verifies 4,201 published directions across
+six partial fields against canonical breadth-first search.
+
+| Z7 window | Advancing calls | Mean vs. release | p95 vs. release | Peak vs. release |
+| --- | ---: | ---: | ---: | ---: |
+| Early dense | 477 | −12.78% | −18.66% | −13.68% |
+| Late peak | 926 | −1.81% | −2.18% | +2.53% |
+| Late following | 905 | −2.16% | +1.54% | −2.85% |
+
+All six late cycle metrics are within 0.015% of the transfer build.
+The short detour saves cycles in the early fight and leaves both
+late regressions open. At early call 48,176 orders cost 740,237 more
+cycles than transfer, while call 48,236 saves 726,674. Keep the route
+flags opt-in. These are emulated updates. GBA hardware cadence is open.
 
 | Nearby-certificate evidence | SHA-256 |
 | --- | --- |
 | Trace and captured walkability grid | `c812a402f6a7f5c365d37c3811060e418e9ed88ebf93dc532ad8ee9c331cd911` |
 | Z7 comparison | `dd0c7adf32d4e120afde9380b00b22f4e46e8061337f2873138f9017e0b7e6e9` |
 | Z8 comparison | `5fe67799cd9d35392841cd6ceac233745ff97d450aed95921e24ab482632748c` |
+| Full Z7 and canonical field comparison | `e619aff2d521261ffda3d02e8c4bb5b33481c2a45bced05c9f82c56835049d43` |
+| P10 victory replay | `ad1d12e14e30c2fc90c18d8d14f6e1be6959ebcf74bec097519efe1b181e9e3d` |
+| Three-CPU Blood Bath comparison | `9268c668a7836edeb7d03c7d3c1ec765489eeb1eab28c5ca1f3e2474a24ba531` |
