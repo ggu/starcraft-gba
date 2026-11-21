@@ -147,6 +147,29 @@ first match destinations and establish the update boundaries.
 | Native later position state | `916723dcbc9485c89aefdc23afa7a6ec3f7e9c34dbde07537de29a6597586347` |
 | GBA physical Move observation | `56ac9f1a0479435d3701c878b26dfac9c618be5c814ec05d72a8f13571d11372` |
 
+## Native base approach
+
+From the ordinary opening, a selected SCV followed a minimap move toward
+the Command Center at (1056, 1744). It reached (1108, 1267) with 55 HP
+and died before reaching the base. Human supply fell from 10/18 to
+9/18 and minerals remained at 40. The sampled frames do not identify
+which actor dealt the damage.
+
+In a separate continuation, R selected all five Marines. A minimap
+move brought the group to Raynor and triggered his introduction and
+survival objective. A second move brought all five Marines alive to
+the Command Center approach at X 1108–1144, Y 1817–1889. Raynor was still
+alive at (1014, 1031) with 300 HP, and the five SCVs remained at their
+opening positions with 60 HP. The next comparison checkpoint is the
+first worker safely reaching the mineral line. Barracks payment and
+completion remain open. These normal-controller observations use
+wall-clock input timings and read-only paused state capture.
+
+The local escort state SHA-256 is
+`2ef299b94d40a31bd91bd9f26d2a9dd937c5f7f383dd068c40e0f5704a98be30`.
+The lone-worker terminal state SHA-256 is
+`e965979c6dd843d96740a697f1810943e3643e59c1b79e98652e1d513c446d3b`.
+
 ## Initial evidence
 
 | Local evidence | SHA-256 |

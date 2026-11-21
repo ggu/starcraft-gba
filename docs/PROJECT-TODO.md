@@ -121,7 +121,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   owned buildings for the zero-actor defeat rule. The normal Terran
   mission wins after an ordinary save and fresh HOME continuation.
   Verify native victory and defeat through ordinary inputs. The
-  independent clocks leave the native mineral grant cadence open. A separate
+  [native base approach scout](audits/2026-11-21-wasteland-opening-cross-platform.md#native-base-approach)
+  reaches the base with five living Marines after Raynor's introduction.
+  Verify a worker reaches minerals safely, then capture paid construction.
+  The independent clocks leave the native mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing
