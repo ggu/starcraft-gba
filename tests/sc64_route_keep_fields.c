@@ -1478,7 +1478,10 @@ static void check_point_certificate_wider_retry(void)
         u8 *field = sc64_route_field[slot];
         assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
         assert(!sc64_point_certificate(slot, origin, goal, SC64_POINT_CERT_FRESH));
+#ifndef SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE
         assert(!sc64_point_certificate(slot, goal + 13 * cols + 6, goal, SC64_POINT_CERT_RETRY));
+#endif
+        assert(!sc64_point_certificate(slot, goal + 13 * cols + 7, goal, SC64_POINT_CERT_RETRY));
         assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
         const unsigned builds = sc64_route_builds, hits = sc64_route_hits;
         assert(sc64_route_slot_for(goal, origin) == slot);
@@ -1502,6 +1505,55 @@ static void check_point_certificate_wider_retry(void)
     }
     puts("Exact cache hits certify 17–18-gap retries without materializing the blocked-goal field.");
 }
+
+#ifdef SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE
+static void check_blocked_warm_gap(void)
+{
+    race_cols = race_rows = 128;
+    const int cols = MAP_COLS, goal = 40 + 40 * cols;
+    enum { CLOSE_SEED, OPEN_ROOT, FAR_SEED, RAW_GAP_20 };
+    for (int mode = CLOSE_SEED; mode <= RAW_GAP_20; ++mode) {
+        const int origin = goal + 3 * cols + 16 + (mode == RAW_GAP_20);
+        memset(desired, 1, sizeof(desired));
+        desired[goal] = mode == OPEN_ROOT;
+        if (mode == FAR_SEED) {
+            for (int y = -1; y <= 1; ++y)
+                for (int x = -1; x <= 1; ++x) desired[goal + y * cols + x] = 0;
+            desired[goal - 1] = 1;
+        }
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        int slot = sc64_route_slot_for(goal, goal - 2);
+        assert(slot >= 0);
+        const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        assert(prefix && prefix->count == SC64_POINT_CERTIFIED_ONLY);
+        assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        assert(!sc64_point_certificate(slot, origin, goal, SC64_POINT_CERT_FRESH));
+        assert(!sc64_point_certificate(slot, origin, goal, SC64_POINT_CERT_NEAR));
+
+        const unsigned builds = sc64_route_builds, hits = sc64_route_hits;
+        assert(sc64_route_slot_for(goal, origin) == slot);
+        assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
+        assert(sc64_point_prefix_find(slot) == (mode == CLOSE_SEED ? prefix : 0));
+        reference_bfs(&oracle[POOL], goal);
+        assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        if (mode == CLOSE_SEED) {
+            assert(oracle[POOL].dist[origin] == 17);
+            for (int cell = 0; cell < MAP_CELLS; ++cell) {
+                const int direction = sc64_route_get(slot, cell);
+                if (direction != SC64_ROUTE_UNREACHABLE)
+                    assert(direction == oracle[POOL].dir[cell]);
+            }
+        }
+        SC64_ROUTE_EXACT(slot);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    puts("Only a warm blocked raw-gap-19 retry with a close seed keeps the exact certificate.");
+}
+#endif
 
 #ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
 static void check_point_prefix_sparse_completion(void)
@@ -1655,6 +1707,9 @@ int main(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "--point-certificate-only")) {
         check_point_cold_certificate();
         check_point_certificate_wider_retry();
+#ifdef SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE
+        check_blocked_warm_gap();
+#endif
 #ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
         check_point_prefix_sparse_completion();
 #endif
