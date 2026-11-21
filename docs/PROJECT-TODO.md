@@ -92,10 +92,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and p95 initially fall 12.06% and 18.05%. The worst call rises
   11.23% when two nearby reads complete after their ordinary cutoff.
   [Transfer into the free reserve](audits/2026-11-21-z8-current-point-certificate.md#transfer-after-the-ordinary-cutoff)
-  removes that peak increase. The paired mean, p95 and peak now fall
-  12.42%, 18.47% and 13.70%. Profile the certificate-only read at
-  call 48,149, then check both late Z7 windows before changing normal
-  route flags. Measure physical performance separately.
+  removes that peak increase. The paired early mean, p95 and peak now
+  fall 12.42%, 18.47% and 13.70%. The [full ordinary Z7 run](audits/2026-11-21-z8-current-point-certificate.md#full-z7-victory-on-the-transfer-build)
+  matches 254 state checks through victory and both exact journals.
+  The late means improve by 1.82% and 2.17%. One late peak rises
+  2.52%, and the following p95 rises 1.53%. Attribute calls 154,198
+  and 154,508 before changing the release flags. A separate
+  [nearby certificate trial](https://github.com/ggu/starcraft-gba/blob/codex/sc64-route-near-certificate-20261121/docs/audits/2026-11-21-z8-current-point-certificate.md#nearby-certificate-after-a-short-detour)
+  saves 725,468 cycles at call 48,149. It needs the same late replays.
+  Measure physical performance separately.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral

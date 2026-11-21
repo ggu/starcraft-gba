@@ -459,3 +459,37 @@ fact table generator with those flags. Running the commands from
 that plan with the pinned prepared inputs regenerates the same
 immutable combat facts and the exact transfer ROM
 `ddbf5d1c9e6715a33b1b3d47ac8d576faf667a67f7231799e6a9138059039831`.
+
+### Full Z7 victory on the transfer build
+
+The normal Z10 trial starts Z7 from blank HOME, writes its pause
+journal at frame 5,641 and resumes it through a fresh HOME load.
+It follows the ordinary controller through call 231,031 and wins
+at frame 228,128. The pause journal, victory journal and fresh
+victory re-export match the shipping Z10 byte for byte.
+
+All 254 named world checkpoints and ten palette, camera and
+dual-page display cuts match. Six logical cache cuts preserve
+metadata and match all 75 commonly complete fields. An independent
+breadth-first search verifies all 4,201 published directions across
+six partial fields.
+
+| Advancing updates | Release mean → transfer | Release p95 → transfer | Release peak → transfer |
+| --- | ---: | ---: | ---: |
+| 477, early dense | 2,193,360 → 1,920,886 | 3,182,885 → 2,595,075 | 5,113,194 → 4,412,647 |
+| 926, late peak | 2,424,115 → 2,380,072 | 3,712,728 → 3,631,471 | 5,796,737 → 5,942,621 |
+| 905, following late | 2,343,482 → 2,292,717 | 3,595,765 → 3,650,773 | 5,341,654 → 5,188,804 |
+
+The two late means improve by 1.82% and 2.17%. The peak at call
+154,198 rises 2.52%. The following window's p95 rises 1.53%.
+Call 154,508 has the largest single increase among the measured
+late updates at 741,608 cycles, of which 741,532 are in orders.
+Start the next attribution pass there and at call 154,198. The
+transfer remains opt-in. These are guest-cycle measurements.
+
+| Full Z7 evidence | SHA-256 |
+| --- | --- |
+| Paired replay comparison | `418a1795f085f5933342e7d2700b0e58ee74d1f34a994842247fed3a7a64b841` |
+| Transfer replay | `9e7d9b8f6e1547c55d3bfea578cde7d370b7ab3197840681c707cbb52997b668` |
+| Pause journal | `4eaecbb90f5e923d73eb97a68012f5fb653d8c751fba7dc1e4d9d80ae54ca3ce` |
+| Victory and fresh re-export | `1acce341f61b2a1e37cadc1e0b304dd63b5b31352789d128fa2d7bf20d6eb627` |
