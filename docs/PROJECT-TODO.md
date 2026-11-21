@@ -79,9 +79,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mean and p95 are now below packed stock. Test bounded demand from the
   nearby-root reader at call 26,357 saves 731,494 cycles in an opt-in
   trial. Its retained extra frontier saturates the four ordinary rows
-  and adds about one million cycles at call 33,890. Qualify a bounded
-  separate repark reservation against both cuts before changing the
-  normal route flags.
+  and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
+  restores both cuts and takes 8.21% fewer cycles on average than packed
+  stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
+  Compare other campaigns and busy Custom Games on current builds before
+  changing the normal route flags.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
