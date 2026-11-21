@@ -30,11 +30,9 @@ per-frame actor-array or full victory claim. A prepared Z10 ASan/UBSan
 fixture verifies nested observer scopes restore all point-prefix storage,
 index entries and both component hints. Source and ARM ROMs remain local.
 
-Local evidence under
-`/Volumes/Storage/sc64-route-observer-purity-20261122/build/purity`:
-`tape.json` SHA-256
-`144cc01b4c0bd0682b0f030f7857b14461b3f2a8723b5130b8af04ce79a2d54d`;
-`comparison.json` SHA-256
+The private bounded tape SHA-256 is
+`144cc01b4c0bd0682b0f030f7857b14461b3f2a8723b5130b8af04ce79a2d54d`.
+The comparison SHA-256 is
 `3821f10f11ebb62f3938231f12080ff781ba9e0f8460690e01a0d59d19afaab0`.
 The host limit intentionally reports a non-win, so the controller exits 1.
 
@@ -43,15 +41,12 @@ private early-gas policy under the 300,000-call cap: HOST won at call
 270,585, frame 267,585, with strict terminal consistency and zero fault.
 The exact full input tape SHA-256 is
 `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`.
-This is HOST evidence; a full physical-input ARM replay is still required.
-
+A full physical-input ARM replay is also required.
 
 ## Focused regression recipe
 
 With an already-prepared Z10 ARM argument JSON and its referenced local inputs,
 run `python3 tools/test_route_purity.py PATH_TO_Z10_ARGS.json` from the checkout
-root. It compiles and runs the prefix fixture with ASan/UBSan; the script does
-not prepare or import private inputs. The local verification used
-`/Volumes/Storage/sc64-shared-depth-overlap-20261122/build/depth-final/qualified/z10-on.json`.
-The exact full physical-input replay on #711 is in progress; no terminal ARM
-result is claimed here.
+root. It compiles and runs the prefix fixture with ASan/UBSan using the
+already-prepared inputs. The local verification used the normal #708 Z10
+manifest. The full physical-input replay on #711 is in progress.

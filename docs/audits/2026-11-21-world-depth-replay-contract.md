@@ -118,6 +118,28 @@ has 136 facing/flip combinations with no overlap and 161 with
 no distinguishing pixel. Keep the exact pixel order pending
 until those image and callback fields are captured together.
 
+A separate isolated headless ares restore of that paused state ran one
+neutral frontend step and received one 640×240 callback. The native update
+counter was 17,166 before the step and 17,167 after it. Both 36-byte sprite
+records and their 60-byte head-image records were byte-identical across this
+interval. The heads are `0x801fc5c8` for 438 and `0x801d1800` for 1418;
+each head identifies image 54. Both sprite flags are `0x06`, including the
+observed `0x04` admission bit. Final visibility depends on viewport and
+fog processing. A synchronized callback, current image-frame masks and
+viewport transforms are still needed for opaque pixel and selection checks.
+
+The local observer was an isolated copy of the earlier read-only state-load
+prototype, patched only to point at a private copy of the checkpoint and
+re-signed. It reported one callback, no controller polls and GPU ready. Its
+binary SHA-256 is
+`165e5cf66779f6e8ca2583c33d5f9fcc83c7492226aec7e53d736c905d1a96c5`.
+The before and after RDRAM SHA-256 values are
+`55022f151ec5d08c4a598b39ff8a3e2e7c28d4ca4144eda026a288428ae02cca` and
+`5df1bef8263c8987d791084a0eb2e762b5879264d8919c59f48d9cd577d6d109`.
+The callback SHA-256 is
+`2b7259ce5ec17c7f139e74e0d375778522afb1a31a9e85b83650061e5d48ff20`.
+Keep the state, binary, RDRAM and callback local.
+
 For `pool-id-cross-kind-reuse`, record the camera and both sprite masks
 at the same native update. Require visible pixels inside the active
 viewport after fog, a nonempty order-sensitive mask, and the winner in
