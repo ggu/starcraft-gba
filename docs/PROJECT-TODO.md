@@ -27,6 +27,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [depth replay assertions](audits/2026-11-21-world-depth-replay-contract.md#replay-cases)
   on both framebuffer pages. Capture an opaque equal-Y native death
   overlap and verify independent sprite IDs through reuse.
+  The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
+  checks the separate layer-5 cue. Add native composed overlap cuts and
+  ordinary pause/reload coverage during mining to the replay harness.
 
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
