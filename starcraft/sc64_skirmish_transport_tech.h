@@ -4,9 +4,6 @@
 
 #include <stdint.h>
 #include <limits.h>
-#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
-#include <string.h>
-#endif
 
 /* Ventral Sacs' pinned default price and 24 Hz duration, scaled to the
  * engine's 30 Hz tick. The campaign has a separate source-bound state. */
@@ -81,7 +78,7 @@ static inline int sc64_sk_transport_decode_elimination(Sc64SkTransportTech *out,
 {
     uint8_t clean[16];
     if (!in || !neutral) return 0;
-    memcpy(clean, in, sizeof(clean));
+    for (unsigned i = 0; i < sizeof(clean); ++i) clean[i] = in[i];
     clean[SC64_NEUTRAL_VENTRAL_BYTE] &= (uint8_t)~SC64_NEUTRAL_VENTRAL_BIT;
     if (!sc64_sk_transport_decode(out, clean, building_count)) return 0;
     *neutral = !!(in[SC64_NEUTRAL_VENTRAL_BYTE] & SC64_NEUTRAL_VENTRAL_BIT);
