@@ -223,7 +223,14 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
         memcpy(bfs_queue, prefix->queue, (size_t)pending * sizeof(*bfs_queue));
 #ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
         int head = 0, tail = pending;
-        if (cell >= 0 && !prefix->second_cutoff) {
+        int can_park = !prefix->second_cutoff;
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+        /* An ordinary row can transfer to the free nearby-reader reserve
+         * after using its own cutoff. A row already in reserve completes
+         * on its next miss. The occupied-reserve check above clears cell. */
+        can_park |= near_reader && prefix != reserve;
+#endif
+        if (cell >= 0 && can_park) {
             int start = cell + sc64_cell_row((unsigned)cell) * SC64_LINEAR_PAD + stride + 4;
             tail = sc64_point_prefix_expand(dense, start, stride, cap, &head, tail);
             int remaining = tail - head;
