@@ -19,14 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **World depth and sprite lifetime.** The optional VRAM death pool now
-  preserves actor elevation through storage. Run the
+- **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
+  keeps attached images in their actor's draw position, including after
+  same-slot reuse and in the optional VRAM pool. The real N64 Blood Bath
+  capture retains a dying SCV's sprite through the collapse and observes
+  when it retires. Run the
   [depth replay assertions](audits/2026-11-21-world-depth-replay-contract.md#replay-cases)
-  on both framebuffer pages. Prioritize an opaque native equal-Y death
-  overlap and verify sprite ID lifetime through last-image retirement
-  and reuse. The [GBA same-Y fixture](audits/2026-11-21-world-depth-replay-contract.md#gba-same-y-reproducer)
-  shows a lower-slot Zergling's collapse covering a Marine that
-  appeared in front while the Zergling was alive.
+  on both framebuffer pages. Capture an opaque equal-Y native death
+  overlap and verify independent sprite IDs through reuse.
 
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
@@ -39,28 +39,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing
-  coverage. The [clean Blood Bath search](audits/2026-11-21-world-depth-replay-contract.md#clean-blood-bath-opportunity-search)
-  reached native frame 12,866 without a sampled death or near-equal
-  depth pair. Stage a visible fight with ordinary controls and capture
-  adjacent render cuts through death, last-image retirement and ID reuse.
+  coverage. Use the active Blood Bath combat witness to qualify opaque
+  overlaps and pool-ID reuse in new ordinary-input cuts.
 
-- **Current campaign verification.** The
-  [released campaign routes](audits/2026-11-21-released-campaign-continuations.md)
-  cover all ten Terran missions, Z1–Z2, Z4, Z10, P5 and P10. All three finales
-  pass full ordinary HOME routes, fresh pause continuation, victory
-  and fresh result readback on the exact released ROMs. Continue the
-  exact-build sweep with Z3, Z5–Z9, P1–P4 and P6–P9. Check physical
-  timing separately.
+- **Campaign verification.** The [preceding ordinary HOME sweep](audits/2026-11-21-released-campaign-continuations.md)
+  covers T1–T10, Z1–Z5, Z10, P1–P5 and P10 through victory
+  and fresh result readback. The updated depth build repeats T1,
+  Z2, Z5 and P5 with matching gameplay and journal evidence,
+  then qualifies Z6 with a pending-impact pause and P6 with
+  113 matched checkpoints. Continue with Z7–Z9 and P7–P9,
+  then refresh the exact-build
+  coverage. Check physical timing separately.
 
 - **Current three-cartridge playtest.** The
-  [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
+  [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)
   passes 54 ordinary starts and fresh SRAM continuations on the exact
   Terran, Z10 and P10 cartridges. It covers both maps, all human races,
   and one to three independently selected CPU seats. The
   [earlier 1,134-case matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
   covers every physical seat and named race assignment at launch. The
-  local Storage folder `StarCraft-GBA-2026-11-21-0e0250d0` holds the
-  three current ROMs and their verified checksums. SD readback,
+  local Storage folder `StarCraft-GBA-2026-11-21-depth-continuity` holds
+  the race ROMs, Showcase and their verified checksums. SD readback,
   physical frame pacing and full campaign verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
@@ -174,9 +173,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fields and continuations. Its Outpost window peak falls by 15.81%.
   The [terrain restore measurement](audits/2026-11-21-terrain-restore-interior-traffic.md)
   estimates about 11,145 cycles of mean headroom for contiguous row
-  transfers in its fixed-camera sample, before bookkeeping. Keep the
-  full-band restore and prioritize full point floods, path-grid rebuilds
-  on invalidation and steady painter cost.
+  transfers in its fixed-camera sample, before bookkeeping. The
+  [point-route origin census](audits/2026-11-21-blood-bath-point-origin.md)
+  links all four fills at update 2,055 to stale-donor gate
+  failures. Both local certificates decline all four. A full-width
+  FIFO can reach the requesting origins after 685–1,662 of the
+  2,795 pops per fill. Prioritize a resumable full-width trial with
+  the stale-donor and exact-read paths covered. Measure its cost
+  alongside path-grid rebuilds and steady painter cost.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral

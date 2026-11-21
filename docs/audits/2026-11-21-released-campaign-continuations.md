@@ -108,3 +108,30 @@ The Zerg finale continues at about 11.81 main-loop updates per emulated
 second. The full Protoss run averages about 10.42. Both include
 presentation waits and UI. Hardware performance and broader native
 campaign parity remain open.
+
+## Further routes on the same three ROMs
+
+Z3 and Z5 match their retained gameplay checkpoints. The drivers
+start at ordinary HOME, use a fresh instance to continue the pause
+save, then load the victory from a third HOME process. The loaded
+terminal world matches and holds for eight neutral updates. The two
+32 KiB result exports match byte for byte.
+
+P1, P2 and P3 pass full ordinary-input routes on the same Protoss
+release. Each resumes from a fresh HOME pause save, finishes its
+objectives and loads a byte-identical stable victory journal in a
+third process. The receipts retain historical actor or economy
+checkpoint differences for these three routes.
+
+P4 completes the full 130,239-call route with 146 matched checks and
+a fresh pause continuation. A third HOME load holds and re-exports
+the victory journal byte for byte.
+
+| Mission | Pause frame | Victory frame | Route receipt SHA-256 |
+| --- | ---: | ---: | --- |
+| Z3 | 24,600 | 136,588 | `d33531ba518648b1accc8e6f1717e944279db12f74a59e65d24445208b030ffa` |
+| Z5 | 900 | 48,347 | `84e8bdbe21aa236eb237eac91c7aba275209062c94b5df543e3c759df3a190c4` |
+| P1 | 448 | 28,270 | `f48c54fef4fd5acc5fc9dbbe4a8f4d20093e81a46f782a58361b4fe82de54723` |
+| P2 | 372 | 33,876 | `917b14d065a5ec828e7df8151b79bb15d97948c9012cdd4744a1e92911f3e513` |
+| P3 | 23,993 | 49,263 | `76eb77c7afc548d960a854371be50959a9204a488a24a4d6f4c42666dc731862` |
+| P4 | 65,700 | 129,310 | `05ac5ad3acb6865aee20b909e9500aa6de5d6dc674234d0ee91e548e6466f0d8` |

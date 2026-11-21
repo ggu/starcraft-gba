@@ -69,7 +69,7 @@ unavailable mode or storage combinations as unavailable.
 | Case ID | Variants | Assertion |
 | --- | --- | --- |
 | `death-storage-depth` | Use the same scene and seed in EWRAM and a VRAM qualification build. Test an attached ground collapse with a Tank to its north and south, a burrowed collapse, an Overlord's attached images beside a Wraith and detached rubble. Add the fallback collapse and air burst cuts. | The loaded elevation, queue key, visible overlap and HUD match across storage. Confirm the VRAM flag and source death depth are both active. [Existing overlap setups](2026-11-21-fallback-world-depth.md#replay-cases) |
-| `same-y-attached-death-continuity` | Capture an opaque equal-elevation, equal-Y overlap alive, on the first attached death image, during actor-slot reuse, and on last-image retirement. Repeat with the victim's ID above and below its neighbor's. Include an independently detached effect with its own key. | On N64 the attached images keep the victim's sprite ID and key until its last image retires. Log both IDs and the free-list head around retirement and reuse. On current GBA a lower-slot unit is behind a higher-slot unit alive, then sorts in front solely because its attached death image changes draw kind. Keep this as an open GBA expectation until shared sprite identity has been qualified. |
+| `same-y-attached-death-continuity` | Capture an opaque equal-elevation, equal-Y overlap alive, on the first attached death image, during actor-slot reuse, and on last-image retirement. Repeat with the victim's ID above and below its neighbor's. Include an independently detached effect with its own key. | Preserve the dying actor's ordering through the last attached image. On GBA the lower-slot collapse stays behind the Marine on both pages. The reused live actor draws in front on an exact slot tie. Retain native sprite IDs and the free-list head around retirement and reuse. [Fix and native lifetime witness](2026-11-21-attached-death-continuity.md) |
 
 The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
 establishes the native sort and allocator rule. The exact death-tie
@@ -92,18 +92,15 @@ elevation and anchor before comparing the images.
 | Lower | Marine | Collapse | 65 alive, 58 after death |
 | Higher | Zergling | Collapse | 65 alive, 58 after death |
 
-The two indexed pages agree. The lower-slot case therefore reproduces
-a visible order flip in the released painter, independent of an anchor
-or elevation change. The HOST sanitizer observation digest is
+The two indexed pages agree. The lower-slot case reproduces
+a visible order flip in the preceding painter, independent of an anchor
+or elevation change. The baseline HOST sanitizer observation digest is
 `1d83afc2ce220cc95a6659f0816ddca8cff0998d8ec3854d9359bcb88fe9455c`.
 
-Extend this cut through actor-slot reuse, death-effect-slot
-replacement and last-image retirement. The shared GBA renderer
-currently switches its final key from the actor slot to the effect
-slot on death. An attached-image fix needs to retain the actor
-identity across that handoff. Detached effects need independent IDs.
-Qualify both render pages and the mode and save/load matrix before
-enabling a new tie rule.
+The [shared renderer fix](2026-11-21-attached-death-continuity.md)
+passes the two-page fixture, actor-slot reuse, effect-slot
+replacement and renderer reset. Retain an ordinary native
+opaque overlap through last-image retirement and ID reuse.
 
 ## Clean Blood Bath opportunity search
 

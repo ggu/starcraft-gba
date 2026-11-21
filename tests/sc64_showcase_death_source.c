@@ -113,6 +113,87 @@ static void capture_death_overlap(u8 *pixels)
             for (int x = 0; x < 240; ++x) assert(gfx_test_pixel(x, y) == C_PANEL);
 }
 
+static void test_attached_death_tie(void)
+{
+    static _Alignas(4) u8 victim_pixels[240 * 108], peer_pixels[240 * 108], pair[240 * 108];
+    for (unsigned victim_in_front = 0; victim_in_front < 2; ++victim_in_front) {
+        game_init();
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        memset(m, 0, sizeof(m));
+        memset(visible, 0xff, sizeof(visible));
+        geyser_count = 0;
+        camx = camy = 0;
+        int first = spawn_unit(SIDE, victim_in_front ? U_MARINE : U_ZERGLING, 96, 52);
+        int second = spawn_unit(SIDE, victim_in_front ? U_ZERGLING : U_MARINE, 96, 52);
+        assert(first >= 0 && second > first);
+        int victim = victim_in_front ? second : first;
+        int peer = victim_in_front ? first : second;
+        u[victim].raw_type = 37;
+        assert(sc64_unit_world_layer(&u[victim]) == 4 && sc64_unit_world_layer(&u[peer]) == 4);
+
+        for (int dead = 0; dead < 2; ++dead) {
+            if (dead) {
+                death_vfx_scan();
+                u[victim].hp = 0;
+                u[victim].alive = 0;
+                death_vfx_scan();
+                frame += 5;
+                assert(death_vfx[0].source && death_vfx_actor_plus1[0] == victim + 1);
+            }
+            for (unsigned page = 0; page < 2; ++page) {
+                u[peer].alive = 0;
+                capture_death_overlap(victim_pixels);
+                u[peer].alive = 1;
+                u[victim].alive = 0;
+                Sc64DeathVfx effect = death_vfx[0];
+                death_vfx[0].style = 0;
+                capture_death_overlap(peer_pixels);
+                u[victim].alive = !dead;
+                death_vfx[0] = effect;
+                capture_death_overlap(pair);
+
+                unsigned overlap = 0;
+                for (unsigned i = 0; i < sizeof(pair); ++i) {
+                    if (peer_pixels[i] == C_PANEL || victim_pixels[i] == C_PANEL ||
+                        peer_pixels[i] == victim_pixels[i]) continue;
+                    assert(pair[i] == (victim_in_front ? victim_pixels[i] : peer_pixels[i]));
+                    ++overlap;
+                }
+                assert(overlap);
+                printf("PASS attached death tie, foreground victim %u, dead %d, page %u, %u pixels\n",
+                       victim_in_front, dead, page, overlap);
+                gfx_end();
+            }
+        }
+
+        /* A replacement actor can occupy the same slot and anchor while the
+         * old collapse is visible. The live actor gets the foreground. */
+        int reused = spawn_unit(SIDE, U_MARINE, 96, 52);
+        assert(reused == victim);
+        u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS + 1];
+        unsigned size = 0;
+        Sc64AttachedDeathQueue attached = {0};
+        sc64_depth_push_deaths(keys, &size, &attached);
+        assert(size == 0 && attached.count == 1);
+        u32 reused_key = sc64_depth_key(4, 52, DEPTH_UNIT, (unsigned)reused);
+        sc64_depth_push_key(keys, &size, reused_key);
+        u32 collapse = sc64_depth_pop_world(keys, &size, &attached);
+        assert(((collapse >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) == DEPTH_DEATH);
+        assert(sc64_depth_pop_world(keys, &size, &attached) == reused_key);
+
+        /* Fill the renderer pool, then replace its oldest entry. */
+        for (unsigned i = 1; i < SC64_DEATH_VFX_POOL; ++i)
+            death_vfx_spawn_slot(death_vfx, peer, 96, 52, SIDE);
+        assert(sc64_death_vfx_slot(death_vfx, SC64_DEATH_VFX_POOL, death_vfx_now()) == 0);
+        death_vfx_spawn_slot(death_vfx, peer, 96, 52, SIDE);
+        assert(death_vfx_actor_plus1[0] == peer + 1);
+        death_vfx_reset();
+        for (unsigned i = 0; i < SC64_DEATH_VFX_POOL; ++i)
+            assert(death_vfx_actor_plus1[i] == 0);
+    }
+}
+
 static void test_death_depth(void)
 {
     static _Alignas(4) u8 actor_pixels[240 * 108], effect_pixels[240 * 108], pair[240 * 108];
@@ -197,19 +278,23 @@ static void test_death_depth(void)
 
         u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];
         unsigned size = 0;
-        sc64_depth_push_deaths(keys, &size);
+        Sc64AttachedDeathQueue attached = {0};
+        sc64_depth_push_deaths(keys, &size, &attached);
         if (raw == 147) {
-            assert(size == 2);
-            u32 rubble = sc64_depth_pop(keys, &size);
+            assert(size == 1 && attached.count == 1);
+            u32 rubble = sc64_depth_pop_world(keys, &size, &attached);
             const Sc64DeathSource *art = sc64_death_source(raw);
             assert((rubble >> DEPTH_LAYER_BITS) == 1 &&
                    art->layers[rubble & DEPTH_SLOT_MASK].image_id == 111);
-            assert(art->layers[keys[0] & DEPTH_SLOT_MASK].image_id == 89);
         }
-        assert(size == 1 && (keys[0] >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        assert(size + attached.count == 1);
+        u32 key = sc64_depth_pop_world(keys, &size, &attached);
+        assert((key >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        if (raw == 147)
+            assert(sc64_death_source(raw)->layers[key & DEPTH_SLOT_MASK].image_id == 89);
         if (burst_image) {
             const Sc64DeathSource *art = sc64_death_source(raw);
-            unsigned index = (keys[0] & DEPTH_SLOT_MASK) % SC64_DEATH_SOURCE_MAX_LAYERS;
+            unsigned index = (key & DEPTH_SLOT_MASK) % SC64_DEATH_SOURCE_MAX_LAYERS;
             assert(art && index < art->layer_count);
             assert(art->layers[index].image_id == burst_image &&
                    (art->layers[index].flags & SC64_DEATH_SOURCE_DETACHED_SPRITE));
@@ -304,8 +389,11 @@ static void test_fallback_death_depth(void)
 
         u32 keys[DEPTH_DEATH_PER_EFFECT];
         unsigned count = 0;
-        sc64_depth_push_deaths(keys, &count);
-        assert(count == 1 && (keys[0] >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        Sc64AttachedDeathQueue attached = {0};
+        sc64_depth_push_deaths(keys, &count, &attached);
+        assert(count + attached.count == 1);
+        u32 key = sc64_depth_pop_world(keys, &count, &attached);
+        assert((key >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
         for (unsigned page = 0; page < 2; ++page) {
             capture_death_overlap(effect);
             int slot = spawn_unit(SIDE, cases[n].actor_type, 96, 52 + cases[n].dy);
@@ -345,15 +433,16 @@ static void test_fallback_death_depth(void)
     frame += 12;
     u32 heap[SC64_DEATH_VFX_POOL * DEPTH_DEATH_PER_EFFECT];
     unsigned count = 0;
-    sc64_depth_push_deaths(heap, &count);
-    assert(count == SC64_DEATH_VFX_POOL * 2);
+    Sc64AttachedDeathQueue attached = {0};
+    sc64_depth_push_deaths(heap, &count, &attached);
+    assert(count == SC64_DEATH_VFX_POOL * 2 && attached.count == 0);
     for (unsigned i = 0; i < SC64_DEATH_VFX_POOL * 2u; ++i) {
         u32 key = sc64_depth_pop(heap, &count);
         assert((key >> DEPTH_LAYER_BITS) == (i < SC64_DEATH_VFX_POOL ? 1u : 5u));
     }
     memset(visible, 0, sizeof(visible));
-    sc64_depth_push_deaths(heap, &count);
-    assert(count == 0);
+    sc64_depth_push_deaths(heap, &count, &attached);
+    assert(count == 0 && attached.count == 0);
     puts("PASS full fallback pool queues rubble and bursts only in visible cells");
 }
 #endif
@@ -366,6 +455,7 @@ int main(int argc, char **argv)
     assert(argc == 1 || argc == 2);
     gba_init();
 #ifdef SC64_DEATH_WORLD_DEPTH
+    test_attached_death_tie();
     test_death_depth();
     test_fallback_death_depth();
 #endif
