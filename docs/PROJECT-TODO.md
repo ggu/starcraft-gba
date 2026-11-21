@@ -70,8 +70,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   GBA counterpart verifies a queued pair and fresh HOME continuation.
   [Draft #689](https://github.com/ggu/starcraft-gba/pull/689) compiles the
   experimental Carrier/Egg authentication path for Terran and Z10.
-  The combined journal format, P10 research composition and normal
-  activation remain open. Use
+  An isolated Z10 HOST fixture reaches the real load preparation and
+  restores a paid Egg, a paid Carrier queue and an active Interceptor
+  from one 14,100-byte record. It also rejects malformed newer
+  candidates and restores legacy Carrier and transport records.
+  Qualify the format in ordinary HOME on ARM, then test P10 research
+  composition before production activation. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 
