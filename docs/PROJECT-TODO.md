@@ -78,6 +78,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds 166 partial depot-field rebuilds when an existing field cannot
   answer a requested origin. The single-wide-frontier trial preserves
   the sampled P10 replay and saves 0.036% in mean game-update cycles.
+  The [Z5 detector call split](audits/2026-11-22-cloak-query-cost.md)
+  saves 0.16% in the matched Z10 Blood Bath sample with the same
+  RAM endpoints. It passes active-cloak recovery and the 54 Custom Game
+  save cases. Compare dense campaign windows before wider use.
   The [local ARM route packer trial](audits/2026-11-22-z7-rendered-replay.md#route-output-packing-trial)
   cuts two P10 full-fill updates by about 63,000–73,000 cycles. The
   full-tail mean improves under 0.01% and Z10 has only 16 IWRAM bytes
@@ -127,7 +131,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   HOST inputs when authoring a physical tape. The refreshed tape reaches
   HOST victory and advances through the old selection cut on the
   normal ARM ROM. Isolate the later gas difference at call 23,879
-  and qualify a new pause, fresh HOME and victory on the normal product.
+  and qualify victory on the normal product. Two new ordinary pauses
+  and fresh HOME loads already replay through frame 9,438 with
+  matching named observations after one Hatchery reselection.
   The retained Z10 tape still writes its frame-2,526 pause save on
   `71809328`; its later script now restarts on that ROM. Regenerate
   and qualify the ordinary late-chapter continuation on the same
