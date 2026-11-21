@@ -131,7 +131,8 @@ different elevations.
 
 Also capture foreground picking at the same opaque overlap. GBA
 contextual picking still has a separate provisional implementation in
-[#587](https://github.com/ggu/starcraft-gba/pull/587). Add a viewpoint
-edge cut for a Wraith or Carrier whose anchor lies beyond the unit cull
-and whose body still intersects the field. A crop can vanish before
-its depth would be compared in the current GBA painter.
+[#587](https://github.com/ggu/starcraft-gba/pull/587). The shared painter
+now keeps partly visible Wraiths and Carriers in depth order. Use the
+`aircraft-crop-past-anchor` case in the [follow-up harness](2026-11-21-native-depth-followup.md#replay-cases)
+to add ordinary-input and native overlap captures to the existing GBA
+edge fixtures.

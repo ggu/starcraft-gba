@@ -19,6 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
+  verifies an eight-Interceptor maximum for raw 82. Separate that limit
+  from the current four-child rescue stock, which needs an ordinary N64
+  before/after capture. Keep the existing save row and verify the larger
+  hangar's queue boundary, rank 7, full actor pool, HUD and fresh continuation.
+  Capture an ordinary native raw-72 launch through return to qualify the
+  source-backed layer transitions on live sprites.
+
 - **Dense Z7 orders.** The [late stage profile](audits/2026-11-21-z7-late-order-budget.md)
   puts 65.7% of 2.661 million mean cycles in orders. Even zero-build
   updates spend 1.296 million cycles in orders. The instruction replay
@@ -70,10 +78,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   its Hatchery. Z8's three known battlefield pixel differences remain
   in the replay gate. The
   [current normal skirmish matrix](audits/2026-11-21-current-skirmish-matrix.md)
-  covers 1,134 ordinary starts across both maps, including every named
-  three-row lineup with one to three CPUs and all closed-seat positions.
-  All 54 sampled fresh SRAM continuations match. Complete long custom
-  wins and check hardware timing.
+  covers all 2,232 ordinary starts across both maps. Each of the three
+  rows supports a named race, Random or Closed with one to three CPUs.
+  All 108 sampled fresh SRAM continuations match. The [shared Carrier
+  qualification](audits/2026-11-21-carrier-empty-training-pass.md#shared-cartridge-qualification)
+  ties current Terran and Protoss finales to stock pause and victory
+  journals and current Zerg finale victory to the same pause journal.
+  Complete long custom wins and check hardware timing.
 - **Keep campaign tapes current.** Current P1–P3 win after
   [fresh saves and updated ordinary endings](audits/2026-11-13-normal-campaign-matrix.md#early-protoss-current-endings).
   Preserve the new ending inputs and update the stale checkpoint tails.
@@ -625,11 +636,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   match the preceding build. Reuse the stable HUD panels next and check
   display timing on GBA hardware.
 
-- **Carrier skirmish parity.** Normal Protoss and Z10 support paid
+- **Carrier skirmish parity.** All three normal race ROMs support paid
   production, flight, combat, and hangar saves. The [normal Z10 release](CARRIER-PROJECTILES.md#normal-z10-cartridge)
   passes human-paid production, active and docked SRAM, stock migration,
   all 378 custom starts, and the paired Z6 and late Z7 victory checks.
-  Qualify regular Terran and Showcase activation next. The [Showcase probe](CARRIER-PROJECTILES.md#showcase-carrier-probe)
+  [Normal Terran qualification](CARRIER-PROJECTILES.md#normal-terran-cartridge)
+  covers human and CPU purchases, active and docked reloads, and stock
+  migration. The [shared empty-pass check](audits/2026-11-21-carrier-empty-training-pass.md#shared-cartridge-qualification)
+  covers both normal Carrier-enabled sibling ROMs. Qualify Showcase
+  activation next. The [Showcase probe](CARRIER-PROJECTILES.md#showcase-carrier-probe)
   fits the projectile, impact and Yamato queues. Ordinary ARM controls paid
   for a Carrier and an Interceptor, attacked a Hydralisk, resumed from a save
   with a live shot, then moved the Carrier away and reloaded the game with
@@ -2031,12 +2046,15 @@ N64 observations and GBA comparisons are scoped in the audits linked above.
 Parallel work is appropriate where source ownership and
 the serialized native-test lock permit it.
 
-The Terran Carrier candidate adds 5.13% mean guest cycles on the paired
-normal Terran-versus-Zerg win with zero Carriers. The sparse-route
-control matches the earlier timing exactly. Reduce the empty Carrier
-training and movement passes while preserving the shared clock and
-released projectiles. Keep the active human and CPU Carrier save
-checks on the optimized candidate.
+The [shared Carrier shortcut](audits/2026-11-21-carrier-empty-training-pass.md)
+recovers about half the added cost on the paired Terran-versus-Zerg win
+with zero Carriers. The remaining cost is 2.45% versus the sparse-route
+control. Preserve active human and CPU Carrier save checks while
+profiling the residual cost and preparing a normal Showcase build.
+The [completed Terran building blit trial](https://github.com/ggu/starcraft-gba/pull/665)
+cuts mean guest cycles by 8.46% in the ordinary Blood Bath win.
+Qualify visible Terran buildings in the other normal product banks
+before enabling the shared draw path across profiles.
 
 | ID | Priority / state | TODO and reason | Completion evidence required |
 | --- | --- | --- | --- |
