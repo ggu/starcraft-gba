@@ -42,15 +42,22 @@ CANONICAL_PATH_GRID_UPDATE_FLAGS ?= -DSC64_PATH_GRID_INCREMENTAL
 # Snapshot Pylon power during defense passes. Campaign runtimes with Z/P
 # target lists can also restrict target searches to nearby spatial cells.
 CANONICAL_DEFENSE_CUSTOM_CELLS ?= 1
+CANONICAL_ZP_DEFENSE_OWNER_MASK ?= 1
 ifneq ($(CANONICAL_DEFENSE_CUSTOM_CELLS),0)
 ifneq ($(CANONICAL_DEFENSE_CUSTOM_CELLS),1)
 $(error CANONICAL_DEFENSE_CUSTOM_CELLS must be 0 or 1)
 endif
 endif
+ifneq ($(CANONICAL_ZP_DEFENSE_OWNER_MASK),0)
+ifneq ($(CANONICAL_ZP_DEFENSE_OWNER_MASK),1)
+$(error CANONICAL_ZP_DEFENSE_OWNER_MASK must be 0 or 1)
+endif
+endif
 DEFENSE_SPATIAL_FLAGS = -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
 DEFENSE_CUSTOM_CELL_FLAGS = $(DEFENSE_SPATIAL_FLAGS) -DSC64_DEFENSE_CUSTOM_CELLS_PROBE
 CANONICAL_DEFENSE_FLAGS = $(DEFENSE_SPATIAL_FLAGS) \
-	$(if $(filter 1,$(CANONICAL_DEFENSE_CUSTOM_CELLS)),-DSC64_DEFENSE_CUSTOM_CELLS_PROBE)
+	$(if $(filter 1,$(CANONICAL_DEFENSE_CUSTOM_CELLS)),-DSC64_DEFENSE_CUSTOM_CELLS_PROBE) \
+	$(if $(filter 1,$(CANONICAL_ZP_DEFENSE_OWNER_MASK)),-DSC64_DEFENSE_ZP_OWNER_MASK_PROBE)
 
 # Exact target-index rebuild and list insertion for the four shipped imported ROMs.
 # Set to 0 for a baseline comparison with the same imported inputs.
@@ -69,7 +76,7 @@ $(error CANONICAL_TARGET_POLICY must be 0 or 1)
 endif
 endif
 CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE)
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK)
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:

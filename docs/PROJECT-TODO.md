@@ -56,11 +56,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   In 16 current P10 zero-new-build samples, campaign defense
   indexing and targeting use 84,015 cycles per update (5.32%).
   Four follow-up cuts show 86–88% of visited list nodes in cells
-  with no hostile owners. The opt-in owner-mask trial saves 0.80%
-  across the full P10 tail on the earlier controls release and
-  is flat in the sampled Z10 Blood Bath replay. Both randomized
-  host differentials pass. Qualify the current composition,
-  Z10 campaign, other map and stack before deciding on promotion.
+  with no hostile owners. The [campaign defense mask](audits/2026-11-22-campaign-defense-owner-masks.md)
+  saves 0.80% across the exact current full P10 tail and 0.81%
+  on the refreshed Z10 continuation. The sampled custom means
+  are flat. The two late Z7 means rise 0.41% and 0.44%.
+  Each tape retains its sampled state.
+  The [current target-index attribution](audits/2026-11-22-campaign-defense-owner-masks.md#remaining-order-cost)
+  identifies target searches and cell insertion as recurring costs.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -115,6 +117,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [follow-on Blood Bath cut](audits/2026-11-21-native-blood-bath-lurker.md#follow-on-egg-observation)
   narrows a likely Zergling pair hatch to 33 native updates. The ordinary
   GBA counterpart verifies a queued pair and fresh HOME continuation.
+  The [normal CPU Drone comparison](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
+  follows a native Larva, Egg and Drone in the same slot, and a
+  current GBA Hatchery debit, queue and new-slot Drone through
+  fresh HOME. The experimental ARM build restores a live CPU Egg
+  while the human plays Protoss. Qualify a paid Carrier and active
+  Interceptor alongside it before promoting the combined journal.
   [Draft #689](https://github.com/ggu/starcraft-gba/pull/689) compiles the
   experimental Carrier/Egg authentication path for Terran and Z10.
   An isolated Z10 HOST fixture reaches the real load preparation and
@@ -141,6 +149,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Wasteland and control build wins at frame 228,128 and reads back
   the same victory journal from HOME. All 254 world, ten display
   and six route cache cuts match the earlier corrected build.
+  The [refreshed Z10 route](audits/2026-11-22-campaign-defense-owner-masks.md#refreshed-normal-zerg-10-route)
+  wins at frame 51,588 from ordinary HOME and from a fresh pause
+  save, with 21 paired continuation checkpoints and identical
+  third-process victory readbacks. Preserve the older unaligned
+  tape as historical evidence.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)

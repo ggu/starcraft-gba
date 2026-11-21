@@ -69,6 +69,54 @@ save continuation near the actor limit before promoting it.
 | Normal Z10 first queue debit | `8fd153dda9abe36f97783a294899d15dc83cf4a0e917c5c132cd30c8e4ecc87c` |
 | Normal Z10 pause and fresh continuation | `56fc61d79df01c534c25eb96488cca605440605348c9781fa8906cbf6cdac2e7` |
 
+## CPU Drone production and fresh HOME continuation
+
+A further neutral ares continuation begins at the authenticated
+native update 12,920. The read-only actor sampler follows CPU Zerg
+slot 133 through four states.
+
+| Native update | Type | HP | Observation |
+| --- | --- | ---: | --- |
+| 12,920 | Larva, raw 35 | 25 | At (608, 1977) |
+| 12,950 | Egg, raw 36 | 200 | Unfinished, same anchor |
+| 13,266 | Drone, raw 41 | 40 | Completion flag clear, same anchor |
+| 13,301 | Drone, raw 41 | 40 | Completed and moving at (669, 1980) |
+
+The normal `fe4e1502` Z10 cartridge uses a Hatchery queue in
+the corresponding ordinary Terran-versus-Zerg Blood Bath test.
+From frame 47 to 48, the CPU bank goes from 50 to zero minerals
+and Hatchery slot 1 queues a Drone. At frame 422 a new 40-HP
+Drone appears in slot 9. The GBA role maps to source raw 41.
+Its Custom Game runtime raw field is unset. The two observations
+use independent clocks and leave the native payment and exact
+transition updates open.
+
+Saving the normal GBA game at frame 48 and loading from fresh
+HOME restores the queue and named gameplay state. At frame 548
+the resumed state matches the uninterrupted run, and the fresh
+process exports byte-identical 32 KiB SRAM.
+
+The experimental combined ARM Egg/Carrier build also restores
+an actual CPU Egg in an ordinary human-Protoss versus Zerg
+match. At frame 6,001, CPU owner 1, slot 30 holds an Egg with
+134 updates remaining. Fresh HOME restores it and both runs
+match over another 100 updates, including the original Egg's
+timer and another CPU Egg. The next case needs a player-built
+Carrier and in-flight Interceptor in that same ARM journal.
+An ordinary Protoss build order now reaches the Stargate on
+the experimental cartridge with a Zerg CPU. It saves through
+pause and restores the paid construction milestone through
+fresh HOME. Continue from that journal through Carrier
+production and Interceptor release.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Native 23-sample observation | `ef063506548d4ed9f99cca89ecae47efb0ec2ed4221bd1c1545796d97d5f1b58` |
+| Native continuation receipt | `bb5377638ce012f44b4edd2683a89021a320e46dfae38ce59dc45c0a368bf0eb` |
+| Current normal GBA pause and Drone completion | `c7528a65be48c9cdc741e812ec9ff9028b96b8e8663935a8756783f1f0fd5453` |
+| Experimental ARM CPU Egg fresh HOME receipt | `218543fe0fee183acbd56de32757aed5b6f2c63655348cadc1963ba24c225204` |
+| Experimental ordinary Protoss Stargate journal | `f5b6785c0db2a60b884ae8198d7d91f10706606cc5fd468f7ae14ec007ae1105` |
+
 ## Custom Game implementation dependencies
 
 The released catalog specifies a Hydralisk producer, Lurker Egg and a
