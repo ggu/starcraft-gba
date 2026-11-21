@@ -1551,7 +1551,7 @@ static int race_custom_carrier_candidate(unsigned ww,unsigned wh
 #ifdef SC64_ZERG_CARRIER_PROBE
                                          ,const Sc64ImpactEvent *impacts,int impact_count
 #endif
-                                        )
+                                         SC64_GCTX_DECL)
 {
 #ifdef SC64_ZERG_CARRIER_PROBE
     if (!race_zc_authenticated) return 1;
@@ -1579,7 +1579,7 @@ static int race_custom_carrier_candidate(unsigned ww,unsigned wh
         }
     }
 #endif
-    Sc64ShowcaseProjectileCandidate view={&race_data,ww,wh};
+    Sc64ShowcaseProjectileCandidate view={&race_data,ww,wh SC64_GCTX_ARG};
     return race_p7_carrier_training_candidate_valid(actors,MAX_UNITS) &&
         sc64_compact_codec_validate_target(&race_p7_projectiles,packet,packet_size,
             SC64_POOL_CAPACITY,race_showcase_projectile_row,&view);
@@ -3018,6 +3018,9 @@ static int race_save_game(void) {
     if (!race_impact_save_write(cargo_have_previous ? &cargo_previous : 0
 #ifdef SC64_NUKE_SILO_JOURNAL
                                 , nuke_silo_tag
+#endif
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+                                , guard_auth
 #endif
                                )) return 0;
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
@@ -4525,7 +4528,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_ZERG_CARRIER_PROBE
             ,plan->impact_candidate,plan->impact_candidate_count
 #endif
-            )) return 0;
+            SC64_GCTX_ARG)) return 0;
 #endif
 #if defined(SC64_P7_PROJECTILES_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
     if (!race_p7_projectile_save_candidate_valid(&race_data,

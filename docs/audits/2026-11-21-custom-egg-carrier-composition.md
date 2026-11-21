@@ -25,3 +25,11 @@ The next bounded change should establish a separate combined candidate authentic
 ## Probe receipts
 
 The isolated probe used the three existing `arm-final` recipe arrays with `-DSC64_SHARED_EGG_CUSTOM_SERVICE`, `-E` or `-fsyntax-only`, and f9 source. It generated no ROM or game assets. Terran and Z10 preprocessing returned 0; P10 preprocessing returned 1. Terran and Z10 syntax checks returned 1. SHA-256 of the diagnostic logs: Terran syntax `bff4aa0fb97f7c44cc2f29f214c846e393bea5ddbd02880422d70dd7bad4d5f6`, Z10 syntax `4ff8013d3bf1de98a4db2a6ef0facb58c1e49d43b1f7a680fb062c27024e5806`, and P10 preprocessing `5cf7705cbe2a3af7cbf9db89de3e8a0f293417513bdfab22820e0696fa02f1e3`.
+
+## Candidate-local callback groundwork
+
+A gated experiment threads the existing candidate-local authentication through the Carrier projectile callback, Carrier candidate validation and save-time callback. It adds no new accepted journal tag. Combined Carrier/Egg builds require `SC64_CARRIER_EGG_AUTH_EXPERIMENT`, and their custom save writer refuses the save until a combined authenticated wire format exists. This is a compile and validation step, not playable save support.
+
+Using the same pinned ARM recipes, `-fsyntax-only` passes Terran and Z10 with both the Egg and experiment flags; the Egg flag alone fails the new fence. The normal Terran, Z10 and P10 syntax controls pass. With debug output disabled, the compiled normal `game.c` object is byte-identical to f9 for Terran (`07a663ac3fe7f32572fedc7501869a8edea20d422ae1f45408257b2ddf9cfa93`) and Z10 (`2438bf4514bd2a233ceb8486382530b31ee9cfb10c3622a90547c3e078cebee8`). P10 combined remains fenced and also requires Egg-aware generated fact tables.
+
+`make -f tests/sc64-carrier-egg-auth/Makefile test-carrier-egg-auth` runs the real projectile callback with a small asset-free decoder stub under ASan/UBSan. Both legacy and authenticated Egg contexts pass; wrong candidate, inner version, feature and outer/inner tag pair are rejected. The separate stage-auth test also passes. These checks do not qualify a combined journal, its writer, fallback or gameplay continuation.
