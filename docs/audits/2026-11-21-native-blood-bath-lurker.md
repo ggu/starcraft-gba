@@ -124,6 +124,15 @@ remaining. A new HOME process restores both, re-exports byte-identical
 the Egg timer reaches 41. The combined journal still needs normal
 cartridge and predecessor-save qualification.
 
+The same ordinary controller sequence was replayed against an
+isolated composition of the armed-type release source and the
+experimental journal code. It matches the launch and reload logs and
+both SRAM images byte for byte. The composed ROM SHA-256 is
+`2beafce36f236057eff7d89319efc56713f94ff8d901fdab2eafeeb9436b2a3e`.
+This build still uses the fixture-only journal tag `0x76540105`.
+Qualify a normal product allocation, predecessor readers, capacity
+and P10 research before enabling the combined writer.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Native 23-sample observation | `ef063506548d4ed9f99cca89ecae47efb0ec2ed4221bd1c1545796d97d5f1b58` |

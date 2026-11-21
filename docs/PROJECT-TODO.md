@@ -145,9 +145,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   candidates and restores legacy Carrier and transport records.
   The isolated ARM fixture also saves an ordinary paid Egg through
   pause, reloads through HOME, and matches 401 updates through its
-  hatch. Rerun the [Outpost live-flight case](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
-  on the current release composition and qualify predecessor
-  and P10 research journals before activation. Use
+  hatch. The [Outpost live-flight case](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
+  repeats byte for byte on the current engine with the experimental
+  journal tag. Qualify a normal product allocation, worst-case capacity,
+  predecessor and P10 research journals before activation. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 
