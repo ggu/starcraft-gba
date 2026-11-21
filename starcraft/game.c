@@ -1096,7 +1096,7 @@ _Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
 #define SC64_PENDING_BUILD_ORDER(o) 0
 #endif
 #define SC64_BUILD_WORKER_ORDER(o) ((o) == ORDER_BUILD || SC64_PENDING_BUILD_ORDER(o))
-enum { BUILD_WORK_RANGE = 36 };
+enum { BUILD_WORK_RANGE = 36, MINERAL_WORK_RANGE = 7 };
 #ifdef SC64_NYDUS_ENABLED
 #define SC64_NYDUS_ORDER(o) ((o) == ORDER_NYDUS_ENTER)
 #else
@@ -8368,7 +8368,7 @@ race_update_resource_worker(Unit *q)
         tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
         ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
         if (dist2(q->x, q->y, tx, ty) >
-            (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
+            (q->order == ORDER_GAS ? 24 * 24 : MINERAL_WORK_RANGE * MINERAL_WORK_RANGE)) {
             move_toward(q, tx, ty);
             return;
         }
@@ -8436,7 +8436,7 @@ race_update_resource_worker(Unit *q)
     tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
     ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
     if (dist2(q->x, q->y, tx, ty) >
-        (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
+        (q->order == ORDER_GAS ? 24 * 24 : MINERAL_WORK_RANGE * MINERAL_WORK_RANGE)) {
         move_toward(q, tx, ty);
     } else if (!worker_gather_ready(q)) {
         return;
@@ -9630,9 +9630,9 @@ target_lists_unavailable:
 		}
 	    } else if (dist2(q->x, q->y, tx, ty) >
 #ifdef SC64_RACES
-            (q->order==ORDER_GAS?24*24:7*7)
+            (q->order == ORDER_GAS ? 24 * 24 : MINERAL_WORK_RANGE * MINERAL_WORK_RANGE)
 #else
-            7*7
+            MINERAL_WORK_RANGE * MINERAL_WORK_RANGE
 #endif
             ) {
 		move_toward(q, tx, ty);

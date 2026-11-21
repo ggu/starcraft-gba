@@ -78,6 +78,8 @@ enum {
     DEPTH_Y_BITS = DEPTH_SLOT_BITS + 4,
     DEPTH_WORLD_Y_BITS = 13,
     DEPTH_LAYER_BITS = DEPTH_Y_BITS + DEPTH_WORLD_Y_BITS,
+    DEPTH_MINERAL_WORK_BASE = MAX_MINERALS,
+    DEPTH_MINERAL_WORK_LAYER = 5,
 };
 
 _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
@@ -86,6 +88,8 @@ _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
                MAX_RACE_GEYSERS <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every actor slot");
 _Static_assert(DEPTH_STORM <= DEPTH_KIND_MASK, "painter keys must hold every kind");
+_Static_assert(DEPTH_MINERAL_WORK_BASE + MAX_UNITS <= DEPTH_SLOT_MASK + 1,
+               "painter keys must hold a work effect for each worker");
 #ifdef SC64_UNIT_FACING
 _Static_assert(MAX_UNITS * 2 <= DEPTH_SLOT_MASK + 1,
                "turret keys must hold the hull's slot and stride lift");
@@ -409,6 +413,39 @@ draw_world_building_ring(Building *q)
     draw_building_ring(q, q->x - camx, bottom, width, SELECTION_RING, 0);
 }
 
+static int __attribute__((noinline))
+sc64_mining_effect_anchor(const Unit *q, int *x, int *y)
+{
+    if (!q->alive || q->order != ORDER_MINE || !q->work_timer ||
+        !IS_WORKER(q->type) || (q->flags & 2u) ||
+        (unsigned)q->target >= MAX_MINERALS ||
+        sc64_worker_cargo_matches_order(q)) return 0;
+    const Mineral *field = &m[q->target];
+    if (field->amount <= 0 ||
+        dist2(q->x, q->y, field->x, field->y) > MINERAL_WORK_RANGE * MINERAL_WORK_RANGE)
+        return 0;
+    int wx = q->x + (field->x - q->x) / 2;
+    int wy = q->y + (field->y - q->y) / 2;
+    *x = wx - camx;
+    *y = wy - camy + 12;
+    return *x >= -2 && *x <= 241 && *y >= 10 && *y <= 121 &&
+           currently_visible(wx, wy);
+}
+
+static void
+sc64_draw_mining_effect(const Unit *q)
+{
+    int x, y;
+    if (!sc64_mining_effect_anchor(q, &x, &y)) return;
+    /* Authored flecks stand in for the separate mineral-working sprite.
+     * Carrying ore still uses the overlay attached to the worker body. */
+    int spread = 1 + ((q->work_timer >> 2) & 1);
+    sc64_weapon_vfx_pixel(x, y, C_WHITE);
+    sc64_weapon_vfx_pixel(x - spread, y, C_CYAN);
+    sc64_weapon_vfx_pixel(x + spread, y - 1, C_CYAN);
+    sc64_weapon_vfx_pixel(x, y + spread, C_CYAN);
+}
+
 static void __attribute__((noinline))
 sc64_draw_depth_ordered_actors(void)
 {
@@ -534,7 +571,10 @@ sc64_draw_depth_ordered_actors(void)
         unsigned i = key & DEPTH_SLOT_MASK;
         switch ((key >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) {
         case DEPTH_MINERAL:
-            draw_map_mineral((int)i);
+            if (i < DEPTH_MINERAL_WORK_BASE)
+                draw_map_mineral((int)i);
+            else
+                sc64_draw_mining_effect(&u[i - DEPTH_MINERAL_WORK_BASE]);
             break;
         case DEPTH_GEYSER:
             draw_map_geyser((int)i);
@@ -596,6 +636,13 @@ sc64_draw_depth_ordered_actors(void)
                 sc64_depth_push_key(heap, &size, (key & ~DEPTH_SLOT_MASK) |
                                     DEPTH_TURRET_BIT | (i << 1) | (unsigned)turret_lift);
 #endif
+            /* A working unit has no turret. Its independent effect can
+             * reuse the heap entry vacated by its layer-4 body. */
+            int work_x, work_y;
+            if (turret_lift < 0 && u[i].order == ORDER_MINE && u[i].work_timer &&
+                sc64_mining_effect_anchor(&u[i], &work_x, &work_y))
+                sc64_depth_push(heap, &size, DEPTH_MINERAL_WORK_LAYER, work_y,
+                                DEPTH_MINERAL, DEPTH_MINERAL_WORK_BASE + i);
             break;
         }
 #if defined(SC64_PROJECTILE_DEPTH) || defined(SC64_P7_PROJECTILES_ENABLED)

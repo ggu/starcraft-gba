@@ -9,6 +9,8 @@ The [building crop and sprite ID cases](audits/2026-11-21-world-depth-edge-and-t
 define edge clipping and exact-tie checks for the framebuffer replay harness.
 The [fallback death depth cases](audits/2026-11-21-fallback-world-depth.md#replay-cases)
 cover unbanked collapses, remains and bursts on both Mode 4 pages.
+The [mineral work layer case](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
+covers the independent gathering effect, attached cargo and flyer overlap.
 
 ## Protoss P10 candidate (2026-11-01)
 

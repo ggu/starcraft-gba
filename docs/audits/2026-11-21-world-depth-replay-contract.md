@@ -70,11 +70,71 @@ unavailable mode or storage combinations as unavailable.
 | --- | --- | --- |
 | `death-storage-depth` | Use the same scene and seed in EWRAM and a VRAM qualification build. Test an attached ground collapse with a Tank to its north and south, a burrowed collapse, an Overlord's attached images beside a Wraith and detached rubble. Add the fallback collapse and air burst cuts. | The loaded elevation, queue key, visible overlap and HUD match across storage. Confirm the VRAM flag and source death depth are both active. [Existing overlap setups](2026-11-21-fallback-world-depth.md#replay-cases) |
 | `same-y-attached-death-continuity` | Capture an opaque equal-elevation, equal-Y overlap alive, on the first attached death image, during actor-slot reuse, and on last-image retirement. Repeat with the victim's ID above and below its neighbor's. Include an independently detached effect with its own key. | Preserve the dying actor's ordering through the last attached image. On GBA the lower-slot collapse stays behind the Marine on both pages. The reused live actor draws in front on an exact slot tie. Retain native sprite IDs and the free-list head around retirement and reuse. [Fix and native lifetime witness](2026-11-21-attached-death-continuity.md) |
+| `worker-mining-effect-and-cargo` | Use an active SCV at a mineral edge and overlap its work effect with visible ground art. Move a Wraith across the effect on a separate cut. Repeat the ordinary gathering loop with a Probe and Drone. Capture approach, active work, loaded return, empty field, hidden worker or field, and each HUD boundary. Pause during work and resume from HOME. | The mineral and worker body sort at layer 4, the independent mining effect at layer 5, and the Wraith above both. Only active mineral work draws the effect. The returning ore badge shares the worker's turn. Require distinguishing masks for both overlap orders on both indexed pages. [Mining reference and fixture](#mineral-work-layer) |
 
 The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
 establishes the native sort and allocator rule. The exact death-tie
 case still needs an opaque N64 framebuffer cut. Use independent native
 and GBA replays and keep ROMs, saves and captures local.
+
+## Mineral work layer
+
+The native Blood Bath step-75 observation records visible SCV mining
+sprite ID 2105 on elevation 5. The SCV and mineral itself both use
+elevation 4. The independent sprite intersects 20 opaque SCV pixels and
+88 opaque mineral pixels in the retained source masks. An off-camera
+Probe's working sprite also uses elevation 5. Returning ore is attached
+to the worker in the step-9053 observation. [Native records](2026-11-21-shared-world-depth-regressions.md#n64-reference)
+
+A fresh ares continuation of an ordinary Blood Bath checkpoint
+reproduced the distinction at native update 62. The render rows contain
+workers 2138 and 2135 at layer 4 and their nearby type-340 sprites 2124
+and 2125 at layer 5. The four keys are `0x201ac85a`, `0x2032c857`,
+`0x2800084c` and `0x2800084d`. The final read-only RDRAM digest is
+`322c3ffbc3921c9b44ce55c813e29de4009f0d23dcebfa8e1db6b3e57e75c990`.
+The retained framebuffer digest is
+`f44e0051e4cb60715f36147b598b46f5984ef3722156624a861a987871fba0f8`.
+
+The shared GBA Mode 4 painter uses an original four-pixel cue at the
+worker–field midpoint while the mineral wait is active and within
+gathering range. The work effect takes the heap entry released by the
+worker body and is drawn at elevation 5. The effect uses the current
+worker and field state, including after HOME load, and adds no saved
+fields. Compare order within each platform's own framebuffer and
+palette. GBA cue pixels and animation timing are authored for this
+port. Exact native tie IDs and a composed native overlap mask remain
+separate assertions.
+
+Run `make test-sc64-mining-depth` with the normal Terran profile inputs
+prepared. Use the regular Campaign, Custom Game and Showcase entry points
+for replay wherever a gathering worker is available. For a screenshot
+where a flyer fully covers the cue, retain a second ground-only cut so
+the expected cue pixels are observable. Record worker slot, field slot and
+remaining minerals, work timer, cargo kind, all anchors and the
+effective depth keys. Keep native capture data local.
+
+The sanitizer fixture distinguishes three ground pixels and one flyer
+pixel on each indexed page. It checks fog and the inactive worker
+states, and fails if the work effect's queue insertion is disabled.
+An ordinary Terran-versus-Zerg Blood Bath replay on Z10 pans to the
+active mineral line and captures frame 113 while an SCV has 32 work
+updates left. Both pages change the four cue pixels at X 79–81 and
+Y 54–56. The world, HUD and palette agree. Both versions write the same
+32 KiB pause journal. A fresh HOME load matches the uninterrupted
+world at six checkpoints over the next 24 updates. The paired replay
+receipt is `be9c2ec5e6927d257909ca76f60b92b0b1f0b72d38f27b4b3cd7f358ae852ea0`.
+
+Terran, Z10, P10 and Showcase retain their ARM RAM endpoints. Campaign
+openings and Showcase Carrier Approach match the existing snapshots
+through frame 121. The three race cartridges pass all 54 ordinary
+Custom Game lobby, pause and fresh HOME continuations across both
+maps, all human races and one to three CPU seats. The matrix receipt
+is `197bffaae5d33bc6f0bffa3b60f692c8f9eae4250cc287a8dd92b391e64805de`.
+A 3,600-update three-CPU Blood Bath replay matches sampled gameplay,
+route counters and pause journal bytes. Mean emulated update cost
+rises from 921,678 to 923,198 guest cycles (+0.16%). Physical
+frame pacing remains open. The timing receipt is
+`8c6020da970e135a34f6155daa6769ff35cd7b96bbe4567c3f573b30032aded2`.
 
 ## GBA same-Y reproducer
 

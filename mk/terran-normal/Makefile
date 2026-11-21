@@ -55,3 +55,12 @@ build/test-sc64-terran-turret-depth: tests/sc64_z3_frame_coverage.c build/sc64-t
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Ibuild/sc64-turret-depth $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
 test-sc64-terran-turret-depth: build/test-sc64-terran-turret-depth
 	./$<
+
+# Prepared-art painter regression.
+# Override the profile flags when checking another already-prepared cartridge.
+MINING_DEPTH_PROFILE_FLAGS ?= $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS)
+.PHONY: test-sc64-mining-depth
+build/test-sc64-mining-depth: tests/sc64_mining_depth_game.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(MINING_DEPTH_PROFILE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
+test-sc64-mining-depth: build/test-sc64-mining-depth
+	./$<
