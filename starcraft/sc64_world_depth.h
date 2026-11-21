@@ -138,6 +138,10 @@ sc64_depth_key(unsigned layer, int y, unsigned kind, unsigned slot)
            (kind << DEPTH_SLOT_BITS) | slot;
 }
 
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+#include "sc64_foreground_pick.h"
+#endif
+
 static void
 sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
                 unsigned kind, unsigned slot)
