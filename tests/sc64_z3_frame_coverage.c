@@ -472,8 +472,124 @@ test_actor_depth(void)
             printf("Actor depth %s: %u overlap pixels match\n", cases[n].name, overlap);
         }
     }
+
+    /* In the same air layer, reversing the slots reverses the overlap
+     * without moving either body. The world Y positions stay distinct. */
+    const DepthActor same_layer[] = {
+        { U_WRAITH, 48, 0, 0, 0 }, { U_MUTALISK, 54, 0, 0, 0 },
+    };
+    for (unsigned first = 0; first < 2; ++first) {
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        depth_spawn(same_layer[first]);
+        depth_spawn(same_layer[1 - first]);
+        assert(u[0].type == same_layer[first].type && u[1].type == same_layer[1 - first].type);
+        assert(u[0].y == same_layer[first].y && u[1].y == same_layer[1 - first].y);
+        assert(sc64_unit_world_layer(&u[0]) == 18 && sc64_unit_world_layer(&u[1]) == 18);
+
+        /* Compose the actual sprite draw calls so translucent sprite pixels
+         * read the same destination colors as the shared painter. */
+        for (unsigned reverse = 0; reverse < 2; ++reverse) {
+            gfx_begin(C_BLACK);
+            gfx_set_clip_y(12, 120);
+            draw_unit(&u[reverse]);
+            draw_unit(&u[1 - reverse]);
+            capture(pixels[reverse]);
+            gfx_end();
+        }
+        unsigned overlap = 0;
+        for (unsigned i = 0; i < FB_SIZE; ++i)
+            overlap += pixels[0][i] != pixels[1][i];
+        assert(overlap);
+
+        unsigned pages = 0;
+        for (unsigned page = 0; page < 2; ++page) {
+            gfx_begin(C_BLACK);
+            gfx_set_clip_y(12, 120);
+            pages |= 1u << gfx_backbuffer_index();
+            sc64_draw_depth_ordered_actors();
+            capture(pixels[2]);
+            gfx_end();
+            if (memcmp(pixels[0], pixels[2], FB_SIZE)) {
+                fprintf(stderr, "Actor depth same-air-layer slot tie failed (order %u, page %u)\n",
+                        first, page);
+                ++failures;
+            } else {
+                printf("Actor depth same-air-layer slot tie (order %u, page %u): %u overlap pixels match\n",
+                       first, page, overlap);
+            }
+        }
+        assert(pages == 3);
+        if (!first) memcpy(pixels[3], pixels[2], FB_SIZE);
+        else assert(memcmp(pixels[3], pixels[2], FB_SIZE) != 0);
+    }
     return failures;
 }
+
+#if defined(SC64_HAS_SPRITES) && defined(GBA_SCENE_CLIP)
+static void
+test_completed_building_edge_depth(void)
+{
+    static u8 expected[FB_SIZE], reversed[FB_SIZE], flyer_only[FB_SIZE], actual[FB_SIZE];
+    static const struct { int x, y, flyer_x, flyer_y; } cuts[] = {
+        { -21, 66, 4, 66 }, { 261, 66, 235, 66 },
+        { 120, 1, 120, 17 }, { 120, 131, 120, 111 },
+    };
+    setup_depth_profile(R_TER);
+    camx = camy = 256;
+    SC64_GRID_CLEAR(visible);
+    for (unsigned i = 0; i < sizeof(cuts) / sizeof(cuts[0]); ++i) {
+        int x = cuts[i].x, y = cuts[i].y;
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        int building = spawn_build(SIDE, B_COMMAND, camx + x, camy + y - 12, 0);
+        int flyer = spawn_unit(SIDE, U_WRAITH, camx + cuts[i].flyer_x, camy + cuts[i].flyer_y - 12);
+        assert(building >= 0 && flyer >= 0);
+        assert(sc64_building_world_layer((unsigned)building) < sc64_unit_world_layer(&u[flyer]));
+        const Sc64SpriteFrame *body = building_art_sprite(&b[building]);
+        assert(body && !building_art_in_view(&b[building], x, y));
+
+        u8 *references[] = { expected, reversed, flyer_only };
+        for (unsigned order = 0; order < 3; ++order) {
+            gfx_begin(C_BLACK);
+            gfx_set_clip_y(12, 120);
+            if (!order) draw_completed_building_sprite(body, x, y);
+            draw_unit(&u[flyer]);
+            if (order == 1) draw_completed_building_sprite(body, x, y);
+            capture(references[order]);
+            gfx_end();
+        }
+        unsigned overlap = 0, visible_body = 0;
+        for (unsigned pixel = 0; pixel < FB_SIZE; ++pixel) {
+            overlap += expected[pixel] != reversed[pixel];
+            visible_body += expected[pixel] != flyer_only[pixel];
+        }
+        assert(overlap && visible_body);
+
+        unsigned pages = 0;
+        for (unsigned page = 0; page < 2; ++page) {
+            gfx_begin(C_BLACK);
+            gfx_set_clip_y(12, 120);
+            pages |= 1u << gfx_backbuffer_index();
+            sc64_draw_depth_ordered_actors();
+            capture(actual);
+            gfx_end();
+            assert(!memcmp(expected, actual, FB_SIZE));
+        }
+        assert(pages == 3);
+        b[building].owner = ENEMY;
+        assert(!currently_visible(b[building].x, b[building].y));
+        gfx_begin(C_BLACK);
+        gfx_set_clip_y(12, 120);
+        sc64_draw_depth_ordered_actors();
+        capture(actual);
+        gfx_end();
+        assert(!memcmp(flyer_only, actual, FB_SIZE));
+        printf("Completed building crop (%d,%d): %u visible body pixels and %u overlap pixels match\n",
+               x, y, visible_body, overlap);
+    }
+}
+#endif
 
 #ifdef SC64_UNIT_FACING
 static int
@@ -733,6 +849,9 @@ main(void)
 #endif
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
     failures += test_actor_depth();
+#if defined(SC64_HAS_SPRITES) && defined(GBA_SCENE_CLIP)
+    test_completed_building_edge_depth();
+#endif
 #ifdef SC64_UNIT_FACING
     failures += test_tank_turret_depth();
 #endif

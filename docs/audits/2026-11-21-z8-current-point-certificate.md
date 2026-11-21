@@ -163,6 +163,7 @@ all 203 frame and logical route counts. The ARM link keeps IWRAM and
 EWRAM endpoints at `0x03004ea0` and `0x02039f60`. This experiment uses
 the prior seven trial flags, the normal sparse pack flag and the new
 flag, with the wider cold rectangle experiment disabled.
+[Opt-in sparse prefix source](https://github.com/ggu/starcraft-gba/commit/d9de8cf895085333f576338cca56c3fd103c7b19)
 
 At call 26,357, a separate nearby-root read takes 993,135 cycles and
 still returns false. The stored 60-entry frontier for root 9,323 matches
@@ -286,6 +287,7 @@ the first four cold candidates at call 33,890 takes its prefix path.
 The two later full fills again belong to roots 13,668 and 13,796.
 This is an opt-in Z10 result on the same retained Z8 input and save. Other
 cartridges, busy custom games and physical GBA timing remain untested.
+[Opt-in reserve source](https://github.com/ggu/starcraft-gba/commit/794524686eee5529c25ff6853c69c5bdde4d64ef)
 
 | Reserve evidence | SHA-256 |
 | --- | --- |

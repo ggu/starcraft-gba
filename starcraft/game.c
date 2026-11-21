@@ -2522,6 +2522,7 @@ static unsigned race_p7_carrier_training_child_count(int carrier);
 #define SC64_P7_CARRIER_PARENT_TYPE(t) ((t) == U_P7_CARRIER)
 #endif
 static int sc64_p7_carrier_parent_type(int type);
+static unsigned sc64_p7_carrier_type_capacity(int type);
 static int race_p7_carrier_training_queue_owner(int carrier);
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
 static int race_p7_interceptor_flight_carrier_holds(int carrier);
@@ -12100,8 +12101,12 @@ static void
 draw_building_art(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES) && defined(GBA_SCENE_CLIP)
+    int anchor_in_view = building_art_in_view(q, x, y);
+#else
     if (!building_art_in_view(q, x, y))
         return;
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_building_actor_flags(q->type) &&
         !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return;
@@ -12109,6 +12114,11 @@ draw_building_art(Building *q)
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = building_art_sprite(q);
+#if defined(SC64_WORLD_DEPTH) && defined(GBA_SCENE_CLIP)
+    /* A completed sprite can intersect the field with its anchor outside. */
+    if (!anchor_in_view && (q->under_construction || !sprite ||
+                           !resource_sprite_in_view(sprite, x, y))) return;
+#endif
 #endif
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
@@ -13032,8 +13042,11 @@ sc64_hud_race_keys(int *values,int first)
     if (values[8]>1) values[12]=0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_protoss_services_active() && sc64_p7_carrier_parent_type(u[first].type))
-        values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
+    if (first >= 0 && race_protoss_services_active() && sc64_p7_carrier_parent_type(u[first].type)) {
+        unsigned children = race_p7_carrier_training_child_count(first);
+        unsigned pending = (unsigned)u[first].carry;
+        values[20] |= (int)((children | (pending << 4)) << 8);
+    }
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (first >= 0 && race_z5_cloak_actor(&u[first]))

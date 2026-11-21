@@ -2,6 +2,12 @@
 #define SC64_RACE_COMBAT_H
 /* Original ground/air weapon eligibility; render coordinates are half of
    the reference's pixels. Scenario invincibility is CHK UNIT flag 0x10. */
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+#include "sc64_combat_facts.h"
+#else
+#define sc64_combat_ground_weapon(type) (sc64_race_unit_damage(type) > 0)
+#define sc64_combat_air_weapon(type) sc64_race_unit_can_attack_air(type)
+#endif
 #ifdef SC64_Z6_RUNTIME
 /* One shared ROM eligibility routine avoids repeating the growing source
  * actor/cloak policy in every hot query and preserves the IWRAM reserve. */
@@ -10,6 +16,9 @@ static int __attribute__((noinline))
 static int
 #endif
 race_can_attack(int attacker,int target) {
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+    unsigned target_facts = 0;
+#endif
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
     if(target<MAX_UNITS&&SC64_TRANSPORT_LOADED(&u[target]))return 0;
 #ifdef SC64_Z5_CLOAK_ENABLED
@@ -34,8 +43,13 @@ race_can_attack(int attacker,int target) {
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if(target<MAX_UNITS) {
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+        target_facts = sc64_combat_target_facts(u[target].type);
+        if((target_facts & SC64_COMBAT_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(&u[target])) return 0;
+#else
         unsigned actor = sc64_game_unit_actor_flags(u[target].type);
         if((actor & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(&u[target])) return 0;
+#endif
     } else {
         unsigned actor = sc64_game_building_actor_flags(b[target-MAX_UNITS].type);
         if(actor & SC64_GAME_ACTOR_INVINCIBLE) return 0;
@@ -44,20 +58,28 @@ race_can_attack(int attacker,int target) {
     if(target<MAX_UNITS) {
         if(u[target].flags&16)return 0;
         if(!race_mode&&race_selected_mission==1&&u[target].type==U_CHRYSALIS&&race_campaign.carrier_unit<MAX_UNITS)return 0;
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+        if(target_facts & SC64_COMBAT_FLYING) {
+#else
         if(sc64_race_unit_flying(u[target].type)) {
-            return sc64_race_unit_can_attack_air(attacker);
+#endif
+            return sc64_combat_air_weapon(attacker);
         }
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
     if(target>=MAX_UNITS&&race_bc_facility_airborne(target-MAX_UNITS))
-        return attacker<0||sc64_race_unit_can_attack_air(attacker);
+        return attacker<0||sc64_combat_air_weapon(attacker);
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if(target>=MAX_UNITS&&race_late_airborne(target-MAX_UNITS))
-        return attacker<0||sc64_race_unit_can_attack_air(attacker);
+        return attacker<0||sc64_combat_air_weapon(attacker);
 #endif
-    return attacker<0||sc64_race_unit_damage(attacker)>0;
+    return attacker<0||sc64_combat_ground_weapon(attacker);
 }
+#ifndef SC64_COMBAT_FACT_TABLE_PROBE
+#undef sc64_combat_ground_weapon
+#undef sc64_combat_air_weapon
+#endif
 #if defined(SC64_P3_DEFENSE_TARGETS) && !defined(SC64_P3_RUNTIME)
 #error "SC64_P3_DEFENSE_TARGETS requires SC64_P3_RUNTIME"
 #endif

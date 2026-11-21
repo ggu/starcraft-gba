@@ -22,8 +22,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
   from the current four-child rescue stock, which needs an ordinary N64
-  before/after capture. Keep the existing save row and verify the larger
-  hangar's queue boundary, rank 7, full actor pool, HUD and fresh continuation.
+  before/after capture. [PR #667](https://github.com/ggu/starcraft-gba/pull/667)
+  adds the generic capacity policy to the shared engine with the existing
+  save row and four-slot production default. The synthetic eight-slot
+  policy passes HOST checks for the queue boundary, rank 7, full actor pool
+  and HUD. Qualify a larger policy on the normal ARM save and load path.
   Capture an ordinary native raw-72 launch through return to qualify the
   source-backed layer transitions on live sprites.
 
@@ -56,9 +59,33 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   checks. Keep the scalar permission path as an independent oracle and
   preserve cloak, fog, containment, invincibility and target tie order.
   [Spatial index retention](https://github.com/ggu/starcraft-gba/pull/590)
-  raises the dense p95. Keep the
-  [short-route proof](https://github.com/ggu/starcraft-gba/pull/616)
-  workload separate and check its peaks against the latest release.
+  raises the dense p95. The [query-local trial](audits/2026-11-21-indexed-target-query.md#dense-z7-ordinary-replay)
+  cuts the two late means by 2.69% and 3.22% with exact timed route
+  state and video. Its early Z7 window rises 1.14% and its Z8 mean
+  rises 0.71%. Position reuse alone stays within 0.05% of stock across
+  the Z7 and Z8 windows. Lazy weapon checks cut the Z8 increase to 0.18%.
+  [Immutable combat facts](audits/2026-11-21-indexed-target-query.md#immutable-combat-facts)
+  cut the Z10 late means by 2.76% and 3.13%, with matching state.
+  The [normal Z10 qualification](audits/2026-11-21-z10-combat-facts-release.md)
+  also verifies the rollback link and both maps with one to three AI
+  seats, three human races and matching fresh continuation. The normal
+  Z7 pair matches all 254 fresh-load replay checks and the victory
+  journal at frame 228,128. A P10 V2
+  candidate matches combat and victory journals but saves only 0.074%
+  in the campaign sample. Prioritize larger shared order and route costs.
+  The separate [point-certificate trial](audits/2026-11-21-z8-current-point-certificate.md)
+  matches 668 live ARM route answers and improves the sampled Z8 mean
+  and peak. The retry removes an 856,694-cycle stall at Z8 call 33,900.
+  [Sparse cold-prefix packing](audits/2026-11-21-z8-current-point-certificate.md#sparse-packing-after-a-cold-prefix-exhausts-its-component)
+  cuts call 33,852 by 120,735 cycles relative to that trial. The sampled
+  mean and p95 are now below packed stock. Test bounded demand from the
+  nearby-root reader at call 26,357 saves 731,494 cycles in an opt-in
+  trial. Its retained extra frontier saturates the four ordinary rows
+  and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
+  restores both cuts and takes 8.21% fewer cycles on average than packed
+  stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
+  Compare other campaigns and busy Custom Games on current builds before
+  changing the normal route flags.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
@@ -860,8 +887,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now witnesses defeat in two unmodified N64 Free for All launches and in the
   current Terran GBA ROM, including ordinary pause and fresh load through
   result. The current opt-in Terran replay also saves after CPU retirement
-  and preserves four surviving human SCVs as neutral through defeat. Native
-  mobile survivors and competitive CPU retirement still need a live witness.
+  and preserves four surviving human SCVs as neutral through defeat. A
+  [one-update native capture](audits/2026-11-21-blood-bath-live-results.md#ordinary-human-survivor-transfer)
+  shows the surviving SCV changing to neutral on the same update as
+  defeat publication and the census falling to zero. The native census
+  still counts the Command Center with zero HP before the scan. Capture
+  competitive CPU retirement and concurrent final-building losses.
   The [normal Terran Blood Bath win](audits/2026-11-21-blood-bath-terran-win.md)
   covers blank HOME, actual paid infantry and buildings, and an ordinary
   victory against one named Zerg AI. The same 186 checkpoints match on
@@ -879,9 +910,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   between retirement and victory. Qualify the ARM boundary and native
   countdown. An opt-in Battlecruiser survivor transfer also passes mixed
   cargo and Yamato HOST save tests. Empty and docked Carrier groups
-  now pass the P10 HOST transfer and save tests. Qualify compact saves,
-  queued and launched fighters, native technology and shot behavior,
-  the other coupled survivors, and simultaneous outcomes before enabling.
+  now pass the P10 HOST transfer and save tests. The [current preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-hangar-retirement-current-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md)
+  passes the Z10 and P10 HOST suites for paid queue refunds and neutral
+  cargo. Z10 also resumes an ordinary active compact journal on ARM.
+  Verify a positive retired-seat compact journal on ARM, launched
+  fighters, the other coupled survivors, and simultaneous outcomes.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
@@ -2256,6 +2289,10 @@ AI wallets and full-match behavior remain unverified.
   cover the separate Goliath turret and capture native pool-ID reuse.
   Promote the tested aircraft crop and detached missile-trail masks to
   ordinary-input cuts in campaign, Custom Game and Showcase.
+- Add the [building crop and sprite ID cases](audits/2026-11-21-world-depth-edge-and-ties.md#replay-cases)
+  to the framebuffer replay harness. Capture a completed building crossing
+  each viewport edge, then capture opaque native exact ties with sprite ID
+  retirement and reuse before changing GBA tie handling.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
   modes and the legacy static-clip fixture. Include
