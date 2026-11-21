@@ -42,3 +42,29 @@ binary, so its own digest is recorded below.
 | Final ARGB capture | `14fde37f40100cbd2b1791dcec889d640ad32885da0508a583f1bce36b78e0a1` |
 
 The ROM, images, saves and captures are stored locally.
+
+## Fresh Wasteland campaign opening
+
+A second fresh reset used the ordinary `advance` schedule from the existing
+headless `main.cpp`: Start pulses at steps 700, 1,000, 1,300 and 1,600;
+Down at 3,900 and 4,000; A at 4,100; and Start at 5,000, 5,600, 6,200
+and 6,800. Each pulse lasts ten runner steps and is released between pulses.
+The interactive runner received the equivalent bounded commands, with capture
+requests at 5,851 and 7,051, and finished at step 7,200. It exited 0 with
+GPU ready and two 640×240 captures; the isolated output occupied 2.3 MiB.
+
+Both captures show the Wasteland Terran opening group and 10/18 supply; the
+later capture also shows 40 minerals. These observations reproduce the prior
+headless opening and agree with the separate native Wasteland save-selection
+record's 40 minerals and 10/18 supply. The GBA campaign documentation says it
+uses Wasteland's original placements and retains the opening mineral grant,
+but these native images alone do not establish a one-for-one GBA roster or
+state comparison. No actor identities, health, exact positions or simulation
+ticks were read in this run. [Native save-selection record](2026-11-13-n64-t1-save-selection.md)
+
+| Wasteland receipt | SHA-256 |
+| --- | --- |
+| Interactive input commands | `c170f2e38ed9cffa6cd0df4912929babd317b7c2484cd595a705bf4987e0fd6f` |
+| Emitted command CSV | `3d9256471387180b6c3d805f7f0084d1752f4d84be7343c26c9056dcacce925f` |
+| First ARGB capture | `ba0080b165a39d80b34bd0f00e74ce462bb72abb77e32f89d2355c6c1088c897` |
+| Second ARGB capture | `df0da3a1853d11aa42df17addd32cd376d01886c6d6b97370622fba718d5c2b8` |
