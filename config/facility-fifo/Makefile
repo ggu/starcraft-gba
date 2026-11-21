@@ -19,6 +19,17 @@ $(error CANONICAL_ROUTE_FACILITY_FRONTIERS must be 0 or 1)
 endif
 FACILITY_FRONTIER_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_FACILITY_FRONTIERS)),-DSC64_FACILITY_FRONTIERS_PROBE)
 FACILITY_FRONTIER_KEY = $(if $(FACILITY_FRONTIER_FLAGS),-facilityfrontiers)
+
+# Experimental Thumb IWRAM placement of the 64x64 facility flood kernel.
+CANONICAL_ROUTE_FACILITY_HOT64 ?= 0
+ifneq ($(words $(CANONICAL_ROUTE_FACILITY_HOT64)),1)
+$(error CANONICAL_ROUTE_FACILITY_HOT64 must be 0 or 1)
+endif
+ifeq ($(filter 0 1,$(CANONICAL_ROUTE_FACILITY_HOT64)),)
+$(error CANONICAL_ROUTE_FACILITY_HOT64 must be 0 or 1)
+endif
+FACILITY_HOT64_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_FACILITY_HOT64)),-DSC64_ROUTE_FACILITY_HOT64)
+FACILITY_HOT64_KEY = $(if $(FACILITY_HOT64_FLAGS),-facilityhot64)
 include config/route-pack/Makefile
 include config/command-census/Makefile
 include config/contact-scan/Makefile
