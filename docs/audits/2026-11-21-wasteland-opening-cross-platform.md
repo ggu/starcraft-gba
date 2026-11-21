@@ -104,6 +104,9 @@ On the exact four links, the opening cuts and 41 Blood Bath
 camera-raster cuts per cartridge match the collision release. The
 three race cartridges pass all 54 ordinary Custom Game starts and
 fresh HOME continuations across both maps and one to three CPU seats.
+The late Protoss 10 victory and 3,600-update Zerg Blood Bath replays
+match their collision-release state, both framebuffer pages, SRAM
+and measured cycle counts.
 
 | Local evidence | SHA-256 |
 | --- | --- |
@@ -116,6 +119,8 @@ fresh HOME continuations across both maps and one to three CPU seats.
 | Terran ARM fresh HOME continuation and victory readback | `e1669e7fc02c479f6d5fa91ae134d5ba2ba2c68bd9caa13baa253b69f0121c00` |
 | Terran ARM Barracks foundation and completion | `4a1e137956708b05eb87a85849ebba84d8b55479a44cf5c7d626ca808758525b` |
 | Custom Game start and fresh continuation matrix | `8adfe790ae4b241b644564a459095fe3e95b7f550bea3123e8fc9ec39e21814d` |
+| Dense Protoss 10 continuation | `650b3abb4f556da47289936911d9f95e365a7b64ebc4397809dd576845679e45` |
+| Busy Zerg Blood Bath comparison | `8b5f5eff81c62b28a0a54086633b3004a36ad31e9404a0324c7ce8266fded0db` |
 
 ## Initial evidence
 
