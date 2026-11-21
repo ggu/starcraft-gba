@@ -61,6 +61,28 @@ The local receipt SHA-256 is
 The raw sprite record log SHA-256 is
 `d214fcd86b135027a90ea572216919faddd0ba9eb445114e5edf7105b83c26c7`.
 
+## Native sprite retirement follow-up
+
+The allocator at `0x8011fde8` removes from the linked free-list head at
+`0x80112890`. The retirement path at `0x80120840` appends to the tail
+at `0x80112894` after the image list clears. A 41-cut ares continuation
+reads those globals at frame 17,168 with head sprite 368 and tail 2138.
+At frame 17,369 the head is sprite 125 and the tail is 2139. Sprite
+2138 remains free. Its previous-link path to the head shrinks from
+2,008 to 1,772 records. This explains why a short continuation is
+unlikely to observe reuse of that particular ID.
+
+The recorded snapshots do not establish intervening allocation
+events or composed pixel ownership. For `native-pool-id-cross-kind-reuse`,
+select an active battle that keeps allocating, sample both globals
+and image-list ownership at each render update, and keep the opaque
+overlap and selection assertions independent.
+
+The local receipt SHA-256 is
+`784458de755ca00bc5608e57a3217ce2fbb4ea592ffbdefde586ac8f4aa6391a`.
+The sampled records SHA-256 is
+`6e45b3f8360f33bda890cd9223a21231d575d0f00bc3dc2b0f375c98abe4e8d7`.
+
 ## GBA qualification
 
 The Terran sanitizer fixture checks real opaque art for a two-unit ground
