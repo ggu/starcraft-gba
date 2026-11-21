@@ -60,3 +60,35 @@ The local receipt SHA-256 is
 `26f5bfaf3a0122c8037055e3125ed8707c3ec2766be846ff4022761ac4f1f0cd`.
 The raw sprite record log SHA-256 is
 `d214fcd86b135027a90ea572216919faddd0ba9eb445114e5edf7105b83c26c7`.
+
+## GBA qualification
+
+The Terran sanitizer fixture checks real opaque art for a two-unit ground
+overlap and a three-flyer overlap on both indexed pages. It also checks
+that a hostile foreground body is ineligible and that an unsupported
+foreground attack pose retains proximity. The Showcase weapon fixture
+compares both Tank impact draw orders. The fallback Siege impact has 14
+distinguishing pixels in each of the three blocker cases on each page
+and leaves both HUD bands unchanged. The separate Tank-only renderer
+passes the legacy raw-LUT and fog oracle.
+
+All four normal ARM products pass ROM and RAM checks. The ordinary
+Campaign and Showcase openings match the preceding release at frames
+61 and 121. All four products match at 41 Custom Game camera cuts each.
+The race ROMs pass 54 ordinary Custom Game launches and fresh HOME
+continuations across both maps, all human races and one to three CPU
+seats.
+
+In a 3,600-update Z10 three-CPU Blood Bath continuation, all 31 world
+and video checkpoints, 16 fresh continuation cuts and the SRAM bytes
+match the preceding release. Mean guest cycles change from 825,582 to
+825,087 and p95 from 1,115,886 to 1,115,670. This covers a busy ordinary
+match. Measure the cost of a sustained opaque overlap under the cursor
+and physical GBA pacing separately.
+
+| Receipt | SHA-256 |
+| --- | --- |
+| Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
+| Custom Game camera cuts | `356b3078e1ebb4c9386f0bbd2de45b4c4bac8388fc8e967a7f77a47a1b3a1d59` |
+| Custom Game SRAM matrix | `201234294efee5100618685f13bd790d1975415b59cba7e21f27ef11a83d589b` |
+| Busy Blood Bath timing and continuation | `36beb92a437b84f53fab6566b61c28ea08b0ef54ff229a23123cc346a695bb10` |
