@@ -131,9 +131,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   times the 30 fps cycle budget. The [combined trial](audits/2026-11-21-route-composition-current.md)
   reduces the dense Z7 mean by about 13% and the late means by about 4%.
   It preserves sampled world state and both journals. One active-page
-  sample differs. Resolve that timing difference and qualify the four
-  product links, other campaigns, busy Custom Games and physical frame
-  pacing before activating this option.
+  sample differs. The current four links and sampled T10, P10 and
+  Custom Game continuations pass. The current Z8 mean and peak fall
+  8.42% and 15.61%. Resolve the active-page difference through the
+  present boundary, finish the current-renderer Z7 pair, and measure
+  busy Custom Games and physical frame pacing before activating this option.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
