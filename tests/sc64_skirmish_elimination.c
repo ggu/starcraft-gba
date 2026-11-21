@@ -304,6 +304,8 @@ static void check_human_trainee_retirement(void)
     const int ship = spawn_unit(SIDE, U_P7_CARRIER, 500, 500);
     const int original = race_owner_minerals(SIDE);
     const int neutral = race_owner_minerals(NEUTRAL);
+    const int human_gas = race_owner_gas(SIDE);
+    const int neutral_gas = race_owner_gas(NEUTRAL);
     assert(ship >= 0 && race_p7_carrier_training_queue_owner(ship));
     const int trainee = race_p7_carrier_training_start(ship);
     assert(trainee >= 0 && race_p7_carrier_training_queue_owner(ship));
@@ -317,11 +319,13 @@ static void check_human_trainee_retirement(void)
            race_owner_minerals(NEUTRAL) == neutral + SC64_P7_INTERCEPTOR_COST);
     assert(race_save_game());
     game_init(); prior_keys = 0;
+    won = lost = 0; /* Model a fresh process before sending HOME L. */
     input(KEY_L);
     assert(!won && lost && screen == SCREEN_RESULT &&
            u[ship].alive && u[ship].owner == NEUTRAL && !u[trainee].alive);
     assert(race_owner_minerals(SIDE) == original - SC64_P7_INTERCEPTOR_COST &&
            race_owner_minerals(NEUTRAL) == neutral + SC64_P7_INTERCEPTOR_COST);
+    assert(race_owner_gas(SIDE) == human_gas && race_owner_gas(NEUTRAL) == neutral_gas);
 }
 
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
