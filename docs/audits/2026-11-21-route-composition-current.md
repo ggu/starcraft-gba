@@ -103,8 +103,17 @@ At update 2,280 (simulation frame 19,585) the release displays page
 0 and the trial displays page 1. These are different page contents
 at the input sample, so the strict display comparator detects a
 difference. Mean cycles rise 0.052% from 924,956 to 925,439.
-This 64×64 map exercises the fallback route path. Verify the phase
-through the VBlank presentation before activating the option.
+This 64×64 map exercises the fallback route path.
+
+An independent diagnostic reproduced that cut and stopped at VBlank
+entry, VBlank return and the ordinary input boundary. At frame
+19,585 the trial has completed its pending flip to page 1. The
+release still displays page 0 with its flip pending. The release
+flips to page 1 with the same page hash at its next VBlank. Both runs
+display page 1 with matching page contents at the next logical
+input sample. This identifies a one-VBlank presentation phase
+difference for Blood Bath. Confirm the corresponding dense Z7
+boundary separately.
 
 | Current-renderer receipt | SHA-256 |
 | --- | --- |
@@ -116,3 +125,5 @@ through the VBlank presentation before activating the option.
 | P10 paired campaign tail | `6d14a579c7851da22dcdd118ccfe1c0a2a319b7b1fe02f50688709d760d092d8` |
 | Z8 comparison | `c081897aa190d53986f4be6ddc22793bb5fa56c8c787db765780122a6e9e0b83` |
 | Late Blood Bath comparison and active-page difference | `4f2347a4854f2c9677ac57a2f31b797396caa00a94aaa8de6fc4403cbad192e2` |
+| Blood Bath release VBlank observer | `f03446fc3d633230adf2d9718e2a2c376edcd30e3a76b66b05c0cc67e001cbe2` |
+| Blood Bath composed VBlank observer | `d16d75682f814538a75ef8cb90234a4229cca90b8f4b40b2bad97fa8e9591270` |
