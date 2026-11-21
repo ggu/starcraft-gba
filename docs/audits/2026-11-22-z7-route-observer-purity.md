@@ -41,12 +41,33 @@ private early-gas policy under the 300,000-call cap: HOST won at call
 270,585, frame 267,585, with strict terminal consistency and zero fault.
 The exact full input tape SHA-256 is
 `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`.
-A full physical-input ARM replay is also required.
+
+
+## Normal ARM victory on the missile-trail release
+
+A fresh process starts the normal `6c9b4482` Zerg ROM at HOME and
+executes the complete corrected tape with physical button inputs.
+All 206 named observations match through call 270,585. The result
+screen reports victory at frame 267,585, with defeat clear and zero
+script fault. The replay checks named campaign fields, actor counts and
+economy. The world and video snapshots provide additional comparison
+points for subsequent builds.
+
+Across all 270,585 calls the replay averages 1,411,541 guest cycles
+per call, including menu and presentation waits. The mean corresponds
+to 11.89 emulated main-loop calls per second. Later ordinary pause,
+fresh HOME and victory should also be verified on the corrected tape.
+The full steering-build replay is a separate run.
+
+The Zerg ROM SHA-256 is
+`b7a6231297cf783011acbe70c8d2a2b6f243114b1c651dd00933a9d829ee5f54`.
+The full ARM replay receipt SHA-256 is
+`492fa7315db38bd07da59d0a3aab755560133dbea9f97e2ade33b8d240b950b8`.
 
 ## Focused regression recipe
 
 With an already-prepared Z10 ARM argument JSON and its referenced local inputs,
 run `python3 tools/test_route_purity.py PATH_TO_Z10_ARGS.json` from the checkout
 root. It compiles and runs the prefix fixture with ASan/UBSan using the
-already-prepared inputs. The local verification used the normal #708 Z10
-manifest. The full physical-input replay on #711 is in progress.
+already-prepared inputs. The focused fixture passes with the normal #708
+and #711 Z10 manifests.
