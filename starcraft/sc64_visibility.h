@@ -51,6 +51,10 @@
 #define SC64_SHARED_SPAN_TABLES 1
 #endif
 #endif
+#if defined(SC64_SHARED_SIGHT_SPARSE_ROWS) && \
+    (!defined(SC64_SHARED_SPAN_TABLES) || !defined(SC64_SHARED_SIGHT_PACKED_ROWS))
+#error "sparse shared sight requires shared source spans and packed rows"
+#endif
 
 #ifdef SC64_SOURCE_SIGHT_ALL_RACES
 /* Unfinished non-morphing structures reveal four source tiles. Morphing
@@ -806,7 +810,9 @@ sc64_z7_visibility_same_phase_footprint(int ox, int oy, int nx, int ny, int radi
 }
 #endif
 
-#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+#endif
+
+#if defined(SC64_Z7_VISIBILITY_SPARSE_ROWS) || defined(SC64_SHARED_SIGHT_SPARSE_ROWS)
 #include "sc64_sight_row_mask_generated.h"
 
 static inline __attribute__((always_inline)) void
@@ -816,8 +822,8 @@ sc64_visibility_row_delta(int row, int old_first, int old_last,
 /* Reversing a move does not change which rows differ. Anchor the mask at the
  * endpoint with lower Y (then lower X), even when a move crosses a tile. */
 static inline unsigned
-sc64_z7_visibility_sparse_mask(unsigned radius_index, int ox, int oy, int nx, int ny,
-                               int *first_row)
+sc64_visibility_sparse_mask(unsigned radius_index, int ox, int oy, int nx, int ny,
+                            int *first_row)
 {
     if ((ox | oy | nx | ny) < 0 || MAP_COLS > 255) return ~0u;
     int dx = nx - ox, dy = ny - oy;
@@ -835,13 +841,13 @@ sc64_z7_visibility_sparse_mask(unsigned radius_index, int ox, int oy, int nx, in
 }
 
 static int __attribute__((noinline))
-sc64_z7_visibility_try_sparse(int ox, int oy, int nx, int ny, int radius)
+sc64_visibility_try_sparse_transition(int ox, int oy, int nx, int ny, int radius)
 {
     unsigned radius_offset = (unsigned)radius - 64u;
     if (radius_offset > 112u || (radius_offset & 15u)) return 0;
     unsigned index = radius_offset >> 4;
     int row;
-    unsigned mask = sc64_z7_visibility_sparse_mask(index, ox, oy, nx, ny, &row);
+    unsigned mask = sc64_visibility_sparse_mask(index, ox, oy, nx, ny, &row);
     if (mask == ~0u) return 0;
     if (row < 0) {
         mask >>= -row;
@@ -876,12 +882,13 @@ sc64_z7_visibility_try_sparse(int ox, int oy, int nx, int ny, int radius)
 }
 #endif
 
+#ifndef SC64_SHARED_SPAN_TABLES
 static void __attribute__((noinline))
 sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
                               int radius)
 {
 #ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
-    if (sc64_z7_visibility_try_sparse(old_x, old_y, new_x, new_y, radius))
+    if (sc64_visibility_try_sparse_transition(old_x, old_y, new_x, new_y, radius))
         return;
 #endif
 #ifdef SC64_Z7_VISIBILITY_PHASE_REJECT
@@ -980,6 +987,10 @@ static int __attribute__((noinline))
 sc64_visibility_try_packed_transition(int old_x, int old_y, int new_x, int new_y,
                                       int radius)
 {
+#ifdef SC64_SHARED_SIGHT_SPARSE_ROWS
+    if (sc64_visibility_try_sparse_transition(old_x, old_y, new_x, new_y, radius))
+        return 1;
+#endif
     if ((old_x | old_y | new_x | new_y) < 0 || MAP_COLS > 255) return 0;
     unsigned index = (unsigned)(radius - 64) / 16u;
     const u8 *old_rows = sc64_z7_sight_packed_rows[index][((old_y & 15) << 4) | (old_x & 15)];

@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Shared by the late Zerg cartridge, controller, replay and test vectors.
-# The earlier race products use a different sight-span path.
 LATE_ZERG_PACKED_SIGHT ?= 1
 LATE_ZERG_SPARSE_SIGHT ?= $(LATE_ZERG_PACKED_SIGHT)
 ifneq ($(words $(filter 0 1,$(LATE_ZERG_PACKED_SIGHT))),1)
@@ -27,6 +26,11 @@ $(SC64_SIGHT_ROW_LUT_HEADER): tools/sc64_sight_row_lut.py | build
 SC64_SIGHT_ROW_MASK_HEADER = build/generated/sc64_sight_row_mask_generated.h
 $(SC64_SIGHT_ROW_MASK_HEADER): tools/sc64_sight_row_lut.py | build
 	$(PYTHON) $< --sparse-mask $@
+
+# Protoss 10 uses the shared source span dispatcher. Late Zerg selects
+# the same changed-row algorithm through its profile flags above.
+build/starcraft-protoss-p10.elf: CFLAGS += -DSC64_SHARED_SIGHT_PACKED_ROWS -DSC64_SHARED_SIGHT_SPARSE_ROWS -Ibuild/generated
+build/starcraft-protoss-p10.elf: $(SC64_SIGHT_ROW_LUT_HEADER) $(SC64_SIGHT_ROW_MASK_HEADER) mk/late-zerg-sight/Makefile
 
 LATE_ZERG_SIGHT_STAMP := build/late-zerg-sight-config
 LATE_ZERG_SIGHT_KEY := $(LATE_ZERG_PACKED_SIGHT):$(LATE_ZERG_SPARSE_SIGHT)
