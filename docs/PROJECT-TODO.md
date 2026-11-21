@@ -39,22 +39,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   live render rows. Extend campaign opening and event timing
   coverage. Resolve visible opaque overlap and reused IDs at equal depth.
 
-- **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
-  pass ordinary-input wins, fresh HOME continuation and victory-journal
-  readback on the current release cartridges. The dense Z10 continuation averaged about
+- **Current campaign verification.** The
+  [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
+  matches the previous Terran ROM through T1–T7, verifies the T10 finale
+  against its earlier pinned control and passes a paired P10 victory tail
+  and fresh result readback. The
+  [earlier three-finale checks](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
+  record victories, fresh HOME continuation and victory-journal readback
+  on their pinned cartridges. The dense Z10 continuation averaged about
   11.81 emulator main-loop updates per second, including presentation waits
-  and UI. Near-30-fps optimization and hardware measurement remain open.
+  and UI. Complete the exact-build campaign sweep and physical timing checks.
 
-- **Current three-cartridge playtest.** The [Custom Game matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
+- **Current three-cartridge playtest.** The
+  [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
   passes 54 ordinary starts and fresh SRAM continuations on the exact
   Terran, Z10 and P10 cartridges. It covers both maps, all human races,
-  and one to three independently selected CPU seats. A further 1,134
-  launches cover every physical seat and named race assignment. The
-  [fallback-depth release](audits/2026-11-21-fallback-world-depth.md#verification-and-remaining-gaps)
-  repeats the 54-case save matrix. The Mac playtest folder
-  `StarCraft-GBA-2026-11-21-749f585a` holds those three verified cartridges.
-  SD readback, physical frame pacing, and gameplay across every race and
-  mission on the combined source remain open.
+  and one to three independently selected CPU seats. The
+  [earlier 1,134-case matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
+  covers every physical seat and named race assignment at launch. The
+  local Storage folder `StarCraft-GBA-2026-11-21-0e0250d0` holds the
+  three current ROMs and their verified checksums. SD readback,
+  physical frame pacing and full campaign verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
@@ -160,8 +165,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   budget. The worst sampled update spends 1.40 million cycles in
   depot reachability and about 870,000 in four full point floods.
   An aligned point-transfer trial raises p95 by 0.48% with exact
-  state and route results. Prioritize measuring repeat exhaustive depot
-  misses and preserving per-page dynamic pixels in the terrain restore.
+  state and route results. The [parked depot flood comparison](audits/2026-11-21-parked-depot-flood-current.md)
+  counts 105 partial positive builds and no complete negatives in
+  56 sampled updates. Fusing discovery cuts the sampled build cycles
+  by 22.24% and the Blood Bath update peak by 7.58%, with matching
+  fields and continuations. Its Outpost window peak falls by 15.81%.
+  Prioritize the full point floods, path-grid rebuild on invalidation
+  and preserving per-page dynamic pixels in the terrain restore.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
