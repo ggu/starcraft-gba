@@ -4633,10 +4633,18 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
 #endif
 
 #if defined(SC64_Z7_SCOURGE_COMBAT) && defined(SC64_UNARMED_QUERY_SKIP)
+#if defined(SC64_Z7_ARMED_TABLE_PROBE) && defined(SC64_COMBAT_FACT_TABLE_PROBE)
+#include "sc64_combat_facts.h"
+#endif
 /* Share the expanded ground/air lookup from ROM in the larger Z7 build. */
 static int __attribute__((noinline))
 sc64_z7_unit_has_weapon(int type)
 {
+#if defined(SC64_Z7_ARMED_TABLE_PROBE) && defined(SC64_COMBAT_FACT_TABLE_PROBE)
+    if ((unsigned)type < SC_RU_COUNT)
+        return (sc64_fact_combat_table[type] &
+                (SC64_COMBAT_GROUND_WEAPON | SC64_COMBAT_AIR_WEAPON)) != 0;
+#endif
     return sc64_race_unit_damage_vs(type, 0) > 0 ||
            sc64_race_unit_damage_vs(type, 1) > 0;
 }
