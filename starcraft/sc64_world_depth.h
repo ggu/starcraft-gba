@@ -138,6 +138,18 @@ sc64_depth_key(unsigned layer, int y, unsigned kind, unsigned slot)
            (kind << DEPTH_SLOT_BITS) | slot;
 }
 
+static inline u32
+sc64_unit_depth_key(unsigned slot)
+{
+    return sc64_depth_key(sc64_unit_world_layer(&u[slot]), u[slot].y, DEPTH_UNIT, slot);
+}
+
+static inline u32
+sc64_building_depth_key(unsigned slot)
+{
+    return sc64_depth_key(sc64_building_world_layer(slot), b[slot].y, DEPTH_BUILDING, slot);
+}
+
 #ifdef SC64_FOREGROUND_PICK_ENABLED
 #include "sc64_foreground_pick.h"
 #endif
@@ -498,7 +510,7 @@ sc64_draw_depth_ordered_actors(void)
         int x = b[i].x - camx, y = b[i].y - camy + 12;
         if (x < -128 || x > 368 || y < -128 || y > 248) continue;
         if (b[i].owner != SIDE && !currently_visible(b[i].x, b[i].y)) continue;
-        sc64_depth_push(heap, &size, sc64_building_world_layer(i), b[i].y, DEPTH_BUILDING, i);
+        sc64_depth_push_key(heap, &size, sc64_building_depth_key(i));
     }
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
@@ -509,7 +521,7 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         if (q->type == U_P7_INTERCEPTOR && SC64_CARRIER_STATE_HIDDEN(q)) continue;
 #endif
-        sc64_depth_push(heap, &size, sc64_unit_world_layer(q), q->y, DEPTH_UNIT, i);
+        sc64_depth_push_key(heap, &size, sc64_unit_depth_key(i));
     }
 #ifdef SC64_PROJECTILE_DEPTH
     /* Traces sharing a shooter paint in slot order within its existing

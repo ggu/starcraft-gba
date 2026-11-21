@@ -6247,8 +6247,8 @@ field_cursor_near(int x, int y, int a, int b, int radius)
 
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
 #define SC64_FOREGROUND_PICK_ENABLED 1
-static int sc64_foreground_pick(int unit, int building, int proximity);
-static int sc64_foreground_unit_pick(int first, int last, int proximity);
+static int sc64_foreground_pick(int first_unit, int last_unit,
+                                int first_building, int last_building, int proximity);
 #endif
 
 /* Selection hints walk the full roster. Inline this eligibility check in
@@ -6270,51 +6270,62 @@ selection_unit_candidate(int i)
            ;
 }
 
+static inline __attribute__((always_inline)) int
+selection_building_candidate(int i)
+{
+    return b[i].alive && b[i].owner == SIDE
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+           && field_cursor_in_box(cx, cy, b[i].x, b[i].y, 26)
+#endif
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+           && sc64_game_building_selectable(b[i].type)
+#endif
+           ;
+}
+
 static int
 selection_target(void)
 {
-    int i, best_unit = -1, best_building = -1;
-    int unit_distance = 31 * 31, building_distance = 26 * 26, d;
+    int best_unit = -1, best_building = -1;
+    int unit_distance = 31 * 31, building_distance = 26 * 26;
 #ifdef SC64_FOREGROUND_PICK_ENABLED
-    int candidate_first = -1, candidate_last = -1;
+    int first_unit = -1, last_unit = -1;
+    int first_building = -1, last_building = -1;
 #endif
-    for (i = 0; i < MAX_UNITS; i++) {
+    for (int i = 0; i < MAX_UNITS; i++) {
         if (!selection_unit_candidate(i)) continue;
-	d = dist2(cx, cy, u[i].x, u[i].y);
+        int distance = dist2(cx, cy, u[i].x, u[i].y);
 #ifdef SC64_FOREGROUND_PICK_ENABLED
-        if (d < 31 * 31) {
-            if (candidate_first < 0) candidate_first = i;
-            candidate_last = i;
+        if (distance < 31 * 31) {
+            if (first_unit < 0) first_unit = i;
+            last_unit = i;
         }
 #endif
-	if (d < unit_distance) {
-	    unit_distance = d;
-	    best_unit = i;
-	}
+        if (distance < unit_distance) {
+            unit_distance = distance;
+            best_unit = i;
+        }
     }
-    for (i = 0; i < MAX_BUILDINGS; i++) {
-	if (!b[i].alive || b[i].owner != SIDE
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
-            || !field_cursor_in_box(cx, cy, b[i].x, b[i].y, 26)
+    for (int i = 0; i < MAX_BUILDINGS; i++) {
+        if (!selection_building_candidate(i)) continue;
+        int distance = dist2(cx, cy, b[i].x, b[i].y);
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+        if (distance < 26 * 26) {
+            if (first_building < 0) first_building = i;
+            last_building = i;
+        }
 #endif
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-            ||!sc64_game_building_selectable(b[i].type)
-#endif
-            )
-	    continue;
-	d = dist2(cx, cy, b[i].x, b[i].y);
-	if (d < building_distance) {
-	    building_distance = d;
-	    best_building = i;
-	}
+        if (distance < building_distance) {
+            building_distance = distance;
+            best_building = i;
+        }
     }
     int proximity = best_building >= 0 && (best_unit < 0 || building_distance <= unit_distance)
         ? MAX_UNITS + best_building : best_unit;
 #ifdef SC64_FOREGROUND_PICK_ENABLED
-    if (best_unit >= 0 && best_building >= 0)
-        return sc64_foreground_pick(best_unit, best_building, proximity);
-    if (best_building < 0 && candidate_first != candidate_last)
-        return sc64_foreground_unit_pick(candidate_first, candidate_last, proximity);
+    if ((best_unit >= 0 && best_building >= 0) ||
+        first_unit != last_unit || first_building != last_building)
+        return sc64_foreground_pick(first_unit, last_unit, first_building, last_building, proximity);
 #endif
     return proximity;
 }
