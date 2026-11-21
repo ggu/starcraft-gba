@@ -86,9 +86,18 @@ match the preceding release. Mean guest cycles change from 825,582 to
 match. Measure the cost of a sustained opaque overlap under the cursor
 and physical GBA pacing separately.
 
+The ordinary Zerg 7 input tape reaches victory at frame 228,128 after
+231,031 controller updates, including a fresh HOME continuation.
+All 254 world observations, ten indexed display cuts and six route
+cache cuts match the preceding release. The pause, victory and fresh
+victory readback journals also match byte for byte. The three timed
+combat windows average 0.03–0.05% fewer guest cycles, with small peak
+increases of at most 0.10%.
+
 | Receipt | SHA-256 |
 | --- | --- |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Custom Game camera cuts | `356b3078e1ebb4c9386f0bbd2de45b4c4bac8388fc8e967a7f77a47a1b3a1d59` |
 | Custom Game SRAM matrix | `201234294efee5100618685f13bd790d1975415b59cba7e21f27ef11a83d589b` |
 | Busy Blood Bath timing and continuation | `36beb92a437b84f53fab6566b61c28ea08b0ef54ff229a23123cc346a695bb10` |
+| Zerg 7 pause, fresh replay and victory | `526e1e70607ba800b99b097567d2af8e5e4d6b30430030193169151841a1fa3c` |
