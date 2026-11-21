@@ -30,7 +30,8 @@ now accepts a valid Carrier-class queue with only unstarted orders and
 fully docked children. It validates the whole departing roster and
 hangar graph before refunding the original owner and clearing the
 paid-order count. Docked actors keep their slots, parent and ranks.
-Training, launched and detached children still defer the transfer.
+The later training change below leaves launched and detached children
+fenced.
 
 The P10 sanitizer fixture pays for two pending orders, one on an empty
 Carrier and one on a Carrier with two docked children. It checks that
@@ -38,9 +39,59 @@ bad cargo and duplicate hangar ranks leave the roster, paid queues and
 wallet intact. The successful transfer refunds exactly 50 minerals to
 the retired CPU, then preserves the neutral ownership, child links and
 wallet through Pause save and fresh HOME load. The active training
-fixture verifies that a blocked transfer also leaves a pending paid
-order intact. The P10 receipt SHA-256 is
+case in that run verified that a blocked transfer also left a pending
+paid order intact. The P10 receipt SHA-256 is
 `ae8adc4b404de847d7273fc63e60334f3c72d78a111f31c5afbde26b70e199c2`.
+
+## Active Interceptor training
+
+The native training service creates the next paid child at
+`0x80127c2c`. It stores the child in the parent at `+0xe4` and
+stores the parent in the child at `+0xbc`. Creation inserts the
+child at the head of its current owner's actor chain. For the ordinary
+single-player elimination path, the defeat finalizer visits that newer
+child before the older parent. It relinks the child to owner 11 even
+while training is incomplete. The incomplete-state guard comes after
+relinking and skips the primary-order reset.
+
+When the finalizer reaches the parent, its queue cancellation uses the
+still-linked child's current owner for the active front order. It
+credits the full raw-73 price, 25 minerals and zero gas, then sends
+the unfinished child to the death-order cleanup. Pending orders take
+their refund from the same price table but credit the parent's former
+owner before its own relink. The active refund therefore credits the
+neutral wallet for the ordinary child-first chain. These findings
+come from matching the owned USA ROM and the step-9,053 RDRAM.
+A live native Carrier training cancellation during defeat remains open.
+
+| Native ROM window | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Training child and parent links at `0xeb860` | 368 | `659cfc0fb168dbbffe9ea8093bb595fac49146d3987ff21c0d9f89e18806dba0` |
+| Owner chain insertion at `0xf81d0` | 128 | `e8eaa79a79879e30014d553235791788766e03ea65ea2063158b80e11c6e434e` |
+| Defeat chain traversal at `0x8d6b0` | 160 | `0da63b54db1c9d85798afb1bcdebbe0b4de9a006e754d41d1fc8e6bf124531fd` |
+| Active child refund at `0xe8f0c` | 56 | `fc9b16262ca6b8aafb47778d17fc7c39d593a5f9ef59d7cfc4f0f9ce7eefc804` |
+| Child removal dispatch at `0xe9004` | 52 | `28f56b09dd8a0623a0057cbc9ffcbdde4b1c7b33f984ed986daa152382b25dfc` |
+
+The opt-in preview validates the full departing roster before clearing
+the valid hidden trainee and paying the split refund. The existing
+wallet arrays carry both balances through the typed and compact journals.
+The CPU fixture exercises one trainee, two paid pending orders and
+two ranked docked Interceptors. Bad cargo, duplicate ranks and a bad
+training timer all leave the roster and wallets intact. After a valid
+retirement, the former owner receives 50 minerals and neutral receives
+25. The docked actors keep their slots and ranks, and an ordinary Pause
+save and fresh HOME load restore both balances and no trainee. The
+Protoss human defeat fixture also verifies one active and one pending
+refund and restores both wallets through the terminal journal. The
+launched and detached fixtures still defer CPU retirement.
+
+The current opt-in P10 and Z10 HOST sanitizer suites pass on
+`9153b24b` with the prepared profile vectors.
+
+| HOST receipt | SHA-256 |
+| --- | --- |
+| P10 complete elimination fixture | `a65c80e5479645130535c2f08dfd43583698c38c8db695d21b044fbda7207842` |
+| Z10 complete Carrier-enabled elimination fixture | `74c79e1e360c17f001bc70b187681ad6759ed673afbedcbb9aa9df7d7202509d` |
 
 ## Compact Z10 save and load
 
