@@ -90,6 +90,7 @@ class CarrierReleaseTest(unittest.TestCase):
         [selector] = self.release_flags("SC64_CARRIER_RELEASE_FLAGS")
         [default] = self.release_flags("Z10_CARRIER_FLAGS")
         self.assertEqual(default, selector)
+        combat_fact = "-DSC64_COMBAT_FACT_TABLE_PROBE"
         for policy in ("0", "1"):
             with self.subTest(target_policy=policy):
                 shared = (f"CANONICAL_TARGET_POLICY={policy}",)
@@ -103,13 +104,19 @@ class CarrierReleaseTest(unittest.TestCase):
                 self.assertEqual(carrier_sources.count(model), 1)
                 self.assertEqual([source for source in carrier_sources if source != model],
                                  stock_sources)
-                self.assertEqual(stock_tables, ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts"])
+                self.assertEqual(stock_tables,
+                                 ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts", combat_fact])
                 self.assertEqual(carrier_tables,
-                                 ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts-carrier"])
-                self.assertEqual(carrier_generator, stock_generator + selector)
+                                 ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts-carrier", combat_fact])
+                self.assertEqual(stock_generator[-1:], [combat_fact])
+                self.assertEqual(carrier_generator, stock_generator[:-1] + selector + [combat_fact])
                 self.assertIn("-DSC64_BUILDING_WORDS_PROBE", carrier_generator)
                 self.assertIn("-DSC64_TARGET_FAST_LINK_PROBE", carrier_generator)
                 self.assertEqual("-DSC64_TARGET_POLICY_PROBE" in carrier_generator, policy == "1")
+                rollback = self.release_flags(
+                    "Z10_FACT_FLAGS", "Z10_FACT_REFERENCE_FLAGS",
+                    settings=(*shared, "Z10_CARRIER_RELEASE=1", "Z10_COMBAT_FACTS=0"))
+                self.assertEqual(rollback, [carrier_tables[:-1], carrier_generator[:-1]])
         self.assertNotEqual(self.make("Z10_CARRIER_RELEASE=2", "carrier-release-plan").returncode, 0)
 
     def test_normal_terran_links_only_the_selected_carrier_service(self):

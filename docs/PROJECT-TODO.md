@@ -906,9 +906,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   between retirement and victory. Qualify the ARM boundary and native
   countdown. An opt-in Battlecruiser survivor transfer also passes mixed
   cargo and Yamato HOST save tests. Empty and docked Carrier groups
-  now pass the P10 HOST transfer and save tests. Qualify compact saves,
-  queued and launched fighters, native technology and shot behavior,
-  the other coupled survivors, and simultaneous outcomes before enabling.
+  now pass the P10 HOST transfer and save tests. The [current preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-hangar-retirement-current-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md)
+  passes the Z10 and P10 HOST suites for paid queue refunds and neutral
+  cargo. Z10 also resumes an ordinary active compact journal on ARM.
+  Verify a positive retired-seat compact journal on ARM, launched
+  fighters, the other coupled survivors, and simultaneous outcomes.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results

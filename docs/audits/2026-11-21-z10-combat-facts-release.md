@@ -14,6 +14,8 @@ the normal actor bank and reproduces the release ROM byte for byte.
 The optimized link retains IWRAM `0x03004d60` and EWRAM `0x02039b30`.
 Both links pass the cartridge, SRAM signature and ELF payload checks.
 The focused fact oracle passes 2,739 comparisons under ASan and UBSan.
+Terran, P10 and Showcase all rebuild byte for byte against the current
+production ROMs with identical RAM endpoints.
 
 ## Normal Custom Game
 
@@ -71,6 +73,8 @@ The normal P10 recipe keeps its existing configuration.
 | Restored rollback ARM ROM | `d664d71c80a6aa959cc98c018e596d69726a6a0c00570873e2d60e50fdc1a5d4` |
 | Optimized normal Z10 ARM ROM | `dfb2e04b3858f849e0ebb19531782efb03c9413986a61767aebfb7babf8af162` |
 | Optimized Z10 ARM link | `6a9803fe7f9b3e0007909f654a97d759a1db29079d36a545025c155ce81ce2f3` |
+| Default build recipe and HOST oracle | `e5a4465e47b6c943cde10166c129dfd96aebfd408aadcd526ee31ece8052e946` |
+| Other normal product rebuilds | `baaa1111e79154edab06f0a62c6b46d665cd8c3e54c8f4a97d8ab3674ea494ea` |
 | Three-AI Z10 Blood Bath comparison | `83aa0c9ceecd55620cb7371ffd1337a437220783b1d5bcfc46814bf02eff1724` |
 | Additional Z10 lobby and save comparisons | `6335f1bde8a3c4f780bee144a327972562c3ee5f091db3eba4705f82afa688c3` |
 | Current Z8 campaign sample comparison | `7c58ba2257bd8f96dfe78c7aa7b0d2b342389b02a74d30d1bcb3d347c809af69` |
