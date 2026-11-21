@@ -26,3 +26,35 @@ Local receipts are under `/Volumes/Storage/sc64-route-next-20261122/build/route-
 The full control and candidate `result.json` SHA-256 values are
 `b6380d144cf18424a39e11e7754e98d39597125310fb06ddec4a63663bcfc943` and
 `75420d37f257ae528a9c715b42d4b63fd2e7b7ffd7ae0004ac0278daf2f31eb4`.
+
+## Combined armed-table qualification
+
+The candidate was composed with the separate opt-in armed-type change and
+compared to its armed-only cartridge. The Z8 saved HOME continuation matched
+1,200 per-update frame, screen and route-counter rows, eleven world, both-page
+and palette cuts, and SRAM. Mean guest cycles were 911,538 and 908,600
+respectively. The Z10 three-CPU Blood Bath continuation matched 3,600 route
+rows, 31 world and both-page cuts, sixteen paired fresh continuation cuts and
+the pause SRAM. Mean guest cycles were 820,015 for both. The Z8 run starts
+from a fresh saved state; the Blood Bath run writes a pause and verifies a
+fresh process continuation.
+
+P10 and Z10 prepared ASan/UBSan differential fixtures pass after explicitly
+warming the cache, changing actor owners and coordinates, and reinitializing
+the game. Both unit and building rows still reject malformed coordinates and
+owners before query filtering. Startup clears BSS; in-process initialization
+can retain cache entries safely because the entries contain only compiled
+raw-type mapping and source geometry, never actor, owner, mission or save data.
+The original validator remains the oracle for every supported raw ID and both
+actor kinds, including coordinate and owner boundary cases.
+
+All four combined links pass ROM and static RAM guards. BSS/IWRAM ends are
+P10 `0x0203b130`/`0x03004ea0`, Z10 `0x02039870`/`0x03004f60`, Terran
+`0x0203a6dc`/`0x03004b38`, and Showcase `0x020389a4`/`0x03004f00`.
+Terran and Showcase cartridges are byte-identical to the armed-only controls.
+
+Local Z8 control/candidate result SHA-256 values are
+`41518efb065deeb08e46a3be1f223fe69da850b226a53b5bd893c593a8eddb27` and
+`2a9a94313c9d811ed01333c2f704249e0b1e9bd4f899cf584d9c317eeb7b5ba1`.
+The Blood Bath comparison is
+`fb20e290ee589fac0913b729eb61406f1b98211c78211db4b9744f6cfeaf243d`.
