@@ -72,3 +72,38 @@ the staged cases with prepared inputs. Follow with
 ordinary-input replays across Campaign, Custom Game and Showcase where
 the actors are available. Record unavailable combinations explicitly.
 Keep native and GBA states, binary images and captures in local evidence.
+
+## Qualification
+
+The prepared Terran framebuffer fixture reproduces the old mixed-picker
+failure on `7c463fab` and passes the new case on both pages. The Showcase
+weapon fixture passes under the same sanitizers, including the prior
+high-layer missile, stationary impact, attached muzzle and HUD cases.
+
+The four normal ARM links retain the RAM endpoints of `bf663a2`. From
+fresh Outpost launches, ordinary A selects the isolated Hatchery at
+(160, 160), and A on the overlap at (140, 162) selects the Overlord. Run
+these as separate launches so the first selection does not turn the
+second press into a production command. The staged fixture covers the
+third body. Campaign and Showcase openings match at frames 61 and 121.
+There are 164 matching Custom Game camera cuts and 54 passing pause and
+fresh HOME cases.
+
+The 9,489-call P10 campaign tail matches all 68 world, framebuffer and fog
+cuts, per-call frame and route counters, and victory SRAM. Main-loop mean
+guest cycles change from 1,549,430 to 1,550,076 (+0.04%). The 3,600-update
+three-CPU Blood Bath replay matches sampled gameplay, both indexed pages
+and pause and continuation SRAM. Its mean changes from 820,015 to 821,028
+(+0.12%). Measure physical pacing and a sustained crowded low-trail scene
+separately.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Terran framebuffer fixture | `b5c2297e52c605d6896b91e2b8bac1d6163f39137245d631d824cb57be9aaef7` |
+| Showcase weapon fixture | `b6a99cfab50f4fde44f38088afa4a9338325c1d60cfa5aaf11c9a7bb81cf0c13` |
+| Ordinary Outpost overlap picks | `3f60fe405d01c0af42ec15a7f311fbfd8831bcc34b90bac7bb616dea97142915` |
+| Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
+| Custom Game camera cuts | `356b3078e1ebb4c9386f0bbd2de45b4c4bac8388fc8e967a7f77a47a1b3a1d59` |
+| Custom Game fresh HOME saves | `c56b8199a05991edf04a497d40dd3ce4ba75362334002e555f7d3072b6d7ea61` |
+| Busy Blood Bath replay | `d4cb50dded6908f97c9ea21b7d4c486d1045d686258e29c47882ffb95af586ec` |
+| P10 victory replay | `eb64ef714538559faea44208ee5af91aa0806755c613f29359e10b9107ff1f79` |
