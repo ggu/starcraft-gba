@@ -6077,6 +6077,34 @@ init_state(void)
 }
 
 #ifdef SC64_IMPORTED_MISSION
+/* Wasteland Command AtMost counts unfinished structures; AtLeast counts
+ * completed actors. Any Unit includes both mobile actors and structures. */
+typedef struct {
+    int raynor_alive, raynor_found, marines, barracks, completed_barracks;
+    int command, owned_actors;
+} Sc64WastelandCounts;
+
+static Sc64WastelandCounts
+sc64_wasteland_counts(void)
+{
+    Sc64WastelandCounts c = {0};
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+        if (u[i].owner == SIDE) ++c.owned_actors;
+        if (u[i].type == U_RAYNOR) {
+            c.raynor_alive = 1;
+            if (u[i].owner == SIDE) c.raynor_found = 1;
+        } else if (u[i].owner == SIDE && u[i].type == U_MARINE) ++c.marines;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE) {
+        ++c.owned_actors;
+        if (b[i].type == B_BARRACKS) {
+            ++c.barracks;
+            if (!b[i].under_construction) ++c.completed_barracks;
+        } else if (b[i].type == B_COMMAND) ++c.command;
+    }
+    return c;
+}
+
 static void
 update_imported_mission(void)
 {
@@ -6131,27 +6159,12 @@ check_imported_mission_outcome(void)
 #elif defined(SC64_SKIRMISH)
     skirmish_outcome();
 #else
-    int i, raynor_alive = 0, raynor_found = 0, marines = 0, barracks = 0;
-    int command = 0, men = 0;
-    for (i = 0; i < MAX_UNITS; i++) if (u[i].alive) {
-	if (u[i].owner == SIDE) men++;
-	if (u[i].type == U_RAYNOR) {
-	    raynor_alive = 1;
-	    raynor_found = u[i].owner == SIDE;
-	} else if (u[i].owner == SIDE && u[i].type == U_MARINE)
-	    marines++;
-    }
-    for (i = 0; i < MAX_BUILDINGS; i++) {
-	if (b[i].alive && b[i].owner == SIDE) {
-	    if (b[i].type == B_BARRACKS) barracks++;
-	    if (b[i].type == B_COMMAND) command++;
-	}
-    }
-	/* The source has two Defeat triggers: no remaining player men, or no
-	 * Command Center/Barracks, fewer than ten Marines, and <=399 minerals. */
-	if (!raynor_alive || !men || (!command && !barracks && marines <= 9 && minerals <= 399))
-	    lost = 1;
-    if (raynor_found && marines >= 10 && barracks >= 1) won = 1;
+    Sc64WastelandCounts c = sc64_wasteland_counts();
+    /* Any Unit includes buildings; the resource defeat uses broad counts. */
+    if (!c.raynor_alive || !c.owned_actors ||
+        (!c.command && !c.barracks && c.marines <= 9 && minerals <= 399))
+        lost = 1;
+    if (c.raynor_found && c.marines >= 10 && c.completed_barracks >= 1) won = 1;
 #endif
 }
 #endif
