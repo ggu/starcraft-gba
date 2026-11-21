@@ -19,6 +19,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
+  reaches the Protoss mineral line against Zerg from reset. Four of five
+  frame captures match the retained ordinary-input reference. Allow for
+  asynchronous frame callbacks. The
+  [fresh Wasteland opening](audits/2026-11-21-native-headless-replay.md#fresh-wasteland-campaign-opening)
+  also reproduces 10/18 supply and 40 minerals. Next capture Blood Bath
+  with a native state observer that can record sprite IDs, visible
+  overlap and the exact campaign roster.
+
 - **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
   pass ordinary-input wins, fresh HOME continuation and victory-journal
   readback on the current release cartridges. The dense Z10 continuation averaged about
