@@ -28,9 +28,10 @@ to qualify any tie-policy change.
 ## Detached trails at ground elevations
 
 The native spawn opcode allocates a separate child at parent elevation
-plus one. [Native render records](2026-11-21-native-depth-followup.md#missile-trails) The GBA drew
-a low-elevation flight trail in its parent's turn. The shared painter
-now gives each low trail its own key using the birth anchor that the
+plus one. [Native render records](2026-11-21-native-depth-followup.md#missile-trails)
+
+The GBA drew a low-elevation flight trail in its parent's turn. The
+shared painter gives each low trail its own key using the birth anchor the
 art renderer resolves. The parent and each subsequent child free one
 heap entry for the next birth. The added cursor array is 128 bytes on
 normal 32-tracer builds. Trails above elevation 4 share a draw entry
@@ -79,12 +80,15 @@ The prepared Terran framebuffer fixture reproduces the old mixed-picker
 failure on `7c463fab` and passes the new case on both pages. The Showcase
 weapon fixture passes under the same sanitizers, including the prior
 high-layer missile, stationary impact, attached muzzle and HUD cases.
+Source-boundary, doctor, default build and default test pass locally.
+The source Python suite ran 1,173 tests with 35 skipped.
 
 The four normal ARM links pass the ROM and static RAM guards. The
 Showcase compiler reports 3,616 bytes for the painter's stack frame,
 up from 3,488 on `bf663a2`, plus 136 bytes for the ground-trail helper
-when active. From
-fresh Outpost launches, ordinary A selects the isolated Hatchery at
+when active.
+
+In fresh Outpost launches, ordinary A selects the isolated Hatchery at
 (160, 160), and A on the overlap at (140, 162) selects the Overlord. Run
 these as separate launches so the first selection does not turn the
 second press into a production command. The staged fixture covers the
