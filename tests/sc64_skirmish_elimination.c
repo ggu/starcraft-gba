@@ -200,19 +200,46 @@ static void check_docked_carrier_retirement(void)
     const unsigned early_rank = sc64_p7_carrier_child_rank(&u[gap]);
     const unsigned late_rank = sc64_p7_carrier_child_rank(&u[second]);
     assert(early_rank != late_rank);
+    const int ore = race_owner_minerals(owner), vespene = race_owner_gas(owner);
+    const int neutral_bank = race_owner_minerals(NEUTRAL);
+    assert(race_p7_carrier_training_queue_owner(carrier));
+    assert(race_p7_carrier_training_queue_owner(empty));
+    assert(u[carrier].carry == 1 && u[empty].carry == 1);
+    const int paid_bank = ore - 2 * SC64_P7_INTERCEPTOR_COST;
+    assert(race_owner_minerals(owner) == paid_bank);
 
+#ifdef SC64_TRANSPORT_RUNTIME
+    const int transport = spawn_unit(owner, U_DROPSHIP, 540, 500);
+    const int passenger = spawn_unit(owner, U_MARINE, 540, 500);
+    assert(transport >= 0 && passenger >= 0);
+    assert(race_transport_request_board(passenger, transport));
+    assert(race_transport_tick_unit(passenger));
+    assert(u[passenger].order == ORDER_TRANSPORTED);
+#endif
     destroy_building(building_of(owner), SIDE);
-    sc64_p7_carrier_child_set_rank(&u[second], early_rank);
     static Unit before[MAX_UNITS];
+#ifdef SC64_TRANSPORT_RUNTIME
+    ++u[passenger].x;
     memcpy(before, u, sizeof(u));
     race_skirmish_outcome();
     assert(!race_skirmish_eliminated && !memcmp(before, u, sizeof(u)));
+    assert(race_owner_minerals(owner) == paid_bank && race_owner_gas(owner) == vespene);
+    --u[passenger].x;
+#endif
+    sc64_p7_carrier_child_set_rank(&u[second], early_rank);
+    memcpy(before, u, sizeof(u));
+    race_skirmish_outcome();
+    assert(!race_skirmish_eliminated && !memcmp(before, u, sizeof(u)));
+    assert(race_owner_minerals(owner) == paid_bank && race_owner_gas(owner) == vespene);
     sc64_p7_carrier_child_set_rank(&u[second], late_rank);
 
     race_skirmish_outcome();
     assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == 4);
     assert(u[carrier].alive && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11 &&
            u[empty].alive && u[empty].owner == NEUTRAL && u[empty].raw_owner == 11);
+    assert(!u[carrier].carry && !u[empty].carry &&
+           race_owner_minerals(owner) == ore && race_owner_gas(owner) == vespene &&
+           race_owner_minerals(NEUTRAL) == neutral_bank);
     assert(race_p7_carrier_training_child_count(carrier) == 2 &&
            !race_p7_carrier_training_child_count(empty));
 
@@ -225,7 +252,9 @@ static void check_docked_carrier_retirement(void)
     assert(u[carrier].alive && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11 &&
            u[empty].alive && u[empty].owner == NEUTRAL && u[empty].raw_owner == 11 &&
            u[carrier].order == ORDER_IDLE && u[empty].order == ORDER_IDLE);
-    const int neutral_bank = race_minerals[NEUTRAL];
+    assert(!u[carrier].carry && !u[empty].carry &&
+           race_owner_minerals(owner) == ore && race_owner_gas(owner) == vespene &&
+           race_owner_minerals(NEUTRAL) == neutral_bank);
     race_minerals[NEUTRAL] = SC64_P7_INTERCEPTOR_COST;
     assert(!race_p7_carrier_training_queue_owner(carrier) &&
            !race_p7_carrier_training_queue_owner(empty));
@@ -249,9 +278,11 @@ static void check_fenced_final_result(int human_defeat)
     const int ship = spawn_unit(owner, type, 500, 500);
     const int survivor = spawn_unit(owner, U_MARINE, 480, 500);
     assert(ship >= 0 && survivor >= 0 && race_p7_carrier_training_queue_owner(ship));
-    assert(!race_skirmish_neutral_transfer_ready(&u[ship]));
+    assert(race_skirmish_neutral_transfer_ready(&u[ship]));
     const int trainee = race_p7_carrier_training_start(ship);
     assert(trainee >= 0 && !race_skirmish_neutral_transfer_ready(&u[trainee]));
+    assert(race_p7_carrier_training_queue_owner(ship));
+    const int paid_bank = race_owner_minerals(owner);
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner != SIDE && b[i].owner != owner)
             destroy_building(i, SIDE);
@@ -262,6 +293,7 @@ static void check_fenced_final_result(int human_defeat)
     game_update(0, 0);
     assert(!won && !lost && screen == SCREEN_PLAY && race_skirmish_eliminated == (7 ^ bit));
     assert(u[ship].owner == owner && u[survivor].owner == owner && owners_hostile(SIDE, owner));
+    assert(u[ship].carry == 1 && race_owner_minerals(owner) == paid_bank);
     if (human_defeat) {
         for (int i = 0; i < MAX_BUILDINGS; ++i)
             if (b[i].alive && b[i].owner == SIDE) destroy_building(i, owner);
