@@ -2256,6 +2256,10 @@ AI wallets and full-match behavior remain unverified.
   cover the separate Goliath turret and capture native pool-ID reuse.
   Promote the tested aircraft crop and detached missile-trail masks to
   ordinary-input cuts in campaign, Custom Game and Showcase.
+- Add the [building crop and sprite ID cases](audits/2026-11-21-world-depth-edge-and-ties.md#replay-cases)
+  to the framebuffer replay harness. Capture a completed building crossing
+  each viewport edge, then capture opaque native exact ties with sprite ID
+  retirement and reuse before changing GBA tie handling.
 - Add [fixed-camera fog and HUD-boundary coverage](audits/2026-11-19-world-depth.md#cache-and-clip-regressions)
   to the world-depth replay harness. Keep the pixel checks for both capture
   modes and the legacy static-clip fixture. Include
