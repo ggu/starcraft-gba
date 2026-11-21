@@ -21,6 +21,24 @@ The emulator measured 70,347,482,196 guest cycles across 49,540 updates, about 1
 
 The prepared cartridge, controller, save, runner and detailed receipts are local. The first continuation process stopped after call 30,000. The successful continuation restarted from the validated HOME save.
 
+## All three current finales
+
+Ordinary controller tapes also completed the finales on the exact T10 and
+P10 cartridges listed below. Each replay saved through pause, resumed in a
+fresh HOME process, and loaded the resulting victory journal in a third
+process. The final SRAM re-export matched the original victory bytes in
+both cases.
+
+| Cartridge | Pause frame | Victory frame | Controller calls | Receipt SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Terran T10 | 2,276 | 3,361 | 3,446 | `8976377e5b3ce40ed673745ef77077826ab131091d1b3f06c6f262b07fb6f8dd` |
+| Protoss P10 | 36,761 | 46,129 | 47,266 | `b2fe252005e631d376112ee6e6c05740d9b51544321d5e29ed97fe88e1e255d2` |
+
+P10 matched 20 retained checkpoints, including six after fresh load,
+and held the victory state through eight neutral updates. The local
+runner copy used a 2 GiB free-space threshold with its existing 16 MiB
+per-file cap. Cartridge and replay assertions were unchanged.
+
 ## Current three-cartridge Custom Game matrix
 
 Fresh mGBA processes used ordinary buttons to configure and launch 18
@@ -34,6 +52,13 @@ after a fresh HOME load and another 120 updates. The saved and restored
 lobby, seats, resolved bases, and gameplay fingerprints matched their
 uninterrupted controls. All 54 loads read the original 32 KiB SRAM
 without changing its bytes.
+
+A separate 1,134-case launch run checked all 63 nonempty assignments of
+closed, Terran, Zerg and Protoss to the three physical CPU seats, on both
+maps and for each human race on each cartridge. All requested seats and
+bases resolved as expected. The exhaustive runs stop at gameplay entry.
+Their receipt SHA-256 is
+`9a578686472720ad9f45a8c389680a66133e061187898c7d62e81b0ae186ae89`.
 
 | Cartridge | Game code | ROM SHA-256 |
 | --- | --- | --- |
