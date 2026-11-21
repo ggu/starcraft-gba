@@ -49,7 +49,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cut the full resumed Z7 mean by 1.17% and the two late windows by
   1.52% and 1.57%, with matching images, SRAM and campaign result.
   Combat facts add about 2% in those late windows and 0.085% across the
-  full tape. Keep that second option off and prioritize the repeated
+  full tape in that initial trial. Prioritize the repeated
   route failures and expensive permissions in the busiest updates.
   The current sparse-route capture averages 2.09M and 2.05M cycles for
   zero-build updates in the two late windows. Orders account for 1.15M
@@ -84,8 +84,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
   restores both cuts and takes 8.21% fewer cycles on average than packed
   stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
-  Compare other campaigns and busy Custom Games on current builds before
-  changing the normal route flags.
+  The [current release trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-frontier-on-the-combat-facts-release)
+  confirms the sampled Z8 gain and passes the four ROM links, a P10
+  victory replay and late three-CPU Blood Bath save continuation.
+  The 64×64 Custom Game checks exercise fallback. The whole resumed
+  Z8 interval saves about 0.39%. In the Z7 cut at calls 47,758–48,237, mean
+  and p95 initially fall 12.06% and 18.05%. The worst call rises
+  11.23% when two nearby reads complete after their ordinary cutoff.
+  [Transfer into the free reserve](audits/2026-11-21-z8-current-point-certificate.md#transfer-after-the-ordinary-cutoff)
+  removes that peak increase. The paired mean, p95 and peak now fall
+  12.42%, 18.47% and 13.70%. Profile the certificate-only read at
+  call 48,149, then check both late Z7 windows before changing normal
+  route flags. Measure physical performance separately.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral

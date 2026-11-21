@@ -1235,6 +1235,36 @@ static void check_point_near_reserve(void)
         assert(sc64_route_get(slots[1], cell) == oracle[POOL].dir[cell]);
     check_grid_unchanged();
     puts("Nearby-root reserve keeps four cold slots, completes when occupied and releases stale owners.");
+
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    first_slot = sc64_route_slot_for(first_root, first_root + 17 * cols);
+    assert(first_slot >= 0);
+    cold = sc64_point_prefix_find(first_slot);
+    assert(cold && cold != reserve && !cold->second_cutoff && !reserve->count);
+    assert(sc64_route_slot_for(first_root, first_root + 20 * cols) == first_slot);
+    assert(sc64_point_prefix_find(first_slot) == cold && cold->second_cutoff);
+
+    const int near_goal = first_root + cols;
+    const int near_origin = first_root + 23 * cols;
+    const int later_origin = first_root + 26 * cols;
+    const u32 after_ordinary = state_hash();
+    assert(sc64_route_get(first_slot, near_origin) == SC64_ROUTE_UNREACHABLE);
+    assert(sc64_route_near_root_reaches(first_slot, near_origin, near_goal, first_root));
+    assert(sc64_point_prefix_find(first_slot) == reserve && !cold->count);
+    assert(state_hash() == after_ordinary);
+    reference_bfs(&oracle[POOL], first_root);
+    assert(sc64_route_get(first_slot, near_origin) == oracle[POOL].dir[near_origin]);
+
+    assert(sc64_route_get(first_slot, later_origin) == SC64_ROUTE_UNREACHABLE);
+    assert(sc64_route_near_root_reaches(first_slot, later_origin, near_goal, first_root));
+    assert(!sc64_point_prefix_find(first_slot) && !reserve->count);
+    assert(state_hash() == after_ordinary);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(first_slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+    puts("A spent ordinary cutoff can use the free reserve once before exact completion.");
 }
 #endif
 
