@@ -3,6 +3,9 @@
 #define SC64_ROUTE_POINT_PREFIX_PROBE_H
 
 static int sc64_route_fill(int slot, int goal);
+#ifdef SC64_ROUTE_POINT_COLD_COMPONENT_BYPASS
+static int sc64_point_prefix_component_reaches(int slot, int cell, unsigned root);
+#endif
 
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
 #include "sc64_route_point_certificate.h"
@@ -102,6 +105,15 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
 #endif
     Sc64PointPrefix *prefix = sc64_point_prefix_free();
     if (!prefix) return sc64_route_fill(slot, goal);
+#ifdef SC64_ROUTE_POINT_COLD_COMPONENT_BYPASS
+    /* An exact witness can prove this new origin is outside the goal's
+     * component. No partial search can reach it, so fill the same field
+     * eagerly. The victim's old goal still occupies its metadata here. */
+    if (sc64_point_prefix_component_reaches(slot, origin, (unsigned)goal) == 0) {
+        SC64_ROUTE_KEEP_COUNT(COLD_BYPASS);
+        return sc64_route_fill(slot, goal);
+    }
+#endif
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
     if (sc64_point_certificate(slot, origin, goal, SC64_POINT_CERT_FRESH)) {
         sc64_point_prefix_discard(prefix);
@@ -340,11 +352,11 @@ static void sc64_point_prefix_require(int slot, int cell)
 /* A complete field seeded at one open tile describes exactly one connected
  * component. If it includes either endpoint, it decides their connectivity
  * without consuming that field or completing the requested one. */
-static int __attribute__((noinline)) sc64_point_prefix_component_reaches(int slot, int cell)
+static int __attribute__((noinline)) sc64_point_prefix_component_reaches(
+    int slot, int cell, unsigned root)
 {
     enum { MAX_WITNESSES = 4 };
     const unsigned cells = (unsigned)MAP_COLS * (unsigned)MAP_ROWS;
-    const unsigned root = sc64_route_goal[slot];
     if (root >= cells || !SC64_GRID_GET(path_walkable, root)) return -1;
     const int active_slots = SC64_ROUTE_ACTIVE_SLOTS;
     unsigned checked = 0;

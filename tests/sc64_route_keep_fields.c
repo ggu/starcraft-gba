@@ -57,7 +57,7 @@ enum {
     KEEP_GATE_CALL, KEEP_GATE_HIT, KEEP_FAIL_BLOCKED, KEEP_FAIL_CODE,
     KEEP_FAIL_LENGTH, KEEP_FAIL_SEEDS, KEEP_FAIL_NEAR_GOAL, KEEP_FAIL_OPENED,
     KEEP_COMMIT_SAME, KEEP_COMMIT_OVERFLOW, KEEP_COMMIT_DROP, KEEP_MATERIALIZE,
-    KEEP_FILL, KEEP_ADOPT, KEEP_POINT_POINTER, KEEP_STATS
+    KEEP_FILL, KEEP_ADOPT, KEEP_POINT_POINTER, KEEP_COLD_BYPASS, KEEP_STATS
 };
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
@@ -1054,6 +1054,53 @@ static void check_point_component_witness(void)
 #endif
     puts("point witnesses preserve yes/no/fallback, selected slot and logical cache metadata");
 }
+
+#ifdef SC64_ROUTE_POINT_COLD_COMPONENT_BYPASS
+static void check_cold_component_bypass(void)
+{
+    const int cols = 128, left = 20 + 32 * cols, middle = 60 + 32 * cols;
+    const int wall = 40 + 32 * cols, distant = 100 + 32 * cols;
+    enum { ORIGIN_WITNESS, GOAL_WITNESS, UNRELATED, STALE, PARTIAL, BLOCKED, CONNECTED };
+    for (int mode = ORIGIN_WITNESS; mode <= CONNECTED; ++mode) {
+        point_component_map();
+        for (int col = 41; col < 80; ++col)
+            desired[25 * cols + col] = desired[35 * cols + col] = 0;
+        build_path_grid();
+        const int goal = mode == CONNECTED ? left - 1 : middle;
+        int witness = mode == GOAL_WITNESS ? middle + 1 : mode == UNRELATED ? distant :
+                      mode == BLOCKED ? wall : left + cols;
+        int w = mode == PARTIAL ? sc64_route_slot_for(witness, witness + 1) :
+                               sc64_route_slot(witness);
+        assert(w >= 0 && !!sc64_point_prefix_find(w) == (mode == PARTIAL));
+        if (mode == STALE) SC64_ROUTE_PF(w) |= SC64_ROUTE_FLAG_STALE;
+
+        /* A vacant victim can retain its old root. Using it as the new
+         * goal would report the origin-witness case connected. */
+        for (int i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+            if (!sc64_route_valid[i]) sc64_route_goal[i] = (u16)left;
+        const unsigned bypasses = keep_stat[KEEP_COLD_BYPASS];
+        const unsigned fills = keep_stat[KEEP_FILL], builds = sc64_route_builds;
+        const unsigned hits = sc64_route_hits, age = sc64_route_age[w];
+        int slot = sc64_route_slot_for(goal, left);
+        assert(slot >= 0 && slot != w && sc64_route_goal[slot] == goal);
+        assert(keep_stat[KEEP_COLD_BYPASS] == bypasses + (mode <= GOAL_WITNESS));
+        assert(keep_stat[KEEP_FILL] == fills + 1 && sc64_route_builds == builds + 1 &&
+               sc64_route_hits == hits && sc64_route_age[w] == age);
+        assert(!!sc64_point_prefix_find(slot) == (mode == CONNECTED));
+        SC64_ROUTE_EXACT(slot);
+        reference_bfs(&oracle[POOL], goal);
+        unsigned reachable = 0;
+        for (int cell = 0; cell < MAP_CELLS; ++cell) {
+            const int direction = sc64_route_get(slot, cell);
+            assert(direction == oracle[POOL].dir[cell]);
+            reachable += direction != SC64_ROUTE_UNREACHABLE;
+        }
+        if (mode != CONNECTED) assert(reachable == 351);
+        check_grid_unchanged();
+    }
+    puts("Cold disconnected bypass preserves exact sparse fields and logical route counters.");
+}
+#endif
 #endif
 
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
@@ -1635,6 +1682,9 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-component-only")) {
         check_point_component_witness();
+#ifdef SC64_ROUTE_POINT_COLD_COMPONENT_BYPASS
+        check_cold_component_bypass();
+#endif
         return 0;
     }
 #endif

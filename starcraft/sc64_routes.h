@@ -129,6 +129,10 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_POINT_COLD_COMPONENT_BYPASS) && \
+    (!defined(SC64_ROUTE_POINT_COMPONENT_PROBE) || !defined(SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE))
+#error "cold disconnected bypass requires exact component witnesses and sparse packing"
+#endif
 #if defined(SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
 #error "nearby-root component rejection requires point component witnesses"
 #endif
@@ -2337,7 +2341,7 @@ static int __attribute__((noinline)) sc64_route_reaches(int slot, int cell)
     if (sc64_point_prefix_find(slot)) {
         if (sc64_route_get(slot, cell) != SC64_ROUTE_UNREACHABLE) return 1;
 #ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
-        int connected = sc64_point_prefix_component_reaches(slot, cell);
+        int connected = sc64_point_prefix_component_reaches(slot, cell, sc64_route_goal[slot]);
         if (connected >= 0) return connected;
 #endif
     }
@@ -2656,7 +2660,7 @@ sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
     if (cell != goal && sc64_point_prefix_find(slot) &&
         sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE) {
 #ifdef SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE
-        if (sc64_point_prefix_component_reaches(slot, cell) == 0) return 0;
+        if (sc64_point_prefix_component_reaches(slot, cell, sc64_route_goal[slot]) == 0) return 0;
 #endif
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
         if (sc64_point_prefix_near_distance_miss(slot, cell, goal, root)) return 0;
