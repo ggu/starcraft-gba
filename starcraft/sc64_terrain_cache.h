@@ -43,17 +43,31 @@ static int sc64_terrain_store_key(int x, int y, unsigned int k) { (void)x; (void
 #endif
 
 #ifdef SC64_TERRAIN_CACHE_VRAM
-/* The first rows of the saved band live in the OBJ tile VRAM range that
- * sc64_obj_vram.h assigns to the cache: the whole 16 KiB (68 rows) in most
- * products, the part after the P7 projectile arena (48 rows) when that arena
- * is enabled. DMA moves them at VRAM speed; only the remainder occupies
- * EWRAM. */
+/* The first rows live in the OBJ tile VRAM range assigned by sc64_obj_vram.h.
+ * The rest goes in EWRAM, with up to ten more rows in the Mode 4 padding. */
 #include "sc64_obj_vram.h"
 #define SC64_TERRAIN_CACHE_VRAM_ROWS ((int)(SC64_OBJ_VRAM_CACHE_BYTES / 240u))
+#ifndef SC64_DEATH_VFX_VRAM_STORAGE
+#include "sc64_mode4_padding.h"
+#define SC64_TERRAIN_CACHE_PADDING_ACTIVE 1
+#define SC64_TERRAIN_CACHE_PADDING_ROWS \
+    ((int)((SC64_MODE4_TEXT_BOX_BASE - SC64_MODE4_PADDING_BASE) / 240u))
+_Static_assert((SC64_MODE4_PADDING_BASE & 3u) == 0u,
+               "terrain cache padding must stay word aligned for DMA");
+#ifdef GBA_HOST
+static _Alignas(4) u8 sc64_terrain_cache_pixels_padding[240 * SC64_TERRAIN_CACHE_PADDING_ROWS];
+#else
+#define sc64_terrain_cache_pixels_padding ((u8 *)SC64_MODE4_PADDING_BASE)
+#endif
+#else
+#define SC64_TERRAIN_CACHE_PADDING_ROWS 0
+#endif
+#define SC64_TERRAIN_CACHE_FAST_ROWS \
+    (SC64_TERRAIN_CACHE_VRAM_ROWS + SC64_TERRAIN_CACHE_PADDING_ROWS)
 #define SC64_TERRAIN_CACHE_RAM_ROWS \
-    (SC64_TERRAIN_CACHE_HEIGHT - SC64_TERRAIN_CACHE_VRAM_ROWS)
+    (SC64_TERRAIN_CACHE_HEIGHT - SC64_TERRAIN_CACHE_FAST_ROWS)
 _Static_assert(SC64_TERRAIN_CACHE_VRAM_ROWS > 0 &&
-               SC64_TERRAIN_CACHE_VRAM_ROWS < SC64_TERRAIN_CACHE_HEIGHT,
+               SC64_TERRAIN_CACHE_RAM_ROWS > 0,
                "the VRAM terrain cache needs part, not all, of the band in VRAM");
 _Static_assert(SC64_OBJ_VRAM_CACHE_OFFSET + 240u * SC64_TERRAIN_CACHE_VRAM_ROWS <=
                GBA_VRAM_SCRATCH_BYTES, "terrain cache rows exceed the OBJ tile VRAM");
@@ -402,15 +416,18 @@ static volatile u32 sc64_terrain_diag_dirty_tiles;
 static int sc64_terrain_cache_view_camx, sc64_terrain_cache_view_camy;
 #endif
 
-/* Whole-band transfers between the framebuffer and the saved pixels. With
- * the VRAM split, each is two transfers over the same screen rows. */
+/* Whole-band transfers between the framebuffer and the saved pixels. */
 static int
 sc64_terrain_cache_restore(void)
 {
 #ifdef SC64_TERRAIN_CACHE_VRAM
     return gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_VRAM_ROWS,
                          sc64_terrain_cache_pixels_vram) &&
+#ifdef SC64_TERRAIN_CACHE_PADDING_ACTIVE
            gfx_blit_band(SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_VRAM_ROWS,
+                         SC64_TERRAIN_CACHE_PADDING_ROWS, sc64_terrain_cache_pixels_padding) &&
+#endif
+           gfx_blit_band(SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_FAST_ROWS,
                          SC64_TERRAIN_CACHE_RAM_ROWS, sc64_terrain_cache_pixels_ram);
 #else
     return gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
@@ -424,7 +441,11 @@ sc64_terrain_cache_capture(void)
 #ifdef SC64_TERRAIN_CACHE_VRAM
     return gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_VRAM_ROWS,
                          sc64_terrain_cache_pixels_vram) &&
+#ifdef SC64_TERRAIN_CACHE_PADDING_ACTIVE
            gfx_read_band(SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_VRAM_ROWS,
+                         SC64_TERRAIN_CACHE_PADDING_ROWS, sc64_terrain_cache_pixels_padding) &&
+#endif
+           gfx_read_band(SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_FAST_ROWS,
                          SC64_TERRAIN_CACHE_RAM_ROWS, sc64_terrain_cache_pixels_ram);
 #else
     return gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
@@ -453,6 +474,7 @@ sc64_terrain_capture_dirty(const Sc64StaticDirtyRowsPlan *plan, Sc64TerrainCaptu
 {
     const int first = SC64_TERRAIN_CACHE_Y;
     const int split = first + SC64_TERRAIN_CACHE_VRAM_ROWS;
+    const int ram_top = first + SC64_TERRAIN_CACHE_FAST_ROWS;
     const int end = first + SC64_TERRAIN_CACHE_HEIGHT;
     int previous = first, total = 0;
     if (!plan || !plan->count || plan->count > SC64_STATIC_DIRTY_ROWS_MAX_BANDS ||
@@ -475,16 +497,22 @@ sc64_terrain_capture_dirty(const Sc64StaticDirtyRowsPlan *plan, Sc64TerrainCaptu
             if (!gfx_read_band(top, last - top, sc64_terrain_cache_pixels_vram + (top - first) * 240)) return 0;
             top = last;
         }
+#ifdef SC64_TERRAIN_CACHE_PADDING_ACTIVE
+        if (top < bottom && top < ram_top) {
+            int last = bottom < ram_top ? bottom : ram_top;
+            if (!gfx_read_band(top, last - top, sc64_terrain_cache_pixels_padding + (top - split) * 240)) return 0;
+            top = last;
+        }
+#endif
         if (top < bottom &&
-            !gfx_read_band(top, bottom - top, sc64_terrain_cache_pixels_ram + (top - split) * 240)) return 0;
+            !gfx_read_band(top, bottom - top, sc64_terrain_cache_pixels_ram + (top - ram_top) * 240)) return 0;
     }
     return total;
 }
 #endif
 
 #ifdef SC64_TERRAIN_SCROLL
-/* Scrolled restore: rows outside each segment are skipped by the window
- * helper, so the two segment calls together cover exactly the old band. */
+/* Scrolled restore: the window helper skips rows outside each segment. */
 static int
 sc64_terrain_cache_restore_window(int dx, int dy)
 {
@@ -492,10 +520,16 @@ sc64_terrain_cache_restore_window(int dx, int dy)
     return gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels_vram, 240,
                            SC64_TERRAIN_CACHE_VRAM_ROWS, dx, dy) &&
+#ifdef SC64_TERRAIN_CACHE_PADDING_ACTIVE
+           gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                           sc64_terrain_cache_pixels_padding, 240,
+                           SC64_TERRAIN_CACHE_PADDING_ROWS, dx,
+                           dy - SC64_TERRAIN_CACHE_VRAM_ROWS) &&
+#endif
            gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels_ram, 240,
                            SC64_TERRAIN_CACHE_RAM_ROWS, dx,
-                           dy - SC64_TERRAIN_CACHE_VRAM_ROWS);
+                           dy - SC64_TERRAIN_CACHE_FAST_ROWS);
 #else
     return gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels, 240,
