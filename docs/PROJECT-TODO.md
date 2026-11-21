@@ -160,8 +160,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   budget. The worst sampled update spends 1.40 million cycles in
   depot reachability and about 870,000 in four full point floods.
   An aligned point-transfer trial raises p95 by 0.48% with exact
-  state and route results. Prioritize measuring repeat exhaustive depot
-  misses and preserving per-page dynamic pixels in the terrain restore.
+  state and route results. The [parked depot flood comparison](audits/2026-11-21-parked-depot-flood-current.md)
+  counts 105 partial positive builds and no complete negatives in
+  56 sampled updates. Fusing discovery cuts the sampled build cycles
+  by 22.24% and the Blood Bath update peak by 7.58%, with matching
+  fields and continuations. Its Outpost window peak falls by 15.81%.
+  Prioritize the full point floods, path-grid rebuild on invalidation
+  and preserving per-page dynamic pixels in the terrain restore.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
