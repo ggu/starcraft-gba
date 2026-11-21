@@ -67,7 +67,9 @@ spending 960 Q8 energy and reproducing the same recovery SRAM.
 A fresh Z10 controller tape, generated with rendered inputs, restores
 the frame-2,526 pause in a fresh HOME process. Both ROMs reach victory
 at frame 63,523 and match all 25 observed world fingerprints, both
-indexed display pages at the checkpoints, and victory SRAM.
+indexed display pages at the checkpoints, and victory SRAM. Loading
+that victory in a third fresh process restores the result screen at
+frame 63,523 in both builds and re-exports identical SRAM.
 The controller tape SHA-256 is
 `7ed5ef9774299acc9efb4b01986938fe1af30db3088094fc389b595b516fd7b0`.
 The paired victory SRAM SHA-256 is
