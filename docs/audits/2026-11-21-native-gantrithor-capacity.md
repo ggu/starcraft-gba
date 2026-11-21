@@ -59,14 +59,13 @@ rank-4 rejection with that validated parent's limit and retain the
 contiguous-rank check. An older executable will reject a world with a
 hangar outside its four-child policy.
 
-Resolve the existing queue boundary before allowing a larger hangar.
-The paid path can raise the pending count to five when the cap exceeds
-four, while slot admission and save validation currently reject five.
-The HUD cache also shifts the pending count by three bits, so eight
-children could alias one pending order. Preserve the 240-actor ceiling
-and shared production reservations. The ordinary AI's Carrier production
-budget reserves one hull and four child slots. A wider AI hangar rule
-also needs the matching reservation.
+Before the configurable capacity trial, the paid path could raise the
+pending count to five with a larger cap, while slot admission and save
+validation rejected five. The HUD cache shifted the pending count by
+three bits, so eight children could alias one pending order. The AI
+budget reserved one hull and four child slots. A wider hangar rule
+needs matching HUD and AI reservations while preserving the 240-actor
+ceiling and shared production reservations.
 
 ## Configurable capacity trial
 
@@ -129,6 +128,30 @@ updates after fresh HOME L. Receipt SHA-256
 `c7111554e0bc34aadec576f69090c31832f47b8e0697ea98925efd0968669948`.
 These observations cover emulated ARM at the built-in four-slot policy.
 The eight-slot case remains covered by the HOST fixture.
+
+### Current renderer composition
+
+The follow-up composition `eab2418c` includes the
+[building-edge depth change](2026-11-21-world-depth-edge-and-ties.md) from
+`9398b13c`. All four normal ARM builds use the same pinned inputs and
+retain the IWRAM and EWRAM endpoints above. The normal Showcase ROM
+matches the qualified `9398b13c` Showcase byte for byte.
+
+| Product | Composed ARM ROM SHA-256 |
+| --- | --- |
+| Terran | `215f5a178e4a596a9f2d21f2e0e3f338190912a1e687ea31dd32ae2e870d45a3` |
+| Z10 | `d664d71c80a6aa959cc98c018e596d69726a6a0c00570873e2d60e50fdc1a5d4` |
+| P10 | `8862f340736df0aac75776659e6cfb8fec6c404cfc4b737edc667b50ff00be3b` |
+| Showcase | `9127bb13474f9098e07b031b072c459211c0ef0210a44c03891eebc0e5e5bcca` |
+
+P10 repeated the ordinary pause at frame 37,589 and loaded from HOME L
+in a fresh emulator. The 32 KiB SRAM, world, shot rows, video cuts, and
+36 continuation updates match the prior four-slot run. The comparison
+SHA-256 is
+`7fa781d241036ddbc722c7752618467065f2369bb398b141af13c216b272194f`.
+Terran and Z10 retain the ordinary gameplay evidence above from their
+earlier links. The current four-link receipt index SHA-256 is
+`de79b6098a2d3ff10313b2b3234fbf407fa126608944af265970ae211b6fe3b0`.
 
 ## Harness cuts
 
