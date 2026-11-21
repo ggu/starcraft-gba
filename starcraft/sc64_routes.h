@@ -1861,6 +1861,136 @@ static inline void sc64_route_pack_linear(u8 *field, const u8 *dense,
 
 #endif
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
+#ifdef SC64_ROUTE_IWRAM_FIFO_PROBE
+#ifndef SC64_ROUTE_LINEAR_POINTER_FIFO_PROBE
+#error SC64_ROUTE_IWRAM_FIFO_PROBE requires the linear pointer FIFO
+#endif
+#ifndef SC64_ROUTE_IWRAM_FIFO_CAP
+#define SC64_ROUTE_IWRAM_FIFO_CAP 512
+#endif
+#if SC64_ROUTE_IWRAM_FIFO_CAP < 8 || SC64_ROUTE_IWRAM_FIFO_CAP > 512 || \
+    (SC64_ROUTE_IWRAM_FIFO_CAP & (SC64_ROUTE_IWRAM_FIFO_CAP - 1))
+#error SC64_ROUTE_IWRAM_FIFO_CAP must be a power of two between 8 and 512
+#endif
+#ifndef SC64_ROUTE_IWRAM_FIFO_EVENT
+#define SC64_ROUTE_IWRAM_FIFO_EVENT(event, value) ((void)0)
+#endif
+
+static u16 *GBA_HOT __attribute__((noinline))
+sc64_route_linear_pop_batch(u8 *dense, const u16 *read, const u16 *end,
+                            u16 *write, int stride)
+{
+    do {
+        const int c = *read++;
+#define SC64_LINEAR_STEP(offset, direction) \
+        if (dense[c + (offset)] == 7u) { \
+            dense[c + (offset)] = direction; \
+            *write++ = (u16)(c + (offset)); \
+        }
+        SC64_LINEAR_STEP(-1, 1)
+        SC64_LINEAR_STEP(1, 2)
+        SC64_LINEAR_STEP(-stride, 3)
+        SC64_LINEAR_STEP(stride, 4)
+#undef SC64_LINEAR_STEP
+    } while (read != end);
+    return write;
+}
+
+static int __attribute__((noinline))
+sc64_route_expand_linear_ewram(u8 *dense, int tail, int stride, int cap)
+{
+    int head = 0, consumed = 0;
+    while (head < tail) {
+        int limit = head + (cap - tail) / 4;
+        if (limit > tail) limit = tail;
+        if (limit == head) {
+            int pending = tail - head;
+            if (pending > cap - 4) return -1;
+            for (int i = 0; i < pending; ++i) bfs_queue[i] = bfs_queue[head + i];
+            consumed += head;
+            head = 0;
+            tail = pending;
+            continue;
+        }
+        u16 *write = sc64_route_linear_pop_batch(dense, bfs_queue + head,
+                                                  bfs_queue + limit, bfs_queue + tail, stride);
+        head = limit;
+        tail = (int)(write - bfs_queue);
+    }
+    return consumed + tail;
+}
+
+static unsigned GBA_HOT __attribute__((noinline))
+sc64_route_expand_linear_ring(u8 *dense, u16 *queue, unsigned tail, int stride)
+{
+    enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP, mask = capacity - 1 };
+    /* A batch reads one contiguous window. The last three entries let its
+     * writes cross the physical end without a per-cell wrap test. */
+    unsigned popped = 0;
+    for (;;) {
+        unsigned head = popped & mask;
+        /* The initial seeds leave slack. Each batch reserves four entries
+         * per pop, so a later batch also cannot leave the ring entirely full. */
+        unsigned pending = (tail - head) & mask;
+        unsigned batch = (capacity - pending) / 4;
+        if (!pending || !batch) return (pending << 16) | popped;
+        if (batch > pending) batch = pending;
+        if (batch > capacity - head) batch = capacity - head;
+        unsigned write_limit = (capacity + 3 - tail) / 4;
+        if (batch > write_limit) batch = write_limit;
+        u16 *write = sc64_route_linear_pop_batch(dense, queue + head,
+                                                  queue + head + batch, queue + tail, stride);
+        unsigned new_tail = (unsigned)(write - queue);
+        for (unsigned i = capacity; i < new_tail; ++i) queue[i - capacity] = queue[i];
+        if (new_tail >= capacity) SC64_ROUTE_IWRAM_FIFO_EVENT(WRAP, new_tail - capacity);
+        popped += batch;
+        tail = new_tail & mask;
+    }
+}
+
+static void __attribute__((noinline))
+sc64_route_spill_linear_ring(const u16 *queue, unsigned popped, unsigned pending)
+{
+    enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP, mask = capacity - 1 };
+    /* Preserve FIFO order when a frontier crosses the end of the ring. */
+    unsigned head = popped & mask;
+    unsigned first = pending < capacity - head ? pending : capacity - head;
+    for (unsigned i = 0; i < first; ++i) bfs_queue[i] = queue[head + i];
+    for (unsigned i = first; i < pending; ++i) bfs_queue[i] = queue[i - first];
+}
+
+static unsigned __attribute__((noinline))
+sc64_route_expand_linear_iwram(u8 *dense, int seeds, int stride)
+{
+    enum { capacity = SC64_ROUTE_IWRAM_FIFO_CAP };
+    u16 queue[capacity + 3];
+    for (int i = 0; i < seeds; ++i) queue[i] = bfs_queue[i];
+    SC64_ROUTE_IWRAM_FIFO_EVENT(ENTER, seeds);
+    /* The field has at most 16,384 cells. The result carries the popped and
+     * pending counts, which recover the head without extra hot-loop state. */
+    const unsigned progress = sc64_route_expand_linear_ring(dense, queue, (unsigned)seeds, stride);
+    unsigned pending = progress >> 16;
+    if (pending) {
+        unsigned popped = progress & 0xffffu;
+        SC64_ROUTE_IWRAM_FIFO_EVENT(SPILL, popped);
+        sc64_route_spill_linear_ring(queue, popped, pending);
+    }
+    return progress;
+}
+
+static inline int sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
+{
+    if (cap < SC64_ROUTE_IWRAM_FIFO_CAP || tail > SC64_ROUTE_IWRAM_FIFO_CAP - 4)
+        return sc64_route_expand_linear_ewram(dense, tail, stride, cap);
+    unsigned progress = sc64_route_expand_linear_iwram(dense, tail, stride);
+    int popped = (int)(progress & 0xffffu), pending = (int)(progress >> 16);
+    if (!pending) return popped;
+    /* The IWRAM ring has unwound. Continue expanding the same dense field
+     * with the saved frontier in the original EWRAM queue. */
+    int remaining = sc64_route_expand_linear_ewram(dense, pending, stride, cap);
+    return remaining < 0 ? remaining : popped + remaining;
+}
+#else
 /* Keep the oldest-to-newest FIFO order. A batch may append at most four
  * cells per pop; make room between batches instead of wrapping each access.
  * No live route bytes or grid bits have changed if a frontier does not fit. */
@@ -1916,6 +2046,7 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
     }
     return consumed + tail;
 }
+#endif
 
 #ifdef SC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
 static inline int sc64_route_linear_goal_has_seed(int col, int row,
