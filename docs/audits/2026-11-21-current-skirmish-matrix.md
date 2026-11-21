@@ -78,3 +78,45 @@ covers a separate full match.
 
 Private aggregate SHA-256
 `9a6793cd3df2c41f92d37b1abcd25347dbc863eb1ac2da0c611a34098010cbcd`.
+
+The shipped Terran ROM `c32005c7…` from #659 separately passed both
+maps with all 378 named lineups and 18 fresh pause loads. Its launch
+and 120-update fingerprints match the Terran candidate above. Combining
+those Terran runs with the unchanged exact Z10 and P10 runs gives
+1,134 launches and 54 fresh continuations on the three shipped ROMs
+from #659. All 54 re-exported journals match their own input SRAM.
+The exact-release private aggregate SHA-256 is
+`994e4901b1bb8b689f99db93c0df6ae24dfe5f82085100e3df107126d6b07672`.
+
+## Three race ROMs with the optimized Carrier service
+
+The [combined Carrier runtime](2026-11-21-carrier-empty-training-pass.md#shared-cartridge-qualification)
+repeats the full matrix against the exact three #659 ROMs. The tested
+Terran, Z10 and P10 ROMs are `455b9e1c…`, `86324a99…` and `91af2b84…`.
+All 1,134 launch fingerprints and their 120-update world observations
+match #659. Each of the 54 sampled pause journals restores its saved
+state in a fresh guest and yields the same 60-update continuation as
+both uninterrupted play and the matching #659 case. Every immediate
+SRAM re-export matches the journal written by its own ROM. All 36 Z10
+and P10 journals also match the previous release byte for byte. Terran
+writes the new compact Custom Game format.
+
+The private paired matrix SHA-256 is
+`58edfd72acbcd0a762fc4155bbffb558488605305b58989fc95301c26f93d207`.
+
+### Independent Random rows
+
+The same three optimized ROMs also launch every lineup that contains a
+Random row. This adds 1,098 starts across both maps, with 54, 378 and 666
+starts for one, two and three opponents. Each Random row resolves to
+a valid race. Named rows keep their selected race, and Closed rows
+remain empty. Spawn locations and starting units match the resolved
+races through the first 120 game updates. The test observes all three
+possible Random resolutions without testing their statistical distribution.
+
+Another 54 pause saves sample each cartridge, map, human race and
+opponent count with a Random row. All preserve the resolved races,
+seat mask, start positions and saved world after a fresh HOME load.
+The next 60 updates match uninterrupted play. All re-exported SRAM
+files match their inputs byte for byte. The private Random matrix
+SHA-256 is `11158cac20466a56278373858cee7ec6bf8018b5cf73c7d0c67c457e9367c15c`.
