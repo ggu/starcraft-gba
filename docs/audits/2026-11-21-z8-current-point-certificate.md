@@ -460,6 +460,14 @@ that plan with the pinned prepared inputs regenerates the same
 immutable combat facts and the exact transfer ROM
 `ddbf5d1c9e6715a33b1b3d47ac8d576faf667a67f7231799e6a9138059039831`.
 
+After bringing in the shared world-depth release `efa386da`, a
+flags-off Z10 link reproduces that release's ordinary ROM byte for
+byte. Its SHA-256 is
+`ad2709458c154142fb776a096d42a444baffe98455832bc0e647a377633bb80a`.
+It keeps IWRAM at `0x03004d60` and EWRAM BSS at `0x02039b30`. The
+timing comparisons below use the earlier pinned combat-facts release
+and keep the draw code fixed within each comparison.
+
 ### Full Z7 victory on the transfer build
 
 The normal Z10 trial starts Z7 from blank HOME, writes its pause
