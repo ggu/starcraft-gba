@@ -697,6 +697,12 @@ sc64_vfx_projectile_animations(uint16_t image_id,
     }
 }
 
+static inline int
+sc64_weapon_source_has_independent_trails(uint16_t image)
+{
+    return image == 521 || image == 528 || image == 529 || image == 532;
+}
+
 /* `prepared` is nullable; when given it must be the motion prepared for this
  * profile from the trace's launch point to (x1,y1). */
 static inline void
@@ -771,8 +777,9 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
      * pose. Stop the projectile and impact children at their own finite end. */
     if (source_age >= (uint32_t)projectile_visual_end) return;
     const int only_trails = (parts & SC64_TRACE_ONLY_FLIGHT_TRAILS) != 0;
-    if (only_trails && (!flight_anim || source_age < init_ticks ||
-                        source_age - init_ticks >= flight_ticks)) return;
+    const int carry_trails = sc64_weapon_source_has_independent_trails(image->image_id);
+    if (only_trails && (!flight_anim || source_age < init_ticks || !flight_ticks ||
+                        (!carry_trails && source_age - init_ticks >= flight_ticks))) return;
 
     const int only_impact = (parts & SC64_TRACE_ONLY_IMPACT_CHILD) != 0;
     if (only_impact && (!death || source_age < init_ticks + flight_ticks)) return;
@@ -836,11 +843,6 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
         sc64_weapon_source_vfx_draw_overlays(init, source_age, source_age,
             image->image_id, projectile_frame, px, py, key.direction,
             projectile_mirror, 0, 0, launch_x, launch_y, x1, y1, 0);
-    if (flight_anim && source_age >= init_ticks && projectile_age < flight_ticks)
-        sc64_weapon_source_vfx_draw_overlays_motion(flight_anim, projectile_age,
-            projectile_age, image->image_id, projectile_frame, px, py,
-            key.direction, projectile_mirror, 0, p, launch_x, launch_y, x1, y1, 0, &motion,
-            parts & (SC64_TRACE_WITHOUT_FLIGHT_TRAILS | SC64_TRACE_ONLY_FLIGHT_TRAILS), trail);
     if (!only_trails && death && source_age >= init_ticks + (moving ? flight_ticks : 0u)) {
         uint32_t death_age = source_age - init_ticks - (moving ? flight_ticks : 0u);
         sc64_weapon_source_vfx_draw_overlays_motion(death, death_age, death_age,
@@ -848,6 +850,20 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
             projectile_mirror, 0, p, launch_x, launch_y, x1, y1,
             flight_ticks, &motion,
             parts & (SC64_TRACE_WITHOUT_IMPACT_CHILD | SC64_TRACE_ONLY_IMPACT_CHILD), 0);
+    }
+    if (flight_anim && source_age >= init_ticks && flight_ticks &&
+        (projectile_age < flight_ticks ||
+         (carry_trails && !(parts & SC64_TRACE_WITHOUT_FLIGHT_TRAILS)))) {
+        /* Emission stops at impact. Existing sprites keep their fixed birth
+         * anchor and continue on their own animation clock. */
+        uint32_t emission_tick = projectile_age < flight_ticks ?
+            projectile_age : flight_ticks - 1u;
+        unsigned trail_parts = parts & (SC64_TRACE_WITHOUT_FLIGHT_TRAILS | SC64_TRACE_ONLY_FLIGHT_TRAILS);
+        if (projectile_age >= flight_ticks) trail_parts = SC64_TRACE_ONLY_FLIGHT_TRAILS;
+        sc64_weapon_source_vfx_draw_overlays_motion(flight_anim, emission_tick,
+            projectile_age, image->image_id, projectile_frame, px, py,
+            key.direction, projectile_mirror, 0, p, launch_x, launch_y, x1, y1, 0, &motion,
+            trail_parts, trail);
     }
 
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE

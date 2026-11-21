@@ -194,10 +194,9 @@ sc64_depth_projectile_child_part(const Sc64TraceSlot *slot, unsigned layer)
         /* The glaive and spore Death scripts each spawn one image 512
          * sprite with zero offset at the captured impact position. */
         return SC64_TRACE_ONLY_IMPACT_CHILD;
-    case 521: case 528: case 529: case 532:
-        return SC64_TRACE_ONLY_FLIGHT_TRAILS;
     default:
-        return 0;
+        return sc64_weapon_source_has_independent_trails(profile->projectile_image)
+            ? SC64_TRACE_ONLY_FLIGHT_TRAILS : 0;
     }
 }
 

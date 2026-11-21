@@ -113,7 +113,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   to ordinary-input replays. The prepared fixtures cover the opaque
   three-body selection and two low trails ordered around a Bunker by
   birth Y. Capture ordinary detected-burrow firing and the matching
-  native overlap.
+  native overlap. The [missile trail lifetime cases](audits/2026-11-22-detached-missile-trail-lifetime.md#replay-harness)
+  cover existing trails remaining at their birth depth through impact.
+  The native Goliath replay confirms independent image lifetime. Add
+  active-camera native overlap and ordinary-input coverage in each mode.
   The [native retirement follow-up](audits/2026-11-22-shared-depth-parity.md#native-sprite-retirement-follow-up)
   identifies both free-list globals and verifies why the observed
   retired sprite stays free throughout that capture. Capture an
