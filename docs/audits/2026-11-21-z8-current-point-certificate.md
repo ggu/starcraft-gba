@@ -130,3 +130,54 @@ same as the previous seven-flag trial.
 | Revised ARM ELF | `2097ea64eaf3856f54d38bd69e3bac7c793a12a11532998405858cbb0866da58` |
 | Revised link receipt | `0226ec75eaad02e05d6b12303f245fc9f31ab368ae83cee5816cc4f8e51b2a8b` |
 | Three-way comparison | `8858d7f1058de0a48163a8460eddc36aa16f41ba06d37881d755b01c13dffe37` |
+
+## Sparse packing after a cold prefix exhausts its component
+
+At call 33,852, the old trial rejects a local certificate at goal 2,419
+and exhausts a two-cell component. The packed control takes 90,329
+cycles to fill and publish this route. The trial's cold prefix takes
+227,548 cycles because it packs the entire dense grid after finding the
+same two cells. An unmodified input tape and read-only function-entry and
+return traces establish both timings.
+
+`SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE` lets the completed cold
+prefix use the same packing helper as an eager fill. A 128-column field
+with at most 384 discoveries and at least four spare queue slots still
+contains the complete discovery list, so the helper clears the packed
+field and writes only the discovered cells. Resuming a parked frontier
+uses dense packing because its queue starts after earlier visits. HOST
+sanitizers compare all packed directions with canonical BFS at 2, 384 and
+385 discoveries and pass the existing sparse, range and far-read cases.
+
+| Guest cycles | Packed control | Retry trial | Sparse prefix trial |
+| --- | ---: | ---: | ---: |
+| Call 33,852 | 3,170,524 | 3,330,888 | 3,210,153 |
+| Mean across 203 calls | 1,694,983 | 1,569,972 | 1,565,906 |
+| Nearest-rank p95 | 3,235,449 | 3,320,958 | 3,210,153 |
+| Peak | 12,056,654 | 10,909,507 | 10,915,192 |
+
+Seven calls save more than 114,000 cycles versus the retry trial. The
+largest individual increase is 6,797 cycles. All 668 route answers and
+17 world and display cuts match, as do the three modal boundaries and
+all 203 frame and logical route counts. The ARM link keeps IWRAM and
+EWRAM endpoints at `0x03004ea0` and `0x02039f60`. This experiment uses
+the prior seven trial flags, the normal sparse pack flag and the new
+flag, with the wider cold rectangle experiment disabled.
+[Opt-in sparse prefix source](https://github.com/ggu/starcraft-gba/commit/d9de8cf895085333f576338cca56c3fd103c7b19)
+
+At call 26,357, a separate nearby-root read takes 993,135 cycles and
+still returns false. The stored 60-entry frontier for root 9,323 matches
+canonical BFS. Its requested origin 5,608 becomes known after 60 more
+pops, and its path excludes requested goal 8,939. The existing bounded
+second-cutoff machinery can be tested on this reader without changing
+whole-field callers. Keep the trial opt-in until the remaining nearby
+root materializations and wider-profile gates are covered.
+
+| Sparse prefix evidence | SHA-256 |
+| --- | --- |
+| Packed control function timings | `bf059ac9b2a50d925f23ce647093ccfb759c6c59653d55d5795d1188ae01b6e8` |
+| Retry trial function timings | `91a64e48b0c6d3ea24ac00e5cf643c740bc2be0356db1be6c578181f83d5240c` |
+| Candidate ARM ROM | `b137e02cf9f30c1618b060759f18ac67e1479273cf7195d3832a1bcd9337ad8b` |
+| Candidate ARM ELF | `9fe37c9b0e35f4f4eab0d29404160ea1b86138a235c7ba0ef8d6f964682f704b` |
+| Candidate link and vector | `eb3e17f244088cc5d68adb7f55ea2ffbaac043057e184636fd8ee6e118f12155` |
+| Candidate ordinary replay | `597bfcf6aab3f934d9abf84003c7a64f18677f705fe31d263489277e217a845b` |

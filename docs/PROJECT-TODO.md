@@ -64,13 +64,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   state and video. Its early Z7 window rises 1.14% and its Z8 mean
   rises 0.71%. Position reuse alone stays within 0.05% of stock across
   the Z7 and Z8 windows. Lazy weapon checks cut the Z8 increase to 0.18%.
-  Compare immutable combat facts in the scalar policy, then test early,
-  late and skirmish workloads before changing the standard compile vector.
+  [Immutable combat facts](audits/2026-11-21-indexed-target-query.md#immutable-combat-facts)
+  cut the current Z10 late means by 2.76% and 3.13%, with near-neutral
+  early Z7 and Z8 means and matching state. Qualify the exact normal Z10
+  recipe and Custom Game. Check P10 with its V2 actor and sight bank
+  before porting the optimization to its recipe.
   The separate [point-certificate trial](audits/2026-11-21-z8-current-point-certificate.md)
   matches 668 live ARM route answers and improves the sampled Z8 mean
   and peak. The retry removes an 856,694-cycle stall at Z8 call 33,900.
-  The revised p95 is still 2.64% higher than stock. Attribute the remaining
-  spikes to the certificate, frontier and whole-field reader separately.
+  [Sparse cold-prefix packing](audits/2026-11-21-z8-current-point-certificate.md#sparse-packing-after-a-cold-prefix-exhausts-its-component)
+  cuts call 33,852 by 120,735 cycles relative to that trial. The sampled
+  mean and p95 are now below packed stock. Test bounded demand from the
+  nearby-root reader at call 26,357, where finishing a different parked
+  field adds 993,135 cycles before the reader declines. Keep the route
+  flags opt-in during current mixed-profile qualification.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
