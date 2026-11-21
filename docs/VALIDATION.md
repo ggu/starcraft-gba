@@ -13,7 +13,8 @@ The [mineral work layer case](audits/2026-11-21-world-depth-replay-contract.md#m
 covers the independent gathering effect, attached cargo and flyer overlap.
 The [shared depth parity cases](audits/2026-11-22-shared-depth-parity.md#replay-cases)
 cover opaque ground and group selection, fallback Tank parts, native burrow
-transitions and sprite retirement.
+transitions and sprite retirement. The [mixed world-depth overlap cases](audits/2026-11-22-mixed-world-depth-overlap.md#harness-cases)
+add crowd picking, low-elevation trails and cross-kind ties.
 
 ## Protoss P10 candidate (2026-11-01)
 

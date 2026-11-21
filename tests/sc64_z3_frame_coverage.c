@@ -534,7 +534,7 @@ test_actor_depth(void)
                 memset(&u[third], 0, sizeof u[third]);
                 int saved_camx = camx;
                 camx = cx + 1;
-                assert(sc64_foreground_unit_pick(0, 1, 0) == 0);
+                assert(sc64_foreground_pick(0, 1, -1, -1, 0) == 0);
                 camx = saved_camx;
             }
             ++disagree;
@@ -1098,6 +1098,58 @@ pick_capture_body(DepthActor actor, u8 *pixels)
     gfx_end();
 }
 
+static void
+test_mixed_foreground_pick(void)
+{
+    static u8 blank[FB_SIZE], pair[FB_SIZE], flyer[FB_SIZE], actual[FB_SIZE];
+    const DepthActor empty = { -1, 0, 0, 0, 0 };
+    const DepthActor overlord = { U_OVERLORD, 54, 0, 0, 0 };
+    const DepthActor wraith = { U_WRAITH, 48, 0, 0, 0 };
+    const DepthActor hatchery = { B_HATCHERY, 56, 1, 0, 0 };
+
+    setup_depth_profile(R_ZERG);
+    depth_capture(empty, empty, blank);
+    depth_capture(overlord, hatchery, pair);
+    pick_capture_body(wraith, flyer);
+    unsigned pages = 0;
+    for (int pass = 0; pass < 2; ++pass) {
+        memset(u, 0, sizeof u);
+        memset(b, 0, sizeof b);
+        depth_spawn(pass ? wraith : overlord);
+        depth_spawn(pass ? overlord : wraith);
+        depth_spawn(hatchery);
+        unsigned front = pass ? 0u : 1u, low = front ^ 1u;
+        cx = 120; cy = 54;
+        pages |= 1u << gfx_backbuffer_index();
+        depth_capture_world(actual);
+        assert(!memcmp(blank, actual, 12 * FB_WIDTH));
+        assert(!memcmp(blank + 120 * FB_WIDTH, actual + 120 * FB_WIDTH, 40 * FB_WIDTH));
+        int witness = 0;
+        for (int py = 12; py < 120 && !witness; ++py) for (int px = 0; px < 240; ++px) {
+            unsigned at = (unsigned)(py * FB_WIDTH + px);
+            if (!flyer[at] || pair[at] == actual[at] || actual[at] != flyer[at]) continue;
+            cx = px; cy = py - 12;
+            int front_distance = dist2(cx, cy, u[front].x, u[front].y);
+            if (front_distance >= 31 * 31 ||
+                dist2(cx, cy, u[low].x, u[low].y) >= front_distance ||
+                dist2(cx, cy, b[0].x, b[0].y) >= 26 * 26 ||
+                sc64_pick_unit_body(&u[low], sc64_unit_art_raw(&u[low]), 1) <= 0 ||
+                !sc64_pick_sprite_pixel(building_art_sprite(&b[0]), b[0].x, b[0].y, 0))
+                continue;
+            assert(select_at() == (int)front && u[front].selected);
+            clear_selection();
+            u[front].owner = ENEMY;
+            assert(select_at() == (int)low && u[low].selected);
+            clear_selection();
+            witness = 1;
+            break;
+        }
+        assert(witness);
+    }
+    assert(pages == 3);
+    puts("mixed depth picker: Wraith foreground over Overlord and Hatchery on both pages");
+}
+
 static int
 test_foreground_pick(void)
 {
@@ -1162,7 +1214,7 @@ test_foreground_pick(void)
                 for (unsigned i = 0; i < sizeof(offsets) / sizeof(offsets[0]); ++i) {
                     camx = offsets[i][0];
                     camy = offsets[i][1];
-                    assert(sc64_foreground_pick(0, 0, proximity) == proximity);
+                    assert(sc64_foreground_pick(0, 0, 0, 0, proximity) == proximity);
                 }
                 camx = camy = 0;
                 SC64_GRID_CLEAR(visible);
@@ -1266,6 +1318,7 @@ main(void)
     failures += test_cross_layer_flyer_selection();
     test_multiple_unit_depth_pick();
     failures += test_foreground_pick();
+    test_mixed_foreground_pick();
     test_foreground_pick_context();
 #endif
 #endif

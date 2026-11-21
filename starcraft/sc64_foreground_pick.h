@@ -82,66 +82,65 @@ sc64_pick_unit_body(const Unit *q, int raw, int flying)
                   : -1;
 }
 
-/* Start with the nearest eligible body. Only a higher, opaque body can
- * replace it. The range comes from the proximity scan and costs no stack. */
-static int __attribute__((noinline))
-sc64_foreground_unit_pick(int first, int last, int proximity)
+static int
+sc64_pick_building_body(const Building *site)
 {
-    int sx = cx - camx, sy = cy - camy + 12;
-    if ((unsigned)sx >= 240 || sy < 12 || sy >= 120 ||
-        !currently_visible(cx, cy)) return proximity;
-    const Unit *nearest = &u[proximity];
-    if (!currently_visible(nearest->x, nearest->y) ||
-        sc64_pick_unit_body(nearest, sc64_unit_art_raw(nearest),
-                            sc64_race_unit_flying(nearest->type)) <= 0) return proximity;
-    int foreground = proximity;
-    u32 front_key = sc64_depth_key(sc64_unit_world_layer(nearest), nearest->y,
-                                  DEPTH_UNIT, (unsigned)proximity);
-    u32 unknown_key = 0;
-    for (int i = first; i <= last; ++i) {
-        const Unit *q = &u[i];
-        if (i == proximity || !selection_unit_candidate(i) ||
-            dist2(cx, cy, q->x, q->y) >= 31 * 31) continue;
-        u32 key = sc64_depth_key(sc64_unit_world_layer(q), q->y, DEPTH_UNIT, (unsigned)i);
-        if (key <= front_key || !currently_visible(q->x, q->y)) continue;
-        int mask = sc64_pick_unit_body(q, sc64_unit_art_raw(q),
-                                       sc64_race_unit_flying(q->type));
-        if (mask > 0) {
-            foreground = i;
-            front_key = key;
-        } else if (mask < 0 && key > unknown_key) {
-            unknown_key = key;
-        }
-    }
-    return unknown_key > front_key ? proximity : foreground;
+    if (!building_art_in_view(site, site->x - camx, site->y - camy + 12)) return 0;
+    int raw = site->raw_type >= 0 ? site->raw_type : sc64_race_raw_building(site->type);
+    if (raw < 106 || raw > 175 || !building_art_is_static(site)) return -1;
+    const Sc64SpriteFrame *sprite = building_art_sprite(site);
+    return sprite ? sc64_pick_sprite_pixel(sprite, site->x, site->y, 0) : -1;
 }
 
-static int __attribute__((noinline))
-sc64_foreground_pick(int unit, int building, int proximity)
+static int
+sc64_pick_actor_body(int ref)
 {
-    const Unit *q = &u[unit];
-    const Building *site = &b[building];
-    int sx = cx - camx, sy = cy - camy + 12;
-    if ((unsigned)sx >= 240 || sy < 12 || sy >= 120) return proximity;
-    int unit_raw = sc64_unit_art_raw(q);
-    int building_raw = site->raw_type >= 0 ? site->raw_type : sc64_race_raw_building(site->type);
-    int flying = sc64_race_unit_flying(q->type);
-    u32 unit_depth = sc64_depth_key(sc64_unit_world_layer(q),
-                                         q->y, DEPTH_UNIT, (unsigned)unit);
-    u32 building_depth = sc64_depth_key(sc64_building_world_layer((unsigned)building),
-                                             site->y, DEPTH_BUILDING, (unsigned)building);
-    /* Upper air layers set bit 31. The source picker and the GBA painter
-     * compare unsigned keys. Equal layer/Y uses the painter's kind/slot tie. */
-    int foreground = unit_depth > building_depth ? unit : MAX_UNITS + building;
-    if (foreground == proximity) return proximity;
+    if (ref < MAX_UNITS) {
+        const Unit *q = &u[ref];
+        if (!currently_visible(q->x, q->y)) return 0;
+        return sc64_pick_unit_body(q, sc64_unit_art_raw(q), sc64_race_unit_flying(q->type));
+    }
+    const Building *site = &b[ref - MAX_UNITS];
+    return currently_visible(site->x, site->y) ? sc64_pick_building_body(site) : 0;
+}
 
-    /* Only override where both supported bodies and the click are visible.
-     * Doodads and dynamic art without a primary mask keep proximity. */
-    if (!currently_visible(cx, cy) || !currently_visible(q->x, q->y) ||
-        !currently_visible(site->x, site->y) ||
-        building_raw < 106 || building_raw > 175 || !building_art_is_static(site) ||
-        !building_art_in_view(site, site->x - camx, site->y - camy + 12) ||
-        !sc64_pick_sprite_pixel(building_art_sprite(site), site->x, site->y, 0) ||
-        sc64_pick_unit_body(q, unit_raw, flying) <= 0) return proximity;
-    return foreground;
+static void
+sc64_consider_foreground(int ref, u32 key, int *foreground, u32 *front_key, u32 *unknown_key)
+{
+    if (key <= *front_key) return;
+    int mask = sc64_pick_actor_body(ref);
+    if (mask > 0) {
+        *foreground = ref;
+        *front_key = key;
+    } else if (mask < 0 && key > *unknown_key) {
+        *unknown_key = key;
+    }
+}
+
+/* Compare visible opaque candidates together, using the painter's unsigned
+ * key for both kinds. Keep proximity when the initial hit or a potentially
+ * occluding foreground pose cannot be verified. */
+static int __attribute__((noinline))
+sc64_foreground_pick(int first_unit, int last_unit,
+                     int first_building, int last_building, int proximity)
+{
+    int sx = cx - camx, sy = cy - camy + 12;
+    if ((unsigned)sx >= 240 || sy < 12 || sy >= 120 || !currently_visible(cx, cy) ||
+        sc64_pick_actor_body(proximity) <= 0) return proximity;
+
+    int foreground = proximity;
+    u32 front_key = proximity < MAX_UNITS ? sc64_unit_depth_key((unsigned)proximity)
+        : sc64_building_depth_key((unsigned)(proximity - MAX_UNITS));
+    u32 unknown_key = 0;
+    for (int i = first_unit; i >= 0 && i <= last_unit; ++i) {
+        if (!selection_unit_candidate(i) || dist2(cx, cy, u[i].x, u[i].y) >= 31 * 31) continue;
+        sc64_consider_foreground(i, sc64_unit_depth_key((unsigned)i),
+                                 &foreground, &front_key, &unknown_key);
+    }
+    for (int i = first_building; i >= 0 && i <= last_building; ++i) {
+        if (!selection_building_candidate(i) || dist2(cx, cy, b[i].x, b[i].y) >= 26 * 26) continue;
+        sc64_consider_foreground(MAX_UNITS + i, sc64_building_depth_key((unsigned)i),
+                                 &foreground, &front_key, &unknown_key);
+    }
+    return unknown_key > front_key ? proximity : foreground;
 }

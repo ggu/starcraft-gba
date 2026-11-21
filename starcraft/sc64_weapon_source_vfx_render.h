@@ -508,6 +508,25 @@ sc64_weapon_source_vfx_sprite_birth_offset(const Sc64WeaponSourceOverlay *overla
     return 1;
 }
 
+/* The low bits preserve the u16 event index and an eight-birth window
+ * within a clamped world Y. The first two keys allow a painter to draw
+ * one child and queue its successor with a single overlay walk. */
+enum { SC64_WEAPON_TRAIL_Y_SHIFT = 19 };
+typedef struct {
+    uint32_t after, key, following;
+    const Sc64WeaponSourceImage *image;
+    const Sc64WeaponSourceFrame *frame;
+    uint16_t image_id;
+    int x, y, mirror;
+} Sc64WeaponTrailPick;
+
+static inline void
+sc64_weapon_source_vfx_paint_trail(const Sc64WeaponTrailPick *trail)
+{
+    sc64_weapon_source_vfx_draw_image_frame_resolved(
+        trail->image_id, trail->image, trail->frame, trail->mirror, trail->x, trail->y);
+}
+
 /* Draw attached image overlays and independently spawned sprite trails from
  * the generated event stream. A looping SPROL stream keeps at most eight live
  * occurrences; each sprite is placed at its authored birth position. */
@@ -525,7 +544,7 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
                                      int x0, int y0, int x1, int y1,
                                      uint32_t stage_start,
                                      const Sc64WeaponSourceMotion *prepared,
-                                     unsigned parts)
+                                     unsigned parts, Sc64WeaponTrailPick *trail)
 {
     if (!anim || anim->overlay_first > SC64_WEAPON_SOURCE_OVERLAY_COUNT ||
         anim->overlay_count > SC64_WEAPON_SOURCE_OVERLAY_COUNT - anim->overlay_first)
@@ -616,9 +635,23 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
             const Sc64WeaponSourceFrame *child_frame =
                 sc64_weapon_source_vfx_frame_resolved(child_image, child_frame_id);
             if (!child_frame) continue;
-            sc64_weapon_source_vfx_draw_image_frame_resolved(
-                overlay->image_id, child_image, child_frame, child_mirror,
-                draw_x + child_dx / 2, draw_y + child_dy / 2);
+            draw_x += child_dx / 2;
+            draw_y += child_dy / 2;
+            if (trail) {
+                unsigned row = draw_y < 0 ? 0u : draw_y > 8191 ? 8191u : (unsigned)draw_y;
+                uint32_t key = (row << SC64_WEAPON_TRAIL_Y_SHIFT) |
+                    ((uint32_t)i << 3) | (iteration - first_iteration);
+                if (trail->after != UINT32_MAX && key <= trail->after) continue;
+                if (key < trail->key) {
+                    *trail = (Sc64WeaponTrailPick){trail->after, key, trail->key,
+                        child_image, child_frame, overlay->image_id, draw_x, draw_y, child_mirror};
+                } else if (key < trail->following) {
+                    trail->following = key;
+                }
+            } else {
+                sc64_weapon_source_vfx_draw_image_frame_resolved(
+                    overlay->image_id, child_image, child_frame, child_mirror, draw_x, draw_y);
+            }
         }
     }
 }
@@ -636,7 +669,7 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
 {
     sc64_weapon_source_vfx_draw_overlays_motion(anim, timeline_tick, child_clock,
         parent_image, parent_frame, world_x, world_y, direction, parent_mirror,
-        relative_to_release, motion, x0, y0, x1, y1, stage_start, 0, 0);
+        relative_to_release, motion, x0, y0, x1, y1, stage_start, 0, 0, 0);
 }
 
 /* Draw the projectile stream from its generated Init/attack/Death image
@@ -672,7 +705,7 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age,
                                      const Sc64WeaponSourceMotion *prepared, unsigned parts,
-                                     int actor_x, int actor_y)
+                                     int actor_x, int actor_y, Sc64WeaponTrailPick *trail)
 {
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     u32 section_start=gba_clock();
@@ -711,7 +744,7 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
             (void)actor_mirror;
             sc64_weapon_source_vfx_draw_overlays_motion(actor_anim,
                 attack_age, attack_age, p->attack_image, actor_frame, actor_x, actor_y,
-                key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0, 0, parts);
+                key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0, 0, parts, 0);
         }
     }
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
@@ -807,14 +840,14 @@ sc64_weapon_source_vfx_draw_trace_parts(Sc64WeaponSourceVfxKey key,
         sc64_weapon_source_vfx_draw_overlays_motion(flight_anim, projectile_age,
             projectile_age, image->image_id, projectile_frame, px, py,
             key.direction, projectile_mirror, 0, p, launch_x, launch_y, x1, y1, 0, &motion,
-            parts & (SC64_TRACE_WITHOUT_FLIGHT_TRAILS | SC64_TRACE_ONLY_FLIGHT_TRAILS));
+            parts & (SC64_TRACE_WITHOUT_FLIGHT_TRAILS | SC64_TRACE_ONLY_FLIGHT_TRAILS), trail);
     if (!only_trails && death && source_age >= init_ticks + (moving ? flight_ticks : 0u)) {
         uint32_t death_age = source_age - init_ticks - (moving ? flight_ticks : 0u);
         sc64_weapon_source_vfx_draw_overlays_motion(death, death_age, death_age,
             image->image_id, projectile_frame, px, py, key.direction,
             projectile_mirror, 0, p, launch_x, launch_y, x1, y1,
             flight_ticks, &motion,
-            parts & (SC64_TRACE_WITHOUT_IMPACT_CHILD | SC64_TRACE_ONLY_IMPACT_CHILD));
+            parts & (SC64_TRACE_WITHOUT_IMPACT_CHILD | SC64_TRACE_ONLY_IMPACT_CHILD), 0);
     }
 
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
@@ -829,7 +862,7 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                                      uint32_t gba_age)
 {
     sc64_weapon_source_vfx_draw_trace_parts(key, p, x0, y0, x1, y1, live,
-                                            gba_age, 0, SC64_TRACE_ALL, x0, y0);
+                                            gba_age, 0, SC64_TRACE_ALL, x0, y0, 0);
 }
 
 static inline void

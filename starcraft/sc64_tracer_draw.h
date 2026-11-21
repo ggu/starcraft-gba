@@ -16,7 +16,11 @@
 
 
 static void __attribute__((noinline))
-draw_tracer(int i, unsigned parts)
+draw_tracer_parts(int i, unsigned parts
+#ifdef SC64_WEAPON_SOURCE_VFX
+                  , Sc64WeaponTrailPick *trail
+#endif
+                  )
 {
 #ifndef SC64_WEAPON_SOURCE_VFX
     (void)parts;
@@ -110,7 +114,7 @@ draw_tracer(int i, unsigned parts)
         int age=sc64_tracer_duration(i)-tracers[i].life;
         sc64_weapon_source_vfx_draw_trace_parts(key,profile,
             tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
-            tracers[i].life,(unsigned)(age<0?0:age),prepared,parts,actor_x,actor_y);
+            tracers[i].life,(unsigned)(age<0?0:age),prepared,parts,actor_x,actor_y,trail);
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
         diag_raster+=gba_clock()-dt;
 #endif
@@ -143,6 +147,16 @@ draw_tracer(int i, unsigned parts)
     sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
         tracers[i].x0-camx,tracers[i].y0-camy+12,
         tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
+}
+
+static inline void
+draw_tracer(int i, unsigned parts)
+{
+    draw_tracer_parts(i, parts
+#ifdef SC64_WEAPON_SOURCE_VFX
+                      , 0
+#endif
+                      );
 }
 
 #ifdef SC64_PROJECTILE_DEPTH

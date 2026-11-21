@@ -138,6 +138,18 @@ sc64_depth_key(unsigned layer, int y, unsigned kind, unsigned slot)
            (kind << DEPTH_SLOT_BITS) | slot;
 }
 
+static inline u32
+sc64_unit_depth_key(unsigned slot)
+{
+    return sc64_depth_key(sc64_unit_world_layer(&u[slot]), u[slot].y, DEPTH_UNIT, slot);
+}
+
+static inline u32
+sc64_building_depth_key(unsigned slot)
+{
+    return sc64_depth_key(sc64_building_world_layer(slot), b[slot].y, DEPTH_BUILDING, slot);
+}
+
 #ifdef SC64_FOREGROUND_PICK_ENABLED
 #include "sc64_foreground_pick.h"
 #endif
@@ -183,12 +195,30 @@ sc64_depth_projectile_child_part(const Sc64TraceSlot *slot, unsigned layer)
          * sprite with zero offset at the captured impact position. */
         return SC64_TRACE_ONLY_IMPACT_CHILD;
     case 521: case 528: case 529: case 532:
-        /* A flight group uses several anchors. Group only when the
-         * child elevation is above the ground Y range. */
-        return layer >= 4 ? SC64_TRACE_ONLY_FLIGHT_TRAILS : 0;
+        return SC64_TRACE_ONLY_FLIGHT_TRAILS;
     default:
         return 0;
     }
+}
+
+/* One ground-layer child at a time takes the heap capacity vacated
+ * by its parent.  Reinsert the next birth after each child draws. */
+static void __attribute__((noinline))
+sc64_depth_ground_trail(u32 *heap, unsigned *size, unsigned trace, unsigned layer,
+                       u32 *after, int paint)
+{
+    Sc64WeaponTrailPick trail = {.after = *after, .key = UINT32_MAX, .following = UINT32_MAX};
+    const unsigned parts = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS;
+    draw_tracer_parts((int)trace, parts, &trail);
+    u32 next = trail.key;
+    if (paint && next != UINT32_MAX) {
+        sc64_weapon_source_vfx_paint_trail(&trail);
+        *after = next;
+        next = trail.following;
+    }
+    if (next != UINT32_MAX)
+        sc64_depth_push(heap, size, layer, (int)(next >> SC64_WEAPON_TRAIL_Y_SHIFT),
+                        DEPTH_PROJECTILE, DEPTH_PROJECTILE_CHILD_BASE + trace);
 }
 
 static int
@@ -498,7 +528,7 @@ sc64_draw_depth_ordered_actors(void)
         int x = b[i].x - camx, y = b[i].y - camy + 12;
         if (x < -128 || x > 368 || y < -128 || y > 248) continue;
         if (b[i].owner != SIDE && !currently_visible(b[i].x, b[i].y)) continue;
-        sc64_depth_push(heap, &size, sc64_building_world_layer(i), b[i].y, DEPTH_BUILDING, i);
+        sc64_depth_push_key(heap, &size, sc64_building_depth_key(i));
     }
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
@@ -509,12 +539,13 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         if (q->type == U_P7_INTERCEPTOR && SC64_CARRIER_STATE_HIDDEN(q)) continue;
 #endif
-        sc64_depth_push(heap, &size, sc64_unit_world_layer(q), q->y, DEPTH_UNIT, i);
+        sc64_depth_push_key(heap, &size, sc64_unit_depth_key(i));
     }
 #ifdef SC64_PROJECTILE_DEPTH
     /* Traces sharing a shooter paint in slot order within its existing
      * draw turn. Use the actor key directly for both image and body. */
     u8 image_heads[MAX_UNITS + MAX_BUILDINGS], image_next[MAX_TRACERS];
+    u32 ground_trail_after[MAX_TRACERS];
     int have_images = 0;
     for (unsigned remaining = MAX_TRACERS; remaining; --remaining) {
         unsigned i = remaining - 1;
@@ -672,7 +703,10 @@ sc64_draw_depth_ordered_actors(void)
                 unsigned trace = i - DEPTH_PROJECTILE_CHILD_BASE;
                 unsigned layer = (key >> DEPTH_LAYER_BITS) - 1;
                 unsigned child = sc64_depth_projectile_child_part(&sc64_trace_slots[trace], layer);
-                draw_tracer((int)trace, SC64_TRACE_PROJECTILE | child);
+                if (child == SC64_TRACE_ONLY_FLIGHT_TRAILS && layer < 4)
+                    sc64_depth_ground_trail(heap, &size, trace, layer + 1, &ground_trail_after[trace], 1);
+                else
+                    draw_tracer((int)trace, SC64_TRACE_PROJECTILE | child);
             } else if (i >= DEPTH_ATTACK_SPRITE_BASE) {
                 Sc64AttackSpriteDraw draw;
                 if (sc64_attack_sprite_draw_state(i - DEPTH_ATTACK_SPRITE_BASE, &draw))
@@ -688,11 +722,15 @@ sc64_draw_depth_ordered_actors(void)
                 unsigned child = sc64_depth_projectile_child_part(&sc64_trace_slots[i], layer);
                 if (child == SC64_TRACE_ONLY_FLIGHT_TRAILS ||
                     (child == SC64_TRACE_ONLY_IMPACT_CHILD && sc64_depth_projectile_impact_born(i))) {
-                    /* Both child groups sort after the parent. Their source
-                     * projectiles are disjoint, so they share the capacity
-                     * and payload vacated by their parent. */
-                    sc64_depth_push(heap, &size, layer + 1, tracers[i].y1,
-                                    DEPTH_PROJECTILE, DEPTH_PROJECTILE_CHILD_BASE + i);
+                    if (child == SC64_TRACE_ONLY_FLIGHT_TRAILS && layer < 4) {
+                        ground_trail_after[i] = UINT32_MAX;
+                        sc64_depth_ground_trail(heap, &size, i, layer + 1, &ground_trail_after[i], 0);
+                    } else {
+                        /* High layers ignore Y. A stationary impact child
+                         * has one anchor at the end of the shot. */
+                        sc64_depth_push(heap, &size, layer + 1, tracers[i].y1,
+                                        DEPTH_PROJECTILE, DEPTH_PROJECTILE_CHILD_BASE + i);
+                    }
                     parts |= child == SC64_TRACE_ONLY_IMPACT_CHILD
                         ? SC64_TRACE_WITHOUT_IMPACT_CHILD : SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
                 }
