@@ -107,8 +107,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   to the harness. Record ground-pair and grouped-flyer picks, fallback Tank
   muzzle and impact, and the native Lurker's same-sprite burrow transition.
   Add the [mixed overlap cases](audits/2026-11-22-mixed-world-depth-overlap.md#harness-cases)
-  to ordinary-input replays. Include an opaque three-body selection and
-  low-elevation detached trails at their birth Y.
+  to ordinary-input replays. The prepared fixtures cover the opaque
+  three-body selection and two low trails ordered around a Bunker by
+  birth Y. Capture ordinary detected-burrow firing and the matching
+  native overlap.
   The [native retirement follow-up](audits/2026-11-22-shared-depth-parity.md#native-sprite-retirement-follow-up)
   identifies both free-list globals and verifies why the observed
   retired sprite stays free throughout that capture. Capture an

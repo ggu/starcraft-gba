@@ -380,6 +380,129 @@ static void test_stationary_projectile_depth(int tank_fallback)
 }
 
 #ifdef SC64_P4_STORM_ENABLED
+static void test_low_trail_depth(void)
+{
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES], reversed[BATTLEFIELD_BYTES], actual[BATTLEFIELD_BYTES];
+    reset_world(); memset(m, 0, sizeof(m)); geyser_count = 0;
+    int target = make_unit(ENEMY, U_DRONE, 41, 208, 54);
+    u[target].flags |= 2u;
+    assert(sc64_unit_world_layer(&u[target]) == 1);
+    assert(sc64_source_emit(2, -1, 4, 0, 32, 54, 208, 54, target));
+    while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    assert(sc64_trace_slots[0].bullet_layer == 2);
+    u[target].alive = 0;
+    int bunker = spawn_build(SIDE, B_BUNKER, 100, 45, 0);
+    assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+    unsigned differences = 0;
+    while (tracers[0].life > 1 && !differences) {
+        for (int x = 48; x <= 192 && !differences; x += 4) {
+            b[bunker].x = x;
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS);
+            draw_building_art(&b[bunker]);
+            draw_tracer(0, SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS);
+            capture_depth_frame(expected);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            draw_building_art(&b[bunker]);
+            capture_depth_frame(reversed);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) differences += expected[i] != reversed[i];
+        }
+        if (!differences) update_tracers();
+    }
+    assert(differences);
+    unsigned bad = 0, pages = 0;
+    for (unsigned page = 0; page < 2; ++page) {
+        begin_depth_frame(); pages |= 1u << gfx_backbuffer_index();
+        sc64_draw_depth_ordered_actors(); draw_tracers_pass(1); capture_depth_frame(actual);
+        unsigned mismatch = 0;
+        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) mismatch += actual[i] != expected[i];
+        fprintf(stderr, "low trail page %u: %u expected/reversed, %u actual/expected pixels\n", page, differences, mismatch);
+        bad += mismatch;
+        if (!page) gfx_end();
+    }
+    assert(pages == 3 && !bad);
+}
+
+static void test_low_trails_interleave_with_world_y(void)
+{
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES], comparison[BATTLEFIELD_BYTES];
+    const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+    const unsigned child = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS;
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    /* Put the southern shot in the first tracer slot so a slot-based sort
+     * would place its visible trail behind the northern one. */
+    for (int i = 0; i < 2; ++i) {
+        int y = i ? 49 : 58;
+        int target = make_unit(ENEMY, U_DRONE, 41, 208, y);
+        u[target].flags |= 2u;
+        assert(sc64_source_emit(2, -1, 4, 0, 32, y, 208, y, target));
+        u[target].alive = 0;
+    }
+    while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    assert(sc64_trace_slots[0].bullet_layer == 2 && sc64_trace_slots[1].bullet_layer == 2);
+    int bunker = spawn_build(SIDE, B_BUNKER, 42, 54, 0);
+    assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+
+    for (; tracers[0].life > 1; update_tracers()) {
+        Sc64WeaponTrailPick north = {.after = UINT32_MAX, .key = UINT32_MAX, .following = UINT32_MAX};
+        Sc64WeaponTrailPick south = north;
+        draw_tracer_parts(1, child, &north);
+        draw_tracer_parts(0, child, &south);
+        if (north.key == UINT32_MAX || south.key == UINT32_MAX) continue;
+        assert(north.y < b[bunker].y && b[bunker].y < south.y);
+        for (int x = north.x - 16; x <= south.x + 16; x += 2) {
+            b[bunker].x = x;
+            begin_depth_frame();
+            draw_tracer(1, parent);
+            draw_tracer(0, parent);
+            sc64_weapon_source_vfx_paint_trail(&north);
+            draw_building_art(&b[bunker]);
+            sc64_weapon_source_vfx_paint_trail(&south);
+            capture_depth_frame(expected);
+
+            begin_depth_frame();
+            draw_tracer(1, parent);
+            draw_tracer(0, parent);
+            draw_building_art(&b[bunker]);
+            sc64_weapon_source_vfx_paint_trail(&north);
+            sc64_weapon_source_vfx_paint_trail(&south);
+            capture_depth_frame(comparison);
+            unsigned early_overlap = 0;
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) early_overlap += expected[i] != comparison[i];
+
+            begin_depth_frame();
+            draw_tracer(1, parent);
+            draw_tracer(0, parent);
+            sc64_weapon_source_vfx_paint_trail(&north);
+            sc64_weapon_source_vfx_paint_trail(&south);
+            draw_building_art(&b[bunker]);
+            capture_depth_frame(comparison);
+            unsigned late_overlap = 0;
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) late_overlap += expected[i] != comparison[i];
+
+            if (!early_overlap || !late_overlap) continue;
+            unsigned pages = 0;
+            for (unsigned page = 0; page < 2; ++page) {
+                begin_depth_frame();
+                pages |= 1u << gfx_backbuffer_index();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                capture_depth_frame(comparison);
+                assert(!memcmp(expected, comparison, BATTLEFIELD_BYTES));
+                if (!page) gfx_end();
+            }
+            assert(pages == 3);
+            printf("PASS low trail birth rows %d and %d around bunker row %d: %u and %u differing pixels on both pages\n",
+                   north.y, south.y, b[bunker].y, early_overlap, late_overlap);
+            return;
+        }
+    }
+    assert(!"no distinct visible birth-row overlap");
+}
+
 static void test_flight_trail_depth(void)
 {
     static _Alignas(4) u8 trail[BATTLEFIELD_BYTES];
@@ -1097,6 +1220,8 @@ int main(void)
     test_detached_impact_depth();
 #endif
 #ifdef SC64_P4_STORM_ENABLED
+    test_low_trail_depth();
+    test_low_trails_interleave_with_world_y();
     test_flight_trail_depth();
 #endif
     test_attached_attacker_depth();
