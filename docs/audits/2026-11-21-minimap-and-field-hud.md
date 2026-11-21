@@ -44,6 +44,16 @@ at frames 61 and 121. The 54 Custom Game save and resume cases produce
 tail reaches victory at frame 46,057 with all 68 world and display
 cuts and the exported SRAM matching the control.
 
+Z7 starts from HOME, pauses at frame 5,641, resumes in a fresh
+process and wins at frame 228,128. The 254 world cuts, ten paired
+display cuts and six route-cache samples agree with the release.
+The pause, victory and fresh result re-export journals match byte
+for byte. Mean cycles fall 1.48% in the early dense window and
+1.12–1.13% in the two late windows. One late-window peak rises
+0.13%. In Terran Outpost, all 90 world and display cuts agree on
+ordinary inputs. Mean cycles fall 0.80% in its 800-update busy
+window and 0.58% over the complete 17,636-call tape.
+
 The HUD cache and current worker gather sanitizer fixtures pass with
 all four prepared profile flags. A separate Z10 hint check covers
 visible minerals, a friendly refinery, a double tap and a transported
@@ -66,8 +76,17 @@ updates 17,144 and 17,166 share the apparent base camera. In the
 80×46-pixel minimap interior sample, 103 RGB pixels differ and 93 of
 those differences involve a strongly red pixel in at least one cut.
 All 218 near-black pixels in that sample agree. The captures come
-from separate restores. Callback timing, marker ownership, fog flags
-and the native cursor-driven viewport case remain open.
+from separate restores. Callback timing, marker ownership, and
+fog flags remain open.
+
+A separate ordinary native replay starts both cases at update 1,365.
+The neutral run keeps the Command Center and minerals on screen.
+Sustained right input moves the cursor and scrolls to a dark field.
+The minimap viewport rectangle goes from the left side to the right.
+The neutral and right-input screenshots follow wall-time-matched
+runs ending at updates 1,552 and 1,595, respectively. Their saved
+states were reopened for capture. Use a frame-matched replay with
+synchronized camera and fog state for exact minimap pixel assertions.
 
 For the next harness cuts, capture each indexed page at visibility
 enter and leave, marker motion and deletion, camera scroll, pause
@@ -100,8 +119,12 @@ iterator and prioritize larger repeated work in orders and drawing.
 | Combined 3,600-update comparison | `6968a1e12a3df5554476b6754be82d8eac7b898aeb1555fa15ba82dc09bd351b` |
 | 54 Custom Game fresh continuations | `fa57ff674179846234b0086ee53909f990ee0c23a26ae39cb9dfe7ed3ff266df` |
 | P10 tail through victory | `4eb2dc78de551b05787202c922dcd6f2cd2712f02b8accfa91156d96be46e9a8` |
+| Z7 complete pause, victory and result readback | `2c5ce98869ad2f8c76c27e461fba6a0b23ed2e782b20264017604a0c6af7c0c9` |
+| Terran three-CPU Outpost | `bee9471ccd5c8b5bd8485b521ff5606e00783d733adb899714067684337b8121` |
 | P10 and Showcase stack canaries | `35c6711d01a6ec8c5f7137c3f158d6063cf0165e562f3bca30e17d2f79632ec2` |
 | Native minimap crop comparison | `5d99bb93f8eec6dfafbce55215b70460038c7c661fd2b807f9f4de6ba6ce27ef` |
+| Native neutral viewport capture | `19d555e11066cb1c7a121353c239f7621d830db1f4dcf109f0a1a9f75a14b142` |
+| Native right-input viewport capture | `34c1fd207f4e4defd422914075dc8f8c4e53907fb201195552e3e15a1a177b7c` |
 | Facility packed mask comparison | `a64b38230e83a936356d527001d353d4236516be1d85fa603d7778de32821f04` |
 | Facility deferred write comparison | `75c8fcfd58d451240542e8c8cd72435917c0041661f61dfa86374803532ad592` |
 | Non-looping overlay comparison | `97f84876c7b631bcc5ced2ab60a61d79ef66463986abe5f4a8d5b5e743c38cf5` |
