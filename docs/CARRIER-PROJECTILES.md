@@ -8,6 +8,10 @@ actors in P7 through P10 and Custom Game. Terran and Z10 enable these services
 in Custom Game with compact journals. The generation descriptions below
 record the earlier experiments and their respective build settings.
 
+The [shared frame roster](audits/2026-11-21-carrier-frame-roster.md)
+reduces repeated Carrier scans during three-AI Custom Games and in
+the Protoss finale. The audit records the replay and SRAM checks.
+
 | Parent | Where | What works |
 | --- | --- | --- |
 | Carrier (raw 72) | Terran, Z10 and Protoss Custom Game, Protoss P7 to P10 | Paid Interceptor orders, release every 7 source ticks, attack passes, return and dock, rebuild, death of the parent or the target, saves. |
