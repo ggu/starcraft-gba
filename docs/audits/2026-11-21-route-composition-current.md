@@ -90,11 +90,22 @@ palette and route cache metadata. Three modal boundaries and all
 | Peak update cycles | 12,062,422 | 10,179,654 |
 
 The mean falls 8.42% and the peak falls 15.61%. The mean still
-exceeds the 30 fps budget by about 2.8 times. The current-renderer
-early dense Z7 mean falls 12.88%, from 2,193,883 to 1,911,338 cycles
-over 477 updates. The timed route counters, three framebuffer
-cuts and frame-5,641 pause journal match. The replay through
+exceeds the 30 fps budget by about 2.8 times.
+
+The current-renderer Z7 pair matches the frame-5,641 pause journal,
+all 228 world cuts, nine indexed display cuts including the active page,
+and all timed route counters through call 155,650. An independent breadth-first
+field check validates 4,201 published directions on six partial fields.
+All 75 complete fields match at the six cache cuts. The replay through
 victory and physical GBA timing remain open.
+
+| Current Z7 window | Advancing updates | Release mean / p95 / peak cycles | Composed mean / p95 / peak cycles |
+| --- | ---: | ---: | ---: |
+| Early dense | 477 | 2,193,883 / 3,179,446 / 5,109,060 | 1,911,338 / 2,580,850 / 4,479,095 |
+| Late peak | 926 | 2,449,994 / 3,734,509 / 5,812,547 | 2,355,802 / 3,331,715 / 5,243,801 |
+| Late following | 905 | 2,381,799 / 3,619,987 / 5,365,789 | 2,281,009 / 3,190,682 / 4,497,029 |
+
+The mean falls 12.88%, 3.84% and 4.23% across these windows.
 
 In a resumed three-CPU Blood Bath, 3,600 route counter pairs, 31
 world and projectile samples and the saved journal match. All 16
@@ -124,6 +135,7 @@ difference for Blood Bath.
 | T10 victory and journal readback | `3095bb1de7509ce1cefa971499aeb2377f4c2f4a3e44dc25453f83a45c41e67e` |
 | P10 paired campaign tail | `6d14a579c7851da22dcdd118ccfe1c0a2a319b7b1fe02f50688709d760d092d8` |
 | Z8 comparison | `c081897aa190d53986f4be6ddc22793bb5fa56c8c787db765780122a6e9e0b83` |
+| Current Z7 comparison through call 155,650 | `3c807c9fc00361373aab4e80ec92dba152bf125c07b389af55edd01207ffd0be` |
 | Late Blood Bath comparison and active-page difference | `4f2347a4854f2c9677ac57a2f31b797396caa00a94aaa8de6fc4403cbad192e2` |
 | Blood Bath release VBlank observer | `f03446fc3d633230adf2d9718e2a2c376edcd30e3a76b66b05c0cc67e001cbe2` |
 | Blood Bath composed VBlank observer | `d16d75682f814538a75ef8cb90234a4229cca90b8f4b40b2bad97fa8e9591270` |
