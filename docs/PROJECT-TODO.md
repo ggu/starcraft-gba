@@ -38,6 +38,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preserves the product-specific building art. The same audit pins
   the nearby route call that shifts roughly 900,000 cycles to a
   later update in the gap-19 trial.
+  The [shared persistent collision buckets](audits/2026-11-22-shared-persistent-collision.md)
+  lower the busy Blood Bath mean by 0.90% and the Protoss 10 late
+  replay cost by 0.78%. Terran Outpost improves 0.48% in mean and
+  increases 0.86% at p95 in its busy window. Replay checks match
+  collision-sensitive movement and placement, world state and both
+  framebuffer pages. Prioritize the remaining route stalls and
+  Command census costs. A query-local Command validation trial cuts
+  the same Protoss tail mean by 1.83% and p95 by 4.45%. A batched
+  selection-outline trial matches the same replay and saves 0.12%
+  on the full tail. Keep the Command trial separate until it passes
+  the four-product memory, Custom Game and save checks.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -64,8 +75,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   asynchronous frame callbacks. The
   [fresh Wasteland comparison](audits/2026-11-21-wasteland-opening-cross-platform.md)
   matches 13 actors by type, owner, HP and scaled coordinates, and
-  verifies 10/18 supply. The independent clocks leave the native
-  mineral grant cadence open. A separate
+  verifies 10/18 supply and the five-Marine R selection. The native
+  scenario confirms ten Marines, a completed Barracks and Raynor.
+  Fix the foundation victory and zero-actor defeat boundaries, then
+  verify native victory and defeat through ordinary inputs. The
+  independent clocks leave the native mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing
@@ -99,6 +113,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   parked-depot releases match both pages, camera and palette. The earlier
   raster difference against `d664d71c` remains unexplained. Native mission
   behavior and physical timing remain separate qualification work.
+  The older Z7 victory tape now misses its terminal win on both the
+  current control and collision-bucket build. Trace the first changed
+  A input at call 17,264 and record a current winning path.
 
 - **Current three-cartridge playtest.** The
   [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)

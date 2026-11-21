@@ -80,6 +80,11 @@ build/canonical-target-index-config: force-canonical-target-index-config | build
 build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
 build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z8-game: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
 
+# Reconcile the existing collision buckets on all four normal products.
+CANONICAL_COLLISION_ELFS := build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf
+$(CANONICAL_COLLISION_ELFS): CFLAGS += -DSC64_PERSISTENT_COLLISION_BUCKETS
+$(CANONICAL_COLLISION_ELFS): mk/combat-perf/Makefile
+
 .PHONY: test-sc64-custom-defense-cells
 test-sc64-custom-defense-cells: build/test-sc64-custom-defense-p10 build/test-sc64-custom-defense-terran
 	./build/test-sc64-custom-defense-p10
