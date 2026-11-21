@@ -79,7 +79,8 @@ sc64_unit_buckets_begin(void)
         int x = u[i].x, y = u[i].y;
         u16 old_cell = sc64_unit_bucket_cell[i];
         if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i])) {
-            sc64_unit_bucket_remove(i);
+            if (old_cell != 0xffffu)
+                sc64_unit_bucket_remove(i);
             continue;
         }
         if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) {
@@ -159,10 +160,10 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
         (mover_flags & SC64_GAME_ACTOR_COLLIDABLE);
 #endif
 #endif
-    /* The audited Z/P roster has a maximum ten-pixel collision radius.
-     * Search every cell that can contain a point strictly inside it. */
+    /* Search cells within the largest strict overlap radius. */
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
-    const int reach = 9;
+    /* Include the entire strict search radius for flyers as well as ground. */
+    const int reach = mover_flying ? 18 : 9;
 #elif defined(SC64_GUARDIAN_DISTINCT_STAGE)
     const int reach = 10;
 #elif defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
@@ -224,6 +225,13 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 1;
     return sc64_contact_step_clear(q, nx, ny, 0);
 }
+#ifdef SC64_NYDUS_ENABLED
+static int GBA_HOT
+sc64_unit_bucket_placement_clear(const Unit *q, int nx, int ny)
+{
+    return sc64_contact_step_clear(q, nx, ny, 1);
+}
+#endif
 #endif
 
 static void

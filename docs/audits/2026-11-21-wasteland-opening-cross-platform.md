@@ -37,9 +37,7 @@ Native and GBA ROMs, RAM captures, save data and images remain local.
 
 A second fresh ares session reached Wasteland through the native menu.
 After an ordinary pause, the Goals panel listed finding Raynor,
-building a Barracks and training additional Marines. The current
-GBA mission requires Raynor to join, a Barracks and ten living
-Marines. The native panel leaves the exact Marine threshold open.
+building a Barracks and training additional Marines.
 
 After the tutorial was dismissed through ordinary controls, the
 native HUD showed 40 minerals and 10/18 supply. On the prepared
@@ -52,6 +50,41 @@ ARM grant observer have the following local SHA-256 values.
 - Goals image `5b42fd23fa8a30ef57b67f409f36da17b79b68774cb57e47836009cef7a7752c`
 - HUD image `5e30f639c52d6cc0ae0dbbd4084bee13096bc68685459943e92ceacd5396e7bb`
 - ARM grant observation `82e81e93052d02d168c0ced9f926939d43d17c6fb754c0cb71e76c1d8f57560e`
+
+## Victory condition and initial group selection
+
+The locally authenticated native scenario's victory record has three
+Command conditions for player group 1. The native comparison helper
+interprets comparison code zero as “at least.” The required counts
+are ten Marines (raw 0), one Barracks (raw 111) and one Raynor (raw 19).
+The native AtLeast count requires completed actors. At `c05ac442`, the
+GBA counts a living player Barracks from foundation onward. The native
+zero-actor defeat condition includes owned buildings. The GBA counts
+only living mobile units in that check.
+
+The separate native resource defeat condition uses the inclusive limits
+zero Command Centers, zero Barracks, nine Marines and 399 minerals.
+Incomplete structures count toward the first two limits. A further
+native trigger checks for zero living Raynors across all players and
+runs waits around a notification before defeat. The GBA resolves defeat
+immediately. Capture ordinary native victory, a completed-building
+boundary and the Raynor-death sequence for timing and presentation.
+
+An ordinary R input at the fresh Wasteland opening selects the five
+Marines in ares and in the Terran ARM replay. The five SCVs are excluded
+in both. Use the same reset and mission launch for a harness case and
+record the selected raw types and counts before and after the button
+edge. The [earlier native actor audit](2026-11-07-native-actor-differential/README.md)
+records a C-Right Move order changing five Marine orders. Use that
+input and sample later unit positions for the movement cut.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Authenticated native scenario | `b03fcbd0d18c2165be82aaab841f54f49f08ae74191cd039a36885059fa81517` |
+| Native victory record | `273129e1fcb56039d21fa5aa2101fa10fb477707ca7a62efe3e1a63723151aba` |
+| Native R screenshot | `62614486e311d263dfb2ffde814d716894c21cba47f81a09a767201c24f2d9ba` |
+| Native R selected-state observation | `791d796da0e254fabcf71ed20c5905fad55143e5b6c0615883df479a7e99e205` |
+| Terran ARM R group observation | `e29102b56271d12110df7b24b2393d84443bef858c9c14326cc0e398e3921921` |
 
 ## Initial evidence
 

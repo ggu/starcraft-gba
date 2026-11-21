@@ -195,11 +195,119 @@ static void test_deferred_steering_admission(void)
 }
 #endif
 
+#if defined(SC64_PERSISTENT_COLLISION) && defined(SC64_NYDUS_ENABLED)
+static unsigned lifecycle_rng = 0x5364a71du;
+
+static unsigned lifecycle_random(void)
+{
+    lifecycle_rng ^= lifecycle_rng << 13;
+    lifecycle_rng ^= lifecycle_rng >> 17;
+    lifecycle_rng ^= lifecycle_rng << 5;
+    return lifecycle_rng;
+}
+
+static void verify_bucket_members(void)
+{
+    int seen[MAX_UNITS] = {0};
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        int previous = 0xff, count = 0;
+        for (int slot = sc64_unit_bucket_head[cell]; slot != 0xff;
+             slot = sc64_unit_bucket_next[slot]) {
+            assert(slot >= 0 && slot < MAX_UNITS && ++count <= MAX_UNITS);
+            assert(sc64_unit_bucket_prev[slot] == previous &&
+                   sc64_unit_bucket_cell[slot] == cell && !seen[slot]);
+            assert(u[slot].alive && !SC64_TRANSPORT_LOADED(&u[slot]));
+            assert(cell == sc64_unit_bucket_cell_at(u[slot].x, u[slot].y));
+            seen[slot] = 1;
+            previous = slot;
+        }
+    }
+    for (int slot = 0; slot < MAX_UNITS; ++slot) {
+        int expected = u[slot].alive && !SC64_TRANSPORT_LOADED(&u[slot]);
+        assert(seen[slot] == expected);
+        if (!expected) assert(sc64_unit_bucket_cell[slot] == 0xffffu);
+    }
+}
+
+static void test_persistent_lifecycle(void)
+{
+    clear_world();
+    unsigned strict_checks = 0;
+    for (int turn = 0; turn < 10000; ++turn) {
+        int slot = lifecycle_random() % MAX_UNITS;
+        Unit *actor = &u[slot];
+        switch (lifecycle_random() % 6) {
+        case 0:
+            actor->alive = 0;
+            break;
+        case 1:
+            actor->flags = 0;
+            actor->alive = 1;
+            actor->type = actor->raw_type = U_MARINE;
+            actor->x = lifecycle_random() % WORLD_W;
+            actor->y = lifecycle_random() % WORLD_H;
+            break;
+        case 2:
+            actor->flags ^= 1u;
+            break;
+        case 3:
+            if (!actor->alive) break;
+            actor->x = lifecycle_random() % WORLD_W;
+            actor->y = lifecycle_random() % WORLD_H;
+            break;
+        case 4:
+            if (!actor->alive || SC64_TRANSPORT_LOADED(actor)) break;
+            actor->x = -1;
+            sc64_unit_buckets_begin();
+            assert(!sc64_unit_bucket_active);
+            actor->x = lifecycle_random() % WORLD_W;
+            break;
+        case 5:
+            if (actor->alive) actor->type = (lifecycle_random() & 1u) ? U_MARINE : U_WRAITH;
+            break;
+        }
+        sc64_unit_buckets_begin();
+        assert(sc64_unit_bucket_active);
+        verify_bucket_members();
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
+            int x = (int)(lifecycle_random() % WORLD_W);
+            int y = (int)(lifecycle_random() % WORLD_H);
+            assert(sc64_unit_bucket_placement_clear(&u[i], x, y) ==
+                   sc64_unit_bucket_step_clear_reference(&u[i], x, y, 1));
+            ++strict_checks;
+        }
+        Unit *moving = &u[lifecycle_random() % MAX_UNITS];
+        if (moving->alive && !SC64_TRANSPORT_LOADED(moving)) {
+            moving->x = lifecycle_random() % WORLD_W;
+            moving->y = lifecycle_random() % WORLD_H;
+            sc64_unit_bucket_move(moving);
+            assert(sc64_unit_bucket_active);
+            verify_bucket_members();
+            if (!(lifecycle_random() & 31u)) {
+                moving->x = -1;
+                sc64_unit_bucket_move(moving);
+                assert(!sc64_unit_bucket_active);
+                moving->x = lifecycle_random() % WORLD_W;
+                sc64_unit_buckets_begin();
+                assert(sc64_unit_bucket_active);
+                verify_bucket_members();
+            }
+        }
+        sc64_unit_buckets_end();
+    }
+    printf("persistent lifecycle: 10000 mutations, %u strict placement comparisons\n", strict_checks);
+}
+#endif
+
 int main(void)
 {
     test_geometry_and_key(); test_self_exclusion_and_lru(); test_eligibility_and_invalidation(); test_stacked_masks();
 #ifdef SC64_CONTACT_DEFER_STEERING_MEMO
     test_deferred_steering_admission();
+#endif
+#if defined(SC64_PERSISTENT_COLLISION) && defined(SC64_NYDUS_ENABLED)
+    test_persistent_lifecycle();
 #endif
     puts("contact memo contract: ok"); return 0;
 }
