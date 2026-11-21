@@ -531,8 +531,8 @@ on a 361-cell component, an unrelated pocket that crosses the row
 boundary, hostile openings above and below the span, a blocked
 root, and exact 384/385-cell trials. The HOST test compares all
 6,144 field bytes with an independent ordered BFS. The route flag
-is opt-in. Normal ARM timing and the cost of a declined attempt
-remain to be measured.
+is opt-in. The late ARM window measures the cost of successful
+and declined attempts.
 
 The full HOST comparison runs 386,646 queries with the cold
 component bypass enabled in both binaries. Its route build totals
@@ -552,3 +552,16 @@ qualifying the ordinary Z7 timing window.
 | --- | --- |
 | Release | `019a26c86a47ba76095ada1a07d5263750dbcf6a82f43f73d12347509440b34f` |
 | Deferred transfer | `fa2a6814912bb0af2982b43828caf69f3282afba58da830c9f2703165aefe076` |
+
+The Z10 ARM link adds eight IWRAM bytes over cold bypass, with
+the same EWRAM endpoint. The first dense window through call
+48,237 matches 114 world and three display cuts, 19 complete
+field samples and 4,201 independently checked partial directions.
+Its mean and p95 are within 0.03% of cold bypass. Its peak rises
+0.13%. The complete late replay is still needed before evaluating
+activation.
+
+| Early ARM evidence | SHA-256 |
+| --- | --- |
+| Z10 ROM | `7b30aeca17c6a0c0c185577b3ebcd87b6a665e506cd9d7b37f116b72062c4450` |
+| Early Z7 comparison | `a8391c33a0eed6db65165a581c7d0dfd13abc6ef9bee1540157fefe293a949dc` |
