@@ -49,18 +49,24 @@ rescue stock explicit until an ordinary native capture establishes it.
 
 The 28-byte P10 unit row already carries three rank bits inside the
 14-bit flags field, and the candidate validator's byte per parent can
-track ranks 0–7. No new field is needed. Apply the same parent-specific
-limit to admission, training, stocking and candidate validation. Replace
-the current hard rank-4 rejection with that validated parent's limit and
-retain the contiguous-rank check. An older executable will reject a world
-with a hangar it cannot represent under its four-child policy.
+track ranks 0–7. The compact Terran and Zerg unit rows carry 16 flag
+bits. No new field is needed. Resolve the limit from a validated
+parent's immutable unit rule in both the live and decoded unit arrays.
+Future owner-upgrade limits would also need the decoded upgrade context
+during save preflight. Apply the same parent-specific limit to admission,
+training, stocking and candidate validation. Replace the current hard
+rank-4 rejection with that validated parent's limit and retain the
+contiguous-rank check. An older executable will reject a world with a
+hangar outside its four-child policy.
 
 Resolve the existing queue boundary before allowing a larger hangar.
 The paid path can raise the pending count to five when the cap exceeds
 four, while slot admission and save validation currently reject five.
 The HUD cache also shifts the pending count by three bits, so eight
 children could alias one pending order. Preserve the 240-actor ceiling
-and shared production reservations.
+and shared production reservations. The ordinary AI's Carrier production
+budget reserves one hull and four child slots. A wider AI hangar rule
+also needs the matching reservation.
 
 ## Harness cuts
 
