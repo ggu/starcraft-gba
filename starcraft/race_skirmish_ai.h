@@ -143,6 +143,9 @@ typedef struct {
     int supply_used, supply_cap, supply_queued;
     unsigned char lane_patch[16], lane_patches, lane_geyser[2], lane_geysers;
     unsigned char battery_placed;
+#if defined(GBA_HOST) && defined(SC64_PROTOSS_THIRD_GATEWAY_PROBE)
+    unsigned char gateway_placed;
+#endif
     int enemy_air, enemy_army, enemy_air_tech, enemy_defense;
     int threat, threat_x, threat_y, threat_d, threat_count;
     int reserve_minerals, reserve_gas;
@@ -234,6 +237,9 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
         key = race_ai_key(sc64_race_raw_building(race_construction_deferred_morph(q) >= 0 ?
                                                  race_construction_deferred_morph(q) : q->type));
         if (key == AK_BATTERY) c->battery_placed = 1;
+#if defined(GBA_HOST) && defined(SC64_PROTOSS_THIRD_GATEWAY_PROBE)
+        if (key == AK_GATEWAY) ++c->gateway_placed;
+#endif
         if (q->under_construction &&
             !(race_mode && (q->type == B_LAIR || q->type == B_HIVE))) {
             if (key >= 0 && c->pend[key] < 255) ++c->pend[key];
@@ -973,6 +979,12 @@ static const RaceAiStep race_ai_protoss_battery_opening[] = {
     { RACE_AI_STEP_BUILD, 172, 1, 15, RACE_AI_PROTOSS_OPENING_BATTERY },
 };
 
+#if defined(GBA_HOST) && defined(SC64_PROTOSS_THIRD_GATEWAY_PROBE)
+static const RaceAiStep race_ai_protoss_third_gateway[] = {
+    { RACE_AI_STEP_BUILD, 160, 3, 17, 0 },
+};
+#endif
+
 static const Sc64SkirmishRecord *race_ai_record(const RaceAiCensus *c, int raw)
 {
     return race_skirmish_build_record(c->owner, raw);
@@ -1109,7 +1121,22 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             !race_ai_count(c, AK_CORE) && race_ai_record(c, 172)) {
             plan = race_ai_protoss_battery_opening;
             steps = (int)(sizeof race_ai_protoss_battery_opening / sizeof *plan);
-        } else {
+        }
+#if defined(GBA_HOST) && defined(SC64_PROTOSS_THIRD_GATEWAY_PROBE)
+        /* A placed Battery identifies the Gateway opening. Wait for its
+         * completion before requesting the third Gateway, and resume gas
+         * when the Gateway foundation exists, even while it is warping in. */
+        else if (race_ai_blood_bath_ffa() && frame < RACE_AI_BATTERY_OPENING_END &&
+                 c->battery_placed && c->gateway_placed == 2 && c->have[AK_GATEWAY] == 2 &&
+                 c->have[AK_NEXUS] == 1 && !c->pend[AK_NEXUS] && c->patches && c->miners &&
+                 c->have[AK_PROBE] >= 15 && !c->enemy_air &&
+                 !race_ai_count(c, AK_ASSIMILATOR) && !race_ai_count(c, AK_CORE) &&
+                 race_ai_record(c, 160)) {
+            plan = race_ai_protoss_third_gateway;
+            steps = c->have[AK_BATTERY] ? 1 : 0;
+        }
+#endif
+        else {
             plan = race_ai_protoss_plan;
             steps = (int)(sizeof race_ai_protoss_plan / sizeof *plan);
         }
