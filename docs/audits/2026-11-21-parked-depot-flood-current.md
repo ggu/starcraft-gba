@@ -71,8 +71,12 @@ bytes and keep the previous IWRAM and EWRAM endpoints. The four
 products match their predecessors at two sampled cuts in each campaign
 or Showcase opening and four cuts on each Custom Game map. The
 comparison checks the active page, both indexed pages, the palette
-and world state. The 30-fps budget is 561,792 cycles per update. Both
-busy samples still exceed it, and physical frame pacing remains open.
+and world state. The three normal race ROMs pass 54 ordinary Custom
+Game save and fresh HOME continuation cases. The matrix covers both
+maps, every human race and one to three independently named AI seats.
+
+The 30-fps budget is 561,792 cycles per update. Both busy samples
+still exceed it, and physical frame pacing remains open.
 
 | Local evidence | SHA-256 |
 | --- | --- |
@@ -81,3 +85,4 @@ busy samples still exceed it, and physical frame pacing remains open.
 | Outpost paired comparison | `22f68844c27e71f38eeb9716e6e1cb16b01d8ac30d3353e99b030450b57a8018` |
 | Both Custom Game maps on four builds | `b63baf7fb78e1a2c75b5e7093018c52c754439f1f131dffc5076612997f70ab0` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
+| Custom Game save and fresh HOME matrix | `428556c9b2a351ce46766fb86d69d1811cdf7a2d58cb591b684fd3efd87e6015` |
