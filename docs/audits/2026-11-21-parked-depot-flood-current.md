@@ -75,6 +75,21 @@ and world state. The three normal race ROMs pass 54 ordinary Custom
 Game save and fresh HOME continuation cases. The matrix covers both
 maps, every human race and one to three independently named AI seats.
 
+The optimized Terran ROM completes T1–T5 through ordinary inputs.
+Each starts from HOME, makes a pause save, resumes in a fresh
+process, wins and reloads its victory journal from another HOME
+process. All 257 retained gameplay checkpoints match the previous
+normal Terran ROM, and all pause, victory and re-exported
+journals match byte for byte. These campaign checkpoints cover game
+state and frames. The campaign opening tests above cover video.
+
+The optimized Protoss ROM loads its ordinary P10 pause journal at
+frame 36,761 and wins at frame 46,057 on the retained controller
+tail. All 68 world, camera, indexed-page and palette checks and the
+victory journal match the previous normal P10 build. A separate HOME
+load holds that result for eight updates and re-exports the journal
+byte for byte.
+
 The 30-fps budget is 561,792 cycles per update. Both busy samples
 still exceed it, and physical frame pacing remains open.
 
@@ -86,3 +101,6 @@ still exceed it, and physical frame pacing remains open.
 | Both Custom Game maps on four builds | `b63baf7fb78e1a2c75b5e7093018c52c754439f1f131dffc5076612997f70ab0` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Custom Game save and fresh HOME matrix | `428556c9b2a351ce46766fb86d69d1811cdf7a2d58cb591b684fd3efd87e6015` |
+| Terran T1–T5 campaign comparison | `5afd300a78ca5f0e43d523764822b753a3878a345c8f3a94c67935f403807069` |
+| P10 resumed victory | `cd0db3cb89df1f3d31e7be4486f8937e71749396916230ff36f450f6637e12ba` |
+| P10 fresh result load | `2c449d87ac4df1ab14fa6ef51db29424628b5e8d29bfb425be4c62e91463d67f` |

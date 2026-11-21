@@ -39,11 +39,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   live render rows. Extend campaign opening and event timing
   coverage. Resolve visible opaque overlap and reused IDs at equal depth.
 
-- **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
-  pass ordinary-input wins, fresh HOME continuation and victory-journal
-  readback on the current release cartridges. The dense Z10 continuation averaged about
+- **Current campaign verification.** The
+  [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
+  matches the previous Terran ROM through T1–T5 and passes a paired
+  P10 victory tail and fresh result readback. The
+  [earlier three-finale checks](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
+  record victories, fresh HOME continuation and victory-journal readback
+  on their pinned cartridges. The dense Z10 continuation averaged about
   11.81 emulator main-loop updates per second, including presentation waits
-  and UI. Near-30-fps optimization and hardware measurement remain open.
+  and UI. Complete the exact-build campaign sweep and physical timing checks.
 
 - **Current three-cartridge playtest.** The [Custom Game matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
   passes 54 ordinary starts and fresh SRAM continuations on the exact
