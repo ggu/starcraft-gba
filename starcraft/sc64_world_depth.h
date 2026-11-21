@@ -182,7 +182,7 @@ sc64_depth_projectile_child_part(const Sc64TraceSlot *slot, unsigned layer)
         /* The glaive and spore Death scripts each spawn one image 512
          * sprite with zero offset at the captured impact position. */
         return SC64_TRACE_ONLY_IMPACT_CHILD;
-    case 528: case 529: case 532:
+    case 521: case 528: case 529: case 532:
         /* A flight group uses several anchors. Group only when the
          * child elevation is above the ground Y range. */
         return layer >= 4 ? SC64_TRACE_ONLY_FLIGHT_TRAILS : 0;
