@@ -296,7 +296,11 @@ static __attribute__((noinline)) void race_tick_defenses_custom(void)
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_zp_cells(const Building *q, int ground, int air,
                                   int range, const RaceDefenseCells *cells,
-                                  u8 hostile_mask)
+                                  u8 hostile_mask
+#ifdef SC64_DEFENSE_ZP_OWNER_MASK_PROBE
+                                  , const u8 *cell_owners
+#endif
+                                  )
 {
     int x = q->x, y = q->y;
     if (x <= -range || y <= -range ||
@@ -313,6 +317,9 @@ race_defense_target_from_zp_cells(const Building *q, int ground, int air,
     for (int row = top; row <= bottom; ++row) {
         for (int col = left; col <= right; ++col) {
             int cell = row * DEFENSE_CELL_SIDE + col;
+#ifdef SC64_DEFENSE_ZP_OWNER_MASK_PROBE
+            if (cell_owners && !(cell_owners[cell] & hostile_mask)) continue;
+#endif
             for (int j = cells->links.head[cell]; j != 0xff; j = cells->links.next[j]) {
                 const Unit *target = &u[j];
                 unsigned owner = target->owner;
@@ -373,6 +380,10 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
     u8 hostile_mask[5];
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
     RaceDefenseCells cells;
+#ifdef SC64_DEFENSE_ZP_OWNER_MASK_PROBE
+    u8 cell_owners[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
+    const u8 *active_cell_owners = cell_owners;
+#endif
 #else
     u8 head[5][2], next[MAX_UNITS];
 #endif
@@ -389,6 +400,9 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
 
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
     memset(cells.links.head, 0xff, sizeof(cells.links.head));
+#ifdef SC64_DEFENSE_ZP_OWNER_MASK_PROBE
+    memset(cell_owners, 0, sizeof(cell_owners));
+#endif
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         if ((unsigned)u[j].owner >= 5 ||
             (unsigned)u[j].x >= DEFENSE_CELL_LIMIT ||
@@ -398,6 +412,9 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         }
         int cell = (u[j].y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE +
                    (u[j].x >> DEFENSE_CELL_SHIFT);
+#ifdef SC64_DEFENSE_ZP_OWNER_MASK_PROBE
+        cell_owners[cell] |= (u8)(1u << u[j].owner);
+#endif
         cells.flying[j] = (u8)sc64_race_unit_flying(u[j].type);
         cells.links.next[j] = cells.links.head[cell];
         cells.links.head[cell] = (u8)j;
@@ -441,12 +458,21 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         if (!race_defense_cooldown_ready(q)) continue;
 #ifdef SC64_DEFENSE_SPATIAL_PROBE
         int best = race_defense_target_from_zp_cells(
-            q, ground, air, range, &cells, hostile_mask[q->owner]);
+            q, ground, air, range, &cells, hostile_mask[q->owner]
+#ifdef SC64_DEFENSE_ZP_OWNER_MASK_PROBE
+            , active_cell_owners
+#endif
+            );
 #else
         int best = race_defense_target_from_zp_lists(
             q, ground, air, range, head, next, hostile_mask[q->owner]);
 #endif
         if (best >= 0) {
+#if defined(SC64_DEFENSE_SPATIAL_PROBE) && defined(SC64_DEFENSE_ZP_OWNER_MASK_PROBE)
+            /* An attack can mutate unit slots. Resume the original live-list
+             * path before attempting it and for the rest of this pass. */
+            active_cell_owners = 0;
+#endif
             if (!hit_stock_building_target(q,best,damage)) continue;
 
 #ifdef SC64_WEAPON_SOURCE_VFX
