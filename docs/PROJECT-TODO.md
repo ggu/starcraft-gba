@@ -78,11 +78,24 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds 166 partial depot-field rebuilds when an existing field cannot
   answer a requested origin. The single-wide-frontier trial preserves
   the sampled P10 replay and saves 0.036% in mean game-update cycles.
+  The [Z5 detector call split](audits/2026-11-22-cloak-query-cost.md)
+  saves 0.16% in the matched Z10 Blood Bath sample with the same
+  RAM endpoints. It passes active-cloak recovery, all 54 Custom Game
+  save cases and the refreshed Z10 fresh-HOME victory at frame 63,523
+  on the combined missile-trail release.
   The [local ARM route packer trial](audits/2026-11-22-z7-rendered-replay.md#route-output-packing-trial)
   cuts two P10 full-fill updates by about 63,000–73,000 cycles. The
   full-tail mean improves under 0.01% and Z10 has only 16 IWRAM bytes
-  before its guard. Keep this trial local. Profile steady simulation
-  and draw costs on consecutive dense updates with no new field work.
+  before its guard. Keep this trial local.
+  The [current dense P10 attribution](audits/2026-11-22-dense-release-attribution.md)
+  averages 1.573 million cycles. Orders use 514,000, and the depth
+  painter uses 342,000, including 247,000 drawing units and their
+  attached images. Reusing the painter's enemy visibility query saves
+  0.018% on a 2,071-call holdout. Keep that trial local and prioritize
+  larger movement, targeting or pixel composition costs. The [early Z7 sample](audits/2026-11-22-dense-release-attribution.md#early-z7-movement-and-target-indexing)
+  measures 39,280 cycles per target index rebuild and 23,701 within
+  its cell-link operation. Preserve canonical chain order in any local
+  builder trial. Count actual queued completions in the later Z7 battle.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -130,11 +143,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   HOST inputs when authoring a physical tape. The refreshed tape reaches
   HOST victory and advances through the old selection cut on the
   normal ARM ROM. Isolate the later gas difference at call 23,879
-  and qualify a new pause, fresh HOME and victory on the normal product.
-  The retained Z10 tape still writes its frame-2,526 pause save on
-  `71809328`; its later script now restarts on that ROM. Regenerate
-  and qualify the ordinary late-chapter continuation on the same
-  shared picker.
+  and qualify victory on the normal product. Two new ordinary pauses
+  and fresh HOME loads already replay through frame 9,438 with
+  matching named observations after one Hatchery reselection.
+  The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
+  restores the frame-2,526 pause and wins at frame 63,523 on both
+  combined builds. All 25 checked world fingerprints, indexed pages
+  and the victory SRAM match.
 
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
