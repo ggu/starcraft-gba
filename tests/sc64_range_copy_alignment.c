@@ -44,6 +44,11 @@ static int limit(int n, int lo, int hi)
 static int sc64_cell_row(unsigned cell) { return (int)cell / MAP_COLS; }
 static int sc64_cell_col(unsigned cell) { return (int)cell % MAP_COLS; }
 #include "../starcraft/sc64_routes.h"
+#ifdef SC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT
+#if !defined(SC64_ROUTE_POINT_FAR_READ) || defined(SC64_ROUTE_MONOTONE_ENABLED)
+#error "this fixture must use far cached reads with ordinary point movement"
+#endif
+#endif
 
 static void test_copy_alignment_and_remainders(void)
 {
@@ -180,12 +185,109 @@ static void test_retained_point_with_range_planes(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+static void test_point_prefix_with_range_planes(void)
+{
+    const int goal = 32 + 32 * 128;
+    int nx, ny;
+    race_cols = race_rows = 128;
+    memset(path_walkable, SC64_GRID_OPEN_BYTE, sizeof(path_walkable));
+    path_grid_valid = 1;
+    sc64_routes_reset();
+    assert(!sc64_route_pcount);
+    int slot = sc64_route_slot_for(goal, goal + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    u32 builds = sc64_route_builds, hits = sc64_route_hits, clock = sc64_route_clock;
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    assert(sc64_point_prefix_find(slot)->count == SC64_POINT_CERTIFIED_ONLY);
+    assert(sc64_range_cached_point_step(520, 552, 520, 520, &nx, &ny));
+    assert(nx == 520 && ny == 536 && sc64_point_prefix_find(slot));
+#endif
+    assert(sc64_range_cached_point_step(1608, 1608, 520, 520, &nx, &ny));
+    assert(nx == 1608 && ny == 1592);
+#ifdef SC64_ROUTE_POINT_FAR_READ
+    assert(sc64_point_prefix_find(slot));
+    SC64_ROUTE_EXACT(slot);
+#endif
+    assert(!sc64_point_prefix_find(slot));
+    assert(sc64_route_builds == builds && sc64_route_hits == hits && sc64_route_clock == clock);
+
+    int first_plane = sc64_range_route_reduced_slots();
+    int second = goal + 20;
+    (void)sc64_point_prefix_fill(first_plane, second, second + 1);
+    sc64_route_valid[first_plane] = 1;
+    sc64_route_goal[first_plane] = (u16)second;
+    assert(sc64_point_prefix_find(first_plane));
+    sc64_range_route_claim_planes();
+    assert(!sc64_point_prefix_find(first_plane));
+    puts("PASS cached point reads preserve logical counters and range claims retire parked fields");
+}
+#endif
+
+#ifdef SC64_ROUTE_POINT_FAR_READ
+static void test_far_cached_point_proof(void)
+{
+    const int origin = 100 + 100 * 128, goal = 32 + 32 * 128;
+    race_cols = race_rows = 128;
+    sc64_routes_reset();
+    int direction;
+    for (int horizontal = 0; horizontal < 2; ++horizontal) {
+        memset(path_walkable, SC64_GRID_OPEN_BYTE, sizeof(path_walkable));
+        path_grid_valid = 1;
+        for (int i = 8; i < 123; ++i) {
+            const int wall = horizontal ? i + 64 * 128 : 64 + i * 128;
+            if (i != 110) SC64_GRID_SET(path_walkable, wall, 0);
+        }
+        assert(sc64_point_far_read(origin, goal, &direction));
+        (void)sc64_route_fill(0, goal);
+        assert(direction == sc64_route_get(0, origin));
+
+        /* A second equal lower-bound crossing needs the ordered flood. */
+        const int other = horizontal ? 22 + 64 * 128 : 64 + 22 * 128;
+        SC64_GRID_SET(path_walkable, other, 1);
+        assert(!sc64_point_far_read(origin, goal, &direction));
+        SC64_GRID_SET(path_walkable, goal, 0);
+        assert(!sc64_point_far_read(origin, goal, &direction));
+    }
+
+    u32 random = 0xb283a1e9u;
+    unsigned certificates = 0;
+    for (int i = 0; i < 128; ++i) {
+        for (int cell = 0; cell < 128 * 128; ++cell) {
+            random ^= random << 13;
+            random ^= random >> 17;
+            random ^= random << 5;
+            SC64_GRID_SET(path_walkable, cell, (random & 31u) > 2);
+        }
+        int root = 19 + (i & 15) + (18 + (i >> 2)) * 128;
+        int from = 83 - (i & 15) + (81 - (i >> 2)) * 128;
+        if (i & 1) { int swap = root; root = from; from = swap; }
+        SC64_GRID_SET(path_walkable, root, 1);
+        SC64_GRID_SET(path_walkable, from, 1);
+        if (!sc64_point_far_read(from, root, &direction)) continue;
+        (void)sc64_route_fill(0, root);
+        assert(direction == sc64_route_get(0, from));
+        ++certificates;
+    }
+    assert(certificates > 64);
+    printf("PASS far exact route matches unique wall crossings and %u randomized full fields\n",
+           certificates);
+}
+#endif
+
 int main(void)
 {
     test_copy_alignment_and_remainders();
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     test_retained_point_with_range_planes();
-#else
+#endif
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    test_point_prefix_with_range_planes();
+#endif
+#ifdef SC64_ROUTE_POINT_FAR_READ
+    test_far_cached_point_proof();
+#endif
+#if !defined(SC64_ROUTE_POINT_POINTER_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
     test_lazy_plane_reservation();
 #endif
     return 0;

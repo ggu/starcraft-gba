@@ -77,7 +77,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cut the full resumed Z7 mean by 1.17% and the two late windows by
   1.52% and 1.57%, with matching images, SRAM and campaign result.
   Combat facts add about 2% in those late windows and 0.085% across the
-  full tape. Keep that second option off and prioritize the repeated
+  full tape in that initial trial. Prioritize the repeated
   route failures and expensive permissions in the busiest updates.
   The current sparse-route capture averages 2.09M and 2.05M cycles for
   zero-build updates in the two late windows. Orders account for 1.15M
@@ -115,6 +115,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
   restores both cuts and takes 8.21% fewer cycles on average than packed
   stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
+  The [current release trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-frontier-on-the-combat-facts-release)
+  confirms the sampled Z8 gain and passes the four ROM links, a P10
+  victory replay and late three-CPU Blood Bath save continuation.
+  The 64×64 Custom Game checks exercise fallback. The whole resumed
+  Z8 interval saves about 0.39%. In the Z7 cut at calls 47,758–48,237, mean
+  and p95 initially fall 12.06% and 18.05%. The worst call rises
+  11.23% when two nearby reads complete after their ordinary cutoff.
+  [Transfer into the free reserve](audits/2026-11-21-z8-current-point-certificate.md#transfer-after-the-ordinary-cutoff)
+  removes that peak increase. The paired mean, p95 and peak now fall
+  12.42%, 18.47% and 13.70%. Profile the certificate-only read at
+  call 48,149, then check both late Z7 windows before changing normal
+  route flags. Measure physical performance separately.
   On the pinned combat-facts Z10, the
   [cold component guard](https://github.com/ggu/starcraft-gba/blob/codex/sc64-route-cold-component-bypass-20261121/docs/audits/2026-11-21-z8-current-point-certificate.md#skip-the-cold-prefix-on-proven-disconnection)
   saves about 120,000 cycles at the late peak and matches the full Z7 victory
@@ -124,13 +136,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   journal match stock. The traced goal stays partial on each resident cut
   and evicts without an eager refill. Both late means remain over four
   times the 30 fps cycle budget. The
-  [composed route trial](https://github.com/ggu/starcraft-gba/pull/677)
-  reduces current Z8 mean cycles by 8.42% and peak cycles by 15.61%,
-  passes all four links and the sampled T10, P10 and Custom Game
-  continuations. The busy Blood Bath discrepancy is a one-VBlank
-  page-flip phase shift. The rendered page contents and next input
-  sample agree. Keep the option off for release while inspecting the
-  dense Z7 presentation boundary and measuring hardware timing.
+  [composed route trial](audits/2026-11-21-route-composition-current.md)
+  reduces current Z8 mean cycles by 8.42% and peak cycles by 15.61%.
+  On the current renderer it wins Z7 with matching world and display
+  cuts and both journals. Mean cycles fall 12.88% in the early dense
+  window and about 4% in both late windows. All four links and the
+  sampled T10, P10 and Custom Game continuations pass. Bounded VBlank
+  observations explain the phase shifts in Blood Bath and the earlier
+  dense Z7 pair. Measure broader busy skirmishes, campaign coverage
+  and physical frame pacing before activating this option by default.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
