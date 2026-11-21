@@ -190,9 +190,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   campaign loads and busy skirmishes still exceed the 30 fps budget.
   Prioritize sustained order work and physical frame pacing checks.
 
-- **Busy Blood Bath.** The [current three-CPU profile](audits/2026-11-21-blood-bath-current-profile.md)
-  averages 924,956 guest cycles against a 561,792-cycle 30-fps
-  budget. The worst sampled update spends 1.40 million cycles in
+- **Busy Blood Bath.** The [minimap and field hint changes](audits/2026-11-21-minimap-and-field-hud.md)
+  reduce Z10 mean guest cycles from 876,399 to 842,472, against a
+  561,792-cycle 30 fps budget. Match the native minimap markers and
+  fog against synchronized samples. In an
+  [earlier three-CPU profile](audits/2026-11-21-blood-bath-current-profile.md),
+  the worst sampled update spends 1.40 million cycles in
   depot reachability and about 870,000 in four full point floods.
   An aligned point-transfer trial raises p95 by 0.48% with exact
   state and route results. The [parked depot flood comparison](audits/2026-11-21-parked-depot-flood-current.md)
