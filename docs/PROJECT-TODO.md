@@ -2409,9 +2409,10 @@ AI wallets and full-match behavior remain unverified.
   dated audits for the actual scope of each earlier result.
 - Add the [foreground picking cases](audits/2026-11-21-world-depth-picking.md#harness-cases)
   to the framebuffer replay harness. Start with the opaque Overlord and
-  Hatchery hit on all four products, then cover lifted buildings, transparent
-  pixels and contextual controls. Qualify same-kind hits, independent turret
-  poses and exact N64 sprite-ID ties with active-camera replay evidence.
+  Hatchery hit on all four products and the Scout air missile's detached
+  trail. Then cover lifted buildings, transparent pixels and contextual
+  controls. Qualify same-kind hits, independent turret poses and exact
+  N64 sprite-ID ties with active-camera replay evidence.
 - Add the [selected building and detached attack sprite cases](audits/2026-11-21-world-depth-overlaps.md#replay-cases)
   to the framebuffer replay harness. Preserve separate masks for the ring,
   the detached sprite and the weapon projectile. Use the native sprite IDs
