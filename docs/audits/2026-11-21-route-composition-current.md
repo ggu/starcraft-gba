@@ -28,11 +28,10 @@ and win at frame 228,128. The pause and victory journals and fresh victory
 readback match byte for byte. All 254 sampled world observations, six logical
 cache cuts, 75 complete fields and 4,201 published partial directions match;
 the latter use an independent BFS oracle. Nine of ten paired display cuts
-match. At call 154,741, camera, palette and both framebuffer page hashes match,
-but normal selects page 0 and composed selects page 1; the pages differ. This
-is an observed display difference, not a demonstrated route or world-state
-mismatch. Its cause and visual duration are unproven. Do not claim full display
-equivalence or enable the flags based on this experiment alone.
+match. At call 154,741, camera, palette and both framebuffer page hashes
+match. Normal selects page 0 and composed selects page 1, so the displayed
+pixels differ at that input sample. The VBlank observer below establishes
+when each run presents its page.
 
 | Window | Advancing calls | Normal mean / p95 / peak cycles | Composed mean / p95 / peak cycles |
 | --- | ---: | ---: | ---: |
@@ -92,8 +91,10 @@ palette and route cache metadata. Three modal boundaries and all
 
 The mean falls 8.42% and the peak falls 15.61%. The mean still
 exceeds the 30 fps budget by about 2.8 times. The current-renderer
-Z7 completion and the earlier active-page discrepancy remain under
-replay. Physical GBA timing remains open.
+early dense Z7 mean falls 12.88%, from 2,193,883 to 1,911,338 cycles
+over 477 updates. The timed route counters, three framebuffer
+cuts and frame-5,641 pause journal match. The replay through
+victory and physical GBA timing remain open.
 
 In a resumed three-CPU Blood Bath, 3,600 route counter pairs, 31
 world and projectile samples and the saved journal match. All 16
@@ -112,8 +113,7 @@ release still displays page 0 with its flip pending. The release
 flips to page 1 with the same page hash at its next VBlank. Both runs
 display page 1 with matching page contents at the next logical
 input sample. This identifies a one-VBlank presentation phase
-difference for Blood Bath. Confirm the corresponding dense Z7
-boundary separately.
+difference for Blood Bath.
 
 | Current-renderer receipt | SHA-256 |
 | --- | --- |
@@ -127,3 +127,28 @@ boundary separately.
 | Late Blood Bath comparison and active-page difference | `4f2347a4854f2c9677ac57a2f31b797396caa00a94aaa8de6fc4403cbad192e2` |
 | Blood Bath release VBlank observer | `f03446fc3d633230adf2d9718e2a2c376edcd30e3a76b66b05c0cc67e001cbe2` |
 | Blood Bath composed VBlank observer | `d16d75682f814538a75ef8cb90234a4229cca90b8f4b40b2bad97fa8e9591270` |
+
+## Dense Z7 presentation phase
+
+A bounded replay of the earlier Z7 pair stopped at the ordinary
+input sample and on either side of the VBlank presentation handler.
+At call 154,741 the normal run completed its flip to page 0 9,434
+guest cycles before the input sample. The composed run still had its
+flip pending at that sample. It presented the same page at its next
+VBlank, 35,921 guest cycles after the sample. At call 154,742 both
+runs display page 0 and queue a matching flip to page 1. All nine
+observed flip payloads and palettes match in order. This comparison
+resolves the sampled phase difference. It covers calls 154,737
+through 154,746 on the earlier composition.
+
+For future display comparisons, preserve the exact input-boundary
+observation. If the two contents differ only in page selection,
+record both runs across the relevant VBlank with the pending flag,
+displayed page and both image hashes. Compare the presented sequence
+and the next input sample before diagnosing a draw-order regression.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Earlier Z7 release VBlank observation | `6b79fa7c725ada8e03c3d74fea05c0c4ad904b438b7aa47122c5aa946a8d70cf` |
+| Earlier Z7 composed VBlank observation | `9908c40124f4d16077cf2ab19765a0e0531ee03b2e215f1003753de6ca9f56e8` |
+| Earlier Z7 presentation comparison | `85c3ece31b8f8b478e6b2065518ec7c261370fff855e385a75e79e82b9c8dacf` |

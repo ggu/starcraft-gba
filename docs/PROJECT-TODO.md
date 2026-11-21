@@ -133,9 +133,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   It preserves sampled world state and both journals. One active-page
   sample differs. The current four links and sampled T10, P10 and
   Custom Game continuations pass. The current Z8 mean and peak fall
-  8.42% and 15.61%. Resolve the active-page difference through the
-  present boundary, finish the current-renderer Z7 pair, and measure
-  busy Custom Games and physical frame pacing before activating this option.
+  8.42% and 15.61%. Separate VBlank observations establish phase shifts
+  in Blood Bath and the earlier dense Z7 pair. Both profiles show the
+  same page payloads in sequence within the sampled cuts. Finish the
+  current-renderer Z7 pair and measure physical frame pacing before
+  activating this option.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
