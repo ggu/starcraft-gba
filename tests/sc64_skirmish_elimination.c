@@ -503,12 +503,34 @@ static void check_neutral_ventral(void)
     race_sk_transport_wire_encode(wire);
     assert((wire[SC64_NEUTRAL_VENTRAL_BYTE] & SC64_NEUTRAL_VENTRAL_BIT) &&
            !sc64_sk_transport_decode(&previous, wire, MAX_BUILDINGS));
-    assert(race_sk_transport_wire_decode(wire) && race_sk_transport_candidate_valid(&race_data));
+    wire[SC64_NEUTRAL_VENTRAL_BYTE] |= 1;
+    assert(race_sk_transport_wire_decode(wire) && race_skirmish_neutral_ventral_candidate &&
+           race_skirmish_transport_candidate.owner[0].researched);
+#ifdef SC64_ZERG_CARRIER_PROBE
+    assert(sc64_zc_tail(wire, sizeof(wire)));
+#endif
+    wire[SC64_NEUTRAL_VENTRAL_BYTE] &= (u8)~1;
+    wire[SC64_NEUTRAL_VENTRAL_BYTE] |= 0x40;
+    assert(!race_sk_transport_wire_decode(wire));
+#ifdef SC64_ZERG_CARRIER_PROBE
+    assert(!sc64_zc_tail(wire, sizeof(wire)));
+#endif
+    wire[SC64_NEUTRAL_VENTRAL_BYTE] &= (u8)~0x40;
+    wire[7] |= SC64_NEUTRAL_VENTRAL_BIT;
+    assert(!race_sk_transport_wire_decode(wire));
+#ifdef SC64_ZERG_CARRIER_PROBE
+    assert(!sc64_zc_tail(wire, sizeof(wire)));
+#endif
+    wire[7] &= (u8)~SC64_NEUTRAL_VENTRAL_BIT;
+    assert(race_sk_transport_wire_decode(wire) && race_load_preflight(&plan));
+#ifdef SC64_ZERG_CARRIER_PROBE
+    assert(sc64_zc_tail(wire, sizeof(wire)));
+#endif
     race_data.state[23] = marked & ~(int)SC64_SKIRMISH_ELIM_BITS;
-    assert(!race_sk_transport_candidate_valid(&race_data));
+    assert(!race_load_preflight(&plan));
     race_data.state[23] = marked;
     race_skirmish_transport_candidate.owner[research].researched = 0;
-    assert(!race_sk_transport_candidate_valid(&race_data));
+    assert(!race_load_preflight(&plan));
     wire[SC64_NEUTRAL_VENTRAL_BYTE] &= (u8)~SC64_NEUTRAL_VENTRAL_BIT;
     assert(sc64_sk_transport_decode(&previous, wire, MAX_BUILDINGS) &&
            race_sk_transport_wire_decode(wire) && !race_skirmish_neutral_ventral_candidate &&
