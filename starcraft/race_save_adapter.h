@@ -677,21 +677,11 @@ static int race_shared_egg_custom_candidate_valid(const RaceSave *candidate,
 #endif
 #ifdef SC64_SHARED_TRANSPORT
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
-/* High bit of the first research byte; its low bit remains the human's
- * completion bit. All older readers require each research byte <= 1. */
-enum { SC64_NEUTRAL_VENTRAL_BYTE = 3, SC64_NEUTRAL_VENTRAL_BIT = 0x80 };
 static int race_sk_transport_wire_decode(const u8 in[16])
 {
-    u8 clean[16];
-    Sc64SkTransportTech decoded;
-    memcpy(clean, in, sizeof(clean));
-    unsigned neutral = !!(clean[SC64_NEUTRAL_VENTRAL_BYTE] & SC64_NEUTRAL_VENTRAL_BIT);
-    clean[SC64_NEUTRAL_VENTRAL_BYTE] &= (u8)~SC64_NEUTRAL_VENTRAL_BIT;
     race_skirmish_neutral_ventral_candidate = 0;
-    if (!sc64_sk_transport_decode(&decoded, clean, MAX_BUILDINGS)) return 0;
-    race_skirmish_transport_candidate = decoded;
-    race_skirmish_neutral_ventral_candidate = (u8)neutral;
-    return 1;
+    return sc64_sk_transport_decode_elimination(&race_skirmish_transport_candidate,
+        in, MAX_BUILDINGS, &race_skirmish_neutral_ventral_candidate);
 }
 
 static void race_sk_transport_wire_encode(u8 out[16])
