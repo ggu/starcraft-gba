@@ -104,11 +104,57 @@ resolving the original three-frame bank to its verified local path.
 | Paired comparison | `6f4bf3923438d70acb30b84107d2d080cab9429cff3c00b229148b1032160348` |
 | Packed candidate link receipt | `4c9937b37455d4b596df8781be562867b76e25dc79ad0a3cc61cb0c2e05f5d44` |
 
-## Other cartridge profiles
+## Normal Showcase replay
+
+The optional `SHOWCASE_TERRAN_BUILDING_WORDS=1` recipe derives the three
+Terran frames from Showcase's own prepared bank. Its Command Center
+crop starts one row higher than the Terran and P10 crops. The sanitizer
+fixture verifies the three live pointers and 360 full-frame comparisons.
+
+```sh
+make SHOWCASE_TERRAN_BUILDING_WORDS=1 verify-showcase
+make test-sc64-showcase-terran-building-words-pixels
+```
+
+The measured pair uses the same blank-SRAM ordinary Custom Game prefix
+as P10. At 12,512 physical calls the game reaches frame 12,120 with an
+active Terran base. All 51 recorded action wallet checks and 15 world,
+both-page, display, palette and source-clock cuts agree. All 293 timed
+stage cuts have matching camera coordinates and frames. The affected
+field views include five completed Barracks and, on a separate cut,
+the Command Center with five Depots.
+
+| Showcase scope | Mean cycles, control | Mean cycles, packed | Mean change |
+| --- | ---: | ---: | ---: |
+| Entire Custom Game prefix | 806,575 | 762,289 | −5.49% |
+| Field tape calls 8,000–11,500 | 997,041 | 918,089 | −7.92% |
+| Field tape calls 11,500–12,500 | 1,105,010 | 1,006,049 | −8.96% |
+| Terran Last Stand through defeat | 708,711 | 687,415 | −3.00% |
+
+The Custom Game prefix peak falls from 6,053,219 to 6,033,136 (−0.33%).
+The mean improves from 20.80 to 22.01 emulated main-loop calls per
+second. In a separate normal hidden-menu Terran Last Stand replay,
+the burning Command Center stays visible through the penultimate update.
+Ten world and both-page cuts match through normal defeat at scene update
+150. This covers the completed frame underneath the fire and damage art.
+
+The packed Showcase link adds 72,472 text bytes and keeps IWRAM
+`0x03004fb8` and EWRAM `0x02039168`. Cartridge and ELF payload checks
+pass. The flag-off compiler argument vector matches the authenticated
+normal Showcase control.
+
+| Showcase local input or receipt | SHA-256 |
+| --- | --- |
+| Normal Showcase control ROM | `a2ea4dcbd92f8050b41f76b739a7bc1786e126aa7058b9f3b1158f9d67c59fe3` |
+| Packed candidate ROM | `a08e67f17a2fe1966ce7e4dad81533baecba6658b611cb29c6327beb244dad64` |
+| Packed candidate ELF | `1fef170297b2ca82fce8c42d0ef6bf9854b1cfac2fe5ed33d9aa62f5a4c2e402` |
+| Custom Game comparison | `c49e1732695d7f25599521dca9f5f64b5c55aafa253663cee1157c06619e85c4` |
+| Terran Last Stand comparison | `f0210bd82154e61a16f7518a8032b5e048459dd2c6beb8286a943520b72a541a` |
+| Packed candidate link receipt | `b4381e20d4d1d8438c03d2e5db1dce5403a080e90db38aced7d83cdd840036b0` |
+
+## Remaining qualification
 
 The authenticated Z10 frame bank maps the same three raw IDs to 71,968
-packed bytes. Showcase's Command Center crop is one row higher, making
-its full set 72,504 bytes. Each requires its own prepared bank, selected
-pointer and pixel checks, ARM link and stack margins, and ordinary play
-with multiple completed Terran structures in view. Physical GBA timing
-remains open for the tested builds.
+packed bytes. It needs its own prepared bank, selected pointer and pixel
+checks, ARM link and stack margins, and ordinary active Terran building
+cuts. Physical GBA timing remains open for the tested builds.
