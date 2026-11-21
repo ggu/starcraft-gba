@@ -434,9 +434,9 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_UNIT_FACING
             if (key & DEPTH_TURRET_BIT) {
                 unsigned hull = i >> 1;
-                sc64_facing_draw_tank_turret(hull, i & 1);
+                sc64_facing_draw_turret(hull, i & 1);
 #ifdef SC64_PROJECTILE_DEPTH
-                /* Both Tank firing flashes attach to the turret image. */
+                /* Turret-mounted firing flashes follow the turret body. */
                 if (have_images && image_heads[hull])
                     sc64_draw_attacker_images(image_heads[hull], image_next,
                                               SC64_TRACE_ATTACKER_OVER);
