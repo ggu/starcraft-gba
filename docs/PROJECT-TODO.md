@@ -24,9 +24,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   frame captures match the retained ordinary-input reference. Allow for
   asynchronous frame callbacks. The
   [fresh Wasteland opening](audits/2026-11-21-native-headless-replay.md#fresh-wasteland-campaign-opening)
-  also reproduces 10/18 supply and 40 minerals. Next capture Blood Bath
-  with a native state observer that can record sprite IDs, visible
-  overlap and the exact campaign roster.
+  also reproduces 10/18 supply and 40 minerals. A separate
+  [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
+  verifies the Command Center, worker and mineral sprite keys in
+  live render rows. Capture the exact campaign roster and resolve
+  visible opaque overlap and reused IDs at equal depth.
 
 - **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
   pass ordinary-input wins, fresh HOME continuation and victory-journal
@@ -38,10 +40,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   passes 54 ordinary starts and fresh SRAM continuations on the exact
   Terran, Z10 and P10 cartridges. It covers both maps, all human races,
   and one to three independently selected CPU seats. A further 1,134
-  launches cover every physical seat and named race assignment. The Mac playtest
-  folder `StarCraft-GBA-2026-11-21-5516dffa` holds these three verified
-  cartridges. SD readback, physical frame pacing, and gameplay across
-  every race and mission on the combined source remain open.
+  launches cover every physical seat and named race assignment. The
+  [fallback-depth release](audits/2026-11-21-fallback-world-depth.md#verification-and-remaining-gaps)
+  repeats the 54-case save matrix. The Mac playtest folder
+  `StarCraft-GBA-2026-11-21-749f585a` holds those three verified cartridges.
+  SD readback, physical frame pacing, and gameplay across every race and
+  mission on the combined source remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
@@ -88,6 +92,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   state and video. Its early Z7 window rises 1.14% and its Z8 mean
   rises 0.71%. Position reuse alone stays within 0.05% of stock across
   the Z7 and Z8 windows. Lazy weapon checks cut the Z8 increase to 0.18%.
+  The [current lazy cache](audits/2026-11-21-indexed-target-query.md#lazy-query-on-the-fallback-depth-release)
+  costs 0.15% in Z8 and 0.21% in early Z7, then saves about 0.8%
+  in late Z7. Keep it off and measure route stalls and large draw passes.
   [Immutable combat facts](audits/2026-11-21-indexed-target-query.md#immutable-combat-facts)
   cut the Z10 late means by 2.76% and 3.13%, with matching state.
   The [normal Z10 qualification](audits/2026-11-21-z10-combat-facts-release.md)
@@ -128,16 +135,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 709,645 more cycles at call 154,508. Its Z7 win and re-exported
   journal match stock. The traced goal stays partial on each resident cut
   and evicts without an eager refill. Both late means remain over four
-  times the 30 fps cycle budget. The [combined trial](audits/2026-11-21-route-composition-current.md)
-  reduces the dense Z7 mean by about 13% and the late means by about 4%.
-  It preserves sampled world state and both journals. One active-page
-  sample differs. The current four links and sampled T10, P10 and
-  Custom Game continuations pass. The current Z8 mean and peak fall
-  8.42% and 15.61%. Separate VBlank observations establish phase shifts
-  in Blood Bath and the earlier dense Z7 pair. Both profiles show the
-  same page payloads in sequence within the sampled cuts. Finish the
-  current-renderer Z7 pair and measure physical frame pacing before
-  activating this option.
+  times the 30 fps cycle budget. The
+  [composed route trial](audits/2026-11-21-route-composition-current.md)
+  reduces current Z8 mean cycles by 8.42% and peak cycles by 15.61%.
+  On the current renderer it wins Z7 with matching world and display
+  cuts and both journals. Mean cycles fall 12.88% in the early dense
+  window and about 4% in both late windows. All four links and the
+  sampled T10, P10 and Custom Game continuations pass. Bounded VBlank
+  observations explain the phase shifts in Blood Bath and the earlier
+  dense Z7 pair. Measure broader busy skirmishes, campaign coverage
+  and physical frame pacing before activating this option by default.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral

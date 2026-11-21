@@ -264,16 +264,20 @@ build/test-sc64-route-point-warm-blocked-gap: $(ROUTE_KEEP_TEST_DEPS) starcraft/
 test-sc64-route-point-warm-blocked-gap: build/test-sc64-route-point-warm-blocked-gap
 	./$< --point-certificate-only
 
+ROUTE_POINT_COMPOSED_TEST_FLAGS = $(ROUTE_POINT_RESERVE_FLAGS) $(POINT_PREFIX_COMPOSED_FLAGS)
 build/test-sc64-route-composed: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
-	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) $(POINT_PREFIX_COMPOSED_FLAGS) $< -o $@
+	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) $< -o $@
+build/test-sc64-route-composed-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) mk/combat-perf/Makefile | build
+	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
 .PHONY: test-sc64-route-composed
-test-sc64-route-composed: build/test-sc64-route-composed
+test-sc64-route-composed: build/test-sc64-route-composed build/test-sc64-route-composed-far-read
 	./$< --point-component-only
 	./$< --point-certificate-only
 	./$< --point-near-distance-only
 	./$< --point-near-demand-only
 	./$< --sparse-linear-only
 	./$< --small-component-only
+	./build/test-sc64-route-composed-far-read
 
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@

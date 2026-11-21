@@ -57,8 +57,10 @@ Set `CANONICAL_ROUTE_POINT_PREFIX=composed` when building a trial
 cartridge. The Makefile expands it to the same 13 probe flags as the Z7
 experiment above and includes the choice in the build key. The default
 remains `0`. The current source with the trial off reproduces the public
-asset-free ROM byte for byte. The six focused route sanitizer checks
-pass with the composed flag set.
+asset-free ROM byte for byte. The focused route sanitizer checks
+pass with the composed flag set, including far-read and range-work
+coverage with all of the composed flags enabled. That check compares
+108 randomized full fields and 8,320 route-copy alignment cases.
 
 All four prepared trial links on top of `878eea80` pass ROM, payload,
 and working RAM checks. The current Showcase link ends at
@@ -93,11 +95,13 @@ The mean falls 8.42% and the peak falls 15.61%. The mean still
 exceeds the 30 fps budget by about 2.8 times.
 
 The current-renderer Z7 pair matches the frame-5,641 pause journal,
-all 228 world cuts, nine indexed display cuts including the active page,
-and all timed route counters through call 155,650. An independent breadth-first
-field check validates 4,201 published directions on six partial fields.
-All 75 complete fields match at the six cache cuts. The replay through
-victory and physical GBA timing remain open.
+all 254 world cuts, ten indexed display cuts including the active
+page, and every timed route counter. An independent breadth-first
+field check validates 4,201 published directions on six partial
+fields. All 75 complete fields match at the six cache cuts. Both
+runs finish the controller tape at call 231,031 and win at frame
+228,128. The result journal and its re-export from a new HOME
+process match between both builds. Physical GBA timing remains open.
 
 | Current Z7 window | Advancing updates | Release mean / p95 / peak cycles | Composed mean / p95 / peak cycles |
 | --- | ---: | ---: | ---: |
@@ -129,6 +133,7 @@ difference for Blood Bath.
 | Current-renderer receipt | SHA-256 |
 | --- | --- |
 | Composed host checks | `3cf38629f8158839ce4573d051381ea38a2acde5d06647e50ab49f67ea9a1041` |
+| Composed host checks with range work and far-read | `04f6508f02dd5c1faf824c8e0231d1daaaf984981b64c7fa9610554f496efc82` |
 | Four profile openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Both Custom Game maps | `21a71ce5db13778d0fc87f91dd6ccb8ad496613be453d3a158884e50e75ea5f3` |
 | Custom Game fresh continuation matrix | `0b5f0e0034be519a321c62d7e9416db33d7c8c06f14603c4368f3bec507d2155` |
@@ -136,6 +141,7 @@ difference for Blood Bath.
 | P10 paired campaign tail | `6d14a579c7851da22dcdd118ccfe1c0a2a319b7b1fe02f50688709d760d092d8` |
 | Z8 comparison | `c081897aa190d53986f4be6ddc22793bb5fa56c8c787db765780122a6e9e0b83` |
 | Current Z7 comparison through call 155,650 | `3c807c9fc00361373aab4e80ec92dba152bf125c07b389af55edd01207ffd0be` |
+| Current Z7 full victory comparison | `feed2bcba11b8dbba5cd98540a1b17eae570fafe2b110d36d7e12f379b8d88c8` |
 | Late Blood Bath comparison and active-page difference | `4f2347a4854f2c9677ac57a2f31b797396caa00a94aaa8de6fc4403cbad192e2` |
 | Blood Bath release VBlank observer | `f03446fc3d633230adf2d9718e2a2c376edcd30e3a76b66b05c0cc67e001cbe2` |
 | Blood Bath composed VBlank observer | `d16d75682f814538a75ef8cb90234a4229cca90b8f4b40b2bad97fa8e9591270` |
