@@ -103,7 +103,7 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     Sc64PointPrefix *prefix = sc64_point_prefix_free();
     if (!prefix) return sc64_route_fill(slot, goal);
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
-    if (sc64_point_certificate(slot, origin, goal, 1)) {
+    if (sc64_point_certificate(slot, origin, goal, SC64_POINT_CERT_FRESH)) {
         sc64_point_prefix_discard(prefix);
         prefix->goal = (u16)goal;
         prefix->slot = (u8)slot;
@@ -287,13 +287,13 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 }
 
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
-static int sc64_point_certificate_require(int slot, int cell)
+static int sc64_point_certificate_require(int slot, int cell, int mode)
 {
     Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
     if (!prefix || prefix->count != SC64_POINT_CERTIFIED_ONLY) return 0;
     if ((unsigned)cell >= (unsigned)(MAP_COLS * MAP_ROWS) ||
         (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
-         !sc64_point_certificate(slot, cell, prefix->goal, 0)))
+         !sc64_point_certificate(slot, cell, prefix->goal, mode)))
         (void)sc64_route_fill(slot, prefix->goal);
     return 1;
 }
@@ -310,7 +310,11 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 static void sc64_point_prefix_require_exact_hit(int slot, int origin, int near_reader)
 {
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
-    if (sc64_point_certificate_require(slot, origin)) return;
+    int mode = SC64_POINT_CERT_RETRY;
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+    if (near_reader) mode = SC64_POINT_CERT_NEAR;
+#endif
+    if (sc64_point_certificate_require(slot, origin, mode)) return;
 #endif
     if (sc64_point_prefix_find(slot) &&
         ((unsigned)origin >= (unsigned)(MAP_COLS * MAP_ROWS) ||
@@ -325,7 +329,7 @@ static void sc64_point_prefix_require_exact_hit(int slot, int origin, int near_r
 static void sc64_point_prefix_require(int slot, int cell)
 {
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
-    if (sc64_point_certificate_require(slot, cell)) return;
+    if (sc64_point_certificate_require(slot, cell, SC64_POINT_CERT_RETRY)) return;
 #endif
     if (sc64_point_prefix_find(slot) &&
         (cell < 0 || sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE))

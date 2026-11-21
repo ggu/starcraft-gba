@@ -1266,6 +1266,45 @@ static void check_point_near_reserve(void)
     check_grid_unchanged();
     puts("A spent ordinary cutoff can use the free reserve once before exact completion.");
 }
+
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+static void check_near_certificate_margin(void)
+{
+    race_cols = race_rows = 128;
+    const int cols = MAP_COLS;
+    const int root = 17 + 47 * cols, origin = 20 + 40 * cols;
+    const int alternative = root + 2 * cols;
+    memset(desired, 1, sizeof(desired));
+    /* The only crossing adds six steps to the ten-step lower bound. */
+    for (int col = 15; col < cols; ++col) desired[col + 44 * cols] = 0;
+    for (int near = 0; near <= 1; ++near) {
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        int slot = sc64_route_slot_for(root, root + cols);
+        assert(slot >= 0);
+        const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        assert(prefix && prefix->count == SC64_POINT_CERTIFIED_ONLY);
+        assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        const u32 metadata = state_hash();
+        if (near) {
+            assert(!sc64_route_near_root_reaches(slot, origin, alternative, root));
+            assert(sc64_point_prefix_find(slot) == prefix);
+        } else {
+            sc64_point_prefix_require(slot, origin);
+            assert(!sc64_point_prefix_find(slot));
+        }
+        assert(state_hash() == metadata);
+        reference_bfs(&oracle[POOL], root);
+        assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        SC64_ROUTE_EXACT(slot);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    puts("Nearby-only certificate covers a six-step detour with the exact canonical route.");
+}
+#endif
 #endif
 
 #ifdef SC64_ROUTE_KEEP_FIELDS
@@ -1377,8 +1416,8 @@ static void check_point_certificate_wider_retry(void)
         assert(prefix && prefix->count == SC64_POINT_CERTIFIED_ONLY);
         u8 *field = sc64_route_field[slot];
         assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
-        assert(!sc64_point_certificate(slot, origin, goal, 1));
-        assert(!sc64_point_certificate(slot, goal + 13 * cols + 6, goal, 0));
+        assert(!sc64_point_certificate(slot, origin, goal, SC64_POINT_CERT_FRESH));
+        assert(!sc64_point_certificate(slot, goal + 13 * cols + 6, goal, SC64_POINT_CERT_RETRY));
         assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
         const unsigned builds = sc64_route_builds, hits = sc64_route_hits;
         assert(sc64_route_slot_for(goal, origin) == slot);
@@ -1572,6 +1611,9 @@ int main(int argc, char **argv)
         check_point_near_demand();
 #ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
         check_point_near_reserve();
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+        check_near_certificate_margin();
+#endif
 #endif
         return 0;
     }

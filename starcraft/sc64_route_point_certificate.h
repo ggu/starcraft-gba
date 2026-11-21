@@ -2,17 +2,23 @@
 #ifndef SC64_ROUTE_POINT_CERTIFICATE_H
 #define SC64_ROUTE_POINT_CERTIFICATE_H
 
-/* Search only paths up to four steps longer than the Manhattan lower
- * bound. A path meeting that bound cannot stray more than two cells
- * outside the bounding box of the origin and possible seeds, since it
- * would have to undo each step outside. The same seed and neighbor order
- * finds the canonical path. Any shorter or equal path is inside the box. */
+enum {
+    SC64_POINT_CERT_RETRY,
+    SC64_POINT_CERT_FRESH,
+    SC64_POINT_CERT_NEAR
+};
+
+/* A path whose length exceeds the Manhattan lower bound by at most twice
+ * the margin cannot stray farther outside the bounding box of the origin
+ * and possible seeds. Every step outside must be undone. The same seed
+ * and neighbor order finds the canonical path within that bound. */
 static int __attribute__((noinline))
-sc64_point_certificate(int slot, int origin, int goal, int clear)
+sc64_point_certificate(int slot, int origin, int goal, int mode)
 {
-    enum { MAX_GAP = 16, MAX_RETRY_GAP = 18, EXTRA_STEPS = 4, MARGIN = EXTRA_STEPS / 2,
+    enum { MAX_GAP = 16, MAX_RETRY_GAP = 18, MARGIN = 2,
            MAX_SIDE = MAX_GAP + 3 + 2 * MARGIN + 2,
            MAX_CELLS = MAX_SIDE * MAX_SIDE };
+    const int clear = mode == SC64_POINT_CERT_FRESH;
     const int cols = MAP_COLS, rows = MAP_ROWS;
     if ((unsigned)origin >= (unsigned)(cols * rows) ||
         !SC64_GRID_GET(path_walkable, origin)) return 0;
@@ -26,17 +32,18 @@ sc64_point_certificate(int slot, int origin, int goal, int clear)
     if (gap > (clear ? MAX_GAP : MAX_RETRY_GAP)) return 0;
 
     const int spread = !SC64_GRID_GET(path_walkable, goal);
+    const int margin = MARGIN + (mode == SC64_POINT_CERT_NEAR && !spread);
     const int seed_left = gx > 0 ? gx - spread : gx;
     const int seed_right = gx + 1 < cols ? gx + spread : gx;
     const int seed_top = gy > 0 ? gy - spread : gy;
     const int seed_bottom = gy + 1 < rows ? gy + spread : gy;
-    const int left = limit((ox < seed_left ? ox : seed_left) - MARGIN, 0, cols - 1);
-    const int right = limit((ox > seed_right ? ox : seed_right) + MARGIN, 0, cols - 1);
-    const int top = limit((oy < seed_top ? oy : seed_top) - MARGIN, 0, rows - 1);
-    const int bottom = limit((oy > seed_bottom ? oy : seed_bottom) + MARGIN, 0, rows - 1);
+    const int left = limit((ox < seed_left ? ox : seed_left) - margin, 0, cols - 1);
+    const int right = limit((ox > seed_right ? ox : seed_right) + margin, 0, cols - 1);
+    const int top = limit((oy < seed_top ? oy : seed_top) - margin, 0, rows - 1);
+    const int bottom = limit((oy > seed_bottom ? oy : seed_bottom) + margin, 0, rows - 1);
     const int stride = right - left + 3;
     const int height = bottom - top + 3;
-    if (gap > MAX_GAP && stride * height > MAX_CELLS) return 0;
+    if (stride * height > MAX_CELLS) return 0;
 
     /* The prefix expansion uses this scratch after this function returns.
      * The independent walkability grid and the borrowed tail stay intact. */
@@ -68,7 +75,8 @@ sc64_point_certificate(int slot, int origin, int goal, int clear)
         }
     }
     const int start = (oy - top + 1) * stride + ox - left + 1;
-    for (int distance = 0; distance < lower + EXTRA_STEPS && head < tail && dense[start] == 7;
+    const int limit_distance = lower + 2 * margin;
+    for (int distance = 0; distance < limit_distance && head < tail && dense[start] == 7;
          ++distance) {
         const int end = tail;
         do {
