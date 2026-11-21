@@ -147,7 +147,10 @@ static int race_z5_cloak_world_state_valid(void)
  * policy, a live enabled enemy detector prop makes her targetable. Traps are
  * stored in the Building pool by the adapter even though their native source
  * UnitType is not Building; use source fact extents and map coordinates. */
-static int race_z5_cloaked_target_attackable(int target_slot)
+/* Keep the detector walk and its temporary boxes out of the common attack
+ * query's stack frame when Z5 cloaking is inactive. */
+static int __attribute__((noinline))
+race_z5_cloaked_target_attackable(int target_slot)
 {
     const Unit *target;
     int hero;
