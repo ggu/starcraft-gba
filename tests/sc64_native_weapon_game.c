@@ -632,6 +632,17 @@ static void test_flight_trail_depth(void)
         const Sc64WeaponSourceAttackProfile *profile =
             sc64_weapon_source_trace_profile((u32)tracers[0].color);
         assert(profile && profile->projectile_image == cases[n].image);
+        const Sc64WeaponSourceAnimation *flight =
+            sc64_weapon_source_animation_lookup(cases[n].image, 2);
+        const Sc64WeaponSourceAnimation *death =
+            sc64_weapon_source_animation_lookup(cases[n].image, 1);
+        assert(flight && death && flight->overlay_count == 1);
+        const Sc64WeaponSourceOverlay *birth =
+            &sc64_weapon_source_overlays[flight->overlay_first];
+        const Sc64WeaponSourceAnimation *smoke =
+            sc64_weapon_source_animation_lookup(birth->image_id, 0);
+        assert(birth->opcode == 15 && smoke && smoke->loop_pc == UINT32_MAX);
+        assert(smoke->duration_ticks <= sc64_weapon_source_animation_visual_ticks(death));
         while (slot->release_life && tracers[0].life > 1) update_tracers();
         unsigned layer = scout ? 17 : 5;
         assert(slot->bullet_layer == layer);
@@ -702,12 +713,38 @@ static void test_flight_trail_depth(void)
                "(flight [%u,%u)), %u order-sensitive pixels on both pages\n",
                cases[n].image, layer + 1, scout ? layer + 1 : layer, source_age,
                flight_start, flight_start + slot->flight, overlaps);
-        if (scout) {
-            u[blocker].alive = 0;
-            continue;
-        }
+        if (n != 0) {
+            if (scout) u[blocker].alive = 0;
+            storm->active = 0;
+            unsigned impact_age = sc64_weapon_source_vfx_first_gba_age(flight_start + slot->flight);
+            while (tracers[0].life && (unsigned)(sc64_tracer_duration(0) - tracers[0].life) < impact_age)
+                update_tracers();
+            assert(tracers[0].life);
 
-        if (n == 0) {
+            begin_depth_frame();
+            draw_tracer(0, parent);
+            capture_depth_frame(pair);
+            draw_tracer(0, child);
+            capture_depth_frame(expected);
+            assert(memcmp(expected, pair, BATTLEFIELD_BYTES));
+
+            unsigned impact_pages = 0;
+            for (unsigned page = 0; page < 2; ++page) {
+                begin_depth_frame();
+                impact_pages |= 1u << gfx_backbuffer_index();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                assert_hud_untouched();
+                capture_depth_frame(pair);
+                assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                gfx_end();
+            }
+            assert(impact_pages == 3);
+            printf("PASS source flight trail image %u remains through impact on both pages\n",
+                   cases[n].image);
+            if (scout) continue;
+            storm->active = 1;
+        } else {
             int blocker = make_unit(SIDE, U_WRAITH, 8, storm->x, storm->y);
             int overlap = 0;
             for (int dx = -8; dx <= 8 && !overlap; ++dx) {
@@ -735,8 +772,7 @@ static void test_flight_trail_depth(void)
             u[blocker].alive = 0;
         }
 
-        /* A layer-4 child needs its individual world-Y key. Keep the
-         * unsplit path until lower children have individual queue entries. */
+        /* A layer-4 child stays below the layer-5 Storm. */
         sc64_trace_slots[0].bullet_layer = 3;
         camy = storm->y;
         begin_depth_frame();

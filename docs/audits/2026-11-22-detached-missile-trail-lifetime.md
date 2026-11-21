@@ -50,3 +50,29 @@ Follow with ordinary input in Campaign, Custom Game and Showcase wherever
 the encounter is available. For exact same-elevation and same-Y ties, use
 the [native sprite lifetime cases](2026-11-21-world-depth-replay-contract.md#native-pool-id-and-pixel-evidence).
 The GBA still resolves exact ties by actor kind and slot.
+
+## Qualification
+
+The prepared Showcase ASan and UBSan fixture fails on `6232bb0` at the
+first Vulture impact. The updated renderer matches the independent
+composition on both indexed pages for 77 north and 74 south
+order-sensitive pixels. It also matches the last live and first
+expired trail cuts. The Goliath, Wraith and Scout fixtures show visible
+trail pixels on the first impact tick on both pages. Each supported
+profile's smoke init is finite, and its child lifetime fits inside the
+projectile impact window even for the last possible birth.
+
+All four normally linked ARM products preserve both static RAM
+endpoints. Fresh ordinary controller inputs matched world, palette and
+indexed pages in the three campaign openings and the Showcase opening.
+Custom Game matched at 164 camera cuts across all four products.
+The 3,600-update three-CPU Blood Bath replay matched 31 world and
+indexed-page cuts, 16 continuation cuts and SRAM bytes. Its mean
+emulated guest cycles rose from 821,028 to 821,530 per update (+0.06%).
+The focused staged case provides the active-impact pixel evidence.
+
+| Local replay receipt | SHA-256 |
+| --- | --- |
+| Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
+| Custom Game camera cuts | `356b3078e1ebb4c9386f0bbd2de45b4c4bac8388fc8e967a7f77a47a1b3a1d59` |
+| Busy Blood Bath and fresh HOME | `bad22581f2ae4b75334c2ca00af769b16f259de867638a4f1968b15ef2d2c930` |
