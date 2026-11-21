@@ -160,10 +160,18 @@ move brought the group to Raynor and triggered his introduction and
 survival objective. A second move brought all five Marines alive to
 the Command Center approach at X 1108–1144, Y 1817–1889. Raynor was still
 alive at (1014, 1031) with 300 HP, and the five SCVs remained at their
-opening positions with 60 HP. The next comparison checkpoint is the
-first worker safely reaching the mineral line. Barracks payment and
-completion remain open. These normal-controller observations use
+opening positions with 60 HP. These normal-controller observations use
 wall-clock input timings and read-only paused state capture.
+
+A further ares continuation selected SCV slot 5 with the field cursor
+and moved it with C-Right on the minimap. The worker passed (1043, 1007)
+at 60 HP and reached (1089, 1868) alive with 40 HP beside the Marines
+and the visible minerals. The HUD offered B Harvest on the mineral
+patch. After that input the SCV used native order 90 and the human
+minerals reached 64 from 40. The mining checkpoint at step 61,053
+has local state SHA-256
+`47926b91fc8b24b41dc8fb67eb2a48f8d062fa74a4b101e18163a9675d30c96a`.
+Use that checkpoint to capture the Barracks cost and completion.
 
 The local escort state SHA-256 is
 `2ef299b94d40a31bd91bd9f26d2a9dd937c5f7f383dd068c40e0f5704a98be30`.

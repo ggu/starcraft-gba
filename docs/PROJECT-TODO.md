@@ -124,7 +124,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Verify native victory and defeat through ordinary inputs. The
   [native base approach scout](audits/2026-11-21-wasteland-opening-cross-platform.md#native-base-approach)
   reaches the base with five living Marines after Raynor's introduction.
-  Verify a worker reaches minerals safely, then capture paid construction.
+  The resumed SCV reaches the mineral line alive and earns minerals
+  with B Harvest. Capture Barracks payment and completion next.
   The independent clocks leave the native mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in

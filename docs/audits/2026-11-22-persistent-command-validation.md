@@ -87,3 +87,14 @@ opening cuts. Use physical timing to qualify play on GBA hardware.
 | All Custom Game launches | `486dba4794a77f84f2dd206e6104af652d29e84ddb2ead5713cd09adf6ba5a14` |
 | Custom Game save matrix | `a0ebb028604a601c8e6c99e98790283fd07e5699eab6b1fadfd906d8a68230fa` |
 | Custom Game camera comparisons | `356b3078e1ebb4c9386f0bbd2de45b4c4bac8388fc8e967a7f77a47a1b3a1d59` |
+
+## Distance from the timing target
+
+The two-VBlank budget is 561,792 guest cycles. In the rebuilt P10 saved
+tail, 9,294 samples advance the gameplay frame. Their median game-update
+cost is 856,797 cycles before audio and rendering. Median and p95
+main-loop costs are 1,484,475 and 2,059,784 cycles. None of these advancing
+updates fits the two-VBlank budget. The busy three-CPU Z10 Blood Bath
+window has a median of 799,488 cycles, and nine of 3,600 updates fit the
+same budget. These comparisons use emulator counters. Both simulation
+and display costs contribute to the remaining pacing work.
