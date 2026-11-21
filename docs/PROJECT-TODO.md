@@ -27,8 +27,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Qualify physical frame pacing on all three race cartridges.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
-  preceding release. Keep it opt-in pending Showcase stack watermark
-  and measure it with the Carrier roster before considering activation.
+  preceding release. On top of the Carrier roster the Blood Bath peak
+  falls another 5.09%, while p95 rises 0.32%. Keep it opt-in pending
+  broader combined replays and the Showcase runtime stack watermark.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -60,8 +61,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   their original slots. Qualify the missing Custom Game research
   and AI morph path with per-owner payment, supply and save checks.
   The [follow-on Blood Bath cut](audits/2026-11-21-native-blood-bath-lurker.md#follow-on-egg-observation)
-  narrows a likely Zergling pair hatch to 33 native updates. Check the
-  existing pair reservation on an ordinary GBA Egg completion and use
+  narrows a likely Zergling pair hatch to 33 native updates. The ordinary
+  GBA counterpart verifies a queued pair and fresh HOME continuation.
+  Qualify the separate Custom Game Egg actor and use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 

@@ -44,11 +44,20 @@ appears in slot 135 with 35 HP at (333, 1817). This is consistent with
 a paired hatch. Its exact update, the source of the second Zergling,
 and the purchase cost remain unobserved in these samples.
 
-The GBA paid pair trainer reserves a second actor slot at admission.
-For comparison, capture an ordinary Custom Game Egg before completion,
-then both newborn actors and owner resources after completion. Pause
-mid-egg and repeat from fresh HOME. Repeat with actor slots nearly
-full to verify that the pair reservation and wallet agree.
+The released GBA Custom Game uses a Hatchery queue. In an ordinary
+Z10 match between a human Terran and a Zerg CPU, the queue held a
+Zergling order at frame 6,101. By frame 6,126 the order had cleared and
+two 35-HP Zerglings occupied new slots 24 and 25. A separate fresh
+run sampled every update around this AI's first Zergling order.
+Between frames 4,175 and 4,176 the queue appended a Zergling after a
+Drone and the owner's bank went from 1,228 to 1,178 minerals with
+zero gas throughout. Saving at frame
+6,101 and loading from fresh HOME produced the same world as
+uninterrupted play at frame 6,161.
+
+An independent Egg actor is available in an experimental Custom
+Game profile. Qualify its payment, second-slot reservation and
+save continuation near the actor limit before promoting it.
 
 | Follow-on receipt | SHA-256 |
 | --- | --- |
@@ -56,6 +65,9 @@ full to verify that the pair reservation and wallet agree.
 | Live samples | `4d91d7452672d8289401d44da2caa677e5ad052b70379d29eb41ba22a993eac5` |
 | Final native state | `4da3a3139006c693a2db4cd35ec215a5d8f6cf42ec80f0651128e89e3c8e7c11` |
 | Observer receipt | `1d2a07d377c445214f5a7fd1da90ab7c9c42d8fdcc2ea836a4aed13d40689ec8` |
+| Normal Z10 Hatchery queue samples | `d0da57f66d205e101da06a6f7812360bdc9b932f48065cc593c0cff3aec2642c` |
+| Normal Z10 first queue debit | `8fd153dda9abe36f97783a294899d15dc83cf4a0e917c5c132cd30c8e4ecc87c` |
+| Normal Z10 pause and fresh continuation | `56fc61d79df01c534c25eb96488cca605440605348c9781fa8906cbf6cdac2e7` |
 
 ## Custom Game implementation dependencies
 

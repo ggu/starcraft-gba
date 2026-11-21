@@ -77,3 +77,16 @@ the displayed-page bit differs. Flip timing has not been traced there.
 These measurements cover emulated guest cycles. Keep the option off
 while qualifying the tight Showcase stack, further maps and late-game
 loads, complete save/load paths across products, and physical hardware.
+
+## With the Carrier frame roster
+
+Repeat the 3,600-update Z10 Blood Bath comparison after enabling the
+[Carrier roster](2026-11-21-carrier-frame-roster.md). The facility-off
+ROM reproduces the qualified roster ROM exactly. The facility option
+changes mean guest cycles from 880,942 to 879,058 (−0.21%), p95 from
+1,171,673 to 1,175,411 (+0.32%) and peak from 3,760,529 to 3,569,137
+(−5.09%). All 31 world and display samples, 16 fresh continuation
+samples, route counters and exported pause bytes match. The comparison
+receipt SHA-256 is
+`c24d256cbfec20f1f342317b0629be1717cc961c6cc3bafe8f372c7e510165fe`.
+This paired trial covers the Z10 busy match.
