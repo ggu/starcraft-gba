@@ -19,6 +19,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **World depth and sprite lifetime.** The optional VRAM death pool now
+  preserves actor elevation through storage. Run the
+  [depth replay assertions](audits/2026-11-21-world-depth-replay-contract.md#replay-cases)
+  on both framebuffer pages. Prioritize an opaque native equal-Y death
+  overlap and verify sprite ID lifetime through last-image retirement
+  and reuse. The current GBA key still changes kind at that transition.
+
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
   frame captures match the retained ordinary-input reference. Allow for

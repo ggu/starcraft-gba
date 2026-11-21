@@ -1668,7 +1668,10 @@ death_vfx_load_row(int slot, Sc64DeathVfx *e)
     e->birth = (uint32_t)p[2] | ((uint32_t)p[3] << 16);
     e->raw = p[4]; e->burst_su = p[5]; e->remnant_start = p[6]; e->total_su = p[7];
     e->style = (uint8_t)p[8]; e->extent = (uint8_t)(p[8] >> 8);
-    e->source = (uint8_t)p[9]; e->color = (uint8_t)(p[9] >> 8);
+    u16 appearance = p[9];
+    e->source = appearance & 1u;
+    e->actor_layer_plus1 = (appearance >> 1) & 31u;
+    e->color = (uint8_t)(appearance >> 8);
 }
 static void
 death_vfx_store_row(int slot, const Sc64DeathVfx *e)
@@ -1678,7 +1681,8 @@ death_vfx_store_row(int slot, const Sc64DeathVfx *e)
     p[2] = (u16)e->birth; p[3] = (u16)(e->birth >> 16);
     p[4] = e->raw; p[5] = e->burst_su; p[6] = e->remnant_start; p[7] = e->total_su;
     p[8] = (u16)e->style | ((u16)e->extent << 8);
-    p[9] = (u16)e->source | ((u16)e->color << 8);
+    /* Source bit, five elevation bits, then the owner color in the high byte. */
+    p[9] = e->source | ((u16)e->actor_layer_plus1 << 1) | ((u16)e->color << 8);
 }
 static u16
 death_vfx_seen_word(unsigned word)
