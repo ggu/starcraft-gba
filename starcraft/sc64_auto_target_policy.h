@@ -50,7 +50,7 @@ sc64_auto_target_candidate_allowed(int attacker, int target, int owner,
 #if defined(SC64_TARGET_QUERY_PROBE) && \
     (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY))
 #define SC64_INDEXED_TARGET_QUERY
-#ifdef SC64_DIRECT_TARGET_POLICY
+#if defined(SC64_DIRECT_TARGET_POLICY) && !defined(SC64_TARGET_QUERY_COORDINATES_ONLY)
 #define SC64_INDEXED_TARGET_WEAPONS
 enum {
     SC64_TARGET_WEAPON_GROUND = 1,
@@ -101,13 +101,15 @@ sc64_indexed_target_candidate_allowed(const Sc64IndexedTargetQuery *query,
         (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H || !currently_visible(x, y)))
         return 0;
     int attacker = query->attacker;
-#ifdef SC64_INDEXED_TARGET_WEAPONS
+#ifdef SC64_DIRECT_TARGET_POLICY
     if (attacker != U_SCOURGE) {
 #ifdef SC64_Z8_RUNTIME
         if (owner == SIDE && race_z8_hidden_any && race_z8_unit_hidden_from_side(target))
             return 0;
 #endif
+#ifdef SC64_INDEXED_TARGET_WEAPONS
         if (query->weapons) return race_can_attack_with_weapons(query->weapons, target);
+#endif
         return race_can_attack(attacker, target);
     }
 #endif
