@@ -24,9 +24,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   frame captures match the retained ordinary-input reference. Allow for
   asynchronous frame callbacks. The
   [fresh Wasteland opening](audits/2026-11-21-native-headless-replay.md#fresh-wasteland-campaign-opening)
-  also reproduces 10/18 supply and 40 minerals. Next capture Blood Bath
-  with a native state observer that can record sprite IDs, visible
-  overlap and the exact campaign roster.
+  also reproduces 10/18 supply and 40 minerals. A separate
+  [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
+  verifies the Command Center, worker and mineral sprite keys in
+  live render rows. Capture the exact campaign roster and resolve
+  visible opaque overlap and reused IDs at equal depth.
 
 - **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
   pass ordinary-input wins, fresh HOME continuation and victory-journal
@@ -38,10 +40,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   passes 54 ordinary starts and fresh SRAM continuations on the exact
   Terran, Z10 and P10 cartridges. It covers both maps, all human races,
   and one to three independently selected CPU seats. A further 1,134
-  launches cover every physical seat and named race assignment. The Mac playtest
-  folder `StarCraft-GBA-2026-11-21-5516dffa` holds these three verified
-  cartridges. SD readback, physical frame pacing, and gameplay across
-  every race and mission on the combined source remain open.
+  launches cover every physical seat and named race assignment. The
+  [fallback-depth release](audits/2026-11-21-fallback-world-depth.md#verification-and-remaining-gaps)
+  repeats the 54-case save matrix. The Mac playtest folder
+  `StarCraft-GBA-2026-11-21-749f585a` holds those three verified cartridges.
+  SD readback, physical frame pacing, and gameplay across every race and
+  mission on the combined source remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
