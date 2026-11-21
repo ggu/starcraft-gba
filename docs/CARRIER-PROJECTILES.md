@@ -23,10 +23,10 @@ death and save validation goes through them, so there is one service and no
 mission-only branch; the only mission-specific code is the P10 rescue tick,
 which calls `race_p7_carrier_training_owner_changed()` and stocks the hangar
 once, when the hero joins the human (`starcraft/sc64_p10_runtime_adapter.h`).
-The hangar size is the ordinary four: the authenticated P10 scenario data carries
-no Carrier Capacity upgrade rows, so nothing in it says otherwise. That the
-Gantrithor starts with a full hangar is an assumption (a placed Carrier starts
-loaded); the source data does not say.
+The GBA currently caps the Gantrithor at four and stocks four on rescue.
+The [owned N64 executable](audits/2026-11-21-native-gantrithor-capacity.md)
+gives it a capacity of eight independently of owner upgrades. Its native
+stock at rescue remains unverified.
 
 Actor slots: Interceptors are Unit rows and count against the 240-slot pool. In
 the P10 finale controller run the pool already reaches 240 of 240 at update
