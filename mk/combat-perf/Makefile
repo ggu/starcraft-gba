@@ -265,7 +265,7 @@ test-sc64-route-point-warm-blocked-gap: build/test-sc64-route-point-warm-blocked
 	./$< --point-certificate-only
 
 build/test-sc64-route-composed: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
-	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) -DSC64_ROUTE_POINT_COLD_COMPONENT_BYPASS -DSC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE -DSC64_ROUTE_SMALL_COMPONENT_PROBE $< -o $@
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) $(POINT_PREFIX_COMPOSED_FLAGS) $< -o $@
 .PHONY: test-sc64-route-composed
 test-sc64-route-composed: build/test-sc64-route-composed
 	./$< --point-component-only

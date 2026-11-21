@@ -226,9 +226,28 @@ sc64_trace_world_y(unsigned i)
 #endif
 
 #ifdef SC64_DEATH_WORLD_DEPTH
-_Static_assert(SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_MAX_LAYERS <= DEPTH_SLOT_MASK + 1 &&
+enum {
+    DEPTH_DEATH_FALLBACK_BASE = SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_MAX_LAYERS,
+    DEPTH_DEATH_PER_EFFECT = SC64_DEATH_SOURCE_DEPTH_LAYERS > 2
+        ? SC64_DEATH_SOURCE_DEPTH_LAYERS : 2,
+};
+_Static_assert(DEPTH_DEATH_FALLBACK_BASE + SC64_DEATH_VFX_POOL * 2 <= DEPTH_SLOT_MASK + 1 &&
                SC64_DEATH_SOURCE_DEPTH_LAYERS <= SC64_DEATH_SOURCE_MAX_LAYERS,
                "painter keys must hold every source death layer");
+
+static unsigned
+sc64_fallback_death_burst_layer(const Sc64DeathVfx *row)
+{
+    unsigned layer = row->actor_layer_plus1 - 1u;
+    switch (row->style) {
+    case SC64_DEATH_VFX_INFANTRY:
+    case SC64_DEATH_VFX_ZERG_SMALL:
+    case SC64_DEATH_VFX_ZERG_LARGE:
+        return layer; /* Collapse is part of the dying actor's draw turn. */
+    default:
+        return layer + 1; /* The fallback burst represents a detached effect. */
+    }
+}
 
 static void __attribute__((noinline))
 sc64_depth_push_deaths(u32 *heap, unsigned *size)
@@ -242,11 +261,21 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
 #else
         const Sc64DeathVfx *row = &death_vfx[i];
 #endif
-        if (!row->source || sc64_death_vfx_expired(row, now)) continue;
+        if (!row->style || sc64_death_vfx_expired(row, now)) continue;
         int x = row->x - camx, y = row->y - camy + 12;
         if (!death_vfx_in_view(row, x, y)) continue;
-        const Sc64DeathSource *art = sc64_death_source(row->raw);
         u32 age = sc64_death_vfx_age_su(row->birth, now);
+        if (!row->source) {
+            if (!row->actor_layer_plus1) continue;
+            unsigned slot = DEPTH_DEATH_FALLBACK_BASE + i * 2;
+            if (age >= row->remnant_start)
+                sc64_depth_push(heap, size, 1, row->y, DEPTH_DEATH, slot);
+            if (age < row->burst_su)
+                sc64_depth_push(heap, size, sc64_fallback_death_burst_layer(row),
+                                row->y, DEPTH_DEATH, slot + 1);
+            continue;
+        }
+        const Sc64DeathSource *art = sc64_death_source(row->raw);
         int actor_queued = 0;
         for (unsigned j = 0; j < art->layer_count; ++j) {
             const Sc64DeathSourceLayer *piece = &art->layers[j];
@@ -271,7 +300,8 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
 static void __attribute__((noinline))
 sc64_depth_draw_death(unsigned slot)
 {
-    unsigned index = slot / SC64_DEATH_SOURCE_MAX_LAYERS;
+    unsigned index = slot >= DEPTH_DEATH_FALLBACK_BASE
+        ? (slot - DEPTH_DEATH_FALLBACK_BASE) / 2 : slot / SC64_DEATH_SOURCE_MAX_LAYERS;
 #ifdef SC64_DEATH_VFX_VRAM_STORAGE
     Sc64DeathVfx effect;
     death_vfx_load_row((int)index, &effect);
@@ -279,10 +309,17 @@ sc64_depth_draw_death(unsigned slot)
 #else
     const Sc64DeathVfx *row = &death_vfx[index];
 #endif
-    const Sc64DeathSource *art = sc64_death_source(row->raw);
-    const Sc64DeathSourceLayer *piece = &art->layers[slot % SC64_DEATH_SOURCE_MAX_LAYERS];
     u32 age = sc64_death_vfx_age_su(row->birth, death_vfx_now());
     int x = row->x - camx, y = row->y - camy + 12;
+    if (slot >= DEPTH_DEATH_FALLBACK_BASE) {
+        if ((slot - DEPTH_DEATH_FALLBACK_BASE) & 1u)
+            sc64_death_vfx_draw_burst(row, x, y, age);
+        else
+            sc64_death_vfx_draw_remnant(row, x, y, age);
+        return;
+    }
+    const Sc64DeathSource *art = sc64_death_source(row->raw);
+    const Sc64DeathSourceLayer *piece = &art->layers[slot % SC64_DEATH_SOURCE_MAX_LAYERS];
     unsigned frame_index;
     if (sc64_death_source_layer_frame(piece, age, &frame_index))
         death_vfx_draw_source_layer(piece, x, y, frame_index);
@@ -326,7 +363,7 @@ sc64_draw_depth_ordered_actors(void)
              + SC64_POOL_CAPACITY
 #endif
 #ifdef SC64_DEATH_WORLD_DEPTH
-             + SC64_DEATH_VFX_POOL * SC64_DEATH_SOURCE_DEPTH_LAYERS
+             + SC64_DEATH_VFX_POOL * DEPTH_DEATH_PER_EFFECT
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
              + SC64_NUKE_FLIGHT_LIMIT * SC64_NUKE_MAX_DRAW_PARTS
