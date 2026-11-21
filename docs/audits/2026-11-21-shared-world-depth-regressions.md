@@ -27,6 +27,15 @@ emitter ends at age 3. The existing bank has eight such nested layers.
 They now share the original death sprite's turn. Independently spawned
 rubble keeps its own key and lifetime.
 
+The Mutalisk glaive and Spore Colony projectile have separate impact
+sprites. Their USA Death scripts at IScript PCs `0x5a9f` and `0x5af7`
+each create sprite 365, image 512, at Death tick 0 with zero offset.
+The native spawn routine raises the child's elevation by one. The
+parent ends a tick later and the child runs for 20 source ticks. The
+GBA used to draw the impact in the parent's turn throughout its
+lifetime. The shared queue now gives each impact its own turn at the
+impact point and keeps its existing timing.
+
 An ordinary Blood Bath step-75 replay shows the SCV and mineral on
 layer 4, with the mining effect on layer 5. The mining image advanced
 from frame 12 in the retained state to frame 16 in the displayed cut.
@@ -49,6 +58,8 @@ The local replay receipt SHA-256 is
 | `pool-id-cross-kind-reuse-active` | Use a layer-4 unit and building at the same sprite Y and on the visible plane. Log each allocator ID and key, then retire an actor's last image and spawn again. Require both pool-ID orderings at an opaque overlap. Repeat with two layer-18 flyers at different Y. Record the current GBA kind-and-slot result separately. The selection check belongs to the same mask once the active picker uses the painter key. |
 | `worker-mining-effect-and-cargo` | Freeze the native effect while the layer-4 worker crosses a mineral edge and a flyer crosses the effect. The layer-5 working sprite covers ground art and stays behind the flyer. Use a second cut of the ore-bearing worker where overlap probes the attached overlay. The GBA comparison of a working sprite remains open. |
 | `death-nested-image-inherits-sprite-depth` | At source ages 2 and 4, overlap the Overlord's nested image 58 with a Wraith and then a Tank. The nested image stays on elevation 16 even when its parent image has expired. It draws behind the Wraith and in front of the Tank. Repeat with the Overmind with Shell (raw 147) at age 69. Require one layer-4 turn for images 89 and 60, plus a separate layer-1 turn for detached rubble image 111. Include a sample at each HUD boundary and a last-image expiration cut. |
+| `mutalisk-detached-impact-depth` | Launch against an SCV and overlap the impact with a layer-5 Storm and then a layer-18 flyer. The glaive launches at elevation 5 and image 512 starts at elevation 6, above the Storm and below the flyer. Compare the last flight tick, first impact tick, a later tick after the parent ends, and the first expired child tick. Repeat with the shooter and target gone after release, with the impact hidden by fog, and across each HUD edge. |
+| `spore-detached-impact-depth` | Launch against a Dropship to get parent elevation 17 and impact elevation 18. Stage an opaque overlap with an elevation-18 Wraith and record the sprite-ID order on N64. The GBA fixture expects the impact in front of the Wraith under its current kind-and-slot tie rule. Capture both native ID orderings before assigning a fixed expected foreground for this pair. Verify the same birth and expiration cuts as the glaive. |
 
 Freeze camera, palette and animation tick across each comparison. Capture
 isolated parts and the expected and reversed compositions. Require a
@@ -88,6 +99,16 @@ Wraith at source ages 2 and 4, 430 pixels over the Tank at age 4, and
 227 pixels under the Wraith at Overmind source age 69. It also checks
 that the Overmind uses two queue entries for three simultaneous images.
 
+The prepared Showcase weapon fixture passed ASan and UBSan with source
+weapon art and audio disabled. It matches 25 visible impact updates
+per weapon against the isolated reference. On both indexed pages it
+checks one distinguishing Storm pixel for the glaive and six Wraith
+pixels for the spore. The rest of the weapon integration fixture
+passed, including detached flight trails and Tank flashes. The GBA
+reuses the projectile's queue slot for the child. The N64 impact
+evidence comes from the scripts and spawn routine. Active-camera
+impact pixels remain to be captured.
+
 The four normal ARM links retained their IWRAM and EWRAM endpoints.
 Paired ordinary mGBA runs matched world state, palette and both indexed
 pages in all three Campaign openings, at Showcase Carrier Approach
@@ -103,12 +124,22 @@ The 9,489 controller updates use 0.018% fewer guest cycles. The replay
 verifies campaign continuity. The staged overlap fixture establishes
 foreground ownership where the two compositions differ.
 
+With the impact change added, the standard Terran, Z10, P10 and
+Showcase ARM links passed ROM, save-signature, payload and RAM checks.
+All four IWRAM and EWRAM endpoints match the earlier depth build.
+Paired mGBA inputs match the world, palette, active page and both
+indexed pages at Campaign or Showcase openings and in both Custom
+Game maps on each product. The overlap fixture covers active impacts.
+The ordinary-input cuts cover the shared build and mode entry points.
+
 | Receipt | SHA-256 |
 | --- | --- |
 | Terran synthetic turret Make target | `f31b06a253818f7a7bdb6b986ffcbc2dbd4dcfddd7f0dc0c8963665873027a7f` |
 | Terran body-only facing fixture | `cc7f059bb87b573f103b15da6b732f0c57acad82250c1c8ec6e44a3ba94d7550` |
+| Showcase weapon and detached impact fixture | `8024b42bb98c066fe885160d8cb5fbec3b69e0cbad2e5e12626db31899f54a77` |
 | ARM link checks | `a1a613570e608b079bc614c9870c301df2ebdf6e010a8ca790612ca169ac4197` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Both Custom Game maps | `88eff7eb1afe41180a9927f5896022509aae8432f4a98df68d6019942bf74ec1` |
 | Zerg Last Stand | `9d3f4749f84cc8ccb85f7ba50ed88b26e76f9704ef2d6d9b8138463c5e210f30` |
 | P10 fresh start to victory | `16f258a34e56a706bf2733e8f6a9ad1e8e55210c16815f95d736049de32122d3` |
+| Impact follow-up ARM replays | `5c246210a11737e1f95f6438f27de41362d1e82d5b5fd32c80a1a5f46c9cad91` |

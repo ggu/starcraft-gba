@@ -594,11 +594,17 @@ static void test_detached_impact_depth(void)
                             overlap += expected[i] != reversed[i];
                     }
                     if (overlap) {
-                        begin_depth_frame();
-                        sc64_draw_depth_ordered_actors();
-                        draw_tracers_pass(1);
-                        capture_depth_frame(pair);
-                        assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                        unsigned pages = 0;
+                        for (unsigned page = 0; page < 2; ++page) {
+                            begin_depth_frame();
+                            pages |= 1u << gfx_backbuffer_index();
+                            sc64_draw_depth_ordered_actors();
+                            draw_tracers_pass(1);
+                            capture_depth_frame(pair);
+                            assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                            if (!page) gfx_end();
+                        }
+                        assert(pages == 3);
                     }
                     if (blocker >= 0) u[blocker].alive = 0;
                     else storm->active = 0;
