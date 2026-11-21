@@ -65,8 +65,10 @@ The Z7 replay matches 228 world checkpoints and nine display cuts
 through call 155,650. Its dense and two late windows reduce mean cycles
 by 1.72–1.74%. The older winning tape reaches call 231,031 on both
 current builds without satisfying the victory assertion. The observer
-does not retain final state after that assertion. Recapture the first
-changed input at call 17,264 and qualify the current winning path.
+does not retain final state after that assertion. The
+[Z7 flyer click follow-up](2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window)
+locates the earlier selection difference and records the current
+harness case.
 
 | Local evidence | SHA-256 |
 | --- | --- |

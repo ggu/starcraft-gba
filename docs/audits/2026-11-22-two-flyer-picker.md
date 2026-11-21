@@ -18,3 +18,30 @@ and 833,082. The p95 values are 1,123,557 and 1,124,208. The busy tape
 tests unrelated gameplay and frame cost. The staged opaque click
 test exercises the changed selection. The packed comparison receipt
 SHA-256 is `8c01a6dd74246ef6111a490172207f70e3097a77c7fc397dad02cde781f5d980`.
+
+## Moving same-type flyers in the double-tap window
+
+The ordinary Z7 tape matches through call 16,375 on the pre-fix
+`43c5d98` cartridge and the current `c05ac442` Zerg cartridge.
+Two friendly Mutalisks overlap at the cursor. The first A edge at
+16,376 picks slot 100 on the old cartridge and foreground slot 104
+on the current one. At the second A edge (16,378), the current
+picker returns slot 100. The double-tap code requires the same
+slot, so the current route enters attack mode with a single
+Mutalisk. The old route enters with both. The later gas order
+becomes movement because the Extractor has been destroyed.
+
+For the replay harness, retain calls 16,375–16,382. Record the
+cursor, opaque body masks, painter keys, both framebuffer pages,
+picked slot and selected raw types at each A edge. Verify that a
+single click selects the foreground unit. After a second click
+within the existing time and cursor bounds, verify that overlapping
+friendly units of the same type can still be selected as a group.
+Cover different types, a second click outside either bound, fogged
+or hostile actors, and retirement and reuse of the remembered slot.
+Compare native overlap and repeat-selection inputs separately.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Pre-fix click pair | `655230d7740fb389a42d06d4b0104910d5812384ae0ba5930eead7312f958469` |
+| Current click pair | `3db26ef336bbc93564235bbec07bb052a6b5797163f823895058652641b7584b` |

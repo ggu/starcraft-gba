@@ -78,6 +78,36 @@ edge. The [earlier native actor audit](2026-11-07-native-actor-differential/READ
 records a C-Right Move order changing five Marine orders. Use that
 input and sample later unit positions for the movement cut.
 
+## GBA outcome correction and replay
+
+Both Wasteland implementations now require a completed Barracks for
+victory and count living owned structures in the zero-actor check.
+The resource deficit branch continues to count unfinished structures.
+The prepared host regression uses
+`make -f Makefile -f tests/sc64-wasteland-outcome/Makefile test-wasteland-outcome`
+to run the actual outcome code in the fallback and unified Terran
+configurations. It covers the foundation/completion boundary, a
+building surviving a mobile wipe, enemy ownership, nine versus ten
+Marines, 399 versus 400 minerals, and neutral and dead Raynor.
+
+The normal Terran ARM replay plays through pause, restart, load and
+victory at frame 10,120. The win contains ten Marines, five SCVs
+and living Raynor. A separate fresh HOME continuation reaches the
+same victory and reloads the result from SRAM in a third instance.
+The pause and victory journal bytes match prior qualified runs.
+An instrumented ordinary replay observes the paid foundation at
+frame 6,372 and the finished Barracks at 7,872. The ten-Marine
+foundation edge is covered by the host fixture. The native waits
+before defeat and a live native victory remain open.
+
+On the exact four links, the opening cuts and 41 Blood Bath
+camera-raster cuts per cartridge match the collision release. The
+three race cartridges pass all 54 ordinary Custom Game starts and
+fresh HOME continuations across both maps and one to three CPU seats.
+The late Protoss 10 victory and 3,600-update Zerg Blood Bath replays
+match their collision-release state, both framebuffer pages, SRAM
+and measured cycle counts.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Authenticated native scenario | `b03fcbd0d18c2165be82aaab841f54f49f08ae74191cd039a36885059fa81517` |
@@ -85,6 +115,12 @@ input and sample later unit positions for the movement cut.
 | Native R screenshot | `62614486e311d263dfb2ffde814d716894c21cba47f81a09a767201c24f2d9ba` |
 | Native R selected-state observation | `791d796da0e254fabcf71ed20c5905fad55143e5b6c0615883df479a7e99e205` |
 | Terran ARM R group observation | `e29102b56271d12110df7b24b2393d84443bef858c9c14326cc0e398e3921921` |
+| Terran ARM launch, restart, load and victory | `02c2a97161f87ca087c485c29660db8a08727f9f1632cd3438134bdacf1be544` |
+| Terran ARM fresh HOME continuation and victory readback | `e1669e7fc02c479f6d5fa91ae134d5ba2ba2c68bd9caa13baa253b69f0121c00` |
+| Terran ARM Barracks foundation and completion | `4a1e137956708b05eb87a85849ebba84d8b55479a44cf5c7d626ca808758525b` |
+| Custom Game start and fresh continuation matrix | `8adfe790ae4b241b644564a459095fe3e95b7f550bea3123e8fc9ec39e21814d` |
+| Dense Protoss 10 continuation | `650b3abb4f556da47289936911d9f95e365a7b64ebc4397809dd576845679e45` |
+| Busy Zerg Blood Bath comparison | `8b5f5eff81c62b28a0a54086633b3004a36ad31e9404a0324c7ce8266fded0db` |
 
 ## Initial evidence
 

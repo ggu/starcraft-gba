@@ -44,8 +44,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   increases 0.86% at p95 in its busy window. Replay checks match
   collision-sensitive movement and placement, world state and both
   framebuffer pages. Prioritize the remaining route stalls and
-  Command census costs. A query-local Command validation trial cuts
-  the same Protoss tail mean by 1.83% and p95 by 4.45%. A batched
+  Command census costs. A query-local Command trial on top of collision
+  cuts the same Protoss tail mean by 1.85% and p95 by 4.41%. A batched
   selection-outline trial matches the same replay and saves 0.12%
   on the full tail. Keep the Command trial separate until it passes
   the four-product memory, Custom Game and save checks.
@@ -65,6 +65,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   observed GBA foreground selection mismatch at two opaque same-layer
   flyers. Exercise more candidate bodies and an ordinary native
   viewport overlap. See the [flyer replay cases](audits/2026-11-22-two-flyer-picker.md).
+  The [moving flyer double-tap case](audits/2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window)
+  captures the change in selected units after two A edges. Keep
+  foreground single-click picking and verify same-type grouping
+  when the overlap changes between edges.
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
@@ -77,8 +81,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches 13 actors by type, owner, HP and scaled coordinates, and
   verifies 10/18 supply and the five-Marine R selection. The native
   scenario confirms ten Marines, a completed Barracks and Raynor.
-  Fix the foundation victory and zero-actor defeat boundaries, then
-  verify native victory and defeat through ordinary inputs. The
+  The GBA checks now require a completed Barracks and count living
+  owned buildings for the zero-actor defeat rule. The normal Terran
+  mission wins after an ordinary save and fresh HOME continuation.
+  Verify native victory and defeat through ordinary inputs. The
   independent clocks leave the native mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
@@ -114,8 +120,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   raster difference against `d664d71c` remains unexplained. Native mission
   behavior and physical timing remain separate qualification work.
   The older Z7 victory tape now misses its terminal win on both the
-  current control and collision-bucket build. Trace the first changed
-  A input at call 17,264 and record a current winning path.
+  current control and collision-bucket build. The first replay
+  difference is an overlapping Mutalisk selection at call 16,376.
+  The Extractor loss appears later. Verify the corrected double tap
+  and record a current winning path.
 
 - **Current three-cartridge playtest.** The
   [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)
