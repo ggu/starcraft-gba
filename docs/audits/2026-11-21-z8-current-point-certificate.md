@@ -498,3 +498,57 @@ transfer build has the full late Z7 qualification.
 | Trace and captured walkability grid | `c812a402f6a7f5c365d37c3811060e418e9ed88ebf93dc532ad8ee9c331cd911` |
 | Z7 comparison | `dd0c7adf32d4e120afde9380b00b22f4e46e8061337f2873138f9017e0b7e6e9` |
 | Z8 comparison | `5fe67799cd9d35392841cd6ceac233745ff97d450aed95921e24ab482632748c` |
+
+## Complete fields for small components
+
+At Z7 call 154,198, the shipping route code makes 11 complete
+fields from 10 open roots in the same 361-cell component. In each
+request the origin is outside the component. These fills cost
+1,552,130 guest cycles on the release and 1,670,282 on the
+deferred transfer build. An individual fill expands its FIFO in
+about 20,000 cycles after spending about 79,000–90,000 cycles
+initializing it. The component fits world rows 0–14. Across the
+two measured late windows, 131 updates issue at least 10 logical
+builds. The retained debugger captures identify the component
+on call 154,198.
+
+`SC64_ROUTE_SMALL_COMPONENT_PROBE` remembers the occupied row
+span of an exact open-root fill of at most 384 cells. It borrows
+the same dense and FIFO scratch for a new open root inside at
+most 16 rows. Each retry uses the current walkability grid and
+the same ordered reverse FIFO. The retry checks that none of
+its reached cells can cross the two artificial row boundaries.
+That proves the retry visited the whole current component.
+The sparse writer then publishes the same directions and
+unreachable bytes as the ordinary full-grid fill. A blocked
+root, an escape or a queue limit sends the request through the
+existing fill before any destination bytes are changed.
+
+The hint takes two bytes and resets with the route cache. Existing
+slot selection, route counters, capacity and save fields are intact.
+`make test-sc64-route-small-component` exercises repeated roots
+on a 361-cell component, an unrelated pocket that crosses the row
+boundary, hostile openings above and below the span, a blocked
+root, and exact 384/385-cell trials. The HOST test compares all
+6,144 field bytes with an independent ordered BFS. The route flag
+is opt-in. Normal ARM timing and the cost of a declined attempt
+remain to be measured.
+
+The full HOST comparison runs 386,646 queries with the cold
+component bypass enabled in both binaries. Its route build totals
+and complete cache-residency stream match byte for byte. The
+residency stream SHA-256 is
+`86acaa0076c87e87fde81aa312fa2105e550e0a36023fa86d37329b04ef3999c`.
+
+Root 693 in the retained 154,198 trace is an open tile in the large
+component, inside the small component's row span. Even a flood
+restricted to that span would find 642 cells. It exercises the
+capacity fallback if the preceding fills establish the hint. One
+decline clears the hint. A later small fill can establish it
+again. Measure both the successful fills and this decline when
+qualifying the ordinary Z7 timing window.
+
+| Z7 breakpoint evidence | SHA-256 |
+| --- | --- |
+| Release | `019a26c86a47ba76095ada1a07d5263750dbcf6a82f43f73d12347509440b34f` |
+| Deferred transfer | `fa2a6814912bb0af2982b43828caf69f3282afba58da830c9f2703165aefe076` |

@@ -133,6 +133,10 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
     (!defined(SC64_ROUTE_POINT_COMPONENT_PROBE) || !defined(SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE))
 #error "cold disconnected bypass requires exact component witnesses and sparse packing"
 #endif
+#if defined(SC64_ROUTE_SMALL_COMPONENT_PROBE) && \
+    (!defined(SC64_ROUTE_POINT_PREFIX_PROBE) || !defined(SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE))
+#error "small component fills require the linear FIFO and sparse packer"
+#endif
 #if defined(SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_COMPONENT_PROBE)
 #error "nearby-root component rejection requires point component witnesses"
 #endif
@@ -293,12 +297,19 @@ _Static_assert(sizeof(Sc64PointPrefix) == 264, "nearby-root reserve must fit one
 #endif
 static Sc64PointPrefix sc64_point_prefixes[SC64_POINT_PREFIX_STORAGE];
 static u8 sc64_point_prefix_index[SC64_ROUTE_SLOTS];
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+/* Padded dense row indices, or a zero first row when no hint is known. */
+static u8 sc64_small_route_first, sc64_small_route_last;
+#endif
 
 static void sc64_point_prefix_reset(void)
 {
     memset(sc64_point_prefix_index, 0, sizeof(sc64_point_prefix_index));
     for (unsigned i = 0; i < SC64_POINT_PREFIX_STORAGE; ++i)
         sc64_point_prefixes[i].count = 0;
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    sc64_small_route_first = 0;
+#endif
 }
 #define SC64_POINT_PREFIX_RESET() sc64_point_prefix_reset()
 #else
@@ -1850,15 +1861,28 @@ static inline int sc64_route_linear_queue_cap(int cols, int rows)
     return cols == SC64_LINEAR_WIDE_COLS ? SC64_LINEAR_WIDE_QUEUE_CAP : SC64_ROUTE_LINEAR_QUEUE_CAP;
 }
 
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+static inline u8 *sc64_route_linear_grid_rows(int cols, int stride, int cap,
+                                              int first, int last)
+#else
 static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap)
+#endif
 {
     uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + cap) + 3u) & ~(uintptr_t)3u;
     u8 *dense = (u8 *)(void *)scratch;
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    const u8 *walk = path_walkable + (first - 1) * (cols / 8);
+
+    memset(dense + (first - 1) * stride, 15, (size_t)stride);
+    memset(dense + (last + 1) * stride, 15, (size_t)stride);
+    for (int y = first; y <= last; ++y) {
+#else
     const u8 *walk = path_walkable;
 
     memset(dense, 15, (size_t)stride);
     memset(dense + (rows + 1) * stride, 15, (size_t)stride);
     for (int y = 1; y <= rows; ++y) {
+#endif
         u8 *out = dense + y * stride;
         const u32 border = 0x0f0f0f0fu;
         __builtin_memcpy(__builtin_assume_aligned(out, 4), &border, 4);
@@ -1879,6 +1903,13 @@ static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap
     }
     return dense;
 }
+
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap)
+{
+    return sc64_route_linear_grid_rows(cols, stride, cap, 1, rows);
+}
+#endif
 
 static inline u32 sc64_dense_pack8(const u8 *p)
 {
@@ -1939,7 +1970,11 @@ static inline void sc64_route_pack_linear(u8 *field, const u8 *dense,
 /* Keep the oldest-to-newest FIFO order. A batch may append at most four
  * cells per pop; make room between batches instead of wrapping each access.
  * No live route bytes or grid bits have changed if a frontier does not fit. */
-#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+static inline __attribute__((always_inline)) int
+sc64_route_expand_linear_fifo(u8 *dense, int tail, int stride, int cap,
+                              int head, int can_compact)
+#elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 static int GBA_HOT __attribute__((noinline))
 sc64_route_expand_linear_from(u8 *dense, int tail, int stride, int cap, int head)
 #else
@@ -1955,6 +1990,9 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
         int limit = head + (cap - tail) / 4;
         if (limit > tail) limit = tail;
         if (limit == head) {
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+            if (!can_compact) return -1;
+#endif
             int pending = tail - head;
             if (pending > cap - 4) return -1;
             for (int i = 0; i < pending; ++i) bfs_queue[i] = bfs_queue[head + i];
@@ -2000,6 +2038,14 @@ sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
     return consumed + tail;
 }
 
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+static int GBA_HOT __attribute__((noinline))
+sc64_route_expand_linear_from(u8 *dense, int tail, int stride, int cap, int head)
+{
+    return sc64_route_expand_linear_fifo(dense, tail, stride, cap, head, 1);
+}
+#endif
+
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
 static inline int sc64_route_expand_linear(u8 *dense, int tail, int stride, int cap)
 {
@@ -2042,30 +2088,118 @@ static inline int sc64_route_linear_seed(u8 *dense, int start, int stride)
     return tail;
 }
 
-/* A completed small component has little to pack. A compaction would
- * require at least cap - 3 discoveries, so this queue still contains
- * each visited tile, in its original position. Only use this writer when
- * the queue began with the seeds, including any earlier prefix pops. */
+#ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
+enum { SC64_ROUTE_SPARSE_LIMIT = 384 };
+
+/* No queue compaction is allowed before the sparse writer. Every visited
+ * tile, beginning with the seeds, must still be in the discovery list. */
+static inline void
+sc64_route_pack_linear_sparse(u8 *field, const u8 *dense, int cols, int tail,
+                              int learn_span)
+{
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    int first = SC64_LINEAR_MAX_ROWS, last = 0;
+#else
+    (void)learn_span;
+#endif
+    sc64_route_field_clear(field);
+    for (int i = 0; i < tail; ++i) {
+        const int at = bfs_queue[i];
+        /* Interior columns 4..131 at stride 136. Multiplying by 241
+         * recovers the row because 136 * 241 = 32768 + 8. */
+        const int row = (int)(((unsigned)at * 241u) >> 15);
+        const int cell = at - row * SC64_LINEAR_PAD - cols - 4;
+        sc64_route_put_new(field, cell, dense[at]);
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+        if (learn_span) {
+            if (row < first) first = row;
+            if (row > last) last = row;
+        }
+#endif
+    }
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    enum { MAX_SMALL_ROUTE_ROWS = 16 };
+    if (learn_span && last >= first && last - first < MAX_SMALL_ROUTE_ROWS) {
+        sc64_small_route_first = (u8)first;
+        sc64_small_route_last = (u8)last;
+    }
+#endif
+}
+#endif
+
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+static int
+sc64_route_small_escape(const u8 *dense, int row, int outside,
+                        int cols, int rows, int stride)
+{
+    if (outside < 1 || outside > rows) return 0;
+    const u8 *inside = dense + row * stride + 4;
+    const int start = (outside - 1) * cols;
+    for (int x = 0; x < cols; ++x)
+        if (inside[x] < SC64_ROUTE_UNREACHABLE &&
+            SC64_GRID_GET(path_walkable, start + x)) return 1;
+    return 0;
+}
+
+/* The remembered span is only a hint. Flood the current grid, then prove
+ * that this component has no exit through either artificial boundary.
+ * Capacity or escape failures leave the destination bytes untouched. */
+static int __attribute__((noinline))
+sc64_route_try_small_component(u8 *field, int goal, int cols, int rows,
+                               int stride, int cap)
+{
+    enum { SMALL_QUEUE_CAP = SC64_ROUTE_SPARSE_LIMIT + 4 };
+    const int first = sc64_small_route_first, last = sc64_small_route_last;
+    if (cols != SC64_LINEAR_WIDE_COLS || rows != SC64_LINEAR_MAX_ROWS ||
+        !first || cap < SMALL_QUEUE_CAP)
+        return -1;
+    const int row = sc64_cell_row((unsigned)goal) + 1;
+    if (row < first || row > last || !SC64_GRID_GET(path_walkable, goal)) return -1;
+
+    u8 *dense = sc64_route_linear_grid_rows(cols, stride, cap, first, last);
+    const int start = goal - (row - 1) * cols + row * stride + 4;
+    dense[start] = 0;
+    bfs_queue[0] = (u16)start;
+    const int tail = sc64_route_expand_linear_fifo(dense, 1, stride,
+                                                    SMALL_QUEUE_CAP, 0, 0);
+    if (tail < 0 || tail > SC64_ROUTE_SPARSE_LIMIT ||
+        sc64_route_small_escape(dense, first, first - 1, cols, rows, stride) ||
+        sc64_route_small_escape(dense, last, last + 1, cols, rows, stride)) {
+        sc64_small_route_first = 0;
+        return -1;
+    }
+    sc64_route_pack_linear_sparse(field, dense, cols, tail, 0);
+    SC64_ROUTE_KEEP_COUNT(SMALL_COMPONENT);
+    return tail;
+}
+#endif
+
+/* A compaction would require at least cap - 3 discoveries. Earlier prefix
+ * pops are still in the queue when the complete field fits this bound. */
 static inline __attribute__((always_inline)) void
 sc64_route_pack_linear_complete(u8 *field, const u8 *dense, int cols, int rows,
-                               int stride, int cap, int tail)
+                               int stride, int cap, int tail, int goal)
 {
 #ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
-    if (cols == SC64_LINEAR_WIDE_COLS && tail <= 384 && tail <= cap - 4) {
-        sc64_route_field_clear(field);
-        for (int i = 0; i < tail; ++i) {
-            const int at = bfs_queue[i];
-            /* The padded interior has columns 4..131 and stride 136.
-             * 136 * 241 = 32768 + 8, with no carry through row 128. */
-            const int dense_row = (int)(((unsigned)at * 241u) >> 15);
-            const int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
-            sc64_route_put_new(field, cell, dense[at]);
-        }
+    if (cols == SC64_LINEAR_WIDE_COLS && tail <= SC64_ROUTE_SPARSE_LIMIT && tail <= cap - 4) {
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+        int learn_span = rows == SC64_LINEAR_MAX_ROWS &&
+            SC64_GRID_GET(path_walkable, goal) &&
+            (!sc64_small_route_first ||
+             sc64_cell_row((unsigned)goal) + 1 < sc64_small_route_first ||
+             sc64_cell_row((unsigned)goal) + 1 > sc64_small_route_last);
+#else
+        int learn_span = 0;
+#endif
+        sc64_route_pack_linear_sparse(field, dense, cols, tail, learn_span);
         return;
     }
 #else
     (void)cap;
     (void)tail;
+#endif
+#ifndef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    (void)goal;
 #endif
     sc64_route_pack_linear(field, dense, cols, rows, stride);
 }
@@ -2086,13 +2220,17 @@ sc64_route_fill_linear(u8 *field, int goal)
     }
 #endif
     const int cap = sc64_route_linear_queue_cap(cols, rows);
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    int small = sc64_route_try_small_component(field, goal, cols, rows, stride, cap);
+    if (small >= 0) return small;
+#endif
     u8 *dense = sc64_route_linear_grid(cols, rows, stride, cap);
     const int row = sc64_cell_row(goal);
     const int start = goal + row * SC64_LINEAR_PAD + stride + 4;
     int tail = sc64_route_linear_seed(dense, start, stride);
     tail = sc64_route_expand_linear(dense, tail, stride, cap);
     if (tail < 0) return tail;
-    sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail);
+    sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail, goal);
     return tail;
 }
 #else

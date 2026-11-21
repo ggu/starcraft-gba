@@ -57,7 +57,8 @@ enum {
     KEEP_GATE_CALL, KEEP_GATE_HIT, KEEP_FAIL_BLOCKED, KEEP_FAIL_CODE,
     KEEP_FAIL_LENGTH, KEEP_FAIL_SEEDS, KEEP_FAIL_NEAR_GOAL, KEEP_FAIL_OPENED,
     KEEP_COMMIT_SAME, KEEP_COMMIT_OVERFLOW, KEEP_COMMIT_DROP, KEEP_MATERIALIZE,
-    KEEP_FILL, KEEP_ADOPT, KEEP_POINT_POINTER, KEEP_COLD_BYPASS, KEEP_STATS
+    KEEP_FILL, KEEP_ADOPT, KEEP_POINT_POINTER, KEEP_COLD_BYPASS,
+    KEEP_SMALL_COMPONENT, KEEP_STATS
 };
 static unsigned keep_stat[KEEP_STATS];
 #define SC64_ROUTE_KEEP_COUNT(name) (++keep_stat[KEEP_##name])
@@ -1637,6 +1638,98 @@ static void check_sparse_linear_pack(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+static void check_small_component_bytes(const u8 *field, int goal)
+{
+    reference_bfs(&oracle[POOL], goal);
+    for (int cell = 0; cell < MAP_CELLS; cell += 8) {
+        unsigned word = 0;
+        for (unsigned i = 0; i < 8; ++i)
+            word |= (unsigned)oracle[POOL].dir[cell + i] << (i * 3);
+        const int byte = cell * 3 / 8;
+        assert(field[byte] == (u8)word && field[byte + 1] == (u8)(word >> 8) &&
+               field[byte + 2] == (u8)(word >> 16));
+    }
+    check_grid_unchanged();
+}
+
+static void check_small_component_fill(void)
+{
+    const int cols = 128, stride = cols + SC64_LINEAR_PAD, count = 361;
+    static u8 unpublished[128 * 128 * 3 / 8];
+    race_cols = race_rows = cols;
+    for (int top = 0; top <= 2; top += 2) {
+        memset(desired, 0, sizeof(desired));
+        for (int row = top; row < top + 15; ++row)
+            for (int col = 49; col <= 71; ++col)
+                desired[row * cols + col] = 1;
+        for (int col = 72; col <= 92; ++col)
+            desired[(top + 7) * cols + col] = 1;
+        for (int col = 49; col <= 53; ++col) desired[top * cols + col] = 0;
+        /* An unrelated component crosses the stripe's boundary. */
+        desired[(top + 14) * cols + 112] = desired[(top + 15) * cols + 112] = 1;
+        const int outside_origin = 91 + 82 * cols;
+        desired[outside_origin] = 1;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        const int cap = sc64_route_linear_queue_cap(cols, cols);
+        const int first = 64 + (top + 4) * cols;
+        int witness = sc64_route_slot(first);
+        assert(witness >= 0);
+        assert(sc64_small_route_first == top + 1 && sc64_small_route_last == top + 15);
+        check_small_component_bytes(sc64_route_field[witness], first);
+
+        /* Different roots on the actual Z7 stripe dimensions get their own
+         * canonical field without changing the allocator or route counters. */
+        const int goals[] = { 65 + (top + 4) * cols, 66 + (top + 6) * cols,
+                              64 + (top + 10) * cols };
+        for (unsigned i = 0; i < sizeof(goals) / sizeof(*goals); ++i) {
+            const unsigned builds = sc64_route_builds, hits = sc64_route_hits;
+            const unsigned fills = keep_stat[KEEP_FILL], small = keep_stat[KEEP_SMALL_COMPONENT];
+            int slot = sc64_route_slot_for(goals[i], outside_origin);
+            assert(slot >= 0 && sc64_route_goal[slot] == goals[i]);
+            assert(sc64_route_builds == builds + 1 && sc64_route_hits == hits);
+            assert(keep_stat[KEEP_FILL] == fills + 1 && keep_stat[KEEP_SMALL_COMPONENT] == small + 1);
+            assert(!sc64_point_prefix_find(slot));
+            check_small_component_bytes(sc64_route_field[slot], goals[i]);
+        }
+        assert(sc64_route_try_small_component(unpublished, first, cols, cols, stride, cap) == count);
+        check_small_component_bytes(unpublished, first);
+        assert(sc64_route_try_small_component(unpublished, first, cols, cols, stride,
+                                              SC64_ROUTE_SPARSE_LIMIT) < 0);
+        check_small_component_bytes(unpublished, first);
+
+        /* An exact capacity field fits. A blocked root, a reachable escape
+         * or one additional cell must leave the destination untouched. */
+        for (int case_index = 0; case_index < 3; ++case_index) {
+            const int change = case_index == 0 ? first :
+                               case_index == 1 ? 64 + (top ? top - 1 : top + 15) * cols : -1;
+            if (change >= 0) desired[change] = !desired[change];
+            else {
+                for (int i = 0; i < SC64_ROUTE_SPARSE_LIMIT - count; ++i)
+                    desired[(top + 2 + i / 5) * cols + 72 + i % 5] = 1;
+                build_path_grid();
+                assert(sc64_route_try_small_component(unpublished, first, cols, cols, stride, cap) ==
+                       SC64_ROUTE_SPARSE_LIMIT);
+                check_small_component_bytes(unpublished, first);
+                desired[(top + 6) * cols + 75] = 1;
+            }
+            build_path_grid();
+            sc64_small_route_first = (u8)(top + 1);
+            sc64_small_route_last = (u8)(top + 15);
+            memset(unpublished, 0x5a, sizeof(unpublished));
+            assert(sc64_route_try_small_component(unpublished, first, cols, cols, stride, cap) < 0);
+            for (unsigned i = 0; i < sizeof(unpublished); ++i) assert(unpublished[i] == 0x5a);
+            assert(sc64_route_fill_linear(unpublished, first) >= 0);
+            check_small_component_bytes(unpublished, first);
+            if (change >= 0) desired[change] = !desired[change];
+        }
+    }
+    puts("Small components preserve packed routes, slot accounting and safe rejection on escape, capacity or blocked goals.");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int shapes[][2] = { { 64, 64 }, { 128, 96 }, { 128, 128 }, { 100, 70 }, { 37, 53 },
@@ -1645,6 +1738,12 @@ int main(int argc, char **argv)
 #endif
     };
     const char *emit = 0, *compare = 0;
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--small-component-only")) {
+        check_small_component_fill();
+        return 0;
+    }
+#endif
 #ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
     if (argc == 2 && !strcmp(argv[1], "--sparse-linear-only")) {
         check_sparse_linear_pack();

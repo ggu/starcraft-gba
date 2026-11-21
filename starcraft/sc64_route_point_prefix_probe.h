@@ -167,7 +167,7 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         tail = sc64_route_expand_linear_from(dense, tail, stride, cap, head);
         if (tail < 0) return sc64_route_fill(slot, goal);
 #ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
-        sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail);
+        sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail, goal);
 #else
         sc64_route_pack_linear(field, dense, cols, rows, stride);
 #endif
