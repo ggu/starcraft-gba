@@ -112,6 +112,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and 200 combined. The combined trial reloads during mining and
   matches the next 240 updates. Prioritize patch occupancy and depot
   approach before wider balance changes.
+  The [warm return](audits/2026-11-21-blood-bath-income-windows.md#deposit-on-the-worker-order-update)
+  confirms one native 8-mineral deposit on the shared order poll.
+  Stock GBA credits all 12 observed returns immediately upon servicing
+  contact. Add a cadence comparison across several arrival phases and
+  a mid-return save before enabling any timing adjustment.
 
 - **Normal race cartridge win and save qualification.** All ten Protoss
   missions win after fresh pause loads on the
