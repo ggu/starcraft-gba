@@ -19,6 +19,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
+  pass ordinary-input wins, fresh HOME continuation and victory-journal
+  readback on the current release cartridges. The dense Z10 continuation averaged about
+  11.81 emulator main-loop updates per second, including presentation waits
+  and UI. Near-30-fps optimization and hardware measurement remain open.
+
+- **Current three-cartridge playtest.** The [Custom Game matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
+  passes 54 ordinary starts and fresh SRAM continuations on the exact
+  Terran, Z10 and P10 cartridges. It covers both maps, all human races,
+  and one to three independently selected CPU seats. A further 1,134
+  launches cover every physical seat and named race assignment. The Mac playtest
+  folder `StarCraft-GBA-2026-11-21-5516dffa` holds these three verified
+  cartridges. SD readback, physical frame pacing, and gameplay across
+  every race and mission on the combined source remain open.
+
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
   from the current four-child rescue stock, which needs an ordinary N64
@@ -84,8 +99,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
   restores both cuts and takes 8.21% fewer cycles on average than packed
   stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
-  Compare other campaigns and busy Custom Games on current builds before
-  changing the normal route flags.
+  On the pinned combat-facts Z10, the
+  [cold component guard](https://github.com/ggu/starcraft-gba/blob/codex/sc64-route-cold-component-bypass-20261121/docs/audits/2026-11-21-z8-current-point-certificate.md#skip-the-cold-prefix-on-proven-disconnection)
+  saves about 120,000 cycles at the late peak and matches the full Z7 victory
+  journal. The
+  [blocked-goal warm retry](https://github.com/ggu/starcraft-gba/blob/codex/sc64-point-warm-blocked-gap-20261121/docs/audits/2026-11-21-z8-current-point-certificate.md#one-wider-retry-for-blocked-goals)
+  saves 709,645 more cycles at call 154,508. Its Z7 win and re-exported
+  journal match stock. The traced goal stays partial on each resident cut
+  and evicts without an eager refill. Both late means remain over four
+  times the 30 fps cycle budget. Compare the combined cold, warm and
+  small-component trial on the current renderer, then check other campaigns,
+  busy Custom Games and physical frame pacing before enabling the flags.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
