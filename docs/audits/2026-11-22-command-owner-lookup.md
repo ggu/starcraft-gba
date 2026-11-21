@@ -23,6 +23,9 @@ SRAM and all timing counters.
 The normal P10 and Z10 ARM links pass ROM and static RAM guards.
 The prepared sanitizer census checks pass on both. Repeat the
 campaign and Custom Game entry-point matrix before promoting.
+Rebuilding all four trial profiles on release `7c463fab` reproduces
+the tested binaries. Both sanitizer checks also pass with the
+raw-type memo disabled.
 
 | Local evidence | SHA-256 |
 | --- | --- |

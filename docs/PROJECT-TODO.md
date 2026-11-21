@@ -76,8 +76,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   for the next pacing gain.
   The [wide facility census](audits/2026-11-22-wide-facility-consumer-census.md)
   finds 166 partial depot-field rebuilds when an existing field cannot
-  answer a requested origin. Try resuming an ordered frontier on
-  128×128 maps and compare all field and next-step answers.
+  answer a requested origin. The single-wide-frontier trial preserves
+  the sampled P10 replay and saves 0.036% in mean game-update cycles.
+  Profile steady simulation and draw costs on consecutive dense updates
+  with no new field work.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -161,8 +163,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   hatch. The [Outpost live-flight case](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
   repeats on the opt-in normal-build Z10 product candidate. Its bounded
   payload, real predecessor saves and 18-case Custom save matrix pass.
-  Qualify ARM stack, pacing and uninterrupted versus fresh trajectories
-  on that product. P10 research composition remains open. Use
+  All 378 candidate launch combinations pass. The initial ARM canary
+  sample leaves 6,528 bytes untouched. Qualify sustained battles,
+  pacing and uninterrupted versus fresh trajectories on that product.
+  P10 research composition remains open. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 
