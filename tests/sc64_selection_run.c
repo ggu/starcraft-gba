@@ -419,6 +419,68 @@ double_tap_selection_tests(void)
     tap(KEY_A);
     if (u[0].order != ORDER_GAS || u[0].target != 0) return 9;
 
+    /* Overlapping same-type actors can exchange foreground between taps.
+     * Each single click selects its actual target; the second groups type. */
+    fixture();
+    cx = 100; cy = 100;
+    put_unit(0, SIDE, U_MARINE, 100, 100, 0, 1);
+    put_unit(1, SIDE, U_MARINE, 104, 100, 0, 1);
+    tap(KEY_A);
+    if (selection_mask() != 1) return 15;
+    u[0].x = 104; u[1].x = 100;
+    tap(KEY_A);
+    if (selection_mask() != 3) return 16;
+
+    /* The existing timing limit also applies across same-type slots. */
+    fixture();
+    cx = 100; cy = 100;
+    put_unit(0, SIDE, U_MARINE, 100, 100, 0, 1);
+    put_unit(1, SIDE, U_MARINE, 104, 100, 0, 1);
+    tap(KEY_A);
+    { int i; for (i = 0; i < 11; ++i) input(0); }
+    u[0].x = 104; u[1].x = 100;
+    tap(KEY_A);
+    if (selection_mask() != 2) return 20;
+
+    /* A dead remembered actor cannot group a surviving same-type actor. */
+    fixture();
+    cx = 100; cy = 100;
+    put_unit(0, SIDE, U_MARINE, 100, 100, 0, 1);
+    put_unit(1, SIDE, U_MARINE, 104, 100, 0, 1);
+    tap(KEY_A);
+    u[0].alive = 0; u[1].x = 100;
+    tap(KEY_A);
+    if (selection_mask() != 2) return 21;
+
+    /* A different type never inherits the first actor's double tap. */
+    fixture();
+    cx = 100; cy = 100;
+    put_unit(0, SIDE, U_MARINE, 100, 100, 0, 1);
+    put_unit(1, SIDE, U_FIREBAT, 104, 100, 0, 1);
+    tap(KEY_A);
+    u[0].x = 104; u[1].x = 100;
+    tap(KEY_A);
+    if (selection_mask() != 2) return 17;
+
+    /* A remembered unit that changes type or ownership is stale. */
+    fixture();
+    cx = 100; cy = 100;
+    put_unit(0, SIDE, U_MARINE, 100, 100, 0, 1);
+    put_unit(1, SIDE, U_MARINE, 104, 100, 0, 1);
+    tap(KEY_A);
+    u[0].type = U_FIREBAT; u[0].x = 104; u[1].x = 100;
+    tap(KEY_A);
+    if (selection_mask() != 2) return 18;
+
+    fixture();
+    cx = 100; cy = 100;
+    put_unit(0, SIDE, U_MARINE, 100, 100, 0, 1);
+    put_unit(1, SIDE, U_MARINE, 104, 100, 0, 1);
+    tap(KEY_A);
+    u[0].owner = ENEMY; u[0].selected = 0; u[0].x = 150; u[1].x = 100;
+    tap(KEY_A);
+    if (selection_mask() != 2) return 19;
+
     /* A replacement actor in the same slot cannot inherit a pending tap. */
     fixture();
     cx = 100; cy = 100;
