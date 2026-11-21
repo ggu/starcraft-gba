@@ -53,3 +53,36 @@ check AI spending and campaign timings before normal activation.
 See the prior [native worker opening and contact audit](2026-11-21-blood-bath-worker-opening.md)
 and [mineral wait experiment](https://github.com/ggu/starcraft-gba/pull/643)
 for the observed worker order and probe switches.
+
+## Deposit on the worker order update
+
+An ordinary ares replay resumes the same native match at update 232.
+SCV 63 already carries eight minerals at its north-side depot contact
+(139,187), with the Command Center as its return target. The wallet
+stays at 74 while the worker remains at that position. Its order poll
+byte at actor offset `0x85` reaches zero at update 237. On the next
+update, the cargo clears, the wallet reaches 82, and the worker switches
+from return order 90 to mineral order 85 with its previous patch as target.
+The four workers add 48 minerals across the later held-neutral updates
+303–537.
+
+The owned USA ROM's order entry at `0x80151cc4` decrements the poll
+byte for orders 85, 87 and 90. When the prior value was zero, it reloads
+8 and dispatches the current order. The 112-byte instruction window at
+ROM offset `0x1159b4` matches the replay's normalized RAM. The observed
+delay at contact depends on order phase.
+
+The shipping Terran GBA ROM repeats the named matchup for 360 ordinary
+updates. At all 12 observed loaded-worker starts within its depot radius,
+the cargo clears on the next update and the wallet increases by the
+matching amount. The first deposit is at game frame 75. Each worker
+retains its mineral target. This establishes the current GBA contact
+rule and one observed native scheduler transition. Test different
+order phases and fresh-save continuation before carrying the native
+cadence into GBA play.
+
+| Warm-return evidence | SHA-256 |
+| --- | --- |
+| Native ordinary replay | `1a806ef9a5e5360294eebe890abce9e1b3d540c083e11a4b9d980c937657c812` |
+| Native order scheduler window | `251858cff17262438bd67aba6f0db1ca202f9c7f8014734e221c0ed8ba2ba909` |
+| Stock GBA worker and wallet comparison | `5e717fa159b297651163dd3bc92f5a9789bfc97a789b49816fdf61b3de3b05fa` |

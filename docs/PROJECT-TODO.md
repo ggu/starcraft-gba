@@ -49,7 +49,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cut the full resumed Z7 mean by 1.17% and the two late windows by
   1.52% and 1.57%, with matching images, SRAM and campaign result.
   Combat facts add about 2% in those late windows and 0.085% across the
-  full tape. Keep that second option off and prioritize the repeated
+  full tape in that initial trial. Prioritize the repeated
   route failures and expensive permissions in the busiest updates.
   The current sparse-route capture averages 2.09M and 2.05M cycles for
   zero-build updates in the two late windows. Orders account for 1.15M
@@ -84,8 +84,28 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and adds about one million cycles at call 33,890. The [reserved-row trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-nearby-root-frontier)
   restores both cuts and takes 8.21% fewer cycles on average than packed
   stock across 203 sampled Z8 updates. It needs 264 extra EWRAM bytes.
-  Compare other campaigns and busy Custom Games on current builds before
-  changing the normal route flags.
+  The [current release trial](audits/2026-11-21-z8-current-point-certificate.md#reserved-frontier-on-the-combat-facts-release)
+  confirms the sampled Z8 gain and passes the four ROM links, a P10
+  victory replay and late three-CPU Blood Bath save continuation.
+  The 64×64 Custom Game checks exercise fallback. The whole resumed
+  Z8 interval saves about 0.39%. In the Z7 cut at calls 47,758–48,237, mean
+  and p95 initially fall 12.06% and 18.05%. The worst call rises
+  11.23% when two nearby reads complete after their ordinary cutoff.
+  [Transfer into the free reserve](audits/2026-11-21-z8-current-point-certificate.md#transfer-after-the-ordinary-cutoff)
+  removes that peak increase. The paired early mean, p95 and peak now
+  fall 12.42%, 18.47% and 13.70%. The [full ordinary Z7 run](audits/2026-11-21-z8-current-point-certificate.md#full-z7-victory-on-the-transfer-build)
+  matches 254 state checks through victory and both exact journals.
+  The late means improve by 1.82% and 2.17%. One late peak rises
+  2.52%, and the following p95 rises 1.53%. The
+  [paired ARM traces](audits/2026-11-21-z8-current-point-certificate.md#two-causes-of-the-late-z7-regressions)
+  identify repeated cold prefixes across disconnected components at
+  call 154,198 and a 740,872-cycle same-goal warm fill at call 154,508.
+  Test the cold component guard and blocked-root retry separately so
+  the ordinary tape shows whether either moves work to a later call. The
+  [nearby certificate trial](https://github.com/ggu/starcraft-gba/blob/codex/sc64-route-near-certificate-20261121/docs/audits/2026-11-21-z8-current-point-certificate.md#nearby-certificate-after-a-short-detour)
+  saves 725,468 cycles at call 48,149. Its full Z7 playthrough and both
+  journals match release. Both late regressions persist.
+  Measure physical performance separately.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
@@ -102,6 +122,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and 200 combined. The combined trial reloads during mining and
   matches the next 240 updates. Prioritize patch occupancy and depot
   approach before wider balance changes.
+  The [warm return](audits/2026-11-21-blood-bath-income-windows.md#deposit-on-the-worker-order-update)
+  confirms one native 8-mineral deposit on the shared order poll.
+  Stock GBA credits all 12 observed returns immediately upon servicing
+  contact. Add a cadence comparison across several arrival phases and
+  a mid-return save before enabling any timing adjustment.
 
 - **Normal race cartridge win and save qualification.** All ten Protoss
   missions win after fresh pause loads on the
@@ -912,9 +937,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cargo and Yamato HOST save tests. Empty and docked Carrier groups
   now pass the P10 HOST transfer and save tests. The [current preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-hangar-retirement-current-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md)
   passes the Z10 and P10 HOST suites for paid queue refunds and neutral
-  cargo. Z10 also resumes an ordinary active compact journal on ARM.
-  Verify a positive retired-seat compact journal on ARM, launched
-  fighters, the other coupled survivors, and simultaneous outcomes.
+  cargo. The [active trainee stage](https://github.com/ggu/starcraft-gba/blob/codex/sc64-carrier-trainee-retirement-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md#active-interceptor-training)
+  uses the native child-first wallet order and passes both HOST
+  journals. Its Z10 ARM predecessor-save replay matches through an
+  active shot. Verify a positive retired-seat compact journal on ARM,
+  launched fighters, the other coupled survivors, and simultaneous outcomes.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results

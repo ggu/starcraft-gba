@@ -296,3 +296,249 @@ cartridges, busy custom games and physical GBA timing remain untested.
 | Candidate ordinary replay | `242972f600d3c32769ca502674d9e475f23f01cc2ba684e5b7b587421ed715c9` |
 | Four-way comparison | `de67351d63430419afe7aa3e7de835e88ac4f130a34b77246dc47a26bbc74cef` |
 | Reserved frontier and cold-row pressure | `f62c3e92a82a9e868518fbfa711599968a050c7a4221fac3c657b4963d2fb8bc` |
+
+## Reserved frontier on the combat-facts release
+
+The opt-in recipe on `63d11258` adds the ten route flags to the
+shipping `9c04c73a` compiler vector. Z10 keeps its packed terrain,
+sparse full-field packing and immutable combat facts. Each pair
+uses identical ordinary input, SRAM and prepared banks.
+
+Z8 resumes from frame 16,659 and traverses tape calls 17,122–33,900
+and three modal transitions. All 668 logged route answers, 17 world
+and two-page framebuffer samples, and logical route counts at all 203
+timed updates match. Full linear fills in those windows fall from
+94 to 2. The candidate makes 103 certificate calls.
+
+| Guest cycles across 203 sampled updates | Release | Reserved frontier |
+| --- | ---: | ---: |
+| Mean | 1,694,349 | 1,554,958 |
+| p95 | 3,235,970 | 3,208,667 |
+| Peak | 12,056,077 | 10,911,067 |
+
+The sampled mean falls 8.23% and the peak 9.50%. The largest
+single-update saving is 3,619,390 cycles at call 33,892. The largest
+increase is 257,246 cycles at call 26,359.
+
+The full resumed interval gives a smaller gain. Without breakpoints,
+16,784 controller calls use 20.158B versus 20.080B guest cycles
+(0.387% lower). Seventeen display and world samples and the three
+modal boundaries match. The maximum since boot is nearly unchanged.
+
+### Dense Z7 stress window
+
+Fresh HOME load and ordinary Hatchery reselection reach tape calls
+47,758–48,237 with matching 114 named world checks, seven raw world
+and two-page samples, 480 logical update rows and five cache metadata
+cuts. All 48 commonly complete nonstale fields match. A partial
+field is expected to contain less than its complete control
+counterpart. Reserve row 5 is live at call 48,149.
+
+| Guest cycles across 477 advancing calls | Release | Reserved frontier |
+| --- | ---: | ---: |
+| Mean | 2,193,360 | 1,928,747 |
+| p95 | 3,182,885 | 2,608,287 |
+| Peak at 47,995 | 5,113,194 | 5,687,320 |
+
+Mean and p95 fall 12.06% and 18.05%. The peak rises 11.23%,
+with 500,427 of the extra 574,126 cycles in orders despite matching
+4 builds and 74 hits. Calls 48,148 and 48,149 change by −702,328
+and +419,349 cycles, respectively. Keep the normal route flags at
+release settings while isolating the peak and checking the late Z7 tail.
+
+### Cross-product checks
+
+All four links pass the ROM, payload and RAM guards. The ten flags
+add 1,336 bytes of EWRAM per product, of which the reserved row uses
+264. IWRAM rises by 320 bytes in Terran, Z10 and P10.
+
+| Trial product | IWRAM endpoint | EWRAM endpoint |
+| --- | --- | --- |
+| Terran | `0x03004b38` | `0x0203af44` |
+| Z10 | `0x03004ea0` | `0x0203a068` |
+| P10 | `0x03004f60` | `0x0203bb64` |
+| Showcase | `0x03004fb8` | `0x020396a0` |
+
+The three-CPU Blood Bath replay resumes with Zerg, Terran and Protoss
+opponents at frame 17,305. Both builds match 3,600 route counter
+pairs, 31 world, projectile and framebuffer observations, and the
+exact pause journal. They match their uninterrupted peers after a
+fresh reload for 240 more updates. Mean cycles rise 0.046%, p95
+falls 0.072%, and peak rises 0.031%. The 64×64 map tests fallback
+because frontier admission requires 128×128.
+
+The P10 replay resumes at frame 36,761 and wins at frame 46,057.
+All 68 world, palette and indexed-page checkpoints and the victory
+journal match after 9,489 ordinary controller updates. Mean guest
+cycles fall 0.024%. The Campaign openings, first Showcase scene
+and both Custom Game maps match on the trial builds.
+
+Run the sanitizer checks with `make test-sc64-route-point-reserve
+test-sc64-route-point-prefix test-sc64-route-point-far-read`. The
+row-span fixture uses the non-certificate recipe because certified
+rows can omit the partial span entirely.
+
+| Current evidence | SHA-256 |
+| --- | --- |
+| Z8 comparison | `e3746b9b68b78afdaa2e0262d11af59bc1a0131d9c5ca770bda783857c78adb2` |
+| Full resumed Z8 interval | `693fa560bf3ce81b0718557e327df69159be8f91e0b35d1e7878deabf72a79bb` |
+| Dense Z7 comparison | `7b5800c5be7cf1d1f6a0b005c305c460f0f52ac41fe763e252c2502000a0836c` |
+| Active Blood Bath comparison | `67b5752a1629c42fec16b2e623837c41fc07bb84fae9433bbe02b11c570fc40a` |
+| P10 victory comparison | `891694fdb0c469abf5dd3d7f5de6c71fdbd49d15106fbde46419bfd53a216afe` |
+
+### Transfer after the ordinary cutoff
+
+Removing the demand and reserve flags from the same Z10 recipe
+leaves the Z7 peak at call 47,995 and raises it 11.42% over the
+release. That sparse-prefix lane matches the same gameplay and
+display checks. The register trace of the reserve lane finds two
+nearby-root misses for roots 6,033 and 6,161. Each has already
+spent its ordinary cutoff. The reserve is empty, but both fall through
+to full materialization and spend 841,857 and 833,984 cycles.
+
+`ffc58226` gives an ordinary row one bounded transfer into a free
+reserve after that row has used its regular cutoff. An occupied
+reserve or a further miss on its owner still completes the field.
+The sanitizer fixture exercises both cutoffs on a fresh 128×128
+grid, verifies ownership and counters, then matches all 16,384
+directions against a full breadth-first search. A flags-off Z10
+link on `ab215718` reproduces the shipping ROM byte for byte.
+
+| Guest cycles | Release | Original reserve | Transfer |
+| --- | ---: | ---: | ---: |
+| Z7 mean, 477 advancing updates | 2,193,360 | 1,928,747 | 1,920,886 |
+| Z7 p95 | 3,182,885 | 2,608,287 | 2,595,075 |
+| Z7 peak, call 47,995 | 5,113,194 | 5,687,320 | 4,412,647 |
+| Z8 mean, 203 sampled updates | 1,694,349 | 1,554,958 | 1,551,249 |
+| Z8 peak | 12,056,077 | 10,911,067 | 10,168,345 |
+
+The transfer matches the Z7 world, page, route counts and complete
+field checks, and all 668 Z8 answers and 17 world and display samples.
+All four transfer builds pass their previous RAM bounds, Campaign
+and Showcase openings, and both Custom Game map starts. The
+3,600-update Blood Bath replay and its 240-update save continuation
+again match the release, with the same timing as the original reserve
+trial on this map. The full resumed Z8 interval saves 0.391%, with
+matching modal input and both indexed pages. The P10 transfer build
+repeats all 68 world and display checkpoints through victory and
+exports the same SRAM journal. Its mean falls 0.024%.
+
+Z7 call 48,149 still spends about 419,000 extra cycles. Its traced
+root 6,033 begins as a certificate-only row, so the warm retry and
+nearby read enter a different fallback. Profile that call and run
+both late Z7 windows from ordinary input before changing the
+release flags. Physical timing remains open.
+
+| Transfer evidence | SHA-256 |
+| --- | --- |
+| Z7 sparse-prefix comparison | `f2c1ad5981d663a30c28d18c84845d953bcc9efa273ce3d1bd8af9af200c81b3` |
+| Original reserve Z7 route trace | `7772c929b2818387b341789c2cd6cd0ac58bba576cf5940d1f64a5b2d28532c7` |
+| Z7 transfer comparison | `9fb2f00f078a9ff11a9e24d59e883da9abebd80ebfb11a99e23bc34e1cff0d78` |
+| Z8 transfer comparison | `fa1c922f7fececf5539eb82cfd64fa2ce7c680d3c5d75fd8d947c8d2e136fb6e` |
+| Full Z8 transfer interval | `613f018edb4a4013ec89e568f87e44884f33f60da86decd584adf5b15dbcdb6f` |
+| P10 transfer victory | `4a26e983d76f02f3969750bae019aaebf3f5789b92700867ca7d04f668d56b44` |
+| Blood Bath transfer comparison | `4cb1dcc7186071d66c017a5830dd392aa99c170808737c9326386dac95642c0c` |
+
+### Build the reserved frontier
+
+Use the normal route settings and prepared profile inputs.
+
+```sh
+CANONICAL_ROUTE_POINT_PREFIX=reserve make zerg-z10
+```
+
+The same option applies to the normal `terran`, `protoss-p10`, and
+`showcase` Make targets. Mode `0` is the release default. Mode `1`
+selects the original four-flag point-prefix trial. Each mode has a
+separate build configuration stamp so changing modes rebuilds the
+affected ROM.
+
+The dry-run compiler plans for all four products add exactly the
+ten tested flags in `reserve` mode. The Z10 plan also compiles its
+fact table generator with those flags. Running the commands from
+that plan with the pinned prepared inputs regenerates the same
+immutable combat facts and the exact transfer ROM
+`ddbf5d1c9e6715a33b1b3d47ac8d576faf667a67f7231799e6a9138059039831`.
+
+After bringing in the shared world-depth release `efa386da`, a
+flags-off Z10 link reproduces that release's ordinary ROM byte for
+byte. Its SHA-256 is
+`ad2709458c154142fb776a096d42a444baffe98455832bc0e647a377633bb80a`.
+It keeps IWRAM at `0x03004d60` and EWRAM BSS at `0x02039b30`. The
+timing comparisons below use the earlier pinned combat-facts release
+and keep the draw code fixed within each comparison.
+
+### Full Z7 victory on the transfer build
+
+The normal Z10 trial starts Z7 from blank HOME, writes its pause
+journal at frame 5,641 and resumes it through a fresh HOME load.
+It follows the ordinary controller through call 231,031 and wins
+at frame 228,128. The pause journal, victory journal and fresh
+victory re-export match the shipping Z10 byte for byte.
+
+All 254 named world checkpoints and ten palette, camera and
+dual-page display cuts match. Six logical cache cuts preserve
+metadata and match all 75 commonly complete fields. An independent
+breadth-first search verifies all 4,201 published directions across
+six partial fields.
+
+| Advancing updates | Release mean → transfer | Release p95 → transfer | Release peak → transfer |
+| --- | ---: | ---: | ---: |
+| 477, early dense | 2,193,360 → 1,920,886 | 3,182,885 → 2,595,075 | 5,113,194 → 4,412,647 |
+| 926, late peak | 2,424,115 → 2,380,072 | 3,712,728 → 3,631,471 | 5,796,737 → 5,942,621 |
+| 905, following late | 2,343,482 → 2,292,717 | 3,595,765 → 3,650,773 | 5,341,654 → 5,188,804 |
+
+The two late means improve by 1.82% and 2.17%. The peak at call
+154,198 rises 2.52%. The following window's p95 rises 1.53%.
+Call 154,508 has the largest single increase among the measured
+late updates at 741,608 cycles, of which 741,532 are in orders.
+Start the next attribution pass there and at call 154,198. The
+transfer remains opt-in. These are guest-cycle measurements.
+
+| Full Z7 evidence | SHA-256 |
+| --- | --- |
+| Paired replay comparison | `418a1795f085f5933342e7d2700b0e58ee74d1f34a994842247fed3a7a64b841` |
+| Transfer replay | `9e7d9b8f6e1547c55d3bfea578cde7d370b7ab3197840681c707cbb52997b668` |
+| Pause journal | `4eaecbb90f5e923d73eb97a68012f5fb653d8c751fba7dc1e4d9d80ae54ca3ce` |
+| Victory and fresh re-export | `1acce341f61b2a1e37cadc1e0b304dd63b5b31352789d128fa2d7bf20d6eb627` |
+
+### Two causes of the late Z7 regressions
+
+Read-only ARM traces on the pinned combat-facts release and transfer
+trial agree on the ordinary restore, 226 world cuts and two display
+cuts. The observer reproduced the cycle counts from the uninstrumented
+replay. These are the two measured calls and their order-stage costs.
+
+| Tape call and measurement | Pinned release | Transfer |
+| --- | ---: | ---: |
+| 154,198 guest cycles | 5,796,737 | 5,942,621 |
+| 154,198 orders | 4,178,972 | 4,333,698 |
+| 154,508 guest cycles | 2,389,316 | 3,130,924 |
+| 154,508 orders | 1,359,487 | 2,101,019 |
+
+At call 154,198, the transfer takes 3,170,471 cycles across 13 cold
+prefix fills. Prefix expansion accounts for 349,306 cycles and linear
+completion for 954,001 cycles within those calls. The pinned release's
+13 linear fills take 3,038,958 cycles. The captured walkability grid
+places 12 of the 13 open goal and origin pairs in different components.
+Eleven requests target a 361-cell component. One targets the 9,790-cell
+component from the other side. One same-component pair still needs the
+normal search. A bounded component check can skip the prefix only when
+a different valid, complete field proves disconnection on that grid.
+
+Call 154,508 has two logical hits and zero builds. The transfer hits
+a certificate-only row for the same blocked goal at (52,99), with
+origin (68,102). Its warm certificate takes 243 cycles and rejects the
+19-cell center gap. The ensuing full fill takes 740,872 cycles with
+five seeds and 9,790 reached cells. The release enters neither routine.
+Canonical BFS finds an 18-step path from the seed at (53,99).
+The existing padded 24×11 window reproduces that path with 145 pops
+from the same seed and neighbor order. The independent cold change
+cannot affect this hit. A blocked-root-only warm retry can keep the
+same scratch, cold bound and canonical chain while covering this gap.
+
+| Trace evidence | SHA-256 |
+| --- | --- |
+| Pinned release read-only trace | `019a26c86a47ba76095ada1a07d5263750dbcf6a82f43f73d12347509440b34f` |
+| Transfer read-only trace | `fa2a6814912bb0af2982b43828caf69f3282afba58da830c9f2703165aefe076` |
+| Paired routine attribution | `aa1d03c053265627001f05ec939d42345781472356f8add6b9f54ae0554abb70` |

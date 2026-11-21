@@ -194,6 +194,58 @@ test-sc64-route-point-tail: build/test-sc64-route-point-tail build/test-sc64-rou
 	./$< --emit build/route-point-tail-candidate.ref
 	cmp build/route-point-tail-base.ref.state build/route-point-tail-candidate.ref.state
 
+ROUTE_POINT_PREFIX_TEST_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_POINT_PREFIX_PROBE -DSC64_ROUTE_POINT_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_DISTANCE_PROBE -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+build/test-sc64-route-point-prefix: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) $< -o $@
+build/test-sc64-route-point-prefix-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
+.PHONY: test-sc64-route-point-prefix
+test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64-route-point-prefix-range build/test-sc64-route-point-tail-baseline
+	./$< --point-prefix-only
+	./$< --point-component-only
+	./$< --point-near-distance-only
+	./build/test-sc64-route-point-prefix-range
+	./build/test-sc64-route-point-tail-baseline --emit build/route-point-prefix-reference.ref
+	./$< --emit build/route-point-prefix-candidate.ref
+	cmp build/route-point-prefix-reference.ref.state build/route-point-prefix-candidate.ref.state
+
+build/test-sc64-route-point-certificate: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE $< -o $@
+build/test-sc64-route-point-certificate-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
+.PHONY: test-sc64-route-point-certificate
+test-sc64-route-point-certificate: build/test-sc64-route-point-certificate build/test-sc64-route-point-certificate-range build/test-sc64-route-point-tail-baseline
+	./$< --point-certificate-only
+	./build/test-sc64-route-point-certificate-range
+	./build/test-sc64-route-point-tail-baseline --emit build/route-point-certificate-reference.ref
+	./$< --emit build/route-point-certificate-candidate.ref
+	cmp build/route-point-certificate-reference.ref.state build/route-point-certificate-candidate.ref.state
+
+ROUTE_POINT_FAR_TEST_FLAGS = $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ
+ROUTE_POINT_FAR_TEST_DEPS = tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h starcraft/sc64_route_point_far_read.h
+build/test-sc64-route-point-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_POINT_FAR_TEST_FLAGS) $< -o $@
+build/test-sc64-route-point-far-read-without-monotone-movement: $(ROUTE_POINT_FAR_TEST_DEPS) | build
+	$(CLANG) $(filter-out -DSC64_ROUTE_MONOTONE_PROBE,$(ROUTE_POINT_FAR_TEST_FLAGS)) -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
+.PHONY: test-sc64-route-point-far-read
+test-sc64-route-point-far-read: build/test-sc64-route-point-far-read build/test-sc64-route-point-far-read-without-monotone-movement
+	./$<
+	./build/test-sc64-route-point-far-read-without-monotone-movement
+
+ROUTE_POINT_RESERVE_FLAGS = $(filter-out -DSC64_ROUTE_MONOTONE_PROBE,$(ROUTE_POINT_PREFIX_TEST_FLAGS)) \
+	-DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE \
+	-DSC64_ROUTE_LINEAR_WORD_PACK_PROBE -DSC64_ROUTE_LINEAR_SPARSE_PACK_PROBE \
+	-DSC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE -DSC64_ROUTE_POINT_NEAR_DEMAND_PROBE \
+	-DSC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+build/test-sc64-route-point-reserve: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) $< -o $@
+.PHONY: test-sc64-route-point-reserve
+test-sc64-route-point-reserve: build/test-sc64-route-point-reserve
+	./$< --point-near-distance-only
+	./$< --point-certificate-only
+	./$< --point-near-demand-only
+	./$< --sparse-linear-only
+
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
 build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build
