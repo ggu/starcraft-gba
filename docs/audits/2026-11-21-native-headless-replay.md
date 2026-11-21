@@ -68,3 +68,63 @@ health, exact positions and simulation ticks. [Native save-selection record](202
 | Emitted command CSV | `3d9256471387180b6c3d805f7f0084d1752f4d84be7343c26c9056dcacce925f` |
 | First ARGB capture | `ba0080b165a39d80b34bd0f00e74ce462bb72abb77e32f89d2355c6c1088c897` |
 | Second ARGB capture | `df0da3a1853d11aa42df17addd32cd376d01886c6d6b97370622fba718d5c2b8` |
+
+## Blood Bath state and render-row observation
+
+A separate local observer restored an ordinary Blood Bath step-zero state and
+read native RDRAM before advancing. Its initial dump has the 900-row,
+312-byte unit-table marker at `0x802d2370`. The first row is at `0x802d2380`.
+The unit sprite pointer at row offset `0x0c` and the native 36-byte sprite pool
+at `0x80207c70` agree on the following records. Sprite layer is at `+0x0d`,
+flags at `+0x0c`, and the renderer's anchor is at `+0x14/+0x16`.
+
+| Unit slot / raw type | Sprite ID | Sprite anchor | Layer / flags | Painter key |
+| --- | ---: | --- | --- | --- |
+| 60 / 106, Command Center | 2139 | (128, 240) | 4 / `0x00` | `0x203c085b` |
+| 61 / 7, SCV | 2138 | (80, 296) | 4 / `0x04` | `0x204a085a` |
+| 62 / 7, SCV | 2137 | (104, 296) | 4 / `0x04` | `0x204a0859` |
+| 63 / 7, SCV | 2136 | (128, 296) | 4 / `0x04` | `0x204a0858` |
+| 64 / 7, SCV | 2135 | (152, 296) | 4 / `0x04` | `0x204a0857` |
+
+All five are owner 2. The Command Center sprite pointer is `0x8021a93c`.
+The four SCV pointers are `0x8021a918`, `0x8021a8f4`, `0x8021a8d0`, and
+`0x8021a8ac`. The row-head entry at `0x80112cbc` points to the Command
+Center; the entry at `0x80112cc4` points to sprite 2135, whose next links
+visit 2136, 2137, and 2138. All four workers sort after the Command Center
+because their native sprite Y is greater. The GBA ground queue applies the
+same Y precedence across units and buildings. The N64 orders the four
+equal-Y workers by sprite ID. Their screen overlap and last-image retirement
+remain open harness cases. [Exact-tie replay cases](2026-11-21-fallback-world-depth.md#replay-cases)
+
+The observer then ran 1,000 neutral runner steps and dumped RDRAM again.
+The native game-update counter advanced from 0 to 271 during those 1,000
+runner steps. At the second cut SCV 61 has order 87, phase 5,
+unit and sprite anchor (58, 107), sprite 2138 and key `0x201ac85a`. Its
+unit target pointer identifies a raw-177 mineral at (32, 80), sprite 2191,
+key `0x2014088f`. The worker sorts after the mineral by native Y. The row
+headed at `0x80112cac` contains worker IDs 2136, 2137 and 2138, and the
+row headed at `0x80112ca8` contains mineral 2191. Their respective chains
+end normally. A composed framebuffer mask and per-update target trace
+would test overlap and reacquisition timing.
+
+The observer is a local state-load and debugger-read modification of the
+interactive probe, with a hard-coded owned step-zero save. It reported 1,000
+completed neutral steps, 1,000 callbacks, GPU ready and no pressed A or
+Start polls. The callback capture was observed at runner step 999; the final
+RDRAM dump is taken after the run. Repeating this exact cut requires the
+local prototype with state-load and memory-read support and the retained
+inputs. Use a bounded `1000 0 0 0 1` interactive chunk and isolated
+existing `saves` and `systems` directories.
+
+| Local input or receipt | SHA-256 |
+| --- | --- |
+| Restored step-zero state | `ed9225feb4caa29de200475af24c435c85acddabdc2c9e352857bc8732f30fcd` |
+| Observer source / executable | `db963c9583e38c21402d25004e8cfc185d3686b7d7f156c0953dba4cc48e3523` / `56bf45b372373cd504cf78ca246ffd1076a0164ba6853b68598ae581eee21251` |
+| Restored RDRAM dump | `fa5e1c5f5d9bb107bc5524297169c623f0ab08764074d321b594ebf3a562e71f` |
+| Final RDRAM dump | `280033561d72c5c4315312b2a32306ce6a94c1d98fc624514cdeacf5f444948e` |
+| Commands / status | `3ebbcbf2715feaccec07242937ad34f6fd7850c642939a16ce41933e1a911899` / `461c9a789ab0a5e34cac361680beeebb390b7b45040a35c5b6a048639c0b9f9c` |
+
+Record target pointer, order and phase on each observed game update in a
+separate controlled neutral continuation before estimating target-selection or
+reacquisition cadence. Isolate any combat acquisition case from mining's own
+service and target-selection rules.

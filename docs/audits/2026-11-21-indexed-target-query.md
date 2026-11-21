@@ -154,3 +154,32 @@ without the necessary actor fact tables.
 | Pinned ARM link | `8c4badda68205aa8731b0e22e18a678fdd2209afcd86f72c7c6164e7737a3767` |
 | Z7 comparison | `ab235cc96acd887faa239cde15f5d23ecbd886ca7bf7940ceaa7924874f449a2` |
 | Z8 comparison | `89d3cbef99f22fbc3255d5347b500bfb5c316b1aaed8ccf5aa0b872c90746ae8` |
+
+## Lazy query on the fallback-depth release
+
+The opt-in trial at `b5ef8641` reuses the indexed candidate position and
+queries each live target normally. It evaluates ground and air weapon
+eligibility lazily from the current combat facts during a single search.
+Scourge, wildcard and specialized source-owner paths retain their scalar
+policy. The same prepared inputs reproduce the release Z10 ROM with
+the flag off. The two links share the same IWRAM and EWRAM endpoints.
+
+ASan and UBSan pass 1,272 direct policy comparisons, 4,000 live
+queries, 24,000 synthetic queries and 500 fallback checks. On current Z8
+the 203 timed route rows, 17 state and indexed framebuffer samples,
+and three modal boundaries match. Mean cycles rise 0.148%, from
+1,694,664 to 1,697,179.
+
+The current Z7 pair matches its ordinary frame-5,641 pause journal.
+Through call 155,650 it matches 228 world observations, nine display
+cuts and six route-cache samples. Mean cycles rise 0.206% in the early
+dense window and fall 0.746% and 0.808% in the two late windows. The
+second late peak rises 0.077%. Keep the trial off and prioritize
+the larger route and rendering costs.
+
+| Measurement receipt | SHA-256 |
+| --- | --- |
+| Current Z10 policy and query differential | `e723638bd9764ab30aa03f1f7e0d34927e36baccbee4ee7203deff09ea943a22` |
+| Current Z8 comparison | `b9cfbc6bfc3722efbfc7b67a08fe61d8a659f0835ee2f3017e46fa0f9191a932` |
+| Current Z7 release through late windows | `60cfcbe652441e21c939c4faf9c5340f1af427dfa043092923a4028a4b62edae` |
+| Current Z7 trial through late windows | `4f942a8cf536287f2235cbaead001111955f740c5a8cff44b5ce93f2d42b33a2` |
