@@ -75,12 +75,19 @@ defeat. Both runs averaged about 602,957 guest cycles per update.
 Timing a dense active fallback pool and measuring physical frame
 pacing remain open.
 
+All three race cartridges also passed 54 ordinary Custom Game
+pause saves and fresh HOME continuations, sampling both maps, every
+human race, and one to three named CPU seats. Each case matched 120
+updates after fresh load against its uninterrupted control and
+preserved the SRAM bytes.
+
 | Receipt | SHA-256 |
 | --- | --- |
 | Showcase sanitizer overlap and capacity checks | `ee0f95c9b1aa7689f971c07a7733065752d7f5630d28e475f81d9e813bb71336` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Both Custom Game maps | `9aa3e35b9b8047a20f36e362a64dcf93972ba221fddbeef312cc68a22a211f5a` |
 | Terran Last Stand | `a97cfbb97d40b36b1b1e1183b162f36099a04a03077a81e1663521619091d45c` |
+| Custom Game pause and fresh HOME continuation | `db9e75c79d79fe46de6b02720bbc2c5400ffd2ebf84168ecd0daefe1a39253b4` |
 
 Exact ties still use GBA kind and slot. A shared native-style
 sprite FIFO needs to account for allocation, last-image retirement
