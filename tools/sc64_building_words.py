@@ -76,11 +76,16 @@ def emit(source: str, frames: tuple[str, ...] = (*NAMES, *PHOTON)) -> str:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("sprite_bank", type=Path)
-    parser.add_argument("--frame", action="append", choices=(*NAMES, *TERRAN_BASE, "overmind_with_shell"),
-                        help="Pack only these named building frames; may be repeated")
+    selected = parser.add_mutually_exclusive_group()
+    names = (*NAMES, *TERRAN_BASE, "overmind_with_shell")
+    selected.add_argument("--frame", action="append", choices=names,
+                          help="Pack only these named building frames; may be repeated")
+    selected.add_argument("--append-frame", action="append", choices=names,
+                          help="Pack these named frames in addition to the default set")
     args = parser.parse_args()
     source = args.sprite_bank.read_text(encoding="ascii")
-    print(emit(source, tuple(dict.fromkeys(args.frame))) if args.frame else emit(source))
+    frames = args.frame or (*NAMES, *PHOTON, *(args.append_frame or ()))
+    print(emit(source, tuple(dict.fromkeys(frames))))
 
 
 if __name__ == "__main__":
