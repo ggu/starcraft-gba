@@ -100,6 +100,9 @@ entire route-counter history, SRAM and total guest cycles.
 The busy Z10 Blood Bath pair matches all observations and
 reported cycle statistics. The ordinary Wasteland pause,
 restart and load route reaches victory at frame 10,120.
+The full Zerg 7 route wins again at frame 228,128, with all
+254 world checks, ten video cuts, six route-cache cuts and
+all three SRAM journals matching the Command-only control.
 
 The three race cartridges pass 1,134 ordinary Custom Game
 launches. The 378 per cartridge cover both maps, all human
@@ -117,5 +120,6 @@ openings and 41 camera cuts per product pass.
 | Composed normal P10 victory | `c1ab64503684e336e849e6314e5775a92e53fa1fe5417818b7c1aa7beb8e01e8` |
 | Composed busy Z10 Blood Bath | `db40d9a2b2d3d8013f4bda946c7a9b0e8879050f33c19e2af8a203d7811fe17d` |
 | Composed normal Wasteland victory | `0d02e7c9ae5637c352a9184bc701cef77c21c3c82492002051327d197d1f2713` |
+| Composed normal Zerg 7 victory and readback | `ee2fd6133a92601f59fe64290e08a1fd2186ffbec7e8827d1515b6b5b1838196` |
 | Exhaustive named CPU launch matrix | `4c5fbb23eab788bd137f838457dc04c3a2b4279a4c4bc567229241ba63341952` |
 | Ordinary Custom Game fresh HOME continuations | `e27612b0531b26a47153c3749ba2770f357a68217c0e46c786aae3d03d29d133` |
