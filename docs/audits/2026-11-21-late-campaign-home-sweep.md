@@ -23,8 +23,13 @@ Z7 matches 254 world observations, six route-cache comparisons and
 all three journals against the earlier normal-combat cartridge
 `d664d71c`. Nine of ten captured display checks match. Both indexed
 page digests differ at call 154,198, with matching palette, camera
-and displayed page. The comparison leaves the source of this raster
-difference open.
+and displayed page. A separate replay at that exact call compares the
+attached-depth Zerg ROM with the intervening parked-depot release
+`ef37fe4a`. Both indexed pages, the active page, camera and palette
+match. The cause of the earlier difference against `d664d71c`
+remains open. The single-cut
+receipt SHA-256 is
+`0e7591a403f4d700a8937e8f5510050e168468bb0240608482b394f7056a61f2`.
 
 Z8 matches all 19 retained host observations. The terminal outcome,
 bank, faults and raw actor and resource hashes match the preceding
@@ -52,12 +57,15 @@ P1 and P2 retain the same victory journal bytes as the preceding
 Protoss release. Both routes have the historical actor or economy
 checkpoint differences previously documented for the older tapes.
 
-T2, T3, T4, T6, T7 and T10 match the preceding normal Terran gameplay
+All ten Terran routes now have exact attached-depth cartridge coverage.
+T2–T10 match the preceding normal Terran gameplay
 observations and all three journals byte for byte. The paired
 Terran comparison digest is
 `611f977d74ebadc2eb7daa796731ebb4674ac56b4bf8db79b58bb5ca7b944d4b`.
 The separate T3 and T6 comparison digest is
 `39abaf70ad51ca6272efe2c138fcd82510484234df426fb974e0952913caa6f7`.
+The T5, T8 and T9 comparison digest is
+`ab3dbc65a85c446ce43049f63e19150610870414551a10d66d641c641b16445c`.
 Z4 and P3 repeat their earlier journal result on the attached-depth
 ROMs. P10 matches all 20 retained checkpoints, including the fresh
 continuation, and re-exports the same victory journal as before.
@@ -71,12 +79,24 @@ Its third HOME readback digest is
 | T2 | 18,204 | 29,366 | `fff4d778e4f36fca597ef77dd0e8af78929b65bb483d5ba0f417bab4244a8d88` |
 | T3 | 26,993 | 54,000 | `8463334dcb574017d3434c2961576fd8abea978f7cc9c90c446d3754963af587` |
 | T4 | 4,968 | 8,911 | `9a53dcb519f8af6ac34e68375a33ad761d8450af46581ee51f7a2e0bea9e2c84` |
+| T5 | 72,076 | 126,331 | `5ea2c45316cb187744572de31a40303886b1a571de20d17d77145ec7a0d54ab9` |
 | T6 | 19,466 | 23,536 | `08cd481d485a79b961b41ef79e634eb1cf841c661a81761b039a51a70ff7a3d1` |
 | T7 | 2,289 | 3,931 | `2c05125314520bcaeec88c199c809653cbb53319bb6b34a7acb72e482f7d4d8d` |
+| T8 | 2,568 | 139,216 | `d5aa931ffd11217527d61a57cf7a116873e0c09c01dd3e69f800fe7dc3340faa` |
+| T9 | 35,363 | 47,266 | `0481d6851007a6f3720d7f3be5daf6acb83646ecae157e32f93d7e3f59159a71` |
 | T10 | 2,276 | 3,361 | `afb6159e5b74adb8bbbbcf1fb60864459ab134581ae09c41ab206635feb9d83a` |
+| Z1 | 50,413 | 50,669 | `9761eac5f1010d64dfdfb2f610de4a29d16b85d523d09800952cac48ef9efe95` |
+| Z3 | 24,600 | 136,588 | `8c81325d4df3c53ebb09f804ed9adbe3b04e23f8513ab873acd428f75b40a626` |
 | Z4 | 9,900 | 34,984 | `2e40e4c2ad4f9be7f4ee29f9d250e344d7b686737df36fb5c783868aa035a322` |
 | Z10 | 2,526 | 50,193 | `79bbcee22edd976431544d94fc60d9deabf08d34daff9db7c86a9a16e847ad54` |
 | P1 | 448 | 28,270 | `9b96a7cca2ee29c754ce13695780be95f8613ae4bad1fb226f3f893c85558639` |
 | P2 | 372 | 33,876 | `f4e891399cb9b14d2b5935bb1cd9b97d0b7d079acb238901710e7b820feea241` |
 | P3 | 23,993 | 49,263 | `15a620da7307b821e3e9ce64e780a709a55c3f1b1189ea426e6ae2cfb6ac5932` |
+| P4 | 65,700 | 129,310 | `dfe79c7e2d338a0253adb5175b24cb9dda8ebc7eab5913a2639b6f0f7d7e46bc` |
 | P10 | 36,761 | 46,129 | `550b16d23ae527b86e119a02607847625361b4679c861bdb050d738dd59abeef` |
+
+Together with T1, Z2, Z5, Z6, P5 and P6 in the
+[attached-depth validation](2026-11-21-attached-death-continuity.md#validation),
+these results cover all 30 missions on the same released cartridge set.
+They establish the recorded ordinary-input routes and save continuation.
+Physical frame pacing and complete native mission parity remain open.
