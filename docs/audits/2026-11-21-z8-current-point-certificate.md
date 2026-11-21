@@ -438,3 +438,24 @@ release flags. Physical timing remains open.
 | Full Z8 transfer interval | `613f018edb4a4013ec89e568f87e44884f33f60da86decd584adf5b15dbcdb6f` |
 | P10 transfer victory | `4a26e983d76f02f3969750bae019aaebf3f5789b92700867ca7d04f668d56b44` |
 | Blood Bath transfer comparison | `4cb1dcc7186071d66c017a5830dd392aa99c170808737c9326386dac95642c0c` |
+
+### Build the reserved frontier
+
+Use the normal route settings and prepared profile inputs.
+
+```sh
+CANONICAL_ROUTE_POINT_PREFIX=reserve make zerg-z10
+```
+
+The same option applies to the normal `terran`, `protoss-p10`, and
+`showcase` Make targets. Mode `0` is the release default. Mode `1`
+selects the original four-flag point-prefix trial. Each mode has a
+separate build configuration stamp so changing modes rebuilds the
+affected ROM.
+
+The dry-run compiler plans for all four products add exactly the
+ten tested flags in `reserve` mode. The Z10 plan also compiles its
+fact table generator with those flags. Running the commands from
+that plan with the pinned prepared inputs regenerates the same
+immutable combat facts and the exact transfer ROM
+`ddbf5d1c9e6715a33b1b3d47ac8d576faf667a67f7231799e6a9138059039831`.
