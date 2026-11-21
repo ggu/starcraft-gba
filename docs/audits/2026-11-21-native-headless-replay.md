@@ -46,21 +46,21 @@ The ROM, images, saves and captures are stored locally.
 ## Fresh Wasteland campaign opening
 
 A second fresh reset used the ordinary `advance` schedule from the existing
-headless `main.cpp`: Start pulses at steps 700, 1,000, 1,300 and 1,600;
-Down at 3,900 and 4,000; A at 4,100; and Start at 5,000, 5,600, 6,200
-and 6,800. Each pulse lasts ten runner steps and is released between pulses.
+headless `main.cpp`. Start pulses occur at steps 700, 1,000, 1,300 and
+1,600. Down occurs at 3,900 and 4,000, then A at 4,100. The last Start
+pulses occur at 5,000, 5,600, 6,200 and 6,800. Each pulse lasts ten runner
+steps and is released between pulses.
 The interactive runner received the equivalent bounded commands, with capture
 requests at 5,851 and 7,051, and finished at step 7,200. It exited 0 with
-GPU ready and two 640×240 captures; the isolated output occupied 2.3 MiB.
+GPU ready and two 640×240 captures. The isolated output occupied 2.3 MiB.
 
-Both captures show the Wasteland Terran opening group and 10/18 supply; the
-later capture also shows 40 minerals. These observations reproduce the prior
+Both captures show the Wasteland Terran opening group and 10/18 supply. The
+later capture shows 40 minerals. These observations reproduce the prior
 headless opening and agree with the separate native Wasteland save-selection
 record's 40 minerals and 10/18 supply. The GBA campaign documentation says it
-uses Wasteland's original placements and retains the opening mineral grant,
-but these native images alone do not establish a one-for-one GBA roster or
-state comparison. No actor identities, health, exact positions or simulation
-ticks were read in this run. [Native save-selection record](2026-11-13-n64-t1-save-selection.md)
+uses Wasteland's original placements and retains the opening mineral grant.
+Comparing the individual actors requires state observations for identities,
+health, exact positions and simulation ticks. [Native save-selection record](2026-11-13-n64-t1-save-selection.md)
 
 | Wasteland receipt | SHA-256 |
 | --- | --- |
