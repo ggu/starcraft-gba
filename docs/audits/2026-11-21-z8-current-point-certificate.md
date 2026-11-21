@@ -217,11 +217,80 @@ variant opt-in. Both link endpoints remain unchanged at `0x03004ea0`
 IWRAM and `0x02039f60` EWRAM. This comparison keeps the wider cold
 rectangle experiment disabled.
 
+Read-only pressure traces match six world and display cuts around calls
+33,852, 33,853 and 33,890. At each cut, the demand variant retains an
+additional frontier on slot 2, root 15,224, with 42 pending cells and its
+second cutoff used. That fills the fourth cold row. On call 33,890 the
+first four cold candidates all have open origins, valid seeds and no
+claimed range points. The capacity check sends all four to eager fills.
+
+| Cold candidate root at call 33,890 | Sparse prefix cycles | Unreserved nearby demand cycles |
+| --- | ---: | ---: |
+| 13,538 | 197,433 | 876,894 |
+| 13,540 | 176,249 | 877,767 |
+| 13,667 | 219,660 | 876,413 |
+| 13,668 | 23,754 | 876,480 |
+
+The sparse prefix spends two later full fills on roots 13,668 and 13,796.
+Unreserved demand only needs the later fill for root 13,796, bringing its
+total to five for the call. The extra parked row causes the lost cold
+certificates and the displaced cost.
+
 | Nearby demand evidence | SHA-256 |
 | --- | --- |
 | Original frontier and canonical path | `d40221122f7eb676a34df508e0fe2448f1d0058413fdfe3437cf0920d3cb3df9` |
 | Sparse prefix function timings | `79423251d4ac47214e1e83377ab225cc8757b2e8781f5aec4d1d74c07d808500` |
 | Nearby demand function timings | `526f4a41dde9e080faf99977a3d57f33ecd7ab73d41420d79299a54233aa9d76` |
+| Sparse prefix cold-row pressure | `9e6bec9bdeb75fa2aabd402b1f8f40256d3cd8afbc1984886d85351bdc5631b3` |
+| Nearby demand cold-row pressure | `ed4ac995f75556ed2554f1a048f2a46624c1cc82be71c806e5d3d8d6cf5f28f4` |
 | Candidate ARM ROM | `65fecf65708467102cc4c5f3a0f1af64a75915387a5a980999a73cebfdb8591a` |
 | Candidate link and vector | `0469be2a73d2b0f35a60c92c6ceef26d66e1e87005183db4312a2fbe377f081d` |
 | Candidate ordinary replay | `d6b1afe479d3e859acd79e949ffe3d1374d4e9982e068b0fbef1f0cf55670c3b` |
+
+## Reserved nearby-root frontier
+
+`SC64_ROUTE_POINT_NEAR_RESERVE_PROBE` adds one 264-byte frontier row
+for successful nearby-root resumptions. The four cold rows remain
+available to the original cold selector. An eligible nearby resume
+writes its new FIFO and bookkeeping into the reserve, switches the
+logical route's owner index, and frees its old row. A live reserved
+owner sends the next nearby request through full completion. Ordinary
+exact hits continue to repark in their original row, and whole-field
+readers still complete their routes.
+
+Sanitizer checks fill all four cold rows alongside the reserve, verify
+the eager fallback for a fifth ordinary request, and verify canonical
+full completion when the reserved row is busy. They also exercise
+transfer after a route slot is repurposed and release after an exact
+full-field read. The flag-off, certificate, range and far-read checks
+pass. The normal Z10 ARM link keeps IWRAM at `0x03004ea0` and moves the
+EWRAM endpoint from `0x02039f60` to `0x0203a068`.
+
+| Guest cycles | Packed control | Sparse prefix | Nearby demand | Nearby reserve |
+| --- | ---: | ---: | ---: | ---: |
+| Call 26,346 | 9,677,315 | 9,299,442 | 8,569,221 | 8,571,227 |
+| Call 26,357 | 2,232,150 | 2,587,525 | 1,856,031 | 1,856,454 |
+| Call 33,890 | 8,486,297 | 5,231,068 | 6,260,211 | 5,228,422 |
+| Mean across 203 calls | 1,694,983 | 1,565,906 | 1,574,460 | 1,555,839 |
+| Nearest-rank p95 | 3,235,449 | 3,210,153 | 3,174,411 | 3,210,981 |
+| Peak | 12,056,654 | 10,915,192 | 10,921,023 | 10,923,237 |
+
+The reserve restores the sparse prefix's two direct full fills and 103
+certificate attempts. All 668 route answers, 17 world and display cuts,
+three modal boundaries and 203 logical route counts match. Compared with
+the sparse prefix, the mean falls 0.64%, p95 rises 828 cycles and the
+peak rises 8,045 cycles. The largest paired increase is 10,254 cycles.
+At the six pressure cuts, the 42 pending cells for root 15,224 occupy
+the reserve. Three active cold rows leave one available to new requests. Each of
+the first four cold candidates at call 33,890 takes its prefix path.
+The two later full fills again belong to roots 13,668 and 13,796.
+This is an opt-in Z10 result on the same retained Z8 input and save. Other
+cartridges, busy custom games and physical GBA timing remain untested.
+
+| Reserve evidence | SHA-256 |
+| --- | --- |
+| Candidate ARM ROM | `7d29e32c8d9dcdc3af6db54b0c82877ef8c2a743754f7b961c629652d422f41b` |
+| Candidate link and vector | `b5231b62da3a2aa0c9a15f1889016e82cee99616e2bd5a0a2c1fbe6ad4d1af3d` |
+| Candidate ordinary replay | `242972f600d3c32769ca502674d9e475f23f01cc2ba684e5b7b587421ed715c9` |
+| Four-way comparison | `de67351d63430419afe7aa3e7de835e88ac4f130a34b77246dc47a26bbc74cef` |
+| Reserved frontier and cold-row pressure | `f62c3e92a82a9e868518fbfa711599968a050c7a4221fac3c657b4963d2fb8bc` |

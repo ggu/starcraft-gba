@@ -116,6 +116,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_NEAR_DEMAND_PROBE) && !defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT)
 #error "nearby-root demand requires bounded exact-origin prefix resumption"
 #endif
+#if defined(SC64_ROUTE_POINT_NEAR_RESERVE_PROBE) && !defined(SC64_ROUTE_POINT_NEAR_DEMAND_PROBE)
+#error "the nearby-root reserve requires nearby-root demand"
+#endif
 #if defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point certificates require deferred point fields"
 #endif
@@ -276,13 +279,21 @@ typedef struct {
 #endif
     u16 queue[SC64_POINT_PREFIX_PENDING];
 } Sc64PointPrefix;
-static Sc64PointPrefix sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];
+enum { SC64_POINT_PREFIX_STORAGE = SC64_POINT_PREFIX_SLOTS
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+                               + 1
+#endif
+};
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+_Static_assert(sizeof(Sc64PointPrefix) == 264, "nearby-root reserve must fit one bounded frontier");
+#endif
+static Sc64PointPrefix sc64_point_prefixes[SC64_POINT_PREFIX_STORAGE];
 static u8 sc64_point_prefix_index[SC64_ROUTE_SLOTS];
 
 static void sc64_point_prefix_reset(void)
 {
     memset(sc64_point_prefix_index, 0, sizeof(sc64_point_prefix_index));
-    for (unsigned i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i)
+    for (unsigned i = 0; i < SC64_POINT_PREFIX_STORAGE; ++i)
         sc64_point_prefixes[i].count = 0;
 }
 #define SC64_POINT_PREFIX_RESET() sc64_point_prefix_reset()
@@ -2315,7 +2326,7 @@ sc64_route_slot(int goal)
 #else
 #ifdef SC64_ROUTE_KEEP_FIELDS
 #ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
-            sc64_point_prefix_require_exact_hit(i, origin);
+            sc64_point_prefix_require_exact_hit(i, origin, 0);
 #elif defined(SC64_ROUTE_POINT_PREFIX_PROBE)
             sc64_point_prefix_require(i, origin);
 #endif
@@ -2580,7 +2591,7 @@ sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
 #ifdef SC64_ROUTE_POINT_NEAR_DEMAND_PROBE
     /* The gradient only needs the origin and its already discovered
      * parents. Let this point reader use the existing bounded resume. */
-    sc64_point_prefix_require_exact_hit(slot, cell);
+    sc64_point_prefix_require_exact_hit(slot, cell, 1);
 #else
     sc64_point_prefix_require(slot, cell);
 #endif

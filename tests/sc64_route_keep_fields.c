@@ -1152,6 +1152,10 @@ static void check_point_near_demand(void)
         const u32 before = state_hash();
         assert(sc64_route_near_root_reaches(slot, origin, goal, root) == follows);
         assert(state_hash() == before);
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+        assert(!prefix->count);
+        prefix = &sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];
+#endif
         assert(sc64_point_prefix_find(slot) == prefix && prefix->second_cutoff);
         assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
         for (int cell = 0; cell < MAP_CELLS; ++cell) {
@@ -1171,6 +1175,66 @@ static void check_point_near_demand(void)
         check_grid_unchanged();
     }
     puts("Nearby-root reads preserve canonical hits and misses through bounded and full resumption.");
+}
+#endif
+
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+static void check_point_near_reserve(void)
+{
+    race_cols = race_rows = 128;
+    const int cols = MAP_COLS, first_root = 24 + 24 * cols;
+    Sc64PointPrefix *reserve = &sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    int first_slot = sc64_route_slot_for(first_root, first_root + 17 * cols);
+    assert(first_slot >= 0);
+    const Sc64PointPrefix *cold = sc64_point_prefix_find(first_slot);
+    assert(cold && cold != reserve && !reserve->count);
+    assert(sc64_route_near_root_reaches(first_slot, first_root + 20 * cols,
+                                       first_root + cols, first_root));
+    assert(!cold->count && reserve->second_cutoff);
+    assert(sc64_point_prefix_find(first_slot) == reserve);
+    assert(sc64_point_prefix_index[first_slot] == SC64_POINT_PREFIX_SLOTS + 1);
+
+    int roots[SC64_POINT_PREFIX_SLOTS], slots[SC64_POINT_PREFIX_SLOTS];
+    for (int i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i) {
+        roots[i] = first_root + 12 + 8 * i;
+        slots[i] = sc64_route_slot_for(roots[i], roots[i] + 17 * cols);
+        assert(slots[i] >= 0);
+        const Sc64PointPrefix *prefix = sc64_point_prefix_find(slots[i]);
+        assert(prefix && prefix != reserve && !prefix->second_cutoff);
+    }
+    assert(!sc64_point_prefix_free());
+    const int extra_root = first_root + 56;
+    const int extra_slot = sc64_route_slot_for(extra_root, extra_root + 17 * cols);
+    assert(extra_slot >= 0 && !sc64_point_prefix_find(extra_slot));
+    assert(sc64_point_prefix_find(first_slot) == reserve);
+
+    /* A live reserve prevents a second nearby repark. The exact cold
+     * field completes in place and the reserved owner stays valid. */
+    assert(sc64_route_near_root_reaches(slots[0], roots[0] + 20 * cols,
+                                       roots[0] + cols, roots[0]));
+    assert(!sc64_point_prefix_find(slots[0]) && sc64_point_prefix_find(first_slot) == reserve);
+    reference_bfs(&oracle[POOL], roots[0]);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slots[0], cell) == oracle[POOL].dir[cell]);
+
+    /* A repurposed range slot no longer owns the reserve. Reassignment
+     * clears that stale index and publishes only the new owner. */
+    sc64_route_valid[first_slot] = 2;
+    assert(!sc64_point_prefix_find(first_slot));
+    assert(sc64_route_near_root_reaches(slots[1], roots[1] + 20 * cols,
+                                       roots[1] + cols, roots[1]));
+    assert(!sc64_point_prefix_index[first_slot] && sc64_point_prefix_find(slots[1]) == reserve);
+    reference_bfs(&oracle[POOL], roots[1]);
+    SC64_ROUTE_EXACT(slots[1]);
+    assert(!reserve->count && !sc64_point_prefix_index[slots[1]]);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slots[1], cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+    puts("Nearby-root reserve keeps four cold slots, completes when occupied and releases stale owners.");
 }
 #endif
 
@@ -1476,6 +1540,9 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_NEAR_DEMAND_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-near-demand-only")) {
         check_point_near_demand();
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+        check_point_near_reserve();
+#endif
         return 0;
     }
 #endif

@@ -22,7 +22,12 @@ static Sc64PointPrefix *sc64_point_prefix_find(int slot)
 static void sc64_point_prefix_discard(Sc64PointPrefix *prefix)
 {
     if (!prefix->count) return;
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+    if (sc64_point_prefix_index[prefix->slot] == (unsigned)(prefix - sc64_point_prefixes + 1))
+        sc64_point_prefix_index[prefix->slot] = 0;
+#else
     sc64_point_prefix_index[prefix->slot] = 0;
+#endif
     prefix->count = 0;
 }
 
@@ -164,7 +169,7 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
 /* Once a reader requests undiscovered data, restore the directions already
  * assigned and resume the exact pending FIFO in the original order. */
 #ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
-static int __attribute__((noinline)) sc64_point_prefix_resume(int slot, int cell)
+static int __attribute__((noinline)) sc64_point_prefix_resume(int slot, int cell, int near_reader)
 #else
 static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 #endif
@@ -176,6 +181,14 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
         (void)sc64_route_fill(slot, sc64_route_goal[slot]);
         return 1;
     }
+#endif
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+    Sc64PointPrefix *reserve = &sc64_point_prefixes[SC64_POINT_PREFIX_SLOTS];
+    if (near_reader && cell >= 0 && reserve->count &&
+        sc64_point_prefix_find(reserve->slot) == reserve)
+        cell = -1;
+#elif defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT)
+    (void)near_reader;
 #endif
     const int cols = MAP_COLS, rows = MAP_ROWS, stride = cols + SC64_LINEAR_PAD;
     const int cap = sc64_route_linear_queue_cap(cols, rows);
@@ -225,11 +238,28 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
                     if (row < first_row) first_row = row;
                     if (row > last_row) last_row = row;
                 }
-                prefix->restore_first_row = (u8)first_row;
-                prefix->restore_last_row = (u8)last_row;
-                memcpy(prefix->queue, bfs_queue + head, (size_t)remaining * sizeof(*bfs_queue));
-                prefix->count = (u8)remaining;
-                prefix->second_cutoff = 1;
+                Sc64PointPrefix *parked = prefix;
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+                if (near_reader) {
+                    sc64_point_prefix_discard(reserve);
+                    parked = reserve;
+                    parked->slot = (u8)slot;
+                    parked->goal = prefix->goal;
+                }
+#endif
+                parked->restore_first_row = (u8)first_row;
+                parked->restore_last_row = (u8)last_row;
+                memcpy(parked->queue, bfs_queue + head, (size_t)remaining * sizeof(*bfs_queue));
+                parked->count = (u8)remaining;
+                parked->second_cutoff = 1;
+#ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+                /* Publish the new owner's completed frontier before freeing
+                 * the cold row. The logical route slot and field stay put. */
+                if (near_reader) {
+                    sc64_point_prefix_index[slot] = SC64_POINT_PREFIX_SLOTS + 1;
+                    prefix->count = 0;
+                }
+#endif
                 return 1;
             }
         }
@@ -265,12 +295,12 @@ static int sc64_point_certificate_require(int slot, int cell)
 #ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
 static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 {
-    return sc64_point_prefix_resume(slot, -1);
+    return sc64_point_prefix_resume(slot, -1, 0);
 }
 
 /* An exact point hit serves this open origin immediately. Other readers
  * still require the complete field, and a second miss cannot repark. */
-static void sc64_point_prefix_require_exact_hit(int slot, int origin)
+static void sc64_point_prefix_require_exact_hit(int slot, int origin, int near_reader)
 {
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
     if (sc64_point_certificate_require(slot, origin)) return;
@@ -280,7 +310,7 @@ static void sc64_point_prefix_require_exact_hit(int slot, int origin)
          sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE)) {
         int demand = (unsigned)origin < (unsigned)(MAP_COLS * MAP_ROWS) &&
                      !SC64_ROUTE_LAZY(slot) && SC64_GRID_GET(path_walkable, origin);
-        (void)sc64_point_prefix_resume(slot, demand ? origin : -1);
+        (void)sc64_point_prefix_resume(slot, demand ? origin : -1, near_reader);
     }
 }
 #endif
