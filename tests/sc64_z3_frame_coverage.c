@@ -501,6 +501,57 @@ test_actor_depth(void)
         for (unsigned i = 0; i < FB_SIZE; ++i)
             overlap += pixels[0][i] != pixels[1][i];
         assert(overlap);
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+        /* Require a real painter disagreement at a pixel inside both bodies,
+         * where proximity chooses slot 0 and the painter chooses slot 1. */
+        memset(visible, 255, sizeof visible);
+        unsigned disagree = 0;
+        for (int py = 12; py < 120; ++py) for (int px = 0; px < 240; ++px) {
+            unsigned at = (unsigned)(py * FB_WIDTH + px);
+            cx = px; cy = py - 12;
+            if (pixels[0][at] == pixels[1][at] ||
+                dist2(cx,cy,u[0].x,u[0].y) >= 31*31 ||
+                dist2(cx,cy,u[1].x,u[1].y) >= 31*31 ||
+                dist2(cx,cy,u[0].x,u[0].y) > dist2(cx,cy,u[1].x,u[1].y) ||
+                !sc64_pick_unit_body(&u[0],sc64_unit_art_raw(&u[0]),1) ||
+                !sc64_pick_unit_body(&u[1],sc64_unit_art_raw(&u[1]),1)) continue;
+            int picked = selection_target();
+            if (!disagree) {
+                fprintf(stderr, "same-kind raster pixel order=%u at %d,%d painter=1 picked=%d\n", first,cx,cy,picked);
+                SC64_GRID_CLEAR(visible);
+                assert(selection_target() == 0);
+                memset(visible, 255, sizeof visible);
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+                u[1].cd = 1; assert(selection_target() == 0); u[1].cd = 0;
+#endif
+                assert(select_at() == 1 && u[1].selected);
+                clear_selection();
+                u[1].owner = ENEMY; assert(selection_target() == 0); u[1].owner = SIDE;
+                int third = spawn_unit(SIDE, U_MARINE, cx, cy);
+                assert(third >= 2 && selection_target() == third);
+                memset(&u[third], 0, sizeof u[third]);
+                int saved_camx = camx;
+                camx = cx + 1;
+                assert(sc64_foreground_flyer_pick(0, 1, 0) == 0);
+                camx = saved_camx;
+            }
+            ++disagree;
+            if (picked != 1) ++failures;
+        }
+        if (!disagree) { fputs("same-kind raster lacked witness\n",stderr); ++failures; }
+        unsigned transparent = 0;
+        for (int py = 12; py < 120 && !transparent; ++py) for (int px = 0; px < 240; ++px) {
+            cx = px; cy = py - 12;
+            if (dist2(cx,cy,u[0].x,u[0].y) >= 31*31 ||
+                dist2(cx,cy,u[1].x,u[1].y) >= 31*31 ||
+                dist2(cx,cy,u[0].x,u[0].y) > dist2(cx,cy,u[1].x,u[1].y) ||
+                (sc64_pick_unit_body(&u[0],sc64_unit_art_raw(&u[0]),1) &&
+                 sc64_pick_unit_body(&u[1],sc64_unit_art_raw(&u[1]),1))) continue;
+            assert(selection_target() == 0);
+            transparent = 1; break;
+        }
+        assert(transparent);
+#endif
 
         unsigned pages = 0;
         for (unsigned page = 0; page < 2; ++page) {
@@ -1023,7 +1074,7 @@ test_foreground_pick_context(void)
            sc64_depth_key(layer, 50, DEPTH_UNIT, 0));
     cx = u[0].x;
     cy = u[0].y;
-    assert(selection_target() == 0);
+    assert(selection_target() == 1);
 
     /* No eligible actor is under the cursor. Contextual A still mines. */
     memset(u, 0, sizeof(u));

@@ -6323,6 +6323,7 @@ field_cursor_near(int x, int y, int a, int b, int radius)
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
 #define SC64_FOREGROUND_PICK_ENABLED 1
 static int sc64_foreground_pick(int unit, int building, int proximity);
+static int sc64_foreground_flyer_pick(int first, int second, int proximity);
 #endif
 
 static int
@@ -6330,6 +6331,9 @@ selection_target(void)
 {
     int i, best_unit = -1, best_building = -1;
     int unit_distance = 31 * 31, building_distance = 26 * 26, d;
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+    int candidate_first = -1, candidate_second = -1, candidate_count = 0;
+#endif
     for (i = 0; i < MAX_UNITS; i++) {
 	if (!u[i].alive ||
 #ifdef SC64_FIELD_CURSOR_QUERY_PROBE
@@ -6348,6 +6352,13 @@ selection_target(void)
             )
 	    continue;
 	d = dist2(cx, cy, u[i].x, u[i].y);
+#ifdef SC64_FOREGROUND_PICK_ENABLED
+        if (d < 31 * 31) {
+            if (candidate_count == 0) candidate_first = i;
+            else if (candidate_count == 1) candidate_second = i;
+            ++candidate_count;
+        }
+#endif
 	if (d < unit_distance) {
 	    unit_distance = d;
 	    best_unit = i;
@@ -6374,6 +6385,8 @@ selection_target(void)
 #ifdef SC64_FOREGROUND_PICK_ENABLED
     if (best_unit >= 0 && best_building >= 0)
         return sc64_foreground_pick(best_unit, best_building, proximity);
+    if (best_building < 0 && candidate_count == 2)
+        return sc64_foreground_flyer_pick(candidate_first, candidate_second, proximity);
 #endif
     return proximity;
 }

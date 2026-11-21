@@ -79,6 +79,28 @@ sc64_pick_unit_body(const Unit *q, int raw, int flying)
     return sc64_pick_sprite_pixel(sprite, q->x, q->y - SC64_WALK_LIFT(walk), 0);
 }
 
+/* Restrict the same-kind override to two unambiguous flyers at the same
+ * painter layer. All unsupported or partially covered bodies keep the
+ * ordinary nearest-target result. */
+static int __attribute__((noinline))
+sc64_foreground_flyer_pick(int first, int second, int proximity)
+{
+    const Unit *a = &u[first], *b = &u[second];
+    int sx = cx - camx, sy = cy - camy + 12;
+    if ((unsigned)sx >= 240 || sy < 12 || sy >= 120 ||
+        !sc64_race_unit_flying(a->type) || !sc64_race_unit_flying(b->type) ||
+        sc64_unit_world_layer(a) != sc64_unit_world_layer(b)) return proximity;
+    u32 ka = sc64_depth_key(sc64_unit_world_layer(a), a->y, DEPTH_UNIT, (unsigned)first);
+    u32 kb = sc64_depth_key(sc64_unit_world_layer(b), b->y, DEPTH_UNIT, (unsigned)second);
+    int foreground = ka > kb ? first : second;
+    if (foreground == proximity) return proximity;
+    if (!currently_visible(cx, cy) || !currently_visible(a->x, a->y) ||
+        !currently_visible(b->x, b->y) ||
+        !sc64_pick_unit_body(a, sc64_unit_art_raw(a), 1) ||
+        !sc64_pick_unit_body(b, sc64_unit_art_raw(b), 1)) return proximity;
+    return foreground;
+}
+
 static int __attribute__((noinline))
 sc64_foreground_pick(int unit, int building, int proximity)
 {

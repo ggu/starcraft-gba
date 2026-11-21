@@ -1,0 +1,7 @@
+# Two-flyer foreground picking
+
+When two friendly same-layer flyers overlap, the shared painter orders their bodies by its depth key. The previous unit-only picker chose the nearer anchor, which could select the body visibly behind the other. This change uses the painter key only when exactly two eligible units and no building are in range, both are flyers on the same layer, both body masks cover the visible cursor, and their current poses are supported. Other cases retain the previous proximity result. This follows the existing GBA painter; native sprite pool-ID lifetime parity remains open.
+
+The Terran framebuffer fixture renders the Wraith/Mutalisk pair in both slot orders and verifies both backbuffers. At world pixels (94,43) and (92,51), respectively, the old picker selected slot 0 while the visible painter selected slot 1; 76 opaque, distinguishing pixel cases exposed the mismatch. The updated fixture checks ordinary selection plus transparent-pixel, fog, unsupported-attack-pose, hostile-owner, third-contender and offscreen fallbacks. Existing foreground, context and Z10 worker gather input checks pass under ASan/UBSan.
+
+On the exact #694 Z10 3,600-update three-CPU Blood Bath pair, 31 video/state cuts, 16 fresh continuation cuts, both pages, palette, route counters and SRAM match. Mean cycles were 840,021 before and 840,110 after; p95 was 1,132,275 and 1,132,358. This run does not exercise the intentionally changed overlap click. The local paired receipt SHA-256 is `050407d095d86ebe01b6f85a5359dde7c203c490da676607e49d48cd037b61a1`.
