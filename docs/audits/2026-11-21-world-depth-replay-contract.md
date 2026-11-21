@@ -73,6 +73,7 @@ unavailable mode or storage combinations as unavailable.
 | `worker-mining-effect-and-cargo` | Use an active SCV at a mineral edge and overlap its work effect with visible ground art. Move a Wraith across the effect on a separate cut. Repeat the ordinary gathering loop with a Probe and Drone. Capture approach, active work, loaded return, empty field, hidden worker or field, and each HUD boundary. Pause during work and resume from HOME. | The mineral and worker body sort at layer 4, the independent mining effect at layer 5, and the Wraith above both. Only active mineral work draws the effect. The returning ore badge shares the worker's turn. Require distinguishing masks for both overlap orders on both indexed pages. [Mining reference and fixture](#mineral-work-layer) |
 | `depth-after-terrain-page-flip` | Run an existing order-sensitive pair through a camera pan and a fog update so the cache uses both a cropped window and a full restore. Include opaque overlap across either cache split, a lifeless actor with attached art, and an independent effect. | After each successive page flip, compare the entire field and both HUD bands with a fresh render at the same camera and animation tick. Require the existing distinguishing mask for the overlap on both pages. Record storage selection, camera delta and cache reuse mode. [Terrain storage qualification](2026-11-22-terrain-cache-padding.md) |
 | `moving-flyer-double-tap` | Use the ordinary Z7 tape around calls 16,375–16,382. Include two friendly same-type flyers that change their foreground order between the two A edges. Repeat with different types, an expired window and replacement of the first actor. | The single tap picks the visible foreground flyer. A valid same-type second tap groups both. Record the two selected slots and both framebuffer pages. [Exact inputs and observed slots](2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window) |
+| `cross-layer-flyer-pick` | Place the layer-18 Wraith over the layer-16 Overlord. Use a cursor pixel inside both opaque body masks and closer to the Overlord's anchor. Reverse actor slots and repeat after flipping pages. | The Wraith's layer wins both the rendered pixel and the selection. Check transparent pixels and every fallback separately. [Bank-backed evidence](2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers) |
 
 The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
 establishes the native sort and allocator rule. The exact death-tie
@@ -105,6 +106,16 @@ current image frames and facing masks to the screenshot callback
 before asserting a distinguishing foreground pixel. The paused
 state digest is
 `c6c4db6a76b44be9d64fca46ba8d06d53f2825879046c7f71d1dae7a17b5ab72`.
+
+Both native sprites point to linked image records whose owner
+back-pointers identify the corresponding sprite. For the next
+opaque-pixel cut, read the current animation frame, facing or
+flip, and crop from verified image records and associate the
+same stopped update with its framebuffer callback. At the
+nominal nine GBA pixels of separation, the available mask sweep
+has 136 facing/flip combinations with no overlap and 161 with
+no distinguishing pixel. Keep the exact pixel order pending
+until those image and callback fields are captured together.
 
 For `pool-id-cross-kind-reuse`, record the camera and both sprite masks
 at the same native update. Require visible pixels inside the active
