@@ -87,10 +87,17 @@ int main(void)
     world.active_mask = 3;
     u32 count;
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
+    world.force[1] = 5;
+    assert(compare(&world, SC64_Z8_SELECT_FORCE1, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
     u[slot] = (Unit){.alive = 1, .raw_owner = 0, .raw_type = 0, .type = U_MARINE,
                      .x = 42, .y = 42};
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 1);
     u[slot].raw_owner = 1;
+    assert(compare(&world, SC64_Z8_SELECT_FORCE1, 64, 0, 0, 2, 0, 0) == -1);
+    world.active_mask = 1;
+    assert(compare(&world, SC64_Z8_SELECT_FORCE1, 64, 0, 0, 2, 0, &count) == 1 && count == 0);
+    world.active_mask = 3;
+    world.force[1] = 2;
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
     u[slot].raw_owner = 11;
     assert(compare(&world, 17, 229, 0, 0, 2, 0, &count) == 1 && count == 0);
