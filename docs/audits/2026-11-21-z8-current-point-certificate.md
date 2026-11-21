@@ -180,3 +180,48 @@ root materializations and wider-profile gates are covered.
 | Candidate ARM ELF | `9fe37c9b0e35f4f4eab0d29404160ea1b86138a235c7ba0ef8d6f964682f704b` |
 | Candidate link and vector | `eb3e17f244088cc5d68adb7f55ea2ffbaac043057e184636fd8ee6e118f12155` |
 | Candidate ordinary replay | `597bfcf6aab3f934d9abf84003c7a64f18677f705fe31d263489277e217a845b` |
+
+## Bounded resumption for nearby-root readers
+
+`SC64_ROUTE_POINT_NEAR_DEMAND_PROBE` gives the nearby-root gradient reader
+the same bounded resumption already used by exact point hits. The reader
+starts at an open origin and follows canonical parents that are already
+discovered once that origin enters the FIFO. A real parked frontier can
+resume for up to 1,024 pops once. A second miss or a declined cutoff
+completes the field through the existing path. Certificate-only and
+whole-field callers keep their existing paths. HOST sanitizers compare
+all discovered cells and the later full field with canonical BFS for
+both acceptance and rejection of a nearby goal.
+
+The paired ARM replay compares the same sparse-prefix Z10 build with and
+without the demand flag. It matches all 668 route answers, 17 world and
+display cuts, three modal boundaries and 203 logical route counts.
+Read-only guest traces confirm that call 26,357 resumes slot 4 for origin
+5,608 instead of requesting the complete field. The nearby-root reader
+returns false in both builds. Its time falls from 993,105 to 262,315
+cycles. The equivalent reader at call 26,346 falls from 986,930 to
+259,238 cycles, also with the same false result.
+
+| Guest cycles | Sparse prefix | Sparse prefix with nearby demand |
+| --- | ---: | ---: |
+| Call 26,346 | 9,299,442 | 8,569,221 |
+| Call 26,357 | 2,587,525 | 1,856,031 |
+| Call 33,890 | 5,231,068 | 6,260,211 |
+| Mean across 203 calls | 1,565,906 | 1,574,460 |
+| Nearest-rank p95 | 3,210,153 | 3,174,411 |
+| Peak | 10,915,192 | 10,921,023 |
+
+Full linear fill visits rise from two to 22, including three additional
+visits on call 33,890. The worst increase and higher mean keep this
+variant opt-in. Both link endpoints remain unchanged at `0x03004ea0`
+IWRAM and `0x02039f60` EWRAM. This comparison keeps the wider cold
+rectangle experiment disabled.
+
+| Nearby demand evidence | SHA-256 |
+| --- | --- |
+| Original frontier and canonical path | `d40221122f7eb676a34df508e0fe2448f1d0058413fdfe3437cf0920d3cb3df9` |
+| Sparse prefix function timings | `79423251d4ac47214e1e83377ab225cc8757b2e8781f5aec4d1d74c07d808500` |
+| Nearby demand function timings | `526f4a41dde9e080faf99977a3d57f33ecd7ab73d41420d79299a54233aa9d76` |
+| Candidate ARM ROM | `65fecf65708467102cc4c5f3a0f1af64a75915387a5a980999a73cebfdb8591a` |
+| Candidate link and vector | `0469be2a73d2b0f35a60c92c6ceef26d66e1e87005183db4312a2fbe377f081d` |
+| Candidate ordinary replay | `d6b1afe479d3e859acd79e949ffe3d1374d4e9982e068b0fbef1f0cf55670c3b` |

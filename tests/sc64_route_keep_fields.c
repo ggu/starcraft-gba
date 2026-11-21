@@ -1107,7 +1107,17 @@ static void check_point_near_distance(void)
         u32 before = state_hash(), hits = sc64_route_hits, builds = sc64_route_builds;
         assert(sc64_route_near_root_reaches(slot, origin, goal, root) == hit);
         assert(state_hash() == before);
+#ifdef SC64_ROUTE_POINT_NEAR_DEMAND_PROBE
+        const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        if (mode == PROOF) {
+            assert(prefix && sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        } else if (prefix) {
+            assert(prefix->count <= SC64_POINT_PREFIX_PENDING && prefix->second_cutoff);
+            assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        }
+#else
         assert(!!sc64_point_prefix_find(slot) == (mode == PROOF));
+#endif
         assert((sc64_route_step_slot(origin, goal) == slot) == hit);
         if (hit) {
             assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
@@ -1116,6 +1126,51 @@ static void check_point_near_distance(void)
         check_grid_unchanged();
     }
     puts("near-root distance witnesses preserve strict misses, ties and invalid witness fallback");
+}
+#endif
+
+#ifdef SC64_ROUTE_POINT_NEAR_DEMAND_PROBE
+static void check_point_near_demand(void)
+{
+    race_cols = race_rows = 128;
+    const int cols = MAP_COLS, root = 24 + 24 * cols;
+    const int first = root + 17 * cols, origin = root + 20 * cols;
+    const int whole_field_cell = root + 42 * cols;
+    for (int follows = 0; follows <= 1; ++follows) {
+        const int goal = root + (follows ? cols : 1);
+        memset(desired, 1, sizeof(desired));
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        reference_bfs(&oracle[POOL], root);
+        int slot = sc64_route_slot_for(root, first);
+        assert(slot >= 0);
+        const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        assert(prefix && prefix->count <= SC64_POINT_PREFIX_PENDING && !prefix->second_cutoff);
+        assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+
+        const u32 before = state_hash();
+        assert(sc64_route_near_root_reaches(slot, origin, goal, root) == follows);
+        assert(state_hash() == before);
+        assert(sc64_point_prefix_find(slot) == prefix && prefix->second_cutoff);
+        assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        for (int cell = 0; cell < MAP_CELLS; ++cell) {
+            int direction = sc64_route_get(slot, cell);
+            if (direction != SC64_ROUTE_UNREACHABLE) assert(direction == oracle[POOL].dir[cell]);
+        }
+
+        /* A missed read after the second cutoff still completes the field. */
+        assert(sc64_route_get(slot, whole_field_cell) == SC64_ROUTE_UNREACHABLE);
+        if (follows)
+            assert(sc64_route_near_root_reaches(slot, whole_field_cell, goal, root));
+        else
+            SC64_ROUTE_EXACT(slot);
+        assert(!sc64_point_prefix_find(slot) && state_hash() == before);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    puts("Nearby-root reads preserve canonical hits and misses through bounded and full resumption.");
 }
 #endif
 
@@ -1415,6 +1470,12 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
     if (argc == 2 && !strcmp(argv[1], "--point-near-distance-only")) {
         check_point_near_distance();
+        return 0;
+    }
+#endif
+#ifdef SC64_ROUTE_POINT_NEAR_DEMAND_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-near-demand-only")) {
+        check_point_near_demand();
         return 0;
     }
 #endif

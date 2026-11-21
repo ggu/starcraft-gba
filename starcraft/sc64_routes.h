@@ -113,6 +113,9 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "second exact-hit cutoff requires resumable point prefixes"
 #endif
+#if defined(SC64_ROUTE_POINT_NEAR_DEMAND_PROBE) && !defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT)
+#error "nearby-root demand requires bounded exact-origin prefix resumption"
+#endif
 #if defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point certificates require deferred point fields"
 #endif
@@ -2574,7 +2577,13 @@ sc64_route_near_root_reaches(int slot, int cell, int goal, int root)
 #endif
     }
 #endif
+#ifdef SC64_ROUTE_POINT_NEAR_DEMAND_PROBE
+    /* The gradient only needs the origin and its already discovered
+     * parents. Let this point reader use the existing bounded resume. */
+    sc64_point_prefix_require_exact_hit(slot, cell);
+#else
     sc64_point_prefix_require(slot, cell);
+#endif
 #endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     /* The gate proves the preferred path to the cached root still agrees
