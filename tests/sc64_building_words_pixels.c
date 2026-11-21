@@ -42,6 +42,13 @@ int main(void)
     assert(count == 360 && sc64_building_word_sources[0] == sc64_race_building_art_sprite(106) &&
            sc64_building_word_sources[1] == sc64_race_building_art_sprite(111) &&
            sc64_building_word_sources[2] == sc64_race_building_art_sprite(109));
+#elif defined(SC64_P10_TERRAN_BUILDING_WORDS_EXPECTED)
+    assert(count == 720 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery &&
+           sc64_building_word_sources[1] == &sc64_race_sprite_overmind_with_shell &&
+           sc64_building_word_sources[2] == &sc64_race_sprite_nexus &&
+           sc64_building_word_sources[3] == sc64_race_building_art_sprite(106) &&
+           sc64_building_word_sources[4] == sc64_race_building_art_sprite(111) &&
+           sc64_building_word_sources[5] == sc64_race_building_art_sprite(109));
 #elif defined(SC64_HATCHERY_WORDS_EXPECTED)
     assert(count == 120 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery);
 #elif defined(SC64_HATCHERY_OVERMIND_WORDS_EXPECTED)

@@ -57,12 +57,58 @@ the authenticated control vector.
 | Paired replay comparison | `3890fbf63f20939ae232700a0cf7597ce006d7990767c3f9abc75e8e64e6d774` |
 | Packed candidate link receipt | `7a086bdc751db40bc14fbf6b8e0e0e19cdf9a13b6f92dd668bc4adec78bb66c2` |
 
+## Normal P10 replay
+
+The optional `P10_TERRAN_BUILDING_WORDS=1` recipe appends the same three
+Terran frames to P10's selected packed building bank. With the normal
+Hatchery, Overmind and Nexus flags enabled, the shared sanitizer fixture
+checks all six frame pointers and passes 720 full-screen comparisons.
+
+```sh
+make P10_TERRAN_BUILDING_WORDS=1 verify-protoss-p10
+make test-sc64-p10-terran-building-words-pixels
+```
+
+Both P10 builds start blank SRAM, select Terran and one named Zerg CPU
+through the normal P10 lobby, and apply the recorded field buttons from
+the Terran win. The test ends after 12,512 physical calls at simulation
+frame 12,120. All 51 action wallet checks, 15 world digests, and 15 cuts
+of both indexed pages, display, palette and Carrier source clock agree.
+All 293 timed stage cuts have matching camera coordinates and frames.
+Five completed Barracks are admitted in the production view. A separate
+cut at field tape call 12,200 admits the Command Center and five Depots.
+
+| P10 scope | Mean cycles, control | Mean cycles, packed | Mean change |
+| --- | ---: | ---: | ---: |
+| Entire opening and production prefix | 836,822 | 782,299 | −6.52% |
+| Field tape calls 8,000–11,500 | 1,045,521 | 947,529 | −9.37% |
+| Field tape calls 11,500–12,500 | 1,161,272 | 1,038,163 | −10.60% |
+
+The late production window saves about 121,022 actor and effect draw
+cycles per sampled call. The measured prefix peak falls from 6,167,310
+to 6,154,503 (−0.21%). The full-prefix means equate to 20.05 and 21.45
+emulated main-loop updates per second. This P10 test covers ordinary
+Custom Game production through the stated cut. P10 campaign and full
+Custom Game victory remain separate qualification runs.
+
+The packed P10 link adds 72,120 text bytes and keeps IWRAM `0x03004e20`
+and EWRAM `0x0203b62c`. Cartridge and ELF payload checks pass. The
+flag-off recipe matches the pinned P10 control compiler vector after
+resolving the original three-frame bank to its verified local path.
+
+| P10 local input or receipt | SHA-256 |
+| --- | --- |
+| Normal Carrier control ROM | `91af2b848c2f57cd24c5d84744d1167e178189fd272a131eb39b33a473a0b7a7` |
+| Packed candidate ROM | `38c7c3944f942ab15a2a656ee21326bf450ce5df4a314ecbb12829409535a2b6` |
+| Packed candidate ELF | `c2cba6019d07ab0686b326849431bb743fe4ee3bf185838bbab314643bd96ccf` |
+| Paired comparison | `6f4bf3923438d70acb30b84107d2d080cab9429cff3c00b229148b1032160348` |
+| Packed candidate link receipt | `4c9937b37455d4b596df8781be562867b76e25dc79ad0a3cc61cb0c2e05f5d44` |
+
 ## Other cartridge profiles
 
-The authenticated Z10 and P10 frame banks map the same three raw IDs to
-71,968 packed bytes each. Showcase's Command Center crop is one row
-higher, making its full set 72,504 bytes. Each profile needs its own
-prepared bank. P10 should add these three frames to its existing packed
-Hatchery, Overmind and Nexus selection. For each profile, check selected
-pointers and pixel parity, ARM link and stack margins, and ordinary
-Custom Game where multiple completed Terran structures are in view.
+The authenticated Z10 frame bank maps the same three raw IDs to 71,968
+packed bytes. Showcase's Command Center crop is one row higher, making
+its full set 72,504 bytes. Each requires its own prepared bank, selected
+pointer and pixel checks, ARM link and stack margins, and ordinary play
+with multiple completed Terran structures in view. Physical GBA timing
+remains open for the tested builds.
