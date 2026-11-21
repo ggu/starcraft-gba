@@ -22,8 +22,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Busy match pacing.** The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
-  peak rises 0.30%. Pursue route stalls, defense queries and the
-  large shared draw passes against the current combined build.
+  peak rises 0.30%. The [shared Custom Game defense pass](audits/2026-11-21-custom-defense-cells.md)
+  saves another 1.05% mean in Blood Bath and 3.22–4.37% in the three
+  Outpost Run windows. Pursue route stalls and the large shared draw
+  passes against the current combined build.
   Qualify physical frame pacing on all three race cartridges.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
@@ -63,7 +65,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [follow-on Blood Bath cut](audits/2026-11-21-native-blood-bath-lurker.md#follow-on-egg-observation)
   narrows a likely Zergling pair hatch to 33 native updates. The ordinary
   GBA counterpart verifies a queued pair and fresh HOME continuation.
-  Qualify the separate Custom Game Egg actor and use
+  [Draft #689](https://github.com/ggu/starcraft-gba/pull/689) compiles the
+  experimental Carrier/Egg authentication path for Terran and Z10.
+  The combined journal format, P10 research composition and normal
+  activation remain open. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 
@@ -184,6 +189,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   observations explain the phase shifts in Blood Bath and the earlier
   dense Z7 pair. Measure broader busy skirmishes, campaign coverage
   and physical frame pacing before activating this option by default.
+  A [paired Z7 replay on the Carrier release](audits/2026-11-21-route-composition-current.md#carrier-release-z7-windows)
+  confirms the dense and late gains through controller call 155,650.
+  Extend the current pair through victory before promoting it.
 
 - **Busy Blood Bath.** The [current three-CPU profile](audits/2026-11-21-blood-bath-current-profile.md)
   averages 924,956 guest cycles against a 561,792-cycle 30-fps

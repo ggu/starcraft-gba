@@ -71,6 +71,9 @@ build/test-carrier-frame-roster: tests/sc64_carrier_roster_regression.c tests/sc
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 test-carrier-frame-roster: build/test-carrier-frame-roster
 	./$<
+
+build/test-sc64-custom-defense-p10: tests/sc64_custom_defense_cells_test.c tests/sc64_zp_defense_targets.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile mk/combat-perf/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $(DEFENSE_CUSTOM_CELL_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 P10_HATCHERY_CONFIG := build/p10-hatchery-words-config
 .PHONY: force-p10-hatchery-words-config
 $(P10_HATCHERY_CONFIG): force-p10-hatchery-words-config | build

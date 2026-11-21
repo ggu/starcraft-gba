@@ -170,3 +170,24 @@ and the next input sample before diagnosing a draw-order regression.
 | Earlier Z7 release VBlank observation | `6b79fa7c725ada8e03c3d74fea05c0c4ad904b438b7aa47122c5aa946a8d70cf` |
 | Earlier Z7 composed VBlank observation | `9908c40124f4d16077cf2ab19765a0e0531ee03b2e215f1003753de6ca9f56e8` |
 | Earlier Z7 presentation comparison | `85c3ece31b8f8b478e6b2065518ec7c261370fff855e385a75e79e82b9c8dacf` |
+
+## Carrier release Z7 windows
+
+The ordinary Z10 pair on source `f9a54b45` reproduces the normal ROM
+when the composition is off. With the composition enabled, both
+ordinary runs match their pause journal at frame 5,641 and reach
+controller call 155,650. All 228 sampled world cuts, nine display
+cuts and 75 complete fields match. An independent breadth-first
+search verifies 4,201 published directions across six partial fields.
+
+| Z7 window | Advancing updates | Mean change | p95 change | Peak change |
+| --- | ---: | ---: | ---: | ---: |
+| Early dense | 477 | −12.87% | −19.22% | −12.53% |
+| Late peak | 926 | −3.84% | −10.92% | −9.77% |
+| Late following | 905 | −4.27% | −11.81% | −16.23% |
+
+The exact comparison receipt SHA-256 is
+`93a74f365ad7fbaae5e6bc003a4b8fc8821399a3f796e46f34f618f058f9471f`.
+Continue the current candidate through victory and re-export before
+considering default activation. Timing covers guest cycles in the
+bounded windows.

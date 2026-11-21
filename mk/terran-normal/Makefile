@@ -64,3 +64,6 @@ build/test-sc64-mining-depth: tests/sc64_mining_depth_game.c $(TERRAN_ARM_SOURCE
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(MINING_DEPTH_PROFILE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
 test-sc64-mining-depth: build/test-sc64-mining-depth
 	./$<
+
+build/test-sc64-custom-defense-terran: tests/sc64_terran_custom_defense_cells_test.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c $(COMMON_HEADERS) mk/terran-normal/Makefile mk/combat-perf/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $(DEFENSE_CUSTOM_CELL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
