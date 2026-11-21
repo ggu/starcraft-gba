@@ -96,10 +96,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fall 12.42%, 18.47% and 13.70%. The [full ordinary Z7 run](audits/2026-11-21-z8-current-point-certificate.md#full-z7-victory-on-the-transfer-build)
   matches 254 state checks through victory and both exact journals.
   The late means improve by 1.82% and 2.17%. One late peak rises
-  2.52%, and the following p95 rises 1.53%. Attribute calls 154,198
-  and 154,508 before changing the release flags. A separate
+  2.52%, and the following p95 rises 1.53%. The
+  [paired ARM traces](audits/2026-11-21-z8-current-point-certificate.md#two-causes-of-the-late-z7-regressions)
+  identify repeated cold prefixes across disconnected components at
+  call 154,198 and a 740,872-cycle same-goal warm fill at call 154,508.
+  Test the cold component guard and blocked-root retry separately so
+  the ordinary tape shows whether either moves work to a later call. The
   [nearby certificate trial](https://github.com/ggu/starcraft-gba/blob/codex/sc64-route-near-certificate-20261121/docs/audits/2026-11-21-z8-current-point-certificate.md#nearby-certificate-after-a-short-detour)
-  saves 725,468 cycles at call 48,149. It needs the same late replays.
+  saves 725,468 cycles at call 48,149. Its full Z7 playthrough and both
+  journals match release. Both late regressions persist.
   Measure physical performance separately.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
@@ -932,9 +937,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cargo and Yamato HOST save tests. Empty and docked Carrier groups
   now pass the P10 HOST transfer and save tests. The [current preview](https://github.com/ggu/starcraft-gba/blob/codex/sc64-hangar-retirement-current-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md)
   passes the Z10 and P10 HOST suites for paid queue refunds and neutral
-  cargo. Z10 also resumes an ordinary active compact journal on ARM.
-  Verify a positive retired-seat compact journal on ARM, launched
-  fighters, the other coupled survivors, and simultaneous outcomes.
+  cargo. The [active trainee stage](https://github.com/ggu/starcraft-gba/blob/codex/sc64-carrier-trainee-retirement-20261121/docs/audits/2026-11-21-carrier-retirement-refund.md#active-interceptor-training)
+  uses the native child-first wallet order and passes both HOST
+  journals. Its Z10 ARM predecessor-save replay matches through an
+  active shot. Verify a positive retired-seat compact journal on ARM,
+  launched fighters, the other coupled survivors, and simultaneous outcomes.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results

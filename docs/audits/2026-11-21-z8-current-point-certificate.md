@@ -493,3 +493,44 @@ transfer remains opt-in. These are guest-cycle measurements.
 | Transfer replay | `9e7d9b8f6e1547c55d3bfea578cde7d370b7ab3197840681c707cbb52997b668` |
 | Pause journal | `4eaecbb90f5e923d73eb97a68012f5fb653d8c751fba7dc1e4d9d80ae54ca3ce` |
 | Victory and fresh re-export | `1acce341f61b2a1e37cadc1e0b304dd63b5b31352789d128fa2d7bf20d6eb627` |
+
+### Two causes of the late Z7 regressions
+
+Read-only ARM traces on the pinned combat-facts release and transfer
+trial agree on the ordinary restore, 226 world cuts and two display
+cuts. The observer reproduced the cycle counts from the uninstrumented
+replay. These are the two measured calls and their order-stage costs.
+
+| Tape call and measurement | Pinned release | Transfer |
+| --- | ---: | ---: |
+| 154,198 guest cycles | 5,796,737 | 5,942,621 |
+| 154,198 orders | 4,178,972 | 4,333,698 |
+| 154,508 guest cycles | 2,389,316 | 3,130,924 |
+| 154,508 orders | 1,359,487 | 2,101,019 |
+
+At call 154,198, the transfer takes 3,170,471 cycles across 13 cold
+prefix fills. Prefix expansion accounts for 349,306 cycles and linear
+completion for 954,001 cycles within those calls. The pinned release's
+13 linear fills take 3,038,958 cycles. The captured walkability grid
+places 12 of the 13 open goal and origin pairs in different components.
+Eleven requests target a 361-cell component. One targets the 9,790-cell
+component from the other side. One same-component pair still needs the
+normal search. A bounded component check can skip the prefix only when
+a different valid, complete field proves disconnection on that grid.
+
+Call 154,508 has two logical hits and zero builds. The transfer hits
+a certificate-only row for the same blocked goal at (52,99), with
+origin (68,102). Its warm certificate takes 243 cycles and rejects the
+19-cell center gap. The ensuing full fill takes 740,872 cycles with
+five seeds and 9,790 reached cells. The release enters neither routine.
+Canonical BFS finds an 18-step path from the seed at (53,99).
+The existing padded 24×11 window reproduces that path with 145 pops
+from the same seed and neighbor order. The independent cold change
+cannot affect this hit. A blocked-root-only warm retry can keep the
+same scratch, cold bound and canonical chain while covering this gap.
+
+| Trace evidence | SHA-256 |
+| --- | --- |
+| Pinned release read-only trace | `019a26c86a47ba76095ada1a07d5263750dbcf6a82f43f73d12347509440b34f` |
+| Transfer read-only trace | `fa2a6814912bb0af2982b43828caf69f3282afba58da830c9f2703165aefe076` |
+| Paired routine attribution | `aa1d03c053265627001f05ec939d42345781472356f8add6b9f54ae0554abb70` |
