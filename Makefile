@@ -3649,6 +3649,12 @@ construction-visuals: build/StarCraft-Construction-Preview-GBA.gba
 # and the original-art game; each game fixture is also built with the feature
 # compiled out and must print the same state/save digest over combat.
 DEATH_VFX_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+.PHONY: test-sc64-death-vfx-storage
+build/test-sc64-death-vfx-storage: tests/sc64_death_vfx_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) -DSC64_DEATH_VFX_VRAM_STORAGE $< -o $@
+test-sc64-death-vfx-storage: build/test-sc64-death-vfx-storage
+	./build/test-sc64-death-vfx-storage
+test: test-sc64-death-vfx-storage
 build/test-sc64-death-vfx: tests/sc64_death_vfx.c starcraft/sc64_death_vfx.h starcraft/sc64_death_vfx_render.h common/gba.c common/gba.h | build
 	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< common/gba.c -o $@
 build/test-sc64-death-vfx-default: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
