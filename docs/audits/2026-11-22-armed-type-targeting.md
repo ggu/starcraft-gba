@@ -25,22 +25,33 @@ display observations, 16 fresh continuation cuts, route counters, and
 the exported SRAM. The same Custom Game camera tape samples both
 pages at 41 cuts per cartridge. All four Campaign or Showcase openings
 match their baseline. The three race cartridges pass the 54 named
-Custom Game start and fresh HOME continuation cases.
+Custom Game start and fresh HOME continuation cases, and all 1,134
+normal-menu launches. The launch matrix checks both maps, all human
+races, and every assignment of one to three CPU seats on each cartridge.
 
 | Replay window | Mean guest cycles | P95 guest cycles |
 | --- | ---: | ---: |
 | Three-CPU Blood Bath, 3,600 updates | 825,087 → 820,015 | 1,115,670 → 1,109,226 |
 | Zerg 10, full ordinary continuation from pause | 1,334,618 → 1,318,488 | — |
+| Zerg 7, dense window | 1,853,881 → 1,824,133 | 2,525,941 → 2,497,979 |
+| Zerg 7, late peak window | 2,308,831 → 2,279,828 | 3,285,267 → 3,254,419 |
+| Zerg 7, late following window | 2,236,521 → 2,209,296 | 3,128,945 → 3,104,763 |
 
 The Zerg 10 replay wins at frame 51,588. All 21 paired continuation
 checkpoints and terminal state match. The third process loads the
 victory from HOME and re-exports identical SRAM. The source and
 candidate both retain the same pause and victory journal bytes.
+The full Zerg 7 replay wins at frame 228,128 after 231,031 controller
+updates. All 254 world checks, ten display cuts and six route cache
+cuts match `f11e089`. The pause and victory SRAM match byte for byte,
+including the victory readback from fresh HOME.
 
 | Local evidence | SHA-256 |
 | --- | --- |
 | Busy Blood Bath comparison | `846dfc7633cf11223d4e84d71e51724ec9c003582049bddd2c42d4385d577645` |
 | Custom Game save matrix | `cb64457cf82006f6b63411f76ed059ed822428c422770ac92dedba721f6ed56c` |
+| All Custom Game seat assignments | `1f119bfa0d730d7c8acfb9092db9d79009054435e834fa4bdfe9c3ca7c60fd65` |
+| Zerg 7 full campaign comparison | `18e3d8defe0c2b474342ff12098cc3a235339dce26472e7cfe1e7a6d218471c3` |
 | Zerg 10 candidate continuation | `828c302506383d916aca260f1583fa826d8be36a99f67bd976c4c0a0ae8e5c13` |
 | Zerg 10 candidate victory readback | `b92566caa780d6522fa74787e2b6c03402b03d8914ca851ce34b52c1ef7471f6` |
 | Z8 stack observation | `a8673adcc6c73a3a1051ae7e0344aeef4148e3f234dc3bb37ac15b470149e484` |

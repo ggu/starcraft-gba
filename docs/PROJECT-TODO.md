@@ -65,9 +65,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   identifies target searches and cell insertion as recurring costs.
   The [armed type lookup](audits/2026-11-22-armed-type-targeting.md)
   cuts the ordinary Z10 continuation mean by 1.21% and the busy Blood
-  Bath mean by 0.61%. The same audit records a static sprite layer
-  trial with flat full-update timing. Target the larger route and
-  order costs for the next pacing gain.
+  Bath mean by 0.61%. The full Z7 replay keeps the same state and
+  victory, with 1.22–1.60% lower means across the three sampled combat
+  windows. The same audit records a static sprite layer trial with
+  flat full-update timing. Target the larger route and order costs
+  for the next pacing gain.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -173,6 +175,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Terran, Z10 and P10 cartridges. It covers both maps, every human
   race and all arrangements of one to three named CPU rivals.
   The separate 54-case matrix passes fresh HOME save continuation.
+  [The armed type release](audits/2026-11-22-armed-type-targeting.md#local-replays)
+  repeats the 1,134 launches and all 54 save cases on the current
+  race cartridge set.
   SD readback, physical frame pacing and broader native campaign
   verification remain open.
 
