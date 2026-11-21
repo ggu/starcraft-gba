@@ -92,6 +92,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   state and video. Its early Z7 window rises 1.14% and its Z8 mean
   rises 0.71%. Position reuse alone stays within 0.05% of stock across
   the Z7 and Z8 windows. Lazy weapon checks cut the Z8 increase to 0.18%.
+  The [current lazy cache](audits/2026-11-21-indexed-target-query.md#lazy-query-on-the-fallback-depth-release)
+  costs 0.15% in Z8 and 0.21% in early Z7, then saves about 0.8%
+  in late Z7. Keep it off and measure route stalls and large draw passes.
   [Immutable combat facts](audits/2026-11-21-indexed-target-query.md#immutable-combat-facts)
   cut the Z10 late means by 2.76% and 3.13%, with matching state.
   The [normal Z10 qualification](audits/2026-11-21-z10-combat-facts-release.md)
@@ -120,9 +123,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 709,645 more cycles at call 154,508. Its Z7 win and re-exported
   journal match stock. The traced goal stays partial on each resident cut
   and evicts without an eager refill. Both late means remain over four
-  times the 30 fps cycle budget. Compare the combined cold, warm and
-  small-component trial on the current renderer, then check other campaigns,
-  busy Custom Games and physical frame pacing before enabling the flags.
+  times the 30 fps cycle budget. The
+  [composed route trial](https://github.com/ggu/starcraft-gba/pull/677)
+  reduces current Z8 mean cycles by 8.42% and peak cycles by 15.61%,
+  passes all four links and the sampled T10, P10 and Custom Game
+  continuations. Dense Z7 and busy Blood Bath each have an active
+  framebuffer page discrepancy to inspect across VBlank. Keep this
+  option off for release while checking presentation and hardware timing.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
