@@ -78,8 +78,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds 166 partial depot-field rebuilds when an existing field cannot
   answer a requested origin. The single-wide-frontier trial preserves
   the sampled P10 replay and saves 0.036% in mean game-update cycles.
-  Profile steady simulation and draw costs on consecutive dense updates
-  with no new field work.
+  The [local ARM route packer trial](audits/2026-11-22-z7-rendered-replay.md#route-output-packing-trial)
+  cuts two P10 full-fill updates by about 63,000–73,000 cycles. The
+  full-tail mean improves under 0.01% and Z10 has only 16 IWRAM bytes
+  before its guard. Keep this trial local. Profile steady simulation
+  and draw costs on consecutive dense updates with no new field work.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -119,6 +122,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
 
+- **Zerg 7 current-controller replay.** The [rendered authoring audit](audits/2026-11-22-z7-rendered-replay.md)
+  isolates the selection change at two stacked Drones. Render between
+  HOST inputs when authoring a physical tape. The refreshed tape reaches
+  HOST victory and advances through the old selection cut on the
+  normal ARM ROM. Isolate the later gas difference at call 23,879
+  and qualify a new pause, fresh HOME and victory on the normal product.
+  The retained Z10 tape still writes its frame-2,526 pause save on
+  `71809328`; its later script now restarts on that ROM. Regenerate
+  and qualify the ordinary late-chapter continuation on the same
+  shared picker.
+
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
   frame captures match the retained ordinary-input reference. Allow for
@@ -144,7 +158,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing
-  coverage. Use the active Blood Bath combat witness to qualify opaque
+  coverage. The [native Custom Game lobby captures](audits/2026-11-22-native-custom-game-lobby.md)
+  show the map and seat controls, race cycling, and no difficulty field
+  in the sampled Challenger and Blood Bath settings.
+  Use the active Blood Bath combat witness to qualify opaque
   overlaps and pool-ID reuse in new ordinary-input cuts.
   The [native Blood Bath production witness](audits/2026-11-21-native-blood-bath-lurker.md)
   follows three Zerg CPU Hydralisks through Lurker Egg and Lurker in
@@ -173,6 +190,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   All 378 candidate launch combinations pass. The initial ARM canary
   sample leaves 6,528 bytes untouched. Qualify sustained battles,
   pacing and uninterrupted versus fresh trajectories on that product.
+  The refreshed Z10 trial passes ordinary matched flight-and-Egg
+  continuation and migration of predecessor Carrier and three-CPU
+  saves. PR #411 reserves 0x4f. The private 0x50 candidate needs a
+  coordinated registry allocation and broader save-capacity checks.
   P10 research composition remains open. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
