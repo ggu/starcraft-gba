@@ -102,6 +102,20 @@ are covered by the HOST fixtures.
 | Compiler vector, input hashes and RAM guards | `de052bf6cb4a72199c5a29444708aacfc20f500578baa6bd2dbb94b3e959ba10` |
 | Active compact journal and fresh continuation | `21d9dc6801b0c5b8307e03ad4c63d31c6b089819fcbeb897b55a7e641ca94047` |
 
+An independent blank-cartridge Blood Bath match selects Terran against
+named Zerg, Protoss and Terran CPUs. The resolved bases are [1,2,0,3].
+Frame 17,359 has one human building and four living human SCVs in
+slots 0–3. Advancing to 17,360 destroys the last building, publishes
+defeat, and transfers all four slots to neutral owner 11. Health remains
+60, 42, 60 and 60. Three workers move two pixels during the final
+update. A normal pause and 32 KiB save taken at frame 17,359 loads
+through fresh HOME and produces the identical defeat state and neutral
+rows. The three CPU owners still hold 16, 10 and 18 buildings. The
+CPU-elimination and neutral Ventral Sacs marker bytes remain clear.
+This witnesses ordinary human transfer on the composed Z10 preview.
+The paired receipt SHA-256 is
+`ebf4f9737b0d1b7d76f46cc0b1814a64e15c45ac0ae8131ec8e5431990b766b3`.
+
 Keep the build option off for normal products. Still needed are an
 eight-slot Gantrithor retirement fixture, an ordinary active ARM
 retirement with neutral transport cargo, and native CPU retirement
