@@ -963,7 +963,7 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
 #endif
  int left=x<0?0:x,right=x+width>240?240:x+width;
  if(left>=right||top>=bottom)return;
- int phase=x%4;if(phase<0)phase+=4;
+ int phase=(unsigned)x&3u;
  int origin=x-phase;
  int first=left&~3,last=(right+3)&~3;
  int groups=(phase+width+3)/4;
@@ -971,6 +971,26 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
  for(int dy=y+top;dy<y+bottom;dy++) {
   volatile u32 *dst=(volatile u32 *)(void *)(pixels+dy*120+first/2);
   const u32 *src=row;
+#ifndef GBA_HOST
+  /* Each packed word is followed by its opacity mask in ROM. Load the
+   * pair in one sequential transfer, and read VRAM only for mixed lanes. */
+  unsigned count=(unsigned)(last-first)>>2;
+  __asm__ volatile(
+   "1: ldmia %[src]!, {r2, r3}\n\t"
+   "cmp r3, #0\n\t"
+   "beq 2f\n\t"
+   "cmn r3, #1\n\t"
+   "ldrne ip, [%[dst]]\n\t"
+   "bicne ip, ip, r3\n\t"
+   "orrne r2, r2, ip\n\t"
+   "str r2, [%[dst]]\n"
+   "2: add %[dst], %[dst], #4\n\t"
+   "subs %[count], %[count], #1\n\t"
+   "bne 1b"
+   : [src] "+&r"(src), [dst] "+&r"(dst), [count] "+&r"(count)
+   :
+   : "r2", "r3", "ip", "cc", "memory");
+#else
   for(int dx=first;dx<last;dx+=4,dst++,src+=2) {
    u32 mask=src[1];
    if(!mask)continue;
@@ -978,6 +998,7 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
    if(mask==0xffffffffu)*dst=color;
    else *dst=(*dst&~mask)|color;
   }
+#endif
   row+=groups*2;
  }
 }
