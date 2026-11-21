@@ -44,6 +44,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [fresh native tie sample](audits/2026-11-21-world-depth-replay-contract.md#native-pool-id-and-pixel-evidence)
   reproduces the ordering keys. Capture both sprite masks inside the
   active viewport before using this case to qualify a shared ID policy.
+  [Draft #696](https://github.com/ggu/starcraft-gba/pull/696) fixes an
+  observed GBA foreground selection mismatch at two opaque same-layer
+  flyers. Exercise more candidate bodies and an ordinary native
+  viewport overlap. See the [flyer replay cases](audits/2026-11-22-two-flyer-picker.md).
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
