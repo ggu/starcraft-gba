@@ -1638,8 +1638,9 @@ enum {
 /* The gap after the sampled-audio arena is not free: imported game audio
  * keeps a live actor snapshot there. Use only the 2.5 KiB padding after the
  * second Mode-4 framebuffer page, before the projectile OBJ arena. */
-#define SC64_DEATH_VFX_VRAM_BASE 0x06013600u
-#define SC64_DEATH_VFX_VRAM_LIMIT 0x06013FE0u /* sc64_text_box.h holds the rest */
+#include "sc64_mode4_padding.h"
+#define SC64_DEATH_VFX_VRAM_BASE SC64_MODE4_PADDING_BASE
+#define SC64_DEATH_VFX_VRAM_LIMIT SC64_MODE4_TEXT_BOX_BASE
 _Static_assert(SC64_DEATH_VFX_VRAM_BASE >=
                GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS) * 2u,
                "death-VFX storage overlaps the imported game-audio snapshot");

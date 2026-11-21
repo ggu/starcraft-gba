@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-21. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-22. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -41,6 +41,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [depth replay assertions](audits/2026-11-21-world-depth-replay-contract.md#replay-cases)
   on both framebuffer pages. Capture an opaque equal-Y native death
   overlap and verify independent sprite IDs through reuse.
+  The [fresh native tie sample](audits/2026-11-21-world-depth-replay-contract.md#native-pool-id-and-pixel-evidence)
+  reproduces the ordering keys. Capture both sprite masks inside the
+  active viewport before using this case to qualify a shared ID policy.
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
@@ -67,8 +70,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   GBA counterpart verifies a queued pair and fresh HOME continuation.
   [Draft #689](https://github.com/ggu/starcraft-gba/pull/689) compiles the
   experimental Carrier/Egg authentication path for Terran and Z10.
-  The combined journal format, P10 research composition and normal
-  activation remain open. Use
+  An isolated Z10 HOST fixture reaches the real load preparation and
+  restores a paid Egg, a paid Carrier queue and an active Interceptor
+  from one 14,100-byte record. It also rejects malformed newer
+  candidates and restores legacy Carrier and transport records.
+  Qualify the format in ordinary HOME on ARM, then test P10 research
+  composition before production activation. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 
@@ -206,6 +213,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [terrain restore measurement](audits/2026-11-21-terrain-restore-interior-traffic.md)
   estimates about 11,145 cycles of mean headroom for contiguous row
   transfers in its fixed-camera sample, before bookkeeping. The
+  [Mode 4 padding change](audits/2026-11-22-terrain-cache-padding.md)
+  frees 2,400 bytes of EWRAM per profile and lowers the current busy
+  Z10 replay mean from 842,472 to 840,021 cycles. Measure per-page
+  damage tracking before adding writes to the painter's hot path. The
   [point-route origin census](audits/2026-11-21-blood-bath-point-origin.md)
   links all four fills at update 2,055 to stale-donor gate
   failures. Both local certificates decline all four. A full-width

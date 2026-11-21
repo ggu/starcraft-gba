@@ -71,11 +71,36 @@ unavailable mode or storage combinations as unavailable.
 | `death-storage-depth` | Use the same scene and seed in EWRAM and a VRAM qualification build. Test an attached ground collapse with a Tank to its north and south, a burrowed collapse, an Overlord's attached images beside a Wraith and detached rubble. Add the fallback collapse and air burst cuts. | The loaded elevation, queue key, visible overlap and HUD match across storage. Confirm the VRAM flag and source death depth are both active. [Existing overlap setups](2026-11-21-fallback-world-depth.md#replay-cases) |
 | `same-y-attached-death-continuity` | Capture an opaque equal-elevation, equal-Y overlap alive, on the first attached death image, during actor-slot reuse, and on last-image retirement. Repeat with the victim's ID above and below its neighbor's. Include an independently detached effect with its own key. | Preserve the dying actor's ordering through the last attached image. On GBA the lower-slot collapse stays behind the Marine on both pages. The reused live actor draws in front on an exact slot tie. Retain native sprite IDs and the free-list head around retirement and reuse. [Fix and native lifetime witness](2026-11-21-attached-death-continuity.md) |
 | `worker-mining-effect-and-cargo` | Use an active SCV at a mineral edge and overlap its work effect with visible ground art. Move a Wraith across the effect on a separate cut. Repeat the ordinary gathering loop with a Probe and Drone. Capture approach, active work, loaded return, empty field, hidden worker or field, and each HUD boundary. Pause during work and resume from HOME. | The mineral and worker body sort at layer 4, the independent mining effect at layer 5, and the Wraith above both. Only active mineral work draws the effect. The returning ore badge shares the worker's turn. Require distinguishing masks for both overlap orders on both indexed pages. [Mining reference and fixture](#mineral-work-layer) |
+| `depth-after-terrain-page-flip` | Run an existing order-sensitive pair through a camera pan and a fog update so the cache uses both a cropped window and a full restore. Include opaque overlap across either cache split, a lifeless actor with attached art, and an independent effect. | After each successive page flip, compare the entire field and both HUD bands with a fresh render at the same camera and animation tick. Require the existing distinguishing mask for the overlap on both pages. Record storage selection, camera delta and cache reuse mode. [Terrain storage qualification](2026-11-22-terrain-cache-padding.md) |
 
 The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
 establishes the native sort and allocator rule. The exact death-tie
 case still needs an opaque N64 framebuffer cut. Use independent native
 and GBA replays and keep ROMs, saves and captures local.
+
+### Native pool ID and pixel evidence
+
+A fresh ares continuation of the same ordinary Blood Bath battle
+reproduces the two layer-4 Zergling records at update 17,144. At world
+`(46,152)`, sprite ID 1418 has key `0x2026058a`. At `(70,152)`, sprite
+ID 1330 has key `0x20260532` and sorts first. The local receipt SHA-256 is
+`a919322bffe77fafe1c0494b91f9b1610989ac8c3434cea4827ee38347399d57`.
+Both observations are from the same frozen update.
+
+A fresh restore at update 17,166 reproduced the equal-Y pair at
+`(80,142)` and `(62,142)` and captured a screenshot. All 1,156
+combinations of standing facings and flips have zero shared opaque
+pixels at that 18-pixel separation. The live image records have
+different extents from the standing bank. The screenshot lacks
+a measured viewport transform for that pair. The local receipt
+SHA-256 is `dae5acd908637950978d9d5ef77211febe1fff4ca85db646c1ce015f72299b46`.
+
+For `pool-id-cross-kind-reuse`, record the camera and both sprite masks
+at the same native update. Require visible pixels inside the active
+viewport after fog, a nonempty order-sensitive mask, and the winner in
+the composed frame. Treat a sprite record flagged `0x04` as metadata.
+Keep the case pending until it captures both ID orders and the free-list
+change through last-image retirement and reuse.
 
 ## Mineral work layer
 

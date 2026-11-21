@@ -49,7 +49,7 @@ test-terrain-fast-validate: $(TFV_TESTS)
 # The existing cache oracles (tests/sc64_terrain_cache.c), flag on.
 TFV_CACHE_FLAGS := -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DSC64_TERRAIN_FAST_VALIDATE
 TFV_REAL := -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -Icommon
-TFV_CACHE_INPUTS := tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h starcraft/sc64_static_dirty_rows.h starcraft/sc64_fog.h starcraft/sc64_obj_vram.h common/gba.h common/gba.c mk/terrain-fast-validate/Makefile
+TFV_CACHE_INPUTS := tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h starcraft/sc64_static_dirty_rows.h starcraft/sc64_fog.h starcraft/sc64_obj_vram.h starcraft/sc64_mode4_padding.h common/gba.h common/gba.c mk/terrain-fast-validate/Makefile
 # $(1) variant name, $(2) flags, $(3) extra sources.
 define TFV_CACHE_VARIANT
 build/test-terrain-cache-fv-$(1): $$(TFV_CACHE_INPUTS) | build
@@ -60,7 +60,9 @@ $(eval $(call TFV_CACHE_VARIANT,cache,,))
 $(eval $(call TFV_CACHE_VARIANT,scroll,$(TFV_REAL) -DSC64_TERRAIN_SCROLL,common/gba.c))
 $(eval $(call TFV_CACHE_VARIANT,key-once,-DSC64_IMPORTED_MISSION -DSC64_RENDER_KEY_ONCE,))
 $(eval $(call TFV_CACHE_VARIANT,key-once-scroll,$(TFV_REAL) -DSC64_TERRAIN_SCROLL -DSC64_IMPORTED_MISSION -DSC64_RENDER_KEY_ONCE,common/gba.c))
-$(eval $(call TFV_CACHE_VARIANT,dirty-capture,$(TFV_REAL) -DSC64_TERRAIN_SCROLL -DSC64_TERRAIN_ROW_MASKS -DSC64_TERRAIN_CACHE_VRAM -DSC64_TERRAIN_DIRTY_CAPTURE -DSC64_P7_PROJECTILES_ENABLED -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_FOG_TEST_PACKED -DSC64_SOFT_FOG -DSC64_FOG_TEST_REAL_RASTER,common/gba.c))
+TFV_DIRTY_FLAGS := $(TFV_REAL) -DSC64_TERRAIN_SCROLL -DSC64_TERRAIN_ROW_MASKS -DSC64_TERRAIN_CACHE_VRAM -DSC64_TERRAIN_DIRTY_CAPTURE -DSC64_P7_PROJECTILES_ENABLED -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_FOG_TEST_PACKED -DSC64_SOFT_FOG -DSC64_FOG_TEST_REAL_RASTER
+$(eval $(call TFV_CACHE_VARIANT,dirty-capture,$(TFV_DIRTY_FLAGS),common/gba.c))
+$(eval $(call TFV_CACHE_VARIANT,dirty-capture-death-vram,$(TFV_DIRTY_FLAGS) -DSC64_DEATH_VFX_VRAM_STORAGE,common/gba.c))
 $(eval $(call TFV_CACHE_VARIANT,soft-fog,$(TFV_REAL) -DSC64_SOFT_FOG,common/gba.c))
 $(eval $(call TFV_CACHE_VARIANT,soft-fog-scroll,$(TFV_REAL) -DSC64_TERRAIN_SCROLL -DSC64_SOFT_FOG,common/gba.c))
 $(eval $(call TFV_CACHE_VARIANT,soft-fog-rowmask,$(TFV_REAL) -DSC64_TERRAIN_SCROLL -DSC64_TERRAIN_ROW_MASKS -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_FOG_TEST_PACKED -DSC64_SOFT_FOG,common/gba.c))

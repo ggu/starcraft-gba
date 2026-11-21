@@ -14,7 +14,8 @@
  *
  * Every other VRAM-resident owner lies below 0x06014000 and is outside this
  * map: the audio arena and the game-audio actor snapshot (0x06009600), the
- * optional death-effect state (from 0x06013600) and the text-box queue
+ * optional death-effect state or extra terrain rows (from 0x06013600),
+ * and the text-box queue
  * (0x06013FE0-0x06013FFF, SC64_TEXT_BOX_VRAM_LIMIT). The fog shade map is
  * written only by gfx_fog_palette_prepare() at palette installation and is
  * read-only while drawing, so no per-frame owner shares its 256 bytes. */

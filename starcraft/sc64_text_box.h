@@ -15,6 +15,7 @@
 #define SC64_TEXT_BOX_H
 
 #include "gba.h"
+#include "sc64_mode4_padding.h"
 
 typedef struct Sc64TextBoxRow {
     u16 string_id;     /* Source string; rows sharing one have identical text. */
@@ -40,8 +41,8 @@ enum {
     SC64_TEXT_BOX_WORDS_TOTAL = SC64_TEXT_BOX_QUEUE_WORD + SC64_TEXT_BOX_QUEUE_CAPACITY
 };
 
-#define SC64_TEXT_BOX_VRAM_BASE 0x06013FE0u
-#define SC64_TEXT_BOX_VRAM_LIMIT 0x06014000u
+#define SC64_TEXT_BOX_VRAM_BASE SC64_MODE4_TEXT_BOX_BASE
+#define SC64_TEXT_BOX_VRAM_LIMIT SC64_MODE4_PADDING_END
 _Static_assert(SC64_TEXT_BOX_VRAM_BASE + SC64_TEXT_BOX_WORDS_TOTAL * 2u <= SC64_TEXT_BOX_VRAM_LIMIT,
                "text-box state exceeds its VRAM padding");
 
