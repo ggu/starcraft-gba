@@ -96,6 +96,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   measures 39,280 cycles per target index rebuild and 23,701 within
   its cell-link operation. Preserve canonical chain order in any local
   builder trial. Count actual queued completions in the later Z7 battle.
+  The [shared steering change](audits/2026-11-22-open-steering-directions.md)
+  skips distance and terrain checks for actor-blocked directions. The
+  P10 victory tail improves 0.93% in mean cycles and the matched Blood
+  Bath window improves 0.28%. Measure longer movement-heavy Z7 windows
+  on the corrected tape and keep exact route and world checkpoints.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
