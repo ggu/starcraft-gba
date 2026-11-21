@@ -422,8 +422,14 @@ static void check_resident_fields(void)
         {
             int goal = sc64_route_goal[slot];
             const Oracle *o = oracle_for(goal);
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+            int parked = sc64_point_prefix_find(slot) != 0;
+#endif
             for (int cell = 0; cell < MAP_COLS * MAP_ROWS; ++cell) {
                 int expected = o->dist[cell] < 0 ? SC64_ROUTE_UNREACHABLE : o->dir[cell];
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+                if (parked && sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE) continue;
+#endif
                 if (sc64_route_get(slot, cell) != expected) {
                     printf("RESIDENT FIELD WRONG: shape %dx%d slot %d goal %d cell %d stored %d fresh %d\n",
                            MAP_COLS, MAP_ROWS, slot, goal, cell, sc64_route_get(slot, cell), expected);
@@ -756,6 +762,363 @@ static void check_single_retained_point(void)
 }
 #endif
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+static void check_point_prefix_resume(void)
+{
+    const int first = 32 + 32 * 128, distant = 100 + 100 * 128;
+    int slots[SC64_POINT_PREFIX_SLOTS + 1];
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    u32 before = sc64_route_builds;
+
+    for (int i = 0; i <= SC64_POINT_PREFIX_SLOTS; ++i) {
+        int root = first + 10 * i;
+        int origin = root + 1;
+        int slot = sc64_route_slot_for(root, origin);
+        assert(slot >= 0 && sc64_route_valid[slot] == 1 && sc64_route_goal[slot] == root);
+        assert(sc64_route_get(slot, origin) == 2);
+        slots[i] = slot;
+        if (i < SC64_POINT_PREFIX_SLOTS) {
+            assert(sc64_point_prefix_find(slot));
+            assert(sc64_route_get(slot, distant) == SC64_ROUTE_UNREACHABLE);
+        } else {
+            assert(!sc64_point_prefix_find(slot));
+            assert(sc64_route_get(slot, distant) != SC64_ROUTE_UNREACHABLE);
+        }
+    }
+    assert(sc64_route_builds == before + SC64_POINT_PREFIX_SLOTS + 1);
+    u32 metadata = state_hash();
+    for (int i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i) {
+        assert(SC64_ROUTE_REACHES(slots[i], distant));
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+        SC64_ROUTE_EXACT(slots[i]);
+#endif
+        assert(!sc64_point_prefix_find(slots[i]));
+        reference_bfs(&oracle[POOL], first + 10 * i);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slots[i], cell) == oracle[POOL].dir[cell]);
+    }
+    assert(metadata == state_hash());
+    check_grid_unchanged();
+
+    int blocked_goal = first + 2 * MAP_COLS;
+    desired[blocked_goal] = 0;
+    invalidate();
+    build_path_grid();
+    int slot = sc64_route_slot_for(blocked_goal, blocked_goal + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_get(slot, blocked_goal + 1) == 0);
+    assert(sc64_route_slot_for(blocked_goal, distant) == slot);
+    assert(!sc64_point_prefix_find(slot));
+    reference_bfs(&oracle[POOL], blocked_goal);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+
+    slot = sc64_route_slot_for(first, first + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    invalidate();
+    for (unsigned i = 0; i < SC64_POINT_PREFIX_SLOTS; ++i)
+        assert(!sc64_point_prefixes[i].count);
+    puts("point prefixes preserve exact FIFO, capacity fallback, logical residency and topology reset");
+}
+
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+static void check_point_prefix_exact_hit(void)
+{
+    const int root = 40 + 40 * 128;
+    const int origin = root + 12 * 128;
+    const int distant = root + 30 * 128;
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+
+    int slot = sc64_route_slot_for(root, root + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+    u32 builds = sc64_route_builds, hits = sc64_route_hits;
+    assert(sc64_route_slot_for(root, origin) == slot);
+    Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+    assert(prefix && prefix->second_cutoff && prefix->restore_last_row >= 53);
+    assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
+    reference_bfs(&oracle[POOL], root);
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        int direction = sc64_route_get(slot, cell);
+        if (direction != SC64_ROUTE_UNREACHABLE)
+            assert(direction == oracle[POOL].dir[cell]);
+    }
+    assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+    assert(sc64_route_get(slot, distant) == SC64_ROUTE_UNREACHABLE);
+
+    assert(sc64_route_slot_for(root, distant) == slot);
+    assert(!sc64_point_prefix_find(slot));
+    assert(sc64_route_builds == builds && sc64_route_hits == hits + 2);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    slot = sc64_route_slot_for(root, root + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_slot(root) == slot && !sc64_point_prefix_find(slot));
+    puts("one open exact hit reparks; repeat miss and complete lookup retain the full route");
+}
+#endif
+
+static void check_point_prefix_row_span(void)
+{
+    const int distant = 100 + 64 * 128;
+    race_cols = race_rows = 128;
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    for (int row = 0; row < 128; row += 127) {
+        int root = 32 + row * 128;
+        for (int blocked = 0; blocked <= 1; ++blocked) {
+            memset(desired, 1, sizeof(desired));
+            desired[root] = !blocked;
+            invalidate();
+            build_path_grid();
+            int slot = sc64_route_slot_for(root, root + 1);
+            assert(slot >= 0);
+            const Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+            assert(prefix);
+            assert(prefix->restore_first_row == (row ? 127 : 1));
+            assert(prefix->restore_last_row == (row ? 128 : 2));
+            assert(sc64_route_get(slot, distant) == SC64_ROUTE_UNREACHABLE);
+            u32 metadata = state_hash();
+            SC64_ROUTE_EXACT(slot);
+            assert(!sc64_point_prefix_find(slot) && state_hash() == metadata);
+            reference_bfs(&oracle[POOL], root);
+            for (int cell = 0; cell < MAP_CELLS; ++cell)
+                assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+            check_grid_unchanged();
+        }
+    }
+    puts("point prefix row bounds preserve exact directions at both map edges");
+}
+
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+static void check_point_prefix_tail_exchange(void)
+{
+    const int first = 32 + 32 * 128;
+    const int other = 64 + 64 * 128;
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    int slot = sc64_route_slot(first);
+    assert(slot >= 0);
+    for (int i = 1; i < SC64_ROUTE_SLOTS; ++i)
+        assert(sc64_route_slot(first + i) >= 0);
+
+    /* Preserve a completed victim and park the incoming prefix in the
+     * borrowed plane. A hit swaps the full field back into the slot. */
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot_for(other, other + 1) == slot);
+    assert(sc64_route_point_saved == first && sc64_point_prefix_find(slot));
+    assert(sc64_route_field[slot] == sc64_route_point_plane);
+    u8 *saved = sc64_route_point_spare;
+    unsigned fills = keep_stat[KEEP_FILL], hits = keep_stat[KEEP_POINT_POINTER];
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot(first) == slot);
+    assert(!sc64_point_prefix_find(slot) && sc64_route_point_saved < 0);
+    assert(sc64_route_field[slot] == saved && sc64_route_point_spare == sc64_route_point_plane);
+    assert(keep_stat[KEEP_FILL] == fills && keep_stat[KEEP_POINT_POINTER] == hits + 1);
+    reference_bfs(&oracle[POOL], first);
+    for (int i = 0; i < MAP_CELLS; ++i)
+        assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+
+    /* A miss can evict a parked prefix and preserve the complete tail.
+     * A full-queue user can then release the bound prefix's backing. */
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot_for(other, other + 1) == slot);
+    assert(sc64_route_point_saved == first && sc64_point_prefix_find(slot));
+    assert(sc64_route_point_spare == saved);
+    sc64_route_age[slot] = 0;
+    assert(sc64_route_slot_for(other + 2, other + 3) == slot);
+    assert(sc64_route_point_saved == first && sc64_route_point_spare == saved);
+    assert(sc64_point_prefix_find(slot) && sc64_route_field[slot] == sc64_route_point_plane);
+    SC64_ROUTE_POINT_TAIL_RELEASE();
+    memset(sc64_route_point_plane, 0x53, SC64_ROUTE_POINT_BYTES);
+    assert(sc64_route_point_saved < 0 && sc64_route_field[slot] == saved);
+    assert(sc64_point_prefix_find(slot));
+    assert(SC64_ROUTE_REACHES(slot, MAP_CELLS - 1));
+    SC64_ROUTE_EXACT(slot);
+    assert(!sc64_point_prefix_find(slot));
+    reference_bfs(&oracle[POOL], other + 2);
+    for (int i = 0; i < MAP_CELLS; ++i)
+        assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+    check_grid_unchanged();
+    puts("completed tail exchange excludes parked prefix victims");
+}
+#endif
+#endif
+
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+static void point_component_map(void)
+{
+    race_cols = race_rows = 128;
+    memset(desired, 1, sizeof(desired));
+    for (int row = 0; row < MAP_ROWS; ++row) {
+        desired[40 + row * MAP_COLS] = 0;
+        desired[80 + row * MAP_COLS] = 0;
+    }
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    sc64_route_clock = 0;
+    sc64_route_builds = sc64_route_hits = 0;
+}
+
+static void check_point_component_witness(void)
+{
+    const int left = 20 + 32 * 128, left_far = 20 + 100 * 128;
+    const int middle = 60 + 32 * 128, middle_far = 60 + 100 * 128;
+    const int right = 100 + 32 * 128, wall = 40 + 32 * 128;
+    u32 formation_meta[2];
+
+    for (int complete = 0; complete <= 1; ++complete) {
+        point_component_map();
+        int slot = sc64_route_slot_for(left, left + 1);
+        int witness = sc64_route_slot(left_far);
+        assert(slot >= 0 && witness >= 0 && sc64_point_prefix_find(slot));
+        assert(sc64_route_get(slot, left_far) == SC64_ROUTE_UNREACHABLE);
+        u32 before = state_hash();
+#ifdef SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE
+        assert(!sc64_route_near_root_reaches(slot, middle_far, left + 1, left));
+        assert(sc64_point_prefix_find(slot) && state_hash() == before);
+#endif
+        assert(SC64_ROUTE_REACHES(slot, left_far));
+        assert(!SC64_ROUTE_REACHES(slot, middle_far));
+        assert(sc64_point_prefix_find(slot) && state_hash() == before);
+
+        if (complete) SC64_ROUTE_EXACT(slot);
+        int hints[] = {slot, -1, -1, -1}, roots[] = {left, -1, -1, -1}, next = 0;
+        u32 witness_age = sc64_route_age[witness];
+        assert(sc64_route_cells_connected(&left_far, 1, &left, 1, &middle_far, 1,
+                                           hints, roots, &next, 0) == 1);
+        assert(hints[0] == slot && roots[0] == left && next == 1);
+        assert(sc64_route_age[witness] == witness_age && sc64_route_hits == 1);
+        assert(sc64_route_builds == 2 && !!sc64_point_prefix_find(slot) == !complete);
+        formation_meta[complete] = state_hash();
+    }
+    assert(formation_meta[0] == formation_meta[1]);
+
+    point_component_map();
+    int slot = sc64_route_slot_for(left, left + 1);
+    assert(sc64_route_slot(middle) >= 0);
+    assert(!SC64_ROUTE_REACHES(slot, middle_far) && sc64_point_prefix_find(slot));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    assert(sc64_route_slot(right) >= 0);
+    assert(!SC64_ROUTE_REACHES(slot, middle_far) && !sc64_point_prefix_find(slot));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    int witness = sc64_route_slot(wall);
+    assert(sc64_route_get(witness, left) != SC64_ROUTE_UNREACHABLE);
+    assert(sc64_route_get(witness, middle_far) != SC64_ROUTE_UNREACHABLE);
+    assert(!SC64_ROUTE_REACHES(slot, middle_far) && !sc64_point_prefix_find(slot));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    witness = sc64_route_slot_for(left_far, left_far + 1);
+    assert(sc64_point_prefix_find(witness));
+    assert(sc64_route_get(witness, left) == SC64_ROUTE_UNREACHABLE);
+    assert(SC64_ROUTE_REACHES(slot, left_far) && !sc64_point_prefix_find(slot));
+    assert(sc64_point_prefix_find(witness));
+
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    witness = sc64_route_slot(left_far);
+    SC64_ROUTE_PF(witness) |= SC64_ROUTE_FLAG_STALE;
+    assert(SC64_ROUTE_REACHES(slot, left_far) && !sc64_point_prefix_find(slot));
+    check_grid_unchanged();
+#ifdef SC64_ROUTE_POINT_NEAR_COMPONENT_PROBE
+    point_component_map();
+    slot = sc64_route_slot_for(left, left + 1);
+    assert(sc64_route_slot(left_far) >= 0);
+    u32 before = state_hash();
+    assert(sc64_route_near_root_reaches(slot, left_far, left + 128, left));
+    assert(!sc64_point_prefix_find(slot) && state_hash() == before);
+    check_grid_unchanged();
+#endif
+    puts("point witnesses preserve yes/no/fallback, selected slot and logical cache metadata");
+}
+#endif
+
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+static void check_point_near_distance(void)
+{
+    const int width = 128, root = 24 + 24 * width;
+    enum { PROOF, TIE, STALE, PARKED, BLOCKED };
+    for (int mode = PROOF; mode <= BLOCKED; ++mode) {
+        const int tie = mode == TIE;
+        int origin = root + 10 - (tie ? 10 * width : 0);
+        int goal = root + (tie ? 1 : width);
+        int upper_seed = root + (tie ? -width : 1);
+        int lower_seed = goal + width;
+        race_cols = race_rows = width;
+        memset(desired, 1, sizeof(desired));
+        if (!tie) {
+            for (int y = 22; y <= 30; ++y) desired[29 + y * width] = 0;
+        }
+        if (mode == BLOCKED) desired[lower_seed] = 0;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        sc64_route_clock = 0;
+        int upper_slot = sc64_route_slot(upper_seed);
+        int lower_slot = mode == PARKED ? sc64_route_slot_for(lower_seed, lower_seed + 1) :
+            sc64_route_slot(lower_seed);
+        int slot = sc64_route_slot_for(root, root - width);
+        assert(slot >= 0 && upper_slot >= 0 && lower_slot >= 0);
+        assert(sc64_point_prefix_find(slot) &&
+               sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        assert(!!sc64_point_prefix_find(lower_slot) == (mode == PARKED));
+        if (mode == STALE) SC64_ROUTE_PF(lower_slot) |= SC64_ROUTE_FLAG_STALE;
+        assert(!sc64_point_near_neighbor(width - 1, width));
+
+        reference_bfs(&oracle[POOL], upper_seed);
+        int upper = oracle[POOL].dist[origin] + 1;
+        reference_bfs(&oracle[POOL], lower_seed);
+        if (tie) assert(oracle[POOL].dist[origin] == upper);
+        if (mode == PROOF) assert(oracle[POOL].dist[origin] > upper);
+        reference_bfs(&oracle[POOL], root);
+        int cursor = origin;
+        for (unsigned step = 0; step < 128 && cursor != goal; ++step) {
+            int at_root, next;
+            if (!expected_next(&oracle[POOL], cursor % width, cursor / width, root,
+                               &next, &at_root) || at_root) break;
+            cursor = next;
+        }
+        int hit = cursor == goal;
+        assert(hit == tie);
+
+        u32 before = state_hash(), hits = sc64_route_hits, builds = sc64_route_builds;
+        assert(sc64_route_near_root_reaches(slot, origin, goal, root) == hit);
+        assert(state_hash() == before);
+        assert(!!sc64_point_prefix_find(slot) == (mode == PROOF));
+        assert((sc64_route_step_slot(origin, goal) == slot) == hit);
+        if (hit) {
+            assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
+            assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        }
+        check_grid_unchanged();
+    }
+    puts("near-root distance witnesses preserve strict misses, ties and invalid witness fallback");
+}
+#endif
+
 #ifdef SC64_ROUTE_KEEP_FIELDS
 /* Adopt an exact donor as lazy after a harmless closure, then request a
  * nearby goal on that gradient. Closing a tile on the path must instead
@@ -811,6 +1174,24 @@ static void check_empty_linear_goals(void)
             for (int cell = 0; cell <= last; ++cell)
                 assert(sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE);
 
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+            if (MAP_COLS == 128) {
+                sc64_routes_reset();
+                sc64_route_pcount = 0;
+                build_path_grid();
+                memset(bfs_queue, 0xa5, sizeof(bfs_queue));
+                const u32 fills = sc64_route_builds;
+                slot = sc64_route_slot_for(goals[j], wrapping[j]);
+                assert(slot >= 0 && sc64_route_valid[slot] == 1 &&
+                       sc64_route_goal[slot] == goals[j] && sc64_route_builds == fills + 1);
+                assert(!sc64_point_prefix_find(slot));
+                for (int cell = 0; cell <= last; ++cell)
+                    assert(sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE);
+                for (unsigned k = 0; k < sizeof(bfs_queue) / sizeof(*bfs_queue); ++k)
+                    assert(bfs_queue[k] == 0xa5a5u);
+            }
+#endif
+
             desired[neighbors[j]] = 1;
             sc64_routes_reset();
             build_path_grid();
@@ -819,6 +1200,71 @@ static void check_empty_linear_goals(void)
         }
     }
     puts("Empty point fields reject wrapped seeds and preserve diagonal seeds.");
+}
+#endif
+
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+static void check_point_cold_certificate(void)
+{
+    int certified = 0, declined = 0, blocked_goals = 0;
+    race_cols = race_rows = 128;
+    for (int i = 0; i < 256; ++i) {
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            desired[cell] = (u8)(aux_rn(100) < 80);
+        int gx = aux_rn(128), gy = aux_rn(128);
+        int ox = limit(gx + aux_rn(17) - 8, 0, 127);
+        int oy = limit(gy + aux_rn(17) - 8, 0, 127);
+        int goal = gy * MAP_COLS + gx, origin = oy * MAP_COLS + ox;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        int slot = sc64_route_slot_for(goal, origin);
+        assert(slot >= 0);
+        Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        if (!prefix || prefix->count != SC64_POINT_CERTIFIED_ONLY) {
+            ++declined;
+            continue;
+        }
+        ++certified;
+        blocked_goals += !desired[goal];
+        reference_bfs(&oracle[POOL], goal);
+        assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        for (int cell = 0; cell < MAP_CELLS; ++cell) {
+            int direction = sc64_route_get(slot, cell);
+            if (direction != SC64_ROUTE_UNREACHABLE) {
+                assert(direction == oracle[POOL].dir[cell]);
+                if (direction) {
+                    const int step[] = {0, 1, -1, MAP_COLS, -MAP_COLS};
+                    assert(sc64_route_get(slot, cell + step[direction]) != SC64_ROUTE_UNREACHABLE);
+                }
+            }
+        }
+        u32 before = state_hash();
+        SC64_ROUTE_EXACT(slot);
+        assert(!sc64_point_prefix_find(slot) && before == state_hash());
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    assert(certified > 30 && declined > 30 && blocked_goals > 5);
+
+    memset(desired, 1, sizeof(desired));
+    sc64_routes_reset();
+    sc64_route_pcount = 0;
+    build_path_grid();
+    const int goal = 32 + 32 * MAP_COLS;
+    const int slot = sc64_route_slot_for(goal, goal + 1);
+    assert(sc64_point_prefix_find(slot)->count == SC64_POINT_CERTIFIED_ONLY);
+    const u32 before = state_hash();
+    sc64_point_prefix_require(slot, goal + 2 * MAP_COLS);
+    assert(sc64_point_prefix_find(slot)->count == SC64_POINT_CERTIFIED_ONLY);
+    assert(sc64_route_near_root_reaches(slot, goal + 2 * MAP_COLS, goal + MAP_COLS, goal));
+    assert(sc64_route_get(slot, goal + 2 * MAP_COLS) == 4 && before == state_hash());
+    sc64_point_prefix_require(slot, goal + 30 * MAP_COLS);
+    assert(!sc64_point_prefix_find(slot) && sc64_route_get(slot, goal + 30 * MAP_COLS) == 4);
+    assert(before == state_hash());
+    printf("Cold certificate covers %d shortest paths, %d blocked goals and %d declines.\n",
+           certified, blocked_goals, declined);
 }
 #endif
 
@@ -875,6 +1321,37 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
     if (argc == 2 && !strcmp(argv[1], "--sparse-linear-only")) {
         check_sparse_linear_pack();
+        return 0;
+    }
+#endif
+#ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+    if (argc == 2 && !strcmp(argv[1], "--point-certificate-only")) {
+        check_point_cold_certificate();
+        return 0;
+    }
+#endif
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-near-distance-only")) {
+        check_point_near_distance();
+        return 0;
+    }
+#endif
+#ifdef SC64_ROUTE_POINT_COMPONENT_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-component-only")) {
+        check_point_component_witness();
+        return 0;
+    }
+#endif
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
+        check_point_prefix_resume();
+        check_point_prefix_row_span();
+#ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
+        check_point_prefix_exact_hit();
+#endif
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+        check_point_prefix_tail_exchange();
+#endif
         return 0;
     }
 #endif
@@ -983,6 +1460,9 @@ int main(int argc, char **argv)
 #endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     check_nearby_lazy_root();
+#endif
+#ifdef SC64_ROUTE_POINT_NEAR_DISTANCE_PROBE
+    check_point_near_distance();
 #endif
     puts("sc64 route keep-fields: ok");
     return 0;
