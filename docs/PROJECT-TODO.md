@@ -22,8 +22,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
   from the current four-child rescue stock, which needs an ordinary N64
-  before/after capture. Keep the existing save row and verify the larger
-  hangar's queue boundary, rank 7, full actor pool, HUD and fresh continuation.
+  before/after capture. [PR #667](https://github.com/ggu/starcraft-gba/pull/667)
+  adds the generic capacity policy to the shared engine with the existing
+  save row and four-slot production default. The synthetic eight-slot
+  policy passes HOST checks for the queue boundary, rank 7, full actor pool
+  and HUD. Qualify a larger policy on the normal ARM save and load path.
   Capture an ordinary native raw-72 launch through return to qualify the
   source-backed layer transitions on live sprites.
 
@@ -56,9 +59,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   checks. Keep the scalar permission path as an independent oracle and
   preserve cloak, fog, containment, invincibility and target tie order.
   [Spatial index retention](https://github.com/ggu/starcraft-gba/pull/590)
-  raises the dense p95. Keep the
-  [short-route proof](https://github.com/ggu/starcraft-gba/pull/616)
-  workload separate and check its peaks against the latest release.
+  raises the dense p95. The [query-local trial](audits/2026-11-21-indexed-target-query.md#dense-z7-ordinary-replay)
+  cuts the two late means by 2.69% and 3.22% with exact timed route
+  state and video. Its early Z7 window rises 1.14% and its Z8 mean
+  rises 0.71%. Position reuse alone stays within 0.05% of stock across
+  the Z7 and Z8 windows. Lazy weapon checks cut the Z8 increase to 0.18%.
+  Compare immutable combat facts in the scalar policy, then test early,
+  late and skirmish workloads before changing the standard compile vector.
+  The separate [point-certificate trial](audits/2026-11-21-z8-current-point-certificate.md)
+  matches 668 live ARM route answers and improves the sampled Z8 mean
+  and peak. The retry removes an 856,694-cycle stall at Z8 call 33,900.
+  The revised p95 is still 2.64% higher than stock. Attribute the remaining
+  spikes to the certificate, frontier and whole-field reader separately.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
@@ -860,8 +872,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now witnesses defeat in two unmodified N64 Free for All launches and in the
   current Terran GBA ROM, including ordinary pause and fresh load through
   result. The current opt-in Terran replay also saves after CPU retirement
-  and preserves four surviving human SCVs as neutral through defeat. Native
-  mobile survivors and competitive CPU retirement still need a live witness.
+  and preserves four surviving human SCVs as neutral through defeat. A
+  [one-update native capture](audits/2026-11-21-blood-bath-live-results.md#ordinary-human-survivor-transfer)
+  shows the surviving SCV changing to neutral on the same update as
+  defeat publication and the census falling to zero. The native census
+  still counts the Command Center with zero HP before the scan. Capture
+  competitive CPU retirement and concurrent final-building losses.
   The [normal Terran Blood Bath win](audits/2026-11-21-blood-bath-terran-win.md)
   covers blank HOME, actual paid infantry and buildings, and an ordinary
   victory against one named Zerg AI. The same 186 checkpoints match on
