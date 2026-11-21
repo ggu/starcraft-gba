@@ -33,6 +33,28 @@ buttons. The isolated observer printed an inherited `STATE_RESTORED_AND_READ`
 label. This observation comes from a reset and ordinary menu input.
 Native and GBA ROMs, RAM captures, save data and images remain local.
 
+## Goals panel and opening bank
+
+A second fresh ares session reached Wasteland through the native menu.
+After an ordinary pause, the Goals panel listed finding Raynor,
+building a Barracks and training additional Marines. The current
+GBA mission requires Raynor to join, a Barracks and ten living
+Marines. The native panel leaves the exact Marine threshold open.
+
+After the tutorial was dismissed through ordinary controls, the
+native HUD showed 40 minerals and 10/18 supply. On the prepared
+`43c5d98` Terran cartridge, a separate fresh launch again reads
+zero minerals at frame 29 and 40 at frame 30. The native capture is
+asynchronous and the independently run clocks do not establish the
+grant cadence. The native goals image, native HUD image and current
+ARM grant observer have the following local SHA-256 values.
+
+- Goals image `5b42fd23fa8a30ef57b67f409f36da17b79b68774cb57e47836009cef7a7752c`
+- HUD image `5e30f639c52d6cc0ae0dbbd4084bee13096bc68685459943e92ceacd5396e7bb`
+- ARM grant observation `82e81e93052d02d168c0ced9f926939d43d17c6fb754c0cb71e76c1d8f57560e`
+
+## Initial evidence
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | USA N64 ROM | `e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020` |

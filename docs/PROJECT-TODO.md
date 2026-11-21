@@ -32,6 +32,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preceding release. On top of the Carrier roster the Blood Bath peak
   falls another 5.09%, while p95 rises 0.32%. Keep it opt-in pending
   broader combined replays and the Showcase runtime stack watermark.
+  The [shared changed-row sight path](audits/2026-11-22-shared-sparse-sight.md)
+  cuts the Protoss 10 campaign tail by 7.87% and the tested Terran
+  Outpost battle window by 0.48%. An isolated generated-header path
+  preserves the product-specific building art. The same audit pins
+  the nearby route call that shifts roughly 900,000 cycles to a
+  later update in the gap-19 trial.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -44,7 +50,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [fresh native tie sample](audits/2026-11-21-world-depth-replay-contract.md#native-pool-id-and-pixel-evidence)
   reproduces the ordering keys. Capture both sprite masks inside the
   active viewport before using this case to qualify a shared ID policy.
-  [Draft #696](https://github.com/ggu/starcraft-gba/pull/696) fixes an
+  [PR #696](https://github.com/ggu/starcraft-gba/pull/696) fixes an
   observed GBA foreground selection mismatch at two opaque same-layer
   flyers. Exercise more candidate bodies and an ordinary native
   viewport overlap. See the [flyer replay cases](audits/2026-11-22-two-flyer-picker.md).

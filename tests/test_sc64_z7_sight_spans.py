@@ -193,15 +193,15 @@ static int check_shared_packed_rows(void)
 }
 #endif
 
-#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+#if defined(SC64_Z7_VISIBILITY_SPARSE_ROWS) || defined(SC64_SHARED_SIGHT_SPARSE_ROWS)
 static int check_sparse_masks(void)
 {
     int first;
-    if (sc64_z7_visibility_sparse_mask(0, -1, 0, 0, 0, &first) != ~0u ||
-        sc64_z7_visibility_sparse_mask(0, 0, 0, 3, 0, &first) != ~0u ||
-        sc64_z7_visibility_sparse_mask(0, 0, 3, 0, 0, &first) != ~0u ||
-        sc64_z7_visibility_try_sparse(0, 0, 0, 1, 65) ||
-        sc64_z7_visibility_try_sparse(0, 0, 0, 1, 192)) return 1;
+    if (sc64_visibility_sparse_mask(0, -1, 0, 0, 0, &first) != ~0u ||
+        sc64_visibility_sparse_mask(0, 0, 0, 3, 0, &first) != ~0u ||
+        sc64_visibility_sparse_mask(0, 0, 3, 0, 0, &first) != ~0u ||
+        sc64_visibility_try_sparse_transition(0, 0, 0, 1, 65) ||
+        sc64_visibility_try_sparse_transition(0, 0, 0, 1, 192)) return 1;
     /* Independent squared-distance check covering every phase, radius and
      * signed direction before clipping, including center-tile crossings. */
     for (int radius = 64; radius <= 176; radius += 16)
@@ -222,7 +222,7 @@ static int check_sparse_masks(void)
                         }
                     }
                 }
-                unsigned actual = sc64_z7_visibility_sparse_mask((unsigned)(radius - 64) / 16,
+                unsigned actual = sc64_visibility_sparse_mask((unsigned)(radius - 64) / 16,
                     x, y, x + dx, y + dy, &first);
                 if (first != first_expected || actual != expected) {
                     fprintf(stderr, "sparse mismatch r=%d xy=%d,%d delta=%d,%d got=%x want=%x\n",
@@ -448,7 +448,7 @@ static int run_dense_counts(int step) {
     return 0;
 }
 
-#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+#if defined(SC64_Z7_VISIBILITY_SPARSE_ROWS) || defined(SC64_SHARED_SIGHT_SPARSE_ROWS)
 static int run_sparse_edges(int step)
 {
     static const int types[] = {35, 37, 38, 39, 103, 42, 45, 44};
@@ -487,7 +487,7 @@ int main(void) {
 #ifdef SC64_Z7_VISIBILITY_ROW_CONTEXT
     if (check_prepared_rows()) return 1;
 #endif
-#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+#if defined(SC64_Z7_VISIBILITY_SPARSE_ROWS) || defined(SC64_SHARED_SIGHT_SPARSE_ROWS)
     if (check_sparse_masks()) return 1;
 #endif
     clear_world();
@@ -495,7 +495,7 @@ int main(void) {
     step = run_fallback_matrix(step);
     step = run_unsupported_radius(step);
     step = run_lifecycle_matrix(step);
-#ifdef SC64_Z7_VISIBILITY_SPARSE_ROWS
+#if defined(SC64_Z7_VISIBILITY_SPARSE_ROWS) || defined(SC64_SHARED_SIGHT_SPARSE_ROWS)
     step = run_sparse_edges(step);
 #endif
     if (run_dense_counts(step)) return 1;
@@ -536,13 +536,15 @@ class Z7SightSpansTests(unittest.TestCase):
                          "-DSC64_Z7_VISIBILITY_PHASE_REJECT",
                          "-DSC64_Z7_VISIBILITY_ROW_CONTEXT", "-DSC64_Z7_VISIBILITY_PACKED_ROWS"]
             z7_sparse = [*z7_packed, "-DSC64_Z7_VISIBILITY_SPARSE_ROWS"]
+            shared_packed = ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
+                             "-DSC64_SHARED_SPAN_TABLES", "-DSC64_SHARED_SIGHT_PACKED_ROWS"]
             variants = (
                 ("scalar", [], 0),
                 ("legacy-spans", ["-DSC64_VISIBILITY_SPANS"], 0),
                 ("z7-spans", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS"], 1),
-                ("shared-packed", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
-                                   "-DSC64_SHARED_SPAN_TABLES",
-                                   "-DSC64_SHARED_SIGHT_PACKED_ROWS"], 1),
+                ("shared-packed", shared_packed, 1),
+                ("shared-sparse-wide", [*shared_packed, "-DSC64_SHARED_SIGHT_SPARSE_ROWS",
+                                        "-DTEST_MAP_SIDE=128"], 1),
                 ("z7-phase", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
                               "-DSC64_Z7_VISIBILITY_PHASE_REJECT"], 1),
                 ("z7-row-context", ["-DSC64_VISIBILITY_SPANS", "-DSC64_Z7_SIGHT_SPANS",
