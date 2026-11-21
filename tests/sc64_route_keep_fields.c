@@ -1254,6 +1254,34 @@ static void check_point_certificate_wider_retry(void)
     puts("Exact cache hits certify 17–18-gap retries without materializing the blocked-goal field.");
 }
 
+#ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
+static void check_point_prefix_sparse_completion(void)
+{
+    const int sizes[] = { 2, 384, 385 };
+    race_cols = race_rows = 128;
+    const int cols = MAP_COLS, goal = 18 + 19 * cols, origin = 70 + 66 * cols;
+    for (unsigned i = 0; i < sizeof(sizes) / sizeof(*sizes); ++i) {
+        memset(desired, 0, sizeof(desired));
+        for (int n = 0; n < sizes[i]; ++n)
+            desired[goal + (n / 32) * cols + n % 32] = 1;
+        desired[origin] = 1;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        reference_bfs(&oracle[POOL], goal);
+        const unsigned builds = sc64_route_builds;
+        int slot = sc64_route_slot_for(goal, origin);
+        assert(slot >= 0 && sc64_route_builds == builds + 1);
+        assert(!sc64_point_prefix_find(slot));
+        assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        for (int cell = 0; cell < MAP_CELLS; ++cell)
+            assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+        check_grid_unchanged();
+    }
+    puts("Exhausted cold prefixes match full fields at 2, 384 and 385 visited cells.");
+}
+#endif
+
 static void check_point_cold_certificate(void)
 {
     int certified = 0, declined = 0, blocked_goals = 0;
@@ -1378,6 +1406,9 @@ int main(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "--point-certificate-only")) {
         check_point_cold_certificate();
         check_point_certificate_wider_retry();
+#ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
+        check_point_prefix_sparse_completion();
+#endif
         return 0;
     }
 #endif

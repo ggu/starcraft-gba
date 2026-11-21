@@ -149,7 +149,11 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     } else {
         tail = sc64_route_expand_linear_from(dense, tail, stride, cap, head);
         if (tail < 0) return sc64_route_fill(slot, goal);
+#ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
+        sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail);
+#else
         sc64_route_pack_linear(field, dense, cols, rows, stride);
+#endif
     }
     SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
     SC64_ROUTE_PF(slot) = 0;

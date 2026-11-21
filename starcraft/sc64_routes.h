@@ -2023,6 +2023,34 @@ static inline int sc64_route_linear_seed(u8 *dense, int start, int stride)
     return tail;
 }
 
+/* A completed small component has little to pack. A compaction would
+ * require at least cap - 3 discoveries, so this queue still contains
+ * each visited tile, in its original position. Only use this writer when
+ * the queue began with the seeds, including any earlier prefix pops. */
+static inline __attribute__((always_inline)) void
+sc64_route_pack_linear_complete(u8 *field, const u8 *dense, int cols, int rows,
+                               int stride, int cap, int tail)
+{
+#ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
+    if (cols == SC64_LINEAR_WIDE_COLS && tail <= 384 && tail <= cap - 4) {
+        sc64_route_field_clear(field);
+        for (int i = 0; i < tail; ++i) {
+            const int at = bfs_queue[i];
+            /* The padded interior has columns 4..131 and stride 136.
+             * 136 * 241 = 32768 + 8, with no carry through row 128. */
+            const int dense_row = (int)(((unsigned)at * 241u) >> 15);
+            const int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
+            sc64_route_put_new(field, cell, dense[at]);
+        }
+        return;
+    }
+#else
+    (void)cap;
+    (void)tail;
+#endif
+    sc64_route_pack_linear(field, dense, cols, rows, stride);
+}
+
 static int __attribute__((noinline))
 sc64_route_fill_linear(u8 *field, int goal)
 {
@@ -2045,24 +2073,7 @@ sc64_route_fill_linear(u8 *field, int goal)
     int tail = sc64_route_linear_seed(dense, start, stride);
     tail = sc64_route_expand_linear(dense, tail, stride, cap);
     if (tail < 0) return tail;
-#ifdef SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE
-    /* A completed small component has little to pack. A compaction would
-     * require at least cap - 3 discoveries, so this queue still contains
-     * each visited tile, in its original position. */
-    if (cols == SC64_LINEAR_WIDE_COLS && tail <= 384 && tail <= cap - 4) {
-        sc64_route_field_clear(field);
-        for (int i = 0; i < tail; ++i) {
-            const int at = bfs_queue[i];
-            /* The padded interior has columns 4..131 and stride 136.
-             * 136 * 241 = 32768 + 8, with no carry through row 128. */
-            const int dense_row = (int)(((unsigned)at * 241u) >> 15);
-            const int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
-            sc64_route_put_new(field, cell, dense[at]);
-        }
-        return tail;
-    }
-#endif
-    sc64_route_pack_linear(field, dense, cols, rows, stride);
+    sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail);
     return tail;
 }
 #endif
@@ -2074,6 +2085,11 @@ sc64_route_fill_linear(u8 *field, int goal)
     (!defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || !defined(SC64_ROUTE_NEW_CELL) || \
      !defined(SC64_ROUTE_WORD_CLEAR))
 #error "sparse linear packing requires the wide linear flood and fresh packed writes"
+#endif
+
+#if defined(SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE) && \
+    (!defined(SC64_ROUTE_POINT_PREFIX_PROBE) || !defined(SC64_ROUTE_LINEAR_SPARSE_PACK_PROBE))
+#error "sparse prefix packing requires the point prefix and sparse linear pack"
 #endif
 
 #if defined(SC64_ROUTE_WIDE_DEPOT_FULL) && \
