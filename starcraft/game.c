@@ -12101,8 +12101,12 @@ static void
 draw_building_art(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES) && defined(GBA_SCENE_CLIP)
+    int anchor_in_view = building_art_in_view(q, x, y);
+#else
     if (!building_art_in_view(q, x, y))
         return;
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_building_actor_flags(q->type) &&
         !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return;
@@ -12110,6 +12114,11 @@ draw_building_art(Building *q)
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = building_art_sprite(q);
+#if defined(SC64_WORLD_DEPTH) && defined(GBA_SCENE_CLIP)
+    /* A completed sprite can intersect the field with its anchor outside. */
+    if (!anchor_in_view && (q->under_construction || !sprite ||
+                           !resource_sprite_in_view(sprite, x, y))) return;
+#endif
 #endif
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;

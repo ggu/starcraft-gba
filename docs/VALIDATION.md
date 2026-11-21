@@ -5,6 +5,8 @@ This page records reproducible checks for the source snapshot. Automated host ch
 Start with the [world-depth harness cases](audits/2026-11-19-world-depth.md#harness-cases).
 The [native follow-up cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
 cover same-row turrets, foreground ties, viewport edges and missile trails.
+The [building crop and sprite ID cases](audits/2026-11-21-world-depth-edge-and-ties.md#replay-cases)
+define edge clipping and exact-tie checks for the framebuffer replay harness.
 
 ## Protoss P10 candidate (2026-11-01)
 
