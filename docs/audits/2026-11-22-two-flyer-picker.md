@@ -41,7 +41,37 @@ Cover different types, a second click outside either bound, fogged
 or hostile actors, and retirement and reuse of the remembered slot.
 Compare native overlap and repeat-selection inputs separately.
 
+The shared input fix compares the second picked actor's selection
+type after checking that the remembered actor remains live, owned,
+selected and eligible. It preserves the original timing and
+distance bounds and the foreground result of the first click.
+With the fix, call 16,376 still selects slot 104 and call 16,378
+groups slots 100 and 104. Both remain selected entering attack mode
+at 16,382. The asset-free sanitizer fixtures exercise matching and
+differing types, expiration, dead and reused actors, a changed type
+and a change in ownership.
+
+On the combined Wasteland and input release, the full ordinary
+Zerg mission 7 tape wins at frame 228,128. A third process loads
+the victory from HOME and exports the same journal. All 254
+world observations, ten two-page display cuts and six route
+cache cuts match the earlier corrected build. The existing
+raster difference at call 154,198 remains when compared with
+the older normal-combat cartridge.
+
+The four exact ARM links pass the existing RAM guards and match
+their Wasteland-release openings and 41 camera cuts per product.
+The three race ROMs pass all 54 ordinary Custom Game starts and
+fresh save continuations. Wasteland wins again after a save,
+restart and resume. The late Protoss 10 victory and busy Zerg
+Blood Bath cuts match their controls in sampled state, both
+pages, palette and SRAM.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Pre-fix click pair | `655230d7740fb389a42d06d4b0104910d5812384ae0ba5930eead7312f958469` |
 | Current click pair | `3db26ef336bbc93564235bbec07bb052a6b5797163f823895058652641b7584b` |
+| Pre-fix, current and corrected ordinary click comparison | `73310720e933762c7ddf22d4e1987ed5b11684defe02d6083e45790783b1b89d` |
+| Exact combined ordinary click observation | `eef52a17019cee79a73eaff808fef8bba6d07d8709f8476849bbe78dbdcae99b` |
+| Exact combined Zerg mission 7 replay | `549ffe1d66604004f2d1f4b7bd7bd6e96e2a820c8d273bc316e9ad9f73296a5b` |
+| Exact combined Custom Game continuations | `f1d9231e5f96d377efc0073f0ac8a26e313a3be8f39f9af75de0594a15e24e4c` |

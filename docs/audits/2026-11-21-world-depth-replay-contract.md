@@ -72,6 +72,7 @@ unavailable mode or storage combinations as unavailable.
 | `same-y-attached-death-continuity` | Capture an opaque equal-elevation, equal-Y overlap alive, on the first attached death image, during actor-slot reuse, and on last-image retirement. Repeat with the victim's ID above and below its neighbor's. Include an independently detached effect with its own key. | Preserve the dying actor's ordering through the last attached image. On GBA the lower-slot collapse stays behind the Marine on both pages. The reused live actor draws in front on an exact slot tie. Retain native sprite IDs and the free-list head around retirement and reuse. [Fix and native lifetime witness](2026-11-21-attached-death-continuity.md) |
 | `worker-mining-effect-and-cargo` | Use an active SCV at a mineral edge and overlap its work effect with visible ground art. Move a Wraith across the effect on a separate cut. Repeat the ordinary gathering loop with a Probe and Drone. Capture approach, active work, loaded return, empty field, hidden worker or field, and each HUD boundary. Pause during work and resume from HOME. | The mineral and worker body sort at layer 4, the independent mining effect at layer 5, and the Wraith above both. Only active mineral work draws the effect. The returning ore badge shares the worker's turn. Require distinguishing masks for both overlap orders on both indexed pages. [Mining reference and fixture](#mineral-work-layer) |
 | `depth-after-terrain-page-flip` | Run an existing order-sensitive pair through a camera pan and a fog update so the cache uses both a cropped window and a full restore. Include opaque overlap across either cache split, a lifeless actor with attached art, and an independent effect. | After each successive page flip, compare the entire field and both HUD bands with a fresh render at the same camera and animation tick. Require the existing distinguishing mask for the overlap on both pages. Record storage selection, camera delta and cache reuse mode. [Terrain storage qualification](2026-11-22-terrain-cache-padding.md) |
+| `moving-flyer-double-tap` | Use the ordinary Z7 tape around calls 16,375–16,382. Include two friendly same-type flyers that change their foreground order between the two A edges. Repeat with different types, an expired window and replacement of the first actor. | The single tap picks the visible foreground flyer. A valid same-type second tap groups both. Record the two selected slots and both framebuffer pages. [Exact inputs and observed slots](2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window) |
 
 The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
 establishes the native sort and allocator rule. The exact death-tie
@@ -94,6 +95,16 @@ pixels at that 18-pixel separation. The live image records have
 different extents from the standing bank. The screenshot lacks
 a measured viewport transform for that pair. The local receipt
 SHA-256 is `dae5acd908637950978d9d5ef77211febe1fff4ca85db646c1ce015f72299b46`.
+
+The paused 17,166 actor table maps the two friendly Zerglings from
+slots 98 and 135 to sprite IDs 438 and 1418 with keys
+`0x202381b6` and `0x2023858a`. A separate traversal from the native
+render-row head visits 438 immediately before 1418. Use that pair
+to check slot-to-sprite identity and row order. Then match both
+current image frames and facing masks to the screenshot callback
+before asserting a distinguishing foreground pixel. The paused
+state digest is
+`c6c4db6a76b44be9d64fca46ba8d06d53f2825879046c7f71d1dae7a17b5ab72`.
 
 For `pool-id-cross-kind-reuse`, record the camera and both sprite masks
 at the same native update. Require visible pixels inside the active

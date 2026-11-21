@@ -2682,7 +2682,7 @@ static u8 pause_cursor, pause_notice;
 static s16 ping_x, ping_y;
 #endif
 static int box_suppress_a;
-static int unit_tap = -1, unit_tap_x, unit_tap_y;
+static int unit_tap = -1, unit_tap_x, unit_tap_y, unit_tap_type;
 static u32 unit_tap_frame;
 static int weapons_level, armor_level, selected_building;
 static int weapons_research, armor_research;
@@ -6474,6 +6474,7 @@ remember_unit_tap(int picked)
 {
     /* Further rapid taps retain the group instead of collapsing to one. */
     unit_tap = picked;
+    unit_tap_type = u[picked].type;
     unit_tap_frame = (u32)frame;
     unit_tap_x = cx; unit_tap_y = cy;
 }
@@ -7804,10 +7805,17 @@ static void
 interact(void)
 {
     int double_unit = -1;
-    if (!menu_open && mode == MODE_NORMAL && selected_building < 0 && unit_tap >= 0 &&
+    if (!menu_open && mode == MODE_NORMAL && selected_building < 0 &&
+        (unsigned)unit_tap < MAX_UNITS && u[unit_tap].alive &&
+        u[unit_tap].owner == SIDE && u[unit_tap].selected &&
+        u[unit_tap].type == unit_tap_type && !SC64_TRANSPORT_LOADED(&u[unit_tap]) &&
+        !SC64_SCARAB_CHILD(&u[unit_tap]) &&
         (u32)frame - unit_tap_frame <= UNIT_DOUBLE_TAP_TICKS &&
-        dist2(cx, cy, unit_tap_x, unit_tap_y) <= UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS &&
-        selection_target() == unit_tap) double_unit = unit_tap;
+        dist2(cx, cy, unit_tap_x, unit_tap_y) <= UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS) {
+        int picked = selection_target();
+        if ((unsigned)picked < MAX_UNITS && u[picked].type == unit_tap_type)
+            double_unit = picked;
+    }
     /* Only an A press that actually selects a unit can be part of a double
      * tap. Orders, construction, gas assignment and production stay immediate. */
     reset_unit_tap();
