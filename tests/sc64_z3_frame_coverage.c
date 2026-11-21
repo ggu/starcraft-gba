@@ -577,6 +577,82 @@ test_actor_depth(void)
     return failures;
 }
 
+#if defined(SC64_FOREGROUND_PICK_ENABLED)
+/* Real sprite-bank oracle: the Wraith's higher layer must win where both
+ * primary bodies paint, even when the lower Overlord is closer to the cursor. */
+static int
+test_cross_layer_flyer_selection(void)
+{
+    static u8 pixels[4][FB_SIZE], other_page[FB_SIZE];
+    const DepthActor empty = { -1, 0, 0, 0, 0 };
+    const DepthActor low = { U_OVERLORD, 54, 0, 0, 0 };
+    const DepthActor high = { U_WRAITH, 48, 0, 0, 0 };
+    unsigned witnesses = 0, wrong = 0;
+    setup_depth_profile(R_TER);
+    depth_capture(empty, empty, pixels[0]);
+    depth_capture(low, empty, pixels[1]);
+    depth_capture(high, empty, pixels[2]);
+    for (unsigned reverse = 0; reverse < 2; ++reverse) {
+        unsigned low_slot = reverse ? 1u : 0u, high_slot = reverse ? 0u : 1u;
+        cx = 120; cy = 54; camx = camy = 0;
+        depth_capture(reverse ? high : low, reverse ? low : high, pixels[3]);
+        depth_capture_world(other_page);
+        assert(!memcmp(pixels[3], other_page, FB_SIZE));
+        assert(sc64_unit_world_layer(&u[low_slot]) == 16 &&
+               sc64_unit_world_layer(&u[high_slot]) == 18);
+        memset(visible, 255, sizeof visible);
+        unsigned prior = witnesses;
+        for (int py = 12; py < 120; ++py) for (int px = 0; px < 240; ++px) {
+            unsigned at = (unsigned)(py * FB_WIDTH + px);
+            cx = px; cy = py - 12;
+            if (pixels[1][at] == pixels[0][at] || pixels[2][at] == pixels[0][at] ||
+                pixels[1][at] == pixels[2][at] || pixels[3][at] != pixels[2][at] ||
+                dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= 31*31 ||
+                dist2(cx,cy,u[high_slot].x,u[high_slot].y) >= 31*31 ||
+                dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= dist2(cx,cy,u[high_slot].x,u[high_slot].y) ||
+                !sc64_pick_unit_body(&u[low_slot],sc64_unit_art_raw(&u[low_slot]),1) ||
+                !sc64_pick_unit_body(&u[high_slot],sc64_unit_art_raw(&u[high_slot]),1)) continue;
+            int picked = selection_target();
+            if (witnesses == prior) {
+                fprintf(stderr,"cross-layer witness reverse=%u cursor=(%d,%d) picked=%d painter=%u\n",reverse,cx,cy,picked,high_slot);
+                SC64_GRID_CLEAR(visible);
+                assert(selection_target() == (int)low_slot);
+                memset(visible, 255, sizeof visible);
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+                u[high_slot].cd = 1; assert(selection_target() == (int)low_slot); u[high_slot].cd = 0;
+#endif
+                assert(select_at() == (int)high_slot && u[high_slot].selected);
+                clear_selection();
+                u[high_slot].owner = ENEMY; assert(selection_target() == (int)low_slot); u[high_slot].owner = SIDE;
+                int third = spawn_unit(SIDE, U_MARINE, cx, cy);
+                assert(third >= 2 && selection_target() == third);
+                memset(&u[third], 0, sizeof u[third]);
+            }
+            ++witnesses; wrong += picked != (int)high_slot;
+        }
+        if (witnesses == prior) { fputs("cross-layer flyer slot order lacked witness\n",stderr); return 1; }
+        unsigned transparent = 0;
+        for (int py = 12; py < 120 && !transparent; ++py) for (int px = 0; px < 240; ++px) {
+            cx = px; cy = py - 12;
+            if (dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= 31*31 ||
+                dist2(cx,cy,u[high_slot].x,u[high_slot].y) >= 31*31 ||
+                dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= dist2(cx,cy,u[high_slot].x,u[high_slot].y) ||
+                (sc64_pick_unit_body(&u[low_slot],sc64_unit_art_raw(&u[low_slot]),1) &&
+                 sc64_pick_unit_body(&u[high_slot],sc64_unit_art_raw(&u[high_slot]),1))) continue;
+            assert(selection_target() == (int)low_slot);
+            transparent = 1; break;
+        }
+        assert(transparent);
+    }
+    if (!witnesses || wrong) {
+        fprintf(stderr,"cross-layer flyer picker: %u wrong of %u witnesses\n",wrong,witnesses);
+        return 1;
+    }
+    printf("cross-layer flyer picker: %u opaque witnesses match\n",witnesses);
+    return 0;
+}
+#endif
+
 #if defined(SC64_HAS_SPRITES) && defined(GBA_SCENE_CLIP)
 static void
 test_completed_building_edge_depth(void)
@@ -1119,6 +1195,7 @@ main(void)
     test_building_flight_layer();
     failures += test_selection_depth();
 #ifdef SC64_FOREGROUND_PICK_ENABLED
+    failures += test_cross_layer_flyer_selection();
     failures += test_foreground_pick();
     test_foreground_pick_context();
 #endif
