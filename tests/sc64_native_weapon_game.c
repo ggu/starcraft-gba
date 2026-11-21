@@ -478,6 +478,149 @@ static void test_flight_trail_depth(void)
 }
 #endif
 
+#ifdef SC64_P4_STORM_ENABLED
+/* Both source Death tracks create one SPROL at the impact point. Test
+ * the authored child independently of the parent-painter split. */
+static void test_detached_impact_depth(void)
+{
+    static _Alignas(4) u8 legacy[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 reversed[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        int raw, weapon, air, image, target_type, target_raw, layer;
+    } cases[] = {
+        { 43, 48, 0, 511, U_SCV, 7, 5 },
+        { 144, 52, 1, 515, U_DROPSHIP, 11, 17 },
+    };
+    const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_IMPACT_CHILD;
+    const unsigned child = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_IMPACT_CHILD;
+    const int x = 112, y = 54;
+    const Sc64WeaponSourceAnimation *splash = sc64_weapon_source_animation_lookup(512, 0);
+    assert(splash && splash->duration_ticks == 20 && splash->loop_pc == UINT32_MAX);
+
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        reset_world();
+        memset(m, 0, sizeof(m));
+        geyser_count = 0;
+        int shooter;
+        if (cases[n].air) {
+            int building = spawn_build(SIDE, B_SPORE_COLONY, 40, y, 0);
+            assert(building >= 0);
+            b[building].raw_type = cases[n].raw;
+            shooter = MAX_UNITS + building;
+        } else {
+            shooter = make_unit(SIDE, U_MUTALISK, cases[n].raw, 40, y);
+        }
+        int target = make_unit(ENEMY, cases[n].target_type, cases[n].target_raw, x, y);
+        assert(sc64_source_emit(cases[n].raw, shooter, cases[n].weapon,
+                                cases[n].air, 40, y, x, y, target));
+        assert(live_tracers() == 1);
+        const Sc64TraceSlot *slot = &sc64_trace_slots[0];
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((u32)tracers[0].color);
+        assert(profile && profile->projectile_image == cases[n].image);
+        const Sc64WeaponSourceAnimation *death =
+            sc64_weapon_source_animation_lookup((u16)cases[n].image, 1);
+        assert(death && death->duration_ticks == 1 && death->overlay_count == 1);
+        const Sc64WeaponSourceOverlay *spawn = &sc64_weapon_source_overlays[death->overlay_first];
+        assert(spawn->opcode == 15 && spawn->image_id == 512 && spawn->sprite_id == 365);
+        assert(spawn->source_tick == 0 && !spawn->x && !spawn->y);
+
+        while (slot->release_life && tracers[0].life > 1) update_tracers();
+        assert(slot->bullet_layer == cases[n].layer);
+        if (shooter >= MAX_UNITS) b[shooter - MAX_UNITS].alive = 0;
+        else u[shooter].alive = 0;
+        u[target].alive = 0;
+        unsigned impact_tick = sc64_weapon_source_trace_release_ticks(profile) +
+            sc64_weapon_source_trace_startup_ticks(profile) + slot->flight;
+        unsigned active_cuts = 0, overlap = 0;
+        while (tracers[0].life > 0) {
+            int age = sc64_tracer_duration(0) - tracers[0].life;
+            assert(age >= 0);
+            unsigned source_age = sc64_weapon_source_vfx_source_tick((unsigned)age);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            capture_depth_frame(legacy);
+            begin_depth_frame();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            capture_depth_frame(pair);
+            assert(!memcmp(legacy, pair, BATTLEFIELD_BYTES));
+
+            begin_depth_frame();
+            draw_tracer(0, child);
+            capture_depth_frame(pair);
+            if (source_age < impact_tick || source_age - impact_tick >= splash->duration_ticks) {
+                assert(!framebuffer_has_battlefield_pixels());
+            } else {
+                begin_depth_frame();
+                sc64_weapon_source_vfx_draw_image(512, 0, source_age - impact_tick, 8, x, y);
+                capture_depth_frame(expected);
+                assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                if (framebuffer_has_battlefield_pixels()) ++active_cuts;
+                if (!overlap) {
+                    /* Dropship targeted by Spore yields parent 17, child
+                     * 18. Wraith 18 is behind the child with GBA's existing
+                     * kind tie. A point Storm at elevation 5 similarly
+                     * falls between Mutalisk's parent and child turns. */
+                    int blocker = -1;
+                    Sc64PsionicStorm *storm = &race_p4.storm.storm[0];
+                    if (!cases[n].air) {
+                        race_selected_mission = SC64_P4_GLOBAL_ID;
+                        memset(&race_p4.storm, 0, sizeof(race_p4.storm));
+                        storm->active = 1;
+                        storm->x = x;
+                        storm->y = y;
+                    } else {
+                        blocker = make_unit(SIDE, U_WRAITH, 8, x, y);
+                        assert(sc64_unit_world_layer(&u[blocker]) == 18);
+                    }
+                    for (int dx = -12; dx <= 12 && !overlap; ++dx) {
+                        if (blocker >= 0) u[blocker].x = x + dx;
+                        else storm->x = x + dx;
+                        begin_depth_frame();
+                        draw_tracer(0, parent);
+                        if (blocker >= 0) draw_unit(&u[blocker]);
+                        else draw_storm_marker(storm);
+                        draw_tracer(0, child);
+                        capture_depth_frame(expected);
+                        begin_depth_frame();
+                        draw_tracer(0, SC64_TRACE_PROJECTILE);
+                        if (blocker >= 0) draw_unit(&u[blocker]);
+                        else draw_storm_marker(storm);
+                        capture_depth_frame(reversed);
+                        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                            overlap += expected[i] != reversed[i];
+                    }
+                    if (overlap) {
+                        unsigned pages = 0;
+                        for (unsigned page = 0; page < 2; ++page) {
+                            begin_depth_frame();
+                            pages |= 1u << gfx_backbuffer_index();
+                            sc64_draw_depth_ordered_actors();
+                            draw_tracers_pass(1);
+                            capture_depth_frame(pair);
+                            assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                            if (!page) gfx_end();
+                        }
+                        assert(pages == 3);
+                    }
+                    if (blocker >= 0) u[blocker].alive = 0;
+                    else storm->active = 0;
+                }
+            }
+            gfx_end();
+            update_tracers();
+        }
+        assert(active_cuts > 1 && overlap > 0);
+        printf("PASS detached impact image %d at layer %u, %u live cuts and %u order-sensitive pixels\n",
+               cases[n].image, slot->bullet_layer + 1u, active_cuts, overlap);
+    }
+}
+
+#endif
+
 static void test_attached_attacker_depth(void)
 {
     static _Alignas(4) u8 shooter_without_muzzle[BATTLEFIELD_BYTES];
@@ -490,7 +633,7 @@ static void test_attached_attacker_depth(void)
         { U_TANK, 5, 54, -3, 0 },
         { U_TANK, 5, 54, 3, 1 },
 #ifdef SC64_UNIT_FACING
-        { U_GOLIATH, 3, 54, 0, 0 },
+        { U_VULTURE, 2, 54, 0, 0 },
 #endif
         { U_WRAITH, 8, 54, 0, 1 },
         { U_WRAITH, 8, 2, 0, 1 },
@@ -528,10 +671,10 @@ static void test_attached_attacker_depth(void)
             u[blocker].x = u[shooter].x + dx;
             begin_depth_frame();
 #ifdef SC64_UNIT_FACING
-            if (cases[n].raw == 3) {
+            if (cases[n].raw == 2) {
                 assert(sc64_facing_blit(30, 0, u[shooter].x, u[shooter].y + 12));
                 draw_unit(&u[blocker]);
-                sc64_facing_draw_tank_turret((unsigned)shooter, 0);
+                sc64_facing_draw_turret((unsigned)shooter, 0);
             } else
 #endif
             {
@@ -887,6 +1030,9 @@ int main(void)
     test_moving_projectile_overlap();
     test_ground_projectile_world_y();
     test_stationary_projectile_depth();
+#ifdef SC64_P4_STORM_ENABLED
+    test_detached_impact_depth();
+#endif
 #ifdef SC64_P4_STORM_ENABLED
     test_flight_trail_depth();
 #endif

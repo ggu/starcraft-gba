@@ -46,3 +46,12 @@ build/test-sc64-terran-building-words-pixels: tests/sc64_building_words_pixels.c
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_BUILDING_WORD_FLAGS) -DSC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
 test-sc64-terran-building-words-pixels: build/test-sc64-terran-building-words-pixels
 	./$<
+
+.PHONY: test-sc64-terran-turret-depth
+build/sc64-turret-depth/sc64_unit_facing_generated.h: tests/sc64_turret_depth_fixture.h | build
+	mkdir -p $(@D)
+	cp $< $@
+build/test-sc64-terran-turret-depth: tests/sc64_z3_frame_coverage.c build/sc64-turret-depth/sc64_unit_facing_generated.h $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Ibuild/sc64-turret-depth $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
+test-sc64-terran-turret-depth: build/test-sc64-terran-turret-depth
+	./$<

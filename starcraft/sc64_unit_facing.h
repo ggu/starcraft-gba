@@ -199,12 +199,22 @@ sc64_walk_blit(const Sc64SpriteFrame *pose, unsigned raw, unsigned step, int dir
 }
 #endif
 
+#ifdef SC64_RACES
+static unsigned
+sc64_facing_turret_raw(const Unit *q, int raw)
+{
+    if (q->type == U_SIEGE_TANK) return 31;
+    if (q->type == U_TANK) return 6;
+    if (q->type == U_GOLIATH && raw == 3) return 4;
+    return 0;
+}
+#endif
+
 /* Draw a unit with its facing frame, or its walk pose while it moves
  * (walk is sc64_walk_track's stride phase) or flies. Units without a source walk
- * cycle keep the one-pixel stride lift above ground row y. Siege Tanks draw
- * their hull and turret subunits (raw 5/6 in tank mode, 30/31 when sieged);
- * the sieged hull has a single frame. Muzzle/impact effects remain with the
- * stock VFX renderer. Returns 0 when no facing art exists for this unit. */
+ * cycle keep the one-pixel stride lift above ground row y. A unit with
+ * independent turret art either defers that part to the depth painter or
+ * paints it immediately in renderers without a depth queue. */
 static int
 sc64_facing_draw_parts(const Unit *q, int raw, int x, int y, int walk,
                        int *turret_lift)
@@ -213,19 +223,28 @@ sc64_facing_draw_parts(const Unit *q, int raw, int x, int y, int walk,
     if (raw < 0) return 0;
     dir = sc64_facing[slot] & SC64_FACING_MASK;
 #ifdef SC64_RACES
-    if (q->type == U_SIEGE_TANK || q->type == U_TANK) {
-        int sieged = q->type == U_SIEGE_TANK, lift = SC64_WALK_LIFT(walk);
+    unsigned turret = sc64_facing_turret_raw(q, raw);
+    int tank = turret == 6 || turret == 31;
+    int has_turret = turret && sc64_unit_facing_frames((unsigned short)turret) &&
+        (tank || sc64_unit_facing_frames((unsigned short)raw));
+    /* Older prepared Goliath banks only have a body. Keep drawing that
+     * body through the ordinary facing path when the subunit is absent. */
+    if (tank || has_turret) {
+        unsigned hull = tank ? (turret == 31 ? 30u : 5u) : (unsigned)raw;
+        int lift = SC64_WALK_LIFT(walk);
 #ifdef SC64_UNIT_WALK_FRAMES
-        /* Rolling treads replace the lift for the hull and its turret. */
         unsigned step = 0;
-        const Sc64SpriteFrame *pose = walk && !sieged ? sc64_walk_pose_step(5u, slot, &step) : 0;
-        if (pose) { sc64_walk_blit(pose, 5u, step, dir, x, y); lift = 0; }
+        const Sc64SpriteFrame *pose = walk && turret != 31 ?
+            sc64_walk_pose_step(hull, slot, &step) : 0;
+        if (pose) {
+            sc64_walk_blit(pose, hull, step, dir, x, y);
+            lift = 0;
+        }
         else
 #endif
-        if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y - lift)) return 0;
-        unsigned turret = sieged ? 31u : 6u;
+        if (!sc64_facing_blit(hull, dir, x, y - lift)) return 0;
+        if (!has_turret) return 0;
         if (turret_lift) {
-            if (!sc64_unit_facing_frames((unsigned short)turret)) return 0;
             *turret_lift = lift;
             return 1;
         }
@@ -257,10 +276,10 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
 
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_RACES)
 static void
-sc64_facing_draw_tank_turret(unsigned slot, int lift)
+sc64_facing_draw_turret(unsigned slot, int lift)
 {
     const Unit *q = &u[slot];
-    sc64_facing_blit(q->type == U_SIEGE_TANK ? 31u : 6u,
+    sc64_facing_blit(sc64_facing_turret_raw(q, sc64_unit_art_raw(q)),
                      sc64_facing[slot] & SC64_FACING_MASK,
                      q->x - camx, q->y - camy + 12 - lift);
 }

@@ -139,6 +139,14 @@ static void test_death_depth(void)
         { 52,  0, U_WRAITH, 5, 5, 0, 157, 0 },
         /* The Queen's attached image outlasts its detached sprite body. */
         { 52,  0, U_WRAITH, 5, 19, 1, 45, 0 },
+        /* The nested Overlord image inherits layer 16, including after its
+         * parent image ends. At frame three both images share one turn. */
+        { 52,  0, U_WRAITH, 3, 16, 0, 42, 0 },
+        { 52,  0, U_WRAITH, 5, 16, 0, 42, 0 },
+        { 52,  0, U_TANK,   5, 16, 1, 42, 0 },
+        /* At source age 69, the Overmind's sprite holds two images while
+         * the newly spawned rubble retains its own layer-one key. */
+        { 52,  0, U_WRAITH, 87, 4, 0, 147, 0 },
     };
     for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
         game_init();
@@ -151,17 +159,20 @@ static void test_death_depth(void)
         int y = cases[n].y;
         int raw = cases[n].victim_raw;
         int burst_image = 0;
-        if (raw == 110 || raw == 149 || raw == 157) {
-            int type = raw == 110 ? B_REFINERY : raw == 149 ? B_EXTRACTOR : B_ASSIMILATOR;
+        if (raw == 110 || raw == 147 || raw == 149 || raw == 157) {
+            /* Showcase uses a staged building slot for the P10-only art. */
+            int type = raw == 110 ? B_REFINERY : raw == 147 ? B_HATCHERY :
+                       raw == 149 ? B_EXTRACTOR : B_ASSIMILATOR;
             int victim = spawn_build(SIDE, type, 96, y, 0);
             assert(victim >= 0);
             b[victim].raw_type = raw;
             death_vfx_scan();
             b[victim].hp = 0;
             b[victim].alive = 0;
-            burst_image = raw == 110 ? 334 : raw == 149 ? 60 : 215;
+            burst_image = raw == 110 ? 334 : raw == 149 ? 60 : raw == 157 ? 215 : 0;
         } else {
-            int type = raw == 7 ? U_SCV : raw == 45 ? U_QUEEN : U_ZERGLING;
+            int type = raw == 7 ? U_SCV : raw == 42 ? U_OVERLORD :
+                       raw == 45 ? U_QUEEN : U_ZERGLING;
             int victim = spawn_unit(SIDE, type, 96, y);
             assert(victim >= 0);
             u[victim].raw_type = raw;
@@ -180,12 +191,21 @@ static void test_death_depth(void)
         }
         death_vfx_scan();
         assert(death_vfx[0].source &&
-               death_vfx[0].actor_layer_plus1 == (cases[n].burrowed ? 2 : raw == 45 ? 19 : 5));
+               death_vfx[0].actor_layer_plus1 ==
+                   (cases[n].burrowed ? 2 : raw == 42 ? 17 : raw == 45 ? 19 : 5));
         frame += cases[n].elapsed;
 
         u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];
         unsigned size = 0;
         sc64_depth_push_deaths(keys, &size);
+        if (raw == 147) {
+            assert(size == 2);
+            u32 rubble = sc64_depth_pop(keys, &size);
+            const Sc64DeathSource *art = sc64_death_source(raw);
+            assert((rubble >> DEPTH_LAYER_BITS) == 1 &&
+                   art->layers[rubble & DEPTH_SLOT_MASK].image_id == 111);
+            assert(art->layers[keys[0] & DEPTH_SLOT_MASK].image_id == 89);
+        }
         assert(size == 1 && (keys[0] >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
         if (burst_image) {
             const Sc64DeathSource *art = sc64_death_source(raw);
@@ -195,6 +215,32 @@ static void test_death_depth(void)
                    (art->layers[index].flags & SC64_DEATH_SOURCE_DETACHED_SPRITE));
         }
         capture_death_overlap(effect_pixels);
+
+        if (raw == 42 || raw == 147) {
+            /* Independently composite all indexed bank images in the
+             * expected native sprite order (rubble first if present). */
+            const Sc64DeathSource *art = sc64_death_source(raw);
+            u32 age = sc64_death_vfx_age_su(death_vfx[0].birth, death_vfx_now());
+            unsigned drew = 0;
+            gfx_begin(C_PANEL);
+            gfx_set_clip_y(12, 120);
+            for (int remnant = 1; remnant >= 0; --remnant) {
+                for (unsigned i = 0; i < art->layer_count; ++i) {
+                    const Sc64DeathSourceLayer *piece = &art->layers[i];
+                    unsigned source_frame;
+                    if (piece->remnant != remnant ||
+                        !sc64_death_source_layer_frame(piece, age, &source_frame)) continue;
+                    const Sc64SpriteFrame *sprite =
+                        sc64_death_image_frame(piece->image_id, (unsigned short)source_frame);
+                    assert(sprite);
+                    death_vfx_blit(sprite, 96 + piece->x, y + 12 + piece->y);
+                    ++drew;
+                }
+            }
+            assert(drew == (raw == 147 ? 3u : cases[n].elapsed == 3 ? 2u : 1u));
+            assert(gfx_read_band(12, 108, pair));
+            assert(!memcmp(effect_pixels, pair, sizeof(pair)));
+        }
 
         int actor = spawn_unit(SIDE, cases[n].type, 96, y + cases[n].dy);
         assert(actor >= 0);
