@@ -56,9 +56,9 @@ Call 33,900 adds 883,950 cycles, including 883,883 in orders. Both
 builds make the same six successful movement queries, all with the
 same outputs. Both retain 423 logical builds across that update.
 The trial enters a local certificate and a full linear fill. The
-control enters zero full fills. Preserve this ordinary read in the
-next bounded-fallback test. Keep the seven trial flags off in the
-normal recipes while this tail and the real far-reader gate remain open.
+control enters zero full fills. This is the [resident retry cut](#resident-retry-at-call-33900)
+for the follow-up. Keep the seven trial flags off in the normal recipes
+while the p95 cost and the real far-reader gate remain open.
 
 The combined sparse and non-monotone HOST oracle checks 194 certified
 shortest paths, including 45 blocked goals, and 62 declines. The sparse
@@ -73,3 +73,60 @@ checks 108 randomized full fields and 8,320 range scratch cases.
 | Ordinary input tape | `b3d9f36b4f7a33b70dfbf12fc4437f7c5c42ca1c86876b5610cabf7324d5b4eb` |
 | Paired comparison with direct route answers | `2051f2a93c46b6348addf297070bbb9dec67c03f8b19f11870ae6e4709b7a6d4` |
 | Trial link and exact compiler vector | `7e038214a43de5fead42ff0ad0c2cc6c4171a9d5a64b4cc565cb0edd126d02ef` |
+
+## Resident retry at call 33,900
+
+The second movement query enters `sc64_route_slot_for` with goal 13,540
+and open origin 15,209. At the preceding input boundary slot 6 is a live
+certificate-only field with that exact goal. The trace enters
+`sc64_point_certificate(6, 15209, 13540, 0)` from `0x0802ace8`, inside
+`sc64_point_certificate_require`. It then enters the full linear fill
+for goal 13,540 from `0x0802a6be`. The attachment clears after that
+update. The caller uses an exact cached goal, and the route build
+counter remains 423 throughout.
+
+The origin at (105,118) is 18 cells from the blocked goal at (100,105).
+The old limit of 16 rejects it before the scratch search. An independent
+ordered reverse BFS on the observed walkability finds an 18-step path
+with a nearest-seed Manhattan lower bound of 17. The existing four-step
+detour proof needs 273 of 625 scratch cells and reaches the same entire
+canonical chain after 85 pops. The first step is west to cell (104,118).
+
+The follow-up permits gaps 17 and 18 only for retries. The initial
+insertion limit stays 16. The expanded retry checks the existing scratch
+capacity before writing and initializes the lower-bound reduction above
+all possible seed distances. Canonical seed ordering, neighbor ordering
+and chain publication use the existing proof. Whole-field readers retain
+the exact materialization path.
+
+| Operation | Packed control | Original trial | Retry trial |
+| --- | ---: | ---: | ---: |
+| Call 33,900 | 1,140,508 | 2,024,458 | 1,167,764 |
+| Linear fills at call 33,900 | 0 | 1 | 0 |
+| All 203 calls, mean | 1,694,983 | 1,574,037 | 1,569,972 |
+| All 203 calls, nearest-rank p95 | 3,235,449 | 3,309,269 | 3,320,958 |
+| All 203 calls, peak | 12,056,654 | 10,909,326 | 10,909,507 |
+
+All 668 direct route answers, 17 world and display cuts, and 203 frame
+and route counter samples match in the revised run. The revised trial
+executes two full linear fills across the three windows and has zero
+far-reader visits. Its worst added cost versus the original trial is
+21,629 cycles at call 33,890. Outside call 33,900, mean cost rises by
+156 cycles and three individual samples rise by more than 1,000 cycles.
+The work remains opt-in with a p95 increase of 2.64% versus the packed
+control, despite fixing the measured displaced fill.
+
+The sanitizer fixture covers both gaps with a blocked goal and an
+isolated nearer seed. It verifies the original cold decline, rejection
+at gap 19, same resident backing and hit counters, and every direction
+against independent BFS after an explicit full-field read. The ARM
+header and ELF payload checks pass. IWRAM and EWRAM endpoints are the
+same as the previous seven-flag trial.
+
+| Retry evidence | SHA-256 |
+| --- | --- |
+| Read-only caller and slot attribution | `06adf3a448ff420fbe56742e62c1ea3e7f40b47a7aace47947fc139ea5b375ac` |
+| Revised ARM ROM | `83374d50b901b1ec23bc123878b5702e59226cb8061b03caf2927fb61251bf56` |
+| Revised ARM ELF | `2097ea64eaf3856f54d38bd69e3bac7c793a12a11532998405858cbb0866da58` |
+| Revised link receipt | `0226ec75eaad02e05d6b12303f245fc9f31ab368ae83cee5816cc4f8e51b2a8b` |
+| Three-way comparison | `8858d7f1058de0a48163a8460eddc36aa16f41ba06d37881d755b01c13dffe37` |

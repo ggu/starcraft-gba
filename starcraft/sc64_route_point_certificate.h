@@ -10,7 +10,7 @@
 static int __attribute__((noinline))
 sc64_point_certificate(int slot, int origin, int goal, int clear)
 {
-    enum { MAX_GAP = 16, EXTRA_STEPS = 4, MARGIN = EXTRA_STEPS / 2,
+    enum { MAX_GAP = 16, MAX_RETRY_GAP = 18, EXTRA_STEPS = 4, MARGIN = EXTRA_STEPS / 2,
            MAX_SIDE = MAX_GAP + 3 + 2 * MARGIN + 2,
            MAX_CELLS = MAX_SIDE * MAX_SIDE };
     const int cols = MAP_COLS, rows = MAP_ROWS;
@@ -20,7 +20,10 @@ sc64_point_certificate(int slot, int origin, int goal, int clear)
     const int gy = sc64_cell_row((unsigned)goal), gx = goal - gy * cols;
     const int dx = ox > gx ? ox - gx : gx - ox;
     const int dy = oy > gy ? oy - gy : gy - oy;
-    if (dx + dy > MAX_GAP) return 0;
+    const int gap = dx + dy;
+    /* A parked field may try a slightly wider proof on a cache hit.
+     * Initial insertions keep their existing certification limit. */
+    if (gap > (clear ? MAX_GAP : MAX_RETRY_GAP)) return 0;
 
     const int spread = !SC64_GRID_GET(path_walkable, goal);
     const int seed_left = gx > 0 ? gx - spread : gx;
@@ -33,6 +36,7 @@ sc64_point_certificate(int slot, int origin, int goal, int clear)
     const int bottom = limit((oy > seed_bottom ? oy : seed_bottom) + MARGIN, 0, rows - 1);
     const int stride = right - left + 3;
     const int height = bottom - top + 3;
+    if (gap > MAX_GAP && stride * height > MAX_CELLS) return 0;
 
     /* The prefix expansion uses this scratch after this function returns.
      * The independent walkability grid and the borrowed tail stay intact. */
@@ -51,7 +55,7 @@ sc64_point_certificate(int slot, int origin, int goal, int clear)
             *cell++ = SC64_GRID_GET(path_walkable, row + x) ? 7 : 0;
     }
 
-    int lower = MAX_GAP + 1;
+    int lower = gap > MAX_GAP ? gap + 3 : MAX_GAP + 1;
     int head = 0, tail = 0;
     for (int y = seed_top; y <= seed_bottom; ++y) {
         for (int x = seed_left; x <= seed_right; ++x) {

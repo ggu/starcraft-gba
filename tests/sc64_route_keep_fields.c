@@ -1204,6 +1204,56 @@ static void check_empty_linear_goals(void)
 #endif
 
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
+static void check_point_certificate_wider_retry(void)
+{
+    race_cols = race_rows = 128;
+    const int cols = MAP_COLS;
+    const int goal = 32 + 32 * cols, near = goal + 2 * cols - 1;
+    const int closer_seed = goal + 1, connected_seed = goal + cols - 1;
+    memset(desired, 1, sizeof(desired));
+    for (int row = -1; row <= 1; ++row)
+        for (int col = -1; col <= 1; ++col)
+            desired[goal + row * cols + col] = 0;
+    desired[goal + 2] = 0;
+    /* The nearer seed is isolated. The canonical chain uses the other seed. */
+    desired[closer_seed] = desired[connected_seed] = 1;
+    for (int gap = 17; gap <= 18; ++gap) {
+        const int origin = goal + 13 * cols + gap - 13;
+        sc64_routes_reset();
+        sc64_route_pcount = 0;
+        build_path_grid();
+        reference_bfs(&oracle[POOL], goal);
+        int slot = sc64_route_slot_for(goal, near);
+        Sc64PointPrefix *prefix = sc64_point_prefix_find(slot);
+        assert(prefix && prefix->count == SC64_POINT_CERTIFIED_ONLY);
+        u8 *field = sc64_route_field[slot];
+        assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        assert(!sc64_point_certificate(slot, origin, goal, 1));
+        assert(!sc64_point_certificate(slot, goal + 13 * cols + 6, goal, 0));
+        assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
+        const unsigned builds = sc64_route_builds, hits = sc64_route_hits;
+        assert(sc64_route_slot_for(goal, origin) == slot);
+        assert(sc64_route_builds == builds && sc64_route_hits == hits + 1);
+        assert(sc64_route_field[slot] == field && sc64_point_prefix_find(slot) == prefix &&
+               prefix->count == SC64_POINT_CERTIFIED_ONLY);
+        const int step[] = {0, 1, -1, cols, -cols};
+        int cell = origin;
+        for (int n = 0; n < gap; ++n) {
+            int direction = sc64_route_get(slot, cell);
+            assert(direction > 0 && direction <= 4 && direction == oracle[POOL].dir[cell]);
+            cell += step[direction];
+        }
+        assert(cell == connected_seed && sc64_route_get(slot, cell) == 0);
+        const u32 before = state_hash();
+        SC64_ROUTE_EXACT(slot);
+        assert(!sc64_point_prefix_find(slot) && state_hash() == before);
+        for (int i = 0; i < MAP_CELLS; ++i)
+            assert(sc64_route_get(slot, i) == oracle[POOL].dir[i]);
+        check_grid_unchanged();
+    }
+    puts("Exact cache hits certify 17–18-gap retries without materializing the blocked-goal field.");
+}
+
 static void check_point_cold_certificate(void)
 {
     int certified = 0, declined = 0, blocked_goals = 0;
@@ -1327,6 +1377,7 @@ int main(int argc, char **argv)
 #ifdef SC64_ROUTE_POINT_COLD_CERTIFICATE
     if (argc == 2 && !strcmp(argv[1], "--point-certificate-only")) {
         check_point_cold_certificate();
+        check_point_certificate_wider_retry();
         return 0;
     }
 #endif
