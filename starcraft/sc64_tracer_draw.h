@@ -122,8 +122,21 @@ draw_tracer(int i, unsigned parts)
     if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
 #ifdef SC64_TANK_SOURCE_VFX
     if (style==SC64_TANK_SOURCE_TANK || style==SC64_TANK_SOURCE_SIEGE) {
+        int x = tracers[i].x0, y = tracers[i].y0;
+        int muzzle = 1, impact = 1;
+#ifdef SC64_PROJECTILE_DEPTH
+        muzzle = (parts & SC64_TRACE_ATTACKER_OVER) != 0;
+        impact = (parts & SC64_TRACE_PROJECTILE) != 0;
+        if (muzzle && !impact) {
+            int actor = sc64_trace_slots[i].attacker_plus1 - 1;
+            int type = style == SC64_TANK_SOURCE_SIEGE ? U_SIEGE_TANK : U_TANK;
+            if ((unsigned)actor >= MAX_UNITS || !u[actor].alive || u[actor].type != type) return;
+            x = u[actor].x;
+            y = u[actor].y;
+        }
+#endif
         sc64_private_tank_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
-            tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,tracers[i].life);
+            x,y,tracers[i].x1,tracers[i].y1,tracers[i].life,muzzle,impact);
         return;
     }
 #endif

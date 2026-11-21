@@ -11,6 +11,9 @@ The [fallback death depth cases](audits/2026-11-21-fallback-world-depth.md#repla
 cover unbanked collapses, remains and bursts on both Mode 4 pages.
 The [mineral work layer case](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
 covers the independent gathering effect, attached cargo and flyer overlap.
+The [shared depth parity cases](audits/2026-11-22-shared-depth-parity.md#replay-cases)
+cover opaque ground and group selection, fallback Tank parts, native burrow
+transitions and sprite retirement.
 
 ## Protoss P10 candidate (2026-11-01)
 

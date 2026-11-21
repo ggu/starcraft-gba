@@ -56,25 +56,30 @@ static void sc64_private_tank_blit(int image,unsigned frame_index,int world_x,in
     }
 }
 /* life is aged by update_tracers: first rendered frame has age 0. */
-static void sc64_private_tank_vfx_draw(int style,int direction,int x0,int y0,int x1,int y1,int life)
+static void sc64_private_tank_vfx_draw(int style,int direction,int x0,int y0,int x1,int y1,
+                                      int life,int muzzle,int impact)
 {
     int duration=style==SC64_TANK_SOURCE_SIEGE?20:28, age=duration-life;
     if(age<0) age=0; if(age>=duration) return;
     int source_age=(age*4)/5; /* BW source updates at 24 Hz; GBA update is 30 Hz. */
     if(style==SC64_TANK_SOURCE_TANK) {
         int d=direction&31, frame=d<=16?d:32-d;
-        if(age==0) sc64_private_tank_blit(536,(unsigned)frame,x0,y0,d);
-        if(source_age>=2 && source_age<22) { unsigned impact=(unsigned)((source_age-2)/2); if(impact>9)impact=9; sc64_private_tank_blit(531,impact,x1,y1,0); }
+        if(muzzle && age==0) sc64_private_tank_blit(536,(unsigned)frame,x0,y0,d);
+        if(impact && source_age>=2 && source_age<22) {
+            unsigned f=(unsigned)((source_age-2)/2);
+            sc64_private_tank_blit(531,f>9?9:f,x1,y1,0);
+        }
     } else if(style==SC64_TANK_SOURCE_SIEGE) {
         int d=direction&31, frame=d<=16?d:32-d;
-        if(source_age<5) {
+        if(muzzle && source_age<5) {
             unsigned pose=(unsigned)(2+source_age); if(pose>6)pose=6;
             unsigned parent=(unsigned)frame; /* match the GBA parent renderer frame (0..16) */
             int lo_x=sc64_tank_siege_lo[parent][0], lo_y=sc64_tank_siege_lo[parent][1];
             if(d>16) lo_x=-lo_x;
             sc64_private_tank_blit(537,pose*17u+(unsigned)frame,x0+lo_x,y0+lo_y,d);
         }
-        if(source_age>=2 && source_age<16) { unsigned impact=(unsigned)(source_age-2); if(impact>13)impact=13; sc64_private_tank_blit(533,impact,x1,y1,0); }
+        if(impact && source_age>=2 && source_age<16)
+            sc64_private_tank_blit(533,(unsigned)(source_age-2),x1,y1,0);
     }
 }
 #endif

@@ -5029,6 +5029,18 @@ sc64_trace_forget_ref(int ref)
 #endif
 #include "sc64_trace_duration.h"
 
+#if defined(SC64_TANK_SOURCE_VFX) && defined(SC64_PROJECTILE_DEPTH)
+static void
+sc64_tank_fallback_depth(int slot, int shooter, int target)
+{
+    if (slot < 0) return;
+    Sc64TraceSlot *trace = &sc64_trace_slots[slot];
+    trace->attacker_plus1 = (s16)(shooter + 1);
+    trace->attacker_parts = SC64_TRACE_ATTACKER_OVER;
+    trace->bullet_layer = (u8)(sc64_trace_actor_layer(target) + 1);
+}
+#endif
+
 #ifdef SC64_WEAPON_SOURCE_VFX
 static int
 sc64_source_effect_direction(int dx,int dy)
@@ -6336,8 +6348,27 @@ field_cursor_near(int x, int y, int a, int b, int radius)
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
 #define SC64_FOREGROUND_PICK_ENABLED 1
 static int sc64_foreground_pick(int unit, int building, int proximity);
-static int sc64_foreground_flyer_pick(int first, int second, int proximity);
+static int sc64_foreground_unit_pick(int first, int last, int proximity);
 #endif
+
+/* Selection hints walk the full roster. Inline this eligibility check in
+ * both scans so the HUD does not pay a call for each unused slot. */
+static inline __attribute__((always_inline)) int
+selection_unit_candidate(int i)
+{
+    return u[i].alive && u[i].owner == SIDE &&
+#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+           field_cursor_in_box(cx, cy, u[i].x, u[i].y, 31) &&
+#endif
+           !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i])
+#ifdef SC64_RACES
+           && u[i].type != U_CHRYSALIS
+#endif
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+           && sc64_game_unit_selectable(u[i].type)
+#endif
+           ;
+}
 
 static int
 selection_target(void)
@@ -6345,31 +6376,15 @@ selection_target(void)
     int i, best_unit = -1, best_building = -1;
     int unit_distance = 31 * 31, building_distance = 26 * 26, d;
 #ifdef SC64_FOREGROUND_PICK_ENABLED
-    int candidate_first = -1, candidate_second = -1, candidate_count = 0;
+    int candidate_first = -1, candidate_last = -1;
 #endif
     for (i = 0; i < MAX_UNITS; i++) {
-	if (!u[i].alive ||
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
-            u[i].owner != SIDE || !field_cursor_in_box(cx, cy, u[i].x, u[i].y, 31) ||
-#endif
-            SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_CHILD(&u[i])
-#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
-            || u[i].owner != SIDE
-#endif
-#ifdef SC64_RACES
-            ||u[i].type==U_CHRYSALIS
-#endif
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-            ||!sc64_game_unit_selectable(u[i].type)
-#endif
-            )
-	    continue;
+        if (!selection_unit_candidate(i)) continue;
 	d = dist2(cx, cy, u[i].x, u[i].y);
 #ifdef SC64_FOREGROUND_PICK_ENABLED
         if (d < 31 * 31) {
-            if (candidate_count == 0) candidate_first = i;
-            else if (candidate_count == 1) candidate_second = i;
-            ++candidate_count;
+            if (candidate_first < 0) candidate_first = i;
+            candidate_last = i;
         }
 #endif
 	if (d < unit_distance) {
@@ -6398,8 +6413,8 @@ selection_target(void)
 #ifdef SC64_FOREGROUND_PICK_ENABLED
     if (best_unit >= 0 && best_building >= 0)
         return sc64_foreground_pick(best_unit, best_building, proximity);
-    if (best_building < 0 && candidate_count == 2)
-        return sc64_foreground_flyer_pick(candidate_first, candidate_second, proximity);
+    if (best_building < 0 && candidate_first != candidate_last)
+        return sc64_foreground_unit_pick(candidate_first, candidate_last, proximity);
 #endif
     return proximity;
 }
@@ -9210,9 +9225,18 @@ tick_combat(Unit * q, int target)
 #endif
 #endif
 #ifdef SC64_WEAPON_SOURCE_VFX
-            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying,target))
+            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying,target)) {
 #endif
+#if defined(SC64_TANK_SOURCE_VFX) && defined(SC64_PROJECTILE_DEPTH)
+                int trace = add_tracer(q->x, q->y, target_x(target), target_y(target), visual_color);
+                if (q->type == U_TANK || q->type == U_SIEGE_TANK)
+                    sc64_tank_fallback_depth(trace, (int)(q - u), target);
+#else
             add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
+#endif
+#ifdef SC64_WEAPON_SOURCE_VFX
+            }
+#endif
 	#ifdef SC64_RACES
 #ifdef SC64_SIEGE_SPLASH
         if (siege_splash_weapon) race_siege_splash_attack(q,target,damage);

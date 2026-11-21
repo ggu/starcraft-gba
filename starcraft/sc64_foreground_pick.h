@@ -15,6 +15,7 @@ sc64_pick_sprite_pixel(const Sc64SpriteFrame *sprite, int x, int y, int mirror)
     return sprite->pixels[row * sprite->w + col] != 0;
 }
 
+/* Negative means the renderer uses a body pose this mask cannot verify. */
 static int
 sc64_pick_unit_body(const Unit *q, int raw, int flying)
 {
@@ -35,22 +36,23 @@ sc64_pick_unit_body(const Unit *q, int raw, int flying)
     if (q->type == U_GUARDIAN_COCOON) return 0;
 #endif
 #if defined(SC64_SHARED_NUKE_PROBE) && defined(SC64_UNIT_FACING)
-    if (sc64_race_ordinary_ghost(q->type)) return 0;
+    if (sc64_race_ordinary_ghost(q->type)) return -1;
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    if (sc64_race_is_battlecruiser(q->type)) return 0;
+    if (sc64_race_is_battlecruiser(q->type)) return -1;
 #endif
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
-    if (q->cd) return 0;
+    if (q->cd) return -1;
 #endif
-    if (q->type == U_TANK || q->type == U_SIEGE_TANK) return 0;
+    if (q->type == U_TANK || q->type == U_SIEGE_TANK ||
+        (q->type == U_GOLIATH && raw == 3)) return -1;
     const int slot = (int)(q - u);
     /* The last painted facing is already retained. A ground stride can be
      * held for one draw and then retire its latch. Limit the ground check to
      * standing art so selection never advances that presentation state. */
     if (!flying && (q->order != ORDER_IDLE || q->path_timer ||
                     (SC64_WALK_BITS[slot] & (SC64_WALK_KEY_MASK | SC64_WALK_HOLD))))
-        return 0;
+        return -1;
     const Sc64SpriteFrame *sprite = q->raw_type >= 0 ? sc64_p8_unit_sprite_for_raw(raw)
                                                     : mission_unit_sprite(q->type);
     int walk = 0;
@@ -76,28 +78,42 @@ sc64_pick_unit_body(const Unit *q, int raw, int flying)
                                           q->x, q->y - SC64_WALK_LIFT(walk), dir > 16);
     }
 #endif
-    return sc64_pick_sprite_pixel(sprite, q->x, q->y - SC64_WALK_LIFT(walk), 0);
+    return sprite ? sc64_pick_sprite_pixel(sprite, q->x, q->y - SC64_WALK_LIFT(walk), 0)
+                  : -1;
 }
 
-/* Restrict the same-kind override to two unambiguous flyers. The painter
- * key orders both equal and distinct layers. Unsupported or partially
- * covered bodies keep the ordinary nearest-target result. */
+/* Start with the nearest eligible body. Only a higher, opaque body can
+ * replace it. The range comes from the proximity scan and costs no stack. */
 static int __attribute__((noinline))
-sc64_foreground_flyer_pick(int first, int second, int proximity)
+sc64_foreground_unit_pick(int first, int last, int proximity)
 {
-    const Unit *a = &u[first], *b = &u[second];
     int sx = cx - camx, sy = cy - camy + 12;
     if ((unsigned)sx >= 240 || sy < 12 || sy >= 120 ||
-        !sc64_race_unit_flying(a->type) || !sc64_race_unit_flying(b->type)) return proximity;
-    u32 ka = sc64_depth_key(sc64_unit_world_layer(a), a->y, DEPTH_UNIT, (unsigned)first);
-    u32 kb = sc64_depth_key(sc64_unit_world_layer(b), b->y, DEPTH_UNIT, (unsigned)second);
-    int foreground = ka > kb ? first : second;
-    if (foreground == proximity) return proximity;
-    if (!currently_visible(cx, cy) || !currently_visible(a->x, a->y) ||
-        !currently_visible(b->x, b->y) ||
-        !sc64_pick_unit_body(a, sc64_unit_art_raw(a), 1) ||
-        !sc64_pick_unit_body(b, sc64_unit_art_raw(b), 1)) return proximity;
-    return foreground;
+        !currently_visible(cx, cy)) return proximity;
+    const Unit *nearest = &u[proximity];
+    if (!currently_visible(nearest->x, nearest->y) ||
+        sc64_pick_unit_body(nearest, sc64_unit_art_raw(nearest),
+                            sc64_race_unit_flying(nearest->type)) <= 0) return proximity;
+    int foreground = proximity;
+    u32 front_key = sc64_depth_key(sc64_unit_world_layer(nearest), nearest->y,
+                                  DEPTH_UNIT, (unsigned)proximity);
+    u32 unknown_key = 0;
+    for (int i = first; i <= last; ++i) {
+        const Unit *q = &u[i];
+        if (i == proximity || !selection_unit_candidate(i) ||
+            dist2(cx, cy, q->x, q->y) >= 31 * 31) continue;
+        u32 key = sc64_depth_key(sc64_unit_world_layer(q), q->y, DEPTH_UNIT, (unsigned)i);
+        if (key <= front_key || !currently_visible(q->x, q->y)) continue;
+        int mask = sc64_pick_unit_body(q, sc64_unit_art_raw(q),
+                                       sc64_race_unit_flying(q->type));
+        if (mask > 0) {
+            foreground = i;
+            front_key = key;
+        } else if (mask < 0 && key > unknown_key) {
+            unknown_key = key;
+        }
+    }
+    return unknown_key > front_key ? proximity : foreground;
 }
 
 static int __attribute__((noinline))
@@ -126,6 +142,6 @@ sc64_foreground_pick(int unit, int building, int proximity)
         building_raw < 106 || building_raw > 175 || !building_art_is_static(site) ||
         !building_art_in_view(site, site->x - camx, site->y - camy + 12) ||
         !sc64_pick_sprite_pixel(building_art_sprite(site), site->x, site->y, 0) ||
-        !sc64_pick_unit_body(q, unit_raw, flying)) return proximity;
+        sc64_pick_unit_body(q, unit_raw, flying) <= 0) return proximity;
     return foreground;
 }
