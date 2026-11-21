@@ -75,3 +75,54 @@ The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
 establishes the native sort and allocator rule. The exact death-tie
 case still needs an opaque N64 framebuffer cut. Use independent native
 and GBA replays and keep ROMs, saves and captures local.
+
+## GBA same-Y reproducer
+
+Stage a Zergling and a Marine on the same world anchor in the HOST
+Showcase fixture. Both use elevation 4. Capture the two isolated draws
+and the combined draw with the Zergling in the lower slot, then repeat
+with it in the higher slot. Use a peer with a single draw turn so a
+separately sorted turret cannot enter the overlap mask. After the
+alive-to-dead scan, capture the Zergling's first attached collapse
+window at an offset of five frames. Assert the attached-image flag,
+elevation and anchor before comparing the images.
+
+| Zergling slot | Foreground alive | Foreground after death | Distinguishing pixels per page |
+| --- | --- | --- | --- |
+| Lower | Marine | Collapse | 65 alive, 58 after death |
+| Higher | Zergling | Collapse | 65 alive, 58 after death |
+
+The two indexed pages agree. The lower-slot case therefore reproduces
+a visible order flip in the released painter, independent of an anchor
+or elevation change. The HOST sanitizer observation digest is
+`1d83afc2ce220cc95a6659f0816ddca8cff0998d8ec3854d9359bcb88fe9455c`.
+
+Extend this cut through actor-slot reuse, death-effect-slot
+replacement and last-image retirement. The shared GBA renderer
+currently switches its final key from the actor slot to the effect
+slot on death. An attached-image fix needs to retain the actor
+identity across that handoff. Detached effects need independent IDs.
+Qualify both render pages and the mode and save/load matrix before
+enabling a new tie rule.
+
+## Clean Blood Bath opportunity search
+
+One retail N64 Blood Bath run used ordinary ares input, pause and save
+copies. The observer read native rows from the copies. Each continuation
+resumed the last verified checkpoint from the preceding segment.
+
+| Native frame span | Samples | HP-zero or order-zero actors | Near-equal depth candidates | Receipt SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| 1,365–6,922 | 161 | 0 | 0 | `f6501f9fd83c69e2d17ec8506f12f874501284e8f786a7e2fed01ac2c01d167a` |
+| 6,922–9,791 | 241 | 0 | 0 | `0ef0ebe98ee2b6031e585c2706fa4942839311d30728f5e51487e77909af9a51` |
+| 9,791–12,866 | 241 | 0 | 0 | `2f236a5b8ae3f87996559a829f7cdb81f8410ec9cdb5cc3a586a4993009f7eae` |
+
+The last span sampled every 4–30 frames. The human building still had
+1,500 HP at frame 12,866. Actor rows can vanish during a morph, and the
+sampling intervals can miss short-lived images. A save-state sample
+also leaves active-camera opacity unobserved. Keep
+`same-y-attached-death-continuity` pending. For the next capture, put
+the camera on a visible fight and retain the adjacent render cuts from
+the last live pose through attached collapse and final image retirement.
+Record actor and sprite IDs at every cut and keep the same camera,
+palette and viewport for the overlap mask.

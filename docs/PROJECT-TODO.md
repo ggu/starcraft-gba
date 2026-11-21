@@ -24,7 +24,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [depth replay assertions](audits/2026-11-21-world-depth-replay-contract.md#replay-cases)
   on both framebuffer pages. Prioritize an opaque native equal-Y death
   overlap and verify sprite ID lifetime through last-image retirement
-  and reuse. The current GBA key still changes kind at that transition.
+  and reuse. The [GBA same-Y fixture](audits/2026-11-21-world-depth-replay-contract.md#gba-same-y-reproducer)
+  shows a lower-slot Zergling's collapse covering a Marine that
+  appeared in front while the Zergling was alive.
 
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
@@ -37,18 +39,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing
-  coverage. Resolve visible opaque overlap and reused IDs at equal depth.
+  coverage. The [clean Blood Bath search](audits/2026-11-21-world-depth-replay-contract.md#clean-blood-bath-opportunity-search)
+  reached native frame 12,866 without a sampled death or near-equal
+  depth pair. Stage a visible fight with ordinary controls and capture
+  adjacent render cuts through death, last-image retirement and ID reuse.
 
 - **Current campaign verification.** The
-  [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
-  matches the previous Terran ROM through T1–T7, verifies the T10 finale
-  against its earlier pinned control and passes a paired P10 victory tail
-  and fresh result readback. The
-  [earlier three-finale checks](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
-  record victories, fresh HOME continuation and victory-journal readback
-  on their pinned cartridges. The dense Z10 continuation averaged about
-  11.81 emulator main-loop updates per second, including presentation waits
-  and UI. Complete the exact-build campaign sweep and physical timing checks.
+  [released campaign routes](audits/2026-11-21-released-campaign-continuations.md)
+  cover all ten Terran missions, Z1–Z2, Z4, Z10, P5 and P10. All three finales
+  pass full ordinary HOME routes, fresh pause continuation, victory
+  and fresh result readback on the exact released ROMs. Continue the
+  exact-build sweep with Z3, Z5–Z9, P1–P4 and P6–P9. Check physical
+  timing separately.
 
 - **Current three-cartridge playtest.** The
   [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
@@ -170,8 +172,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   56 sampled updates. Fusing discovery cuts the sampled build cycles
   by 22.24% and the Blood Bath update peak by 7.58%, with matching
   fields and continuations. Its Outpost window peak falls by 15.81%.
-  Prioritize the full point floods, path-grid rebuild on invalidation
-  and preserving per-page dynamic pixels in the terrain restore.
+  The [terrain restore measurement](audits/2026-11-21-terrain-restore-interior-traffic.md)
+  estimates about 11,145 cycles of mean headroom for contiguous row
+  transfers in its fixed-camera sample, before bookkeeping. Keep the
+  full-band restore and prioritize full point floods, path-grid rebuilds
+  on invalidation and steady painter cost.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
