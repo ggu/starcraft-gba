@@ -121,8 +121,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   follows a native Larva, Egg and Drone in the same slot, and a
   current GBA Hatchery debit, queue and new-slot Drone through
   fresh HOME. The experimental ARM build restores a live CPU Egg
-  while the human plays Protoss. Qualify a paid Carrier and active
-  Interceptor alongside it before promoting the combined journal.
+  and a paid human Carrier queue from the same record. Qualify
+  Carrier completion and an in-flight Interceptor alongside a
+  live CPU Egg before promoting the combined journal.
   [Draft #689](https://github.com/ggu/starcraft-gba/pull/689) compiles the
   experimental Carrier/Egg authentication path for Terran and Z10.
   An isolated Z10 HOST fixture reaches the real load preparation and

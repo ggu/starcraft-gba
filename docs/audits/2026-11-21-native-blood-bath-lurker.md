@@ -101,13 +101,17 @@ an actual CPU Egg in an ordinary human-Protoss versus Zerg
 match. At frame 6,001, CPU owner 1, slot 30 holds an Egg with
 134 updates remaining. Fresh HOME restores it and both runs
 match over another 100 updates, including the original Egg's
-timer and another CPU Egg. The next case needs a player-built
-Carrier and in-flight Interceptor in that same ARM journal.
-An ordinary Protoss build order now reaches the Stargate on
-the experimental cartridge with a Zerg CPU. It saves through
-pause and restores the paid construction milestone through
-fresh HOME. Continue from that journal through Carrier
-production and Interceptor release.
+timer and another CPU Egg.
+
+An ordinary Protoss build order on that experimental cartridge
+reaches a Stargate and Fleet Beacon against a Zerg CPU. At
+frame 17,294, the paid Carrier order occupies Stargate slot 18
+and the CPU has a live Egg in slot 23. Pause and fresh HOME
+restore both, and the SRAM re-export matches byte for byte.
+The CPU destroys the base before the 2,100-update Carrier
+queue finishes. The next continuation needs earlier gas
+production or a defense long enough for Carrier completion
+and Interceptor release alongside a live CPU Egg.
 
 | Local evidence | SHA-256 |
 | --- | --- |
@@ -116,6 +120,7 @@ production and Interceptor release.
 | Current normal GBA pause and Drone completion | `c7528a65be48c9cdc741e812ec9ff9028b96b8e8663935a8756783f1f0fd5453` |
 | Experimental ARM CPU Egg fresh HOME receipt | `218543fe0fee183acbd56de32757aed5b6f2c63655348cadc1963ba24c225204` |
 | Experimental ordinary Protoss Stargate journal | `f5b6785c0db2a60b884ae8198d7d91f10706606cc5fd468f7ae14ec007ae1105` |
+| Experimental ordinary ARM Carrier queue plus live CPU Egg journal | `69a356babed42f59d69401772664e7106d04854cb150f9ac9ad5f12eb5b715bc` |
 
 ## Custom Game implementation dependencies
 

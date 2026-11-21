@@ -126,3 +126,11 @@ of the target-search cycles. One sampled late update without a
 fill still exceeds two million guest cycles. The six-cut
 instruction report digest is
 `d9e210530fbf2fede720a168cc0476540a0dca74005780e848e3564476121d8b`.
+
+An optional Z10 probe reuses the generated armed-unit facts.
+It matches the scalar answer for all 50 types in that profile.
+The bounded Z7 comparison saves 1.29% and 1.19% in the two
+late windows and 0.61% in busy Blood Bath. Qualify the other
+profiles, the defense-mask composition and the full victory
+before enabling it. The paired Z7 receipt digest is
+`f846ff4f45064607e3c7bc63ba49dca56b7f3b6cdb8dd60298f4e9a75d5836bc`.
