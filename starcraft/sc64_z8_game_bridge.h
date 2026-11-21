@@ -168,7 +168,8 @@ sc64_z8_game_actor_at(void *context, unsigned index, Sc64Z8ActorView *out)
 #ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
 #ifdef SC64_COMMAND_RAW_VALIDATION_CACHE
 /* Compact pool coordinates are 16-bit; source extents only depend on the
- * raw type and nonnegative center. The table lives for one command call. */
+ * raw type and nonnegative center. The mapping and source geometry are
+ * immutable, so a validated raw type remains valid across command calls. */
 _Static_assert(sizeof(((Unit *)0)->x) <= 2 && sizeof(((Unit *)0)->y) <= 2 &&
                sizeof(((Building *)0)->x) <= 2 && sizeof(((Building *)0)->y) <= 2,
                "command raw validation requires compact coordinates");
@@ -202,7 +203,6 @@ sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *
     int left, up, right, down;
 #else
     static u8 validated[2][SC64_Z8_RAW_UNIT_LIMIT];
-    memset(validated, 0, sizeof(validated));
 #endif
     if (world->actor_at != sc64_z8_game_actor_at ||
         world->actor_count != MAX_UNITS + MAX_BUILDINGS)

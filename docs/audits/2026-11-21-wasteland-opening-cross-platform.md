@@ -147,6 +147,52 @@ first match destinations and establish the update boundaries.
 | Native later position state | `916723dcbc9485c89aefdc23afa7a6ec3f7e9c34dbde07537de29a6597586347` |
 | GBA physical Move observation | `56ac9f1a0479435d3701c878b26dfac9c618be5c814ec05d72a8f13571d11372` |
 
+## Native base approach
+
+From the ordinary opening, a selected SCV followed a minimap move toward
+the Command Center at (1056, 1744). It reached (1108, 1267) with 55 HP
+and died before reaching the base. Human supply fell from 10/18 to
+9/18 and minerals remained at 40. The sampled frames do not identify
+which actor dealt the damage.
+
+In a separate continuation, R selected all five Marines. A minimap
+move brought the group to Raynor and triggered his introduction and
+survival objective. A second move brought all five Marines alive to
+the Command Center approach at X 1108–1144, Y 1817–1889. Raynor was still
+alive at (1014, 1031) with 300 HP, and the five SCVs remained at their
+opening positions with 60 HP. These normal-controller observations use
+wall-clock input timings and read-only paused state capture.
+
+A further ares continuation selected SCV slot 5 with the field cursor
+and moved it with C-Right on the minimap. The worker passed (1043, 1007)
+at 60 HP and reached (1089, 1868) alive with 40 HP beside the Marines
+and the visible minerals. The HUD offered B Harvest on the mineral
+patch. After that input the SCV used native order 90 and the human
+minerals reached 64 from 40. The mining checkpoint at step 61,053
+has local state SHA-256
+`47926b91fc8b24b41dc8fb67eb2a48f8d062fa74a4b101e18163a9675d30c96a`.
+
+With the SCV selected, C-Left opened Build. Analog Left selected the
+Barracks at the displayed cost of 150 minerals. A entered placement,
+then another A confirmed the location once the full footprint was green.
+At native step 84,720 the new owner-1 Barracks in slot 46 was at
+(1184, 1808), raw 111, with 144 HP, order 44 and its completion bit clear.
+The SCV was still alive at 40 HP and issuing order 33. At step 91,184,
+that same building had 1,000 HP, order 23 and its completion bit set.
+The SCV was idle and alive. The sampled bank includes continued mining,
+so the displayed cost and the exact payment debit are separate checks.
+The next milestone is victory with ten Marines and Raynor alive.
+
+| Local state | SHA-256 |
+| --- | --- |
+| Barracks foundation | `d64bede57068d24e13565fa3198dfd2f53a0e0db9d862132d39d7635fc726eed` |
+| Completed Barracks | `bf7cce1c0bbc8f7f63d48dcac6d657fe394e7cca29355987fa5ee9dadcd0b102` |
+
+The local escort state SHA-256 is
+`2ef299b94d40a31bd91bd9f26d2a9dd937c5f7f383dd068c40e0f5704a98be30`.
+The lone-worker terminal state SHA-256 is
+`e965979c6dd843d96740a697f1810943e3643e59c1b79e98652e1d513c446d3b`.
+
 ## Initial evidence
 
 | Local evidence | SHA-256 |

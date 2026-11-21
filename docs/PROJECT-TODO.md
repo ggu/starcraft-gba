@@ -61,6 +61,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   on the refreshed Z10 continuation. The sampled custom means
   are flat. The two late Z7 means rise 0.41% and 0.44%.
   Each tape retains its sampled state.
+  The [persistent Command validation](audits/2026-11-22-persistent-command-validation.md)
+  saves 0.71% on the exact P10 tail and 0.32% in the 1,200-update Z8
+  continuation with matching state. Z7 and Z10 campaign wins and
+  fresh HOME readbacks match. Measure physical timing separately.
   The [current target-index attribution](audits/2026-11-22-campaign-defense-owner-masks.md#remaining-order-cost)
   identifies target searches and cell insertion as recurring costs.
   The [armed type lookup](audits/2026-11-22-armed-type-targeting.md)
@@ -70,6 +74,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   windows. The same audit records a static sprite layer trial with
   flat full-update timing. Target the larger route and order costs
   for the next pacing gain.
+  The [wide facility census](audits/2026-11-22-wide-facility-consumer-census.md)
+  finds 166 partial depot-field rebuilds when an existing field cannot
+  answer a requested origin. Try resuming an ordered frontier on
+  128×128 maps and compare all field and next-step answers.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -118,7 +126,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   owned buildings for the zero-actor defeat rule. The normal Terran
   mission wins after an ordinary save and fresh HOME continuation.
   Verify native victory and defeat through ordinary inputs. The
-  independent clocks leave the native mineral grant cadence open. A separate
+  [native base approach scout](audits/2026-11-21-wasteland-opening-cross-platform.md#native-base-approach)
+  reaches the base with five living Marines after Raynor's introduction.
+  The resumed SCV reaches the mineral line alive and earns minerals
+  with B Harvest. The same native Barracks is observed at foundation
+  and completion. Capture the ten-Marine victory with Raynor alive.
+  The independent clocks leave the native mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing
@@ -146,9 +159,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The isolated ARM fixture also saves an ordinary paid Egg through
   pause, reloads through HOME, and matches 401 updates through its
   hatch. The [Outpost live-flight case](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
-  repeats byte for byte on the current engine with the experimental
-  journal tag. Qualify a normal product allocation, worst-case capacity,
-  predecessor and P10 research journals before activation. Use
+  repeats on the opt-in normal-build Z10 product candidate. Its bounded
+  payload, real predecessor saves and 18-case Custom save matrix pass.
+  Qualify ARM stack, pacing and uninterrupted versus fresh trajectories
+  on that product. P10 research composition remains open. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 

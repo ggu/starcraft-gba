@@ -122,10 +122,36 @@ int main(void)
     assert(compare(&world, 0, 231, 1, 0, 2, 0, &count) == 1 && count == 1);
     b[building].under_construction = 0;
     assert(compare(&world, 0, 231, 0, 0, 2, 0, &count) == 1 && count == 1);
+    /* The raw-type memo is warm: each row still rechecks owner and both
+     * coordinates, even if the queried owner would exclude the row. */
+    b[building].raw_owner = -1;
+    assert(compare(&world, 1, 64, 0, 0, 2, 0, 0) == -1);
+    b[building].raw_owner = 0;
+    b[building].x = -1;
+    assert(compare(&world, 1, 64, 0, 0, 2, 0, 0) == -1);
+    b[building].x = 48;
     b[building].y = -1;
     assert(compare(&world, 1, 64, 0, 0, 2, 0, 0) == -1);
     b[building].alive = 0;
     assert(compare(&world, 0, 231, 0, 0, 2, 0, &count) == 1 && count == 0);
+
+    /* Reinitialize the game after warming the static raw memo. Reset and
+     * HOME-like initialization must not reuse prior actor or owner data. */
+    game_init();
+    race_mode = 0;
+    race_selected_mission = CENSUS_MISSION;
+    init_state();
+    assert(CENSUS_ACTIVE());
+    world = CENSUS_WORLD;
+    memset(u, 0, sizeof u);
+    memset(b, 0, sizeof b);
+    world.active_mask = 3;
+    u[slot] = (Unit){.alive = 1, .raw_owner = 1, .raw_type = 0, .type = U_MARINE,
+                     .x = 42, .y = 42};
+    assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
+    assert(compare(&world, 1, 0, 0, 0, 2, 0, &count) == 1 && count == 1);
+    u[slot].y = -1;
+    assert(compare(&world, 0, 0, 0, 0, 2, 0, 0) == -1);
 
     world.actor_at = custom_actor;
     world.actor_count = 1;
