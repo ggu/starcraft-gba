@@ -38,7 +38,11 @@ int main(void)
                     ++count;
                 }
     }
-#ifdef SC64_HATCHERY_WORDS_EXPECTED
+#ifdef SC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED
+    assert(count == 360 && sc64_building_word_sources[0] == sc64_race_building_art_sprite(106) &&
+           sc64_building_word_sources[1] == sc64_race_building_art_sprite(111) &&
+           sc64_building_word_sources[2] == sc64_race_building_art_sprite(109));
+#elif defined(SC64_HATCHERY_WORDS_EXPECTED)
     assert(count == 120 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery);
 #elif defined(SC64_HATCHERY_OVERMIND_WORDS_EXPECTED)
     assert(count == 240 && sc64_building_word_sources[0] == &sc64_race_sprite_hatchery &&
