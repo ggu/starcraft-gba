@@ -58,3 +58,11 @@ Local Z8 control/candidate result SHA-256 values are
 `2a9a94313c9d811ed01333c2f704249e0b1e9bd4f899cf584d9c317eeb7b5ba1`.
 The Blood Bath comparison is
 `fb20e290ee589fac0913b729eb61406f1b98211c78211db4b9744f6cfeaf243d`.
+
+The combined Z10 ordinary HOME and fresh pause continuations both won at
+frame 51,588 with 23 and 21 checkpoints, respectively, and no historical
+drift. The fresh victory journal passed an independent HOME readback. The
+combined Z7 replay completed call 231,031 with all 254 world checkpoints,
+ten video cuts, six route-cache cuts and victory readback matching the pinned
+reference. The local Z7 result SHA-256 is
+`108afef5613c5d0fdb7d9c4551ccce3e8ca3a1146272966ca1764cdfb8e9b382`.
