@@ -459,3 +459,42 @@ fact table generator with those flags. Running the commands from
 that plan with the pinned prepared inputs regenerates the same
 immutable combat facts and the exact transfer ROM
 `ddbf5d1c9e6715a33b1b3d47ac8d576faf667a67f7231799e6a9138059039831`.
+
+### Nearby certificate after a short detour
+
+The exact Z7 call 48,149 trace captures an open root at (17,47)
+and origin at (20,40). The root's canonical shortest path is 16
+steps for a Manhattan gap of 10. It crosses at column 14, three
+cells west of the root, and passes west of the previous two-cell
+margin. The nearby query for (17,49) returns false. The original
+transfer run spends 753,971 cycles in the nearby read and
+516,023 of those cycles in full-field expansion.
+
+This follow-up gives an open-root nearby certificate a three-cell
+margin and at most six extra path steps. The largest rectangle
+under the existing 18-cell admission is 18×18, within the 625-cell
+scratch allocation. The fixture checks the exact 16-step path and
+all its published directions. An 18-step path still uses full
+completion. Cold insertion and ordinary retries retain the two-cell
+margin. The four-run reserve and far-range sanitizer fixtures pass.
+
+| Z7 guest cycles | Shipping Z10 | Free reserve transfer | Nearby certificate |
+| --- | ---: | ---: | ---: |
+| Call 48,149 | 2,402,668 | 2,821,420 | 2,095,952 |
+| Mean over 477 advancing calls | 2,193,360 | 1,920,886 | 1,913,035 |
+| p95 | 3,182,885 | 2,595,075 | 2,588,899 |
+| Peak | 5,113,194 | 4,412,647 | 4,413,513 |
+
+The three Z7 runs match 114 named world observations, seven
+display samples, logical route counters and all 48 commonly
+complete nonstale fields. Z8 matches all 668 answers and 17
+world and display samples. Compared with the transfer, Z8's
+sampled mean rises 55 cycles and its peak rises 426 cycles.
+The new Z10 link retains the same RAM endpoints. Only the earlier
+transfer build has the full late Z7 qualification.
+
+| Nearby-certificate evidence | SHA-256 |
+| --- | --- |
+| Trace and captured walkability grid | `c812a402f6a7f5c365d37c3811060e418e9ed88ebf93dc532ad8ee9c331cd911` |
+| Z7 comparison | `dd0c7adf32d4e120afde9380b00b22f4e46e8061337f2873138f9017e0b7e6e9` |
+| Z8 comparison | `5fe67799cd9d35392841cd6ceac233745ff97d450aed95921e24ab482632748c` |

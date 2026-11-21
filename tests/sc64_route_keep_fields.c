@@ -1112,6 +1112,11 @@ static void check_point_near_distance(void)
         if (mode == PROOF) {
             assert(prefix && sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
         } else if (prefix) {
+#if defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) && defined(SC64_ROUTE_POINT_NEAR_RESERVE_PROBE)
+            if (prefix->count == SC64_POINT_CERTIFIED_ONLY)
+                assert(prefix->slot == slot && prefix->goal == root);
+            else
+#endif
             assert(prefix->count <= SC64_POINT_PREFIX_PENDING && prefix->second_cutoff);
             assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
         }
@@ -1274,10 +1279,13 @@ static void check_near_certificate_margin(void)
     const int cols = MAP_COLS;
     const int root = 17 + 47 * cols, origin = 20 + 40 * cols;
     const int alternative = root + 2 * cols;
-    memset(desired, 1, sizeof(desired));
-    /* The only crossing adds six steps to the ten-step lower bound. */
-    for (int col = 15; col < cols; ++col) desired[col + 44 * cols] = 0;
-    for (int near = 0; near <= 1; ++near) {
+    for (int test = 0; test < 3; ++test) {
+        const int use_near = test != 0;
+        const int wall_col = test == 2 ? 14 : 15;
+        const int certified = use_near && wall_col == 15;
+        memset(desired, 1, sizeof(desired));
+        /* Moving the only crossing one cell west adds two more steps. */
+        for (int col = wall_col; col < cols; ++col) desired[col + 44 * cols] = 0;
         sc64_routes_reset();
         sc64_route_pcount = 0;
         build_path_grid();
@@ -1287,16 +1295,22 @@ static void check_near_certificate_margin(void)
         assert(prefix && prefix->count == SC64_POINT_CERTIFIED_ONLY);
         assert(sc64_route_get(slot, origin) == SC64_ROUTE_UNREACHABLE);
         const u32 metadata = state_hash();
-        if (near) {
+        if (use_near)
             assert(!sc64_route_near_root_reaches(slot, origin, alternative, root));
-            assert(sc64_point_prefix_find(slot) == prefix);
-        } else {
+        else
             sc64_point_prefix_require(slot, origin);
-            assert(!sc64_point_prefix_find(slot));
-        }
+        assert(sc64_point_prefix_find(slot) == (certified ? prefix : 0));
         assert(state_hash() == metadata);
         reference_bfs(&oracle[POOL], root);
+        assert(oracle[POOL].dist[origin] == (wall_col == 15 ? 16 : 18));
         assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+        if (certified) {
+            for (int cell = 0; cell < MAP_CELLS; ++cell) {
+                int direction = sc64_route_get(slot, cell);
+                if (direction != SC64_ROUTE_UNREACHABLE)
+                    assert(direction == oracle[POOL].dir[cell]);
+            }
+        }
         SC64_ROUTE_EXACT(slot);
         for (int cell = 0; cell < MAP_CELLS; ++cell)
             assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
