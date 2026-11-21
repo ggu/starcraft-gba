@@ -88,20 +88,26 @@ restores the journal when the sixth free slot is available.
 
 ## Ordinary ARM checks with the four-slot policy
 
-The normal Terran, Z10, and P10 ARM builds compose the generic policy trial
+The normal Terran, Z10, P10, and Showcase ARM builds compose the trial
 with the [packed building release](2026-11-21-terran-building-word-draw.md)
 at `60dd3d94`. The trial source was `ca594583` and the composed runtime tree
 was `498d3abf`. Each build used its authenticated production command and
 private inputs. The packed banks and both generated fact banks matched.
 The 32 MiB payloads and RAM endpoints passed the ordinary product guards.
 The relevant Carrier validator, slot-reservation, save, and HUD stack
-entries matched their packed ARM controls.
+entries in the three race products matched their packed ARM controls.
 
 | Product | ARM ROM SHA-256 | IWRAM end | EWRAM end |
 | --- | --- | --- | --- |
 | Terran | `1b298fbbd39a62a15de35983ef7ddf84b2283a12212f174307af39d577d6ba6f` | `0x030049f8` | `0x0203aa0c` |
 | Z10 | `fa17bacfc510a363f6271c19ac50ccb107030680cf1b4b1358f63b2a7a995088` | `0x03004d60` | `0x02039b30` |
 | P10 | `2da1eba67f634a70450243c6322d650ad9cae3c5a39734ec2ce3f0293816ed64` | `0x03004e20` | `0x0203b62c` |
+| Showcase | `a08e67f17a2fe1966ce7e4dad81533baecba6658b611cb29c6327beb244dad64` | `0x03004fb8` | `0x02039168` |
+
+Normal Showcase reproduced the packed control ROM byte for byte. Its
+ELF differs only in debug sections and temporary object filenames.
+Link receipt SHA-256
+`6855ae869bde1b414201ddfd65cc5c7b3ca82848a762ce2bfd4095f935d73903`.
 
 The normal Terran controller tape buys a Carrier for 350 minerals and
 250 gas and an Interceptor for 25 minerals. It saves a live attack at
