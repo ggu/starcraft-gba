@@ -126,14 +126,19 @@ sc64_depth_push_key(u32 *heap, unsigned *size, u32 key)
 
 /* Ground depth uses the world anchor. The turret bit sorts after all
  * ordinary sprites at the same elevation and Y. Kind and slot break ties. */
+static inline u32
+sc64_depth_key(unsigned layer, int y, unsigned kind, unsigned slot)
+{
+    unsigned row = layer <= 4 ? (unsigned)limit(y, 0, (1 << DEPTH_WORLD_Y_BITS) - 1) : 0;
+    return (layer << DEPTH_LAYER_BITS) | (row << DEPTH_Y_BITS) |
+           (kind << DEPTH_SLOT_BITS) | slot;
+}
+
 static void
 sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
                 unsigned kind, unsigned slot)
 {
-    unsigned row = layer <= 4 ? (unsigned)limit(y, 0, (1 << DEPTH_WORLD_Y_BITS) - 1) : 0;
-    u32 key = (layer << DEPTH_LAYER_BITS) | (row << DEPTH_Y_BITS) |
-              (kind << DEPTH_SLOT_BITS) | slot;
-    sc64_depth_push_key(heap, size, key);
+    sc64_depth_push_key(heap, size, sc64_depth_key(layer, y, kind, slot));
 }
 
 static u32
@@ -235,6 +240,55 @@ _Static_assert(DEPTH_DEATH_FALLBACK_BASE + SC64_DEATH_VFX_POOL * 2 <= DEPTH_SLOT
                SC64_DEATH_SOURCE_DEPTH_LAYERS <= SC64_DEATH_SOURCE_MAX_LAYERS,
                "painter keys must hold every source death layer");
 
+typedef struct {
+    u32 key;
+    u16 slot, age;
+} Sc64AttachedDeathDraw;
+
+typedef struct {
+    Sc64AttachedDeathDraw rows[SC64_DEATH_VFX_POOL];
+    unsigned count;
+} Sc64AttachedDeathQueue;
+
+/* One attached group per effect. Merge this small sorted queue with the
+ * main heap so ordinary heap comparisons still use a single word. */
+static void
+sc64_depth_push_attached_death(u32 *heap, unsigned *size, Sc64AttachedDeathQueue *attached,
+                              unsigned effect, unsigned layer, int y, unsigned slot, u32 age)
+{
+    unsigned actor = death_vfx_actor_plus1[effect];
+    if (!actor) {
+        sc64_depth_push(heap, size, layer, y, DEPTH_DEATH, slot);
+        return;
+    }
+    --actor;
+    u32 key = actor < MAX_UNITS ? sc64_depth_key(layer, y, DEPTH_UNIT, actor)
+                               : sc64_depth_key(layer, y, DEPTH_BUILDING, actor - MAX_UNITS);
+    unsigned at = attached->count++;
+    /* When the actor slot is reused, draw its older collapse first. */
+    while (at) {
+        const Sc64AttachedDeathDraw *previous = &attached->rows[at - 1];
+        if (previous->key > key || (previous->key == key && previous->age < age)) break;
+        attached->rows[at--] = *previous;
+    }
+    attached->rows[at] = (Sc64AttachedDeathDraw){key, (u16)slot, (u16)age};
+}
+
+static inline u32
+sc64_depth_pop_world(u32 *heap, unsigned *size, Sc64AttachedDeathQueue *attached)
+{
+    if (attached->count) {
+        const Sc64AttachedDeathDraw *next = &attached->rows[attached->count - 1];
+        /* A new live actor using the same slot draws over the old collapse. */
+        if (!*size || next->key <= heap[0]) {
+            --attached->count;
+            return (next->key & ~((1u << DEPTH_Y_BITS) - 1u)) |
+                   (DEPTH_DEATH << DEPTH_SLOT_BITS) | next->slot;
+        }
+    }
+    return sc64_depth_pop(heap, size);
+}
+
 static unsigned
 sc64_fallback_death_burst_layer(const Sc64DeathVfx *row)
 {
@@ -250,7 +304,7 @@ sc64_fallback_death_burst_layer(const Sc64DeathVfx *row)
 }
 
 static void __attribute__((noinline))
-sc64_depth_push_deaths(u32 *heap, unsigned *size)
+sc64_depth_push_deaths(u32 *heap, unsigned *size, Sc64AttachedDeathQueue *attached)
 {
     u32 now = death_vfx_now();
     for (unsigned i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
@@ -270,9 +324,13 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
             unsigned slot = DEPTH_DEATH_FALLBACK_BASE + i * 2;
             if (age >= row->remnant_start)
                 sc64_depth_push(heap, size, 1, row->y, DEPTH_DEATH, slot);
-            if (age < row->burst_su)
-                sc64_depth_push(heap, size, sc64_fallback_death_burst_layer(row),
-                                row->y, DEPTH_DEATH, slot + 1);
+            if (age < row->burst_su) {
+                unsigned layer = sc64_fallback_death_burst_layer(row);
+                if (layer == row->actor_layer_plus1 - 1u)
+                    sc64_depth_push_attached_death(heap, size, attached, i, layer, row->y, slot + 1, age);
+                else
+                    sc64_depth_push(heap, size, layer, row->y, DEPTH_DEATH, slot + 1);
+            }
             continue;
         }
         const Sc64DeathSource *art = sc64_death_source(row->raw);
@@ -283,16 +341,18 @@ sc64_depth_push_deaths(u32 *heap, unsigned *size)
             int layer = death_vfx_world_layer(row, piece);
             if (layer < 0) continue;
             int world_y = row->y;
-            if (piece->flags & (SC64_DEATH_SOURCE_FIXED_LOW | SC64_DEATH_SOURCE_DETACHED_SPRITE))
+            if (piece->flags & (SC64_DEATH_SOURCE_FIXED_LOW | SC64_DEATH_SOURCE_DETACHED_SPRITE)) {
                 world_y += piece->y;
-            else {
+                sc64_depth_push(heap, size, (unsigned)layer, world_y, DEPTH_DEATH,
+                                i * SC64_DEATH_SOURCE_MAX_LAYERS + j);
+            } else {
                 /* All original-sprite images share one painter turn.
-                 * Its first live image represents the group in the heap. */
+                 * Its first live image represents the group in the queue. */
                 if (actor_queued) continue;
                 actor_queued = 1;
+                sc64_depth_push_attached_death(heap, size, attached, i, (unsigned)layer, world_y,
+                                              i * SC64_DEATH_SOURCE_MAX_LAYERS + j, age);
             }
-            sc64_depth_push(heap, size, (unsigned)layer, world_y, DEPTH_DEATH,
-                            i * SC64_DEATH_SOURCE_MAX_LAYERS + j);
         }
     }
 }
@@ -445,7 +505,9 @@ sc64_draw_depth_ordered_actors(void)
 #endif
 #endif
 #ifdef SC64_DEATH_WORLD_DEPTH
-    sc64_depth_push_deaths(heap, &size);
+    Sc64AttachedDeathQueue attached;
+    attached.count = 0;
+    sc64_depth_push_deaths(heap, &size, &attached);
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (race_protoss_services_active()) race_p7_projectile_push_depth(heap, &size);
@@ -462,8 +524,13 @@ sc64_draw_depth_ordered_actors(void)
             if (storms->storm[i].active)
                 sc64_depth_push(heap, &size, 5, storms->storm[i].y, DEPTH_STORM, i);
 #endif
+#ifdef SC64_DEATH_WORLD_DEPTH
+    while (size || attached.count) {
+        u32 key = sc64_depth_pop_world(heap, &size, &attached);
+#else
     while (size) {
         u32 key = sc64_depth_pop(heap, &size);
+#endif
         unsigned i = key & DEPTH_SLOT_MASK;
         switch ((key >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) {
         case DEPTH_MINERAL:

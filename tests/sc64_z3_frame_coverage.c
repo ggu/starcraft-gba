@@ -794,10 +794,11 @@ test_building_flight_layer(void)
     camy = y - 52;
     u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];
     unsigned size = 0;
-    sc64_depth_push_deaths(keys, &size);
-    assert(size == 2);
-    assert((sc64_depth_pop(keys, &size) >> DEPTH_LAYER_BITS) == 1);
-    assert((sc64_depth_pop(keys, &size) >> DEPTH_LAYER_BITS) == 12);
+    Sc64AttachedDeathQueue attached = {0};
+    sc64_depth_push_deaths(keys, &size, &attached);
+    assert(size == 1 && attached.count == 1);
+    assert((sc64_depth_pop_world(keys, &size, &attached) >> DEPTH_LAYER_BITS) == 1);
+    assert((sc64_depth_pop_world(keys, &size, &attached) >> DEPTH_LAYER_BITS) == 12);
     puts("PASS destroyed lifted Facility: rubble layer 1, attached burst layer 12");
     death_vfx_reset();
 #endif
