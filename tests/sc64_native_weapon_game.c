@@ -287,7 +287,7 @@ static void test_ground_projectile_world_y(void)
     }
 }
 
-static void test_stationary_projectile_depth(void)
+static void test_stationary_projectile_depth(int tank_fallback)
 {
     static _Alignas(4) u8 effect_in_front[BATTLEFIELD_BYTES];
     static _Alignas(4) u8 actor_in_front[BATTLEFIELD_BYTES];
@@ -305,12 +305,36 @@ static void test_stationary_projectile_depth(void)
     int shooter = make_unit(SIDE, U_SIEGE_TANK, 30, 32, 24);
     int target = spawn_build(ENEMY, B_BUNKER, 112, 54, 0);
     assert(target >= 0 && sc64_building_world_layer((unsigned)target) == 3);
-    assert(sc64_source_unit_vfx(&u[shooter], 112, 54, 0, MAX_UNITS + target));
-    assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
-    const Sc64WeaponSourceAttackProfile *profile =
-        sc64_weapon_source_trace_profile((u32)tracers[0].color);
-    assert(profile && profile->weapon_bullet_type == SC64_SOURCE_BULLET_APPEAR_TARGET_UNIT);
-    while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    if (tank_fallback) {
+#ifdef SC64_TANK_SOURCE_VFX
+        int tag = sc64_weapon_vfx_pack(SC64_TANK_SOURCE_SIEGE, 8);
+        int slot = add_tracer(30, 32, 112, 54, tag);
+        assert(slot == 0);
+        sc64_tank_fallback_depth(slot, shooter, MAX_UNITS + target);
+        update_tracers();
+        begin_depth_frame();
+        u[shooter].x = 100;
+        u[shooter].y = 80;
+        draw_tracer(slot, SC64_TRACE_ATTACKER_OVER);
+        assert(framebuffer_has_battlefield_pixels());
+        begin_depth_frame();
+        u[shooter].type = U_TANK;
+        draw_tracer(slot, SC64_TRACE_ATTACKER_OVER);
+        assert(!framebuffer_has_battlefield_pixels());
+        u[shooter].type = U_SIEGE_TANK;
+        u[shooter].x = 30;
+        u[shooter].y = 32;
+#else
+        assert(!tank_fallback);
+#endif
+    } else {
+        assert(sc64_source_unit_vfx(&u[shooter], 112, 54, 0, MAX_UNITS + target));
+        assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((u32)tracers[0].color);
+        assert(profile && profile->weapon_bullet_type == SC64_SOURCE_BULLET_APPEAR_TARGET_UNIT);
+        while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    }
     assert(tracers[0].life > 1 && sc64_trace_slots[0].bullet_layer == 4);
     assert(sc64_trace_world_y(0) == b[target].y);
 
@@ -337,16 +361,20 @@ static void test_stationary_projectile_depth(void)
             update_tracers();
         }
         assert(overlap && "the stationary effect must overlap the blocker");
-        begin_depth_frame();
-        sc64_draw_depth_ordered_actors();
-        draw_tracers_pass(1);
-        capture_depth_frame(pair);
-        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
-            if (effect_in_front[i] == actor_in_front[i]) continue;
-            assert(pair[i] == (cases[n].in_front ? actor_in_front[i] : effect_in_front[i]));
+        for (int page = 0; page < 2; ++page) {
+            begin_depth_frame();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            assert_hud_untouched();
+            capture_depth_frame(pair);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
+                if (effect_in_front[i] == actor_in_front[i]) continue;
+                assert(pair[i] == (cases[n].in_front ? actor_in_front[i] : effect_in_front[i]));
+            }
+            gfx_end();
         }
-        printf("PASS stationary projectile depth against raw %d at Y%d, %u overlap pixels\n",
-               cases[n].raw, cases[n].y, overlap);
+        printf("PASS %s stationary projectile depth against raw %d at Y%d, %u overlap pixels\n",
+               tank_fallback ? "fallback" : "source", cases[n].raw, cases[n].y, overlap);
         u[blocker].alive = 0;
     }
 }
@@ -1061,7 +1089,10 @@ int main(void)
 #ifdef SC64_PROJECTILE_DEPTH
     test_moving_projectile_overlap();
     test_ground_projectile_world_y();
-    test_stationary_projectile_depth();
+    test_stationary_projectile_depth(0);
+#ifdef SC64_TANK_SOURCE_VFX
+    test_stationary_projectile_depth(1);
+#endif
 #ifdef SC64_P4_STORM_ENABLED
     test_detached_impact_depth();
 #endif

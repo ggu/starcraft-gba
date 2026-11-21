@@ -513,8 +513,8 @@ test_actor_depth(void)
                 dist2(cx,cy,u[0].x,u[0].y) >= 31*31 ||
                 dist2(cx,cy,u[1].x,u[1].y) >= 31*31 ||
                 dist2(cx,cy,u[0].x,u[0].y) > dist2(cx,cy,u[1].x,u[1].y) ||
-                !sc64_pick_unit_body(&u[0],sc64_unit_art_raw(&u[0]),1) ||
-                !sc64_pick_unit_body(&u[1],sc64_unit_art_raw(&u[1]),1)) continue;
+                sc64_pick_unit_body(&u[0],sc64_unit_art_raw(&u[0]),1) <= 0 ||
+                sc64_pick_unit_body(&u[1],sc64_unit_art_raw(&u[1]),1) <= 0) continue;
             int picked = selection_target();
             if (!disagree) {
                 fprintf(stderr, "same-kind raster pixel order=%u at %d,%d painter=1 picked=%d\n", first,cx,cy,picked);
@@ -528,11 +528,13 @@ test_actor_depth(void)
                 clear_selection();
                 u[1].owner = ENEMY; assert(selection_target() == 0); u[1].owner = SIDE;
                 int third = spawn_unit(SIDE, U_MARINE, cx, cy);
-                assert(third >= 2 && selection_target() == third);
+                assert(third >= 2);
+                u[third].order = ORDER_MOVE;
+                assert(selection_target() == third);
                 memset(&u[third], 0, sizeof u[third]);
                 int saved_camx = camx;
                 camx = cx + 1;
-                assert(sc64_foreground_flyer_pick(0, 1, 0) == 0);
+                assert(sc64_foreground_unit_pick(0, 1, 0) == 0);
                 camx = saved_camx;
             }
             ++disagree;
@@ -545,8 +547,8 @@ test_actor_depth(void)
             if (dist2(cx,cy,u[0].x,u[0].y) >= 31*31 ||
                 dist2(cx,cy,u[1].x,u[1].y) >= 31*31 ||
                 dist2(cx,cy,u[0].x,u[0].y) > dist2(cx,cy,u[1].x,u[1].y) ||
-                (sc64_pick_unit_body(&u[0],sc64_unit_art_raw(&u[0]),1) &&
-                 sc64_pick_unit_body(&u[1],sc64_unit_art_raw(&u[1]),1))) continue;
+                (sc64_pick_unit_body(&u[0],sc64_unit_art_raw(&u[0]),1) > 0 &&
+                 sc64_pick_unit_body(&u[1],sc64_unit_art_raw(&u[1]),1) > 0)) continue;
             assert(selection_target() == 0);
             transparent = 1; break;
         }
@@ -610,8 +612,8 @@ test_cross_layer_flyer_selection(void)
                 dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= 31*31 ||
                 dist2(cx,cy,u[high_slot].x,u[high_slot].y) >= 31*31 ||
                 dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= dist2(cx,cy,u[high_slot].x,u[high_slot].y) ||
-                !sc64_pick_unit_body(&u[low_slot],sc64_unit_art_raw(&u[low_slot]),1) ||
-                !sc64_pick_unit_body(&u[high_slot],sc64_unit_art_raw(&u[high_slot]),1)) continue;
+                sc64_pick_unit_body(&u[low_slot],sc64_unit_art_raw(&u[low_slot]),1) <= 0 ||
+                sc64_pick_unit_body(&u[high_slot],sc64_unit_art_raw(&u[high_slot]),1) <= 0) continue;
             int picked = selection_target();
             if (witnesses == prior) {
                 fprintf(stderr,"cross-layer witness reverse=%u cursor=(%d,%d) picked=%d painter=%u\n",reverse,cx,cy,picked,high_slot);
@@ -625,7 +627,9 @@ test_cross_layer_flyer_selection(void)
                 clear_selection();
                 u[high_slot].owner = ENEMY; assert(selection_target() == (int)low_slot); u[high_slot].owner = SIDE;
                 int third = spawn_unit(SIDE, U_MARINE, cx, cy);
-                assert(third >= 2 && selection_target() == third);
+                assert(third >= 2);
+                u[third].order = ORDER_MOVE;
+                assert(selection_target() == third);
                 memset(&u[third], 0, sizeof u[third]);
             }
             ++witnesses; wrong += picked != (int)high_slot;
@@ -637,8 +641,8 @@ test_cross_layer_flyer_selection(void)
             if (dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= 31*31 ||
                 dist2(cx,cy,u[high_slot].x,u[high_slot].y) >= 31*31 ||
                 dist2(cx,cy,u[low_slot].x,u[low_slot].y) >= dist2(cx,cy,u[high_slot].x,u[high_slot].y) ||
-                (sc64_pick_unit_body(&u[low_slot],sc64_unit_art_raw(&u[low_slot]),1) &&
-                 sc64_pick_unit_body(&u[high_slot],sc64_unit_art_raw(&u[high_slot]),1))) continue;
+                (sc64_pick_unit_body(&u[low_slot],sc64_unit_art_raw(&u[low_slot]),1) > 0 &&
+                 sc64_pick_unit_body(&u[high_slot],sc64_unit_art_raw(&u[high_slot]),1) > 0)) continue;
             assert(selection_target() == (int)low_slot);
             transparent = 1; break;
         }
@@ -650,6 +654,70 @@ test_cross_layer_flyer_selection(void)
     }
     printf("cross-layer flyer picker: %u opaque witnesses match\n",witnesses);
     return 0;
+}
+
+static void
+test_multiple_unit_depth_pick(void)
+{
+    static u8 empty[FB_SIZE], front[FB_SIZE], back[FB_SIZE], actual[FB_SIZE];
+    const DepthActor none = { -1, 0, 0, 0, 0 };
+    const DepthActor actors[][3] = {
+        { { U_HYDRALISK, 50, 0, 0, 0 }, { U_DRAGOON, 52, 0, 0, 0 }, none },
+        { { U_OVERLORD, 54, 0, 0, 0 }, { U_MUTALISK, 56, 0, 0, 0 },
+          { U_WRAITH, 48, 0, 0, 0 } },
+    };
+    for (unsigned flying = 0; flying < 2; ++flying) {
+        unsigned top = flying + 1;
+        setup_depth_profile(R_TER);
+        memset(visible, 255, sizeof visible);
+        depth_capture(none, none, empty);
+        depth_capture(actors[flying][0], none, back);
+        depth_capture(actors[flying][top], none, front);
+        unsigned pages = 0;
+        for (int pass = 0; pass < 2; ++pass) {
+            cx = 120;
+            cy = 54;
+            memset(u, 0, sizeof u);
+            for (unsigned i = 0; i <= top; ++i) depth_spawn(actors[flying][i]);
+            pages |= 1u << gfx_backbuffer_index();
+            depth_capture_world(actual);
+            assert(!memcmp(empty, actual, 12 * FB_WIDTH));
+            assert(!memcmp(empty + 120 * FB_WIDTH, actual + 120 * FB_WIDTH, 40 * FB_WIDTH));
+            int witness = 0;
+            for (int py = 12; py < 120 && !witness; ++py) for (int px = 0; px < 240; ++px) {
+                unsigned at = (unsigned)(py * FB_WIDTH + px);
+                if (front[at] == empty[at] || back[at] == empty[at] ||
+                    front[at] == back[at] || actual[at] != front[at]) continue;
+                cx = px;
+                cy = py - 12;
+                int distance = dist2(cx, cy, u[0].x, u[0].y);
+                unsigned i;
+                for (i = 0; i <= top; ++i) {
+                    if (dist2(cx, cy, u[i].x, u[i].y) >= 31 * 31 ||
+                        (i && dist2(cx, cy, u[i].x, u[i].y) <= distance) ||
+                        sc64_pick_unit_body(&u[i], sc64_unit_art_raw(&u[i]), flying) <= 0) break;
+                }
+                if (i <= top) continue;
+                assert(selection_target() == (int)top);
+                assert(select_at() == (int)top && u[top].selected);
+                clear_selection();
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+                u[top].cd = 1;
+                assert(selection_target() == 0);
+                u[top].cd = 0;
+#endif
+                u[top].owner = ENEMY;
+                assert(selection_target() == (int)top - 1);
+                witness = 1;
+                break;
+            }
+            if (!witness) fprintf(stderr, "No opaque %s pick witness on pass %d\n",
+                                  flying ? "flyer" : "ground", pass);
+            assert(witness);
+        }
+        assert(pages == 3);
+    }
+    puts("unit depth picker: ground pair and three opaque flyers on both pages");
 }
 #endif
 
@@ -1196,6 +1264,7 @@ main(void)
     failures += test_selection_depth();
 #ifdef SC64_FOREGROUND_PICK_ENABLED
     failures += test_cross_layer_flyer_selection();
+    test_multiple_unit_depth_pick();
     failures += test_foreground_pick();
     test_foreground_pick_context();
 #endif

@@ -86,6 +86,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the overlap changes between A edges. The native same-Y Zergling
   row visits sprite 438 directly before 1418. Match its image
   frames and camera to the screenshot before asserting pixel order.
+  Add the [shared depth parity cases](audits/2026-11-22-shared-depth-parity.md#replay-cases)
+  to the harness. Record ground-pair and grouped-flyer picks, fallback Tank
+  muzzle and impact, and the native Lurker's same-sprite burrow transition.
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
