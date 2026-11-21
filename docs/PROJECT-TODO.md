@@ -41,24 +41,25 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Current campaign verification.** The
   [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
-  matches the previous Terran ROM through T1–T5 and passes a paired
-  P10 victory tail and fresh result readback. The
+  matches the previous Terran ROM through T1–T7, verifies the T10 finale
+  against its earlier pinned control and passes a paired P10 victory tail
+  and fresh result readback. The
   [earlier three-finale checks](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
   record victories, fresh HOME continuation and victory-journal readback
   on their pinned cartridges. The dense Z10 continuation averaged about
   11.81 emulator main-loop updates per second, including presentation waits
   and UI. Complete the exact-build campaign sweep and physical timing checks.
 
-- **Current three-cartridge playtest.** The [Custom Game matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
+- **Current three-cartridge playtest.** The
+  [parked depot flood build](audits/2026-11-21-parked-depot-flood-current.md#ordinary-arm-comparisons)
   passes 54 ordinary starts and fresh SRAM continuations on the exact
   Terran, Z10 and P10 cartridges. It covers both maps, all human races,
-  and one to three independently selected CPU seats. A further 1,134
-  launches cover every physical seat and named race assignment. The
-  [fallback-depth release](audits/2026-11-21-fallback-world-depth.md#verification-and-remaining-gaps)
-  repeats the 54-case save matrix. The Mac playtest folder
-  `StarCraft-GBA-2026-11-21-749f585a` holds those three verified cartridges.
-  SD readback, physical frame pacing, and gameplay across every race and
-  mission on the combined source remain open.
+  and one to three independently selected CPU seats. The
+  [earlier 1,134-case matrix](audits/2026-11-21-z10-current-full-circle.md#current-three-cartridge-custom-game-matrix)
+  covers every physical seat and named race assignment at launch. The
+  local Storage folder `StarCraft-GBA-2026-11-21-0e0250d0` holds the
+  three current ROMs and their verified checksums. SD readback,
+  physical frame pacing and full campaign verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
