@@ -9924,7 +9924,7 @@ death_vfx_spawn_slot(Sc64DeathVfx *pool, int slot, int x, int y, int owner)
                                       x, y, death_vfx_extent(slot, raw), &timing, source,
                                       owner_color(owner));
 #ifdef SC64_DEATH_WORLD_DEPTH
-    if (source && effect >= 0) {
+    if (effect >= 0) {
         unsigned layer = building ? sc64_building_world_layer((unsigned)(slot - MAX_UNITS)) :
                                     sc64_unit_world_layer(&u[slot]);
         pool[effect].actor_layer_plus1 = layer + 1;
@@ -11814,6 +11814,10 @@ draw_death_vfx(int under)
         const Sc64DeathVfx *row = &e;
 #endif
         if (!row->style) continue;
+#ifdef SC64_DEATH_WORLD_DEPTH
+        /* The world queue owns fallback effects with a captured elevation. */
+        if (!row->source && row->actor_layer_plus1) continue;
+#endif
         u32 age = sc64_death_vfx_age_su(row->birth, now);
         if (age >= row->total_su) continue;
         /* Skip a pass this effect has nothing for before the fog lookup:

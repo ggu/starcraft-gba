@@ -262,6 +262,100 @@ static void test_death_depth(void)
                raw, cases[n].layer, y, cases[n].dy, overlap);
     }
 }
+
+static void test_fallback_death_depth(void)
+{
+    static u8 actor[240 * 108], effect[240 * 108], pair[240 * 108];
+    static const struct {
+        int victim_type, victim_raw, actor_type, dy, age, layer, effect_in_front;
+    } cases[] = {
+        { U_ZERGLING, 37, U_TANK,  2, 5, 4, 0 },
+        { U_ZERGLING, 37, U_TANK, -2, 5, 4, 1 },
+        { U_ZERGLING, 37, U_TANK,  0, 36, 1, 0 },
+        { U_ZERGLING, 37, U_WRAITH, 0, 5, 4, 0 },
+        { U_WRAITH, 8, U_WRAITH, 0, 5, 19, 1 },
+    };
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        game_init();
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        memset(m, 0, sizeof(m));
+        memset(visible, 0xff, sizeof(visible));
+        geyser_count = 0;
+        camx = camy = 0;
+        int victim = spawn_unit(SIDE, cases[n].victim_type, 96, 52);
+        assert(victim >= 0);
+        /* An actor absent from the bank takes the normal fallback path. We
+         * stage the regular family afterwards to exercise each silhouette. */
+        assert(!sc64_death_source_valid(sc64_death_source(226)));
+        u[victim].raw_type = 226;
+        death_vfx_spawn_slot(death_vfx, victim, 96, 52, SIDE);
+        Sc64DeathVfx *row = &death_vfx[0];
+        assert(!row->source && row->actor_layer_plus1 == 5);
+        row->actor_layer_plus1 = cases[n].victim_type == U_WRAITH ? 19 : 5;
+        row->raw = cases[n].victim_raw;
+        row->style = sc64_death_vfx_style_for_raw(row->raw, 0);
+        Sc64DeathVfxTiming timing = sc64_death_vfx_timing(row->style);
+        row->burst_su = timing.burst_su;
+        row->remnant_start = timing.remnant_start;
+        row->total_su = timing.total_su;
+        frame += cases[n].age;
+        u[victim].alive = 0;
+
+        u32 keys[DEPTH_DEATH_PER_EFFECT];
+        unsigned count = 0;
+        sc64_depth_push_deaths(keys, &count);
+        assert(count == 1 && (keys[0] >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        for (unsigned page = 0; page < 2; ++page) {
+            capture_death_overlap(effect);
+            int slot = spawn_unit(SIDE, cases[n].actor_type, 96, 52 + cases[n].dy);
+            assert(slot >= 0);
+            Sc64DeathVfx saved = *row;
+            row->style = 0;
+            capture_death_overlap(actor);
+            *row = saved;
+            capture_death_overlap(pair);
+            u[slot].alive = 0;
+            unsigned overlap = 0;
+            for (unsigned i = 0; i < sizeof(pair); ++i) {
+                if (actor[i] == C_PANEL || effect[i] == C_PANEL || actor[i] == effect[i])
+                    continue;
+                assert(pair[i] == (cases[n].effect_in_front ? effect[i] : actor[i]));
+                ++overlap;
+            }
+            assert(overlap);
+            printf("PASS fallback death case %u page %u overlap %u pixels\n",
+                   n, page, overlap);
+            gfx_end();
+        }
+    }
+
+    /* A building can leave rubble while its burst is still running. */
+    game_init();
+    memset(visible, 0xff, sizeof(visible));
+    camx = camy = 0;
+    Sc64DeathVfxTiming timing = sc64_death_vfx_timing(SC64_DEATH_VFX_BUILDING_TERRAN);
+    for (unsigned i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
+        int slot = sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL,
+            death_vfx_now(), SC64_DEATH_VFX_BUILDING_TERRAN, 106, 96, 52,
+            20, &timing, 0, C_GREEN);
+        assert(slot == (int)i);
+        death_vfx[slot].actor_layer_plus1 = 5;
+    }
+    frame += 12;
+    u32 heap[SC64_DEATH_VFX_POOL * DEPTH_DEATH_PER_EFFECT];
+    unsigned count = 0;
+    sc64_depth_push_deaths(heap, &count);
+    assert(count == SC64_DEATH_VFX_POOL * 2);
+    for (unsigned i = 0; i < SC64_DEATH_VFX_POOL * 2u; ++i) {
+        u32 key = sc64_depth_pop(heap, &count);
+        assert((key >> DEPTH_LAYER_BITS) == (i < SC64_DEATH_VFX_POOL ? 1u : 5u));
+    }
+    memset(visible, 0, sizeof(visible));
+    sc64_depth_push_deaths(heap, &count);
+    assert(count == 0);
+    puts("PASS full fallback pool queues rubble and bursts only in visible cells");
+}
 #endif
 
 int main(int argc, char **argv)
@@ -273,6 +367,7 @@ int main(int argc, char **argv)
     gba_init();
 #ifdef SC64_DEATH_WORLD_DEPTH
     test_death_depth();
+    test_fallback_death_depth();
 #endif
     game_init();
     sc64_showcase_start(1); /* Siege Line: six tanks against 32 Zerglings. */
