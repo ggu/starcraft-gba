@@ -30,12 +30,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reaches the Protoss mineral line against Zerg from reset. Four of five
   frame captures match the retained ordinary-input reference. Allow for
   asynchronous frame callbacks. The
-  [fresh Wasteland opening](audits/2026-11-21-native-headless-replay.md#fresh-wasteland-campaign-opening)
-  also reproduces 10/18 supply and 40 minerals. A separate
+  [fresh Wasteland comparison](audits/2026-11-21-wasteland-opening-cross-platform.md)
+  matches 13 actors by type, owner, HP and scaled coordinates, and
+  verifies 10/18 supply. The independent clocks leave the native
+  mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
-  live render rows. Capture the exact campaign roster and resolve
-  visible opaque overlap and reused IDs at equal depth.
+  live render rows. Extend campaign opening and event timing
+  coverage. Resolve visible opaque overlap and reused IDs at equal depth.
 
 - **Current campaign finales.** [All three current finales](audits/2026-11-21-z10-current-full-circle.md#all-three-current-finales)
   pass ordinary-input wins, fresh HOME continuation and victory-journal
@@ -152,6 +154,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   observations explain the phase shifts in Blood Bath and the earlier
   dense Z7 pair. Measure broader busy skirmishes, campaign coverage
   and physical frame pacing before activating this option by default.
+
+- **Busy Blood Bath.** The [current three-CPU profile](audits/2026-11-21-blood-bath-current-profile.md)
+  averages 924,956 guest cycles against a 561,792-cycle 30-fps
+  budget. The worst sampled update spends 1.40 million cycles in
+  depot reachability and about 870,000 in four full point floods.
+  An aligned point-transfer trial raises p95 by 0.48% with exact
+  state and route results. Prioritize measuring repeat exhaustive depot
+  misses and preserving per-page dynamic pixels in the terrain restore.
 
 - **Native worker openings.** The [matched Blood Bath replay](audits/2026-11-21-blood-bath-worker-opening.md)
   confirms that N64 SCVs start at the hall, briefly share a mineral
