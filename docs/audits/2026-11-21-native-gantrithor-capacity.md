@@ -84,8 +84,45 @@ The continuation digest is
 `20ead61f18b4bdba4e8478c43a9732c73668b30531d3b98ea1c19798f42d4ccf`.
 The optional combined journal also rejects five pending orders alongside a
 paired Egg when the live unit pool is one slot short. It accepts and
-restores the journal when the sixth free slot is available. Prepared ARM
-links and ordinary emulator loads remain open for this trial.
+restores the journal when the sixth free slot is available.
+
+## Ordinary ARM checks with the four-slot policy
+
+The normal Terran, Z10, and P10 ARM builds compose the generic policy trial
+with the [packed building release](2026-11-21-terran-building-word-draw.md)
+at `60dd3d94`. The trial source was `ca594583` and the composed runtime tree
+was `498d3abf`. Each build used its authenticated production command and
+private inputs. The packed banks and both generated fact banks matched.
+The 32 MiB payloads and RAM endpoints passed the ordinary product guards.
+The relevant Carrier validator, slot-reservation, save, and HUD stack
+entries matched their packed ARM controls.
+
+| Product | ARM ROM SHA-256 | IWRAM end | EWRAM end |
+| --- | --- | --- | --- |
+| Terran | `1b298fbbd39a62a15de35983ef7ddf84b2283a12212f174307af39d577d6ba6f` | `0x030049f8` | `0x0203aa0c` |
+| Z10 | `fa17bacfc510a363f6271c19ac50ccb107030680cf1b4b1358f63b2a7a995088` | `0x03004d60` | `0x02039b30` |
+| P10 | `2da1eba67f634a70450243c6322d650ad9cae3c5a39734ec2ce3f0293816ed64` | `0x03004e20` | `0x0203b62c` |
+
+The normal Terran controller tape buys a Carrier for 350 minerals and
+250 gas and an Interceptor for 25 minerals. It saves a live attack at
+frame 16,100 and the docked child at 16,140. The active and docked SRAM
+images are byte-identical to the earlier ordinary paid tape, and both
+restore via fresh HOME L. The paired receipt SHA-256 is
+`3b17ca7c1ecb682e954baea328b52e944e7f7039577443a47830823d6f99c030`.
+
+Z10 loads the earlier compact journal, then writes a new pause at frame
+17,305 when a shot carries its launch layer. It matches the historical
+whole journal, render cuts, and observed stack watermarks. The fresh
+HOME L run matches the uninterrupted pool for 180 updates with 12 world
+checks. Receipt SHA-256
+`5ab1999dcd06c64b03a27ef500f9e210539c05f9188850db5281e18348e880ad`.
+
+P10 writes an identical active-shot journal at frame 37,589. The earlier
+world and video cuts match, with 36 matching pool and target-health
+updates after fresh HOME L. Receipt SHA-256
+`c7111554e0bc34aadec576f69090c31832f47b8e0697ea98925efd0968669948`.
+These observations cover emulated ARM at the built-in four-slot policy.
+The eight-slot case remains covered by the HOST fixture.
 
 ## Harness cuts
 
