@@ -19,6 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
+  verifies an eight-Interceptor maximum for raw 82. Separate that limit
+  from the current four-child rescue stock, which needs an ordinary N64
+  before/after capture. Keep the existing save row and verify the larger
+  hangar's queue boundary, rank 7, full actor pool, HUD and fresh continuation.
+  Capture an ordinary native raw-72 launch through return to qualify the
+  source-backed layer transitions on live sprites.
+
 - **Dense Z7 orders.** The [late stage profile](audits/2026-11-21-z7-late-order-budget.md)
   puts 65.7% of 2.661 million mean cycles in orders. Even zero-build
   updates spend 1.296 million cycles in orders. The instruction replay

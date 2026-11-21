@@ -2,8 +2,9 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
-The [native world-depth replay cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
-track exact-row turrets, foreground ties, viewport edges and missile trails.
+Start with the [world-depth harness cases](audits/2026-11-19-world-depth.md#harness-cases).
+The [native follow-up cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
+cover same-row turrets, foreground ties, viewport edges and missile trails.
 
 ## Protoss P10 candidate (2026-11-01)
 
