@@ -20,10 +20,13 @@ when generating a trace and keep the rendered option in the receipt.
 The rendered controller reaches HOST victory at game frame 287,798
 after 289,599 calls. The exact normal ARM cartridge matches all 60
 named observations through call 23,571. At call 23,879, HOST gas
-is 3 and ARM gas is 11. The packed-route and isolated cloak-query
-ARM trials reach that same observation. Finish the physical replay
-and isolate the first input or state change before using this tape
-for exact parity and pacing claims.
+is 3 and ARM gas is 11. A tighter observer sees the deposit at
+call 23,714. Drone slot 115's first observed positional difference
+is at call 22,926, before it reaches the extractor and returns.
+Slot 40 has an earlier positional difference at call 21,435.
+The packed-route and isolated cloak-query ARM trials reach the
+same aggregate observations. Isolate the first underlying movement
+difference before using this tape as an exact HOST-to-ARM oracle.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -49,12 +52,20 @@ loses 73,208 and 63,195 cycles, respectively. The 3,600-update Blood
 Bath mean is flat at about 821,000 cycles, with matching sampled display
 and world state, fresh continuation and SRAM.
 
-The trial is private. A direct ARM pack oracle for 64-, 96- and
-128-column geometry, a runtime stack watermark and substantial
-sustained gains are open. The existing HOST word-packing fixture
-runs the C implementation.
+A synthetic ARM probe checks 24 cases against an independent
+per-cell bit packer. The test exercises 64-, 96- and 128-column
+layouts, random high bits, aligned outputs and six fallback cases
+with nonstandard padding, an unaligned output or a non-word row.
+Every output byte and guard matches. On the aligned cases the IWRAM
+kernel uses 592,164 cycles to write 41,472 bytes, versus 858,960
+for the C word packer. Placing the same ARM code in ROM uses
+1,401,480 cycles. This is isolated emulator timing. Runtime stack
+watermarks and substantial sustained gains are still open. The
+trial remains private.
 
 | Local evidence | SHA-256 |
 | --- | --- |
 | P10 paired candidate replay | `21eec34d94e309166c4cca04e9becc634802c55f7dd882f516d3af3d49b9a68c` |
 | Busy Blood Bath paired comparison | `4531f03b5aa4cfaffffdb7985544d0feaa68c295fc48d5814a478ecdad7a7b19` |
+| Direct IWRAM ARM oracle | `2e57a2cd196842572d737231f21f87ba4d223a9c87924b8494e2ca4b0bef3d2e` |
+| Direct ROM ARM oracle | `008a54c00b90b17e58ce03fe362575f198f281ead2102649ce56afcb6769d17c` |

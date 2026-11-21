@@ -128,6 +128,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   HOST victory and advances through the old selection cut on the
   normal ARM ROM. Isolate the later gas difference at call 23,879
   and qualify a new pause, fresh HOME and victory on the normal product.
+  The retained Z10 tape still writes its frame-2,526 pause save on
+  `71809328`; its later script now restarts on that ROM. Regenerate
+  and qualify the ordinary late-chapter continuation on the same
+  shared picker.
 
 - **Fresh N64 gameplay verification.** The [headless Challenger replay](audits/2026-11-21-native-headless-replay.md)
   reaches the Protoss mineral line against Zerg from reset. Four of five
