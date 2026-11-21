@@ -122,6 +122,31 @@ and measured cycle counts.
 | Dense Protoss 10 continuation | `650b3abb4f556da47289936911d9f95e365a7b64ebc4397809dd576845679e45` |
 | Busy Zerg Blood Bath comparison | `8b5f5eff81c62b28a0a54086633b3004a36ad31e9404a0324c7ce8266fded0db` |
 
+## Ordinary group movement
+
+The native ares run uses R to select the five opening Marines and
+C-Right to issue Move. At native step 2,343 all five actor records
+carry move order 6. At step 2,411 all five have moved 95 source
+pixels in X and 22 in Y and are idle again. The SCVs stay in place.
+
+On the normal GBA Terran ROM from `2152b370`, use R, aim to the
+right, then use B, A for Move and A on the destination. All five
+Marines have move order 1 and separate formation targets at game
+frame 17, and each has changed position by frame 30. The two
+replays use separate clocks and different destinations.
+
+Keep `wasteland-opening-group-move` as a replay case. Check the
+selected actor types before the order, active order and target
+after the press, and later position changes for the selected
+Marines and unselected SCVs. For a formation or speed comparison,
+first match destinations and establish the update boundaries.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Native in-flight state | `c8e73af1dd2a399b1313aa361276203221c39ee1f3a2e85da700d7ca3a8fbc07` |
+| Native later position state | `916723dcbc9485c89aefdc23afa7a6ec3f7e9c34dbde07537de29a6597586347` |
+| GBA physical Move observation | `56ac9f1a0479435d3701c878b26dfac9c618be5c814ec05d72a8f13571d11372` |
+
 ## Initial evidence
 
 | Local evidence | SHA-256 |
