@@ -617,6 +617,9 @@ test_turret_depth(void)
         assert(hull >= 0 && blocker > hull);
         assert(sc64_unit_world_layer(&u[hull]) == 4);
         assert(sc64_unit_world_layer(&u[blocker]) == 4);
+#ifdef SC64_DEPTH_SYNTHETIC_TURRET
+        assert(sc64_unit_facing_frames(4));
+#endif
         if (cases[c].type == U_GOLIATH && !sc64_unit_facing_frames(4)) {
             int lift = -1;
             gfx_begin(C_BLACK);
@@ -666,7 +669,8 @@ test_turret_depth(void)
 #if defined(GBA_SCENE_CLIP) && defined(SC64_HAS_SPRITES)
         if (cases[c].type == U_GOLIATH) {
             /* Wider turret crops can remain visible beyond the hull. */
-            for (int x = -9; x >= -32; --x) {
+            int x;
+            for (x = -9; x >= -32; --x) {
                 if (!sc64_unit_facing_frame_in_view(4, 0, x, 66) ||
                     sc64_unit_facing_frame_in_view(3, 0, x, 66)) continue;
                 camx = 64;
@@ -689,6 +693,9 @@ test_turret_depth(void)
                 printf("Goliath turret-only crop at X %d matches both pages\n", x);
                 break;
             }
+#ifdef SC64_DEPTH_SYNTHETIC_TURRET
+            assert(x >= -32); /* A skipped edge cut would give a false pass. */
+#endif
         }
 #endif
     }

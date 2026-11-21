@@ -21,10 +21,11 @@ sprite key.
 
 In the N64 Death scripts, `imgol` passes the emitting image's sprite
 pointer to the attachment routine. The routine inserts the new image
-after its parent in the painter's traversal. This applies even when a
-child starts after the parent image disappears. The existing bank has
-eight such nested layers. They now share the original death sprite's
-turn. Independently spawned rubble keeps its own key and lifetime.
+after its parent in the painter's traversal. In the Overlord Death
+sequence, image 58 begins at source age 2 and remains visible after its
+emitter ends at age 3. The existing bank has eight such nested layers.
+They now share the original death sprite's turn. Independently spawned
+rubble keeps its own key and lifetime.
 
 An ordinary Blood Bath step-75 replay shows the SCV and mineral on
 layer 4, with the mining effect on layer 5. The mining image advanced
@@ -47,7 +48,7 @@ The local replay receipt SHA-256 is
 | `goliath-turret-legacy-bank` | Use the existing facing bank without raw 4. The previous hull-only composition renders once, with no queued turret. Compare the standing and moving body, clip, and both HUD bands. |
 | `pool-id-cross-kind-reuse-active` | Use a layer-4 unit and building at the same sprite Y and on the visible plane. Log each allocator ID and key, then retire an actor's last image and spawn again. Require both pool-ID orderings at an opaque overlap. Repeat with two layer-18 flyers at different Y. Record the current GBA kind-and-slot result separately. The selection check belongs to the same mask once the active picker uses the painter key. |
 | `worker-mining-effect-and-cargo` | Freeze the native effect while the layer-4 worker crosses a mineral edge and a flyer crosses the effect. The layer-5 working sprite covers ground art and stays behind the flyer. Use a second cut of the ore-bearing worker where overlap probes the attached overlay. The GBA comparison of a working sprite remains open. |
-| `death-nested-image-inherits-sprite-depth` | At source ages 2 and 4, overlap the Overlord's nested image 58 with a Wraith and then a Tank. The nested image stays on elevation 16 even when its parent image has expired. It draws behind the Wraith and in front of the Tank. Repeat with the Overmind with Shell (raw 147) at age 69. Require one layer-4 turn for the body and attached image 60, plus a separate layer-1 turn for detached rubble. Include a sample at each HUD boundary and a last-image expiration cut. |
+| `death-nested-image-inherits-sprite-depth` | At source ages 2 and 4, overlap the Overlord's nested image 58 with a Wraith and then a Tank. The nested image stays on elevation 16 even when its parent image has expired. It draws behind the Wraith and in front of the Tank. Repeat with the Overmind with Shell (raw 147) at age 69. Require one layer-4 turn for images 89 and 60, plus a separate layer-1 turn for detached rubble image 111. Include a sample at each HUD boundary and a last-image expiration cut. |
 
 Freeze camera, palette and animation tick across each comparison. Capture
 isolated parts and the expected and reversed compositions. Require a
@@ -64,6 +65,15 @@ shared sprite lifecycle covering effects, last-image retirement, ID
 reuse, and save continuation.
 
 ## Local regression checks
+
+With the usual Terran inputs prepared, run
+`make test-sc64-terran-turret-depth` for the synthetic turret and
+`make build/test-sc64-terran-full-frame && ./build/test-sc64-terran-full-frame`
+for the normal bank. The synthetic fixture requires a distinguishing
+overlap at both Y values and a visible turret-only crop on both pages.
+Its original rectangle art exists only in the host fixture. Terran
+production banks currently provide the Goliath body. The independent
+turret's source attack poses and active-camera N64 pixels remain open.
 
 Terran HOST passed the Tank and sieged Tank overlaps with the original
 body-only Goliath bank. With an original synthetic turret fixture, it
@@ -95,6 +105,8 @@ foreground ownership where the two compositions differ.
 
 | Receipt | SHA-256 |
 | --- | --- |
+| Terran synthetic turret Make target | `f31b06a253818f7a7bdb6b986ffcbc2dbd4dcfddd7f0dc0c8963665873027a7f` |
+| Terran body-only facing fixture | `cc7f059bb87b573f103b15da6b732f0c57acad82250c1c8ec6e44a3ba94d7550` |
 | ARM link checks | `a1a613570e608b079bc614c9870c301df2ebdf6e010a8ca790612ca169ac4197` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Both Custom Game maps | `88eff7eb1afe41180a9927f5896022509aae8432f4a98df68d6019942bf74ec1` |
