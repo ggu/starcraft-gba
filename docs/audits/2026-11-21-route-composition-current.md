@@ -93,7 +93,18 @@ palette and route cache metadata. Three modal boundaries and all
 The mean falls 8.42% and the peak falls 15.61%. The mean still
 exceeds the 30 fps budget by about 2.8 times. The current-renderer
 Z7 completion and the earlier active-page discrepancy remain under
-replay. Physical GBA timing and busy skirmish qualification remain open.
+replay. Physical GBA timing remains open.
+
+In a resumed three-CPU Blood Bath, 3,600 route counter pairs, 31
+world and projectile samples and the saved journal match. All 16
+fresh-resume comparison cuts match over the subsequent 240 updates.
+Both indexed pages and the palette match at all 31 original samples.
+At update 2,280 (simulation frame 19,585) the release displays page
+0 and the trial displays page 1. These are different page contents
+at the input sample, so the strict display comparator detects a
+difference. Mean cycles rise 0.052% from 924,956 to 925,439.
+This 64×64 map exercises the fallback route path. Verify the phase
+through the VBlank presentation before activating the option.
 
 | Current-renderer receipt | SHA-256 |
 | --- | --- |
@@ -104,3 +115,4 @@ replay. Physical GBA timing and busy skirmish qualification remain open.
 | T10 victory and journal readback | `3095bb1de7509ce1cefa971499aeb2377f4c2f4a3e44dc25453f83a45c41e67e` |
 | P10 paired campaign tail | `6d14a579c7851da22dcdd118ccfe1c0a2a319b7b1fe02f50688709d760d092d8` |
 | Z8 comparison | `c081897aa190d53986f4be6ddc22793bb5fa56c8c787db765780122a6e9e0b83` |
+| Late Blood Bath comparison and active-page difference | `4f2347a4854f2c9677ac57a2f31b797396caa00a94aaa8de6fc4403cbad192e2` |
