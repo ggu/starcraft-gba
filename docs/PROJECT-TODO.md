@@ -46,15 +46,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   their original slots. Qualify the missing Custom Game research
   and AI morph path with per-owner payment, supply and save checks.
 
-- **Campaign verification.** The [preceding ordinary HOME sweep](audits/2026-11-21-released-campaign-continuations.md)
-  covers T1–T10, Z1–Z5, Z10, P1–P5 and P10 through victory
-  and fresh result readback. The [late campaign sweep](audits/2026-11-21-late-campaign-home-sweep.md)
-  adds Z7–Z9 and P7–P9 on the attached-depth ROMs, completing
-  the 30-mission victory and fresh result-readback sweep across
-  the two release sets. The attached-depth ROMs now have 24
-  exact-build routes. Refresh T5, T8, T9, Z1, Z3 and P4 and trace the display
-  difference at Z7 call 154,198. Native mission behavior and
-  physical timing remain separate qualification work.
+- **Campaign verification.** All 30 missions now have ordinary HOME
+  wins, fresh pause continuations and result readbacks on the same
+  [attached-depth cartridge set](audits/2026-11-21-late-campaign-home-sweep.md).
+  At Z7 call 154,198 the attached-depth and immediately preceding
+  parked-depot releases match both pages, camera and palette. The earlier
+  raster difference against `d664d71c` remains unexplained. Native mission
+  behavior and physical timing remain separate qualification work.
 
 - **Current three-cartridge playtest.** The
   [attached death depth build](audits/2026-11-21-attached-death-continuity.md#validation)
@@ -65,7 +63,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   covers every physical seat and named race assignment at launch. The
   local Storage folder `StarCraft-GBA-2026-11-21-depth-continuity` holds
   the race ROMs, Showcase and their verified checksums. SD readback,
-  physical frame pacing and full campaign verification remain open.
+  physical frame pacing and broader native campaign verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit
@@ -1557,8 +1555,9 @@ T10, Z9, P10, Showcase and optional Z10 preview. All five ROM headers, SRAM
 signatures, lengths and read-back checksums pass; P10 is exactly the measured
 `0ec0ebeb…` candidate. T10/Showcase retain their preceding normal bytes because
 those vectors do not use the nearest-depot service. KODAK is not mounted, so no
-SD copy occurred. Research/ammunition/Flash experimental stages remain excluded. The full campaign 29/30 and near-30-fps gates
-below remain open. Keep source-only public artifacts and local Actions policy.
+SD copy occurred. Research/ammunition/Flash experimental stages remain excluded.
+That historical package predates the current 30-mission sweep. The near-30-fps
+gate remains open. Keep source-only public artifacts and local Actions policy.
 
 ## Current real-device feedback and integration
 
