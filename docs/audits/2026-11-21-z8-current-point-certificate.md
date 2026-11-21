@@ -498,3 +498,48 @@ transfer build has the full late Z7 qualification.
 | Trace and captured walkability grid | `c812a402f6a7f5c365d37c3811060e418e9ed88ebf93dc532ad8ee9c331cd911` |
 | Z7 comparison | `dd0c7adf32d4e120afde9380b00b22f4e46e8061337f2873138f9017e0b7e6e9` |
 | Z8 comparison | `5fe67799cd9d35392841cd6ceac233745ff97d450aed95921e24ab482632748c` |
+
+### One wider retry for blocked goals
+
+The cold component bypass in `6f836320` still spends 3,132,290
+cycles on Z7 call 154,508. The parked field at slot 8 has blocked
+goal 12,724 and origin 13,124, a raw Manhattan gap of 19. Allow
+that gap only on a warm blocked-goal retry with an open seed
+within the existing gap-18 limit. Cold admissions, open goals and
+nearby reads keep their existing bounds. The search keeps the same
+distance budget and canonical direction rules.
+
+The sanitizer fixture verifies the published chain and all 16,384
+directions after completion. Open gap 19, blocked gap 20 and a
+blocked gap 19 with no sufficiently close seed all fall back to
+exact materialization. The composed warm and cold HOST checks
+pass. The pinned Z10 ARM link keeps the cold build's IWRAM and
+EWRAM endpoints at `0x03004ea0` and `0x0203a068`.
+
+At call 154,508 the retry certifies the direction in 32,149
+cycles. Total cost drops to 2,422,645, a 709,645-cycle gain over
+cold bypass. A separate instruction trace captures 19 resident
+cuts for that goal, all partial, through its final eviction at
+call 154,566. None of the 75 observed eager fills in that trace
+rebuilds the goal.
+
+The ordinary Z7 input tape reaches victory at frame 228,128 with
+254 matching gameplay checks, ten display cuts, six logical
+cache cuts, 75 complete field samples and 4,201 checked partial
+directions. The paused, victory and fresh HOME re-exported
+journals match the pinned release byte for byte. The early dense
+mean falls 12.90% against that release. The late means fall
+2.27% and 2.55%. The first late peak still rises 0.46%, and the
+second late p95 is within 0.03% of stock. The Z8 check matches
+668 route answers. These are emulated measurements. Keep the
+flags opt-in while qualifying the larger small-component change,
+the current four-product build matrix and physical frame pacing.
+
+| Warm retry evidence | SHA-256 |
+| --- | --- |
+| Z10 ROM | `ee6743e1d84da6be0ac65af1ea57455dc902dab8911e1e6c5d10050874e874a3` |
+| Warm and cold HOST checks | `a55ceb4812fdfeceaa3fb293516f21a75be912e320dcd58d8c3b190dfd7ca3e3` |
+| Full Z7 result | `3777323f44a69c74906d18da0920898d42ccf8a4d7e0a178d8781b403fff2eee` |
+| Full Z7 comparison | `7d7fb0bed3de32383e103cc752d47d2e46dea08387ef5a1227439a5e5dafd9e6` |
+| Late instruction trace and residency | `a7f2cd3b6b42adf9593a3b071bc11624c62c76b1c8acacbfbf45a395e6125fd5` |
+| Z8 route answers | `9ce80deeb1c34960a211cf4c7545e800ec04e5ef5a25869399f3f9fe8b47f0a3` |
