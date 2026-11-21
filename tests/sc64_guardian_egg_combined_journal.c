@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#define SC64_P7_HANGAR_CAPACITY_FOR_TYPE(type) \
+    ((type) == U_P7_CARRIER ? 8u : SC64_P7_CARRIER_CAPACITY)
 #include "../starcraft/game.c"
 extern void guardian_test_reset(void);
 extern void guardian_test_snapshot(void *);
@@ -152,22 +154,26 @@ static void reject_unauthenticated_legacy_egg(void)
 }
 
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-/* One paid Carrier order and one paired Egg need two additional unit slots;
- * an already-allocated training child would already occupy a live slot. */
+/* Five paid Carrier orders and one paired Egg need six additional unit slots.
+ * The Egg already occupies the slot for one of its two units. */
 static void carrier_reservation(void)
 {
     guardian_test_reset();game_init();race_mode=1;race_human=R_PROTOSS;race_bots=1;
     race_skirmish_map=0;race_bot_races[0]=R_ZERG;init_state();assert(screen==SCREEN_PLAY);
     minerals=1000;int carrier=spawn_unit(SIDE,U_P7_CARRIER,100,100);assert(carrier>=0);
-    assert(race_p7_carrier_training_queue(carrier));
+    for (int i = 0; i < SC64_P7_CARRIER_QUEUE_LIMIT; ++i)
+        assert(race_p7_carrier_training_queue(carrier));
     int egg=add_actor(SC64_SHARED_EGG_TYPE,36,U_ZERGLING,300,140);
     u[egg].owner=ENEMY;u[egg].selected=0;
     int last=-1,free_slots=0;
     for(int i=0;i<MAX_UNITS;i++)free_slots+=!u[i].alive;
-    while(free_slots>1) {last=spawn_unit(ENEMY,U_DRONE,160,160);assert(last>=0);--free_slots;}
+    while(free_slots>SC64_P7_CARRIER_QUEUE_LIMIT) {
+        last=spawn_unit(ENEMY,U_DRONE,160,160);assert(last>=0);--free_slots;
+    }
     assert(last>=0 && !race_save_game());
     hit_target(last,9999,U_MARINE,SIDE);
-    assert(race_save_game());
+    assert(race_save_game() && race_load_game());
+    assert(u[carrier].carry == SC64_P7_CARRIER_QUEUE_LIMIT);
 }
 #endif
 int main(void)

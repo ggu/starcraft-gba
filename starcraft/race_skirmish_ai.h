@@ -1246,14 +1246,15 @@ static int race_ai_pick_zerg(RaceAiCensus *c)
 #ifdef RACE_AI_CARRIERS
 /* A Carrier is due when a Fleet Beacon stands, the cap and the ground-line
  * ratio allow one more, and the owner's unit share has room for it and its
- * four Interceptors (children occupy unit slots like any other unit). */
+ * configured Interceptor capacity (children occupy ordinary unit slots). */
 static int race_ai_carrier_wanted(const RaceAiCensus *c)
 {
     int carriers = race_ai_count(c, AK_CARRIER);
-    return c->have[AK_FLEET] && carriers < RACE_AI_CARRIER_CAP &&
+    int capacity = (int)sc64_p7_carrier_type_capacity(U_P7_CARRIER);
+    return capacity && c->have[AK_FLEET] && carriers < RACE_AI_CARRIER_CAP &&
            race_ai_count(c, AK_ZEALOT) + race_ai_count(c, AK_DRAGOON) >=
                (carriers + 1) * RACE_AI_CARRIER_LINE &&
-           c->units + c->queued_units + 5 <= race_ai_unit_cap();
+           c->units + c->queued_units + 1 + capacity <= race_ai_unit_cap();
 }
 
 /* One Interceptor order for each of this owner's Carrier-class units, paid
