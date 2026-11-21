@@ -59,6 +59,10 @@ static void unit(int type)
            "ground weapon", type);
     expect(sc64_combat_air_weapon(type) == sc64_race_unit_can_attack_air(type),
            "air weapon", type);
+    if ((unsigned)type < SC_RU_COUNT)
+        expect(!!(combat & (SC64_COMBAT_GROUND_WEAPON | SC64_COMBAT_AIR_WEAPON)) ==
+               (sc64_race_unit_damage_vs(type, 0) > 0 || sc64_race_unit_damage_vs(type, 1) > 0),
+               "any damage class", type);
 #endif
 }
 

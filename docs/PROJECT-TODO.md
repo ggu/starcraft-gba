@@ -63,6 +63,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Each tape retains its sampled state.
   The [current target-index attribution](audits/2026-11-22-campaign-defense-owner-masks.md#remaining-order-cost)
   identifies target searches and cell insertion as recurring costs.
+  The [armed type lookup](audits/2026-11-22-armed-type-targeting.md)
+  cuts the ordinary Z10 continuation mean by 1.21% and the busy Blood
+  Bath mean by 0.61%. The same audit records a static sprite layer
+  trial with flat full-update timing. Target the larger route and
+  order costs for the next pacing gain.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -89,6 +94,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Add the [shared depth parity cases](audits/2026-11-22-shared-depth-parity.md#replay-cases)
   to the harness. Record ground-pair and grouped-flyer picks, fallback Tank
   muzzle and impact, and the native Lurker's same-sprite burrow transition.
+  The [native retirement follow-up](audits/2026-11-22-shared-depth-parity.md#native-sprite-retirement-follow-up)
+  identifies both free-list globals and verifies why the observed
+  retired sprite stays free throughout that capture. Capture an
+  actual reallocation and opaque overlap before changing tie semantics.
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
@@ -123,10 +132,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [normal CPU Drone comparison](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
   follows a native Larva, Egg and Drone in the same slot, and a
   current GBA Hatchery debit, queue and new-slot Drone through
-  fresh HOME. The experimental ARM build restores a live CPU Egg
-  and a paid human Carrier queue from the same record. Qualify
-  Carrier completion and an in-flight Interceptor alongside a
-  live CPU Egg before promoting the combined journal.
+  fresh HOME. The experimental Outpost replay restores a live
+  Carrier and later an in-flight Interceptor alongside a live
+  CPU Egg, with byte-identical fresh exports.
   [Draft #689](https://github.com/ggu/starcraft-gba/pull/689) compiles the
   experimental Carrier/Egg authentication path for Terran and Z10.
   An isolated Z10 HOST fixture reaches the real load preparation and
@@ -135,9 +143,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   candidates and restores legacy Carrier and transport records.
   The isolated ARM fixture also saves an ordinary paid Egg through
   pause, reloads through HOME, and matches 401 updates through its
-  hatch. Repeat with a live Carrier/Interceptor in the same ARM
-  record, then test P10 research composition before production
-  activation. Use
+  hatch. Rerun the [Outpost live-flight case](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
+  on the current release composition and qualify predecessor
+  and P10 research journals before activation. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 

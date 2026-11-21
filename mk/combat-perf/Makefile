@@ -75,8 +75,16 @@ ifneq ($(CANONICAL_TARGET_POLICY),1)
 $(error CANONICAL_TARGET_POLICY must be 0 or 1)
 endif
 endif
-CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE)
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK)
+# Use the armed-type facts where the generated combat table is available.
+CANONICAL_ARMED_TYPE_TABLE ?= 1
+ifneq ($(CANONICAL_ARMED_TYPE_TABLE),0)
+ifneq ($(CANONICAL_ARMED_TYPE_TABLE),1)
+$(error CANONICAL_ARMED_TYPE_TABLE must be 0 or 1)
+endif
+endif
+CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE) \
+	$(if $(filter 1,$(CANONICAL_ARMED_TYPE_TABLE)),-DSC64_Z7_ARMED_TABLE_PROBE)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE)
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:

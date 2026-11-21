@@ -109,9 +109,20 @@ frame 17,294, the paid Carrier order occupies Stargate slot 18
 and the CPU has a live Egg in slot 23. Pause and fresh HOME
 restore both, and the SRAM re-export matches byte for byte.
 The CPU destroys the base before the 2,100-update Carrier
-queue finishes. The next continuation needs earlier gas
-production or a defense long enough for Carrier completion
-and Interceptor release alongside a live CPU Egg.
+queue finishes in that first build order.
+
+An ordinary Outpost match on the same experimental ROM
+(`2e8c4ff5fbc98733c90f6ae81abda4d056a2e813ff7ead88e7a2c34122dcf844`)
+reaches a completed Carrier and a live CPU Egg at frame 18,763
+with early gas, two Cannons and a reserve Pylon. Fresh HOME restores
+both. Paying 25 minerals at frame 18,856 starts training an
+Interceptor. The Carrier retreats while training and then attack-moves.
+At frame 19,523 the Interceptor in slot 0 is outside Carrier slot 2
+and targeting enemy slot 33, while the CPU Egg in slot 5 has 91 updates
+remaining. A new HOME process restores both, re-exports byte-identical
+32 KiB SRAM, and advances 50 updates while the Interceptor moves and
+the Egg timer reaches 41. The combined journal still needs normal
+cartridge and predecessor-save qualification.
 
 | Local evidence | SHA-256 |
 | --- | --- |
@@ -121,6 +132,10 @@ and Interceptor release alongside a live CPU Egg.
 | Experimental ARM CPU Egg fresh HOME receipt | `218543fe0fee183acbd56de32757aed5b6f2c63655348cadc1963ba24c225204` |
 | Experimental ordinary Protoss Stargate journal | `f5b6785c0db2a60b884ae8198d7d91f10706606cc5fd468f7ae14ec007ae1105` |
 | Experimental ordinary ARM Carrier queue plus live CPU Egg journal | `69a356babed42f59d69401772664e7106d04854cb150f9ac9ad5f12eb5b715bc` |
+| Experimental Outpost live Carrier plus Egg journal | `0d4c0eae4388ee64d8c6b658910bf4137a3efe753d7ea8bcf835b883243f38f1` |
+| Experimental Outpost launched Interceptor plus Egg journal and fresh export | `7b813fa0514efca919dfee61e2370310d72954713bc7098fe70514f67e3af310` |
+| Interceptor launch and pause observation | `c1a54307248ee894f596a88a8eee9c4437da82290a8c6ff233b7080964a0df12` |
+| Interceptor and Egg fresh HOME observation | `0942e81b3484cedd7ca4a0caad38afa5fae2e790074475a65f05a1a5e764e63d` |
 
 ## Custom Game implementation dependencies
 
