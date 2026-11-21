@@ -127,13 +127,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The GBA checks now require a completed Barracks and count living
   owned buildings for the zero-actor defeat rule. The normal Terran
   mission wins after an ordinary save and fresh HOME continuation.
-  Verify native victory and defeat through ordinary inputs. The
+  Verify native defeat through ordinary inputs. The
   [native base approach scout](audits/2026-11-21-wasteland-opening-cross-platform.md#native-base-approach)
   reaches the base with five living Marines after Raynor's introduction.
   The resumed SCV reaches the mineral line alive and earns minerals
   with B Harvest. The same native Barracks is observed at foundation
-  and completion. Capture the ten-Marine victory with Raynor alive.
-  The independent clocks leave the native mineral grant cadence open. A separate
+  and completion. The ordinary native run won with ten Marines, the completed
+  Barracks and Raynor alive, matching the GBA objective. The independent clocks
+  leave the native mineral grant cadence open. Compare the score overview and
+  isolate the Barracks payment. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. Extend campaign opening and event timing

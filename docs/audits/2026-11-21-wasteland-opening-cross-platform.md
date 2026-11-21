@@ -67,7 +67,7 @@ zero Command Centers, zero Barracks, nine Marines and 399 minerals.
 Incomplete structures count toward the first two limits. A further
 native trigger checks for zero living Raynors across all players and
 runs waits around a notification before defeat. The GBA resolves defeat
-immediately. Capture ordinary native victory, a completed-building
+immediately. See the [ordinary native victory](#native-base-approach). Capture a completed-building
 boundary and the Raynor-death sequence for timing and presentation.
 
 An ordinary R input at the fresh Wasteland opening selects the five
@@ -98,7 +98,7 @@ The pause and victory journal bytes match prior qualified runs.
 An instrumented ordinary replay observes the paid foundation at
 frame 6,372 and the finished Barracks at 7,872. The ten-Marine
 foundation edge is covered by the host fixture. The native waits
-before defeat and a live native victory remain open.
+before defeat remains open. The [native victory](#native-base-approach) now covers the three objective conditions.
 
 On the exact four links, the opening cuts and 41 Blood Bath
 camera-raster cuts per cartridge match the collision release. The
@@ -181,12 +181,28 @@ The SCV was still alive at 40 HP and issuing order 33. At step 91,184,
 that same building had 1,000 HP, order 23 and its completion bit set.
 The SCV was idle and alive. The sampled bank includes continued mining,
 so the displayed cost and the exact payment debit are separate checks.
-The next milestone is victory with ten Marines and Raynor alive.
+A later ordinary ares continuation dismissed two advisor dialogs,
+selected the Barracks with A, opened Build with C-Right and selected
+Marine with analog Up. The menu showed 50 minerals and one supply.
+At step 121,802 there were seven completed Marines and one in production.
+At step 132,512 the native result read “YOU ARE VICTORIOUS!”
+The paused actor table had ten completed owner-1 Marines, a completed
+owner-1 Barracks at 1,000 HP and Raynor alive with 300 HP. This exercises
+the same three objective conditions as the normal GBA campaign.
+
+A advanced to the native score overview. Colonial Militia showed
+2,368 points (850 units, 525 structures, 993 resources) against Zerg's
+575, with displayed elapsed time 1:27:46. This captures the native
+result presentation. Scoring and time conversion need separate checks.
+Controller timing is wall-clock and this leg begins from the retained
+ordinary completed-Barracks state.
 
 | Local state | SHA-256 |
 | --- | --- |
 | Barracks foundation | `d64bede57068d24e13565fa3198dfd2f53a0e0db9d862132d39d7635fc726eed` |
 | Completed Barracks | `bf7cce1c0bbc8f7f63d48dcac6d657fe394e7cca29355987fa5ee9dadcd0b102` |
+| Victory at step 132,512 | `25d3dc28d5239b52f0dddddd2b71aeff61f2819e1d468928f3b93528354969a2` |
+| Victory capture | `e2136d7c21052d66f756ef1e71e26b3b932762a114eacbf98799a85154c5c2e9` |
 
 The local escort state SHA-256 is
 `2ef299b94d40a31bd91bd9f26d2a9dd937c5f7f383dd068c40e0f5704a98be30`.
