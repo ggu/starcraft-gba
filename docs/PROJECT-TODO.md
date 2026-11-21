@@ -74,6 +74,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   windows. The same audit records a static sprite layer trial with
   flat full-update timing. Target the larger route and order costs
   for the next pacing gain.
+  The [wide facility census](audits/2026-11-22-wide-facility-consumer-census.md)
+  finds 166 partial depot-field rebuilds when an existing field cannot
+  answer a requested origin. Try resuming an ordered frontier on
+  128×128 maps and compare all field and next-step answers.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -125,7 +129,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [native base approach scout](audits/2026-11-21-wasteland-opening-cross-platform.md#native-base-approach)
   reaches the base with five living Marines after Raynor's introduction.
   The resumed SCV reaches the mineral line alive and earns minerals
-  with B Harvest. Capture Barracks payment and completion next.
+  with B Harvest. The same native Barracks is observed at foundation
+  and completion. Capture the ten-Marine victory with Raynor alive.
   The independent clocks leave the native mineral grant cadence open. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
@@ -154,9 +159,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The isolated ARM fixture also saves an ordinary paid Egg through
   pause, reloads through HOME, and matches 401 updates through its
   hatch. The [Outpost live-flight case](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
-  repeats byte for byte on the current engine with the experimental
-  journal tag. Qualify a normal product allocation, worst-case capacity,
-  predecessor and P10 research journals before activation. Use
+  repeats on the opt-in normal-build Z10 product candidate. Its bounded
+  payload, real predecessor saves and 18-case Custom save matrix pass.
+  Qualify ARM stack, pacing and uninterrupted versus fresh trajectories
+  on that product. P10 research composition remains open. Use
   the [Lurker implementation dependencies](audits/2026-11-21-native-blood-bath-lurker.md#custom-game-implementation-dependencies)
   for the separate Den research and same-slot morph work.
 

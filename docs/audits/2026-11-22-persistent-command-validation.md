@@ -4,14 +4,14 @@ The direct Command census validates every live row on every query. Its
 raw-type memo previously cleared 456 bytes on each query and recomputed
 immutable raw mappings and source geometry. The shared census retains that memo
 across calls. Owner and coordinate checks, live pool scans, filtering and
-failure behavior remain per query. The cache is static scratch, not saved
-state, and adds no storage over the existing cache.
+failure behavior remain per query. The memo uses the existing static scratch and is rebuilt from compiled facts
+on a fresh boot.
 
 The prepared P10 cartridge at source `f11e089` was compared with the
 one-header change over the 9,489-call ordinary-input saved campaign tail.
 All 68 sampled world, both framebuffer pages, palette and fog observations,
 per-call frame, screen and route counters, victory and SRAM matched. Mean
-`demo_last_cycles` fell from 1,565,224 to 1,554,111 (0.71%); mean
+`demo_last_cycles` fell from 1,565,224 to 1,554,111 (0.71%). Mean
 `demo_update_cycles` fell from 891,254 to 880,116 (1.25%). Peak
 `demo_last_cycles` fell from 33,275,388 to 33,207,413. These are emulator
 guest cycle observations, not physical frame pacing.
@@ -35,13 +35,13 @@ and palette cuts, and SRAM. Mean guest cycles were 911,538 and 908,600
 respectively. The Z10 three-CPU Blood Bath continuation matched 3,600 route
 rows, 31 world and both-page cuts, sixteen paired fresh continuation cuts and
 the pause SRAM. Mean guest cycles were 820,015 for both. The Z8 run starts
-from a fresh saved state; the Blood Bath run writes a pause and verifies a
+from a fresh saved state. The Blood Bath run writes a pause and verifies a
 fresh process continuation.
 
 P10 and Z10 prepared ASan/UBSan differential fixtures pass after explicitly
 warming the cache, changing actor owners and coordinates, and reinitializing
 the game. Both unit and building rows still reject malformed coordinates and
-owners before query filtering. Startup clears BSS; in-process initialization
+owners before query filtering. Startup clears BSS. In-process initialization
 can retain cache entries safely because the entries contain only compiled
 raw-type mapping and source geometry, never actor, owner, mission or save data.
 The original validator remains the oracle for every supported raw ID and both

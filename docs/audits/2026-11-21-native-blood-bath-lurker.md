@@ -133,6 +133,33 @@ This build still uses the fixture-only journal tag `0x76540105`.
 Qualify a normal product allocation, predecessor readers, capacity
 and P10 research before enabling the combined writer.
 
+The opt-in Z10 product candidate now uses the combined journal tag
+`0x164f5a61`. The normal Make recipe with retained private Z8, Z9 and
+Z10 descriptors reproduces the direct-link ROM
+`5dbaa43bea36c445192cb2ec433d72f2538896d32b1d4e014dd254d698e8f89b`.
+The ordinary live-flight/Egg replay reaches the same frame and actors.
+Both candidate SRAM images have SHA-256
+`c84f1c1bc4417b907a49cec1f8f16d643c0dfd343e1088e4cc8e69359a04d297`.
+
+The candidate migrates a real released three-CPU Custom journal with a
+Carrier and four flying Interceptors. A new save preserves the original
+bank and writes the candidate tag. Fresh HOME matches the state and
+SRAM re-export. An independent ordinary Custom predecessor also migrates.
+An earlier Z10 campaign pause restores and resaves under the existing
+campaign tag, retaining its original bank. All 18 Z10 Custom cases
+in the save matrix pass. The migration log digest is
+`32d160fdcb335c032aa13e1db4b20ee08a5405c26959f54bde7c9f521d329584`.
+The matrix receipt digest is
+`d84e0874ea522dd70a5308aa9d67a1018e2a2266d3fef015bf0e829a15165a18`.
+
+The writer and real loader also accept a constructed world with a paid
+Egg, Carrier, child, 100 projectile records and 32 impacts. The
+14,054-byte fixed prefix, 2,015-byte maximum packet and 216-byte maximum
+impact tail give a 16,285-byte bound within the 16,368-byte payload.
+The normal Z10 build still selects its existing writer. Measure ARM
+stack and pacing, qualify the remaining seat assignments and compare
+uninterrupted and fresh trajectories before activating the combined writer.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Native 23-sample observation | `ef063506548d4ed9f99cca89ecae47efb0ec2ed4221bd1c1545796d97d5f1b58` |

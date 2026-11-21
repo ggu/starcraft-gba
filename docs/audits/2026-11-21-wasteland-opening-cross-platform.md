@@ -171,7 +171,22 @@ patch. After that input the SCV used native order 90 and the human
 minerals reached 64 from 40. The mining checkpoint at step 61,053
 has local state SHA-256
 `47926b91fc8b24b41dc8fb67eb2a48f8d062fa74a4b101e18163a9675d30c96a`.
-Use that checkpoint to capture the Barracks cost and completion.
+
+With the SCV selected, C-Left opened Build. Analog Left selected the
+Barracks at the displayed cost of 150 minerals. A entered placement,
+then another A confirmed the location once the full footprint was green.
+At native step 84,720 the new owner-1 Barracks in slot 46 was at
+(1184, 1808), raw 111, with 144 HP, order 44 and its completion bit clear.
+The SCV was still alive at 40 HP and issuing order 33. At step 91,184,
+that same building had 1,000 HP, order 23 and its completion bit set.
+The SCV was idle and alive. The sampled bank includes continued mining,
+so the displayed cost and the exact payment debit are separate checks.
+The next milestone is victory with ten Marines and Raynor alive.
+
+| Local state | SHA-256 |
+| --- | --- |
+| Barracks foundation | `d64bede57068d24e13565fa3198dfd2f53a0e0db9d862132d39d7635fc726eed` |
+| Completed Barracks | `bf7cce1c0bbc8f7f63d48dcac6d657fe394e7cca29355987fa5ee9dadcd0b102` |
 
 The local escort state SHA-256 is
 `2ef299b94d40a31bd91bd9f26d2a9dd937c5f7f383dd068c40e0f5704a98be30`.
