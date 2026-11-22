@@ -45,10 +45,18 @@ class ReplayPlanTest(unittest.TestCase):
     def test_plan_preserves_call_indices(self):
         plan, keys, checks, edges, briefs = self.parse()
         self.assertEqual(plan["stop"], 20)
+        self.assertFalse(plan["recorded_dialogue"])
         self.assertEqual(keys, {0: 1})
         self.assertEqual(list(checks), [20])
         self.assertEqual(edges[0]["frame_after"], 0)
         self.assertEqual(briefs, {2: (0, 2), 4: (1, 2)})
+
+    def test_recorded_dialogue_is_an_explicit_boolean(self):
+        self.rows[0]["recorded_dialogue"] = True
+        self.assertTrue(self.parse()[0]["recorded_dialogue"])
+        self.rows[0]["recorded_dialogue"] = "true"
+        with self.assertRaisesRegex(ValueError, "dialogue mode"):
+            self.parse()
 
     def test_missing_briefing_page_fails(self):
         self.log.write_text("2 briefing 0 2\n")

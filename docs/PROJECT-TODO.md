@@ -384,13 +384,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all 4,929 physical input transitions. Extend that proof to other
   campaign saves and the next combined runtime.
   [Carried P8](audits/2026-11-22-steady-order-cost.md#carried-p8-replay-refresh)
-  diverges on Fenix's shields at frame 11,690 with the facility
-  defense and target flags and explicit authored-page inputs.
-  Before the Reaver shot, a Dragoon receives an attack-move on the
-  ROM and stays idle on the host. The A press follows different
-  selected groups at the same cursor. The first observed selection
-  split follows the point A press at input call 10,075. Repair the
-  ordinary input tape and verify a fresh pause save through victory.
+  now wins at frame 104,113 on the current Protoss cartridge and
+  matches all 40 named checks, including 27 after fresh HOME.
+  The host renders before the next input so the overlapping-unit
+  selection uses the painted camera. Add a separate fresh victory
+  journal readback and extend the check to the next combined runtime.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)

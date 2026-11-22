@@ -580,8 +580,31 @@ same physical command therefore changes different units. Earlier
 selection checkpoints locate the split at the A press at input call
 10,075. With the cursor at (467, 220), the host selects slot 112 and
 the ROM selects slot 127. The next A expands the host selection to
-a group while the ROM keeps slot 127. Resolve the point selection
-when regenerating the ordinary pause-to-victory tape.
+a group while the ROM keeps slot 127.
+
+All eight candidates occupy (468, 220) at the first split, with
+the same standing facing. The update-only host camera stays at
+(0, 0). The cartridge camera is at (344, 166). The click is outside
+the host viewport, so the host picks by proximity and the cartridge
+uses the foreground painter order. Rendering after each update in
+the normal HOME controller gives the next click the painted camera
+and records the authored field-dialogue inputs in the tape.
+
+On the current P10 image from the weapon profile index release,
+the regenerated tape wins after an ordinary pause save and separate
+fresh HOME load. It reaches victory at frame 104,113 after 106,011
+controller updates. All 40 named checks match, including 27 after
+loading. The physical pause journal contains frame 30,949 and its
+bytes remain identical through the continuation. Fenix has full
+health and shields, the Hyperion survives, and the objective flag
+is set with zero trigger faults.
+
+The tracked HOST recipe reproduces every input and checkpoint of
+the full replay. The tracked observer also passes a 12,000-update
+physical prefix with matching world and key-edge checks, and
+independently verifies both opening dialogue pages. The full
+victory receipt uses the earlier observer that follows the same
+recorded dialogue inputs and checks key-edge frames.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -590,6 +613,11 @@ when regenerating the ordinary pause-to-victory tape.
 | First tracked hostile shield difference | `17ac9dcec3142fd04a4d7ee339f1aadf2e2eb5e657ed3021b981ed827beaaf71` |
 | Dragoon command selection bracket | `edf31bc12c13825883e9ea2986ff08ed12a73065e7fc2a25721fa315cf69aea4` |
 | First point-selection split | `5a377e3adb3ef87054d832409bc4f675b794bfd74bff0deed6fe557d205b07d5` |
+| Paired camera and actor geometry | `a77e9a7e8993f835ed4f984d0788583630307dbaa642def434a36e2aa45844e7` |
+| Tracked HOST tape | `9b4a77eb57054e89f831bb744c943a6bb0f4bbf4de6c40079d512292d08a62e4` |
+| Tracked physical observer prefix | `e0d1fd4c61d4f7e29ac742eeb5e3c48f62c7371680847ab689f55bf1e5cfbb49` |
+| Current P10 fresh HOME victory | `da1a360279e72be1f69e2d99f19d09b9a2c772ca05d4bf13e12b0283c3b90b35` |
+| Current P10 pause journal | `e074c498d189521570812bf9052b0254f9777d4d2690ebb1149316d71ee0d79a` |
 
 ## Selection and detector query candidate
 
