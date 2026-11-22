@@ -233,7 +233,7 @@ int main(int argc,char** argv) {
       if(!root->unserialize(same_state) || cpu.recompiler.enabled || rsp.recompiler.enabled || ares::Nintendo64::system.homebrewMode || rdram.ram.size!=before.size())return 8;
       bool post_ok=read_view(after);std::cout<<"POST_CACHE_OK "<<post_ok<<std::endl;view_equal=sc64_hybrid_views_equal(pre_ok,before.data(),post_ok,after.data(),before.size());
       if(!view_equal){std::cerr<<"post-transition cache conflict or view mismatch\n";return 8;}
-      transitioned=true;std::cout<<"HYBRID "<<completed<<" view_equal=1\n";continue;
+      transitioned=true;std::cout<<"HYBRID "<<completed<<" view_equal=1"<<std::endl;continue;
     }
     if(capture==3) {
       using namespace ares::Nintendo64;

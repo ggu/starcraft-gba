@@ -363,7 +363,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Carried P8](audits/2026-11-22-steady-order-cost.md#carried-p8-replay-refresh)
   diverges on Fenix's shields at frame 11,690 with the facility
   defense and target flags and explicit authored-page inputs.
-  Find the first damaging action before qualifying its pause save.
+  The first shield loss is a Reaver shot at frame 10,031. Nearby
+  enemies already occupy different positions before that shot.
+  Identify the first earlier simulation difference before qualifying
+  the pause save on the current release.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
