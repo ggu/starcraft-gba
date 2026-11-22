@@ -80,6 +80,24 @@ static const RoutePureRegion route_pure_regions[] = {
     RP_REGION(sc64_route_query_origin),
 #endif
 #endif
+#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    /* Resumable FIFO/certificate state is separate from packed fields and
+     * must follow their snapshot, including the nearby-root reserve slot. */
+    RP_REGION(sc64_point_prefixes),
+    RP_REGION(sc64_point_prefix_index),
+#ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
+    RP_REGION(sc64_small_route_first),
+    RP_REGION(sc64_small_route_last),
+#endif
+#endif
+#ifdef SC64_FACILITY_FRONTIERS
+    /* Records themselves live in bfs_queue and are copied below. */
+    RP_REGION(sc64_facility_frontiers),
+    RP_REGION(sc64_facility_frontier_next),
+#endif
+#ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
+    RP_REGION(sc64_route_probe_diag),
+#endif
     RP_REGION(sc64_route_valid),
     RP_REGION(sc64_route_goal),
     RP_REGION(sc64_route_age),
@@ -113,9 +131,15 @@ static const RoutePureRegion route_pure_regions[] = {
     RP_REGION(path_fp_key),
     RP_REGION(path_fp_valid),
 #ifdef SC64_PATH_GRID_VERIFY
+    RP_REGION(path_grid_verify_copy),
     RP_REGION(path_grid_verify_prev),
     RP_REGION(path_grid_verify_have),
 #endif
+#endif
+#ifdef SC64_PATH_GRID_STATS
+    RP_REGION(path_grid_stat_full),
+    RP_REGION(path_grid_stat_inc),
+    RP_REGION(path_grid_stat_same),
 #endif
     RP_REGION(bfs_queue),
 #ifndef SC64_IMPORTED_MISSION

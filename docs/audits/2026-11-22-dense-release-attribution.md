@@ -87,3 +87,20 @@ The Z7 validation SHA-256 is
 `2fd3e8fff9eb85b180f18d1373e4bf33b09a9a0eeeb3650bb71919c6295a2c7b`.
 The full call-stack report SHA-256 is
 `e65b08419b39d3a5b1f01df29067d1ef6bb2d0c4ac39061e6e94604f4e835b2c`.
+
+## Owner-local index trial
+
+A private trial based on `98678f70` kept the same fresh owner traversal
+and batched each owner's cell occupancy writes. All nine target-index
+sanitizer configurations pass. The same 16 P10 calls match frame,
+screen and route counters. Index rebuild cost falls from 61,023 to
+58,403 cycles per update. Mean full-loop cycles fall from 1,572,861
+to 1,569,808 (0.19%) and the function's ARM stack grows from 52 to
+76 bytes. This trial stays local. Further index work should preserve
+one insertion path and demonstrate a sustained gain in the late
+campaign and busy skirmish holdouts.
+
+The control validation SHA-256 is
+`9482a301ab811e640268d6a6e73dcc1d9ae960bcf501ee7ebd901ce30c3b6b71`.
+The candidate validation SHA-256 is
+`726361eb8f43274cdf0fa58819ebac1c2861da6f244d6c31ab41cc6d1d955fd2`.

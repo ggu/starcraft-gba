@@ -177,3 +177,12 @@ which fills were avoidable or measure hardware FPS. Preserve route-cache
 semantics and compare the same dense window before promoting a change.
 
 - Dense stage receipt SHA-256: `93809b1993233b716cdc09c9b132a69a775c0e4747989045413d9d00402e72cf`.
+
+
+### November 22 route observer correction
+
+The newer rendered HOST controller needed a route-observer snapshot correction.
+Its corrected 24,000-call tape matches 62 named ARM observations on #708;
+a full HOST win is recorded separately. The exact full replay on #711 remains
+in progress. See the [route observer audit](2026-11-22-z7-route-observer-purity.md)
+for the evidence and limits.
