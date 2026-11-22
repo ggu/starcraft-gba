@@ -6503,7 +6503,9 @@ find_selected_worker(void)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
+	if (u[i].selected && u[i].alive && u[i].owner == SIDE &&
+	    !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) &&
+	    IS_WORKER(u[i].type))
 	    return i;
     return -1;
 }

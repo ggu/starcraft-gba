@@ -31,8 +31,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 3.61% in the archived late Z7 16-update window and moves
   whole-run means by less than 0.1% in the measured replays. Record
   a fresh late Z7 paired run and keep profiling the steady draw and
-  order costs. The current P10 victory tail still averages 10.92
-  emulated updates per second.
+  order costs. The compaction trial at that revision averaged 10.92
+  emulated updates per second in the P10 victory tail.
   The [unit projection and facing trial](audits/2026-11-22-dense-release-attribution.md#unit-projection-and-facing-on-the-compacted-release)
   lowers the later P10 window by 1.79% and the 9,489-update mean by
   0.39%.
@@ -54,9 +54,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   updates per second. Across all three race cartridges and both maps,
   the [three-AI Custom Game opening measurements](audits/2026-11-22-steady-order-cost.md#three-ai-custom-game-opening-pace)
   average 29.76–29.86 emulated updates per second with 28–29 live
-  units. All six miss the 30-update deadline at p95. Measure an active
-  combat and expansion window separately to cover sustained play.
-  A uniform-radius whole-bucket bound excludes
+  units. All six miss the two-VBlank deadline at p95. The
+  [later three-AI battle windows](audits/2026-11-22-steady-order-cost.md#three-ai-custom-game-battle-pace)
+  drop to 13.24–18.47 emulated updates per second. In the sampled
+  no-new-route-build Protoss Outpost cut, targeting alone costs 139,078
+  cycles within orders and tracer passes cost 96,034 within rendering.
+  The [selection and detector query draft](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
+  saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
+  Custom Game replays with matching state and video. Profile repeated
+  eligibility and tracer drawing here, then validate in a player-driven
+  battle and on hardware. In this cut, trace timing and animation bank
+  lookups account for about 15,400 cycles per update. Confirm constant-bank
+  metadata can replace them before revisiting the overlay walk. A point-route
+  predecessor skip has flat timing in the 3,600-update Blood Bath holdout
+  and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
+  whole-bucket bound excludes
   3.5% of visited contact nodes in a five-update P10 sample. Broader
   movement and collision work remains the priority. Compare sustained
   cost, normal-input outcomes and fresh title continuation.
@@ -2359,6 +2371,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   every owner. The Terran CPU spends 50 on a queued SCV before any
   owner adds a building. Capture first purchases for Zerg and Protoss
   before comparing the later AI build order.
+- The [matched Wasteland selection run](audits/2026-11-22-steady-order-cost.md#wasteland-selection-and-terran-7-continuation)
+  confirms that five Marines remain selected after releasing R in both
+  the native N64 emulator and the current Terran GBA ROM. Both controls
+  keep selection empty. Terran 7 on the same GBA ROM wins after a fresh
+  HOME save load and passes victory journal readback.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
