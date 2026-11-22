@@ -42,8 +42,9 @@ numbers are recorded here.
 | Shot gap | 60 to 69 steps | 60-tick cooldown, one Scarab at a time | consistent |
 | Target dies in flight | flies on, explodes at the stored position | same | confirmed |
 | Quarter-zone hit | about 59 px, 25 damage, shields then armor | 25 at 41 to 60 px | consistent (one read) |
-| Placed Reaver, stock | 5 for P7 owner 0; 0 for P7 owner 4, P8 owner 3, Z6/Z8/Z9/Z10 enemies | the source UNIT hangar count: 5 for P7 owner 0, 0 for every other placed Reaver (24 rows) | confirmed against the source maps (the table is asserted row by row in the product test) |
-| Campaign AI restock | enemy Reavers climb 0 to 5, one per 105 to 112 steps, the first order at once | same timer, no payment | changed to match |
+| Placed Reaver, stock | 5, 5 for P7 owner 0 and 0, 0 for owner 4 (confirmed on a second fresh start); 0 for P8 owner 3, Z6/Z8/Z9/Z10 enemies | the source UNIT hangar count: 5 for P7 owner 0, 0 for every other placed Reaver (24 rows) | confirmed against the source maps (the table is asserted row by row in the product test) |
+| Campaign AI restock | enemy Reavers climb 0 to 5, one per 105 to 112 steps, the first order at once; owner 0 also trains new Reavers, which arrive at 0 | same timer, no payment | changed to match |
+| Campaign AI payment per Scarab | not established: the first Scarab of each Reaver coincided with a -15 on one candidate counter, later ones showed no charge; the per-owner resource cells could not be mapped. P7 AI banks start near 10,000 minerals per cell, gain about 8 per mining trip (mined, not scripted) and never ran short in the window; no enemy Reaver was held below 5 by money | timer only, which behaves like paying from a bank that never runs dry | not established; the switch to paid-by-owner is one predicate (`sc64_psc_campaign_ai`) and the restock line in `sc64_psc_parent_tick` |
 | Launch delay | about 4 to 5 steps (resolution 1 to 2) | 3 ticks | not established |
 | Flight steering | turns at a limited rate (8 px per step mid-turn) | straight-line homing | approximation |
 | Player Reaver (trained or placed), price read, full and half splash zones, own-side damage, several Scarabs in flight, terrain following, 90-tick life | not measured | as in the table above | not established |
