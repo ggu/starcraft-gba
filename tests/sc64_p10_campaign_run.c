@@ -58,7 +58,10 @@ static void step(u16 held)
 #ifdef SC64_P10_NORMAL_HOME
     assert(route_purity_hash()==after_update);
 #endif
+    /* Draw after every update like common/main.c and the PX replay: selection
+     * picks read the facing and stride state that drawing advances. */
     game_update(held,pressed);
+    game_render();
 #ifdef SC64_P10_NORMAL_HOME
     after_update=route_purity_hash();
 #endif
