@@ -44,13 +44,17 @@
  *   20. Normal damage: shields, then armor.
  *
  *   Starting stock. A Reaver made by production starts empty. A Reaver a
- *   mission places at its start (seen within SC64_PSC_PLACED_FRAMES updates)
- *   starts empty too: the imported placed-unit rows (Sc64ImportedUnit) carry
- *   no hangar count, so there is no per-unit source value to use. The N64 shows
- *   one placed pair starting with 5 (P7 owner 0); this is a known difference.
- *   A Reaver that appears later (reinforced, rescued) and one loaded from a
- *   save written before this service existed starts full the first time the
- *   service looks at it: a project assumption, not a source fact.
+ *   campaign mission places at its start (seen within SC64_PSC_PLACED_FRAMES
+ *   updates) starts with the hangar count of its source map UNIT record, looked
+ *   up by mission, source owner and position in a table generated from the
+ *   authenticated source CHKs (tools/sc64_placed_hangar_pack.py): 5 for P7's
+ *   source owner 0, 0 for every other placed Reaver in P4 to P10 and Z4 to Z10.
+ *   Missions without a CHK here (P1 to P3, Z1 to Z3) place no Reaver in their
+ *   imported unit tables; if one did it would start empty (not checked against
+ *   source). A Reaver that appears later (reinforced, rescued, made by a trigger)
+ *   and one loaded from a save written before this service existed starts full
+ *   the first time the service looks at it: a project assumption, not a source
+ *   fact. A custom game places none.
  *   A computer-owned Reaver in a campaign mission restocks on its own, one
  *   Scarab at a time on the build timer, with no payment (scripted source
  *   banks). Computer opponents in custom games buy through the same command
@@ -66,6 +70,8 @@
     !defined(SC64_RACES)
 #error "Paid Scarabs need the Protoss services and the source bounds table"
 #endif
+
+#include "sc64_placed_hangar_generated.h" /* build/generated, from the source CHKs */
 
 enum {
     SC64_PSC_QUEUE_LIMIT = 5,
@@ -452,14 +458,34 @@ static void race_paid_scarab_clear_slot(int slot)
 
 /* A scripted removal can take a Reaver without the death hook: detach
  * what it launched. */
+/* The hangar count a mission's source map gives this placed Reaver, matched by mission, source
+ * owner and position (a few pixels of slack: it may have taken a step). -1: a Reaver of a covered
+ * mission that is not a placed row (reinforced, rescued, made by a trigger); it starts full later. */
+static int sc64_psc_placed_stock(const Unit *q)
+{
+    int best = -1, best_d = 0x7fffffff;
+    if (race_mode || (unsigned)race_selected_mission >= 32u) return 0;
+    if (!((SC64_PLACED_HANGAR_COVERED_MASK >> race_selected_mission) & 1u)) return 0; /* no source CHK here */
+    for (unsigned i = 0; i < SC64_PLACED_HANGAR_COUNT; ++i) {
+        const Sc64PlacedHangar *h = &sc64_placed_hangar[i];
+        int dx = q->x - (int)h->x_px, dy = q->y - (int)h->y_px, d = dx * dx + dy * dy;
+        if (h->mission != race_selected_mission || h->owner != q->raw_owner || d > 12 * 12 || d >= best_d) continue;
+        best = h->hangar; best_d = d;
+    }
+    return best;
+}
+
 static void race_paid_scarab_end_frame(void)
 {
-    /* Reavers a mission places at its start hold nothing: the import carries no
-     * hangar count (see docs/PAID-SCARABS.md). Establish them empty. */
+    /* Reavers a mission places at its start hold their source hangar count (table above);
+     * establish them before anything looks at them. */
     if ((unsigned)frame <= SC64_PSC_PLACED_FRAMES)
         for (int i = 0; i < MAX_UNITS; ++i)
             if (u[i].alive && u[i].type == U_REAVER && !u[i].carry && !u[i].work_timer) {
-                u[i].carry = SC64_PSC_INIT;
+                int stock = sc64_psc_placed_stock(&u[i]);
+                if (stock < 0) continue;
+                if (stock > (int)sc64_psc_capacity(u[i].owner)) stock = (int)sc64_psc_capacity(u[i].owner);
+                u[i].carry = SC64_PSC_INIT | stock;
                 if (u[i].owner != SIDE) sc64_psc_hint = 1;
             }
     if (!sc64_psc_hint) return;

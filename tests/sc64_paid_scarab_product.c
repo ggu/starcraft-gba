@@ -784,6 +784,64 @@ static void campaign(void)
     puts("campaign PASS");
 }
 
+/* ---- placed Reavers start with the source map's hangar count ---- */
+
+/* The N64 table in docs/PAID-SCARABS.md, as (mission, source owner, Reavers, Scarabs each). */
+static const struct { int mission, owner, count, stock; } n64_placed[] = {
+    {SC64_P7_GLOBAL_ID, 0, 2, 5}, {SC64_P7_GLOBAL_ID, 4, 2, 0}, {SC64_P8_GLOBAL_ID, 3, 2, 0},
+    {17, 1, 4, 0},                                        /* Z6 */
+    {19, 1, 2, 0}, {19, 2, 2, 0},                         /* Z8 */
+    {20, 2, 1, 0}, {20, 7, 4, 0}, {20, 4, 4, 0},          /* Z9 */
+    {21, 0, 1, 0},                                        /* Z10 */
+};
+
+static void placed_hangar(void)
+{
+    int rv[16], n = 0, expected = 0;
+    /* 1. The generated table agrees with the N64 table, row by row and in total. */
+    for (unsigned k = 0; k < sizeof n64_placed / sizeof *n64_placed; ++k) {
+        int found = 0;
+        expected += n64_placed[k].count;
+        for (unsigned i = 0; i < SC64_PLACED_HANGAR_COUNT; ++i)
+            if (sc64_placed_hangar[i].mission == n64_placed[k].mission &&
+                sc64_placed_hangar[i].owner == n64_placed[k].owner) {
+                ++found;
+                assert(sc64_placed_hangar[i].hangar == n64_placed[k].stock);
+            }
+        assert(found == n64_placed[k].count);
+    }
+    assert((int)SC64_PLACED_HANGAR_COUNT == expected);
+    printf("placed hangar: the table's %d Reavers agree with the N64 rows (P7 owner 0 = 5, all others 0)\n", expected);
+    /* 2. P7 in the game: owner 0's two Reavers start full, owner 4's empty. */
+    start_campaign(SC64_P7_GLOBAL_ID);
+    for (int k = 0; k < 4; ++k) pad(0);
+    for (int i = 0, m = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type == U_REAVER) rv[m++] = i, n = m;
+    assert(n == 4);
+    {
+        int full = 0, empty = 0;
+        for (int k = 0; k < n; ++k) {
+            int owner = u[rv[k]].raw_owner, stock = race_paid_scarab_stock(rv[k]);
+            printf("placed hangar: P7 Reaver %d, source owner %d, holds %d\n", rv[k], owner, stock);
+            assert(stock == (owner == 0 ? 5 : 0));
+            full += owner == 0 && stock == 5; empty += owner == 4 && stock == 0;
+        }
+        assert(full == 2 && empty == 2);
+    }
+    /* 3. A Reaver that appears later (reinforced, rescued, made by a trigger) starts full. */
+    for (int t = 0; t < SC64_PSC_PLACED_FRAMES + 10; ++t) pad(0);
+    {
+        int late = spawn_unit(SIDE, U_REAVER, u[rv[0]].x + 40, u[rv[0]].y + 40);
+        assert(late >= 0);
+        pad(0);
+        printf("placed hangar: a Reaver that arrives at frame %d holds %d (the project rule: full)\n", frame, race_paid_scarab_stock(late));
+        assert(race_paid_scarab_stock(late) == 5);
+    }
+    /* 4. The empty pair restocks on the timer as before; the full pair stays at the cap. */
+    for (int t = 0; t < 5 * 131 + 60; ++t) pad(0);
+    for (int k = 0; k < n; ++k) if (u[rv[k]].alive) assert(race_paid_scarab_stock(rv[k]) == 5);
+    puts("placed hangar PASS");
+}
+
 static void campaign_write(const char *path)
 {
     unsigned digests[7]; int rv[8], n;
@@ -881,6 +939,7 @@ int main(int argc, char **argv)
     else if (argc == 2 && !strcmp(argv[1], "validate")) validate();
     else if (argc == 2 && !strcmp(argv[1], "save-process")) save_in_process();
     else if (argc == 2 && !strcmp(argv[1], "campaign")) campaign();
+    else if (argc == 2 && !strcmp(argv[1], "placed")) placed_hangar();
     else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);
