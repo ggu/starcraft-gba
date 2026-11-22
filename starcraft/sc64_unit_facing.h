@@ -54,31 +54,55 @@ sc64_facing_reset_slot(int slot)
     if ((unsigned)slot < MAX_UNITS) sc64_facing[slot] = 0;
 }
 
-/* Unit vectors for the 32 StarCraft directions, scaled by 256; y grows down. */
+#ifdef GBA_HOST
+/* Full dot-product reference for the 32 directions with Y increasing down. */
 static const s16 sc64_facing_vector[32][2] = {
     {0,-256},{50,-251},{98,-237},{142,-213},{181,-181},{213,-142},{237,-98},{251,-50},
     {256,0},{251,50},{237,98},{213,142},{181,181},{142,213},{98,237},{50,251},
     {0,256},{-50,251},{-98,237},{-142,213},{-181,181},{-213,142},{-237,98},{-251,50},
     {-256,0},{-251,-50},{-237,-98},{-213,-142},{-181,-181},{-142,-213},{-98,-237},{-50,-251}
 };
+#endif
 
 static int
 sc64_facing_direction(int dx, int dy)
 {
-    int first, last, best, best_dot;
+    int first, along, across;
     if (!dx && !dy) return 0;
-    /* Direction zero precedes the wrapping quadrant in the original table. */
-    if (dx < 0 && dy < 0) {
-        first=24; last=31; best=0; best_dot=dy * sc64_facing_vector[0][1];
+    if (dy < 0) {
+        if (dx < 0) {
+            first = 24;
+            along = -dx;
+            across = -dy;
+        } else {
+            first = 0;
+            along = -dy;
+            across = dx;
+        }
     } else {
-        first=dx>=0 ? (dy>=0 ? 8 : 0) : (dy>=0 ? 16 : 24);
-        last=first+8; best=first; best_dot=-0x7fffffff;
+        if (dx < 0) {
+            first = 16;
+            along = dy;
+            across = -dx;
+        } else {
+            first = 8;
+            along = dx;
+            across = dy;
+        }
     }
-    for (int d=first;d<=last;++d) {
-        int dot=dx*sc64_facing_vector[d][0]+dy*sc64_facing_vector[d][1];
-        if (dot>best_dot) {best_dot=dot;best=d;}
+    /* Adjacent dot products cross at increasing across/along ratios.
+     * Search the exact differences between the rounded direction vectors. */
+    if (across * 39 <= along * 32) {
+        if (across * 48 <= along * 14)
+            return first + (across * 50 > along * 5);
+        return first + 2 + (across * 44 > along * 24);
     }
-    return best;
+    if (across * 24 <= along * 44)
+        return first + 4 + (across * 32 > along * 39);
+    if (across * 14 <= along * 48) return first + 6;
+    /* At the wrapping boundary, direction zero wins an equal dot product. */
+    if (first == 24) return across * 5 >= along * 50 ? 0 : 31;
+    return first + 7 + (across * 5 > along * 50);
 }
 
 /* Called when a unit fires: face the target. */
