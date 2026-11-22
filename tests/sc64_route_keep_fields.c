@@ -873,6 +873,58 @@ static void check_point_prefix_exact_hit(void)
 }
 #endif
 
+static void check_compacted_prefix(void)
+{
+    race_cols = race_rows = 128;
+    memset(desired, 0, sizeof(desired));
+    for (int row = 0; row < 128; row += 2) {
+        for (int col = 0; col < 128; ++col) desired[col + row * 128] = 1;
+        if (row + 1 < 128) desired[((row / 2) & 1 ? 0 : 127) + (row + 1) * 128] = 1;
+    }
+    sc64_routes_reset(); sc64_route_pcount = 0; build_path_grid();
+    const int goal = 0, origin = 80 * 128 + 100;
+    int slot = sc64_route_slot_for(goal, origin);
+    const Sc64PointPrefix *prefix = slot >= 0 ? sc64_point_prefix_find(slot) : 0;
+    assert(prefix && prefix->count <= SC64_POINT_PREFIX_PENDING &&
+           prefix->restore_first_row == 1 && prefix->restore_last_row == MAP_ROWS);
+    reference_bfs(&oracle[POOL], goal);
+    assert(sc64_route_get(slot, origin) == oracle[POOL].dir[origin]);
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        int direction = sc64_route_get(slot, cell);
+        assert(direction == SC64_ROUTE_UNREACHABLE || direction == oracle[POOL].dir[cell]);
+    }
+    SC64_ROUTE_EXACT(slot);
+    assert(!sc64_point_prefix_find(slot));
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+#if defined(SC64_ROUTE_POINT_SECOND_EXACT_HIT) && !defined(SC64_ROUTE_POINT_COLD_CERTIFICATE)
+    sc64_routes_reset(); sc64_route_pcount = 0; build_path_grid();
+    slot = sc64_route_slot_for(goal, goal + 1);
+    assert(slot >= 0 && sc64_point_prefix_find(slot));
+    assert(sc64_route_slot_for(goal, origin) == slot);
+    Sc64PointPrefix *reparked = sc64_point_prefix_find(slot);
+    assert(reparked && reparked->second_cutoff &&
+           reparked->restore_first_row == 1 && reparked->restore_last_row == MAP_ROWS);
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        int direction = sc64_route_get(slot, cell);
+        assert(direction == SC64_ROUTE_UNREACHABLE || direction == oracle[POOL].dir[cell]);
+    }
+    SC64_ROUTE_EXACT(slot);
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    puts("Compacted FIFO repark and completion match independent BFS");
+#endif
+    sc64_routes_reset(); sc64_route_pcount = 0; build_path_grid();
+    const int far = 126 * 128;
+    slot = sc64_route_slot_for(goal, far);
+    assert(slot >= 0 && !sc64_point_prefix_find(slot));
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        assert(sc64_route_get(slot, cell) == oracle[POOL].dir[cell]);
+    check_grid_unchanged();
+    puts("Compacted FIFO park and full completion match independent BFS");
+}
+
 static void check_point_prefix_row_span(void)
 {
     const int distant = 100 + 64 * 128;
@@ -1843,6 +1895,10 @@ int main(int argc, char **argv)
     }
 #endif
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
+    if (argc == 2 && !strcmp(argv[1], "--point-prefix-compaction-only")) {
+        check_compacted_prefix();
+        return 0;
+    }
     if (argc == 2 && !strcmp(argv[1], "--point-prefix-only")) {
         check_point_prefix_resume();
         check_point_prefix_row_span();

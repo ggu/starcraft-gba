@@ -280,7 +280,7 @@ static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 #ifdef SC64_ROUTE_POINT_PREFIX_PROBE
 enum { SC64_POINT_PREFIX_SLOTS = 4, SC64_POINT_PREFIX_PENDING = 128,
-       SC64_POINT_PREFIX_LIMIT = 1024, SC64_POINT_PREFIX_BATCH = 32 };
+       SC64_POINT_PREFIX_LIMIT = 8192, SC64_POINT_PREFIX_BATCH = 32 };
 typedef struct {
     u16 goal;
     u8 slot, count;
