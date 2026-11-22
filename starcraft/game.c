@@ -4440,11 +4440,15 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
     }
     for (p = 0; hostile_mask; ++p, hostile_mask >>= 1) {
         if (!(hostile_mask & 1u)) continue;
-        if (!(sc64_target_owner_columns[p] & col_mask) ||
-            !(sc64_target_owner_rows[p] & row_mask)) continue;
+        u32 columns = (sc64_target_owner_columns[p] & col_mask) >> col0;
+        if (!columns || !(sc64_target_owner_rows[p] & row_mask)) continue;
         for (row = row0; row <= row1; ++row) {
             if (!(sc64_target_owner_rows[p] & ((u32)1u << row))) continue;
-            for (col = col0; col <= col1; ++col) {
+            /* The published owner summary can include stale set bits.
+             * A clear bit still rules out this column in every row. */
+            u32 occupied = columns;
+            for (col = col0; occupied; ++col, occupied >>= 1) {
+                if (!(occupied & 1u)) continue;
                 int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
                 for (entity = sc64_target_head[p][cell]; entity != SC64_TARGET_NONE;
