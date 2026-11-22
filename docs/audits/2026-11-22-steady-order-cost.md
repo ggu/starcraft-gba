@@ -30,8 +30,17 @@ All eight normal and preview images pass both memory guards at their
 original endpoints. Terran and Zerg reproduce the control ROMs.
 The changed Protoss and Showcase builds use the shared observer path.
 The prepared Protoss and Showcase ASan/UBSan fixtures match the frozen
-oracle across 48 worlds and 17,280 updates. Physical hardware pacing
-remains open.
+oracle across 48 worlds and 17,280 updates. All ten Protoss chapters
+start from the ordinary campaign menu and advance past opening
+dialogue. The two Protoss ROMs pass 36 Custom Game start/save/reload
+cases. Showcase passes normal Free for All and preview Melee Blood
+Bath continuations.
+
+A controlled native Arbiter encounter remains open. The next N64
+comparison should move an ally across the cloak boundary, then
+bring a powered Cannon or Observer into detection range. Compare
+target acquisition and damage with the same inputs on both engines.
+Physical GBA frame pacing remains open.
 
 ## Bounding the other steady costs
 
@@ -51,6 +60,14 @@ an upper limit on the nodes removed by this uniform-radius geometric
 test in the sampled workload, before paying for the bound itself.
 The broader movement and collision traversal remains the priority.
 
+An isolated audio probe suppresses volatile snapshot writes whose
+value would be unchanged. It matches world, video, palette and
+route counters at the 32 attribution cuts. The early observer scope
+rises from 37,420 to 40,964 guest cycles and the late scope rises
+from 41,537 to 45,064. The conditional scan stays out. Future audio
+work needs to reduce the duplicated actor traversal itself while
+preserving ordered event admission and slot reuse.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Control P10 replay | `2fc3cde69e257772fc454bbf2a2c1c13658589414757af09f3def32563045bc2` |
@@ -58,3 +75,7 @@ The broader movement and collision traversal remains the priority.
 | Candidate instruction attribution | `c371ce2b4116bd83627ceb9f7b60e23dbb98f062f7dd280ae866108f1169dc7b` |
 | Contact census | `c9ecf168bd2d1896b97ae87b9ff7318bf0029f4b7bc5d77c7c9a511da6eb9644` |
 | Prepared host comparisons | `85fb61a1f5e7c15023bb464ec61f1ff08e91d4b45d5e88ced00d95420638192b` |
+| Protoss chapter starts | `b4d9c22777ae2dba696a5a03e78f23931e2c7b74499e8a9e84cb42796fcb8849` |
+| Normal Protoss Custom Game matrix | `b5c41de469d331b5adaa3bb1821afa750105b89acf1c72987e7cd702be67703b` |
+| Preview Protoss Custom Game matrix | `076ee6a8e277f2970dde40bab96837224908bd1bda380a0a139da6254bc1c4b2` |
+| Audio snapshot write trial | `d172e631be8bfa2bcee1a2b9408a873e06849d0d0e67a6cce75876baf1a9ec86` |
