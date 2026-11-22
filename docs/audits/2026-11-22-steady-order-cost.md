@@ -379,6 +379,64 @@ corrected renderer module passes with the current prepared inputs.
 | Exhaustive named-seat launch matrix | `f92dff99fd9671eea66174eec2ef2b9f50b97df1422929df8089aa388b8640b6` |
 | Pause save and fresh HOME matrix | `5325dd211df92503fc5e8762154600c99e57bb77698263e396b60506e3269f82` |
 
+## Source weapon profile index
+
+On the preceding P10 ARM link, the cached timing lookup uses two
+software divisions to check alignment and index a 52-byte profile.
+The shared lookup bounds the address by the array and divides a
+record offset by four, then multiplies by the exact inverse of 13
+modulo 2^32. The result is an index only when it lies inside the
+bank. A different record layout uses the ordinary checked division.
+The packed cache, profile values and caller interfaces stay in use.
+
+The ASan/UBSan fixture checks every byte offset in the 66-record
+array, the one-past address and copied profiles. Its timing and
+motion differential passes 686,256 cases. All eight normal and
+preview ARM links retain their preceding IWRAM and EWRAM endpoints.
+The default ROM matches its preceding bytes.
+
+| Replay | Control mean cycles | Index mean cycles |
+| --- | ---: | ---: |
+| Crossfire, 900 updates | 934,432 | 926,310 |
+| P10 fresh HOME victory, 9,489 updates | 1,503,232 | 1,502,844 |
+| Protoss Outpost, 12,000 updates | 759,876 | 759,603 |
+
+All six ordinary three-CPU replays use 0.029–0.041% fewer cycles.
+All 231 world and video cuts match, along with the full P10 victory
+journal. Crossfire saves 0.87%. The P10 continuation still averages
+about 11.16 emulated updates per second.
+
+All 30 campaign launch checkpoints match. All 1,134 normal Custom
+Game launches verify the requested map, human race, named/closed
+CPU seats and hall locations. The 48 ordinary pause-save and fresh
+HOME cases pass across the normal and preview products. The full
+local `./dev test` run completes with 1,177 Python tests, nine skips
+and passing native sanitizer fixtures, including the renderer module
+with the corrected world-depth building check.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Six Custom Games | `f088b70e067f3c8a41cc100c5c13f3bec42954b2dd61256256e5427f5b1ca6b6` |
+| P10 fresh HOME victory | `b4987e76dbe7c5b43766a8939b41a8cfc29c5f3d00759b62dc569bc17a4f6817` |
+| Crossfire | `ac9491edfd8a82afacb71c97a1f58f657e3d210789ec49373503af7667982a37` |
+| Campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Exhaustive named-seat launch matrix | `9e8fa637a948f4e66ffb70d69b99607665d2d3ead3fff5cc87a4672becc80311` |
+| Pause save and fresh HOME matrix | `71c6395cd239cf8b4b8491d3d86d74d9c8f305c0eb8ea72886912154f6c82972` |
+
+## Outpost resource sprite costs
+
+The ordinary late Outpost repeat matches the retained world,
+two-page framebuffer, palette and route observations across 16
+updates. Its five recurring painter calls to the byte sprite
+compositor resolve to four mineral sprites and one geyser. The
+mineral calls account for about 59,514 guest cycles per update and
+the geyser for 9,750. These are measured call costs, and the
+[earlier optional packed mineral path](2026-11-13-static-mineral-word-draw.md)
+gained about 695 cycles per update in its 1,000-update Outpost trial.
+Use the current busy window to evaluate the same exact compositor
+and retain the full match as a holdout. The local census receipt
+SHA-256 is `b2f13dc9e64ba200cfb8db0190f6dd355f02271b93a5e6ef4cc3b56cb38c4331`.
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
@@ -420,9 +478,45 @@ The native observer's cache-aware memory views match before and after
 switching from the recompiler to the interpreter at runner step 4,200.
 The isolated interactive driver waited for the transition response
 while the observer waited for the next command. The observer now
-flushes that response, as it does for its other command replies. The
-corrected capture still needs a run with sufficient disk space to
-collect the planned frame and RAM samples.
+flushes that response, as it does for its other command replies.
+Available disk space delayed the first run of the corrected observer.
+
+### Matched Blood Bath credit and elapsed time
+
+The corrected native observer completes the same neutral tape. Its
+snapshot beside HUD callback step 6,307 has elapsed-seconds value 9
+and the frame shows 50 minerals. The snapshot beside callback step
+6,407 has value 11 and the frame shows 58 minerals. The RAM cuts
+occur at steps 6,309 and 6,409. The game clock is the big-endian
+word at `0x800b9368`, identified in the earlier pause intervention.
+Video callbacks and RAM captures are asynchronous, so the paired
+cuts bracket the observed credit rather than identify its update.
+
+The native Command Center is at (288, 1808) and the Hatchery at
+(1760, 240). The regular GBA Melee preview launches through the
+same map and race choices, with buildings at (144, 904) and
+(880, 120), matching both native anchors at half scale. Its wallet
+stays at 50 through neutral update 73 and reaches 58 at update 74,
+after 2.470 seconds measured by the emulated GBA main-loop clock.
+It has 114 minerals at 9.027 seconds and 122 at 11.034 seconds.
+
+A further native replay with the same hall anchors shows 66 minerals
+beside elapsed-seconds value 19 and 90 beside value 28. The GBA
+wallet for elapsed second 19 ranges from 186 to 194, and its wallet
+is 266 throughout elapsed second 28. The observed warm-window
+gains are 24 minerals on native and 72–80 in the corresponding GBA
+clock brackets. The clocks were sampled independently. Separating
+formation, travel, patch contention and depot contact remains next.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native input and binary pins | `548aa5ea47118533bf1fcdf7b680afe50aa127862e56dcf2e245cd9ed4328579` |
+| Native commands | `144ab8c390815ba035e466ce4de93c7c4f6d973e1067cf1d7324f62013dfc581` |
+| Earlier native RAM cut | `e565b0ff5a7492e12160119c7b8355f3839fffbe46855a6a9659016425040981` |
+| Later native RAM cut | `542c61a39b1e97cbdaddb611cd0064a5181fc505bec99f8db6efcb62596130c7` |
+| Matching GBA corners and guest clock | `42f96f2d1862b5767dca602bae3ed91f9781ef4dee2ee429ff4dd8fb9bd3ee46` |
+| Native warm-window commands | `ff9b85523d8551992ca346f5a93c20955b39fc037853d9eb1bab0ae9b96cc3ad` |
+| GBA warm-window replay | `990cff94a1db57dc67d2dafdd15f4a42ffa18951cb23e50ad446c4d04d49e762` |
 
 ## Protoss campaign continuation and replay controls
 
@@ -466,20 +560,36 @@ physical call and reproduces the 240 versus 76 shield difference.
 Adding the facility collision-bucket and shared-sight flags produces
 the same host controller log and checkpoint trace byte for byte.
 
-The first shield loss occurs at physical call 10,271, game frame
+Fenix's first observed shield loss occurs at physical call 10,271, game frame
 10,031. The ROM Reaver at (653, 108) fires at Fenix at (528, 81),
 reducing his shields from 240 to 140. The host Reaver at (669, 120)
 fires toward (558, 182), leaving Fenix's shields at 240. At call
 10,245 Fenix's position matches in both runs. The hostile Reaver and
 three other enemy actors already have different positions. Earlier
-paired observations are needed to identify the first simulation
-event that differs. Earlier complete P8 save wins remain qualified
-on their pinned older ROMs.
+complete P8 save wins remain qualified on their pinned older ROMs.
+
+A paired actor sweep matches all four watched enemies through call
+10,000. At call 10,163, frame 9,926, a Zealot's shields drop by 20
+on the ROM while its host row stays at full shields. The ROM already
+has a live friendly Dragoon trace aimed at that Zealot. The same
+Dragoon stands idle in the host run before the later Reaver shot.
+At the A press immediately after call 10,111, both runs have the
+cursor at (567, 184) with the field menu closed. The ROM has Dragoon
+slot 127 selected. The host has seven other slots selected. The
+same physical command therefore changes different units. Earlier
+selection checkpoints locate the split at the A press at input call
+10,075. With the cursor at (467, 220), the host selects slot 112 and
+the ROM selects slot 127. The next A expands the host selection to
+a group while the ROM keeps slot 127. Resolve the point selection
+when regenerating the ordinary pause-to-victory tape.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | First shield loss and paired positions | `6b058071cd381a708a1c4055291b7ecf05837607e075fd0e4b5106af78293322` |
 | Aligned host actor samples | `33d91b6e31b95d234c4b65fc33d26e8f2c735a8ac9f42648d11f4ce88285d107` |
+| First tracked hostile shield difference | `17ac9dcec3142fd04a4d7ee339f1aadf2e2eb5e657ed3021b981ed827beaaf71` |
+| Dragoon command selection bracket | `edf31bc12c13825883e9ea2986ff08ed12a73065e7fc2a25721fa315cf69aea4` |
+| First point-selection split | `5a377e3adb3ef87054d832409bc4f675b794bfd74bff0deed6fe557d205b07d5` |
 
 ## Selection and detector query candidate
 

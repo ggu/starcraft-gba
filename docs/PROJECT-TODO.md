@@ -103,6 +103,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cuts guest cycles slightly in six ordinary battles, the P10
   victory replay and Crossfire. The busy-frame target still needs
   larger movement and rendering gains.
+  The [shared weapon profile index](audits/2026-11-22-steady-order-cost.md#source-weapon-profile-index)
+  removes two Thumb division calls. It saves 0.87% across the full
+  Crossfire sample and slightly improves all six three-CPU means.
+  The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
+  attributes about 59,514 guest cycles per update to four mineral
+  blits and 9,750 to one geyser blit. Recheck the existing packed
+  mineral path at that busy cut and over the full match.
   A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
@@ -310,6 +317,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   coverage. The [native Custom Game lobby captures](audits/2026-11-22-native-custom-game-lobby.md)
   show the map and seat controls, race cycling, and no difficulty field
   in the sampled Challenger and Blood Bath settings.
+  The [matched Blood Bath Melee opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
+  observes the native opening credit beside elapsed times of 9 and
+  11 seconds. The GBA gives the same eight minerals at 2.470 guest
+  seconds, with both hall anchors matching at half scale. At the
+  sampled 19-to-28-second interval the native bank gains 24 minerals
+  and the GBA gains 72–80 within corresponding clock brackets.
+  Isolate worker formation, patch contention and depot contact.
   Use the active Blood Bath combat witness to qualify opaque
   overlaps and pool-ID reuse in new ordinary-input cuts.
   The [native Blood Bath production witness](audits/2026-11-21-native-blood-bath-lurker.md)
@@ -372,10 +386,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Carried P8](audits/2026-11-22-steady-order-cost.md#carried-p8-replay-refresh)
   diverges on Fenix's shields at frame 11,690 with the facility
   defense and target flags and explicit authored-page inputs.
-  The first shield loss is a Reaver shot at frame 10,031. Nearby
-  enemies already occupy different positions before that shot.
-  Identify the first earlier simulation difference before qualifying
-  the pause save on the current release.
+  Before the Reaver shot, a Dragoon receives an attack-move on the
+  ROM and stays idle on the host. The A press follows different
+  selected groups at the same cursor. The first observed selection
+  split follows the point A press at input call 10,075. Repair the
+  ordinary input tape and verify a fresh pause save through victory.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
