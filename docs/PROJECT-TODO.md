@@ -113,8 +113,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and rendering costs still dominate the crowded scenes.
   The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
   attributes about 59,514 guest cycles per update to four mineral
-  blits and 9,750 to one geyser blit. Recheck the existing packed
-  mineral path at that busy cut and over the full match.
+  blits and 9,750 to one geyser blit. Reusing the loaded word for
+  mixed pixels saves 0.47% in that cut and 0.21–0.53% across all
+  six long three-CPU matches. The P10 victory replay averages 11.26
+  emulated updates per second. Enabling aligned word loads in
+  Showcase slows each of the three sampled Crossfire windows.
+  Use the [page census](audits/2026-11-22-steady-order-cost.md#mode-4-page-update-coverage)
+  to bound a stationary-camera band reuse trial. Measure the cost
+  of tracking changes before relying on it in crowded fights.
   A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
