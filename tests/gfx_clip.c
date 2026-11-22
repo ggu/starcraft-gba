@@ -166,6 +166,22 @@ test_begin_resets_clip(void)
     assert(gfx_test_pixel(4, 4) == 30);
 }
 
+static void
+test_aligned_sprite_transparency(void)
+{
+    static _Alignas(4) const u8 sprite[] = {
+        0, 1, 0x80, 0, 1, 0, 0xff, 0,
+        13, 15, 17, 19, 21, 23, 25, 27,
+    };
+    gfx_begin(43);
+    gfx_set_clip_y(17, 18);
+    gfx_blit_sprite(20, 17, 8, 2, sprite);
+    for (int i = 0; i < 8; ++i) {
+        assert(gfx_test_pixel(20 + i, 17) == (sprite[i] ? sprite[i] : 43));
+        assert(gfx_test_pixel(20 + i, 18) == 43);
+    }
+}
+
 int
 main(void)
 {
@@ -179,5 +195,6 @@ main(void)
     for (unsigned i = 0; i < sizeof(ranges) / sizeof(ranges[0]); ++i)
         check_clip_range(ranges[i][0], ranges[i][1]);
     test_invalid_ranges_are_ignored();
+    test_aligned_sprite_transparency();
     return 0;
 }

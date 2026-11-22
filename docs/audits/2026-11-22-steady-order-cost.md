@@ -298,6 +298,22 @@ contributors and bounded storage for both pages. Retain moving
 camera cases in the benchmark. The census measures pixel
 equality. Render-cycle savings remain to be measured.
 
+Counting full-width work-page changes in the same fixed-camera
+windows gives an average of 37 changed rows and 6.31 changed
+eight-row bands in Outpost. Early and middle Crossfire average
+79.25 and 76.25 changed rows, or 10.56 and 10.13 bands out of 14.
+These are lower bounds on the rows that a conservative damage
+tracker would revisit. The row census receipt SHA-256 is
+`161e90bd4a097528006b93f3e17b24b8bd8b456c7bbe24d74c19467d513128c0`.
+
+The old work page differs from bare terrain in every row in the
+late Outpost cut and all three Crossfire cuts.
+Terrain stays stable during all 64 updates. Skipping only clean
+full-width rows would save no terrain transfer in these samples.
+An exact reuse trial will need smaller regions or retained
+composited bands. The terrain-restore census receipt SHA-256 is
+`9c40cfe4704a984474011c86f8fa34e8b0ada5fc9cf5e7bc1778ef85c9573d0e`.
+
 ## Detached attack sprite draw records
 
 Crossfire spends about 27,600 guest cycles per update resolving
@@ -487,9 +503,61 @@ mineral calls account for about 59,514 guest cycles per update and
 the geyser for 9,750. These are measured call costs, and the
 [earlier optional packed mineral path](2026-11-13-static-mineral-word-draw.md)
 gained about 695 cycles per update in its 1,000-update Outpost trial.
-Use the current busy window to evaluate the same exact compositor
-and retain the full match as a holdout. The local census receipt
-SHA-256 is `b2f13dc9e64ba200cfb8db0190f6dd355f02271b93a5e6ef4cc3b56cb38c4331`.
+The local census receipt SHA-256 is
+`b2f13dc9e64ba200cfb8db0190f6dd355f02271b93a5e6ef4cc3b56cb38c4331`.
+
+In the aligned word path used by all three regular race cartridges,
+the compositor now uses the loaded pixels for both opaque and mixed
+groups. Each byte with a zero source pixel keeps its destination
+pixel. The zero-byte test removes false matches for a source byte of
+one following a borrow from a lower byte. The host clip fixture
+covers this case, palette indices on both sides of bit seven and a
+clipped row. A separate sanitizer oracle passed 431,697 comparisons.
+
+| Paired ARM workload | Mean guest cycles saved |
+| --- | ---: |
+| Late Protoss Outpost, 16 updates | 0.47% |
+| Terran Outpost, 12,000 updates | 0.41% |
+| Terran Blood Bath, 12,000 updates | 0.21% |
+| Zerg Outpost, 12,000 updates | 0.42% |
+| Zerg Blood Bath, 12,000 updates | 0.23% |
+| Protoss Outpost, 12,000 updates | 0.53% |
+| Protoss Blood Bath, 12,000 updates | 0.26% |
+| P10 fresh HOME victory, 9,489 updates | 0.12% |
+
+The late Outpost window moves from 1,340,828 to 1,334,492 cycles
+per update. Across 16 late Outpost cuts and 120 long skirmish
+cuts, world state, both framebuffer pages, palette and route
+counters match. The P10 victory run matches all 81 cuts and
+final SRAM. It averages 1,490,148 cycles per update, or 11.26
+emulated updates per second. All 30 campaign openings and 24
+regular pause-save and fresh HOME continuations match, including
+the saved SRAM bytes.
+
+Each regular race build adds 16 bytes to IWRAM and uses the same
+EWRAM as its control. Z10 ends at `0x03004fd8`, leaving 40 bytes
+to the linker guard. Both tested Z10 busy windows record the same
+minimum system stack pointer of `0x03006870` before and after the
+change. The default source build and ordinary Showcase ROMs are
+byte-identical to their controls. Enabling the existing aligned word
+path in Showcase adds 0.19–0.36% cycles across three 16-update
+Crossfire windows despite matching all sampled frames. Keep the
+current build flags.
+
+A separate bottom-up depth-heap trial matches all 64 late Outpost
+and Crossfire cuts. It adds 0.30% cycles in Outpost and 0.32–0.49%
+in the two busy Crossfire windows. Keep the incremental heap.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Late Outpost | `6fae47ec8c69727468a01f694aae349cfd5da4dde30eec01730eb0d4da465ca0` |
+| Six Custom Games | `006a3c74eca0f111d58d5077c9dbfa1d545330ce338ab9bf0efd00fcbaac6e3e` |
+| P10 fresh HOME victory | `471e69e4bb28a9398fada4e9ccdff1769d76ec9c075043ef22fad020462f576f` |
+| Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular pause-save and fresh HOME matrix | `4ed2681e57b97484b59063126a3c2792d2a06f1725cc5049a434a94493bc925c` |
+| Z10 stack probe | `876c0ef38c7772e6fbc89bcafe582e37edebaf2e40ce0c134cfec715e8024dea` |
+| Showcase aligned word trial | `ff4d7840e8296a80799c2bc305c82804e66cfd45ec1e38abbd26f83002db34a6` |
+| Depth-heap trial | `cd642403f5f4d390847692415e392983807de3b4748936f952b40007e7087e2f` |
 
 ## Automatic gathering in two Custom Game openings
 
@@ -747,6 +815,16 @@ The comparison confirms panning into darkness without revealing
 it and records the difference in cursor placement during the pan.
 
 ## Bounding the other steady costs
+
+The combat audio budget rejects five of 50 attack and death sound
+attempts in 48 Crossfire updates. The late Outpost and P10 replay
+samples record no calls to the effect emitter in 16 and 18 updates
+respectively. All 82 observed updates match the retained world state,
+framebuffer pages, palette and route counters. Skipping the visibility
+and actor lookup once the budget is full has little opportunity in
+these cuts. Keep the existing event order and focus on larger costs.
+The audio census receipt SHA-256 is
+`be2fcb108db8afa9d5de25652adab719ab57be685eb1588ade9b8d0fc6c714e2`.
 
 Earlier read-only target sampling on the same release observed 409
 queries and 1,899 owner-cell visits across three P10 updates. Of those
