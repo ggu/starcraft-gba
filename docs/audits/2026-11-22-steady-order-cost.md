@@ -138,6 +138,116 @@ lookup to direct pose metadata and qualifying a sustained battle.
 back to Mode 4 for Custom Game and gave flat P7 timing. Its imported
 audio and RAM limits remain relevant. See [renderer validation](../VALIDATION.md#p7-mode-0-tile-renderer).
 
+## Generated attack-pose sidecar
+
+The optional source generator takes actor names and emits sidecar
+metadata from the same resolved pose records as the byte-sprite
+bank. At runtime, the renderer uses the resolved actor, mode,
+heading and tick to select the packed frame, then checks frame
+identity. A generated content identifier rejects stale bank pairs.
+An empty option preserves the existing generator output and draw
+path. Switching the option invalidates the build configuration.
+
+With the Hydralisk bank selected, the paired Showcase Crossfire run
+averages 1,421,295 to 1,399,615 cycles per update in the two 16-update
+windows. All 32 world, video, palette, route and tracer bank samples
+match. The eight normal and preview links pass their original memory
+guards. Each gains 292,332–292,732 linked ROM bytes, with unchanged
+BSS and data sizes. A prepared fallback without the word-sprite
+capability also links. The 36 focused source generator, facing and
+weapon tests pass, including bank mismatch and boundary cases.
+
+The documented Showcase Make target also builds with the option
+disabled, enabled and disabled again. The final disabled ROM matches
+the first one byte for byte. The enabled build adds 292,532 text bytes
+with unchanged data and BSS, and the two products match all 32
+Crossfire checkpoints. The pooled guest cycle mean falls by 1.48%.
+
+Over 900 advancing updates of the full Crossfire scene, the
+mean falls from 946,292 to 937,866 cycles (0.89%). All 30 checkpoints
+match the world, both video pages, palette, route and tracer bank.
+The scene is still in play at the last sample.
+
+The broader replays show the workload dependence. All six
+12,000-update three-AI Custom Game pairs match 120 world, two-page,
+palette and route cuts. Mean cycles are within 0.01% in each pair.
+The eight packed-actor cartridge variants pass all 48 ordinary
+Custom Game startup, save and fresh-process load cases across both
+maps and the three independently configured CPU seat counts. Each
+case runs 120 updates before saving and 120 after loading.
+The 9,489-update P10 continuation matches all 81 cuts and victory
+SRAM, with means of 1,506,238 and 1,506,323 cycles. Z1 reaches the
+same victory at frame 50,669 with 50 matching periodic checkpoints.
+Over the 50,856 recorded inputs, mean cycles fall from 698,858 to
+698,346 (0.07%). The actor subset remains an opt-in build option.
+Choose further actor banks using sustained visible battle measurements
+and the remaining ROM space.
+
+The same frame subset can use two alignment phases of 16-bit pairs.
+It stores 127,540 pixel and mask bytes, versus 283,608 for four
+word phases. The byte and pair renderers agree in the clip/no-clip
+ASan/UBSan oracle and at all 32 Crossfire samples. The pair loop in
+ROM raises the early mean to 1,507,434 and the late mean to
+1,426,478. Putting its inner loop in IWRAM lowers them to 1,460,249
+and 1,375,805. The latter adds 72 IWRAM bytes in Showcase and trails
+the four-phase path. The normal Z10 link has 40 bytes of IWRAM guard
+margin. Keep the pair variants local.
+
+## Automatic gathering in two Custom Game openings
+
+A fresh native Melee setup selects Challenger, human Terran and
+computer Zerg. After Start, no in-map controller commands are sent.
+The callbacks at runner steps 6,009, 6,509 and 7,009 show 98, 122
+and 138 minerals, with 4/10 supply and moving SCVs. The retained
+ROM, executable, MoltenVK and tape hashes match before and after the
+run. The direct ares build launches from an unpacked source tree;
+the standard wrapper's pinned Git revision check remains unavailable
+for that tree. Callback steps are asynchronous to game updates.
+
+The regular GBA Terran ROM launches Outpost with one Zerg computer
+through its Custom Game menu. All four SCVs have mining orders
+before any in-map inputs. Minerals rise from 50 to 450 over 1,000
+neutral updates, with 4/10 supply and eight minerals in sampled
+worker cargo. The observed openings share automatic gathering. The
+maps, game type and timing units differ, so the relative mining
+rate remains open.
+
+The follow-up ordinary Blood Bath Melee runs select a Terran human,
+one Zerg CPU and two closed seats on both engines. Native captures
+show four starting SCVs, 50 minerals and 4/10 supply. After neutral
+input, the first visible credit is eight minerals between observer
+steps 6,309 and 6,409. The GBA preview first credits eight minerals at
+neutral update 74. The visible native start is southwest and the
+GBA first-seat run starts southeast. The observer increments are
+asynchronous to native game updates. Matching the base position and
+measuring the native gameplay clock remain prerequisites for a rate
+comparison.
+
+## Protoss campaign continuation and replay controls
+
+The exact routing release wins P5 after an ordinary pause save at
+frame 2,700 and fresh HOME load. Seven checkpoints, 12 briefing pages
+and five field pages match. Tassadar survives at (1,704, 1,771),
+and the mission wins at frame 5,057 with its completion bit set and
+zero trigger faults.
+
+The regenerated historical P6 controller tape still matches its
+published hashes. A paired input run on the historical and current
+ARM ROMs differs on call 39, with the cursor beside overlapping
+units. The older proximity picker selects the Zealot at (107, 84).
+The shared foreground picker selects Tassadar at (108, 98). The
+following attack-move reaches different units, which explains the
+first retained checkpoint mismatch at call 943.
+
+A P6 replay controller repair selects units through ordinary cursor
+and button input, then checks the single selected unit before issuing
+its next order. The regenerated host tape wins at frame 92,986.
+The facility P10 ARM ROM wins on the same tape, using a fresh HOME
+load after saving at frame 64,800. All 105 retained checkpoints match,
+including 32 after loading, and SRAM is unchanged by the load.
+Zeratul and Tassadar survive, the completion bit is set, and the
+replay records zero trigger faults and unsupported actions.
+
 ## Selection and detector query candidate
 
 The [combined draft](https://github.com/ggu/starcraft-gba/pull/724)
@@ -301,3 +411,23 @@ which repeated overlay walks can be elided before adding storage.
 | Matched profiled and unprofiled Crossfire cuts | `50928c356289710d94fa8c52fbf83080ba87468224ce79eecfb8779070e63954` |
 | Crossfire attack-pose call census | `948d1c7e09a856e875f7b8e5f8689c9a4c553578eb3a4567763cb1d0074127b5` |
 | Selectively packed attack-pose trial | `9ba22c1ff4633172913521b98da94dc16954bb72ffc76237926026208c16e7cf` |
+| Eight packed-pose normal and preview link comparisons | `8db8ffae0bb20adcb6300317b9bae851a38742eb61058ad27a91e9d964e375e2` |
+| Documented Showcase target, packed poses off | `e8726e5f828f8067e6f676ed7ff9398885f68a1c3a648458e369d4f32e8d9fce` |
+| Documented Showcase target, packed poses on | `9685250f05a786e39fdeab95cdc836ff544fcfc535641338d64776f774e52431` |
+| Sustained Crossfire control | `77703a54ac7c7f098ae4574414f8ccbd8291a7d0a1b4d8bd135a4724a3e7659b` |
+| Sustained Crossfire with packed poses | `326942ba0facfbab4e50246570209565f7dece4247f2d0e110fc7d2393f6998d` |
+| Packed-pose 48-case ordinary Custom Game matrix | `395252f6b13bf27abef890bc131d30f24ac40237f96f1fce454a9abe73885514` |
+| Packed-pose six Custom Game pair candidate | `761eb3f8eb98e42cc9bc25ec6be4e80764a01d3b18744a20c09556248c6119a0` |
+| Packed-pose P10 victory | `347d19a29195330e6c5ef33eb5169097af4b144127bade4c0ef273b7a38d3d44` |
+| Packed-pose Z1 victory | `47174756fc67adc21274df4558995723a3e41011c3419ee9094feb60ea4b0a75` |
+| Compact pair compositor in ROM | `734fda9e01a765f303d22b3f204e2e95efb5f5e89252aa2d3fecea7158d0260a` |
+| Compact pair compositor with IWRAM inner loop | `f56aed0a7a3fa12fab3675e62a42edebd029ae957029518ec2497075c3ba97b4` |
+| Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
+| Native Challenger final observed opening frame | `1f802e921166a464433def5394c2f64b6585d504c1e7f7d9754754722ae76fc1` |
+| Current GBA Outpost gathering continuation | `b0c29b94177124741107388941c4f4f7c930bc0c957a2f7714e86c56af0218b8` |
+| Native Blood Bath one-CPU opening tape | `ed076af8ed5c8d8906f75d49fa8791ce3abe1b62a247072e132de0cd8e5805dc` |
+| Native Blood Bath one-CPU opening frames index | `28324258b6de0f8ef51b63d545bb2aaccb08d1db64ad261de64e05e3915182e3` |
+| GBA Blood Bath one-CPU opening | `9557929dff3d115dc2accece76081ee18bd46cb9c20c126a3591c440459aa034` |
+| Current P5 fresh save victory | `9e23597c5b2d0e3198cf7b3138c4df93da07cec51d6bfc85849d78e29a56c88c` |
+| P6 historical and current pick comparison | `5422d9d79a5d2295bac6237931be73a52cfb4f5ec88125e20107827a6a69a8af` |
+| P6 ordinary ARM fresh save victory | `6f701acab49cb1c597100e03977c395eb74899bb769f0ce06fe11997bdd89348` |

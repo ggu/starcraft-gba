@@ -832,6 +832,13 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #endif
 #ifdef SC64_UNIT_ATTACK_POSES_ENABLED
 #include "sc64_unit_attack_source.h"
+#if defined(SC64_UNIT_ATTACK_WORDS) && defined(SC64_UNIT_WORD_SPRITES)
+#define SC64_ATTACK_WORD_RENDER 1
+#include "sc64_unit_attack_words_generated.h"
+#if !defined(SC64_UNIT_ATTACK_WORDS_METADATA) || SC64_UNIT_ATTACK_WORDS_METADATA != 1
+#error "Attack word poses require generated metadata v1"
+#endif
+#endif
 #endif
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
 #if !defined(SC64_Z5_SPRITE_SET_COMPLETE) || \
@@ -11425,11 +11432,18 @@ sc64_worker_cargo_badge_kind(const Unit *q)
 
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
 static const Sc64SpriteFrame *
-sc64_source_unit_attack_pose(const Unit *q)
+sc64_source_unit_attack_pose_resolve(const Unit *q
+#ifdef SC64_ATTACK_WORD_RENDER
+, const GbaSpriteWordFrame **packed
+#endif
+)
 {
     int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     int slot=(int)(q-u)+1, newest=0x7fffffff;
     const Sc64SpriteFrame *pose=0;
+#ifdef SC64_ATTACK_WORD_RENDER
+    if(packed) *packed=0;
+#endif
     if(!q->cd) return 0;
     for(int i=0;i<MAX_TRACERS;++i) {
         const Tracer *t=&tracers[i]; Sc64WeaponSourceVfxKey key;
@@ -11439,12 +11453,27 @@ sc64_source_unit_attack_pose(const Unit *q)
         int age=sc64_tracer_duration(i)-t->life;
         if(age<0) age=0;
         if(age>=newest) continue;
+        unsigned tick=sc64_weapon_source_vfx_source_tick((unsigned)age);
         const Sc64SpriteFrame *candidate=sc64_unit_attack_source_full_frame(
-            (unsigned short)raw,key.target_air,key.direction,
-            sc64_weapon_source_vfx_source_tick((unsigned)age));
-        if(candidate) {pose=candidate;newest=age;}
+            (unsigned short)raw,key.target_air,key.direction,tick);
+        if(candidate) {
+            pose=candidate;newest=age;
+#ifdef SC64_ATTACK_WORD_RENDER
+            if(packed) *packed=sc64_attack_words_lookup((unsigned short)raw,
+                key.target_air,key.direction,tick,candidate);
+#endif
+        }
     }
     return pose;
+}
+static const Sc64SpriteFrame *
+sc64_source_unit_attack_pose(const Unit *q)
+{
+    return sc64_source_unit_attack_pose_resolve(q
+#ifdef SC64_ATTACK_WORD_RENDER
+        , 0
+#endif
+    );
 }
 #endif
 
@@ -11540,7 +11569,12 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
 #endif
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
     /* The selection stays sized from the standing art while a pose plays. */
+#ifdef SC64_ATTACK_WORD_RENDER
+    const GbaSpriteWordFrame *attack_word=0;
+    const Sc64SpriteFrame *attack_pose=selection_pass?0:sc64_source_unit_attack_pose_resolve(q,&attack_word);
+#else
     const Sc64SpriteFrame *attack_pose=selection_pass?0:sc64_source_unit_attack_pose(q);
+#endif
     if(attack_pose) sprite=attack_pose;
 #endif
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
@@ -11592,7 +11626,15 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
 #endif
     sc64_facing_track(q);
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
-    if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
+    if(attack_pose) {
+#ifdef SC64_ATTACK_WORD_RENDER
+        if(attack_word)
+            gfx_blit_sprite_words(x-attack_pose->canvas_w/2+attack_pose->offset_x,
+                body_y-attack_pose->canvas_h/2+attack_pose->offset_y,attack_word);
+        else
+#endif
+            draw_mission_sprite(attack_pose,x,body_y);
+    }
     else
 #endif
     if (sprite && sc64_facing_draw_parts(q, facing_raw, x, y, walk, turret_lift)) {}

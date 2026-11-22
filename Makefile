@@ -584,10 +584,10 @@ endif
 # Read-only key comparison also handles sub-second changes with macOS Make 3.81.
 sc64_lookup_quote = '$(subst ','"'"',$(1))'
 include config/canonical-lookup/Makefile
-CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
+include mk/attack-word-poses/Makefile
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
 CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_HEADER)) $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
-SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(CANONICAL_LOOKUP_INPUTS)
+SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(ATTACK_WORD_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
 CANONICAL_LOOKUP_FLAGS = $(if $(and $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(filter -DSC64_WEAPON_SOURCE_VFX,$(CANONICAL_WEAPON_FLAGS))),-Ibuild/generated/weapon-lookup '-DSC64_WEAPON_SOURCE_BANK_HEADER="sc64_weapon_source_indexed.h"')
 
 $(WALK_WORDS_HEADER): $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) $(WALK_PAIR_CHECK) tools/sc64_unit_walk_words.py tools/sc64_unit_facing.py tools/sc64_walk_pair.py build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
@@ -602,10 +602,10 @@ $(INDEXED_WEAPON_HEADER): $(WEAPON_SOURCE_HEADER) tools/sc64_weapon_lookup_index
 force-canonical-lookup-rebuild:
 force-canonical-lookup-config:
 build/canonical-lookup-config: force-canonical-lookup-config | build
-	@printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' > $@.tmp
+	@printf '%s\n' $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_CONFIG_KEY)) > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
-SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
+SOURCE_WEAPON_FLAGS := $(ATTACK_WORD_FLAGS) -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
 # Cache only the immutable presentation duration for the four qualified source
 # weapon products. Empty the override to compare or disable it on those builds.
 CANONICAL_TRACE_DURATION_FLAGS ?= -DSC64_TRACE_DURATION_CACHE -DSC64_TRACE_PROFILE_INDEX_CACHE
