@@ -48,10 +48,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [current Blood Bath spike](audits/2026-11-12-target-index-bulk.md#the-next-dense-skirmish-bottleneck)
   spends 1.09 million cycles on worker facility paths and 870,183
   on movement point fills. One destroyed building invalidates 32
-  worker depot choices. All 32 pick their previous depot again across
-  the next two updates. Prioritize preserving certified reachable
-  choices through partial topology changes and check nearer or newly
-  reachable depots, worker crossings and exact saved replays.
+  worker depot choices. The [depot expansion continuation](audits/2026-11-22-dense-depot-suffix.md)
+  switches long 64×64 floods to byte-grid scratch while preserving
+  the FIFO and its packed result. Busy Blood Bath's worst update is
+  3.01% faster with matching gameplay, video and saves. Its average
+  cost improves 0.12%. The longest depot query still consumes 529,000
+  cycles. Every distinct depot-query origin in the stall had a positive
+  witness before the six-cell opening. A destruction-only proof cuts
+  the worst update a further 8.06%, while the mean and p95 rise 0.35%
+  and 2.13%. Keep that trial out of the cartridges. Prioritize reuse of
+  exact retained directions when an opening cannot affect the path.
+  Measure the next update and full replay to capture cache-warming cost.
+  Include closer newly reachable depots and save/load continuation.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak
