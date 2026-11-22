@@ -155,6 +155,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   exact retained directions when an opening cannot affect the path.
   Measure the next update and full replay to capture cache-warming cost.
   Include closer newly reachable depots and save/load continuation.
+  The [64×64 point FIFO](audits/2026-11-22-dense-depot-suffix.md#dense-point-queue-on-the-current-release)
+  saves 3.29% on the current Blood Bath peak and 5.05% on the
+  next update. All seven fields have different goals. Their
+  requested origins are first discovered after 685–1,662 of
+  2,795 pops. The earlier partial-field trials often shifted the
+  cost to later reads. Measure how long fields remain usable
+  before materialization and look for savings in the full fill.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak

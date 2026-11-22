@@ -134,8 +134,11 @@ and 219 action checks. These cover launch configuration, action-time
 frame and resources, and terminal unit and building counts. On the
 current runtime the human finishes with 39 units and 17 buildings.
 The 43,386-call replay averages 21.29 emulated main-loop updates per
-second, including menu and presentation time. The separate earlier
-30,541-call HOST win remains a host measurement.
+second, including menu and presentation time. The earlier controller
+tape also wins on the released normal Terran ARM cartridge at call
+30,541 and frame 29,909. It matches 192 observations across 3,175
+input transitions and 190 action checks, with 83 Terran units and
+18 buildings remaining.
 
 The four regular links use the same IWRAM and EWRAM as the current
 control. All 1,134 ordinary named and closed-seat lobby observations
@@ -153,6 +156,7 @@ fingerprints and SRAM bytes.
 | Formation HOST victory with rendered controller frames | `bd48ae2d8221ddccf9e49d6674f039ab0ac49f1be45aea697a6e95e22e57c7c0` |
 | Ordinary ARM victory on the original trial | `e8775789f0519ee3c251fbe784214785d95d0471129247ae6b930e9da9202696` |
 | Ordinary ARM victory on the current composition | `21d20157196bf66bacb75ed21666e7ece84a78bd474338d8a0569f7805520b68` |
+| Earlier controller's ordinary ARM victory | `c2d4a629aaf7126c38389c5a6153dd64c1f83d4e2e8e4531e6ab0e3d6f4a5096` |
 | Current 1,134 ordinary launches | `3aa41077157c38253f02ebf0e7f573fcaf73398091fe9de6a9e299f5bd180132` |
 | Current 24-case regular fresh HOME matrix | `69d3b681acdd0cc5246ee4ffaf3ac33a4ca69bfdcc7f20f20d221f7d9a6a91bf` |
 
