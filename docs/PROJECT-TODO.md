@@ -45,6 +45,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preserves target order and the sampled dense matches. It fails the
   Z10 IWRAM guard and raises the dense Blood Bath mean by 1.22% when
   compared with matched ROM placement. Keep the current index.
+  The [steady target and cloak-cache audit](audits/2026-11-22-steady-order-cost.md)
+  finds empty cells at 93% of sampled indexed visits. Row bitmaps
+  make queries cheaper and still raise mean Blood Bath cost after
+  sparse clearing. Skipping redundant untracked Arbiter cache writes
+  cuts the P10 victory replay's mean 0.39% with matching cache
+  words, displays and saves. The replay averages 11.06 emulated
+  updates per second. A uniform-radius whole-bucket bound excludes
+  3.5% of visited contact nodes in a five-update P10 sample. Broader
+  movement and collision work remains the priority. Compare sustained
+  cost, normal-input outcomes and fresh title continuation.
   The [current Blood Bath spike](audits/2026-11-12-target-index-bulk.md#the-next-dense-skirmish-bottleneck)
   spends 1.09 million cycles on worker facility paths and 870,183
   on movement point fills. One destroyed building invalidates 32
