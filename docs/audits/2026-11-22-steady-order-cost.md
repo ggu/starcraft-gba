@@ -456,6 +456,8 @@ weapon and HUD fingerprints and final SRAM. Its mean moves from
 1,502,844 to 1,491,932 cycles per update, about 11.25 emulated updates
 per second. The 30 campaign opening fingerprints and all 24 regular
 pause-save and fresh HOME cases also match, including saved SRAM bytes.
+All 1,134 normal Custom Game launches match the earlier map, human race,
+named or closed CPU seats and hall positions.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -465,6 +467,15 @@ pause-save and fresh HOME cases also match, including saved SRAM bytes.
 | Showcase Crossfire | `7086a496074cfdea19df7cb7d88d6338581611e52c430ff4c387f0c2dbfbab4f` |
 | Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
 | Regular pause save and fresh HOME matrix | `f3d10f2b9f5e7354fee2e0a879df60a676f4fd8b73f796e73ca139994aed7350` |
+| Ordinary Custom Game launch matrix | `0955050b8a1dd809200f174a728a01c689deddbfb88d0b347a27c9a7c67b5d34` |
+
+On the retained Outpost frame 11,100, a read-only breakpoint census
+records no entries into the attacker-overlay branch of tracer drawing.
+The same cut matches world, both video pages, palette and route counters.
+An early exit for empty actor overlays cannot save cycles in this cut.
+Measure the projectile-overlay branch and wider fights before proposing
+a tracer shortcut. The one-frame receipt SHA-256 is
+`17be680573df0bde2e69793ffbfa0372f25bea1765d31bf0bca2d4e209d03e24`.
 
 ## Outpost resource sprite costs
 
