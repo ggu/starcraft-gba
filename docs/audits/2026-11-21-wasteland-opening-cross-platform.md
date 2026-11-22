@@ -78,6 +78,30 @@ edge. The [earlier native actor audit](2026-11-07-native-actor-differential/READ
 records a C-Right Move order changing five Marine orders. Use that
 input and sample later unit positions for the movement cut.
 
+### November 22 paired opening selection
+
+A clean native run from reset completes 9,000 ares steps. The command
+log records R held for ten steps from 8,400, followed by a release.
+The callbacks at 8,399 and 8,449 show no rings before R and five
+green-ringed infantry afterward. The HUD reports `UNITS: 5` and
+offers Move, Stop and Attack. The observer polls confirm the R press.
+The callback step counts and GBA simulation frames use separate clocks.
+
+The current Terran ARM image from the generated-bounds release starts
+Wasteland with normal HOME, briefing and deployment input. After two
+neutral updates, no human unit is selected. An ordinary R press and
+release selects the five raw-0 Marines. All five workers stay
+unselected. The observer reads the selected fields at their ELF
+offsets. This pair establishes the opening combat-group selection.
+The Move and defeat timing follow-ups remain open on this frontend.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Native input and callback manifest | `3ed071df466aa265c9256cf1b43b72215083764a30d90e56965b0b47943c70a6` |
+| Native capture before R | `10da414c22aaf88818c477297f399076c26bf8e05d9b7fa75040b28f6b0f70c2` |
+| Native capture after R | `02f0da292763597bfc41672d0272d7951d5207c5e64199943d37420e0897ac46` |
+| Current ARM selected actors | `6e94a43f22dd42a9cd514ce652a720b5425b09bc497a6451f9be067f1d002c5e` |
+
 ## GBA outcome correction and replay
 
 Both Wasteland implementations now require a completed Barracks for
