@@ -157,6 +157,12 @@ BSS and data sizes. A prepared fallback without the word-sprite
 capability also links. The 36 focused source generator, facing and
 weapon tests pass, including bank mismatch and boundary cases.
 
+The documented Showcase Make target also builds with the option
+disabled, enabled and disabled again. The final disabled ROM matches
+the first one byte for byte. The enabled build adds 292,532 text bytes
+with unchanged data and BSS, and the two products match all 32
+Crossfire checkpoints. The pooled guest cycle mean falls by 1.48%.
+
 Over 900 advancing updates of the full Crossfire scene, the
 mean falls from 946,292 to 937,866 cycles (0.89%). All 30 checkpoints
 match the world, both video pages, palette, route and tracer bank.
@@ -205,6 +211,17 @@ neutral updates, with 4/10 supply and eight minerals in sampled
 worker cargo. The observed openings share automatic gathering. The
 maps, game type and timing units differ, so the relative mining
 rate remains open.
+
+The follow-up ordinary Blood Bath Melee runs select a Terran human,
+one Zerg CPU and two closed seats on both engines. Native captures
+show four starting SCVs, 50 minerals and 4/10 supply. After neutral
+input, the first visible credit is eight minerals between observer
+steps 6,309 and 6,409. The GBA preview first credits eight minerals at
+neutral update 74. The visible native start is southwest and the
+GBA first-seat run starts southeast. The observer increments are
+asynchronous to native game updates. Matching the base position and
+measuring the native gameplay clock remain prerequisites for a rate
+comparison.
 
 ## Protoss campaign continuation and replay controls
 
@@ -395,6 +412,8 @@ which repeated overlay walks can be elided before adding storage.
 | Crossfire attack-pose call census | `948d1c7e09a856e875f7b8e5f8689c9a4c553578eb3a4567763cb1d0074127b5` |
 | Selectively packed attack-pose trial | `9ba22c1ff4633172913521b98da94dc16954bb72ffc76237926026208c16e7cf` |
 | Eight packed-pose normal and preview link comparisons | `8db8ffae0bb20adcb6300317b9bae851a38742eb61058ad27a91e9d964e375e2` |
+| Documented Showcase target, packed poses off | `e8726e5f828f8067e6f676ed7ff9398885f68a1c3a648458e369d4f32e8d9fce` |
+| Documented Showcase target, packed poses on | `9685250f05a786e39fdeab95cdc836ff544fcfc535641338d64776f774e52431` |
 | Sustained Crossfire control | `77703a54ac7c7f098ae4574414f8ccbd8291a7d0a1b4d8bd135a4724a3e7659b` |
 | Sustained Crossfire with packed poses | `326942ba0facfbab4e50246570209565f7dece4247f2d0e110fc7d2393f6998d` |
 | Packed-pose 48-case ordinary Custom Game matrix | `395252f6b13bf27abef890bc131d30f24ac40237f96f1fce454a9abe73885514` |
@@ -406,6 +425,9 @@ which repeated overlay walks can be elided before adding storage.
 | Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
 | Native Challenger final observed opening frame | `1f802e921166a464433def5394c2f64b6585d504c1e7f7d9754754722ae76fc1` |
 | Current GBA Outpost gathering continuation | `b0c29b94177124741107388941c4f4f7c930bc0c957a2f7714e86c56af0218b8` |
+| Native Blood Bath one-CPU opening tape | `ed076af8ed5c8d8906f75d49fa8791ce3abe1b62a247072e132de0cd8e5805dc` |
+| Native Blood Bath one-CPU opening frames index | `28324258b6de0f8ef51b63d545bb2aaccb08d1db64ad261de64e05e3915182e3` |
+| GBA Blood Bath one-CPU opening | `9557929dff3d115dc2accece76081ee18bd46cb9c20c126a3591c440459aa034` |
 | Current P5 fresh save victory | `9e23597c5b2d0e3198cf7b3138c4df93da07cec51d6bfc85849d78e29a56c88c` |
 | P6 historical and current pick comparison | `5422d9d79a5d2295bac6237931be73a52cfb4f5ec88125e20107827a6a69a8af` |
 | P6 ordinary ARM fresh save victory | `6f701acab49cb1c597100e03977c395eb74899bb769f0ce06fe11997bdd89348` |

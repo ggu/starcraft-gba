@@ -2404,8 +2404,10 @@ save/source-owner and timing evidence; do not advertise unwired components.
   victory journal. Continue qualifying other normal campaign save points.
 - The [ordinary Custom Game openings](audits/2026-11-22-steady-order-cost.md#automatic-gathering-in-two-custom-game-openings)
   show automatic Terran gathering on native Challenger and GBA
-  Outpost. Compare the same map, game type and gameplay clock before
-  tuning the collection rate.
+  Outpost. A follow-up launches Blood Bath Melee with one Zerg CPU
+  on both engines and confirms automatic gathering. The human start
+  locations differ. Match the starting base and gameplay clock
+  before tuning the collection rate.
 - [Fresh P5 and P6 controls](audits/2026-11-22-steady-order-cost.md#protoss-campaign-continuation-and-replay-controls)
   verify P5 and P6 victories after fresh SRAM load on the facility
   release. The repaired P6 controller verifies the intended unit
