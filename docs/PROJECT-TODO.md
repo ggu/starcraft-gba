@@ -77,7 +77,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the saving is 0.89%. The full Custom Game and P10 samples are nearly
   flat, and Z1 saves 0.07%. All 48 ordinary Custom Game save and reload
   cases pass. Keep the option explicit and use sustained battle
-  measurements to choose future actor banks. A point-route
+  measurements to choose future actor banks. A
+  [shared byte-sprite trial](audits/2026-11-22-steady-order-cost.md#aligned-reads-in-the-shared-byte-sprite-compositor)
+  saves 1.53% over the sustained visible Crossfire run with matching
+  pixels and state. The three Outpost matches use 0.33–0.42% more
+  cycles and the P10 campaign tail is flat. Keep the trial out of the
+  regular builds while reducing the unaligned and mixed-opacity
+  cost. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
@@ -2410,9 +2416,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
   before tuning the collection rate.
 - [Fresh P5 and P6 controls](audits/2026-11-22-steady-order-cost.md#protoss-campaign-continuation-and-replay-controls)
   verify P5 and P6 victories after fresh SRAM load on the facility
-  release. The repaired P6 controller verifies the intended unit
-  after each contested click and matches 105 ARM checkpoints. Carry
-  the controller into source and qualify later campaign save points.
+  release. The [merged P6 controller](https://github.com/ggu/starcraft-gba/pull/728)
+  verifies the intended unit after each contested click and matches
+  105 ARM checkpoints. Qualify later campaign save points.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie

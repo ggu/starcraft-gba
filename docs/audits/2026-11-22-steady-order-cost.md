@@ -193,6 +193,35 @@ and 1,375,805. The latter adds 72 IWRAM bytes in Showcase and trails
 the four-phase path. The normal Z10 link has 40 bytes of IWRAM guard
 margin. Keep the pair variants local.
 
+## Aligned reads in the shared byte-sprite compositor
+
+A local trial reads two indexed pixels in one halfword when the
+source pointer is aligned. Unaligned pairs use byte reads. Mode 4
+still writes only aligned halfwords or words, and transparent pixels
+retain the corresponding destination lanes. The original-art
+framebuffer oracle passes with both word-copy configurations under
+ASan and UBSan.
+
+The ordinary Showcase Crossfire control and the trial match both
+video pages, the palette, world, tracer bank and route at all 32
+short-window cuts. Removing indexed inner-loop address arithmetic
+alone saves 0.64% pooled. Also using aligned halfword reads saves
+2.24% pooled and 1.53% over 900 advancing updates. All 30 cuts
+in the longer fight match.
+
+The eight normal and preview links reproduce the measured pilot
+ROMs byte for byte from the tracked source candidate. Each passes
+its RAM guard. Showcase gains 72 bytes of IWRAM margin and normal
+Z10 has 16 bytes of margin. All six 12,000-update Custom Game pairs
+match 120 state and video samples. Outpost means increase
+0.33–0.42%, and Blood Bath means fall 0.04–0.05%. The P10 fresh
+save tail wins with all 81 state, video and route cuts and the
+victory journal matching. Its mean rises 0.018%.
+
+Keep the trial out of the regular cartridge builds. A broader
+renderer change should retain the visible-battle improvement while
+reducing cost under both common skirmish workloads.
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
@@ -422,6 +451,10 @@ which repeated overlay walks can be elided before adding storage.
 | Packed-pose Z1 victory | `47174756fc67adc21274df4558995723a3e41011c3419ee9094feb60ea4b0a75` |
 | Compact pair compositor in ROM | `734fda9e01a765f303d22b3f204e2e95efb5f5e89252aa2d3fecea7158d0260a` |
 | Compact pair compositor with IWRAM inner loop | `f56aed0a7a3fa12fab3675e62a42edebd029ae957029518ec2497075c3ba97b4` |
+| Shared byte compositor, 32 Crossfire cuts | `826089da58fe0bc2ac43c9500adc5c2a60445de8d9a6306b617d55408eace57f` |
+| Shared byte compositor, 900 Crossfire updates | `906978a6180de3d72e07ac6f131a724c3dbd155c734534e3fcf0c14dc4c3bcf2` |
+| Shared byte compositor, six Custom Game replays | `5cb807685223cc20a737c5b64c49686ef6f0416327e5da09187243d03825549f` |
+| Shared byte compositor, current P10 fresh save victory | `e67cb892b874b383e11c915661bc24ae209c6f29b44702e50c158105e60a8a6d` |
 | Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
 | Native Challenger final observed opening frame | `1f802e921166a464433def5394c2f64b6585d504c1e7f7d9754754722ae76fc1` |
 | Current GBA Outpost gathering continuation | `b0c29b94177124741107388941c4f4f7c930bc0c957a2f7714e86c56af0218b8` |
