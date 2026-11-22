@@ -60,6 +60,25 @@ enum {
 #endif
 };
 
+/* These fallback styles have one independent moving head. Source-attached
+ * flashes and composite effects still need their own image information. */
+static inline int
+sc64_weapon_vfx_has_moving_head(int style)
+{
+    switch (style) {
+    case SC64_WEAPON_VFX_STYLE_NEEDLE:
+    case SC64_WEAPON_VFX_STYLE_MISSILE:
+    case SC64_WEAPON_VFX_STYLE_PLASMA:
+    case SC64_WEAPON_VFX_STYLE_ACID:
+    case SC64_WEAPON_VFX_STYLE_SHELL:
+    case SC64_WEAPON_VFX_STYLE_ARC:
+    case SC64_WEAPON_VFX_STYLE_BEAM:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 /* Number of visible renderer calls for an authored style. Callers seed a
  * transient tracer with lifetime+1 and age it before drawing, so the first
  * visible call sees exactly this value. NONE and unknown styles draw zero. */

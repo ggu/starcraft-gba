@@ -757,8 +757,8 @@ race_p6_combat_tick_traps(void)
 #ifdef SC64_WEAPON_SOURCE_BANK_VERSION
             if (!sc64_source_building_vfx(trap,target_x(best),target_y(best),0,best))
 #endif
-            add_tracer(trap->x,trap->y,target_x(best),target_y(best),
-                sc64_weapon_vfx_building_profile(trap->type));
+            sc64_emit_fallback_attack(trap->x, trap->y, best,
+                                      sc64_weapon_vfx_building_profile(trap->type));
             trap->shield_remainder=SC64_P6_WALL_TRAP_COOLDOWN_GBA_TICKS;
             ++fired;
         }

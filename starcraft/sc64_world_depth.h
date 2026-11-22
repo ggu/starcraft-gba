@@ -242,12 +242,18 @@ sc64_trace_world_y(unsigned i)
     const Sc64TraceSlot *slot = &sc64_trace_slots[i];
     Sc64WeaponSourceVfxKey key;
     if (!sc64_weapon_source_vfx_unpack((uint32_t)trace->color, &key)) {
+        int style = sc64_weapon_vfx_style(trace->color);
 #ifdef SC64_TANK_SOURCE_VFX
         /* Legacy source-bank Tank impacts remain at their captured target. */
-        int style = sc64_weapon_vfx_style(trace->color);
         if (style == SC64_TANK_SOURCE_TANK || style == SC64_TANK_SOURCE_SIEGE)
             return trace->y1;
 #endif
+        if (sc64_weapon_vfx_has_moving_head(style)) {
+            int x, y;
+            sc64_weapon_vfx_move_point(style, trace->x0, trace->y0, trace->x1, trace->y1,
+                                       trace->life, &x, &y);
+            return y;
+        }
         return trace->y0;
     }
     const Sc64WeaponSourceAttackProfile *profile = slot->profile_plus1 ?

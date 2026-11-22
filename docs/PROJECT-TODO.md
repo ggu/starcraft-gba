@@ -147,6 +147,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [mineral work regression](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
   checks the separate layer-5 cue. Add native composed overlap cuts and
   ordinary pause/reload coverage during mining to the replay harness.
+  The [fallback projectile fix](audits/2026-11-22-fallback-projectile-world-depth.md#harness-cases)
+  puts authored moving shots in the shared queue using the native launch
+  layer rule. Add the diagonal flight and impact cases to the harness.
+  Prioritize a synchronized native opaque overlap with both pool IDs
+  before replacing the GBA's exact-tie policy.
 
 - **Zerg 7 current-controller replay.** The [rendered authoring audit](audits/2026-11-22-z7-rendered-replay.md)
   isolates the selection change at two stacked Drones. Render between

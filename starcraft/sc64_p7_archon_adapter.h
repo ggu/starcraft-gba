@@ -195,7 +195,7 @@ race_p7_archon_splash_attack(Unit *attacker,int primary)
         if(!sc64_source_unit_vfx(attacker,target_x(primary),target_y(primary),
                 primary<MAX_UNITS && sc64_race_unit_flying(u[primary].type),primary))
 #endif
-        add_tracer(attacker->x,attacker->y,target_x(primary),target_y(primary),color);
+        sc64_emit_fallback_attack(attacker->x, attacker->y, primary, color);
     }
     attacker->cd=SC64_P7_ARCHON_COOLDOWN_GBA_TICKS;
     return 1;

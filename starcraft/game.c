@@ -4933,6 +4933,19 @@ sc64_trace_forget_ref(int ref)
 #endif
 #include "sc64_trace_duration.h"
 
+static int __attribute__((noinline))
+sc64_emit_fallback_attack(int x, int y, int target, int color)
+{
+    int slot = add_tracer(x, y, target_x(target), target_y(target), color);
+#ifdef SC64_PROJECTILE_DEPTH
+    /* An authored shot has no separate wind-up. Capture its launch layer
+     * here, before the target can change elevation or vacate its slot. */
+    if (slot >= 0 && sc64_weapon_vfx_has_moving_head(sc64_weapon_vfx_style(color)))
+        sc64_trace_slots[slot].bullet_layer = (u8)(sc64_trace_actor_layer(target) + 1);
+#endif
+    return slot;
+}
+
 #if defined(SC64_TANK_SOURCE_VFX) && defined(SC64_PROJECTILE_DEPTH)
 static void
 sc64_tank_fallback_depth(int slot, int shooter, int target)
@@ -9143,11 +9156,11 @@ tick_combat(Unit * q, int target)
             if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying,target)) {
 #endif
 #if defined(SC64_TANK_SOURCE_VFX) && defined(SC64_PROJECTILE_DEPTH)
-                int trace = add_tracer(q->x, q->y, target_x(target), target_y(target), visual_color);
+                int trace = sc64_emit_fallback_attack(q->x, q->y, target, visual_color);
                 if (q->type == U_TANK || q->type == U_SIEGE_TANK)
                     sc64_tank_fallback_depth(trace, (int)(q - u), target);
 #else
-            add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
+            sc64_emit_fallback_attack(q->x, q->y, target, visual_color);
 #endif
 #ifdef SC64_WEAPON_SOURCE_VFX
             }
