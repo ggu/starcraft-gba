@@ -120,9 +120,13 @@ identical before and after the change.
 
 The existing combined-arms HOST policy wins with the formation at call 30,541
 and game frame 29,909. The variant that renders every controller frame stalls
-at its 75,000-call limit, while that variant wins on the previous build. Use
-the new winning tape for physical verification and investigate the autonomous
-controller's selection and attack behavior before publishing the change.
+at its 75,000-call limit, while that variant wins on the previous build. Its
+attack policy stops sending the main force below 30 Marines while any enemy
+units remain. A local controller comparison allows the sweep at 12 Marines
+once the opponent has at most eight units. The first additional attack issues
+orders to 47 actors at call 32,142. The formation build then defeats the Zerg
+at call 43,386 and game frame 42,658 with zero Zerg units or buildings. Both new
+victory tapes still need replay on the physical-button ARM observer.
 
 | Local witness | SHA-256 |
 | --- | --- |
@@ -131,6 +135,7 @@ controller's selection and attack behavior before publishing the change.
 | Regular ARM lobby matrix | `1dae2173c498b742dd3950d4893f573045ae57e11dd5bc71eb473881949e5d9e` |
 | ARM 48-case fresh HOME matrix | `de684a464324f6beb0d36eee8d621aeaec7a5230901142325145660110504b5e` |
 | Formation HOST victory tape | `6e7dc6f9cf8caca66719ae0ab64dee87f50cc777707b721112ec23bd097fb681` |
+| Formation HOST victory with rendered controller frames | `bd48ae2d8221ddccf9e49d6674f039ab0ac49f1be45aea697a6e95e22e57c7c0` |
 
 ### Earlier opt-in witnesses
 
