@@ -87,8 +87,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 1.19% over the same visible fight and 0.16% on the P10
   victory tail. Five long Custom Game pairs improve slightly and the
   sixth stays within 0.003%. All 48 ordinary save/reload cases pass.
-  Continue toward the two-VBlank budget by profiling the remaining
-  movement, route and depth-render costs. A point-route
+  The [Mode 4 page census](audits/2026-11-22-steady-order-cost.md#mode-4-page-update-coverage)
+  finds changes in 8–36 of 105 battlefield tiles in fixed-camera
+  windows, with 55–81 tiles still carrying overlays over terrain.
+  Prioritize exact reuse of finished regions where the camera and
+  contributors are stable. Retain moving-camera cases, with 105
+  changed tiles on each pan update in one P10 window. Continue
+  profiling movement and route work toward the two-VBlank budget.
+  A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
@@ -354,6 +360,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   after a fresh HOME load. The exact controller target reproduces
   all 4,929 physical input transitions. Extend that proof to other
   campaign saves and the next combined runtime.
+  [Carried P8](audits/2026-11-22-steady-order-cost.md#carried-p8-replay-refresh)
+  diverges on Fenix's shields at frame 11,690 with the facility
+  defense and target flags and explicit authored-page inputs.
+  Find the first damaging action before qualifying its pause save.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)

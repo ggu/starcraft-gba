@@ -262,6 +262,42 @@ The prepared opt-in packed pose bank also links. With the option
 enabled, 32 checkpoints across 960 Crossfire updates match the
 disabled build, with a further 0.93% cycle saving in that run.
 
+## Mode 4 page update coverage
+
+On the merged targeting and pose runtime, the physical-button
+observer reads both indexed display pages, the palette and DISPCNT
+after each advancing update. Each 16-update window below has one
+page flip per update and a stable palette. The page selected in
+DISPCNT already contains its new image at the preceding sample.
+The other page contains the newly composited world for the next
+flip, so the comparison follows that physical address across the
+update. A tile in this census is a 16×16 screen-aligned region of
+the 240×108 battlefield, with a shorter last row.
+
+| Workload | Camera changes | Mean changed work-page tiles | Mean tiles with an overlay over terrain |
+| --- | ---: | ---: | ---: |
+| Crossfire, frames 40–55 | 0 | 35.94 | 80.94 |
+| Crossfire, frames 95–110 | 0 | 35.13 | 77.75 |
+| Crossfire, frames 600–615 | 0 | 8.25 | 55.00 |
+| Three-CPU Outpost, frames 11,100–11,115 | 0 | 16.00 | 73.75 |
+| P10, calls 39,760–39,775 | 13 | 96.81 | 60.38 |
+| P10, calls 44,000–44,015 | 13 | 50.13 | 49.75 |
+
+All counts are out of 105 tiles. The overlay column compares the
+new work page with the bare terrain and fog band assembled from
+its VRAM and EWRAM cache segments. The cache is valid and its
+camera matches the new frame at every sample. Camera movement
+changes all 105 work-page tiles in the first P10 window on each
+of its 13 movement updates.
+
+Terrain-only restoration can skip a smaller set of tiles than
+the visible frame change suggests, because substantial stable
+art remains over the terrain. Prioritize reuse of composited
+regions on a stationary camera, with an exact test for unchanged
+contributors and bounded storage for both pages. Retain moving
+camera cases in the benchmark. The census measures pixel
+equality. Render-cycle savings remain to be measured.
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
@@ -323,6 +359,24 @@ load after saving at frame 64,800. All 105 retained checkpoints match,
 including 32 after loading, and SRAM is unchanged by the load.
 Zeratul and Tassadar survive, the completion bit is set, and the
 replay records zero trigger faults and unsupported actions.
+
+## Carried P8 replay refresh
+
+The regenerated host route wins P8 at frame 105,433. An ordinary
+input run on the facility P10 cartridge matches the first four
+named checkpoints. At the next checkpoint, frame 11,690, Fenix
+has 240 HP in both runs. The recorded host shield value is 240 and
+the ROM reads 76. The game frame matches and no trigger fault is
+reported. The replay stops before its planned pause save.
+
+The first host build omits the facility's canonical defense and
+target flags, and it auto-acknowledges field dialogue. A follow-up
+uses the facility source with those flags and records ordinary
+authored-page input. It reaches the same checkpoint in the same
+physical call and reproduces the 240 versus 76 shield difference.
+The first damaging action and any earlier world divergence need
+finer sampling. Earlier complete P8 save wins remain qualified on
+their pinned older ROMs.
 
 ## Selection and detector query candidate
 
@@ -515,6 +569,9 @@ which repeated overlay walks can be elided before adding storage.
 | Combined indices, 48-probe Custom Game matrix | `a57acb6f8e1e80cd470ac1a16ace2db118c078b4f79081bd17901f5c9e066e6a` |
 | Combined indices, all 30 campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
 | Combined indices, stack observer | `6b11f0b451904a1665dbcf6a95b688a10c2d83684996f7eb4fb838b8b7027e33` |
+| Mode 4 page and overlay coverage, Crossfire | `ceec52e00a69424d262cc67b58a80eed28b1198f58104bc1b43f5c93d6d41400` |
+| Mode 4 page and overlay coverage, three-CPU Outpost | `edd555b039873e21e7ea49142e567325046a2ca758ce6daf9b39db038f8afbb0` |
+| Mode 4 page and overlay coverage, P10 | `ab58f706404b5936c65c848ab860de63aa37ff8301f6c3fd04976a61d072876f` |
 | Collision table addressing, P10 victory continuation | `85167f6a4b7092138f5896abd31e17715c30d024c0e234880a2173d0d3827ac5` |
 | Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
 | Native Challenger final observed opening frame | `1f802e921166a464433def5394c2f64b6585d504c1e7f7d9754754722ae76fc1` |
@@ -526,3 +583,5 @@ which repeated overlay walks can be elided before adding storage.
 | Current P5 fresh save victory | `9e23597c5b2d0e3198cf7b3138c4df93da07cec51d6bfc85849d78e29a56c88c` |
 | P6 historical and current pick comparison | `5422d9d79a5d2295bac6237931be73a52cfb4f5ec88125e20107827a6a69a8af` |
 | P6 ordinary ARM fresh save victory | `6f701acab49cb1c597100e03977c395eb74899bb769f0ce06fe11997bdd89348` |
+| Carried P8 first facility-ROM replay divergence | `485e866d70da87e7f67e479329824ad2c4915c7d63d231d88093224f6f142c81` |
+| Carried P8 facility flags and authored dialogue replay divergence | `734d1f5da3fcc85b2334b7dbfe1288ae1fe603249e76fe77d589c50b7aff756b` |
