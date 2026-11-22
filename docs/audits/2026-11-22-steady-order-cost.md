@@ -306,6 +306,14 @@ These are lower bounds on the rows that a conservative damage
 tracker would revisit. The row census receipt SHA-256 is
 `161e90bd4a097528006b93f3e17b24b8bd8b456c7bbe24d74c19467d513128c0`.
 
+The old work page differs from bare terrain in every row in the
+late Outpost cut and all three Crossfire cuts.
+Terrain stays stable during all 64 updates. Skipping only clean
+full-width rows would save no terrain transfer in these samples.
+An exact reuse trial will need smaller regions or retained
+composited bands. The terrain-restore census receipt SHA-256 is
+`9c40cfe4704a984474011c86f8fa34e8b0ada5fc9cf5e7bc1778ef85c9573d0e`.
+
 ## Detached attack sprite draw records
 
 Crossfire spends about 27,600 guest cycles per update resolving
@@ -807,6 +815,16 @@ The comparison confirms panning into darkness without revealing
 it and records the difference in cursor placement during the pan.
 
 ## Bounding the other steady costs
+
+The combat audio budget rejects five of 50 attack and death sound
+attempts in 48 Crossfire updates. The late Outpost and P10 replay
+samples record no calls to the effect emitter in 16 and 18 updates
+respectively. All 82 observed updates match the retained world state,
+framebuffer pages, palette and route counters. Skipping the visibility
+and actor lookup once the budget is full has little opportunity in
+these cuts. Keep the existing event order and focus on larger costs.
+The audio census receipt SHA-256 is
+`be2fcb108db8afa9d5de25652adab719ab57be685eb1588ade9b8d0fc6c714e2`.
 
 Earlier read-only target sampling on the same release observed 409
 queries and 1,899 owner-cell visits across three P10 updates. Of those
