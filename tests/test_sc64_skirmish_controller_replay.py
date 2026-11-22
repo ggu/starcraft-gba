@@ -146,6 +146,36 @@ class TraceValidationTests(unittest.TestCase):
         self.assertEqual(plan["terminal"]["kind"], "won")
         self.assertEqual(plan["peak_page_transitions"], 10)
 
+    def test_native_start_requires_live_match_type_and_base_order(self):
+        trace = valid_trace()
+        trace["events"][8].update(map=1, melee=1, start_order=11)
+        trace["terminal"]["map"] = 1
+        start = replay.validate_trace(trace, capacity=32)["start"]
+        state = {"race_mode": 1, "race_human": 1, "race_bots": 1, "race_skirmish_map": 1,
+                 "bot_races": [2, 0, 0], "bot_owners": [1, 0, 0], "melee": 1, "start_order": 11}
+        replay.verify_configuration(start, state)
+        for key, wrong in (("melee", 0), ("start_order", 14)):
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, f"live ARM {key}"):
+                replay.verify_configuration(start, dict(state, **{key: wrong}))
+        del state["melee"]
+        with self.assertRaisesRegex(RuntimeError, "live ARM melee"):
+            replay.verify_configuration(start, state)
+
+    def test_native_start_rejects_incomplete_or_invalid_match_configuration(self):
+        trace = valid_trace()
+        start = trace["events"][8]
+        start.update(map=1, melee=1)
+        trace["terminal"]["map"] = 1
+        with self.assertRaisesRegex(ValueError, "start event fields"):
+            replay.validate_trace(trace, capacity=32)
+        for order in (5, 27):
+            start["start_order"] = order
+            with self.subTest(order=order), self.assertRaisesRegex(ValueError, "distinct Blood Bath bases"):
+                replay.validate_trace(trace, capacity=32)
+        start.update(melee=True, start_order=11)
+        with self.assertRaisesRegex(ValueError, "start.melee must be an integer"):
+            replay.validate_trace(trace, capacity=32)
+
     def test_rejects_wrong_profile_nonwindowed_or_extra_top_level_fields(self):
         trace = valid_trace()
         trace["profile"] = "campaign"

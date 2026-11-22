@@ -33,6 +33,7 @@ MAX_U32 = 0xFFFFFFFF
 KEY_A, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN = 1, 32, 16, 64, 128
 MENU_KEYS = KEY_A | KEY_LEFT | KEY_RIGHT | KEY_UP | KEY_DOWN
 BOT_OWNERS = (1, 3, 4)
+NATIVE_START_SYMBOLS = {"melee": "race_skirmish_melee", "start_order": "race_skirmish_start_order"}
 DEFAULT_OUTPUT = ROOT / ".local/sc64/skirmish/arm-replay"
 
 UNIT_WIDTHS = {
@@ -128,8 +129,10 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True,
         elif kind == "start":
             if start is not None or start_index >= 0:
                 raise ValueError("trace must contain exactly one start event")
-            _exact_keys(row, {"kind", "host_tick", "frame", "map", "human_race", "bots"},
-                        "start event")
+            columns = {"kind", "host_tick", "frame", "map", "human_race", "bots"}
+            if NATIVE_START_SYMBOLS.keys() & row.keys():
+                columns.update(NATIVE_START_SYMBOLS)
+            _exact_keys(row, columns, "start event")
             start = row
             start_index = index
             start_frame = _integer(row["frame"], "start.frame", 1)
@@ -199,6 +202,13 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True,
         raise ValueError("start must configure one to three opponents")
     if not isinstance(bots, list):
         raise ValueError("start.bots must be an array")
+    if "melee" in start:
+        _integer(start["melee"], "start.melee", 0, 1)
+        order = _integer(start["start_order"], "start.start_order", 1, 255)
+        seats = bot_count + 1
+        bases = {(order >> (2 * i)) & 3 for i in range(seats)}
+        if start["map"] != 1 or order >> (2 * seats) or len(bases) != seats:
+            raise ValueError("native start_order must identify distinct Blood Bath bases for the active seats")
     for index, bot in enumerate(bots):
         _exact_keys(bot, {"owner", "race"}, f"start bot {index}")
         _integer(bot["owner"], f"start bot {index}.owner", 0, 4)
@@ -341,6 +351,14 @@ def checkpoint_observer_symbol(sym: dict[str, int]) -> str:
     return "demo_replay_checkpoint"
 
 
+def read_native_start(read_u32, sizes: dict[str, int]) -> dict[str, int]:
+    if "race_skirmish_melee" not in sizes:
+        return {}
+    if any(sizes.get(symbol) != 4 for symbol in NATIVE_START_SYMBOLS.values()):
+        raise RuntimeError("ELF must expose both native match configuration words")
+    return {key: read_u32(symbol) for key, symbol in NATIVE_START_SYMBOLS.items()}
+
+
 def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict) -> dict:
     unit_stride = bank["unit_stride"]
     unit_compact = unit_stride == 56
@@ -372,6 +390,7 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict) -> dic
     state["bot_races"] = decode_scalar_array(rsp.read(sym["race_bot_races"], bot_race_size), 3, 4, signed=True)
     state["bot_owners"] = decode_scalar_array(rsp.read(sym["race_bot_owner_ids"], bot_owner_size), 3, 4, signed=True)
     state["units"], state["buildings"] = units, buildings
+    state.update(read_native_start(lambda name: races.read_u32(rsp, sym[name]), sizes))
     return state
 
 
@@ -382,6 +401,9 @@ def verify_configuration(trace_start: dict, state: dict) -> None:
     for key, wanted in actual.items():
         if state[key] != wanted:
             raise RuntimeError(f"live ARM {key}={state[key]} differs from trace start {wanted}")
+    for key in NATIVE_START_SYMBOLS:
+        if key in trace_start and state.get(key) != trace_start[key]:
+            raise RuntimeError(f"live ARM {key}={state.get(key)} differs from native trace start {trace_start[key]}")
     expected_races = [bot["race"] for bot in bots]
     expected_owners = [bot["owner"] for bot in bots]
     if state["bot_races"][:len(bots)] != expected_races:

@@ -106,6 +106,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   routing uses 150,000 including 95,000 in FIFO expansion. The uncached
   contact mask uses 132,000. Prioritize these measured costs over
   sprite-span caching, which increases P10 actor-draw cost and memory use.
+  The [follow-up routing measurements](audits/2026-11-22-dense-release-attribution.md#full-fifo-completions)
+  show that all six sampled point origins still need a full fill
+  after 2,048 pops. Their first visits take 5,400–7,855 pops.
+  Compare an 8,192-pop cutoff on exact matched tapes and measure
+  later reads and queue evictions.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -165,8 +170,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   replay on that version wins at frame 267,585, matching all 206 checks.
   Mean cycles fall 1.85% across the detector and steering releases.
   Fresh HOME from frame 30,739 also wins at frame 267,585 with all 124
-  continuation checks matching. Verify a third-process victory
-  journal readback on the same runtime.
+  continuation checks matching. A third fresh HOME process reads
+  the [victory journal](audits/2026-11-22-z7-route-observer-purity.md#full-normal-victory-on-the-steering-release)
+  and re-exports identical SRAM.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages
@@ -270,9 +276,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   verify T4, T7 and T10 fresh-pause victories and result readbacks,
   P5 Shuttle continuation and result readback, and the normal Terran Blood Bath win.
   Current Melee previews reach the same three-CPU defeat before and
-  after fresh HOME on all four profiles. Active Melee wins and
-  survivor transfer remain open. SD readback, physical frame pacing
-  and broader native campaign verification remain open.
+  after fresh HOME on all four profiles. The [active Terran Melee replay](audits/2026-11-22-blood-bath-melee-victory.md)
+  verifies seeded deployment, an ordinary-input victory and a fresh
+  HOME result. Native CPU alliances persist through the sampled
+  three-CPU opening. The dual-flag composition passes ordinary human
+  defeat with two neutral survivors, a staged enemy transfer and
+  an ordinary Terran victory one update after retiring the last CPU.
+  Verify ordinary enemy survivor transfer and broader active wins
+  with other races and two or three CPUs.
+  SD readback, physical frame pacing and broader native campaign
+  verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit

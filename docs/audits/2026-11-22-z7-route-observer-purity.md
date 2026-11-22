@@ -95,10 +95,17 @@ The steering-build victory receipt SHA-256 is
 A separate fresh HOME process restores the same frame-30,739 pause and
 plays 238,694 physical calls through victory at frame 267,585. All
 124 named continuation checkpoints match, with defeat clear and zero
-fault. The pause file is byte-identical after replay. A subsequent
-fresh-process victory journal readback is a separate gate.
+fault. The pause file is byte-identical after replay.
 The continuation receipt SHA-256 is
 `529c2c0df2a73600b5a8c9d178d9740b13e0a79ba595457107b834e2c647be16`.
+
+A third process opens the exported victory journal from HOME on the
+same cartridge. It reaches RESULT at frame 267,585, mission slot 18,
+with victory set and defeat clear. The re-export matches the original
+32 KiB victory journal byte for byte. The SRAM SHA-256 is
+`5c3ea865dd3ab256fc7ca0515c1ec25fe2310c11611e9eafb1a4dc81cdff1a0d`.
+The readback receipt SHA-256 is
+`29afd3918be0d59321379d19bd46125a509747c5b4b851fc1fa39f2e21ee32bc`.
 
 ## Focused regression recipe
 
