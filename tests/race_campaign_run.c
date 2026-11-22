@@ -15,6 +15,7 @@ static FILE *controller_pages;
 static u16 controller_previous;
 static unsigned long controller_ticks;
 static int controller_mission_started;
+static int controller_draw_updates;
 static int controller_start_delay;
 typedef struct { unsigned long tick; u16 held; } RaceInputEvent;
 typedef struct { unsigned long tick; int screen, frame, won, lost, elapsed, flags, phase;
@@ -115,7 +116,7 @@ static void controller_step(u16 held)
     /* Draw after every update like common/main.c and the PX replay: selection
      * picks read the facing and stride state that drawing advances. */
     game_update(held, held & (u16)~controller_previous);
-    game_render();
+    if (controller_draw_updates) game_render();
 #ifdef SC64_CONTROLLER_NORMAL_HOME
     controller_route_after=route_purity_hash();
 #endif
@@ -781,6 +782,7 @@ static int controller_last_stand(void)
 
 static int controller_mission(int mission)
 {
+    controller_draw_updates = mission == SC64_RACE_MISSION_P1 || mission == SC64_RACE_MISSION_P2;
     int i, target = -1;
     controller_previous = 0; controller_ticks = 0; controller_mission_started = 0;
     race_event_count = 0; race_checkpoint_count = 0; race_event_overflow = 0;
