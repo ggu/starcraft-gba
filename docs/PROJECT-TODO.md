@@ -101,6 +101,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   P10 victory tail improves 0.93% in mean cycles and the matched Blood
   Bath window improves 0.28%. Measure longer movement-heavy Z7 windows
   on the corrected tape and keep exact route and world checkpoints.
+  The [later Z7 instruction sample](audits/2026-11-22-dense-release-attribution.md#later-z7-orders-and-point-routing-on-the-steering-release)
+  averages 1.606 million cycles, with 887,000 in orders. Point-prefix
+  routing uses 150,000 including 95,000 in FIFO expansion. The uncached
+  contact mask uses 132,000. Prioritize these measured costs over
+  sprite-span caching, which increases P10 actor-draw cost and memory use.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -171,7 +176,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The GBA checks now require a completed Barracks and count living
   owned buildings for the zero-actor defeat rule. The normal Terran
   mission wins after an ordinary save and fresh HOME continuation.
-  Verify native defeat through ordinary inputs. The
+  The [native worker-loss case](audits/2026-11-21-wasteland-opening-cross-platform.md#ordinary-worker-loss-boundary)
+  keeps the mission active after all five SCVs die. Verify Raynor loss
+  and the zero-actor boundary through ordinary inputs. The
   [native base approach scout](audits/2026-11-21-wasteland-opening-cross-platform.md#native-base-approach)
   reaches the base with five living Marines after Raynor's introduction.
   The resumed SCV reaches the mineral line alive and earns minerals
@@ -250,8 +257,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [The armed type release](audits/2026-11-22-armed-type-targeting.md#local-replays)
   repeats the 1,134 launches and all 54 save cases on the current
   race cartridge set.
-  SD readback, physical frame pacing and broader native campaign
-  verification remain open.
+  The [current campaign and skirmish replays](audits/2026-11-22-current-campaign-and-skirmish-replays.md)
+  verify T4, T7 and T10 fresh-pause victories and result readbacks,
+  P5 Shuttle continuation, and the normal Terran Blood Bath win.
+  Current Melee previews reach the same three-CPU defeat before and
+  after fresh HOME on all four profiles. Active Melee wins and
+  survivor transfer remain open. SD readback, physical frame pacing
+  and broader native campaign verification remain open.
 
 - **Native Gantrithor capacity and rescue.** The [owned-ROM audit](audits/2026-11-21-native-gantrithor-capacity.md)
   verifies an eight-Interceptor maximum for raw 82. Separate that limit

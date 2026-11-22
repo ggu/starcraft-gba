@@ -224,3 +224,27 @@ The lone-worker terminal state SHA-256 is
 | GBA unit observer | `5ec00a19eaa78947971ed4008f8b331c2377dd587ac9315ecaf559ba56db24b9` |
 | GBA building observer | `8ded4b66202c204e2fa3df1da3bf1581171b0b7483103693e6bb5648def2ffe7` |
 | GBA neutral grant observer | `f8affd24fba52ff6e34804caaccd7eda9733ff6195fe87a0caa10620ed7a63a2` |
+
+## Ordinary worker-loss boundary
+
+An isolated ares continuation from the retained escort seed
+`2ef299b9` selected the five opening SCVs through ordinary controls
+and sent them toward the Zerg. By native update 52,076 four workers
+had died. The last SCV was alive at (769, 1011) with 50 HP. A
+second ordinary Move sent it back toward the Zerg. The retained
+state at update 54,116 has zero living human SCVs, five Marines,
+Raynor at 300 HP, the Command Center and the Supply Depot.
+Gameplay remains active and the HUD shows 40 minerals and 5/18
+supply.
+
+The GBA Wasteland outcome fixture reproduces the worker-loss
+boundary with five Marines, Raynor, 40 minerals and both
+structures. It checks the actual outcome function after each
+of five SCV deaths. The prepared normal Terran and fallback
+fixtures pass under ASan and UBSan. Raynor loss and the zero-actor
+boundary remain separate native observations.
+
+The final native state SHA-256 is
+`993e2093c8ac3689ba7af55410e9eecfd757c8f9cb622a66eae95b7865475351`.
+The corroborating private screenshot SHA-256 is
+`844b188bd835d7c8e8cb1fac99853460328f99e45c2df11dcf71cf9894aaa844`.

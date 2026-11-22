@@ -104,3 +104,39 @@ The control validation SHA-256 is
 `9482a301ab811e640268d6a6e73dcc1d9ae960bcf501ee7ebd901ce30c3b6b71`.
 The candidate validation SHA-256 is
 `726361eb8f43274cdf0fa58819ebac1c2861da6f244d6c31ab41cc6d1d955fd2`.
+
+## Later Z7 orders and point routing on the steering release
+
+The normal Z10 ROM from `c2624205` starts a fresh emulator from the
+verified pause at call 31,892. The physical tape matches the retained
+observations through call 78,020. Instruction samples at calls
+80,000–80,015 each advance the game and cover frames 78,513–78,528.
+
+| Inclusive stage | Mean guest cycles per update |
+| --- | ---: |
+| Full loop | 1,606,097 |
+| Orders | 886,645 |
+| Movement within orders | 347,069 |
+| Point-prefix fill within movement | 149,833 |
+| FIFO expansion within point-prefix fill | 94,514 |
+| Packing output within point-prefix fill | 25,540 |
+| Contact steering within movement | 142,500 |
+| Uncached contact mask within steering | 132,143 |
+
+The six increments in the logical build counter establish when routing
+work recurs. The instruction profile separately attributes the executed
+work, including prefix resumption and frontier expansion. Orders rises
+to roughly 1.36–1.48 million cycles on the sampled build updates,
+compared with roughly 0.57–0.68 million on the other updates.
+Contact-mask geometry and FIFO expansion have the largest measured
+inner costs. The detailed report SHA-256 is
+`5aa4bab70b3d117925e895826b6668ea99607d6c390c19b3ee38355444c62487`.
+
+A separate P10 raster trial cached per-row spans for packed sprites.
+The better direct-mapped variant raises mean actor-depth cost from
+341,779 to 379,962 cycles per update in the 16-call profile and
+uses about 4.3 KiB additional EWRAM. It also exceeds the IWRAM
+reserve. This trial stays local. The packed compositor already skips
+fully transparent groups and copies fully opaque groups directly.
+Profile mixed-word and byte-sprite coverage before revisiting span
+skipping.

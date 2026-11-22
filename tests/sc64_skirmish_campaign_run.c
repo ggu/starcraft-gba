@@ -20,6 +20,7 @@ static FILE *trace;
 static int trace_first = 1;
 static int combined_arms_witness;
 static int blood_bath_witness;
+static int render_input_frames;
 
 enum build_state { BUILD_NONE, BUILD_PENDING, BUILD_FOUNDATION };
 static struct {
@@ -46,6 +47,8 @@ static void input(u16 held)
     int changed = held != prior_keys;
     if (screen == SCREEN_RESULT || won || lost || host_ticks >= match_limit) return;
     game_update(held, pressed);
+    /* Physical-input replays render between updates, including camera state for picking. */
+    if (render_input_frames) game_render();
     prior_keys = held;
     ++host_ticks;
     if (trace && changed) {
@@ -646,6 +649,8 @@ int main(int argc, char **argv)
         match_limit = (unsigned)value;
     }
     if (argc == 7 && !set_named_bot_races(argv[6])) goto invalid_args;
+    const char *render = getenv("SC64_SKIRMISH_RENDER_INPUT_FRAMES");
+    render_input_frames = render && strcmp(render, "1") == 0;
     const char *witness = getenv("SC64_SKIRMISH_COMBINED_ARMS");
     if (witness && strcmp(witness, "1") == 0) {
         if ((option_map != 0 && option_map != 1) || option_human != R_TER ||
