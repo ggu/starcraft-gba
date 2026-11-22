@@ -159,7 +159,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   through frame 38,149 on the steering build. The complete uninterrupted
   replay on that version wins at frame 267,585, matching all 206 checks.
   Mean cycles fall 1.85% across the detector and steering releases.
-  Finish the full fresh-resume victory check.
+  Fresh HOME from frame 30,739 also wins at frame 267,585 with all 124
+  continuation checks matching. Verify a third-process victory
+  journal readback on the same runtime.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages

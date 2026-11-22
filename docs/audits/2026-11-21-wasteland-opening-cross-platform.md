@@ -248,3 +248,12 @@ The final native state SHA-256 is
 `993e2093c8ac3689ba7af55410e9eecfd757c8f9cb622a66eae95b7865475351`.
 The corroborating private screenshot SHA-256 is
 `844b188bd835d7c8e8cb1fac99853460328f99e45c2df11dcf71cf9894aaa844`.
+
+The bounded Raynor continuation from the worker-loss state uses
+ordinary selection and Move through the center and north. At update
+68,900 Raynor has 290 HP at (1120, 1472). At 71,689 he has 200 HP at
+(1120, 352). At the retained final update 77,943 he has 186 HP at
+(975, 1012). The five Marines and both buildings survive and gameplay
+remains active. Raynor's death still needs a direct observation. The
+final continuation state SHA-256 is
+`40d25515004e1e9549a0ff8fe30dfc4eccbcbf82db14a7d86f42ba131f5011ae`.
