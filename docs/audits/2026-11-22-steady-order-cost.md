@@ -98,6 +98,36 @@ repeated target eligibility and tracer admission work, alongside the
 separate route-stall cut. Player-driven battle pacing and hardware
 measurement remain open.
 
+## Visible fights in Protoss Crossfire
+
+The merged #724 Showcase build enters Crossfire through the normal
+hidden menu and runs with neutral controls. Profiled and unprofiled
+runs match all 32 full clock, world, tracer bank, route, palette and
+video samples. This gives a dense on-screen workload alongside the
+three-computer Outpost setup.
+
+| Mean guest cycles per update | Frames 40–55 | Frames 95–110 |
+| --- | ---: | ---: |
+| Full loop | 1,462,383 | 1,380,207 |
+| Game update | 486,099 | 402,542 |
+| Render | 839,388 | 847,815 |
+| Depth-ordered actors | 584,897 | 592,225 |
+| Byte sprites inside unit drawing | 130,161 | 148,318 |
+| Tracer part drawing inside actor depth | 119,725 | 109,255 |
+| Overlay walking inside tracer parts | 26,982 | 5,719 |
+
+The early and late overlay scopes vary even with similar call counts.
+A separate read-only census matches the 32 unprofiled cuts and maps
+all 507 direct unit byte-sprite calls to attack-pose source arrays.
+Those calls use 56 distinct frame pointers. The full bank has 1,651
+arrays and 1.23 MB of indexed pixels. Four phase copies with masks
+would need at least 9.84 MB, above the available ROM space. Qualify
+a bounded packed subset and retain the exact byte-sprite fallback.
+Retain the ordinary Outpost
+battle as a second workload. The historical mode-0 tile path falls
+back to Mode 4 for Custom Game and gave flat P7 timing. Its imported
+audio and RAM limits remain relevant. See [renderer validation](../VALIDATION.md#p7-mode-0-tile-renderer).
+
 ## Selection and detector query candidate
 
 The [combined draft](https://github.com/ggu/starcraft-gba/pull/724)
@@ -148,6 +178,29 @@ victory journal survives another fresh readback. The draft runtime
 repeats all 15 checks and produces byte-identical pause, victory
 and readback SRAM.
 
+## Wasteland camera and fog
+
+A fresh native Wasteland launch holds the analog stick to the right
+from runner step 9,000. At callback step 9,049 the viewport box has
+moved from approximately x=32–72 to x=64–103 in the minimap, with
+room before the right boundary at x=163. A green scroll indicator
+appears by the right edge of the 640×240 capture, whose content is
+horizontally doubled. The step 9,099 cut has reached the right
+boundary, and the main view shows unexplored ground in black. The
+root-run steps schedule inputs and capture callbacks. Game update
+timing is asynchronous to those steps.
+
+A separate ordinary Terran GBA run holds D-pad Right after the
+visible opening dialogue. The camera x coordinate moves from 0 to
+100 at 50 advancing updates and to 300 at 150 updates. The cursor
+remains near x=120 on the 240-pixel screen until the viewport
+clamps at the end of the map. At 150 advances, 25,171 of 25,920
+scene pixels use the dark fog palette index, up from 3,782 at the
+opening. The neutral control stays at 3,782. The neutral and pan
+branches match world, visible and explored hashes at each cut.
+The comparison confirms panning into darkness without revealing
+it and records the difference in cursor placement during the pan.
+
 ## Bounding the other steady costs
 
 Earlier read-only target sampling on the same release observed 409
@@ -184,6 +237,21 @@ builds, all 31 sampled state and video cuts and the exported SRAM
 match. Mean cycles are 575,794.18 and 575,794.06. Keep the trial local.
 The archived late Z7 battle still lacks a current paired measurement.
 
+The later Protoss Outpost contact window permits a stricter search
+bound. Once a non-egg target is eligible, cells whose nearest point
+is strictly farther can be skipped. The diagnostic finds 7,088 of
+15,824 live node visits in those cells across 16 updates. The short
+trial saves 2,656 cycles per update with matching cuts. The longer
+P10 replay costs 0.60% more and the canonical Z10 link exceeds the
+IWRAM guard. Keep the current target search.
+
+Using an existing timing cache for trace startup calls leaves the
+same 16-update mean within 47 guest cycles. An independent 128-byte
+animation-index cache cuts the short battle mean 0.29%. Its full
+9,489-update P10 replay saves 0.02% and matches all 81 cuts and the
+final SRAM. Keep both trials local. Use an active battle to measure
+which repeated overlay walks can be elided before adding storage.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Control P10 replay | `2fc3cde69e257772fc454bbf2a2c1c13658589414757af09f3def32563045bc2` |
@@ -211,3 +279,14 @@ The archived late Z7 battle still lacks a current paired measurement.
 | Matched six-game combined trial | `0c0da0e5b1ba92ae4ea74bf2bebe1d2cab1eb0833b526ce03291d6c2d18178be` |
 | Candidate 48-case cartridge save/load matrix | `7710d185af7a0bfeeafcf15d89d17e8c7544c939ef32ef372beb08f94ce48df1` |
 | Draft Terran 7 fresh-SRAM and victory readback | `414b31ad903b4950e26f52c92bc1a4369dc7f113fae4479ed617aa16c61ffc25` |
+| Native pan controller polls | `eee02f3618135729d384e64d5360b61572e32e4a33f5fe57b995b89665b87c86` |
+| Native pan callback windows | `7984d3e7a587debad852c996819f3b2640bd168f12bee41ba23deb1b0e9a6dc9` |
+| Native pan before the viewport reaches the edge | `d28762bce485fd7271c6d06344a82c54419847895486d40e16d10d730801079a` |
+| GBA pan and neutral comparison | `4d3ee8b3865cb37d2d21abd0fdf752b3173696e9f344cc8fbf0310b0f8e97f5d` |
+| Target-bound live node census | `446d790031d75a50d915fc9a1e439f43cee93c8576d3a40988c761f62f328f36` |
+| Target-bound full P10 replay | `6adc414f046423faf50b672d3e5cd14d86fb13fe3f40f7c44c4bfaeb3658c8f3` |
+| Indexed animation cache short battle | `37908f901f19d4081e8bba9a1c38f9658fec6785cdb67ee3b0840a4f500c441b` |
+| Indexed animation cache full P10 replay | `e07765af34580f7e451d64150d591ae8439d23a786c4c12a5b5a1a959ce1a855` |
+| Visible Crossfire instruction attribution | `0b001e9a886f937fa8b553f2a85fea6cb83107f7762ae304116c4ece51951545` |
+| Matched profiled and unprofiled Crossfire cuts | `50928c356289710d94fa8c52fbf83080ba87468224ce79eecfb8779070e63954` |
+| Crossfire attack-pose call census | `948d1c7e09a856e875f7b8e5f8689c9a4c553578eb3a4567763cb1d0074127b5` |

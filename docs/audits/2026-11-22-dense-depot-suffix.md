@@ -147,6 +147,72 @@ selects all five Marines and leaves all five SCVs unselected. It
 matches both unit-list observations from the prior Terran build.
 Blood Bath native mining contact remains a separate comparison.
 
+## Fresh distant requests on the pacing release
+
+The follow-up starts a bounded 64×64 facility search in byte-grid
+scratch when the first origin is at least 48 Manhattan cells from the
+facility center. Nearby and resumed requests retain the 768-pop packed
+prefix. The threshold selects the scratch representation. Both paths
+keep the same seed order, FIFO pops, neighbors and stopping rule.
+
+The paired regular Zerg match continues the documented Blood Bath
+journal from gameplay frame 17,305 for 3,600 neutral updates. Both
+builds take the same six-cell opening at frame 19,360.
+
+| Guest cycle metric | Merged #724 | Fresh distant transfer |
+| --- | ---: | ---: |
+| Mean per advancing update | 810,180 | 808,903 |
+| Nearest-rank p95 | 1,096,267 | 1,088,201 |
+| Peak at frame 19,360 | 3,565,643 | 3,440,685 |
+| All 34 facility calls at the peak | 991,833 | 873,492 |
+| The first large depot 2 fill | 528,988 | 405,319 |
+| Following update | 1,663,631 | 1,664,057 |
+
+Peak, p95 and mean fall 3.50%, 0.74% and 0.16%, respectively. All
+3,600 route counter pairs, 36 sampled world, two-page and palette
+cuts, the exported pause save and 17 fresh HOME continuation cuts
+match. The breakpoint observer matches each of the 34 facility query
+results and parked frontier records at the peak. The long depot 2
+lookup leaves the same 25 pending entries and 2,595 discoveries.
+
+All six facility FIFO sanitizer variants pass. All eight normal and
+preview builds match the previous IWRAM and EWRAM endpoints. The six
+12,000-update Custom Game pairs match their 120 sampled world,
+route, palette and two-page cuts and stay within 0.05% in full-run
+mean timing. The ordinary 9,489-update Protoss 10 victory matches all
+81 sampled state and display cuts and its victory save. Terran 10
+wins from a fresh ordinary HOME load with six matching checkpoints
+and byte-identical victory readback. The 48 Custom Game start/save/
+reload cases pass on both variants, all four products and both maps.
+Retain a small disconnected-region holdout for future threshold
+tuning. The hardware pacing check remains open.
+
+The normal-button startup pass starts all 30 chapters, reads each
+briefing entry, and advances beyond the opening dialogue. The
+previously pinned Z1 HOME tape reaches victory at frame 50,669 with
+50 matching periodic checks and the Chrysalis alive. The separate
+opening save at frame 97 reloads and matches the next 120 neutral
+updates. A full same-tape reload from frame 984 first differs at
+frame 1,422 when the uninterrupted A action spends 50 minerals.
+Both #724 and the candidate clear the selected Hatchery on reload.
+The replay's next A selects it, while the uninterrupted A queues
+another Drone. The restored queue, wallet and world match through
+call 1,437. Qualify a normal reselection at a neutral input boundary.
+
+The two normal Showcase ROMs run all eight scenes from their hidden
+menu. All sampled world, two-page and palette fingerprints match,
+with the same losses at update 150 in each of the three Last Stand
+scenes and matching scene restarts. An ordinary Blood Bath scouting
+replay selects and moves an Overlord, then pans the camera along
+its route. The 4,800 advancing updates match all 41 sampled world,
+fog and display cuts. Mean cycles fall from 791,050 to 789,686.
+Four cuts see other units in the view. Use a sustained visible-fight
+workload for further actor-rendering qualification.
+
+The fresh asset-free suite passes on runtime `80047031`, including
+1,176 Python tests with 35 skips and the native sanitizer checks.
+The default ARM image is byte-identical to #724.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Control Z10 ROM | `00b7bd4e6796519319a0e5470cc4f82ee502cdc29b96b543476bde1a5f23777a` |
@@ -163,3 +229,20 @@ Blood Bath native mining contact remains a separate comparison.
 | Asset-free suite log | `477f54803f37534a76b8a13fa48ac4931c6f68ceb3ddf69a22531c0d0b4034b4` |
 | Opening-path bound sample | `ebceed3322d90bc376b61c67ad96ec9f7c572704689d6456826b2b4c18169164` |
 | Current Terran Wasteland selection reply | `c54bf2c312d2e57831d3e17d7657219c7f6f77318b47c3d44ca999150c8530ee` |
+| Fresh distant transfer control replay | `f48c27409631ced6b4485033309a5f62cc14a25d71999f021bb597c8dda0c156` |
+| Fresh distant transfer candidate replay | `bd96a1c3151637b9f6fbb902e7801a94e3f9bbecdc755360c046df55ef993d8f` |
+| Fresh distant transfer control call ledger | `2acbee36289e6f027145cf77290b2d61d6ff7e0d23016723fb827248bdd9731e` |
+| Fresh distant transfer candidate call ledger | `ea692573028d79b7dc829c1dc10dcc58a49ce22a19ce9465622fb45ae3bd7709` |
+| Follow-up six Custom Game replays | `175d235997b28ebf52d0679546003c814861d3d703d1ff0b08daad0a37a5ad59` |
+| Follow-up P10 replay | `a1a61c53469792bf5124a33a6f9904b47873a87143aeaacda41be7af18b306e7` |
+| Follow-up facility sanitizer log | `007a73ea5c5ea435c41b37134e768b800ed662a7aad241d28f776fde865e980e` |
+| Follow-up 48-case Custom Game save/load matrix | `4a15eaf37f9e32aaf44c38bce41782a22244c4c8a77fcf4044e693ed8ab803c1` |
+| Follow-up Terran 10 fresh-SRAM victory | `c100e289d903babf4e80e1194f173c6e4abc298c932eecc51f27d7b6826d422c` |
+| All 30 candidate campaign starts | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Candidate Z1 pinned HOME-to-victory tape | `3c0b07f7408e478b6c035f08c91fabb55f088dfdba3965e2126817f6e180789f` |
+| Candidate Z1 opening fresh load | `8755e6931dcbcf5591c98891b0ece0b81f834cecb8b38a0419d98e48dd12e436` |
+| Candidate same-tape Z1 resume mismatch | `677c2a8d8042a99693b6d7c23f54e4df0330ea20644e67011b3bd66c5a139427` |
+| Showcase scene control | `8adb5e944d012edbc41f5cd19e702bfbdeed8ada21428d9f0205f2d271ca732b` |
+| Showcase scene candidate | `34f08029ad488d7228ace20012b0f7826009ec08e50fc8685858222e0b678298` |
+| Blood Bath scouting control | `6bd04d92180be267ad0c7e45dbad4dc439d6fb5c00684c73ebac8a61b02fba83` |
+| Blood Bath scouting candidate | `409c7d0411084981e63ccdc3dd3b8e7aa535692c65d24246a4e3929685488da0` |

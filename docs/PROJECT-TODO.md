@@ -59,13 +59,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   drop to 13.24–18.47 emulated updates per second. In the sampled
   no-new-route-build Protoss Outpost cut, targeting alone costs 139,078
   cycles within orders and tracer passes cost 96,034 within rendering.
-  The [selection and detector query draft](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
+  The [merged selection and detector query changes](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
   saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
   Custom Game replays with matching state and video. Profile repeated
   eligibility and tracer drawing here, then validate in a player-driven
-  battle and on hardware. In this cut, trace timing and animation bank
-  lookups account for about 15,400 cycles per update. Confirm constant-bank
-  metadata can replace them before revisiting the overlay walk. A point-route
+  battle and on hardware. A strict target cell bound can exclude 44.8%
+  of live node visits in the short battle cut, then costs 0.60% on
+  the full P10 replay and exceeds the Z10 stack reserve. The animation
+  index cache saves 0.29% in 16 skirmish updates and 0.02% in the full
+  campaign run. Keep both trials local. In [visible Crossfire](audits/2026-11-22-steady-order-cost.md#visible-fights-in-protoss-crossfire),
+  uncompressed unit sprite blits take 130,161–148,318 guest cycles per
+  update. All 507 sampled calls draw attack poses. Qualify a selective
+  packed path with the original fallback and 32 MiB ROM limit in both
+  Crossfire and the ordinary three-computer match. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
@@ -80,7 +86,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the FIFO and its packed result. Busy Blood Bath's worst update is
   3.01% faster with matching gameplay, video and saves. Its average
   cost improves 0.12%. The longest depot query still consumes 529,000
-  cycles. Every distinct depot-query origin in the stall had a positive
+  cycles. The [fresh distant transfer](audits/2026-11-22-dense-depot-suffix.md#fresh-distant-requests-on-the-pacing-release)
+  reduces that call to 405,319 cycles and cuts the current match peak
+  3.50% and p95 0.74% with matching directions and continuation.
+  Every distinct depot-query origin in the stall had a positive
   witness before the six-cell opening. A destruction-only proof cuts
   the worst update a further 8.06%, while the mean and p95 rise 0.35%
   and 2.13%. Keep that trial out of the cartridges. Prioritize reuse of
@@ -2376,6 +2385,16 @@ save/source-owner and timing evidence; do not advertise unwired components.
   the native N64 emulator and the current Terran GBA ROM. Both controls
   keep selection empty. Terran 7 on the same GBA ROM wins after a fresh
   HOME save load and passes victory journal readback.
+- [Wasteland camera comparison](audits/2026-11-22-steady-order-cost.md#wasteland-camera-and-fog)
+  confirms that panning alone leaves unexplored space dark. Native analog
+  scrolling places its indicator at the edge before the camera clamps.
+  The GBA D-pad centers the cursor over the interior. Account for this
+  difference in subsequent normal-input camera and fog comparisons.
+- The [facility-transfer campaign checks](audits/2026-11-22-dense-depot-suffix.md#fresh-distant-requests-on-the-pacing-release)
+  confirm all 30 starts, an ordinary Z1 win from HOME and fresh SRAM
+  victories in T10 and P10. The Z1 same-tape fresh load from frame 984
+  misses a 50-mineral action at frame 1,422. Resolve the input and save
+  context at that cut before counting it as an equivalent continuation.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
