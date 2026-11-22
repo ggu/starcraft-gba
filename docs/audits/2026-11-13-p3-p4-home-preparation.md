@@ -254,8 +254,14 @@ controller calls.
 All 49 checkpoints, nine briefing pages and three in-game dialogue
 acknowledgements match the authored HOME tape. The terminal check
 confirms the primary objective and zero remaining hostile buildings.
-The run qualifies the uninterrupted ordinary input path. Fresh pause
-and victory SRAM reads remain separate checks.
+The same normal ROM also pauses at frame 20,000, on input call 20,395,
+and exports its 32 KiB SRAM. A new emulator process loads the pause
+through HOME/L. The restored world and named mission fields match at
+the pause. All 28 subsequent observations and the final victory
+match the uninterrupted run. A third fresh HOME/L loads the result
+at frame 47,661, preserves it for eight neutral updates and
+re-exports the victory SRAM byte for byte. The victory write
+preserves the original 16 KiB pause bank.
 
 The existing 256 KiB per-file cap stopped the verbose mGBA runner
 at call 500. DMA diagnostics account for most of its log. The
@@ -271,3 +277,6 @@ current release uses 27,273,555 bytes of log and 40,192 bytes of report.
 | Authored HOME tape | `ee03bc74391adc95bee8c381906a7a890fc31afbc380d55f9e7986a5dac031fb` |
 | Previous uninterrupted ordinary P3 victory | `f7355e77cae9a0074b65f0e0b462b7898f5e301eaaf20de72cf4eb2f410fc49a` |
 | Current uninterrupted ordinary P3 victory | `9e460a6d17706acac2b93d5f8ae9d1e6718102f82c414a7a3ffd7755e139d960` |
+| P3 pause and victory through separate HOME loads | `b2fe36dc4f8ebf9a61cd1118b41ecaf3f0d3d40f0b0db0c2abd5502fb4fdbba5` |
+| P3 pause SRAM | `16786e21f396875b2e942fd0e6ec6fd2615549a1ad88a702626ec19336651a4f` |
+| P3 victory SRAM and fresh readback | `a0ed4a552a52a2289c29ea3ebb4fd1395d346801416637cbf12e46056c7bcdc5` |

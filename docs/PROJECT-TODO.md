@@ -132,6 +132,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   3.5% of visited contact nodes in a five-update P10 sample. Broader
   movement and collision work remains the priority. Compare sustained
   cost, normal-input outcomes and fresh title continuation.
+  The tighter [contact footprint trial](audits/2026-11-22-steady-order-cost.md#collision-bucket-footprints)
+  finds more removable visits. Maintaining the footprint exceeds the
+  P10 IWRAM guard, and moving its update helper to ROM raises late
+  Outpost mean cycles by 4.30%. Focus on reducing candidate loads
+  without adding work to each coordinate update.
   The [current Blood Bath spike](audits/2026-11-12-target-index-bulk.md#the-next-dense-skirmish-bottleneck)
   spends 1.09 million cycles on worker facility paths and 870,183
   on movement point fills. One destroyed building invalidates 32
@@ -408,8 +413,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reproduces all ten victories in independent HOST replay processes
   on the visibility release. The P8 and P9 fresh-process paths match
   all 327 continuation checkpoints. The [ordinary P3 ARM replay](audits/2026-11-13-p3-p4-home-preparation.md#current-ordinary-p3-victory)
-  also wins at frame 47,661 on the regular Protoss cartridge.
-  Extend the same fixture to a fresh pause-save and victory SRAM readback.
+  also wins at frame 47,661 on the regular Protoss cartridge after
+  restoring a frame-20,000 pause save in a fresh process. The victory
+  SRAM reloads into the result screen and re-exports byte-for-byte.
   Reuse the unchanged P7 and P8 authored HOME tapes.
 
 - **Current three-cartridge playtest.** The
