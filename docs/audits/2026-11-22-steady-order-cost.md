@@ -116,7 +116,8 @@ across the six replays and 0.26–0.50% in their slowest 600-update
 intervals. All eight normal and preview RAM endpoints match the
 control. Forty-eight ordinary start/save/reload cases also pass across
 both variants, all four products, both maps and one to three CPUs.
-The full default suite is still running on candidate runtime `6f9679de`.
+The full default suite passes on runtime `6f9679de`, including 1,176
+Python tests with 35 skips and the native sanitizer checks.
 
 ## Wasteland selection and Terran 7 continuation
 
