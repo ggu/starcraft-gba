@@ -40,9 +40,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   crops per update in the later window. [Generated animation bounds](audits/2026-11-22-dense-release-attribution.md#generated-bounds-for-offscreen-animation-checks)
   now reduce that window by another 4.02%. The exact crop stays active
   for visible or uncertified art. With the bounds active, the later
-  orders pass alone still costs about 537,000 cycles. Qualify the
-  retained spatial index against same-update order and target ties,
-  and profile movement and attack processing on the combined build.
+  orders pass alone still costs about 537,000 cycles. The [strict target
+  retention comparison](audits/2026-11-12-target-index-bulk.md#strict-reuse-on-the-generated-bounds-release)
+  preserves target order and the sampled dense matches. It fails the
+  Z10 IWRAM guard and raises the dense Blood Bath mean by 1.22% when
+  compared with matched ROM placement. Keep the current index.
+  The [current Blood Bath spike](audits/2026-11-12-target-index-bulk.md#the-next-dense-skirmish-bottleneck)
+  spends 1.09 million cycles on worker facility paths and 870,183
+  on movement point fills. One destroyed building invalidates 32
+  worker depot choices. All 32 pick their previous depot again across
+  the next two updates. Prioritize preserving certified reachable
+  choices through partial topology changes and check nearer or newly
+  reachable depots, worker crossings and exact saved replays.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak

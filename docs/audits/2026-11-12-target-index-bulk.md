@@ -169,3 +169,90 @@ outside the default build.
 | Early rejection | `6a2f52db50a638b8bbdd9e4f22971123da874af3d38bafc48ff5120a4e148a9a` |
 | Fused control | `a1a008ed9dffdd9fb6c8294bf0373fe990c83796070dc6045d33d523ebf4b89d` |
 | Fused rebuild | `2d34beb6788dfe386e510047cddd33f8b2fdf3a648890b206763c311cdf0d9d0` |
+
+## Strict reuse on the generated-bounds release
+
+The November 22 trial applies the draft to `aa1d49c8`. It verifies
+each retained graph member while the owner lists already scan live
+slots. The membership check covers owner, eligible slot, exact cell
+and world dimensions. Every retained cell chain must remain in
+canonical order, including Protoss. Exhausted membership, a slot
+change, an out-of-order link or a geometry change triggers the
+current fresh index path. The parked index stays inactive. The
+15 host sanitizer configurations pass including slot replacement,
+an extra eligible member, reordered ties, geometry and overflow.
+
+The Protoss 10 saved-game pair reaches victory in all variants and
+matches all 81 sampled world, route, fog, HUD, palette and two-page
+framebuffer cuts plus final SRAM. Across 9,489 updates, the current
+image averages 1,523,161 cycles. The strict separate traversal
+averages 1,519,068. Fusing that validation into the owner-list loop
+averages 1,518,245. Checking chain order on every candidate removes
+the ordering flag but gives 1,521,432 cycles. The final four-argument
+validator with ROM placement for fast-memory orders builds averages
+1,530,854 on P10. Exact instruction attribution shows the final
+candidate still rebuilds the index in 12 of 16 earlier samples and
+9 of 16 later samples. The fused check adds setup work to updates
+that rebuild anyway. These variants are experimental.
+
+Z10 fails its original IWRAM link guard with the fused variants,
+including removal of the ordering flag, an out-of-line remove,
+and a ROM-resident validator. For a separate matched comparison,
+the current algorithm and retention both run the orders routine
+from ROM. Both link with the original guards. The current algorithm
+also runs in its ordinary fast-memory configuration as a reference.
+All three replay the same ordinary Blood Bath save with 72 starting
+units, 49 buildings and three CPU races. They match route counters
+on all 3,600 updates, all 31 gameplay and frame cuts, the saved SRAM
+and 16 fresh-load continuation cuts. The fingerprints include live
+actors, production, projectile state and both framebuffer pages.
+
+| Z10 orders placement and algorithm | Mean cycles | p95 | Peak |
+| --- | ---: | ---: | ---: |
+| Current, IWRAM | 812,646 | 1,102,874 | 3,677,137 |
+| Current, ROM | 841,977 | 1,134,121 | 3,714,437 |
+| Strict retention, ROM | 852,229 | 1,146,291 | 3,727,932 |
+
+Retention raises the mean by 1.22% and p95 by 1.07% against the matched
+ROM control. Leave the release index unchanged. Use this dense save
+alongside the P10 battle tape for future movement, contact and target
+costs. Retention would need to avoid most revalidation or repair only
+changed cells while preserving same-update target order.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Unfused strict P10 replay | `56e980e432b86df9533351c99c9f9a19de48bc2c085b586a80ac6a4b590b3bc2` |
+| Fused P10 replay with ordering flag | `84f2b8631f7a2093074eac2b1c6f1d171f405f7805ac89940adda87b9251c875` |
+| Final fused P10 replay | `7d65cc45d4e75faa32620aa94c741d451151e4502a3d9194e2128422ac8a0d9b` |
+| Current Z10 dense custom replay | `e0aa7344e104b7d91e275246d5ca8b42624b4e7fb9cbd353ccc7d66e69dcd4a2` |
+| Z10 ROM control replay | `0a687bc6a89f2da5f2008a9b644d7067df84fc4b02409aef2dcdbef1045daeef` |
+| Z10 ROM retention replay | `886041da05e2dbe17e8e1085f74df7be04ceedd562cf0158fc813a377d29c64e` |
+
+### The next dense skirmish bottleneck
+
+Independent profiled and unprofiled runs of the ordinary Z10 image
+match at 32 cuts across two 16-update windows starting at replay
+updates 1,750 and 2,050. Instruction totals account for all measured
+guest cycles. Orders use 241,012 cycles on average in the first
+window and 558,598 around the spike. Rebuilding the target index uses
+28,919 and 30,736 respectively. Focus on the route work around the
+spike, where movement and worker return paths recur in the same update.
+
+The exact peak at game frame 19,360 takes 3,677,630 guest cycles
+between input samples. Worker facility routing accounts for 1,089,014
+cycles and movement point-route fills account for another 870,183.
+The preceding frame removes building slot 44 (raw 144) and clears
+all 32 active mining and gas workers' stored depot slots. At the
+peak 31 workers reselect their former depot. The last worker reselects
+its former depot one update later. Global invalidation is followed
+by ten route builds at the peak and five more in the next update.
+Measure a proof of when opening a changed tile preserves the chosen
+reachable depot, including closer candidates, changed resource sites
+and any worker crossing. Keep exact reselection for inconclusive cases.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Profiled and unprofiled 32 cuts | `b4fe6c77b8a1831c124a264f805488aa8f63f5280d0c55a8340a50681c5cbbac` |
+| Two-window attribution | `1025bf448c8997ae1a92883685b5c832d0f06737b6c2a91b4ded28e35f7afc70` |
+| Exact peak attribution | `e1f948bfdeaa8a87754ee86475b718372a6199b7a317061b59c06fb8693a8874` |
+| Worker and building state around the peak | `199111201e384f6f5350604f151168e634b3fae8c23793f6fe1aad73515f9fb5` |
