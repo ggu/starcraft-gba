@@ -106,6 +106,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [shared weapon profile index](audits/2026-11-22-steady-order-cost.md#source-weapon-profile-index)
   removes two Thumb division calls. It saves 0.87% across the full
   Crossfire sample and slightly improves all six three-CPU means.
+  The [shared visibility lookup](audits/2026-11-22-steady-order-cost.md#visibility-coordinate-lookup)
+  cuts mean guest cycles 0.56–0.87% in the six three-CPU battles,
+  0.47% in Crossfire and 0.73% on the P10 victory tail. The measured
+  P10 pace rises to 11.25 emulated updates per second. Larger movement
+  and rendering costs still dominate the crowded scenes.
   The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
   attributes about 59,514 guest cycles per update to four mineral
   blits and 9,750 to one geyser blit. Recheck the existing packed
