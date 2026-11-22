@@ -394,6 +394,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The host renders before the next input so the overlapping-unit
   selection uses the painted camera. Add a separate fresh victory
   journal readback and extend the check to the next combined runtime.
+  The [rendered Protoss controller matrix](audits/2026-11-13-p3-p4-home-preparation.md#rendered-protoss-controllers-on-the-visibility-release)
+  reproduces all ten victories in independent HOST replay processes
+  on the visibility release. The P8 and P9 fresh-process paths match
+  all 327 continuation checkpoints. Reuse the unchanged P7 and P8
+  authored HOME tapes and verify the new frame-47,661 P3 HOME win on
+  the regular ARM cartridge.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
