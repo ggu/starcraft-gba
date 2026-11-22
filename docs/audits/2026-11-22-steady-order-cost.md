@@ -222,6 +222,221 @@ Keep the trial out of the regular cartridge builds. A broader
 renderer change should retain the visible-battle improvement while
 reducing cost under both common skirmish workloads.
 
+## Target column and crowded pose indices
+
+Nearest-target search now uses the published per-owner column
+summary to skip cells in unused columns. Occupied columns and
+entity chains retain their previous visit order. A stale set bit may
+still cause a cell read. The isolated change lowers targeting from
+136,688 to 131,331 guest cycles in the 16-update Protoss Outpost
+battle sample and saves 0.16% in the 9,489-update P10 victory tail.
+
+The painter builds a tracer index when eight or more admitted units
+have active cooldowns. It includes live tagged projectile-only traces
+and preserves ascending tracer-slot priority for equal ages. Unit
+identity, launch coordinates and pose validity still decide whether a
+trace supplies a frame. Sparse scenes and draws outside the indexed
+painter use the direct scan. An unconditional index increased mean
+cost in every 12,000-update Custom Game replay by 0.21–0.40%.
+
+The combined runtime saves 1.19% over 900 advancing Crossfire
+updates, with 30 matching world, video, palette, route and tracer
+cuts. The P10 fresh save tail saves 0.16% with 81 matching cuts and
+the same victory journal. All six 12,000-update Custom Game pairs
+match all 120 non-timing samples. Five pairs use 0.004–0.134% fewer
+cycles and the sixth uses 0.003% more. All 48 ordinary Custom Game
+startup, pause save and fresh HOME continuation cases pass across
+eight normal and preview products.
+
+All 30 missions launch through the ordinary campaign menus on the
+three combined normal cartridges. After acknowledging any initial
+field dialogue, each advances into gameplay. The 30 retained
+launch checkpoints match the facility release.
+
+All eight links pass the static RAM guards. The painter's stack frame
+grows by 224 bytes on Terran and Z10 and 280 bytes on P10 and
+Showcase. Observed system stack margins over the static IWRAM end are
+6,776 bytes in sampled Crossfire updates and 6,312 bytes in five Z10
+busy-save updates. These samples leave worst-case stack use open.
+The prepared opt-in packed pose bank also links. With the option
+enabled, 32 checkpoints across 960 Crossfire updates match the
+disabled build, with a further 0.93% cycle saving in that run.
+
+## Mode 4 page update coverage
+
+On the merged targeting and pose runtime, the physical-button
+observer reads both indexed display pages, the palette and DISPCNT
+after each advancing update. Each 16-update window below has one
+page flip per update and a stable palette. The page selected in
+DISPCNT already contains its new image at the preceding sample.
+The other page contains the newly composited world for the next
+flip, so the comparison follows that physical address across the
+update. A tile in this census is a 16×16 screen-aligned region of
+the 240×108 battlefield, with a shorter last row.
+
+| Workload | Camera changes | Mean changed work-page tiles | Mean tiles with an overlay over terrain |
+| --- | ---: | ---: | ---: |
+| Crossfire, frames 40–55 | 0 | 35.94 | 80.94 |
+| Crossfire, frames 95–110 | 0 | 35.13 | 77.75 |
+| Crossfire, frames 600–615 | 0 | 8.25 | 55.00 |
+| Three-CPU Outpost, frames 11,100–11,115 | 0 | 16.00 | 73.75 |
+| P10, calls 39,760–39,775 | 13 | 96.81 | 60.38 |
+| P10, calls 44,000–44,015 | 13 | 50.13 | 49.75 |
+
+All counts are out of 105 tiles. The overlay column compares the
+new work page with the bare terrain and fog band assembled from
+its VRAM and EWRAM cache segments. The cache is valid and its
+camera matches the new frame at every sample. Camera movement
+changes all 105 work-page tiles in the first P10 window on each
+of its 13 movement updates.
+
+Terrain-only restoration can skip a smaller set of tiles than
+the visible frame change suggests, because substantial stable
+art remains over the terrain. Prioritize reuse of composited
+regions on a stationary camera, with an exact test for unchanged
+contributors and bounded storage for both pages. Retain moving
+camera cases in the benchmark. The census measures pixel
+equality. Render-cycle savings remain to be measured.
+
+## Detached attack sprite draw records
+
+Crossfire spends about 27,600 guest cycles per update resolving
+the position and source age of detached attack sprites. The painter
+resolves an admitted sprite once for ordering and again for drawing.
+A local trial reuses the draw record stored at admission. The first
+variant keeps up to eight records, and a second indexes the full
+bounded set by tracer slot. Both preserve the existing heap keys.
+
+| Replay | Control mean cycles | Slot-indexed trial |
+| --- | ---: | ---: |
+| Crossfire, 900 updates | 935,055 | 929,124 |
+| Protoss Outpost, 12,000 updates | 760,046 | 760,160 |
+| Protoss Blood Bath, 12,000 updates | 689,425 | 689,504 |
+| P10 fresh HOME victory, 9,489 updates | 1,503,782 | 1,503,862 |
+
+The slot-indexed trial matches all 151 sampled cuts, including both
+display pages, the world, and each workload's retained route and
+palette state. The campaign victory journal matches byte for byte.
+The eight-record variant has about the same Crossfire gain and
+slightly higher costs in both Custom Games. Keep both trials local.
+
+A separate census of 507 direct attack-pose byte-sprite calls in
+Crossfire finds 140,501 transparent edge pixels out of 267,934
+source pixels. That includes 2,539 entirely transparent rows. The
+census uses unclipped source rectangles, so it bounds the available
+work rather than measuring a cycle saving. The 56 distinct poses
+would use 2,708 bytes of two-byte row bounds before lookup overhead.
+Measure an equivalent Outpost sample before choosing a sidecar.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Slot-indexed Crossfire trial | `b94c5cfabe7a73025c0f8e01648747fc0c623f475ecdb7b2980386d9f6175979` |
+| Slot-indexed Custom Game trial | `6d87accdeec50ec16eaceca21acd5b543b8bb1ec5deb6813bcf2e2ef073a484b` |
+| Slot-indexed P10 trial | `0031a3876a0b9787bf9913bc4bacdd2da06c206ceb3d89fc8a888e30c36ba033` |
+
+## Shared heading for projectiles and unit facing
+
+Projectile creation and delayed-impact launch now use the same
+integer direction lookup as unit facing. A double shot reuses the
+heading of its two common endpoints. The previous projectile
+calculation tested all 32 rounded direction vectors. An independent
+dot-product oracle matches 16,785,409 map-coordinate pairs and
+140,256 additional samples on and beside direction boundaries.
+Those samples extend to deltas of 65,535 and include the wraparound
+tie between northwest and north.
+
+Across six 12,000-update three-CPU Custom Games, the shared lookup
+uses 0.0166–0.0224% fewer guest cycles. Crossfire uses 0.067% fewer
+cycles over 900 updates. The P10 fresh HOME replay saves 0.037%
+over 9,489 updates to victory. All 231 sampled world and video
+cuts and the P10 victory journal match. The four normal and four
+preview images pass the existing static RAM guards. The default
+asset-free ROM reproduces byte for byte.
+
+All 30 campaign entries launch and advance after opening dialogue,
+with the same 30 recorded world checkpoints. The three normal race
+cartridges pass 1,134 ordinary Custom Game launches. Each launch
+checks the human race, map, computer seats and town hall locations
+for every nonempty arrangement of the three named or closed seats.
+Forty-eight Custom Games across the eight images pass ordinary pause
+saves and fresh HOME continuation on both maps. The prepared
+weapon and projectile depth fixture passes under ASan and UBSan.
+
+The first full local run found three failures in the prepared
+building roster fixture. They reproduce on the preceding release.
+The fixture called the vitals overlay by itself while expecting a
+ring from the world-depth painter. It now exercises the painter and
+composes the expected ring, body and vitals in that order. The
+corrected renderer module passes with the current prepared inputs.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent direction differential | `88e2b1f065c7ac0332c915dcd3ab5b9aaaf16de557b2acdc475e8a88b0009295` |
+| Six Custom Games | `b88b62332e1287175a75e5bea04c4376fdbf9e2520ab0f1561471dc172b73d19` |
+| P10 fresh HOME victory | `8494bbede980bf2cd86fcf209b315637c9cc7a631ed8968d5c078098485b9135` |
+| Crossfire | `24bed3a24f0deebc76a1215fbdade40775c3c0b7029514091c23f1921b384333` |
+| Campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Exhaustive named-seat launch matrix | `f92dff99fd9671eea66174eec2ef2b9f50b97df1422929df8089aa388b8640b6` |
+| Pause save and fresh HOME matrix | `5325dd211df92503fc5e8762154600c99e57bb77698263e396b60506e3269f82` |
+
+## Source weapon profile index
+
+On the preceding P10 ARM link, the cached timing lookup uses two
+software divisions to check alignment and index a 52-byte profile.
+The shared lookup bounds the address by the array and divides a
+record offset by four, then multiplies by the exact inverse of 13
+modulo 2^32. The result is an index only when it lies inside the
+bank. A different record layout uses the ordinary checked division.
+The packed cache, profile values and caller interfaces stay in use.
+
+The ASan/UBSan fixture checks every byte offset in the 66-record
+array, the one-past address and copied profiles. Its timing and
+motion differential passes 686,256 cases. All eight normal and
+preview ARM links retain their preceding IWRAM and EWRAM endpoints.
+The default ROM matches its preceding bytes.
+
+| Replay | Control mean cycles | Index mean cycles |
+| --- | ---: | ---: |
+| Crossfire, 900 updates | 934,432 | 926,310 |
+| P10 fresh HOME victory, 9,489 updates | 1,503,232 | 1,502,844 |
+| Protoss Outpost, 12,000 updates | 759,876 | 759,603 |
+
+All six ordinary three-CPU replays use 0.029–0.041% fewer cycles.
+All 231 world and video cuts match, along with the full P10 victory
+journal. Crossfire saves 0.87%. The P10 continuation still averages
+about 11.16 emulated updates per second.
+
+All 30 campaign launch checkpoints match. All 1,134 normal Custom
+Game launches verify the requested map, human race, named/closed
+CPU seats and hall locations. The 48 ordinary pause-save and fresh
+HOME cases pass across the normal and preview products. The full
+local `./dev test` run completes with 1,177 Python tests, nine skips
+and passing native sanitizer fixtures, including the renderer module
+with the corrected world-depth building check.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Six Custom Games | `f088b70e067f3c8a41cc100c5c13f3bec42954b2dd61256256e5427f5b1ca6b6` |
+| P10 fresh HOME victory | `b4987e76dbe7c5b43766a8939b41a8cfc29c5f3d00759b62dc569bc17a4f6817` |
+| Crossfire | `ac9491edfd8a82afacb71c97a1f58f657e3d210789ec49373503af7667982a37` |
+| Campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Exhaustive named-seat launch matrix | `9e8fa637a948f4e66ffb70d69b99607665d2d3ead3fff5cc87a4672becc80311` |
+| Pause save and fresh HOME matrix | `71c6395cd239cf8b4b8491d3d86d74d9c8f305c0eb8ea72886912154f6c82972` |
+
+## Outpost resource sprite costs
+
+The ordinary late Outpost repeat matches the retained world,
+two-page framebuffer, palette and route observations across 16
+updates. Its five recurring painter calls to the byte sprite
+compositor resolve to four mineral sprites and one geyser. The
+mineral calls account for about 59,514 guest cycles per update and
+the geyser for 9,750. These are measured call costs, and the
+[earlier optional packed mineral path](2026-11-13-static-mineral-word-draw.md)
+gained about 695 cycles per update in its 1,000-update Outpost trial.
+Use the current busy window to evaluate the same exact compositor
+and retain the full match as a holdout. The local census receipt
+SHA-256 is `b2f13dc9e64ba200cfb8db0190f6dd355f02271b93a5e6ef4cc3b56cb38c4331`.
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
@@ -252,6 +467,57 @@ asynchronous to native game updates. Matching the base position and
 measuring the native gameplay clock remain prerequisites for a rate
 comparison.
 
+In a further GBA sweep, pre-launch waits of three, 12 and 13 updates
+produce a southwest human base and, respectively, a northwest,
+northeast or southeast Zerg base. These launches use ordinary menu
+input. All three credit the first eight minerals at neutral update
+74. The native human corner now has a GBA match. The native Zerg
+corner and gameplay clock still need the separate RAM observation.
+
+The native observer's cache-aware memory views match before and after
+switching from the recompiler to the interpreter at runner step 4,200.
+The isolated interactive driver waited for the transition response
+while the observer waited for the next command. The observer now
+flushes that response, as it does for its other command replies.
+Available disk space delayed the first run of the corrected observer.
+
+### Matched Blood Bath credit and elapsed time
+
+The corrected native observer completes the same neutral tape. Its
+snapshot beside HUD callback step 6,307 has elapsed-seconds value 9
+and the frame shows 50 minerals. The snapshot beside callback step
+6,407 has value 11 and the frame shows 58 minerals. The RAM cuts
+occur at steps 6,309 and 6,409. The game clock is the big-endian
+word at `0x800b9368`, identified in the earlier pause intervention.
+Video callbacks and RAM captures are asynchronous, so the paired
+cuts bracket the observed credit rather than identify its update.
+
+The native Command Center is at (288, 1808) and the Hatchery at
+(1760, 240). The regular GBA Melee preview launches through the
+same map and race choices, with buildings at (144, 904) and
+(880, 120), matching both native anchors at half scale. Its wallet
+stays at 50 through neutral update 73 and reaches 58 at update 74,
+after 2.470 seconds measured by the emulated GBA main-loop clock.
+It has 114 minerals at 9.027 seconds and 122 at 11.034 seconds.
+
+A further native replay with the same hall anchors shows 66 minerals
+beside elapsed-seconds value 19 and 90 beside value 28. The GBA
+wallet for elapsed second 19 ranges from 186 to 194, and its wallet
+is 266 throughout elapsed second 28. The observed warm-window
+gains are 24 minerals on native and 72–80 in the corresponding GBA
+clock brackets. The clocks were sampled independently. Separating
+formation, travel, patch contention and depot contact remains next.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native input and binary pins | `548aa5ea47118533bf1fcdf7b680afe50aa127862e56dcf2e245cd9ed4328579` |
+| Native commands | `144ab8c390815ba035e466ce4de93c7c4f6d973e1067cf1d7324f62013dfc581` |
+| Earlier native RAM cut | `e565b0ff5a7492e12160119c7b8355f3839fffbe46855a6a9659016425040981` |
+| Later native RAM cut | `542c61a39b1e97cbdaddb611cd0064a5181fc505bec99f8db6efcb62596130c7` |
+| Matching GBA corners and guest clock | `42f96f2d1862b5767dca602bae3ed91f9781ef4dee2ee429ff4dd8fb9bd3ee46` |
+| Native warm-window commands | `ff9b85523d8551992ca346f5a93c20955b39fc037853d9eb1bab0ae9b96cc3ad` |
+| GBA warm-window replay | `990cff94a1db57dc67d2dafdd15f4a42ffa18951cb23e50ad446c4d04d49e762` |
+
 ## Protoss campaign continuation and replay controls
 
 The exact routing release wins P5 after an ordinary pause save at
@@ -276,6 +542,82 @@ load after saving at frame 64,800. All 105 retained checkpoints match,
 including 32 after loading, and SRAM is unchanged by the load.
 Zeratul and Tassadar survive, the completion bit is set, and the
 replay records zero trigger faults and unsupported actions.
+
+## Carried P8 replay refresh
+
+The regenerated host route wins P8 at frame 105,433. An ordinary
+input run on the facility P10 cartridge matches the first four
+named checkpoints. At the next checkpoint, frame 11,690, Fenix
+has 240 HP in both runs. The recorded host shield value is 240 and
+the ROM reads 76. The game frame matches and no trigger fault is
+reported. The replay stops before its planned pause save.
+
+The first host build omits the facility's canonical defense and
+target flags, and it auto-acknowledges field dialogue. A follow-up
+uses the facility source with those flags and records ordinary
+authored-page input. It reaches the same checkpoint in the same
+physical call and reproduces the 240 versus 76 shield difference.
+Adding the facility collision-bucket and shared-sight flags produces
+the same host controller log and checkpoint trace byte for byte.
+
+Fenix's first observed shield loss occurs at physical call 10,271, game frame
+10,031. The ROM Reaver at (653, 108) fires at Fenix at (528, 81),
+reducing his shields from 240 to 140. The host Reaver at (669, 120)
+fires toward (558, 182), leaving Fenix's shields at 240. At call
+10,245 Fenix's position matches in both runs. The hostile Reaver and
+three other enemy actors already have different positions. Earlier
+complete P8 save wins remain qualified on their pinned older ROMs.
+
+A paired actor sweep matches all four watched enemies through call
+10,000. At call 10,163, frame 9,926, a Zealot's shields drop by 20
+on the ROM while its host row stays at full shields. The ROM already
+has a live friendly Dragoon trace aimed at that Zealot. The same
+Dragoon stands idle in the host run before the later Reaver shot.
+At the A press immediately after call 10,111, both runs have the
+cursor at (567, 184) with the field menu closed. The ROM has Dragoon
+slot 127 selected. The host has seven other slots selected. The
+same physical command therefore changes different units. Earlier
+selection checkpoints locate the split at the A press at input call
+10,075. With the cursor at (467, 220), the host selects slot 112 and
+the ROM selects slot 127. The next A expands the host selection to
+a group while the ROM keeps slot 127.
+
+All eight candidates occupy (468, 220) at the first split, with
+the same standing facing. The update-only host camera stays at
+(0, 0). The cartridge camera is at (344, 166). The click is outside
+the host viewport, so the host picks by proximity and the cartridge
+uses the foreground painter order. Rendering after each update in
+the normal HOME controller gives the next click the painted camera
+and records the authored field-dialogue inputs in the tape.
+
+On the current P10 image from the weapon profile index release,
+the regenerated tape wins after an ordinary pause save and separate
+fresh HOME load. It reaches victory at frame 104,113 after 106,011
+controller updates. All 40 named checks match, including 27 after
+loading. The physical pause journal contains frame 30,949 and its
+bytes remain identical through the continuation. Fenix has full
+health and shields, the Hyperion survives, and the objective flag
+is set with zero trigger faults.
+
+The tracked HOST recipe reproduces every input and checkpoint of
+the full replay. The tracked observer also passes a 12,000-update
+physical prefix with matching world and key-edge checks, and
+independently verifies both opening dialogue pages. The full
+victory receipt uses the earlier observer that follows the same
+recorded dialogue inputs and checks key-edge frames.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First shield loss and paired positions | `6b058071cd381a708a1c4055291b7ecf05837607e075fd0e4b5106af78293322` |
+| Aligned host actor samples | `33d91b6e31b95d234c4b65fc33d26e8f2c735a8ac9f42648d11f4ce88285d107` |
+| First tracked hostile shield difference | `17ac9dcec3142fd04a4d7ee339f1aadf2e2eb5e657ed3021b981ed827beaaf71` |
+| Dragoon command selection bracket | `edf31bc12c13825883e9ea2986ff08ed12a73065e7fc2a25721fa315cf69aea4` |
+| First point-selection split | `5a377e3adb3ef87054d832409bc4f675b794bfd74bff0deed6fe557d205b07d5` |
+| Paired camera and actor geometry | `a77e9a7e8993f835ed4f984d0788583630307dbaa642def434a36e2aa45844e7` |
+| Tracked HOST tape | `9b4a77eb57054e89f831bb744c943a6bb0f4bbf4de6c40079d512292d08a62e4` |
+| Tracked physical observer prefix | `e0d1fd4c61d4f7e29ac742eeb5e3c48f62c7371680847ab689f55bf1e5cfbb49` |
+| Current P10 fresh HOME victory | `da1a360279e72be1f69e2d99f19d09b9a2c772ca05d4bf13e12b0283c3b90b35` |
+| Current P10 pause journal | `e074c498d189521570812bf9052b0254f9777d4d2690ebb1149316d71ee0d79a` |
 
 ## Selection and detector query candidate
 
@@ -368,6 +710,12 @@ an upper limit on the nodes removed by this uniform-radius geometric
 test in the sampled workload, before paying for the bound itself.
 The broader movement and collision traversal remains the priority.
 
+Hoisting the collision mask table's speed offset removes two
+redundant axis checks after the radius gate. The tighter lookup
+matches both 16-update P10 windows and all 81 victory-tail cuts.
+Full-tail mean changes from 1,506,238 to 1,506,445 cycles. Keep this
+table-addressing trial local and focus on the repeated traversal.
+
 An isolated audio probe suppresses volatile snapshot writes whose
 value would be unchanged. It matches world, video, palette and
 route counters at the 32 attribution cuts. The early observer scope
@@ -455,12 +803,26 @@ which repeated overlay walks can be elided before adding storage.
 | Shared byte compositor, 900 Crossfire updates | `906978a6180de3d72e07ac6f131a724c3dbd155c734534e3fcf0c14dc4c3bcf2` |
 | Shared byte compositor, six Custom Game replays | `5cb807685223cc20a737c5b64c49686ef6f0416327e5da09187243d03825549f` |
 | Shared byte compositor, current P10 fresh save victory | `e67cb892b874b383e11c915661bc24ae209c6f29b44702e50c158105e60a8a6d` |
+| Target-column-only 16-update Outpost candidate | `ce1619d53c2536b84e052a3eb330f9391a2a9e52d07cc6ece7d050e495dec350` |
+| Combined indices, sustained Crossfire | `254ed62ad2ad629968f5e579169dc591e75fc5bb26ac3d9b7fecd7c361fc25b5` |
+| Combined indices, six Custom Game replays | `a9e551497e4cce09b6f4254111a6dc6bec05e8af7255fed115d689ac7c3f15ec` |
+| Combined indices, P10 victory continuation | `c207a602a7034dd202789d6ee14be793eff33fd7716bb96295a750a36f724d40` |
+| Combined indices, 48-probe Custom Game matrix | `a57acb6f8e1e80cd470ac1a16ace2db118c078b4f79081bd17901f5c9e066e6a` |
+| Combined indices, all 30 campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Combined indices, stack observer | `6b11f0b451904a1665dbcf6a95b688a10c2d83684996f7eb4fb838b8b7027e33` |
+| Mode 4 page and overlay coverage, Crossfire | `ceec52e00a69424d262cc67b58a80eed28b1198f58104bc1b43f5c93d6d41400` |
+| Mode 4 page and overlay coverage, three-CPU Outpost | `edd555b039873e21e7ea49142e567325046a2ca758ce6daf9b39db038f8afbb0` |
+| Mode 4 page and overlay coverage, P10 | `ab58f706404b5936c65c848ab860de63aa37ff8301f6c3fd04976a61d072876f` |
+| Collision table addressing, P10 victory continuation | `85167f6a4b7092138f5896abd31e17715c30d024c0e234880a2173d0d3827ac5` |
 | Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
 | Native Challenger final observed opening frame | `1f802e921166a464433def5394c2f64b6585d504c1e7f7d9754754722ae76fc1` |
 | Current GBA Outpost gathering continuation | `b0c29b94177124741107388941c4f4f7c930bc0c957a2f7714e86c56af0218b8` |
 | Native Blood Bath one-CPU opening tape | `ed076af8ed5c8d8906f75d49fa8791ce3abe1b62a247072e132de0cd8e5805dc` |
 | Native Blood Bath one-CPU opening frames index | `28324258b6de0f8ef51b63d545bb2aaccb08d1db64ad261de64e05e3915182e3` |
 | GBA Blood Bath one-CPU opening | `9557929dff3d115dc2accece76081ee18bd46cb9c20c126a3591c440459aa034` |
+| GBA Blood Bath southwest start, three Zerg corners | `7ba669e5788c64207a9f290c883e79dd4d51b2dd8d2e33a621613afa6aba8ac7` |
 | Current P5 fresh save victory | `9e23597c5b2d0e3198cf7b3138c4df93da07cec51d6bfc85849d78e29a56c88c` |
 | P6 historical and current pick comparison | `5422d9d79a5d2295bac6237931be73a52cfb4f5ec88125e20107827a6a69a8af` |
 | P6 ordinary ARM fresh save victory | `6f701acab49cb1c597100e03977c395eb74899bb769f0ce06fe11997bdd89348` |
+| Carried P8 first facility-ROM replay divergence | `485e866d70da87e7f67e479329824ad2c4915c7d63d231d88093224f6f142c81` |
+| Carried P8 facility flags and authored dialogue replay divergence | `734d1f5da3fcc85b2334b7dbfe1288ae1fe603249e76fe77d589c50b7aff756b` |

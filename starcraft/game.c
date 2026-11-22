@@ -4440,11 +4440,15 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
     }
     for (p = 0; hostile_mask; ++p, hostile_mask >>= 1) {
         if (!(hostile_mask & 1u)) continue;
-        if (!(sc64_target_owner_columns[p] & col_mask) ||
-            !(sc64_target_owner_rows[p] & row_mask)) continue;
+        u32 columns = (sc64_target_owner_columns[p] & col_mask) >> col0;
+        if (!columns || !(sc64_target_owner_rows[p] & row_mask)) continue;
         for (row = row0; row <= row1; ++row) {
             if (!(sc64_target_owner_rows[p] & ((u32)1u << row))) continue;
-            for (col = col0; col <= col1; ++col) {
+            /* The published owner summary can include stale set bits.
+             * A clear bit still rules out this column in every row. */
+            u32 occupied = columns;
+            for (col = col0; occupied; ++col, occupied >>= 1) {
+                if (!(occupied & 1u)) continue;
                 int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
                 for (entity = sc64_target_head[p][cell]; entity != SC64_TARGET_NONE;
@@ -4958,22 +4962,7 @@ sc64_tank_fallback_depth(int slot, int shooter, int target)
 #endif
 
 #ifdef SC64_WEAPON_SOURCE_VFX
-static int
-sc64_source_effect_direction(int dx,int dy)
-{
-    static const short vector[32][2] = {
-        {0,-256},{50,-251},{98,-237},{142,-213},{181,-181},{213,-142},{237,-98},{251,-50},
-        {256,0},{251,50},{237,98},{213,142},{181,181},{142,213},{98,237},{50,251},
-        {0,256},{-50,251},{-98,237},{-142,213},{-181,181},{-213,142},{-237,98},{-251,50},
-        {-256,0},{-251,-50},{-237,-98},{-213,-142},{-181,-181},{-142,-213},{-98,-237},{-50,-251}
-    };
-    int best=0; long score=-0x7fffffffL;
-    for(int i=0;i<32;++i) {
-        long dot=(long)dx*vector[i][0]+(long)dy*vector[i][1];
-        if(dot>score) {score=dot;best=i;}
-    }
-    return best;
-}
+#include "sc64_facing_direction.h"
 
 static int __attribute__((noinline))
 sc64_source_emit(int raw,int source,int weapon,int air,
@@ -4985,12 +4974,13 @@ sc64_source_emit(int raw,int source,int weapon,int air,
         sc64_weapon_source_profile_lookup((uint8_t)raw,(uint8_t)weapon,(uint8_t)air,(uint8_t)variant);
     if(!profile) return 0;
     unsigned count=profile->weapon_count==2 ? 2u : 1u;
+    uint8_t direction = (uint8_t)sc64_facing_direction(x1 - x0, y1 - y0);
     for(unsigned shot=0;shot<count;++shot) {
         Sc64WeaponSourceVfxKey key = {
             .actor_raw=(uint8_t)raw,
             .actor_slot_plus1=(unsigned)source<MAX_UNITS ? (uint8_t)(source+1) : 0,
             .weapon_id=(uint8_t)weapon,
-            .direction=(uint8_t)sc64_source_effect_direction(x1-x0,y1-y0),
+            .direction=direction,
             .target_air=(uint8_t)!!air,.variant=(uint8_t)(variant?variant:shot)
         };
         uint32_t packed;
@@ -11431,6 +11421,9 @@ sc64_worker_cargo_badge_kind(const Unit *q)
 #endif
 
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+#if defined(SC64_WORLD_DEPTH)
+static const u8 *sc64_pose_heads, *sc64_pose_next;
+#endif
 static const Sc64SpriteFrame *
 sc64_source_unit_attack_pose_resolve(const Unit *q
 #ifdef SC64_ATTACK_WORD_RENDER
@@ -11445,7 +11438,15 @@ sc64_source_unit_attack_pose_resolve(const Unit *q
     if(packed) *packed=0;
 #endif
     if(!q->cd) return 0;
+#if defined(SC64_WORLD_DEPTH)
+    /* The depth renderer's temporary census retains ascending slot order,
+     * preserving the first match when equally recent traces have a pose. */
+    int cursor = sc64_pose_heads ? sc64_pose_heads[slot-1] : 0;
+    for(int i=sc64_pose_heads ? cursor-1 : 0; i<MAX_TRACERS && i>=0;
+        i=sc64_pose_heads ? (int)sc64_pose_next[i]-1 : i+1) {
+#else
     for(int i=0;i<MAX_TRACERS;++i) {
+#endif
         const Tracer *t=&tracers[i]; Sc64WeaponSourceVfxKey key;
         if(t->life<=0 || !sc64_weapon_source_vfx_unpack((uint32_t)t->color,&key) ||
            key.actor_slot_plus1!=slot || key.actor_raw!=raw ||

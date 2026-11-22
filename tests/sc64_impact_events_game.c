@@ -126,7 +126,7 @@ static void test_impact_matches_presentation(void)
     assert(p && !sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type));
     int lx, ly;
     sc64_weapon_source_trace_launch_origin(p,
-        (uint8_t)sc64_source_effect_direction(u[t].x - u[a].x, u[t].y - u[a].y),
+        (uint8_t)sc64_facing_direction(u[t].x - u[a].x, u[t].y - u[a].y),
         u[a].x, u[a].y, &lx, &ly);
     uint32_t arrival = sc64_weapon_source_trace_startup_ticks(p) +
         sc64_weapon_source_trace_flight_ticks(p, lx, ly, u[t].x, u[t].y);

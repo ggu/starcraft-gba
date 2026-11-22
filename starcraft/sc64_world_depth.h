@@ -515,6 +515,10 @@ sc64_draw_depth_ordered_actors(void)
              + SC64_STORM_MAX_ACTIVE
 #endif
              ];
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    u8 pose_heads[MAX_UNITS], pose_next[MAX_TRACERS];
+    unsigned pose_units=0;
+#endif
     unsigned size = 0;
     for (unsigned i = 0; i < MAX_MINERALS; ++i) {
         if (m[i].amount <= 0) continue;
@@ -548,11 +552,19 @@ sc64_draw_depth_ordered_actors(void)
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         if (q->type == U_P7_INTERCEPTOR && SC64_CARRIER_STATE_HIDDEN(q)) continue;
 #endif
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+        if (q->cd) ++pose_units;
+#endif
         sc64_depth_push_key(heap, &size, sc64_unit_depth_key(i));
     }
 #ifdef SC64_PROJECTILE_DEPTH
     /* Traces sharing a shooter paint in slot order within its existing
      * draw turn. Use the actor key directly for both image and body. */
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    /* Eight visible units with cooldowns amortized the census in measured
+     * crowded scenes. Sparse scenes retain the original scan. */
+    if (pose_units >= 8) memset(pose_heads, 0, sizeof(pose_heads));
+#endif
     u8 image_heads[MAX_UNITS + MAX_BUILDINGS], image_next[MAX_TRACERS];
     u32 ground_trail_after[MAX_TRACERS];
     int have_images = 0;
@@ -560,6 +572,17 @@ sc64_draw_depth_ordered_actors(void)
         unsigned i = remaining - 1;
         const Sc64TraceSlot *slot = &sc64_trace_slots[i];
         if (!tracers[i].life) continue;
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+        /* Include every live tagged source, even projectile-only traces.
+         * Reverse traversal produces ascending tracer-slot chains. */
+        Sc64WeaponSourceVfxKey pose_key;
+        if (pose_units >= 8 && tracers[i].life > 0 && sc64_weapon_source_vfx_unpack((u32)tracers[i].color, &pose_key) &&
+            pose_key.actor_slot_plus1 && pose_key.actor_slot_plus1 <= MAX_UNITS) {
+            unsigned actor=pose_key.actor_slot_plus1-1;
+            pose_next[i]=pose_heads[actor];
+            pose_heads[actor]=(u8)(i+1);
+        }
+#endif
         if (slot->attacker_plus1 > 0 && (slot->attacker_parts & SC64_TRACE_ATTACKER_IMAGE)) {
             unsigned ref = (unsigned)slot->attacker_plus1 - 1;
             if (!have_images) {
@@ -582,6 +605,10 @@ sc64_draw_depth_ordered_actors(void)
             sc64_depth_push(heap, &size, slot->attack_sprite_layer, draw.y,
                             DEPTH_PROJECTILE, DEPTH_ATTACK_SPRITE_BASE + i);
     }
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    /* Draw-only pointers into this stack frame; cleared before returning. */
+    if (pose_units >= 8) { sc64_pose_heads=pose_heads; sc64_pose_next=pose_next; }
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
     for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i) {
         const Sc64BcYamatoShot *shot = &sc64_bc_shots[i];
@@ -754,4 +781,7 @@ sc64_draw_depth_ordered_actors(void)
 #endif
         }
     }
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    sc64_pose_heads=0; sc64_pose_next=0;
+#endif
 }
