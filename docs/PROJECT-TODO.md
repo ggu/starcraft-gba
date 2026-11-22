@@ -94,6 +94,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   contributors are stable. Retain moving-camera cases, with 105
   changed tiles on each pan update in one P10 window. Continue
   profiling movement and route work toward the two-VBlank budget.
+  [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
+  saves 0.63% in Crossfire and slightly increases both measured
+  Custom Game means. Keep it local. Count transparent row edges in
+  an ordinary fight before trialing generated row bounds.
   A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
@@ -363,7 +367,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Carried P8](audits/2026-11-22-steady-order-cost.md#carried-p8-replay-refresh)
   diverges on Fenix's shields at frame 11,690 with the facility
   defense and target flags and explicit authored-page inputs.
-  Find the first damaging action before qualifying its pause save.
+  The first shield loss is a Reaver shot at frame 10,031. Nearby
+  enemies already occupy different positions before that shot.
+  Identify the first earlier simulation difference before qualifying
+  the pause save on the current release.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
