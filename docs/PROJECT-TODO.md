@@ -83,7 +83,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pixels and state. The three Outpost matches use 0.33–0.42% more
   cycles and the P10 campaign tail is flat. Keep the trial out of the
   regular builds while reducing the unaligned and mixed-opacity
-  cost. A point-route
+  cost. The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
+  saves 1.19% over the same visible fight and 0.16% on the P10
+  victory tail. Five long Custom Game pairs improve slightly and the
+  sixth stays within 0.003%. All 48 ordinary save/reload cases pass.
+  Continue toward the two-VBlank budget by profiling the remaining
+  movement, route and depth-render costs. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
@@ -2411,9 +2416,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
 - The [ordinary Custom Game openings](audits/2026-11-22-steady-order-cost.md#automatic-gathering-in-two-custom-game-openings)
   show automatic Terran gathering on native Challenger and GBA
   Outpost. A follow-up launches Blood Bath Melee with one Zerg CPU
-  on both engines and confirms automatic gathering. The human start
-  locations differ. Match the starting base and gameplay clock
-  before tuning the collection rate.
+  on both engines and confirms automatic gathering. Ordinary
+  pre-launch delays now reproduce the native southwest human start
+  with each possible Zerg corner on GBA. The first mineral credit is
+  at neutral update 74 in all three. Verify the native Zerg start and
+  gameplay clock before tuning the collection rate.
 - [Fresh P5 and P6 controls](audits/2026-11-22-steady-order-cost.md#protoss-campaign-continuation-and-replay-controls)
   verify P5 and P6 victories after fresh SRAM load on the facility
   release. The [merged P6 controller](https://github.com/ggu/starcraft-gba/pull/728)

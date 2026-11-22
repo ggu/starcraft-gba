@@ -1346,6 +1346,62 @@ static void test_zealot_pose_lifecycle(void)
     update_tracers();
     const Sc64SpriteFrame *pose = sc64_source_unit_attack_pose(&u[zealot]);
     assert(pose && pose->pixels && pose->w && pose->h);
+#ifdef SC64_WORLD_DEPTH
+    {
+        Tracer saved[MAX_TRACERS];
+#ifdef SC64_TRACE_DURATION_CACHE
+        u16 durations[MAX_TRACERS];
+        memcpy(durations, sc64_trace_durations, sizeof(durations));
+#endif
+        memcpy(saved, tracers, sizeof(saved));
+        int shooter = -1;
+        Sc64WeaponSourceVfxKey original;
+        for (int i = 0; i < MAX_TRACERS; ++i) {
+            if (tracers[i].life > 0 &&
+                sc64_weapon_source_vfx_unpack((u32)tracers[i].color, &original) &&
+                original.actor_slot_plus1 == zealot + 1) {
+                shooter = i;
+                break;
+            }
+        }
+        assert(shooter >= 0);
+        int duration = sc64_tracer_duration(shooter);
+        memset(tracers, 0, sizeof(tracers));
+        for (int i = 0; i < 4; ++i) {
+            tracers[i] = saved[shooter];
+            sc64_trace_duration_cache_store(i, duration);
+        }
+        Sc64WeaponSourceVfxKey key = original;
+        u32 packed;
+        key.actor_raw ^= 1;
+        assert(sc64_weapon_source_vfx_pack(key, &packed));
+        tracers[0].color = (int)packed;
+        key = original;
+        key.direction = (key.direction + 8) & 31u;
+        assert(sc64_weapon_source_vfx_pack(key, &packed));
+        tracers[2].color = (int)packed;
+        ++tracers[3].x0;
+
+        /* The first entry is ineligible. The next two have equal ages
+         * and different headings. An expired lower slot cannot win. */
+        u8 heads[MAX_UNITS] = {0}, next[MAX_TRACERS] = {2, 3, 4, 0};
+        heads[zealot] = 1;
+        for (int i = 0; i < 2; ++i) {
+            const Sc64SpriteFrame *expected = sc64_source_unit_attack_pose(&u[zealot]);
+            assert(expected && (i ? expected != pose : expected == pose));
+            sc64_pose_heads = heads;
+            sc64_pose_next = next;
+            assert(sc64_source_unit_attack_pose(&u[zealot]) == expected);
+            sc64_pose_heads = 0;
+            sc64_pose_next = 0;
+            tracers[1].life = 0;
+        }
+        memcpy(tracers, saved, sizeof(saved));
+#ifdef SC64_TRACE_DURATION_CACHE
+        memcpy(sc64_trace_durations, durations, sizeof(durations));
+#endif
+    }
+#endif
     u[zealot].x++;
     assert(sc64_source_unit_attack_pose(&u[zealot]) == 0);
 

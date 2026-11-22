@@ -4440,11 +4440,15 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
     }
     for (p = 0; hostile_mask; ++p, hostile_mask >>= 1) {
         if (!(hostile_mask & 1u)) continue;
-        if (!(sc64_target_owner_columns[p] & col_mask) ||
-            !(sc64_target_owner_rows[p] & row_mask)) continue;
+        u32 columns = (sc64_target_owner_columns[p] & col_mask) >> col0;
+        if (!columns || !(sc64_target_owner_rows[p] & row_mask)) continue;
         for (row = row0; row <= row1; ++row) {
             if (!(sc64_target_owner_rows[p] & ((u32)1u << row))) continue;
-            for (col = col0; col <= col1; ++col) {
+            /* The published owner summary can include stale set bits.
+             * A clear bit still rules out this column in every row. */
+            u32 occupied = columns;
+            for (col = col0; occupied; ++col, occupied >>= 1) {
+                if (!(occupied & 1u)) continue;
                 int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
                 for (entity = sc64_target_head[p][cell]; entity != SC64_TARGET_NONE;
@@ -11431,6 +11435,9 @@ sc64_worker_cargo_badge_kind(const Unit *q)
 #endif
 
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+#if defined(SC64_WORLD_DEPTH)
+static const u8 *sc64_pose_heads, *sc64_pose_next;
+#endif
 static const Sc64SpriteFrame *
 sc64_source_unit_attack_pose_resolve(const Unit *q
 #ifdef SC64_ATTACK_WORD_RENDER
@@ -11445,7 +11452,15 @@ sc64_source_unit_attack_pose_resolve(const Unit *q
     if(packed) *packed=0;
 #endif
     if(!q->cd) return 0;
+#if defined(SC64_WORLD_DEPTH)
+    /* The depth renderer's temporary census retains ascending slot order,
+     * preserving the first match when equally recent traces have a pose. */
+    int cursor = sc64_pose_heads ? sc64_pose_heads[slot-1] : 0;
+    for(int i=sc64_pose_heads ? cursor-1 : 0; i<MAX_TRACERS && i>=0;
+        i=sc64_pose_heads ? (int)sc64_pose_next[i]-1 : i+1) {
+#else
     for(int i=0;i<MAX_TRACERS;++i) {
+#endif
         const Tracer *t=&tracers[i]; Sc64WeaponSourceVfxKey key;
         if(t->life<=0 || !sc64_weapon_source_vfx_unpack((uint32_t)t->color,&key) ||
            key.actor_slot_plus1!=slot || key.actor_raw!=raw ||

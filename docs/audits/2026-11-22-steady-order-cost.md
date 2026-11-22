@@ -222,6 +222,46 @@ Keep the trial out of the regular cartridge builds. A broader
 renderer change should retain the visible-battle improvement while
 reducing cost under both common skirmish workloads.
 
+## Target column and crowded pose indices
+
+Nearest-target search now uses the published per-owner column
+summary to skip cells in unused columns. Occupied columns and
+entity chains retain their previous visit order. A stale set bit may
+still cause a cell read. The isolated change lowers targeting from
+136,688 to 131,331 guest cycles in the 16-update Protoss Outpost
+battle sample and saves 0.16% in the 9,489-update P10 victory tail.
+
+The painter builds a tracer index when eight or more admitted units
+have active cooldowns. It includes live tagged projectile-only traces
+and preserves ascending tracer-slot priority for equal ages. Unit
+identity, launch coordinates and pose validity still decide whether a
+trace supplies a frame. Sparse scenes and draws outside the indexed
+painter use the direct scan. An unconditional index increased mean
+cost in every 12,000-update Custom Game replay by 0.21–0.40%.
+
+The combined runtime saves 1.19% over 900 advancing Crossfire
+updates, with 30 matching world, video, palette, route and tracer
+cuts. The P10 fresh save tail saves 0.16% with 81 matching cuts and
+the same victory journal. All six 12,000-update Custom Game pairs
+match all 120 non-timing samples. Five pairs use 0.004–0.134% fewer
+cycles and the sixth uses 0.003% more. All 48 ordinary Custom Game
+startup, pause save and fresh HOME continuation cases pass across
+eight normal and preview products.
+
+All 30 missions launch through the ordinary campaign menus on the
+three combined normal cartridges. After acknowledging any initial
+field dialogue, each advances into gameplay. The 30 retained
+launch checkpoints match the facility release.
+
+All eight links pass the static RAM guards. The painter's stack frame
+grows by 224 bytes on Terran and Z10 and 280 bytes on P10 and
+Showcase. Observed system stack margins over the static IWRAM end are
+6,776 bytes in sampled Crossfire updates and 6,312 bytes in five Z10
+busy-save updates. These samples leave worst-case stack use open.
+The prepared opt-in packed pose bank also links. With the option
+enabled, 32 checkpoints across 960 Crossfire updates match the
+disabled build, with a further 0.93% cycle saving in that run.
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
@@ -251,6 +291,13 @@ GBA first-seat run starts southeast. The observer increments are
 asynchronous to native game updates. Matching the base position and
 measuring the native gameplay clock remain prerequisites for a rate
 comparison.
+
+In a further GBA sweep, pre-launch waits of three, 12 and 13 updates
+produce a southwest human base and, respectively, a northwest,
+northeast or southeast Zerg base. These launches use ordinary menu
+input. All three credit the first eight minerals at neutral update
+74. The native human corner now has a GBA match. The native Zerg
+corner and gameplay clock still need the separate RAM observation.
 
 ## Protoss campaign continuation and replay controls
 
@@ -368,6 +415,12 @@ an upper limit on the nodes removed by this uniform-radius geometric
 test in the sampled workload, before paying for the bound itself.
 The broader movement and collision traversal remains the priority.
 
+Hoisting the collision mask table's speed offset removes two
+redundant axis checks after the radius gate. The tighter lookup
+matches both 16-update P10 windows and all 81 victory-tail cuts.
+Full-tail mean changes from 1,506,238 to 1,506,445 cycles. Keep this
+table-addressing trial local and focus on the repeated traversal.
+
 An isolated audio probe suppresses volatile snapshot writes whose
 value would be unchanged. It matches world, video, palette and
 route counters at the 32 attribution cuts. The early observer scope
@@ -455,12 +508,21 @@ which repeated overlay walks can be elided before adding storage.
 | Shared byte compositor, 900 Crossfire updates | `906978a6180de3d72e07ac6f131a724c3dbd155c734534e3fcf0c14dc4c3bcf2` |
 | Shared byte compositor, six Custom Game replays | `5cb807685223cc20a737c5b64c49686ef6f0416327e5da09187243d03825549f` |
 | Shared byte compositor, current P10 fresh save victory | `e67cb892b874b383e11c915661bc24ae209c6f29b44702e50c158105e60a8a6d` |
+| Target-column-only 16-update Outpost candidate | `ce1619d53c2536b84e052a3eb330f9391a2a9e52d07cc6ece7d050e495dec350` |
+| Combined indices, sustained Crossfire | `254ed62ad2ad629968f5e579169dc591e75fc5bb26ac3d9b7fecd7c361fc25b5` |
+| Combined indices, six Custom Game replays | `a9e551497e4cce09b6f4254111a6dc6bec05e8af7255fed115d689ac7c3f15ec` |
+| Combined indices, P10 victory continuation | `c207a602a7034dd202789d6ee14be793eff33fd7716bb96295a750a36f724d40` |
+| Combined indices, 48-probe Custom Game matrix | `a57acb6f8e1e80cd470ac1a16ace2db118c078b4f79081bd17901f5c9e066e6a` |
+| Combined indices, all 30 campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Combined indices, stack observer | `6b11f0b451904a1665dbcf6a95b688a10c2d83684996f7eb4fb838b8b7027e33` |
+| Collision table addressing, P10 victory continuation | `85167f6a4b7092138f5896abd31e17715c30d024c0e234880a2173d0d3827ac5` |
 | Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
 | Native Challenger final observed opening frame | `1f802e921166a464433def5394c2f64b6585d504c1e7f7d9754754722ae76fc1` |
 | Current GBA Outpost gathering continuation | `b0c29b94177124741107388941c4f4f7c930bc0c957a2f7714e86c56af0218b8` |
 | Native Blood Bath one-CPU opening tape | `ed076af8ed5c8d8906f75d49fa8791ce3abe1b62a247072e132de0cd8e5805dc` |
 | Native Blood Bath one-CPU opening frames index | `28324258b6de0f8ef51b63d545bb2aaccb08d1db64ad261de64e05e3915182e3` |
 | GBA Blood Bath one-CPU opening | `9557929dff3d115dc2accece76081ee18bd46cb9c20c126a3591c440459aa034` |
+| GBA Blood Bath southwest start, three Zerg corners | `7ba669e5788c64207a9f290c883e79dd4d51b2dd8d2e33a621613afa6aba8ac7` |
 | Current P5 fresh save victory | `9e23597c5b2d0e3198cf7b3138c4df93da07cec51d6bfc85849d78e29a56c88c` |
 | P6 historical and current pick comparison | `5422d9d79a5d2295bac6237931be73a52cfb4f5ec88125e20107827a6a69a8af` |
 | P6 ordinary ARM fresh save victory | `6f701acab49cb1c597100e03977c395eb74899bb769f0ce06fe11997bdd89348` |
