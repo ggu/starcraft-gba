@@ -69,9 +69,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   index cache saves 0.29% in 16 skirmish updates and 0.02% in the full
   campaign run. Keep both trials local. In [visible Crossfire](audits/2026-11-22-steady-order-cost.md#visible-fights-in-protoss-crossfire),
   uncompressed unit sprite blits take 130,161–148,318 guest cycles per
-  update. All 507 sampled calls draw attack poses. Qualify a selective
-  packed path with the original fallback and 32 MiB ROM limit in both
-  Crossfire and the ordinary three-computer match. A point-route
+  update. All 507 sampled calls draw attack poses. A private 85-frame
+  packed bank saves 1.02–1.24% across two short Crossfire windows for
+  286,156 ROM bytes. Replace its link-order lookup with direct pose
+  metadata, then qualify sustained Crossfire and ordinary three-CPU
+  combat within the 32 MiB ROM limit. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes

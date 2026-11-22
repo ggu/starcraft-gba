@@ -124,7 +124,17 @@ arrays and 1.23 MB of indexed pixels. Four phase copies with masks
 would need at least 9.84 MB, above the available ROM space. Qualify
 a bounded packed subset and retain the exact byte-sprite fallback.
 Retain the ordinary Outpost
-battle as a second workload. The historical mode-0 tile path falls
+battle as a second workload.
+
+A local trial packs 85 frames from one source bank shared by actor
+IDs 37, 38 and 53. A linear pointer lookup raises the mean in both
+windows. An ordered lookup lowers the early window from 1,462,383
+to 1,447,442 cycles and the late window from 1,380,207 to 1,363,039.
+All 32 recorded cuts match. It adds 286,156 linked ROM bytes and
+preserves both RAM endpoints. The experiment verifies the pointer
+order for that link. Keep the branch local while converting the
+lookup to direct pose metadata and qualifying a sustained battle.
+ The historical mode-0 tile path falls
 back to Mode 4 for Custom Game and gave flat P7 timing. Its imported
 audio and RAM limits remain relevant. See [renderer validation](../VALIDATION.md#p7-mode-0-tile-renderer).
 
@@ -290,3 +300,4 @@ which repeated overlay walks can be elided before adding storage.
 | Visible Crossfire instruction attribution | `0b001e9a886f937fa8b553f2a85fea6cb83107f7762ae304116c4ece51951545` |
 | Matched profiled and unprofiled Crossfire cuts | `50928c356289710d94fa8c52fbf83080ba87468224ce79eecfb8779070e63954` |
 | Crossfire attack-pose call census | `948d1c7e09a856e875f7b8e5f8689c9a4c553578eb3a4567763cb1d0074127b5` |
+| Selectively packed attack-pose trial | `9ba22c1ff4633172913521b98da94dc16954bb72ffc76237926026208c16e7cf` |
