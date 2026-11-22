@@ -98,6 +98,26 @@ repeated target eligibility and tracer admission work, alongside the
 separate route-stall cut. Player-driven battle pacing and hardware
 measurement remain open.
 
+## Selection and detector query candidate
+
+The [combined draft](https://github.com/ggu/starcraft-gba/pull/724)
+checks selection before the other live worker and hint flags. The
+cached detector resolves its source slot only when a cloaked target
+requires the existing detector lookup. The legacy observer retains
+its normalized optical slot. Both changes leave game state layout
+and command dispatch intact.
+
+The 9,489-update P10 replay to victory falls from 1,517,236 to
+1,506,386 guest cycles per update (0.72%). All 81 world, cache,
+route, fog and display cuts and the full victory journal match.
+The six 12,000-update Custom Game replay pairs match 120 semantic
+world, route, palette and video cuts. Mean guest cost falls 0.17–0.25%
+across the six replays and 0.26–0.50% in their slowest 600-update
+intervals. All eight normal and preview RAM endpoints match the
+control. Forty-eight ordinary start/save/reload cases also pass across
+both variants, all four products, both maps and one to three CPUs.
+The full default suite is still running on candidate runtime `6f9679de`.
+
 ## Wasteland selection and Terran 7 continuation
 
 Two isolated runs of the authenticated USA N64 ROM use the same
@@ -183,3 +203,7 @@ The archived late Z7 battle still lacks a current paired measurement.
 | Current Terran 7 fresh-SRAM victory | `e5843d9a9a1d8683dbfd46f230aa9232b70e686a964fa916cd320dc16ffcc551` |
 | Point predecessor ROM-placement control | `c7ce279873e286c66d5350a2c3ef162dc90625a2525c083797fcd5dd234c9176` |
 | Point predecessor trial | `fe3c3b42273aeda085567964ac667700dda3ce446f8f25e90b8677942848cbdc` |
+| Combined Protoss 10 victory replay | `2762fc00d29327d87fdee95389f0359c0169541e09b58397afd8ebbe2d6d91ca` |
+| Matched six-game control with video and world cuts | `1e90c488704968e50765b9323a94cd36a334b30bd7fb5d1d39ed698d09837e39` |
+| Matched six-game combined trial | `0c0da0e5b1ba92ae4ea74bf2bebe1d2cab1eb0833b526ce03291d6c2d18178be` |
+| Candidate 48-case cartridge save/load matrix | `7710d185af7a0bfeeafcf15d89d17e8c7544c939ef32ef372beb08f94ce48df1` |

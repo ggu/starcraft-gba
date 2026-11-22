@@ -59,8 +59,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   drop to 13.24–18.47 emulated updates per second. In the sampled
   no-new-route-build Protoss Outpost cut, targeting alone costs 139,078
   cycles within orders and tracer passes cost 96,034 within rendering.
-  Profile repeated target eligibility and tracer drawing here, then
-  validate in a player-driven battle and on hardware. A point-route
+  The [selection and detector query draft](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
+  saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
+  Custom Game replays with matching state and video. Profile repeated
+  eligibility and tracer drawing here, then validate in a player-driven
+  battle and on hardware. In this cut, trace timing and animation bank
+  lookups account for about 15,400 cycles per update. Confirm constant-bank
+  metadata can replace them before revisiting the overlay walk. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
