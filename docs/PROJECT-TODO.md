@@ -156,8 +156,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all 206 named observations matching. Two earlier pause and fresh HOME
   tests reach frame 9,438 after one Hatchery reselection. The corrected
   tape now also pauses at frame 30,739 and resumes from fresh HOME
-  through frame 38,149 on the steering build. Complete the full
-  uninterrupted and fresh-resume victory runs on that build.
+  through frame 38,149 on the steering build. The complete uninterrupted
+  replay on that version wins at frame 267,585, matching all 206 checks.
+  Mean cycles fall 1.85% across the detector and steering releases.
+  Finish the full fresh-resume victory check.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages
@@ -259,7 +261,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   race cartridge set.
   The [current campaign and skirmish replays](audits/2026-11-22-current-campaign-and-skirmish-replays.md)
   verify T4, T7 and T10 fresh-pause victories and result readbacks,
-  P5 Shuttle continuation, and the normal Terran Blood Bath win.
+  P5 Shuttle continuation and result readback, and the normal Terran Blood Bath win.
   Current Melee previews reach the same three-CPU defeat before and
   after fresh HOME on all four profiles. Active Melee wins and
   survivor transfer remain open. SD readback, physical frame pacing

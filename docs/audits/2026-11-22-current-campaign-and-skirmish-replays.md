@@ -13,13 +13,15 @@ attached-depth cartridges from November 21.
 | T4 | 4,968 | 8,911 | 10 | Identical re-export |
 | T7 | 2,289 | 3,931 | 12 | Identical re-export |
 | T10 | 2,276 | 3,361 | 6 | Identical re-export |
-| P5 | 2,700 | 5,057 | 7 | Pending third process |
+| P5 | 2,700 | 5,057 | 7 | Identical re-export |
 
 Each Terran replay saves through ordinary Pause and continues from
 fresh HOME. For P5, the complete HOME replay checks twelve briefing
 pages, five dialogue pages and mission completion. A separate fresh
 HOME load picks up the Shuttle in flight with both passengers and
-matches seven checks through victory. The earlier mission-wide
+matches seven checks through victory. A third process restores P5's
+result at frame 5,057, matches the observed world through eight neutral
+updates and re-exports identical 32 KiB SRAM. The earlier mission-wide
 coverage and these current cartridge replays remain distinct receipts.
 
 | Local campaign receipt | SHA-256 |
@@ -29,6 +31,7 @@ coverage and these current cartridge replays remain distinct receipts.
 | T10 continuation and result | `2531aff81cfa073039a4f58207f2260bea4fc4a8d707063c2bfe0fdf86a6b619` |
 | P5 HOME victory | `a203741cfac555b469601a81e430d504af92613ef3040966cf99fd570456669d` |
 | P5 Shuttle pause continuation | `88c972f353511a679f79924382e34e7878f098d9ac8e84e5440aea10d89327c2` |
+| P5 victory and third-process readback | `c6dcd11f9b3f254b53f42f5906290b8cd249fb2e0a60270b246da3569569b908` |
 
 ## Normal Blood Bath win
 

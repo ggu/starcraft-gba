@@ -72,6 +72,27 @@ The Zerg ROM SHA-256 is
 The full ARM replay receipt SHA-256 is
 `492fa7315db38bd07da59d0a3aab755560133dbea9f97e2ade33b8d240b950b8`.
 
+## Full normal victory on the steering release
+
+The exact `c2624205` cartridge repeats the full corrected ordinary
+button tape and wins at frame 267,585. All 206 named checkpoints
+match. The two release ROMs match the sampled world fields, route
+counters, UI state, palette and both framebuffer page hashes.
+The displayed-page phase differs at two cuts.
+
+| Tape window | Mean guest cycles per call, missile trails → steering |
+| --- | ---: |
+| Entire 270,585-call tape | 1,411,541 → 1,385,425 |
+| Calls 71,261–93,896 | 1,544,871 → 1,516,264 |
+| Calls 152,303–170,438 | 1,674,097 → 1,641,111 |
+| Calls 222,902–243,327 | 1,375,089 → 1,341,575 |
+
+The full replay improves 1.85% across the combined detector and steering
+changes. These are emulated main-loop calls, including presentation
+waits, and dense combat remains above the 30 fps cycle budget.
+The steering-build victory receipt SHA-256 is
+`3651fd4fa509432c542cc4fbb7ea800f137fbd36f3c613ff6b1013afa04ff6ce`.
+
 ## Focused regression recipe
 
 With an already-prepared Z10 ARM argument JSON and its referenced local inputs,
