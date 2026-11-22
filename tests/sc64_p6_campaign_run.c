@@ -671,21 +671,25 @@ static int select_actor_only(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE)
         return 0;
-    /* A moving hero can leave the old cursor destination while the controller
-     * crosses the map. Chase its observed position using ordinary cursor keys. */
-    for (int attempt = 0; attempt < 600 && u[slot].alive; ++attempt) {
-        int dx = u[slot].x - cx, dy = u[slot].y - cy;
-        if (abs(dx) <= 3 && abs(dy) <= 3) break;
-        u16 held = KEY_R;
-        if (dx > 0) held |= KEY_RIGHT;
-        else if (dx < 0) held |= KEY_LEFT;
-        if (dy > 0) held |= KEY_DOWN;
-        else if (dy < 0) held |= KEY_UP;
-        step(held);
+    /* Foreground picking can put a different actor over the requested
+     * center. Probe a bounded set of nearby physical cursor clicks and
+     * accept only a verified single selection. No guest state is changed
+     * except through step/tap. Re-read position for moving actors. */
+    static const int offsets[][2] = {
+        {0,0}, {0,-16}, {-16,0}, {16,0}, {0,16},
+        {-12,-12}, {12,-12}, {-12,12}, {12,12},
+        {0,-24}, {-24,0}, {24,0}, {0,24}
+    };
+    for (unsigned attempt = 0; attempt < sizeof offsets / sizeof offsets[0] &&
+         u[slot].alive && u[slot].owner == SIDE; ++attempt) {
+        int x = u[slot].x + offsets[attempt][0];
+        int y = u[slot].y + offsets[attempt][1];
+        if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) continue;
+        move_cursor(x, y);
+        tap(KEY_A);
+        if (u[slot].selected && selected_count() == 1) return 1;
     }
-    step(0);
-    tap(KEY_A);
-    return u[slot].selected && selected_count() == 1;
+    return 0;
 }
 
 static int select_zealot_group(void)
