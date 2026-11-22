@@ -109,8 +109,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [follow-up routing measurements](audits/2026-11-22-dense-release-attribution.md#full-fifo-completions)
   show that all six sampled point origins still need a full fill
   after 2,048 pops. Their first visits take 5,400–7,855 pops.
-  Compare an 8,192-pop cutoff on exact matched tapes and measure
-  later reads and queue evictions.
+  The 8,192-pop cutoff alone reaches the shared scratch limit after
+  4,412 pops. Compare in-place queue compaction on the exact tape and
+  measure later reads and queue evictions.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -282,6 +283,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   three-CPU opening. The dual-flag composition passes ordinary human
   defeat with two neutral survivors, a staged enemy transfer and
   an ordinary Terran victory one update after retiring the last CPU.
+  The [later native replay](audits/2026-11-18-blood-bath-elimination-arm.md#native-melee-defeat-and-neutral-workers)
+  retains the CPU alliances and transfers four surviving SCVs at
+  human defeat. The current preview also carries the compact Zerg
+  transport save fix and the unstarted Interceptor refund.
+  Keep launched and training Interceptor groups separate until
+  their retirement and journal paths are qualified.
   Verify ordinary enemy survivor transfer and broader active wins
   with other races and two or three CPUs.
   SD readback, physical frame pacing and broader native campaign

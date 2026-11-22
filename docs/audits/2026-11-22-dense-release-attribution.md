@@ -201,3 +201,21 @@ and the sampled frame and route counters. Its diagnostic window
 uses a separate FIFO in ROM. Use its receipt for work counts.
 The receipt SHA-256 is
 `819480138f209e7c420642f2dde0be79170a703859ed44c3f489840750c5ecb9`.
+
+The unmodified queue fills its shared scratch after 4,412 pops in
+each of the six expansions with the 8,192-pop limit. All six still
+complete and pack the entire field. The next 2,987 advancing
+updates contain 33 prefix expansions with full completion in each
+build and zero normal parked FIFO resumptions. All 14 sampled
+world, framebuffer and palette cuts match. Mean cycles change
+from 1,606,097 to 1,606,772 in the 16-call profile and from
+1,358,652 to 1,358,638 in the continuation.
+
+Qualify compaction of the unread FIFO in place, retaining the
+cumulative pop count and original neighbour order. After compaction,
+pack discovered directions from the dense grid, since the compacted
+queue contains only the remaining frontier. Verify park, another-reader
+resumption and full-budget decline against an independent BFS before
+using the matched tape to measure savings. The paired unmodified-queue
+receipt SHA-256 is
+`31251cb661755704992c26a57760461e9bb9f9292039d6d7a1f0459034e35199`.

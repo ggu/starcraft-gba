@@ -216,3 +216,70 @@ SHA-256 is `2453fd79f6fa0f3c8b5f978b716689b71c372f3b1267f031d59b9f8b394106a9`.
 The next native result check needs a grounded last building, a surviving
 unit belonging to its owner, and another CPU still in play. These captures
 cover the lobby and passive mining through step 9,000.
+## Current release qualification
+
+### Native Melee defeat and neutral workers
+
+A continuation in the USA N64 emulator uses the ordinary Blood Bath
+Melee setup with human Terran and Zerg, Terran and Protoss CPUs.
+At step 7,288 the human has one registered building and five actors.
+Four of them are SCVs in slots 79–82 with 60 HP each. All six
+directed CPU-to-CPU relations still read allied.
+
+In a replay branch from that cut, the human has zero registered
+buildings and a published defeat at step 8,766. The same four SCV
+slots now have neutral owner 11 and 60, 60, 55 and 60 HP. All three
+CPU building counts remain positive and all six CPU relations remain
+allied. Another read at step 8,914 confirms those relations and still
+shows the three CPU result words at zero. The visible defeat overview
+was captured from a separate continuation of the same opening.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Native step 7,288 | `b3ae047199ccb44d9a0ee2653b4cb1fda0e86c3c0e3d4efc26cc07a8024d4d2f` |
+| Native step 8,766 | `42042da94bcda05ff34e940a4d88b29324b5b499a92722d959811f2551c03dc7` |
+| Native step 8,914 | `e6e11fdd131a94b849100aa50c3ce0d9d64f5bbcd60caa67b44cad2d43d2a9b7` |
+| Native defeat overview | `604304e99d6cc2ff92dc4b786133e67b84eb4eac53a086723afcecc1b567461e` |
+
+### Current source and save validation
+
+The opt-in build combines the complete draft with the queued
+Interceptor refund and compact Zerg save fixes. Before the fixes,
+the current Z10 HOST fixture produced a positive neutral Ventral Sacs
+marker and failed to write the compact Carrier envelope. Its outer
+transport trailer validator was still checking only the older two
+research values. Both compact and ordinary preview journal paths now
+decode the same marker and reject unrelated bits. The test reads the
+authenticated record before inspecting the decoded candidate.
+
+On the complete draft before the queue and trailer changes, an
+ordinary Terran three-CPU Melee pause at frame 5,001 matched the
+fresh continuation to defeat at frame 11,580. Two surviving SCVs
+transferred to neutral raw owner 11 at 60 HP. A separate staged P10
+fight with a Carrier and two docked Interceptors transfers the entire
+group after the last CPU building falls. The docked links survive a
+fresh HOME load and eight further updates.
+
+A current reference for the ordinary Terran one-CPU win is
+[the normal input replay](2026-11-22-blood-bath-melee-victory.md).
+The full draft's ordinary ARM replay repeats all 236 observations
+and wins at frame 38,259 after the extra retirement update.
+
+The Z10 build from `16a54367` also passes the staged positive-marker
+case. A queued lethal hit destroys the last CPU building on ARM.
+The researched Overlord and its loaded Zergling transfer to neutral
+with their cargo link intact. The neutral Ventral Sacs marker survives
+an ordinary pause save, fresh HOME load and eight more updates.
+
+The production race and Showcase targets keep the preview flag off.
+The prepared preview provides a distinct build target and cartridge
+identity. Training and airborne Interceptors still defer retirement.
+Native competitive CPU elimination and physical GBA timing remain
+open.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Full-draft Terran pause and neutral SCVs | `f5fb9bf69cf0f73cc284de5aa5a6b8835426b0613b08fc5eb2e9e718c02fba99` |
+| Full-draft P10 docked group and fresh save | `edd5f9f32d4a297a8462c30e387b283485fe00c2b75dfc6a0eaa74b957298f95` |
+| Full-draft Terran ordinary win | `dbc89f8dd37025ff34c39343c9bc15c52335fc59d1baf8491b4a382787a5a1a1` |
+| Current Z10 neutral transport reload | `af19d0027947bc08dc3181ba4ccc1a791135fc4d5a594e79f98530b4191bc8d9` |
