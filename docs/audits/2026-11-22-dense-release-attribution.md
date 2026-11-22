@@ -296,3 +296,63 @@ and the compaction source. The Terran subcase passes in both.
 | Elimination preview saved replay, baseline | `a8193058d998ce53d94ecc63eb9a334e70e7171295c0befca2c0318353f6cc0f` |
 | Elimination preview saved replay, compaction | `9ed83022142c957f0fb3549764c465c47f9a206300e8e72efeaa0f91e2f560f6` |
 | Elimination preview Custom Game save matrix | `3457feb4ed924c66b513aa07ff44aa2e3cbf5b14f4f19d4adf832108b4f62ab0` |
+
+## Unit projection and facing on the compacted release
+
+The `9acfa906` Protoss image runs the same ordinary saved-game controller
+tape. An independent unprofiled run matches all 32 sampled guest clocks,
+world cuts, route counters and both framebuffer pages. The instruction
+and call-stack totals account for every guest cycle in both 16-update
+windows. Calls 39,760–39,775 average 1,557,491 cycles. Calls 44,000–44,015
+average 1,506,884. In the latter window the painter attempts about 76
+exact sprite crops and draws about 15 units per update. The crop path
+alone uses 105,557 cycles, including 35,569 in walk-pose lookup and
+20,850 in order-facing lookup. Initial heap insertion uses only 7,052
+cycles in the first window. Prioritize avoiding unnecessary pose work.
+
+The painter checks enemy fog before resolving an exact crop, after a
+conservative bound covering body art, cocoons and charge images. This
+cuts the later crop path to 88,100 cycles and preserves all 32 cuts.
+The earlier window adds 674 cycles, and the later window saves 15,104.
+The change alone improves the full tail by 0.013%.
+
+Facing rotates the displacement into the first quadrant and searches
+the exact dot-product crossover ratios of the original rounded vectors.
+The lower direction still wins ties, including direction zero at the
+wrap. The prepared host oracle checks 16,785,409 displacements against
+all 32 directions and exercises the raw-type fallback. The facing change
+alone saves 10,184 and 12,180 cycles in the two windows and reduces the
+9,489-update victory tail mean from 1,536,156 to 1,530,270.
+
+With both changes, the two short windows average 1,548,204 and 1,479,974
+cycles (0.60% and 1.79% lower). The victory tail averages 1,530,146 cycles
+(0.39% lower) and matches all 81 sampled world, frame, fog, HUD, route
+and palette cuts and SRAM. The host turret, mining, selection and
+foreground picking checks pass. All four normal images and all four
+elimination previews retain their previous EWRAM and IWRAM endpoints.
+The dense tail still achieves about 10.96 emulated updates per second.
+
+The normal and elimination-preview ROMs each pass all 54 Custom Game
+menu, save and fresh-load cases. The Zerg Blood Bath pairs start from
+the same ordinary save within each build group. Both groups match 31
+world, video, palette and route cuts and the exported SRAM over 3,600
+updates. Mean cycles change from 576,467 to 576,330 in the normal match
+and from 571,392 to 571,196 in the preview.
+
+A read-only census finds that friendly Marines and Firebats account
+for 61.6 of the 75.7 candidate outer-band crops in each later update.
+A hypothetical symmetric 24-pixel art bound would reject 59.1 of
+those 75.7 candidates overall. The 24-pixel assumption has no verified
+art coverage. Generate per-identity bounds from the actual facing,
+walking, mirrored, attack, turret and fallback banks before using
+this approach. Retain the current exact crop on unknown art.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Exact current timing and cuts | `0cf06d8eb0761bcf588a95a29e28365d3746982358f59572a7b2c72cc58ce5e6` |
+| Exact current instruction attribution | `924cb03d7cfc96a24917de76263c3a532417f2a130e78762b990192460751ffe` |
+| Combined timing and cuts | `4545cc21356af3745d2de47f4dd63aa193435cd8322c95ba08c70d64fbae5888` |
+| Combined Protoss victory tail | `ca12b02708bb9e356000cad61b182073037a53990420494d9f4096b200d21668` |
+| Normal Custom Game matrix | `f41775839cc5473724ee24893e220450c64197c83aeb706224e2213c14609e80` |
+| Preview Custom Game matrix | `780123b907f8bd2dc761cf2cd93f665cc4ec75191554ef08e9e8a4ee984585d5` |
+| Crop candidate population | `947f742a62c67c36cecd575abf49a89749e6ecad8cb6e441ef5cf3c3b36d1907` |

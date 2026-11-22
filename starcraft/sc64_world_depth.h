@@ -539,8 +539,12 @@ sc64_draw_depth_ordered_actors(void)
         Unit *q = &u[i];
         if (!q->alive) continue;
         int x = q->x - camx, y = q->y - camy + 12;
+        if (q->owner != SIDE) {
+            /* Enclose the body, displaced cocoon and charge-image bounds. */
+            if (x < -64 || x > 304 || y < -80 || y >= 192) continue;
+            if (!currently_visible(q->x, q->y)) continue;
+        }
         if (!sc64_unit_anchor_in_view(q, x, y)) continue;
-        if (q->owner != SIDE && !currently_visible(q->x, q->y)) continue;
 #ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
         if (q->type == U_P7_INTERCEPTOR && SC64_CARRIER_STATE_HIDDEN(q)) continue;
 #endif

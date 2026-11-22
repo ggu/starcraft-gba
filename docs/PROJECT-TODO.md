@@ -33,6 +33,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   a fresh late Z7 paired run and keep profiling the steady draw and
   order costs. The current P10 victory tail still averages 10.92
   emulated updates per second.
+  The [unit projection and facing trial](audits/2026-11-22-dense-release-attribution.md#unit-projection-and-facing-on-the-compacted-release)
+  lowers the later P10 window by 1.79% and the 9,489-update mean by
+  0.39%. Animation lookup inside viewport checks remains expensive.
+  Friendly Marines and Firebats account for 61.6 of the 75.7 outer-band
+  crops per update in the later window. Measure a reject-only bounds
+  table certified against facing, walking, mirrored, attack, turret
+  and fallback art. Keep the exact crop for uncertified metadata and
+  check foreground picks and both framebuffer pages.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak

@@ -79,6 +79,13 @@ grant timing, Raynor loss and the zero-actor defeat boundary remain open. The
 paired GBA receipt SHA-256 is
 `327919258a563a00e1fb8aff65bab6dddaa5de9be9b681ff6f53051735637e23`.
 
+A separate native run appends 1,800 neutral steps and still observes
+active Wasteland at 40 minerals and 10/18 supply. The older observer
+requires its MoltenVK path in `DYLD_LIBRARY_PATH`. An isolated control
+reproduces snapshot failure without that path. The extended run reports
+GPU ready after 9,000 steps and captures one frame. It has no Raynor
+loss or mission outcome observation.
+
 ## Blood Bath state and render-row observation
 
 A separate local observer restored an ordinary Blood Bath step-zero state and
