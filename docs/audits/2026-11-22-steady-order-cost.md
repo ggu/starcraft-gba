@@ -423,6 +423,60 @@ with the corrected world-depth building check.
 | Exhaustive named-seat launch matrix | `9e8fa637a948f4e66ffb70d69b99607665d2d3ead3fff5cc87a4672becc80311` |
 | Pause save and fresh HOME matrix | `71c6395cd239cf8b4b8491d3d86d74d9c8f305c0eb8ea72886912154f6c82972` |
 
+## Visibility coordinate lookup
+
+The prior P10 link spends about 27,235 cycles per busy Outpost update
+in `currently_visible`. Its Thumb code uses signed-division correction
+on each axis and saves registers to the stack. The shared lookup now
+checks both signs together and shifts nonnegative coordinates directly.
+Coordinates from -15 to -1 still map to cell zero. Coordinates of -16
+or lower are outside the grid. The common linked path uses no stack.
+
+The byte and packed grids each match the earlier C calculation in
+1,578,123 ASan/UBSan comparisons. The fixture covers offsets around zero
+and both far edges, empty dimensions, non-power-of-two widths and
+integer extremes. The original-art skirmish fixture covers the first and
+last cells and the adjacent out-of-bounds cases. All four usual ARM
+builds have the same IWRAM and EWRAM link endpoints as the control.
+
+| Paired replay | Mean guest cycles saved |
+| --- | ---: |
+| Terran Outpost, 12,000 updates | 0.77% |
+| Terran Blood Bath, 12,000 updates | 0.56% |
+| Zerg Outpost, 12,000 updates | 0.81% |
+| Zerg Blood Bath, 12,000 updates | 0.63% |
+| Protoss Outpost, 12,000 updates | 0.87% |
+| Protoss Blood Bath, 12,000 updates | 0.63% |
+| Showcase Crossfire, 900 updates | 0.47% |
+| P10 fresh HOME victory, 9,489 updates | 0.73% |
+
+All 231 replay cuts match world state, both framebuffer pages, palette
+and route counters. The P10 continuation also matches its fog grids,
+weapon and HUD fingerprints and final SRAM. Its mean moves from
+1,502,844 to 1,491,932 cycles per update, about 11.25 emulated updates
+per second. The 30 campaign opening fingerprints and all 24 regular
+pause-save and fresh HOME cases also match, including saved SRAM bytes.
+All 1,134 normal Custom Game launches match the earlier map, human race,
+named or closed CPU seats and hall positions.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Coordinate comparison fixture | `42efec20460807a6979d86fd55a518a5d3f97bb905d8e68ae3b97460be250b75` |
+| Six Custom Games | `dbc98b62ef8a7de0132ed090ca96b89c978c80cb8f8dca562ed751c7b0456da2` |
+| P10 fresh HOME victory | `c28c76cf409873d428df3fffd61f7ee4df4451e6c361b6a7d302507a3bce7b09` |
+| Showcase Crossfire | `7086a496074cfdea19df7cb7d88d6338581611e52c430ff4c387f0c2dbfbab4f` |
+| Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular pause save and fresh HOME matrix | `f3d10f2b9f5e7354fee2e0a879df60a676f4fd8b73f796e73ca139994aed7350` |
+| Ordinary Custom Game launch matrix | `0955050b8a1dd809200f174a728a01c689deddbfb88d0b347a27c9a7c67b5d34` |
+
+On the retained Outpost frame 11,100, a read-only breakpoint census
+records no entries into the attacker-overlay branch of tracer drawing.
+The same cut matches world, both video pages, palette and route counters.
+An early exit for empty actor overlays cannot save cycles in this cut.
+Measure the projectile-overlay branch and wider fights before proposing
+a tracer shortcut. The one-frame receipt SHA-256 is
+`17be680573df0bde2e69793ffbfa0372f25bea1765d31bf0bca2d4e209d03e24`.
+
 ## Outpost resource sprite costs
 
 The ordinary late Outpost repeat matches the retained world,
