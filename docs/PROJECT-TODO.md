@@ -98,6 +98,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in
   an ordinary fight before trialing generated row bounds.
+  The [shared projectile heading lookup](audits/2026-11-22-steady-order-cost.md#shared-heading-for-projectiles-and-unit-facing)
+  preserves launch and impact direction through exact ties. It
+  cuts guest cycles slightly in six ordinary battles, the P10
+  victory replay and Crossfire. The busy-frame target still needs
+  larger movement and rendering gains.
   A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius

@@ -4962,22 +4962,7 @@ sc64_tank_fallback_depth(int slot, int shooter, int target)
 #endif
 
 #ifdef SC64_WEAPON_SOURCE_VFX
-static int
-sc64_source_effect_direction(int dx,int dy)
-{
-    static const short vector[32][2] = {
-        {0,-256},{50,-251},{98,-237},{142,-213},{181,-181},{213,-142},{237,-98},{251,-50},
-        {256,0},{251,50},{237,98},{213,142},{181,181},{142,213},{98,237},{50,251},
-        {0,256},{-50,251},{-98,237},{-142,213},{-181,181},{-213,142},{-237,98},{-251,50},
-        {-256,0},{-251,-50},{-237,-98},{-213,-142},{-181,-181},{-142,-213},{-98,-237},{-50,-251}
-    };
-    int best=0; long score=-0x7fffffffL;
-    for(int i=0;i<32;++i) {
-        long dot=(long)dx*vector[i][0]+(long)dy*vector[i][1];
-        if(dot>score) {score=dot;best=i;}
-    }
-    return best;
-}
+#include "sc64_facing_direction.h"
 
 static int __attribute__((noinline))
 sc64_source_emit(int raw,int source,int weapon,int air,
@@ -4989,12 +4974,13 @@ sc64_source_emit(int raw,int source,int weapon,int air,
         sc64_weapon_source_profile_lookup((uint8_t)raw,(uint8_t)weapon,(uint8_t)air,(uint8_t)variant);
     if(!profile) return 0;
     unsigned count=profile->weapon_count==2 ? 2u : 1u;
+    uint8_t direction = (uint8_t)sc64_facing_direction(x1 - x0, y1 - y0);
     for(unsigned shot=0;shot<count;++shot) {
         Sc64WeaponSourceVfxKey key = {
             .actor_raw=(uint8_t)raw,
             .actor_slot_plus1=(unsigned)source<MAX_UNITS ? (uint8_t)(source+1) : 0,
             .weapon_id=(uint8_t)weapon,
-            .direction=(uint8_t)sc64_source_effect_direction(x1-x0,y1-y0),
+            .direction=direction,
             .target_air=(uint8_t)!!air,.variant=(uint8_t)(variant?variant:shot)
         };
         uint32_t packed;

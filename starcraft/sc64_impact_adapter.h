@@ -86,7 +86,7 @@ race_impact_profile_steps(const Sc64WeaponSourceAttackProfile *p, int x0, int y0
          p->weapon_bullet_type != SC64_SOURCE_BULLET_FOLLOW &&
          p->weapon_bullet_type != SC64_SOURCE_BULLET_BOUNCE)) return 0;
     sc64_weapon_source_trace_launch_origin(p,
-        (uint8_t)sc64_source_effect_direction(x1 - x0, y1 - y0), x0, y0,
+        (uint8_t)sc64_facing_direction(x1 - x0, y1 - y0), x0, y0,
         &launch_x, &launch_y);
     flight = sc64_weapon_source_trace_flight_ticks(p, launch_x, launch_y, x1, y1);
     /* The renderer draws no trace for a distant projectile without motion. */
