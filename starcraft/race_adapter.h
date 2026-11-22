@@ -1841,6 +1841,47 @@ static void race_tick_buildings(void)
     }
 }
 
+#ifdef SC64_IMPORTED_SKIRMISH
+enum { RACE_OPENING_WORKER_SPACING = 12, RACE_OPENING_WORKER_DEPTH = 28 };
+
+static void race_skirmish_opening_fields(int hall_x, int hall_y, int fields[4])
+{
+    for (int worker = 0; worker < 4; ++worker) {
+        int best = 0x7fffffff;
+        fields[worker] = -1;
+        for (int patch = 0; patch < MAX_MINERALS; ++patch) {
+            if (m[patch].amount <= 0) continue;
+            int used = 0;
+            for (int prior = 0; prior < worker; ++prior)
+                used |= fields[prior] == patch;
+            if (used) continue;
+            int distance = dist2(m[patch].x, m[patch].y, hall_x, hall_y);
+            if (distance >= best) continue;
+            fields[worker] = patch;
+            best = distance;
+        }
+    }
+}
+
+/* Start the whole crew beside its hall when the row can reach its jobs.
+ * Use a standing worker for the collision check before assigning mining,
+ * whose movement ignores collisions with other workers. */
+static int race_skirmish_opening_row(int hall_x, int y, const int fields[4])
+{
+    Unit worker = {.type = U_SCV, .y = y};
+    for (int i = 0; i < 4; ++i) {
+        int x = hall_x + RACE_OPENING_WORKER_SPACING * (i - 2);
+        int patch = fields[i], nx, ny;
+        worker.x = x;
+        if (patch < 0 || x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
+            !is_traversable(x / 16, y / 16, -1) ||
+            !unit_step_clear_race_fallback(&worker, x, y) ||
+            !path_next_tile(x, y, m[patch].x, m[patch].y, &nx, &ny)) return 0;
+    }
+    return 1;
+}
+#endif
+
 static void race_skirmish_init(void)
 {
     static const int mdx[4] = { 56, 42, 56, 42 };
@@ -1926,24 +1967,29 @@ static void race_skirmish_init(void)
         spawn_build(owner, townhall, race_base_x[base], race_base_y[base], 0);
         if (race_owner_identity(owner) == R_ZERG)
             spawn_unit(owner, U_OVERLORD, race_base_x[base] - 24, race_base_y[base] - 18);
+#ifdef SC64_IMPORTED_SKIRMISH
+        int fields[4], start_at_hall = 0;
+        int hall_x = race_base_x[base], row_y = race_base_y[base] + RACE_OPENING_WORKER_DEPTH;
+        if (race_skirmish_map > 0) {
+            race_skirmish_opening_fields(hall_x, race_base_y[base], fields);
+            start_at_hall = race_skirmish_map == SC64_MAP_BLOOD_BATH && worker_type == U_SCV &&
+                            race_skirmish_opening_row(hall_x, row_y, fields);
+        }
+#endif
         for (j = 0; j < 4; ++j) {
             int idx = base * 4 + j;
 #ifdef SC64_IMPORTED_SKIRMISH
-            if(race_skirmish_map>0){
-                int picked[4]={-1,-1,-1,-1};
-                for(int k=0;k<=j;k++){
-                    int best=0x7fffffff;idx=-1;
-                    for(int p=0;p<MAX_MINERALS;p++)if(m[p].amount>0){
-                        int used=0;for(int q=0;q<k;q++)if(picked[q]==p)used=1;
-                        int distance=dist2(m[p].x,m[p].y,race_base_x[base],race_base_y[base]);
-                        if(!used&&distance<best){best=distance;idx=p;}
-                    }
-                    picked[k]=idx;
-                }
-                if(idx<0)continue;
+            if (race_skirmish_map > 0) idx = fields[j];
+            if (idx < 0) break;
+#endif
+            int x = m[idx].x + 4, y = m[idx].y + 4;
+#ifdef SC64_IMPORTED_SKIRMISH
+            if (start_at_hall) {
+                x = hall_x + RACE_OPENING_WORKER_SPACING * (j - 2);
+                y = row_y;
             }
 #endif
-            int wi = spawn_unit(owner, worker_type, m[idx].x + 4, m[idx].y + 4);
+            int wi = spawn_unit(owner, worker_type, x, y);
             if (wi >= 0) {
                 u[wi].order = ORDER_MINE;
                 u[wi].target = idx;
