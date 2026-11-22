@@ -349,6 +349,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   save, with 21 paired continuation checkpoints and identical
   third-process victory readbacks. Preserve the older unaligned
   tape as historical evidence.
+  The [facility P7 proof](audits/2026-11-13-p7-carried-normal-home.md#november-22-facility-release)
+  recovers the ordinary opening through authored dialogue and wins
+  after a fresh HOME load. The exact controller target reproduces
+  all 4,929 physical input transitions. Extend that proof to other
+  campaign saves and the next combined runtime.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
