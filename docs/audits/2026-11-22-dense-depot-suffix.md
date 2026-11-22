@@ -197,7 +197,17 @@ frame 1,422 when the uninterrupted A action spends 50 minerals.
 Both #724 and the candidate clear the selected Hatchery on reload.
 The replay's next A selects it, while the uninterrupted A queues
 another Drone. The restored queue, wallet and world match through
-call 1,437. Qualify a normal reselection at a neutral input boundary.
+call 1,437.
+
+The successful fresh-load replay replaces neutral tape ticks 1,000 and
+1,001 with a physical A press and release. The cursor still points at
+the Hatchery. This restores the building selection within the same
+two gameplay updates. All 49 remaining checkpoints and the terminal
+state match. Z1 wins at frame 50,669 with the Chrysalis alive and
+30 Hydralisks. A third fresh HOME load confirms the terminal state
+across eight neutral updates and exports a byte-identical 32 KiB
+victory readback. Physical-call counters in the receipt restart when
+the fresh process opens.
 
 The two normal Showcase ROMs run all eight scenes from their hidden
 menu. All sampled world, two-page and palette fingerprints match,
@@ -246,3 +256,5 @@ The default ARM image is byte-identical to #724.
 | Showcase scene candidate | `34f08029ad488d7228ace20012b0f7826009ec08e50fc8685858222e0b678298` |
 | Blood Bath scouting control | `6bd04d92180be267ad0c7e45dbad4dc439d6fb5c00684c73ebac8a61b02fba83` |
 | Blood Bath scouting candidate | `409c7d0411084981e63ccdc3dd3b8e7aa535692c65d24246a4e3929685488da0` |
+| Z1 fresh load, Hatchery reselect, victory and fresh readback | `b42e444ad2ec04811bb2df975445a75456f4359dd6d922a7c382e638720eb256` |
+| Z1 identical victory SRAM and readback | `fd6b53a2e5be9d898d44e93c39e203a6148a3f7f4efc7309a77ca29036b936d2` |

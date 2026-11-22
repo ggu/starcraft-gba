@@ -2391,10 +2391,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   The GBA D-pad centers the cursor over the interior. Account for this
   difference in subsequent normal-input camera and fog comparisons.
 - The [facility-transfer campaign checks](audits/2026-11-22-dense-depot-suffix.md#fresh-distant-requests-on-the-pacing-release)
-  confirm all 30 starts, an ordinary Z1 win from HOME and fresh SRAM
-  victories in T10 and P10. The Z1 same-tape fresh load from frame 984
-  misses a 50-mineral action at frame 1,422. Resolve the input and save
-  context at that cut before counting it as an equivalent continuation.
+  confirm all 30 starts and fresh SRAM victories in T10, Z1 and P10.
+  The Z1 replay reloads at frame 984 and uses an ordinary A press and
+  release to reselect the Hatchery during two neutral tape updates.
+  All 49 remaining checkpoints match, and a third process verifies its
+  victory journal. Continue qualifying other normal campaign save points.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
