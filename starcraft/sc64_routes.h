@@ -3823,6 +3823,17 @@ facility_expand:
 #endif
 #ifdef SC64_ROUTE_FACILITY_64_FUSED
     if (frontier) {
+#ifdef SC64_ROUTE_DENSE_FLOOD
+        /* A fresh distant destination is likely to exhaust the packed
+         * prefix. Keep that prefix for nearby and previously parked work. */
+        int dx = (origin & 63) - (center_x >> 4);
+        int dy = (origin >> 6) - (center_y >> 4);
+        if (origin >= 0 && !previous_pops &&
+            (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy) >= 48) {
+            tail = sc64_route_expand_facility_dense(new_field, facility_walkable,
+                                                   (unsigned)origin, &head, tail);
+        } else
+#endif
         tail = sc64_route_expand_facility_64(new_field, facility_walkable,
                                             origin_byte, origin_mask, &head, tail);
         complete = head == tail;
