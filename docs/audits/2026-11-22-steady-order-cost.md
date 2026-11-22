@@ -143,7 +143,9 @@ runner steps and input dispatch timing are measured independently.
 Terran 7 on the same ROM wins after an ordinary pause and a fresh
 HOME load. All 15 checkpoints match the pinned input tape. The save
 is made at frame 2,289 and victory occurs at frame 3,931. The
-victory journal survives another fresh readback.
+victory journal survives another fresh readback. The draft runtime
+repeats all 15 checks and produces byte-identical pause, victory
+and readback SRAM.
 
 ## Bounding the other steady costs
 
@@ -207,3 +209,4 @@ The archived late Z7 battle still lacks a current paired measurement.
 | Matched six-game control with video and world cuts | `1e90c488704968e50765b9323a94cd36a334b30bd7fb5d1d39ed698d09837e39` |
 | Matched six-game combined trial | `0c0da0e5b1ba92ae4ea74bf2bebe1d2cab1eb0833b526ce03291d6c2d18178be` |
 | Candidate 48-case cartridge save/load matrix | `7710d185af7a0bfeeafcf15d89d17e8c7544c939ef32ef372beb08f94ce48df1` |
+| Draft Terran 7 fresh-SRAM and victory readback | `414b31ad903b4950e26f52c92bc1a4369dc7f113fae4479ed617aa16c61ffc25` |
