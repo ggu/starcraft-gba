@@ -35,12 +35,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   emulated updates per second.
   The [unit projection and facing trial](audits/2026-11-22-dense-release-attribution.md#unit-projection-and-facing-on-the-compacted-release)
   lowers the later P10 window by 1.79% and the 9,489-update mean by
-  0.39%. Animation lookup inside viewport checks remains expensive.
+  0.39%.
   Friendly Marines and Firebats account for 61.6 of the 75.7 outer-band
-  crops per update in the later window. Measure a reject-only bounds
-  table certified against facing, walking, mirrored, attack, turret
-  and fallback art. Keep the exact crop for uncertified metadata and
-  check foreground picks and both framebuffer pages.
+  crops per update in the later window. [Generated animation bounds](audits/2026-11-22-dense-release-attribution.md#generated-bounds-for-offscreen-animation-checks)
+  now reduce that window by another 4.02%. The exact crop stays active
+  for visible or uncertified art. With the bounds active, the later
+  orders pass alone still costs about 537,000 cycles. Qualify the
+  retained spatial index against same-update order and target ties,
+  and profile movement and attack processing on the combined build.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak

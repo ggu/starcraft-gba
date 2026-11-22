@@ -6,6 +6,45 @@ sc64_unit_crop_intersects(int x, int y, int width, int height)
     return x < 240 && x + width > 0 && y < 120 && y + height > 12;
 }
 
+#if defined(SC64_UNIT_FACING) && defined(SC64_UNIT_FACING_BOUNDS_METADATA) && \
+    (!defined(SC64_UNIT_WALK_FRAMES) || defined(SC64_UNIT_WALK_BOUNDS_METADATA))
+#define SC64_UNIT_CROP_BOUNDS_ENABLED 1
+
+/* A facing family certifies the body and rules out the default sprite path.
+ * Older banks and bodies without a facing family use the exact crop below. */
+static inline int
+sc64_unit_crop_radius(const Unit *q)
+{
+    int raw = sc64_unit_art_raw(q);
+    unsigned turret = sc64_facing_turret_raw(q, raw);
+    int body_raw = turret == 6 ? 5 : turret == 31 ? 30 : raw;
+    if (body_raw < 0) return 0;
+    unsigned radius = sc64_unit_facing_radius((unsigned short)body_raw);
+    if (!radius) return 0;
+#ifdef SC64_UNIT_WALK_FRAMES
+    unsigned walk = sc64_unit_walk_radius((unsigned short)body_raw);
+    if (walk > radius) radius = walk;
+#endif
+    if (turret) {
+        unsigned turret_radius = sc64_unit_facing_radius((unsigned short)turret);
+        if (turret_radius > radius) radius = turret_radius;
+    }
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    if (q->cd) {
+#ifdef SC64_UNIT_ATTACK_BOUNDS_METADATA
+        int attack_raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+        unsigned attack = sc64_unit_attack_radius((unsigned short)attack_raw);
+        if (attack > radius) radius = attack;
+#else
+        return 0;
+#endif
+    }
+#endif
+    /* Some standing and attack poses rise one pixel during a stride. */
+    return (int)radius + 1;
+}
+#endif
+
 static inline int
 sc64_unit_frame_in_view(const Sc64SpriteFrame *sprite, int x, int y, int mirror)
 {
@@ -94,6 +133,11 @@ sc64_unit_body_anchor_in_view(const Unit *q, int x, int y)
     /* Bound the lookup by the prepared body art's maximum reach, including
      * stride lift. The current raster crop determines admission. */
     if (x < -64 || x >= 304 || y < -60 || y >= 192) return 0;
+#ifdef SC64_UNIT_CROP_BOUNDS_ENABLED
+    int radius = sc64_unit_crop_radius(q);
+    if (radius && !sc64_unit_crop_intersects(x - radius, y - radius, 2 * radius, 2 * radius))
+        return 0;
+#endif
     return sc64_unit_body_crop_in_view(q, x, y);
 #else
     return 0;
