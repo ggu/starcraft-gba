@@ -67,6 +67,8 @@ static void step(u16 held)
 #endif
     game_update(held,pressed);
 #ifdef SC64_P8_NORMAL_HOME
+    /* The next click uses the camera and facing from the painted frame. */
+    game_render();
     route_after=route_purity_hash();
 #endif
     prior=held;
@@ -705,7 +707,11 @@ int main(int argc,char **argv)
     const char *path=argc>1?argv[1]:".local/traces/p8-controller.jsonl";
     unsigned limit_ticks=argc>2?(unsigned)strtoul(argv[2],0,10):P8_RUN_LIMIT;
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
-    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":27,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P8_CONTROLLER_PROFILE);
+    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":27,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\""
+#if defined(SC64_P8_NORMAL_HOME) && defined(SC64_TEXT_BOX_HOST_MODAL)
+            ",\"recorded_dialogue\":true"
+#endif
+            "}\n",P8_CONTROLLER_PROFILE);
     game_init();prior=0;
 #ifdef SC64_P8_NORMAL_HOME
     route_after=route_purity_hash();
@@ -1109,7 +1115,7 @@ int main(int argc,char **argv)
                 sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE;
             if(out>launch_peak)launch_peak=out;
         }
-        if(frame>=next_checkpoint){census("progress");next_checkpoint=frame+2000;}
+        if(frame>=next_checkpoint&&!won&&!lost){census("progress");next_checkpoint=frame+2000;}
         input(0);
     }
     census("final");
