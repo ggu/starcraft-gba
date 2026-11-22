@@ -111,3 +111,31 @@ full-context option stays off in normal builds.
 | --- | --- |
 | Preview P10 ROM | `e79fb055746c0377508acd3c9b44dffef4b97bc693252bd0d242897dbc06e478` |
 | Preview save and fresh-load receipt | `24ac9483ffc8d3efd45d040794ccc1cca117498914682e0b8cafb77f2261808d` |
+
+## November 22 facility release
+
+The older host controller's first field command lands during an
+authored transmission on the facility P10 cartridge. The host-only
+controller now sends the ordinary advance key and release for each
+queued field page before issuing that command. The prepared host
+target is `make test-sc64-p10-p7-normal-home`. Its 4,929 input
+transitions exactly match the qualified tape's held keys, input calls
+and game frames. The controller wins at frame 55,892.
+
+The exact facility cartridge saves through START/B at frame 8,845.
+The pause journal matches the November 20 journal byte for byte.
+A fresh process boots to HOME and loads with L, restoring the
+recorded named mission snapshot, heroes and Nexus census. The
+unchanged suffix matches the recorded frame at every input
+transition and wins at frame 55,892. All three heroes survive,
+the hostile original Nexuses are gone, and the mission records
+zero trigger faults. This run measures the named save snapshot and
+the input schedule.
+
+| Facility input or receipt | SHA-256 |
+| --- | --- |
+| Normal P10 ROM | `ae19f284f5447c269026cb5b651913028f2cc0379c8f0c36a0605611fc82edb0` |
+| Matching ELF | `2908a8568690b6c5c4e3e93a8334eca3663d92a099dad6e596d5f2a01a248c43` |
+| Prepared host target tape | `973cbb1b57b67337c80286f0f66e9550a1efe4b03f3dc62ae6bfa525cc50e93d` |
+| Facility ARM input tape | `34a82f4cbb54e0ceeb9a066804fd26c7c58bedfa15911255ed213e46b10c2fdb` |
+| Fresh HOME through victory receipt | `0f05a0636263ba98922c81fe5840aeccc29ab2d5876825baf8506db5a8e79e7d` |
