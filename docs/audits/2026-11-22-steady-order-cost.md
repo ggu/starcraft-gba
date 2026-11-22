@@ -42,6 +42,29 @@ bring a powered Cannon or Observer into detection range. Compare
 target acquisition and damage with the same inputs on both engines.
 Physical GBA frame pacing remains open.
 
+## Three-AI Custom Game opening pace
+
+The three normal race ROMs enter each map through the regular Custom
+Game menu. The human uses the cartridge's race, and the three active
+CPU seats are Terran, Zerg and Protoss. After 900 neutral updates, a
+second 900-update window measures each advancing main-loop interval.
+There are 28–29 live units at the end of each window.
+
+| ROM | Map | Emulated updates/s | p95 guest cycles | Peak guest cycles |
+| --- | --- | ---: | ---: | ---: |
+| Terran | Outpost Run | 29.86 | 594,898 | 719,666 |
+| Terran | Blood Bath | 29.86 | 588,761 | 662,871 |
+| Zerg | Outpost Run | 29.78 | 592,674 | 1,160,534 |
+| Zerg | Blood Bath | 29.86 | 629,032 | 732,478 |
+| Protoss | Outpost Run | 29.76 | 615,386 | 927,305 |
+| Protoss | Blood Bath | 29.86 | 589,718 | 661,891 |
+
+The 30-update timing deadline is 561,792 guest cycles. Every opening
+sample exceeds that deadline at p95, and the longest Zerg Outpost
+update spans more than two such intervals. This measures neutral-input
+opening pace in an emulator. Active battle and physical GBA pacing
+remain qualification gaps.
+
 ## Bounding the other steady costs
 
 Earlier read-only target sampling on the same release observed 409
@@ -79,3 +102,4 @@ preserving ordered event admission and slot reuse.
 | Normal Protoss Custom Game matrix | `b5c41de469d331b5adaa3bb1821afa750105b89acf1c72987e7cd702be67703b` |
 | Preview Protoss Custom Game matrix | `076ee6a8e277f2970dde40bab96837224908bd1bda380a0a139da6254bc1c4b2` |
 | Audio snapshot write trial | `d172e631be8bfa2bcee1a2b9408a873e06849d0d0e67a6cce75876baf1a9ec86` |
+| Three-AI Custom Game opening pace | `d3ca4076caf0274ad6723017b1eea3ae1eedb72db2c316c7e68cdce9edfb61e0` |

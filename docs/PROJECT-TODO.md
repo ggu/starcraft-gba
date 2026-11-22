@@ -51,7 +51,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   sparse clearing. Skipping redundant untracked Arbiter cache writes
   cuts the P10 victory replay's mean 0.39% with matching cache
   words, displays and saves. The replay averages 11.06 emulated
-  updates per second. A uniform-radius whole-bucket bound excludes
+  updates per second. Across all three race cartridges and both maps,
+  the [three-AI Custom Game opening measurements](audits/2026-11-22-steady-order-cost.md#three-ai-custom-game-opening-pace)
+  average 29.76–29.86 emulated updates per second with 28–29 live
+  units. All six miss the 30-update deadline at p95. Measure an active
+  combat and expansion window separately to cover sustained play.
+  A uniform-radius whole-bucket bound excludes
   3.5% of visited contact nodes in a five-update P10 sample. Broader
   movement and collision work remains the priority. Compare sustained
   cost, normal-input outcomes and fresh title continuation.
