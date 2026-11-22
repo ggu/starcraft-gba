@@ -453,6 +453,7 @@ def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) ->
         "#define SC64_UNIT_ATTACK_SOURCE_GENERATED_H",
         "#define SC64_UNIT_ATTACK_POSE_BANK_VERSION 1",
         "#define SC64_UNIT_ATTACK_POSE_METADATA 1",
+        "#define SC64_UNIT_ATTACK_BOUNDS_METADATA 1",
         "#ifndef SC64_SPRITES_GENERATED_H",
         "#ifndef SC64_RACE_SPRITES_GENERATED_H",
         "typedef struct { short offset_x, offset_y; unsigned short w, h, canvas_w, canvas_h; const unsigned char *pixels; } Sc64SpriteFrame;",
@@ -486,6 +487,7 @@ def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) ->
                 f"{frame['canvas_w']},{frame['canvas_h']},{psym}}};")
         return fsym
     rows_by_raw: dict[int, dict[int, tuple[int, int, str, int, int, int, str, int]]] = {}
+    radii_by_raw: dict[int, int] = {}
     for (raw, air), entry in sorted(compiled.items()):
         step_symbol = f"sc64_unit_attack_raw{raw}_{'air' if air else 'ground'}_steps"
         step_frames = []
@@ -511,11 +513,25 @@ def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) ->
         lines.append("};")
         fallback_full_span = entry["release_tick"] + step_frames[-1][0] + 1
         full_duration = int(entry.get("full_duration_source_ticks", fallback_full_span))
+        if full_duration > 0:
+            radius = max(
+                sprites.sprite_anchor_radius(
+                    frame["offset_x"], frame["offset_y"], frame["w"], frame["h"],
+                    frame["canvas_w"], frame["canvas_h"])
+                for step in source_steps for frame in step["frames"]
+            )
+            radii_by_raw[raw] = max(radii_by_raw.get(raw, 0), 1, radius)
         row = (entry["release_tick"], step_frames[-1][0], step_symbol, len(step_frames),
                full_duration, full_step_frames[-1][0], full_step_symbol,
                len(full_step_frames))
         rows_by_raw.setdefault(raw, {})[air] = row
     lines.extend([
+        "static inline unsigned short sc64_unit_attack_radius(unsigned short raw_type) {",
+        "    switch (raw_type) {",
+    ])
+    for raw, radius in sorted(radii_by_raw.items()):
+        lines.append(f"    case {raw}u: return {radius}u;")
+    lines.extend(["    default: return 0u;", "    }", "}",
         "static inline unsigned char sc64_unit_attack_source_release_tick(unsigned short raw_type, int target_air) {",
         "    switch (raw_type) {",
     ])
