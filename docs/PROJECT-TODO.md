@@ -118,6 +118,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   six long three-CPU matches. The P10 victory replay averages 11.26
   emulated updates per second. Enabling aligned word loads in
   Showcase slows each of the three sampled Crossfire windows.
+  The [shared opaque minimap copy](audits/2026-11-22-steady-order-cost.md#opaque-minimap-raster-copy)
+  then saves 0.37–0.56% across the six three-CPU matches and 0.47%
+  across 900 Showcase updates. The P10 victory replay rises to
+  11.30 emulated updates per second with matching frames and SRAM.
   Use the [page census](audits/2026-11-22-steady-order-cost.md#mode-4-page-update-coverage)
   to bound a stationary-camera band reuse trial. Measure the cost
   of tracking changes before relying on it in crowded fights.

@@ -559,6 +559,45 @@ in the two busy Crossfire windows. Keep the incremental heap.
 | Showcase aligned word trial | `ff4d7840e8296a80799c2bc305c82804e66cfd45ec1e38abbd26f83002db34a6` |
 | Depth-heap trial | `cd642403f5f4d390847692415e392983807de3b4748936f952b40007e7087e2f` |
 
+## Opaque minimap raster copy
+
+The minimap copies a 24×24 opaque raster to x=197. At that destination
+phase, aligned source words can supply the interior of two consecutive
+destination words. The shared compositor preserves both neighboring
+pixels on each row and uses the existing pixel pairs for other
+alignments and horizontally clipped draws. The sanitizer fixture
+checks zero-valued pixels, row clipping, and both horizontal edges.
+
+| Paired ARM workload | Mean guest cycles saved |
+| --- | ---: |
+| Late Protoss Outpost, 16 updates | 0.53% |
+| Terran Outpost, 12,000 updates | 0.44% |
+| Terran Blood Bath, 12,000 updates | 0.37% |
+| Zerg Outpost, 12,000 updates | 0.44% |
+| Zerg Blood Bath, 12,000 updates | 0.41% |
+| Protoss Outpost, 12,000 updates | 0.56% |
+| Protoss Blood Bath, 12,000 updates | 0.46% |
+| Showcase Crossfire, 900 updates | 0.47% |
+| P10 fresh HOME victory, 9,489 updates | 0.38% |
+
+All 64 short Outpost and Crossfire cuts, 120 long-match cuts, 30
+sustained Crossfire cuts and 81 P10 observations match their controls
+in world state, both indexed framebuffer pages, palette and route
+counters. P10 victory SRAM, all 30 campaign openings and 24
+pause-save and fresh HOME cases also match. All four production links
+retain their IWRAM and EWRAM endpoints. The default ROM's SHA-256
+is unchanged. The P10 victory replay averages 1,484,463 guest cycles
+or 11.30 emulated updates per second.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Short Outpost and Crossfire cuts | `37c1608cf8d4cd9ec090d64b2f939614b74900c3b4cc95727ce05b9ad3818d75` |
+| Six Custom Games | `baa68e3319065264cd90a9c12b884b8450831e0c68bbb6174c8c9f8f4f48928c` |
+| Sustained Showcase Crossfire | `172e28f0232f2acb585e83ce7d38f6cc716e2e080bc4d5e8d28ed291bc54ad57` |
+| P10 fresh HOME victory | `23a834f176690f6991ff050c93be5eda8440f39b03dbfb3472c6092386de21a7` |
+| Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular pause-save and fresh HOME matrix | `bb3384b1407224e1fbbefa07a00c0454a60f798efbd6409d0394cf3a3d8cfdf3` |
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and

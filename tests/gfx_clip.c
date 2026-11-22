@@ -182,6 +182,28 @@ test_aligned_sprite_transparency(void)
     }
 }
 
+static void
+test_opaque_word_shift(void)
+{
+    static _Alignas(4) u8 source[24 * 3];
+    static const int x_positions[] = {1, 197, 213, 217, -3};
+    for (unsigned i = 0; i < sizeof(source); ++i)
+        source[i] = (u8)(i * 29);
+    for (unsigned i = 0; i < sizeof(x_positions) / sizeof(x_positions[0]); ++i) {
+        int left = x_positions[i];
+        gfx_begin(43);
+        gfx_set_clip_y(130, 132);
+        gfx_blit_opaque(left, 129, 24, 3, source);
+        for (int y = 128; y <= 132; ++y)
+            for (int x = 0; x < WIDTH; ++x) {
+                int col = x - left;
+                u8 expected = y >= 130 && y < 132 && col >= 0 && col < 24
+                    ? source[(y - 129) * 24 + col] : 43;
+                assert(gfx_test_pixel(x, y) == expected);
+            }
+    }
+}
+
 int
 main(void)
 {
@@ -196,5 +218,6 @@ main(void)
         check_clip_range(ranges[i][0], ranges[i][1]);
     test_invalid_ranges_are_ignored();
     test_aligned_sprite_transparency();
+    test_opaque_word_shift();
     return 0;
 }

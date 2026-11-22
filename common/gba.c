@@ -580,6 +580,27 @@ void gfx_blit_opaque(int x,int y,int width,int height,const u8 *src) {
  int top=y<0?-y:0,bottom=y+height>160?160-y:height;
 #endif
  GFX_TILE_TOUCH(x,y,x+width,y+height);
+ /* When drawing aligned source bytes at x % 4 == 1, reuse each word load
+    across two stores. Keep the neighboring pixels intact. */
+ if(x>=0 && x<=240-width && (x&3)==1 && width>=8 && !(width&3) &&
+    !(((uintptr_t)src|(uintptr_t)pixels)&3u)) {
+  typedef u32 __attribute__((may_alias)) word;
+  const word *in=(const word *)(src+top*width);
+  int words=width/4;
+  for(int row=top;row<bottom;++row,in+=words) {
+   volatile word *out=(volatile word *)(pixels+(y+row)*120+(x>>1));
+   word left=in[0];
+   out[0]=(out[0]&255u)|(left<<8);
+   for(int col=1;col<words;++col) {
+    word right=in[col];
+    out[col]=(left>>24)|(right<<8);
+    left=right;
+   }
+   volatile u16 *tail=(volatile u16 *)(out+words);
+   *tail=(*tail&0xff00u)|(u16)(left>>24);
+  }
+  return;
+ }
  int left=x<0?-x:0,right=x+width>240?240-x:width;
  for(int row=top;row<bottom;row++) {
   int col=left;const u8*s=src+row*width;
