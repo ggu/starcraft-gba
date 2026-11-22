@@ -271,9 +271,16 @@ The researched Overlord and its loaded Zergling transfer to neutral
 with their cargo link intact. The neutral Ventral Sacs marker survives
 an ordinary pause save, fresh HOME load and eight more updates.
 
+The exact opt-in Terran build from the same source repeats the
+ordinary win at frame 38,259, matching the start, result and 234
+action observations. All 54 ordinary Free for All launch and
+fresh-load cases pass on the three opt-in race cartridges.
+
 The production race and Showcase targets keep the preview flag off.
-The prepared preview provides a distinct build target and cartridge
-identity. Training and airborne Interceptors still defer retirement.
+Build the preview with `make sc64-native-skirmish-elimination-arm`
+after preparing the local race inputs. The target uses separate
+cartridge identities. Training and airborne Interceptors still
+defer retirement.
 Native competitive CPU elimination and physical GBA timing remain
 open.
 
@@ -283,3 +290,5 @@ open.
 | Full-draft P10 docked group and fresh save | `edd5f9f32d4a297a8462c30e387b283485fe00c2b75dfc6a0eaa74b957298f95` |
 | Full-draft Terran ordinary win | `dbc89f8dd37025ff34c39343c9bc15c52335fc59d1baf8491b4a382787a5a1a1` |
 | Current Z10 neutral transport reload | `af19d0027947bc08dc3181ba4ccc1a791135fc4d5a594e79f98530b4191bc8d9` |
+| Current Terran ordinary win | `41271e26ff62a67867e3d1d248f86ac2dc66ffebe3f33edbcdf80cd51d9c15e9` |
+| Current Free for All launch and reload matrix | `04d3e8e519bec334dc75f45ee6b143a30cce368f8f296a6d4940e37463137422` |
