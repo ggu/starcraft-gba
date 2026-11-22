@@ -235,3 +235,14 @@ that tape on the regular P10 ARM cartridge once the disk guard passes.
 | Ten-mission sanitized controller and replay matrix | `32b1bf563458a8863bf6b4b1dd831a339032c3ab6b4a50ab38d87614e240f03a` |
 | P7 and P8 ordinary HOME comparison | `28601acfc1c923fe0e9e810bb87caba42941db0e7e0c43950910d7e9492dcbe5` |
 | P3 ordinary HOME HOST tape | `ee03bc74391adc95bee8c381906a7a890fc31afbc380d55f9e7986a5dac031fb` |
+
+### P4 storm save fixture
+
+On `adbb22bf`, the carried fixture fails its first save from HOME,
+where the shared projectile pool has yet to be initialized. The
+fixture now starts a non-P4 world for its inactive-storm check. It
+uses the enclosing product's unit encoder and the existing save
+candidate helper to inject both malformed records with valid checksums.
+The loader rejects both records and preserves the live units and storm
+state. The original P4 and canonical P7 fixtures both pass under
+ASan/UBSan, including the pause, damage and framebuffer checks.
