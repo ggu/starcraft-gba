@@ -105,7 +105,7 @@ def start(runner: Path, rom: Path, out: Path, symbols: dict, sizes: dict, *,
     home = (out / "home").resolve()
     home.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
-    env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / ".config"))
+    env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / ".config"), TMPDIR=str(home))
     log = (out / "headless.log").open("w")
     proc = subprocess.Popen([str(runner.resolve()), str(rom.resolve()), "--physical", *save_args],
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log,

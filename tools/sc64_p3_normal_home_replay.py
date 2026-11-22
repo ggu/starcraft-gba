@@ -16,6 +16,11 @@ from sc64_z7_normal_replay import input_hashes, require_unchanged
 from sc64_z2_normal_replay import terminal_modal_release
 
 MISSION = 22
+MIB = 1024 * 1024
+REPORT_LIMIT = 256 * 1024
+LOG_LIMIT = 64 * MIB
+OUTPUT_BUDGET = LOG_LIMIT + REPORT_LIMIT
+DISK_RESERVE = 1024 * MIB
 FIELDS = (
     "frame",
     "elapsed",
@@ -50,6 +55,27 @@ FIELDS = (
 def require(ok, message):
     if not ok:
         raise ValueError(message)
+
+
+def check_report_plan(cut, checks, briefs, modal, pins):
+    metadata = dict(briefing=list(briefs.items()), pages=list(modal.items()), sha256=pins)
+    # Allow space for a larger final row, terminal details and a failure message.
+    remaining = REPORT_LIMIT - 16 * 1024 - len(json.dumps(metadata, indent=2))
+    require(remaining >= 0, "P3 inputs exceed the report budget")
+    for call, check in checks.items():
+        if call > cut:
+            break
+        row = dict(call=call, fields={key: check[key] for key in FIELDS}, differences={})
+        remaining -= len(json.dumps(dict(observations=[row]), indent=2))
+        require(remaining >= 0, "P3 checkpoints exceed the report budget")
+
+
+def has_disk_reserve(path, extra=0):
+    return shutil.disk_usage(path).free >= DISK_RESERVE + extra
+
+
+def within_output_budget(path):
+    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file()) <= LOG_LIMIT
 
 
 def load_plan(trace, pages):
@@ -178,6 +204,7 @@ def run(args):
     )
     cut = stop if args.stop is None else args.stop
     require(0 < cut <= stop, "invalid replay boundary")
+    check_report_plan(cut, checks, briefs, modal, pins)
     if args.plan:
         print(
             json.dumps(
@@ -193,12 +220,14 @@ def run(args):
             )
         )
         return
+    require(args.out and not args.out.exists(), "new --out required")
     require(
-        args.out and shutil.disk_usage(args.out.parent).free >= int(5.25 * 1024**3),
-        "new --out and 5.25 GiB free required",
+        has_disk_reserve(args.out.parent, OUTPUT_BUDGET),
+        "P3 replay needs 1 GiB free plus space for the capped log and report",
     )
     args.out.mkdir()
-    resource.setrlimit(resource.RLIMIT_FSIZE, (256 * 1024, 256 * 1024))
+    # The runner logs DMA activity to stderr as well as reporting faults.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (LOG_LIMIT, LOG_LIMIT))
     layouts = {
         s: dwarf_struct_layout(args.elf, t)
         for s, t in (
@@ -294,20 +323,28 @@ def run(args):
 
     def report(status, **detail):
         require_unchanged(paths, pins)
-        (args.out / "result.json").write_text(
-            json.dumps(
-                dict(
-                    status=status,
-                    observations=observations,
-                    briefing=revealed,
-                    pages=acknowledged,
-                    sha256=pins,
-                    **detail,
-                ),
-                indent=2,
-            )
-            + "\n"
+        payload = json.dumps(
+            dict(
+                status=status,
+                observations=observations,
+                briefing=revealed,
+                pages=acknowledged,
+                sha256=pins,
+                **detail,
+            ),
+            indent=2,
+        ).encode() + b"\n"
+        require(
+            len(payload) <= REPORT_LIMIT and within_output_budget(args.out),
+            "P3 output budget exceeded",
         )
+        (args.out / "result.json").write_bytes(payload)
+
+    def check_disk(next_call):
+        if not has_disk_reserve(args.out):
+            report("disk-floor", next_call=next_call)
+            raise SystemExit(75)
+        require(within_output_budget(args.out), "P3 output budget exceeded")
 
     modal_checks = {}
     for call, row in modal.items():
@@ -321,11 +358,8 @@ def run(args):
             "guest is not at fresh HOME",
         )
         for call in range(1, cut + 1):
-            if call % 500 == 0 and shutil.disk_usage(args.out).free < int(
-                4.15 * 1024**3
-            ):
-                report("disk-floor", next_call=call)
-                raise SystemExit(75)
+            if call % 500 == 0:
+                check_disk(call)
             if call - 1 in keys and keys[call - 1] != r.held:
                 r.set_keys(keys[call - 1])
             r._advance(1)
@@ -408,16 +442,19 @@ def run(args):
                 }
                 observations.append(dict(call=call, fields=actual, differences=diff))
                 require(not diff, f"checkpoint {call} differs: {diff}")
-        report(
-            "won" if cut == stop else "prefix",
-            calls=cut,
-            terminal_modal_release=release,
-        )
     except Exception as exc:
-        report("diverged", call=locals().get("call"), error=str(exc))
+        if within_output_budget(args.out):
+            report("diverged", call=locals().get("call"), error=str(exc)[:4096])
         raise
     finally:
         g.close()
+    require(g.proc.returncode == 0, f"P3 runner exited with status {g.proc.returncode}")
+    check_disk(cut + 1)
+    report(
+        "won" if cut == stop else "prefix",
+        calls=cut,
+        terminal_modal_release=release,
+    )
 
 
 def main():

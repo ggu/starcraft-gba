@@ -403,9 +403,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [rendered Protoss controller matrix](audits/2026-11-13-p3-p4-home-preparation.md#rendered-protoss-controllers-on-the-visibility-release)
   reproduces all ten victories in independent HOST replay processes
   on the visibility release. The P8 and P9 fresh-process paths match
-  all 327 continuation checkpoints. Reuse the unchanged P7 and P8
-  authored HOME tapes and verify the new frame-47,661 P3 HOME win on
-  the regular ARM cartridge.
+  all 327 continuation checkpoints. The [ordinary P3 ARM replay](audits/2026-11-13-p3-p4-home-preparation.md#current-ordinary-p3-victory)
+  also wins at frame 47,661 on the regular Protoss cartridge.
+  Extend the same fixture to a fresh pause-save and victory SRAM readback.
+  Reuse the unchanged P7 and P8 authored HOME tapes.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
