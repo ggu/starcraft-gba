@@ -96,7 +96,7 @@ static void test_all_source_profiles(void)
                 assert(key.weapon_id == p->weapon_id);
                 assert(key.target_air == p->mode);
                 assert(key.actor_slot_plus1 == 0);
-                assert(key.direction == sc64_source_effect_direction(x1 - x0, y1 - y0));
+                assert(key.direction == sc64_facing_direction(x1 - x0, y1 - y0));
             }
             if (!has_projectile) continue;
             const Sc64WeaponSourceAttackProfile *resolved =
@@ -105,7 +105,7 @@ static void test_all_source_profiles(void)
                                                    p->variant);
             assert(resolved && resolved->projectile_image == p->projectile_image);
             int duration = sc64_weapon_source_trace_duration_heading(
-                resolved, sc64_source_effect_direction(x1 - x0, y1 - y0),
+                resolved, sc64_facing_direction(x1 - x0, y1 - y0),
                 x0, y0, x1, y1);
             assert(duration > 0);
             int any_pixels = 0;

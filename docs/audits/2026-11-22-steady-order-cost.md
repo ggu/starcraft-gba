@@ -334,6 +334,40 @@ Measure an equivalent Outpost sample before choosing a sidecar.
 | Slot-indexed Custom Game trial | `6d87accdeec50ec16eaceca21acd5b543b8bb1ec5deb6813bcf2e2ef073a484b` |
 | Slot-indexed P10 trial | `0031a3876a0b9787bf9913bc4bacdd2da06c206ceb3d89fc8a888e30c36ba033` |
 
+## Shared heading for projectiles and unit facing
+
+Projectile creation and delayed-impact launch now use the same
+integer direction lookup as unit facing. A double shot reuses the
+heading of its two common endpoints. The previous projectile
+calculation tested all 32 rounded direction vectors. An independent
+dot-product oracle matches 16,785,409 map-coordinate pairs and
+140,256 additional samples on and beside direction boundaries.
+Those samples extend to deltas of 65,535 and include the wraparound
+tie between northwest and north.
+
+Across six 12,000-update three-CPU Custom Games, the shared lookup
+uses 0.0166–0.0224% fewer guest cycles. Crossfire uses 0.067% fewer
+cycles over 900 updates. The P10 fresh HOME replay saves 0.037%
+over 9,489 updates to victory. All 231 sampled world and video
+cuts and the P10 victory journal match. The four normal and four
+preview images pass the existing static RAM guards. The default
+asset-free ROM reproduces byte for byte.
+
+All 30 campaign entries launch and advance after opening dialogue,
+with the same 30 recorded world checkpoints. Forty-eight Custom
+Games across the eight images pass ordinary pause saves and fresh
+HOME continuation on both maps. The prepared weapon, impact and
+projectile depth fixture passes under ASan and UBSan.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent direction differential | `88e2b1f065c7ac0332c915dcd3ab5b9aaaf16de557b2acdc475e8a88b0009295` |
+| Six Custom Games | `b88b62332e1287175a75e5bea04c4376fdbf9e2520ab0f1561471dc172b73d19` |
+| P10 fresh HOME victory | `8494bbede980bf2cd86fcf209b315637c9cc7a631ed8968d5c078098485b9135` |
+| Crossfire | `24bed3a24f0deebc76a1215fbdade40775c3c0b7029514091c23f1921b384333` |
+| Campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Pause save and fresh HOME matrix | `5325dd211df92503fc5e8762154600c99e57bb77698263e396b60506e3269f82` |
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
