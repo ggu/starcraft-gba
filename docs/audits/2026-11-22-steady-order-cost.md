@@ -881,6 +881,34 @@ an upper limit on the nodes removed by this uniform-radius geometric
 test in the sampled workload, before paying for the bound itself.
 The broader movement and collision traversal remains the priority.
 
+### Collision bucket footprints
+
+Eight read-only P10 cuts on the opaque minimap release model 175
+uncached contact queries and 2,484 candidate visits. The existing
+actor-specific axis test rejects 1,850 of 2,309 same-layer candidates.
+There are no opposite-layer visits in these cuts. Within each update,
+673 visits repeat a bucket whose occupant records still match.
+
+Bounding the occupied points inside each bucket can exclude 416
+visits with the verified layer radius, or 1,062 using the largest
+known radius in each bucket. These counts model the scan before
+its full-mask early exit and exclude maintenance cost. The trial
+stores local extrema on the current bucket head, widens them
+after moves and rebuilds them for each orders pass. An asset-free
+sanitizer oracle passes 10,000 lifecycle mutations and compares
+30,797 eight-direction masks to the existing point queries.
+
+The trial exceeds the P10 IWRAM guard at `0x03005138`. Moving
+bucket movement bookkeeping to ROM links with 480 additional
+EWRAM bytes. It matches all 16 late Outpost cuts in world state,
+both display pages, palette and route counters, but raises mean
+cycles from 1,327,411 to 1,384,514. Keep this trial local.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Occupied bounds census | `6bc8ad020d02d4ba7c5deebd10231c31699ade418e25c5bae9b46bbdc40bd67d` |
+| Late Outpost pair | `97e3e2ca5dd5df38d7fb8e5ae99d410f86edcae3474c85a685c27d5d547839f5` |
+
 Hoisting the collision mask table's speed offset removes two
 redundant axis checks after the radius gate. The tighter lookup
 matches both 16-update P10 windows and all 81 victory-tail cuts.
