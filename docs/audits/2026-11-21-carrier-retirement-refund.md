@@ -59,3 +59,17 @@ refund uses the existing Interceptor price and the same preflight graph
 validation that will enforce the composed per-type capacities. Verify
 the merged profile flags, an eight-slot Gantrithor fixture and the
 retirement-to-victory path before qualifying a normal build.
+
+## Deferred Carrier retirement liveness
+
+On source `7058f5cb`, the P10 elimination HOST fixture advances the real
+`game_update` services after all CPU buildings are destroyed. A training
+Interceptor initially fences its owner's retirement; it completes and docks,
+allowing neutral transfer after 748 updates. Victory publishes on the next
+update, and the terminal journal reloads through HOME with the Carrier and
+child linked. In a separate case a stocked Interceptor launches against a
+hostile Marine before the building loss. Without forcing recall, it docks and
+allows retirement after 780 updates; victory follows on the next update.
+Both cases passed with ASan and UBSan. The setup is staged on HOST, so it does
+not establish native behavior or cover every airborne phase and target state.
+This evidence changes no production code or preview qualification gate.

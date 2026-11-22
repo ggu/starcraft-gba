@@ -285,6 +285,76 @@ static void check_docked_carrier_retirement(void)
     assert(race_save_game());
 }
 
+static void check_training_retirement_liveness(void)
+{
+    launch(0);
+    const int owner = 4, bit = 4;
+    const int ship = spawn_unit(owner, U_P7_CARRIER, 500, 500);
+    assert(ship >= 0);
+    const int ore = race_owner_minerals(owner);
+    assert(race_p7_carrier_training_queue_owner(ship));
+    const int trainee = race_p7_carrier_training_start(ship);
+    assert(trainee >= 0 && !race_skirmish_neutral_transfer_ready(&u[trainee]));
+    assert(race_owner_minerals(owner) == ore - SC64_P7_INTERCEPTOR_COST);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner != SIDE) destroy_building(i, SIDE);
+    game_update(0, 0);
+    assert(!won && !lost && !(race_skirmish_eliminated & bit));
+    unsigned ticks = 0;
+    while (!(race_skirmish_eliminated & bit) && ticks++ < 3000) game_update(0, 0);
+    assert(race_skirmish_eliminated & bit);
+    assert(!won && !lost && u[ship].alive && u[ship].owner == NEUTRAL);
+    assert(u[trainee].alive && u[trainee].owner == NEUTRAL &&
+           sc64_p7_carrier_child_state(&u[trainee]) == SC64_P7_INTERCEPTOR_INSIDE);
+    assert(!u[ship].carry);
+    game_update(0, 0);
+    assert(won && !lost && screen == SCREEN_RESULT);
+    game_init(); prior_keys = 0; won = lost = 0;
+    input(KEY_L);
+    assert(won && !lost && screen == SCREEN_RESULT && u[ship].owner == NEUTRAL &&
+           u[trainee].owner == NEUTRAL && u[trainee].build == ship);
+    printf("training retirement completed after %u updates\n", ticks);
+}
+
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+static void check_airborne_retirement_liveness(void)
+{
+    launch(0);
+    const int owner = 4, bit = 4;
+    const int ship = spawn_unit(owner, U_P7_CARRIER, 500, 500);
+    const int target = spawn_unit(SIDE, U_MARINE, 600, 500);
+    assert(ship >= 0 && target >= 0 && race_p7_carrier_training_stock(ship, 1) == 1);
+    u[ship].order = ORDER_ATTACK_TARGET; u[ship].target = target;
+    sc64_visibility_reset(); update_exploration();
+    int child = -1;
+    unsigned launch_ticks = 0;
+    while (child < 0 && launch_ticks++ < 300) {
+        game_update(0, 0);
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].type == U_P7_INTERCEPTOR && u[i].build == ship &&
+                sc64_p7_carrier_child_state(&u[i]) == SC64_P7_INTERCEPTOR_OUTSIDE) child = i;
+    }
+    assert(child >= 0);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner != SIDE) destroy_building(i, SIDE);
+    game_update(0, 0);
+    assert(!(race_skirmish_eliminated & bit) && !won && !lost);
+    unsigned ticks = 0;
+    while (!(race_skirmish_eliminated & bit) && ticks++ < 3000) game_update(0, 0);
+    if (!(race_skirmish_eliminated & bit))
+        fprintf(stderr, "airborne retirement stalled: child alive=%d state=%d order=%d target=%d ship order=%d\n",
+                u[child].alive, sc64_p7_carrier_child_state(&u[child]), u[child].order,
+                u[child].target, u[ship].order);
+    assert(race_skirmish_eliminated & bit);
+    assert(!won && !lost && u[ship].owner == NEUTRAL && u[child].owner == NEUTRAL &&
+           sc64_p7_carrier_child_state(&u[child]) == SC64_P7_INTERCEPTOR_INSIDE);
+    game_update(0, 0);
+    assert(won && !lost && screen == SCREEN_RESULT);
+    printf("airborne retirement: launched after %u updates, docked after %u updates\n", launch_ticks, ticks);
+}
+
+#endif
+
 static void check_fenced_final_result(int human_defeat)
 {
     launch(0);
@@ -656,6 +726,10 @@ int main(void)
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     check_docked_carrier_retirement();
+    check_training_retirement_liveness();
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+    check_airborne_retirement_liveness();
+#endif
     check_fenced_final_result(0);
     check_fenced_final_result(1);
 #endif
