@@ -287,6 +287,116 @@ static void test_ground_projectile_world_y(void)
     }
 }
 
+static void test_fallback_projectile_depth(void)
+{
+    static _Alignas(4) u8 effect_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 actor_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 actual[BATTLEFIELD_BYTES];
+    static const struct {
+        int style, life, x, y;
+    } stages[] = {
+        { SC64_WEAPON_VFX_STYLE_PLASMA, 5, 104, 62 },
+        { SC64_WEAPON_VFX_STYLE_NEEDLE, 4, 72, 46 },
+        { SC64_WEAPON_VFX_STYLE_NEEDLE, 3, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_NEEDLE, 2, 152, 86 },
+        { SC64_WEAPON_VFX_STYLE_PLASMA, 2, 152, 86 },
+        { SC64_WEAPON_VFX_STYLE_MISSILE, 5, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_ACID, 5, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_SHELL, 5, 104, 62 },
+        { SC64_WEAPON_VFX_STYLE_ARC, 5, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_BEAM, 5, 112, 66 },
+    };
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int blocker = make_unit(SIDE, U_TANK, 5, 104, 62);
+    const int flyer = make_unit(ENEMY, U_WRAITH, 8, 152, 86);
+    const int plasma = sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_PLASMA, C_CYAN);
+    const int air_shot = sc64_emit_fallback_attack(72, 46, flyer, plasma);
+    assert(air_shot >= 0 && sc64_trace_slots[air_shot].bullet_layer == 19);
+    tracers[air_shot].life = 2;
+    u[blocker].alive = 0;
+    begin_depth_frame();
+    draw_unit(&u[flyer]);
+    draw_tracer(air_shot, SC64_TRACE_PROJECTILE);
+    capture_depth_frame(effect_in_front);
+    begin_depth_frame();
+    draw_tracer(air_shot, SC64_TRACE_PROJECTILE);
+    draw_unit(&u[flyer]);
+    capture_depth_frame(actor_in_front);
+    assert(memcmp(effect_in_front, actor_in_front, BATTLEFIELD_BYTES));
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    capture_depth_frame(actual);
+    assert(!memcmp(actual, effect_in_front, BATTLEFIELD_BYTES));
+    clear_tracers();
+    u[flyer].alive = 0;
+
+    for (unsigned s = 0; s < sizeof(stages) / sizeof(*stages); ++s) {
+        const int bunker = spawn_build(ENEMY, B_BUNKER, 152, 86, 0);
+        assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+        const int color = sc64_weapon_vfx_pack(stages[s].style, C_CYAN);
+        const int shot = sc64_emit_fallback_attack(72, 46, MAX_UNITS + bunker, color);
+        assert(shot >= 0 && sc64_trace_slots[shot].bullet_layer == 4);
+        tracers[shot].life = stages[s].life;
+        assert(sc64_trace_world_y((unsigned)shot) == stages[s].y);
+
+        /* A retired target can be replaced at another layer. The existing
+         * shot keeps its launch layer, including at its impact position. */
+        b[bunker].alive = 0;
+        int replacement = spawn_build(ENEMY, B_COMMAND, 600, 600, 0);
+        assert(replacement == bunker && sc64_building_world_layer((unsigned)replacement) == 4);
+        for (unsigned page = 0; page < 2; ++page) {
+            for (unsigned variant = 0; variant < 3; ++variant) {
+                Unit *cover = &u[variant == 2 ? flyer : blocker];
+                u[blocker].alive = variant != 2;
+                u[flyer].alive = variant == 2;
+                cover->x = stages[s].x;
+                cover->y = stages[s].y + (variant == 0 ? -2 : variant == 1 ? 2 : 0);
+                begin_depth_frame();
+                draw_unit(cover);
+                draw_tracer(shot, SC64_TRACE_PROJECTILE);
+                capture_depth_frame(effect_in_front);
+                begin_depth_frame();
+                draw_tracer(shot, SC64_TRACE_PROJECTILE);
+                draw_unit(cover);
+                capture_depth_frame(actor_in_front);
+                unsigned distinguishing = 0;
+                for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                    distinguishing += effect_in_front[i] != actor_in_front[i];
+                assert(distinguishing > 0);
+                begin_depth_frame();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                capture_depth_frame(actual);
+                if (memcmp(actual, variant ? actor_in_front : effect_in_front,
+                           BATTLEFIELD_BYTES)) {
+                    fprintf(stderr, "fallback stage %u page %u cover %u (%u pixels)\n",
+                            s, page, variant, distinguishing);
+                    assert(0 && "fallback projectile draw order");
+                }
+                /* A trace with no launch metadata uses the legacy pass. */
+                if (variant == 2) {
+                    sc64_trace_slots[shot].bullet_layer = 0;
+                    begin_depth_frame();
+                    sc64_draw_depth_ordered_actors();
+                    draw_tracers_pass(1);
+                    capture_depth_frame(actual);
+                    assert(!memcmp(actual, effect_in_front, BATTLEFIELD_BYTES));
+                    sc64_trace_slots[shot].bullet_layer = 4;
+                }
+                printf("PASS fallback stage %u page %u cover %u: %u distinguishing pixels\n",
+                       s, page, variant, distinguishing);
+            }
+            gfx_end();
+        }
+        clear_tracers();
+        b[replacement].alive = 0;
+    }
+    puts("PASS fallback projectile depth at launch, flight and impact on both pages");
+}
+
 static void test_stationary_projectile_depth(int tank_fallback)
 {
     static _Alignas(4) u8 effect_in_front[BATTLEFIELD_BYTES];
@@ -1340,6 +1450,7 @@ int main(void)
 #ifdef SC64_PROJECTILE_DEPTH
     test_moving_projectile_overlap();
     test_ground_projectile_world_y();
+    test_fallback_projectile_depth();
     test_stationary_projectile_depth(0);
 #ifdef SC64_TANK_SOURCE_VFX
     test_stationary_projectile_depth(1);

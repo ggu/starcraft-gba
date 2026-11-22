@@ -144,6 +144,10 @@ draw_tracer_parts(int i, unsigned parts
         return;
     }
 #endif
+#ifdef SC64_PROJECTILE_DEPTH
+    /* The authored fallbacks have one raster pass and no separate images. */
+    if (!(parts & SC64_TRACE_PROJECTILE)) return;
+#endif
     sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
         tracers[i].x0-camx,tracers[i].y0-camy+12,
         tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
