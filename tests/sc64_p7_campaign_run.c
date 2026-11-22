@@ -114,7 +114,9 @@ static void input_raw(u16 held)
 #endif
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
-    if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);
+    /* Draw after every update like common/main.c and the PX replay: selection
+     * picks read the facing and stride state that drawing advances. */
+    if (screen!=SCREEN_RESULT && !won && !lost) { game_update(held,pressed); game_render(); }
     prior=held;
     ++host_tick;
     if(trace && changed) {

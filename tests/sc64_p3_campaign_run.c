@@ -95,6 +95,16 @@ static int side_active_builders(void)
     return count;
 }
 
+/* Probes gathering minerals, the only income the army and a Nexus need. */
+static int side_mining_probes(void)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order == ORDER_MINE) ++n;
+    return n;
+}
+
 static int side_probe_count(void)
 {
     int n = 0;
@@ -234,7 +244,10 @@ static void step_raw(u16 held)
 #ifdef SC64_P34_NORMAL_HOME
     assert(route_purity_hash() == route_after);
 #endif
+    /* Draw after every update like common/main.c and the PX replay: selection
+     * picks read the facing and stride state that drawing advances. */
     game_update(held, pressed);
+    game_render();
 #ifdef SC64_P34_NORMAL_HOME
     route_after = route_purity_hash();
 #endif
@@ -465,6 +478,54 @@ static void queue_dragoon(void)
         }
 }
 
+/* Trained units appear at a fixed point beside their producer, even when a
+ * neighbouring footprint covers that cell, and a unit standing there cannot
+ * route out. A Pylon packed against a Gateway therefore strands every unit
+ * the Gateway trains while they still count toward each strike. */
+static void producer_spawn_cell(int bx, int by, int *col, int *row)
+{
+    int x = bx + 20;
+    if (x >= WORLD_W - 8) x = bx - 20;
+    *col = x / 16; *row = (by + 4) / 16;
+}
+
+/* The path grid's footprint rule for a building of type at bx,by. */
+static int footprint_covers(int type, int bx, int by, int col, int row)
+{
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    int left, up, right, down;
+    if (sc64_game_building_bounds_source(type, &left, &up, &right, &down)) {
+        int x0 = bx * 2 - left, x1 = bx * 2 + right;
+        int y0 = by * 2 - up, y1 = by * 2 + down;
+        return col * 32 <= x1 && col * 32 + 32 >= x0 &&
+               row * 32 <= y1 && row * 32 + 32 >= y0;
+    }
+#else
+    (void)type;
+#endif
+    return dist2(col * 16 + 8, row * 16 + 8, bx, by) < 18 * 18;
+}
+
+/* Keep every Gateway and Nexus exit open, and give a new Gateway an open
+ * exit of its own, as a player leaves room in front of production. */
+static int site_keeps_spawns_clear(int type, int x, int y)
+{
+    int col, row;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE &&
+            (b[i].type == B_GATEWAY || b[i].type == B_NEXUS)) {
+            producer_spawn_cell(b[i].x, b[i].y, &col, &row);
+            if (footprint_covers(type, x, y, col, row)) return 0;
+        }
+    if (type != B_GATEWAY) return 1;
+    producer_spawn_cell(x, y, &col, &row);
+    if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS ||
+        terrain_blocked(col, row)) return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && footprint_covers(b[i].type, b[i].x, b[i].y, col, row)) return 0;
+    return 1;
+}
+
 static int find_build_site_near_nexus(int type, int *x_out, int *y_out)
 {
     int nexus = nearest_side_building();
@@ -487,8 +548,9 @@ static int find_build_site_near_nexus(int type, int *x_out, int *y_out)
             int d = dist2(b[nexus].x, b[nexus].y, x, y);
             /* Do not congest the starting Nexus/Pylons; leave workers an open
                approach lane so the construction order can actually arrive. */
-            if (d < 80 * 80 || nearest_available_probe(x, y) < 0) continue;
-            if (d < best) { best = d; *x_out = x; *y_out = y; found = 1; }
+            if (d < 80 * 80 || d >= best || nearest_available_probe(x, y) < 0 ||
+                !site_keeps_spawns_clear(type, x, y)) continue;
+            best = d; *x_out = x; *y_out = y; found = 1;
         }
     return found;
 }
@@ -520,11 +582,10 @@ static void ensure_gateway(void)
 static void build_near_nexus(int type, int menu_row)
 {
     ensure_normal_ui();
-    int site_x, site_y, worker = -1, best = 0x7fffffff;
+    int site_x, site_y, worker = -1;
     int nexus = nearest_side_building();
     if (nexus < 0 || !find_build_site_near_nexus(type, &site_x, &site_y)) return;
     worker = nearest_available_probe(site_x, site_y);
-    if (worker >= 0) best = dist2(u[worker].x, u[worker].y, site_x, site_y);
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
     if (!open_menu_row(menu_row)) { ensure_normal_ui(); return; }
     tap(KEY_A);
@@ -551,7 +612,9 @@ static void build_pylon_near_nexus(void)
                 if (m[mi].amount > 0 && dist2(x, y, m[mi].x, m[mi].y) < 64 * 64) {
                     near_mineral = 1; break;
                 }
-            if (!near_mineral && d < best) { best = d; site_x = x; site_y = y; }
+            if (!near_mineral && d < best && site_keeps_spawns_clear(B_PYLON, x, y)) {
+                best = d; site_x = x; site_y = y;
+            }
         }
     if (best != 0x7fffffff) build_on_site(B_PYLON, MENU_DEPOT, site_x, site_y);
 }
@@ -732,15 +795,34 @@ static int recover_stalled_builder(void)
     return 0;
 }
 
-#ifdef SC64_P34_NORMAL_HOME
-/* Open a second mineral line before the starting bank is spent. */
-static void build_forward_nexus(void)
+/* Mineral patches the controller has seen, as a player remembers a cleared
+ * base after the army moves on. Only on-screen state feeds this memory. */
+static unsigned char seen_mineral[MAX_MINERALS];
+
+static void remember_visible_minerals(void)
 {
-    int home = side_building(B_NEXUS, 1), x = 0, y = 0, best = 0;
-    if (home < 0 || side_building_count(B_NEXUS) != 1 || minerals < 500) return;
+    for (int i = 0; i < MAX_MINERALS; ++i)
+        if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) seen_mineral[i] = 1;
+}
+
+static int foe_building_near(int x, int y, int radius)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && (b[i].owner == ENEMY || b[i].owner == 4) &&
+            dist2(x, y, b[i].x, b[i].y) < radius * radius) return 1;
+    return 0;
+}
+
+/* The richest legal Nexus site at a remembered mineral line away from home
+ * and clear of standing enemy buildings. Returns its remembered ore. */
+static int forward_nexus_site(int *x_out, int *y_out)
+{
+    int home = side_building(B_NEXUS, 1), best = 0;
+    if (home < 0) return 0;
     for (int mslot = 0; mslot < MAX_MINERALS; ++mslot) {
-        if (m[mslot].amount < 250 || !currently_visible(m[mslot].x,m[mslot].y) ||
-            dist2(m[mslot].x,m[mslot].y,b[home].x,b[home].y) < 288*288) continue;
+        if (!seen_mineral[mslot] || m[mslot].amount < 250 ||
+            dist2(m[mslot].x,m[mslot].y,b[home].x,b[home].y) < 288*288 ||
+            foe_building_near(m[mslot].x, m[mslot].y, 320)) continue;
         for (int dy = -112; dy <= 112; dy += 32)
             for (int dx = -112; dx <= 112; dx += 32) {
                 int sx = (m[mslot].x+dx)&~15, sy = (m[mslot].y+dy)&~15;
@@ -748,26 +830,103 @@ static void build_forward_nexus(void)
                 if (sx < 64 || sy < 64 || sx >= WORLD_W-64 || sy >= WORLD_H-64 ||
                     !race_can_site(SIDE,B_NEXUS,sx,sy) || !can_place(B_NEXUS,sx,sy)) continue;
                 for (int mi = 0; mi < MAX_MINERALS; ++mi)
-                    if (m[mi].amount > 0 && dist2(sx,sy,m[mi].x,m[mi].y) < 160*160)
+                    if (seen_mineral[mi] && m[mi].amount > 0 &&
+                        dist2(sx,sy,m[mi].x,m[mi].y) < 160*160)
                         score += m[mi].amount;
                 if (score <= best || nearest_available_probe(sx,sy) < 0) continue;
-                best=score; x=sx; y=sy;
+                best=score; *x_out=sx; *y_out=sy;
             }
     }
+    return best;
+}
+
+/* The home line holds about 10,000 minerals. Once it runs low, keep 400
+ * for a Nexus at a remembered clear line instead of spending the bank on
+ * the army, which cannot replace its losses after the line is gone. */
+#define EXPANSION_HOME_LOW 2000
+static int saving_for_expansion(void)
+{
+    int x, y;
+    /* Saving is pointless once nothing gathers; then the bank buys units. */
+    return side_building_count(B_NEXUS) == 1 && side_mining_probes() > 0 &&
+        minerals_near_nexus() < EXPANSION_HOME_LOW && forward_nexus_site(&x, &y) > 0;
+}
+
+/* Click one Probe that may be walking: chase its live position with the
+ * cursor, tap it, and accept only a verified single selection. A box at
+ * an old position misses it or also picks up units stacked beside it. */
+static int select_walking_probe(int w)
+{
+    ensure_normal_ui();
+    move_cursor(u[w].x, u[w].y);
+    for (int ticks = 0; ticks < 256 && u[w].alive && screen == SCREEN_PLAY &&
+         !won && !lost; ++ticks) {
+        int dx = u[w].x - cx, dy = u[w].y - cy;
+        if (abs(dx) <= 2 && abs(dy) <= 2) break;
+        u16 held = KEY_R;
+        if (dx > 0) held |= KEY_RIGHT; else if (dx < 0) held |= KEY_LEFT;
+        if (dy > 0) held |= KEY_DOWN; else if (dy < 0) held |= KEY_UP;
+        step(held);
+    }
+    step(0);
+    tap(KEY_A);
+    return u[w].alive && u[w].selected && selected_count() == 1 && selected_building < 0;
+}
+
+/* Without typed cargo, the mineral order refuses a loaded Probe and nothing
+ * returns its cargo, so a Probe left idle while carrying never mines again.
+ * STOP discards the cargo and frees it for the next mining pass. Typed cargo
+ * accepts the mineral order and delivers first, so the mining pass takes
+ * loaded Probes directly. */
+static void free_loaded_probe(void)
+{
+#ifndef SC64_WORKER_CARGO_KIND
+    int probe = -1;
+    for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order == ORDER_IDLE && u[i].carry) probe = i;
+    if (probe < 0 || !select_walking_probe(probe)) { ensure_normal_ui(); return; }
+    if (open_menu_row(MENU_STOP)) tap(KEY_A);
+    ensure_normal_ui();
+#endif
+}
+
+/* Open a second mineral line before the starting bank is spent. */
+static void build_forward_nexus(void)
+{
+    int x = 0, y = 0, best;
+#ifdef SC64_P34_NORMAL_HOME
+    if (minerals < 500) return;
+#else
+    if (spendable_minerals() < 400) return;
+#endif
+    if (side_building(B_NEXUS, 1) < 0 || side_building_count(B_NEXUS) != 1) return;
+    best = forward_nexus_site(&x, &y);
     if (best) {
         fprintf(stderr,"P3 forward Nexus frame=%d xy=%d,%d ore=%d\n",frame,x,y,best);
+#ifdef SC64_P34_NORMAL_HOME
         build_on_site(B_NEXUS,MENU_STOP+1,x,y);
+#else
+        /* The nearest Probe is usually a long-distance miner that keeps
+         * walking while the cursor crosses the map; a wide box at its old
+         * position misses it or picks up other units, so follow it. */
+        int worker = nearest_available_probe(x, y);
+        if (worker < 0 || !select_walking_probe(worker)) { ensure_normal_ui(); return; }
+        if (!open_menu_row(MENU_STOP + 1)) { ensure_normal_ui(); return; }
+        tap(KEY_A);
+        move_cursor(x, y);
+        tap(KEY_A);
+#endif
     }
 }
-#endif
 
 static void build_pylons_and_gateways(void)
 {
     if (side_active_builders() >= 2) return;
     int free_supply = race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE);
     int before = side_construction_count();
-    /* Without nearest-depot delivery in this profile, Probes at a new Nexus would
-     * still carry cargo home across the map, so stay on the home patches. */
+    /* Probes deliver to the nearest Nexus. A second line opens only once the
+     * home patches run low; see saving_for_expansion. */
     /* Tech/economy structures unlock more production and are otherwise
        starved indefinitely by supply depots when the army grows quickly. */
     if (side_building(B_ASSIMILATOR, 0) < 0 && minerals >= 100) {
@@ -807,6 +966,12 @@ static void queue_probe(void)
         }
 }
 
+#ifdef SC64_WORKER_CARGO_KIND
+#define LOADED_PROBE_MINES 1
+#else
+#define LOADED_PROBE_MINES 0
+#endif
+
 /* Idle Probes do not find work: starting Probes wait for an order and a spent
  * patch leaves its Probes standing on it. Send up to three each pass to the
  * least-worked visible patches near a Nexus. */
@@ -817,7 +982,7 @@ static void mine_idle_probes(void)
         ensure_normal_ui();
         for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
             if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-                u[i].order == ORDER_IDLE && !u[i].carry) probe = i;
+                u[i].order == ORDER_IDLE && (!u[i].carry || LOADED_PROBE_MINES)) probe = i;
         if (probe < 0) return;
         for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
             int depot = 0x7fffffff, workers = 0;
@@ -875,6 +1040,51 @@ static void issue_defense_order(void)
     issue_attack_move(limit(x, 0, WORLD_W - 1), limit(y, 0, WORLD_H - 1));
 }
 
+/* Gather short of a Sunken line before attacking it. Fighters that arrive
+ * one re-aim at a time die to 400 HP Sunkens without breaking the line. */
+#define SUNKEN_RANGE 112
+#define STAGE_CLEARANCE (SUNKEN_RANGE + 32)
+#define STAGE_PATIENCE 1800
+static int stage_target = -1, stage_x, stage_y, stage_since, stage_done;
+
+static int foe_sunkens_near(int x, int y, int radius)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && (b[i].owner == ENEMY || b[i].owner == 4) &&
+            b[i].type == B_SUNKEN_COLONY && dist2(x, y, b[i].x, b[i].y) < radius * radius) ++n;
+    return n;
+}
+
+static int fighters_near(int x, int y, int radius, int *total)
+{
+    int n = 0;
+    *total = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
+            u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
+            ++*total;
+            if (dist2(x, y, u[i].x, u[i].y) < radius * radius) ++n;
+        }
+    return n;
+}
+
+/* Walk from the target toward the army until clear of every Sunken. */
+static int find_stage_point(int tx, int ty, int from_x, int from_y, int *sx, int *sy)
+{
+    int dx = from_x - tx, dy = from_y - ty;
+    int len = FAST_ABS(dx) > FAST_ABS(dy) ? FAST_ABS(dx) : FAST_ABS(dy);
+    if (len == 0) return 0;
+    for (int d = 160; d <= 480; d += 16) {
+        int x = tx + dx * d / len, y = ty + dy * d / len;
+        if (x < 16 || y < 16 || x >= WORLD_W - 16 || y >= WORLD_H - 16) return 0;
+        if (terrain_blocked(x / 16, y / 16) || foe_sunkens_near(x, y, STAGE_CLEARANCE)) continue;
+        *sx = x; *sy = y;
+        return 1;
+    }
+    return 0;
+}
+
 static void issue_sweep_order(void)
 {
     ensure_normal_ui();
@@ -888,7 +1098,36 @@ static void issue_sweep_order(void)
             if (d >= best || (reach = closest_foe_building(u[i].x, u[i].y)) < 0) continue;
             best = d; army = i; target = reach;
         }
-    if (army >= 0) issue_attack_move(b[target].x, b[target].y);
+    if (army < 0) return;
+    int tx = b[target].x, ty = b[target].y, total;
+    int at_front = fighters_near(tx, ty, 256, &total);
+    if (stage_target != target && foe_sunkens_near(tx, ty, 224) >= 2 &&
+        at_front * 2 < total) {
+        long cx_sum = 0, cy_sum = 0;
+        int n = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
+                u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
+                cx_sum += u[i].x; cy_sum += u[i].y; ++n;
+            }
+        stage_target = target;
+        stage_since = frame;
+        stage_done = 0;
+        if (!n || !find_stage_point(tx, ty, (int)(cx_sum / n), (int)(cy_sum / n),
+                                    &stage_x, &stage_y)) stage_done = 1;
+    }
+    if (stage_target == target && !stage_done && frame - stage_since < STAGE_PATIENCE) {
+        int gathered = fighters_near(stage_x, stage_y, 112, &total);
+        if (gathered * 4 < total * 3) {
+            issue_attack_move(stage_x, stage_y);
+            return;
+        }
+    }
+    /* Any attack on the target commits to it: losses or new arrivals must
+     * not pull the fight back to the stage. */
+    stage_target = target;
+    stage_done = 1;
+    issue_attack_move(tx, ty);
 }
 
 static void print_blocker(void)
@@ -958,6 +1197,8 @@ int main(int argc, char **argv)
     int assault_started = 0;
 #ifdef SC64_P34_NORMAL_HOME
     int next_expansion = 12000;
+#else
+    int next_expansion = frame, saving = 0;
 #endif
     while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost &&
            !controller_input_error) {
@@ -965,9 +1206,21 @@ int main(int argc, char **argv)
            freezes the native frame clock. Recover through the regular B menu
            input before deciding the next action. */
         if (menu_open || mode != MODE_NORMAL) ensure_normal_ui();
+        remember_visible_minerals();
+#ifdef SC64_P34_NORMAL_HOME
+        const int saving = 0;
+#else
+        /* The site search issues route queries, so refresh it on the
+         * ordinary 240-frame decision cadence rather than every frame. */
+        if (frame >= next_expansion) {
+            saving = saving_for_expansion();
+            if (saving) build_forward_nexus();
+            next_expansion = frame + 240;
+        }
+#endif
         if (frame >= next_build) {
             (void)recover_stalled_builder();
-            build_pylons_and_gateways();
+            if (!saving) build_pylons_and_gateways();
             next_build = frame + 240;
         }
 #ifdef SC64_P34_NORMAL_HOME
@@ -977,15 +1230,16 @@ int main(int argc, char **argv)
         }
 #endif
         if (frame >= next_worker) {
+            free_loaded_probe();
             mine_idle_probes();
-            queue_probe();
+            if (!saving) queue_probe();
             next_worker = frame + 240;
         }
         if (frame >= next_gas) {
             assign_gas_probe();
             next_gas = frame + 300;
         }
-        if (frame >= next_queue && side_building(B_GATEWAY, 1) >= 0) {
+        if (frame >= next_queue && side_building(B_GATEWAY, 1) >= 0 && !saving) {
             if (side_building(B_CYBERNETICS_CORE, 1) >= 0 && gas >= 50)
                 queue_dragoon();
             else
@@ -999,16 +1253,21 @@ int main(int argc, char **argv)
         if (frame >= next_order) {
             /* Strike together and regroup when spent: units fed in piecemeal die
              * to the Sunken Colonies without clearing anything. The last enemy
-             * units need less, and a force that cannot rebuild goes in anyway. */
-            int army = owner_army(SIDE);
-            int strike = owner_units(ENEMY) + owner_units(4) < army ? 16 : 32;
-            if (assault_started && army < 10) assault_started = 0;
-            if (!assault_started && (army >= strike ||
-                                     (minerals_near_nexus() == 0 && minerals < 100 && army)))
+             * units need less, and a force that cannot rebuild, or that faces
+             * only buildings, goes in anyway. */
+            int army = owner_army(SIDE), foes = owner_units(ENEMY) + owner_units(4);
+            int strike = foes < army ? 16 : 32;
+            int no_income = minerals < 100 &&
+                (minerals_near_nexus() == 0 || side_mining_probes() == 0);
+            if (assault_started && army < 10 && foes) assault_started = 0;
+            if (!assault_started && army && (army >= strike || no_income || !foes))
                 assault_started = 1;
             if (assault_started) {
+                /* Re-aim often. Native 400 HP Sunkens hold a target long
+                 * enough that a stale order leaves the army trading with
+                 * stragglers while reinforcements walk in alone. */
                 issue_sweep_order();
-                next_order = frame + 1200;
+                next_order = frame + 300;
             } else {
                 issue_defense_order();
                 next_order = frame + 900;
