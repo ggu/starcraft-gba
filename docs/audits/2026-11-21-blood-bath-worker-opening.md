@@ -78,6 +78,86 @@ matches 13 uninterrupted world and worker samples and all observed
 mineral credits. The IWRAM and EWRAM link endpoints are unchanged.
 Keep the flag off by default while broadening the ordinary replay.
 
+### Shared Terran opening trial
+
+The shared initializer tries a four-worker row beside each Terran Command
+Center, for human and computer seats and in both Custom Game types. The row
+must fit the live path grid and offer a route to each worker's starting field.
+The prior placement remains the fallback for a blocked row. The four initial
+jobs still use the existing nearest-unused field order. The change operates
+only during initialization and the save codec stays the same.
+
+An ordinary Blood Bath Melee launch placed the human Terran southwest and
+one Zerg CPU northeast. At the first update, both GBA versions had 50
+minerals and assigned the same field slots to the four SCVs. The new row
+sent each worker on an outbound trip before the existing 45-update gather
+wait. The first eight-mineral delivery moved from update 74 to 99, or
+2.470 to 3.303 emulated seconds after the launch cut. First pickups moved
+from update 44 for all four to 69, 79, 92 and 103 in slot order.
+The matched N64 capture places the first credit next to the 9- and 11-second
+elapsed readings. The native workers share a patch in that capture. They
+take turns working it and the next worker starts during the first worker's
+return trip. The new GBA row still sends the workers to four separate fields.
+Its warm-window bank samples range from 170–178 at second 19 and 234–258 at
+second 28. Patch allocation, service and depot contact still need their own
+comparisons. [Matched clock observations](2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
+
+Four fresh HOME continuations matched the uninterrupted state. They cover a
+pre-change journal and new journals with workers en route, mining and carrying
+ore. Loading and re-exporting preserved each journal byte for byte. All eight
+regular and alternate-start profile links retain the previous IWRAM and EWRAM
+endpoints. The four-Terran launch costs about 603,200 additional guest cycles
+on the launch call. The one-Terran launch adds about 194,980. Those are launch
+costs, separate from ongoing gameplay pacing.
+
+The eight sanitizer fixtures passed 234 ordinary race lineups apiece, including
+seat and restart checks and first deliveries from all 16 SCVs in a four-Terran
+match. The regular cartridges match the previous launch metadata for 1,134
+named or closed-seat lobbies and the previous state fingerprints for all 30
+campaign openings. All 48 ordinary ARM save/reload checks passed across regular
+and alternate-start builds. The Outpost control's full HOST trace is byte
+identical before and after the change.
+
+The existing combined-arms HOST policy wins with the formation at call 30,541
+and game frame 29,909. The variant that renders every controller frame stalls
+at its 75,000-call limit, while that variant wins on the previous build. Its
+attack policy stops sending the main force below 30 Marines while any enemy
+units remain. A local controller comparison allows the sweep at 12 Marines
+once the opponent has at most eight units. The first additional attack issues
+orders to 47 actors at call 32,142. The formation build then defeats the Zerg
+at call 43,386 and game frame 42,658 with zero Zerg units or buildings.
+
+The ordinary HOME ARM replay follows that rendered-controller tape on
+both the original trial and its composition with release `43e91668`.
+All 221 recorded observations match across 3,406 input transitions
+and 219 action checks. These cover launch configuration, action-time
+frame and resources, and terminal unit and building counts. On the
+current runtime the human finishes with 39 units and 17 buildings.
+The 43,386-call replay averages 21.29 emulated main-loop updates per
+second, including menu and presentation time. The separate earlier
+30,541-call HOST win remains a host measurement.
+
+The four regular links use the same IWRAM and EWRAM as the current
+control. All 1,134 ordinary named and closed-seat lobby observations
+and 30 campaign opening fingerprints match. The 24 regular pause-save
+and fresh HOME cases match the earlier trial, including world
+fingerprints and SRAM bytes.
+
+| Local witness | SHA-256 |
+| --- | --- |
+| Matched southwest economy and four continuations | `4d8c29ba1c04db3abb931a9f1cb64af5a21fc259b6905737906ec701a5fedc69` |
+| One- and four-Terran launch costs | `0d208bfa9b825319dac4bf79ebf21ac181c0e1fe7227526395da435290ebf95f` |
+| Regular ARM lobby matrix | `1dae2173c498b742dd3950d4893f573045ae57e11dd5bc71eb473881949e5d9e` |
+| ARM 48-case fresh HOME matrix | `de684a464324f6beb0d36eee8d621aeaec7a5230901142325145660110504b5e` |
+| Formation HOST victory tape | `6e7dc6f9cf8caca66719ae0ab64dee87f50cc777707b721112ec23bd097fb681` |
+| Formation HOST victory with rendered controller frames | `bd48ae2d8221ddccf9e49d6674f039ab0ac49f1be45aea697a6e95e22e57c7c0` |
+| Ordinary ARM victory on the original trial | `e8775789f0519ee3c251fbe784214785d95d0471129247ae6b930e9da9202696` |
+| Ordinary ARM victory on the current composition | `21d20157196bf66bacb75ed21666e7ece84a78bd474338d8a0569f7805520b68` |
+| Current 1,134 ordinary launches | `3aa41077157c38253f02ebf0e7f573fcaf73398091fe9de6a9e299f5bd180132` |
+| Current 24-case regular fresh HOME matrix | `69d3b681acdd0cc5246ee4ffaf3ac33a4ca69bfdcc7f20f20d221f7d9a6a91bf` |
+
+### Earlier opt-in witnesses
+
 | Local witness | SHA-256 |
 | --- | --- |
 | N64 USA ROM | `e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020` |
