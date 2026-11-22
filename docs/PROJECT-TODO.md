@@ -341,10 +341,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [shared Terran row trial](audits/2026-11-21-blood-bath-worker-opening.md#shared-terran-opening-trial)
   moves the southwest first credit to 3.303 guest seconds using the same
   four mineral targets and 45-update wait. All 16 SCVs deliver on HOST and
-  ARM restores both old and new openings. The original HOST policy wins.
-  The rendered controller also wins when its final sweep allows an army
-  below 30 Marines to finish a weakened opponent. Verify the winning tapes
-  on ARM before release. The matched
+  ARM restores both old and new openings. The rendered controller wins
+  on the regular ARM build at frame 42,658 with all 221 observations
+  matched. All 1,134 named and closed-seat launches, 30 campaign openings
+  and 24 regular fresh HOME continuations match the earlier trial. The matched
   N64 workers take turns on one southwest patch. Qualify patch contention
   and depot contact separately from the starting row.
   Use the active Blood Bath combat witness to qualify opaque

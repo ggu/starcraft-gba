@@ -125,8 +125,23 @@ attack policy stops sending the main force below 30 Marines while any enemy
 units remain. A local controller comparison allows the sweep at 12 Marines
 once the opponent has at most eight units. The first additional attack issues
 orders to 47 actors at call 32,142. The formation build then defeats the Zerg
-at call 43,386 and game frame 42,658 with zero Zerg units or buildings. Both new
-victory tapes still need replay on the physical-button ARM observer.
+at call 43,386 and game frame 42,658 with zero Zerg units or buildings.
+
+The ordinary HOME ARM replay follows that rendered-controller tape on
+both the original trial and its composition with release `43e91668`.
+All 221 recorded observations match across 3,406 input transitions
+and 219 action checks. These cover launch configuration, action-time
+frame and resources, and terminal unit and building counts. On the
+current runtime the human finishes with 39 units and 17 buildings.
+The 43,386-call replay averages 21.29 emulated main-loop updates per
+second, including menu and presentation time. The separate earlier
+30,541-call HOST win remains a host measurement.
+
+The four regular links use the same IWRAM and EWRAM as the current
+control. All 1,134 ordinary named and closed-seat lobby observations
+and 30 campaign opening fingerprints match. The 24 regular pause-save
+and fresh HOME cases match the earlier trial, including world
+fingerprints and SRAM bytes.
 
 | Local witness | SHA-256 |
 | --- | --- |
@@ -136,6 +151,10 @@ victory tapes still need replay on the physical-button ARM observer.
 | ARM 48-case fresh HOME matrix | `de684a464324f6beb0d36eee8d621aeaec7a5230901142325145660110504b5e` |
 | Formation HOST victory tape | `6e7dc6f9cf8caca66719ae0ab64dee87f50cc777707b721112ec23bd097fb681` |
 | Formation HOST victory with rendered controller frames | `bd48ae2d8221ddccf9e49d6674f039ab0ac49f1be45aea697a6e95e22e57c7c0` |
+| Ordinary ARM victory on the original trial | `e8775789f0519ee3c251fbe784214785d95d0471129247ae6b930e9da9202696` |
+| Ordinary ARM victory on the current composition | `21d20157196bf66bacb75ed21666e7ece84a78bd474338d8a0569f7805520b68` |
+| Current 1,134 ordinary launches | `3aa41077157c38253f02ebf0e7f573fcaf73398091fe9de6a9e299f5bd180132` |
+| Current 24-case regular fresh HOME matrix | `69d3b681acdd0cc5246ee4ffaf3ac33a4ca69bfdcc7f20f20d221f7d9a6a91bf` |
 
 ### Earlier opt-in witnesses
 
