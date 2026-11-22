@@ -362,6 +362,13 @@ Forty-eight Custom Games across the eight images pass ordinary pause
 saves and fresh HOME continuation on both maps. The prepared
 weapon and projectile depth fixture passes under ASan and UBSan.
 
+The first full local run found three failures in the prepared
+building roster fixture. They reproduce on the preceding release.
+The fixture called the vitals overlay by itself while expecting a
+ring from the world-depth painter. It now exercises the painter and
+composes the expected ring, body and vitals in that order. The
+corrected renderer module passes with the current prepared inputs.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent direction differential | `88e2b1f065c7ac0332c915dcd3ab5b9aaaf16de557b2acdc475e8a88b0009295` |
