@@ -72,9 +72,23 @@ emulated cycles per update change from 817,911 to 818,261 (+0.04%).
 The ordinary holdout checks integration and pacing. Use the staged
 fixture for the order-sensitive fallback pixels.
 
+The 9,489-call normal P10 campaign tail reaches victory with all 68
+world, framebuffer and fog cuts matching. The route counters, update
+sequence and victory SRAM also match. Mean emulated cycles per update
+change from 1,535,936 to 1,536,740 (+0.05%).
+
+The default source build and test, plus the optional unified build and
+test, pass locally. The default Python suite runs 1,173 tests, with 34
+skips. The prepared Terran full-profile startup/save fixture passes all
+234 configurations. A separate split-profile HOST fixture reaches the
+same pending-impact save assertion on the baseline and candidate, after
+its opening economy checks. Keep that synthetic malformed-journal case
+open independently of the physical fresh-load matrix.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Showcase weapon sanitizer fixture | `0423a96707267d3b51000c75bdfb73e80df3880bce82846c474419020bad9f8e` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
 | Custom Game launch and fresh-load matrix | `7c5f53ef23a75cfa5b76dd058cfdd34023d03da4a9d3c0bd3bdb27c3d4e0add3` |
 | Blood Bath comparison | `05129273d198af9e8a1aa52b6207873811af6e7bf2cbee6754b7de03d047369f` |
+| P10 normal campaign tail | `52c25ecfc5396afda73bffdf7d9b416eaf97191007a0d4a4d38b74794f3dbef7` |
