@@ -354,10 +354,13 @@ preview images pass the existing static RAM guards. The default
 asset-free ROM reproduces byte for byte.
 
 All 30 campaign entries launch and advance after opening dialogue,
-with the same 30 recorded world checkpoints. Forty-eight Custom
-Games across the eight images pass ordinary pause saves and fresh
-HOME continuation on both maps. The prepared weapon, impact and
-projectile depth fixture passes under ASan and UBSan.
+with the same 30 recorded world checkpoints. The three normal race
+cartridges pass 1,134 ordinary Custom Game launches. Each launch
+checks the human race, map, computer seats and town hall locations
+for every nonempty arrangement of the three named or closed seats.
+Forty-eight Custom Games across the eight images pass ordinary pause
+saves and fresh HOME continuation on both maps. The prepared
+weapon and projectile depth fixture passes under ASan and UBSan.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -366,6 +369,7 @@ projectile depth fixture passes under ASan and UBSan.
 | P10 fresh HOME victory | `8494bbede980bf2cd86fcf209b315637c9cc7a631ed8968d5c078098485b9135` |
 | Crossfire | `24bed3a24f0deebc76a1215fbdade40775c3c0b7029514091c23f1921b384333` |
 | Campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Exhaustive named-seat launch matrix | `f92dff99fd9671eea66174eec2ef2b9f50b97df1422929df8089aa388b8640b6` |
 | Pause save and fresh HOME matrix | `5325dd211df92503fc5e8762154600c99e57bb77698263e396b60506e3269f82` |
 
 ## Automatic gathering in two Custom Game openings
