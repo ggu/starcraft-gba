@@ -258,3 +258,56 @@ The default ARM image is byte-identical to #724.
 | Blood Bath scouting candidate | `409c7d0411084981e63ccdc3dd3b8e7aa535692c65d24246a4e3929685488da0` |
 | Z1 fresh load, Hatchery reselect, victory and fresh readback | `b42e444ad2ec04811bb2df975445a75456f4359dd6d922a7c382e638720eb256` |
 | Z1 identical victory SRAM and readback | `fd6b53a2e5be9d898d44e93c39e203a6148a3f7f4efc7309a77ca29036b936d2` |
+
+## Dense point queue on the current release
+
+On `a33d1272`, the same six-cell opening triggers four full
+64×64 point fills at frame 19,360 and three on the next update.
+The seven goals differ and each flood discovers 2,795 cells.
+The current-release observer matches the uninterrupted clocks and
+state at all five cuts. An independent FIFO over the observed grid
+finds the requested origins after 685–1,662 pops. Five of the
+seven fills follow failed reads through stale saved directions.
+The pending frontier at first discovery contains 14–65 cells.
+Prior trials with bounded partial fields often recouped the
+deferred work on later reads. Compare frontier lifetime and
+publication costs before retrying that design. [Earlier trials](2026-11-21-dense64-prefix-and-placement.md#resumable-point-flood)
+
+The shared dense point fill now keeps read and write pointers into
+its existing queue. Seeds and neighbour order stay the same.
+Each discovered cell is marked before it is queued, so the existing
+scratch still fits even on a completely open map. An independent
+ASan/UBSan oracle matches the packed output, discovery count and
+unchanged topology on 1,038 full fields.
+
+| 3,600-update saved Blood Bath replay | Before | After |
+| --- | ---: | ---: |
+| Frame 19,360 guest cycles | 3,418,751 | 3,306,306 |
+| Following update guest cycles | 1,640,903 | 1,557,995 |
+| Mean guest cycles per update | 788,171 | 786,560 |
+| Nearest-rank p95 guest cycles | 1,068,696 | 1,054,737 |
+
+All 3,600 route-counter pairs, all 31 sampled world and
+indexed-page cuts and the exported SRAM match. The display
+page selector differs at 14 individual updates. All 120 cuts
+of six separate three-CPU replays match in state, both indexed
+pages, palette and route counters. Those replays use 0.017–0.059%
+fewer cycles. The 9,489-update P10 victory replay matches all 81
+cuts and final SRAM, with mean cost within 0.001%. All 30 campaign
+openings and 24 regular pause-save and fresh HOME cases match.
+All four regular profiles use 40 fewer IWRAM bytes and the same EWRAM.
+At the peak update, both Z10 links observe the same minimum
+system stack pointer of `0x03006870` and IRQ stack pointer of
+`0x03007e98`.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Control five-cut point and facility ledger | `9ea6cda8d61e82a5255f174760776afc7a6c865442bbff6c4efb49fac85091ce` |
+| Current-release origin and gate ledger | `7a7408d4e46a0f70162fa2ae6a1b7f7f233eca51abaa282070e981d34474ab75` |
+| Candidate five-cut point and facility ledger | `772743e8c4821d520e3c1a686dc7079fb9c3b7cbfa1154ee666390c850a51ca7` |
+| Control 3,600-update saved replay | `52dd254c86c62b2299f8b73804fac03aa523063b4cc7a38bc55b4978c1b38079` |
+| Candidate 3,600-update saved replay | `1e9c69c8a9da4362557521fe3a9872e3ba5768b7e46b2aa569c27c87e0294400` |
+| Six three-CPU replays | `649ac7d7c798eee9a3fd3560edb7e09942cba88b7bf7134e99251fd13e2c67c6` |
+| P10 victory replay | `9c3023cf704be3eaa7078ea775a19caf74828df53662dbb99be5903afdea1648` |
+| Regular save continuations | `6154e0caecd19c3a3f4a3b0ce15cabbc31cb2f886567f965de5f1c190536df61` |
+| Peak stack comparison | `f10c2fc3e8216768733b53ad8d4d4b26317a7034c5da6785ef2387612d75019a` |

@@ -1779,7 +1779,7 @@ sc64_route_fill_dense(u8 *field, int goal)
     u8 *dense = (u8 *)(void *)scratch;
     const u8 *walk = path_walkable;
     const int start = (goal & 63) + 4 + ((goal >> 6) + 1) * SC64_DENSE_STRIDE;
-    int head = 0, tail = 0;
+    u16 *read = bfs_queue, *write = bfs_queue;
 
     memset(dense, 15, SC64_DENSE_STRIDE);
     memset(dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE, 15, SC64_DENSE_STRIDE);
@@ -1798,21 +1798,22 @@ sc64_route_fill_dense(u8 *field, int goal)
     }
     if (dense[start] == 7u) {
         dense[start] = 0;
-        bfs_queue[tail++] = (u16)start;
+        *write++ = (u16)start;
     } else {
         for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
             int seed = start + dy * SC64_DENSE_STRIDE + dx;
             if (dense[seed] != 7u) continue;
             dense[seed] = 0;
-            bfs_queue[tail++] = (u16)seed;
+            *write++ = (u16)seed;
         }
     }
-    while (head < tail) {
-        int c = bfs_queue[head++];
+    while (read != write) {
+        int c = *read++;
+        u8 *cell = dense + c;
 #define SC64_DENSE_STEP(offset, direction) \
-        if (dense[c + (offset)] == 7u) { \
-            dense[c + (offset)] = direction; \
-            bfs_queue[tail++] = (u16)(c + (offset)); \
+        if (cell[(offset)] == 7u) { \
+            cell[(offset)] = direction; \
+            *write++ = (u16)(c + (offset)); \
         }
         SC64_DENSE_STEP(-1, 1)
         SC64_DENSE_STEP(1, 2)
@@ -1830,7 +1831,7 @@ sc64_route_fill_dense(u8 *field, int goal)
             *field++ = (u8)(pair >> 16);
         }
     }
-    return tail;
+    return (int)(write - bfs_queue);
 }
 #if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || defined(SC64_ROUTE_FACILITY_FIFO_PROBE)
 enum { SC64_LINEAR_COLS = 96, SC64_LINEAR_WIDE_COLS = 128, SC64_LINEAR_MAX_ROWS = 128,
