@@ -248,6 +248,11 @@ cycles and the sixth uses 0.003% more. All 48 ordinary Custom Game
 startup, pause save and fresh HOME continuation cases pass across
 eight normal and preview products.
 
+All 30 missions launch through the ordinary campaign menus on the
+three combined normal cartridges. After acknowledging any initial
+field dialogue, each advances into gameplay. The 30 retained
+launch checkpoints match the facility release.
+
 All eight links pass the static RAM guards. The painter's stack frame
 grows by 224 bytes on Terran and Z10 and 280 bytes on P10 and
 Showcase. Observed system stack margins over the static IWRAM end are
@@ -508,6 +513,7 @@ which repeated overlay walks can be elided before adding storage.
 | Combined indices, six Custom Game replays | `a9e551497e4cce09b6f4254111a6dc6bec05e8af7255fed115d689ac7c3f15ec` |
 | Combined indices, P10 victory continuation | `c207a602a7034dd202789d6ee14be793eff33fd7716bb96295a750a36f724d40` |
 | Combined indices, 48-probe Custom Game matrix | `a57acb6f8e1e80cd470ac1a16ace2db118c078b4f79081bd17901f5c9e066e6a` |
+| Combined indices, all 30 campaign launches | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
 | Combined indices, stack observer | `6b11f0b451904a1665dbcf6a95b688a10c2d83684996f7eb4fb838b8b7027e33` |
 | Collision table addressing, P10 victory continuation | `85167f6a4b7092138f5896abd31e17715c30d024c0e234880a2173d0d3827ac5` |
 | Native Challenger opening tape | `341ea961382f8e368a90b7e084a63afe8267da23c1fc59dd26ed37183e6bfa9f` |
