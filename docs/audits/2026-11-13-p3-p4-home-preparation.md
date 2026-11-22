@@ -246,3 +246,28 @@ candidate helper to inject both malformed records with valid checksums.
 The loader rejects both records and preserves the live units and storm
 state. The original P4 and canonical P7 fixtures both pass under
 ASan/UBSan, including the pause, damage and framebuffer checks.
+## Current ordinary P3 victory
+
+On releases `2b95d534` and `43e91668` the regular Protoss cartridge
+starts at fresh HOME and completes P3 at frame 47,661 after 48,168
+controller calls.
+All 49 checkpoints, nine briefing pages and three in-game dialogue
+acknowledgements match the authored HOME tape. The terminal check
+confirms the primary objective and zero remaining hostile buildings.
+The run qualifies the uninterrupted ordinary input path. Fresh pause
+and victory SRAM reads remain separate checks.
+
+The existing 256 KiB per-file cap stopped the verbose mGBA runner
+at call 500. DMA diagnostics account for most of its log. The
+bounded replay now retains a 1 GiB free-space reserve and budgets
+64 MiB for runner output and 256 KiB for its report. HOME and
+temporary output are under the same replay directory. The final
+receipt requires a clean runner exit and a final disk check. The
+current release uses 27,273,555 bytes of log and 40,192 bytes of report.
+
+| Local input or receipt | SHA-256 |
+| --- | --- |
+| Current regular Protoss ROM | `b1dbb61a3398e890201d5fa4ed9d4253d8f1f6f0813815c3a64393077d327765` |
+| Authored HOME tape | `ee03bc74391adc95bee8c381906a7a890fc31afbc380d55f9e7986a5dac031fb` |
+| Previous uninterrupted ordinary P3 victory | `f7355e77cae9a0074b65f0e0b462b7898f5e301eaaf20de72cf4eb2f410fc49a` |
+| Current uninterrupted ordinary P3 victory | `9e460a6d17706acac2b93d5f8ae9d1e6718102f82c414a7a3ffd7755e139d960` |
