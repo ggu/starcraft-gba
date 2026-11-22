@@ -70,10 +70,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   campaign run. Keep both trials local. In [visible Crossfire](audits/2026-11-22-steady-order-cost.md#visible-fights-in-protoss-crossfire),
   uncompressed unit sprite blits take 130,161–148,318 guest cycles per
   update. All 507 sampled calls draw attack poses. A private 85-frame
-  packed bank saves 1.02–1.24% across two short Crossfire windows for
-  286,156 ROM bytes. Replace its link-order lookup with direct pose
-  metadata, then qualify sustained Crossfire and ordinary three-CPU
-  combat within the 32 MiB ROM limit. A point-route
+  packed bank saves 1.02–1.24% across two short Crossfire windows.
+  The [generated sidecar](audits/2026-11-22-steady-order-cost.md#generated-attack-pose-sidecar)
+  raises the pooled saving to 1.53% with stable frame metadata and
+  about 292,000 added ROM bytes. Over 900 visible Crossfire updates,
+  the saving is 0.89%. The full Custom Game and P10 samples are nearly
+  flat, and Z1 saves 0.07%. All 48 ordinary Custom Game save and reload
+  cases pass. Keep the option explicit and use sustained battle
+  measurements to choose future actor banks. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
@@ -2398,6 +2402,15 @@ save/source-owner and timing evidence; do not advertise unwired components.
   release to reselect the Hatchery during two neutral tape updates.
   All 49 remaining checkpoints match, and a third process verifies its
   victory journal. Continue qualifying other normal campaign save points.
+- The [ordinary Custom Game openings](audits/2026-11-22-steady-order-cost.md#automatic-gathering-in-two-custom-game-openings)
+  show automatic Terran gathering on native Challenger and GBA
+  Outpost. Compare the same map, game type and gameplay clock before
+  tuning the collection rate.
+- [Fresh P5 and P6 controls](audits/2026-11-22-steady-order-cost.md#protoss-campaign-continuation-and-replay-controls)
+  verify P5 and P6 victories after fresh SRAM load on the facility
+  release. The repaired P6 controller verifies the intended unit
+  after each contested click and matches 105 ARM checkpoints. Carry
+  the controller into source and qualify later campaign save points.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie
