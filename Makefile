@@ -583,11 +583,29 @@ $(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
 endif
 # Read-only key comparison also handles sub-second changes with macOS Make 3.81.
 sc64_lookup_quote = '$(subst ','"'"',$(1))'
+ATTACK_POSE_WORD_ACTORS ?=
 include config/canonical-lookup/Makefile
-CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
+CANONICAL_LOOKUP_CONFIG_KEY := $(CANONICAL_LOOKUP_CONFIG_KEY)-attackwords$(ATTACK_POSE_WORD_ACTORS)
+CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_CONFIG_KEY)) | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
 CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_WALK_WORDS)),$(WALK_WORDS_HEADER)) $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
-SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(CANONICAL_LOOKUP_INPUTS)
+# Optional, explicitly bounded attack word sidecar; comma-separated actor names.
+# Its independently generated pose bank is placed first on the include path so
+# its content fingerprint and the sidecar always come from the same run.
+ATTACK_WORD_DIR := build/generated/attack-words
+ATTACK_WORD_HEADER := $(ATTACK_WORD_DIR)/sc64_unit_attack_words_generated.h
+ATTACK_WORD_BANK := $(ATTACK_WORD_DIR)/sc64_unit_attack_source_generated.h
+ATTACK_WORD_MISSING := $(if $(wildcard $(ATTACK_WORD_BANK)),,force-attack-word-rebuild)
+.PHONY: force-attack-word-config force-attack-word-rebuild
+force-attack-word-rebuild:
+force-attack-word-config:
+$(ATTACK_WORD_DIR)/config: force-attack-word-config
+	@mkdir -p $(@D)
+	@printf '%s\n' $(call sc64_lookup_quote,$(ATTACK_POSE_WORD_ACTORS)) > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+$(ATTACK_WORD_HEADER): $(ATTACK_POSE_HEADER) $(ATTACK_WORD_DIR)/config tools/sc64_unit_facing.py $(ATTACK_WORD_MISSING)
+	$(PYTHON) tools/sc64_unit_attack_sprites.py --out $(ATTACK_WORD_DIR) --header $(ATTACK_WORD_BANK) --word-header $@ --word-actors $(call sc64_lookup_quote,$(ATTACK_POSE_WORD_ACTORS))
+SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(if $(ATTACK_POSE_WORD_ACTORS),$(ATTACK_WORD_HEADER)) $(CANONICAL_LOOKUP_INPUTS)
 CANONICAL_LOOKUP_FLAGS = $(if $(and $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(filter -DSC64_WEAPON_SOURCE_VFX,$(CANONICAL_WEAPON_FLAGS))),-Ibuild/generated/weapon-lookup '-DSC64_WEAPON_SOURCE_BANK_HEADER="sc64_weapon_source_indexed.h"')
 
 $(WALK_WORDS_HEADER): $(UNIT_WALK_HEADER) $(UNIT_FACING_HEADER) $(WALK_PAIR_CHECK) tools/sc64_unit_walk_words.py tools/sc64_unit_facing.py tools/sc64_walk_pair.py build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
@@ -602,10 +620,10 @@ $(INDEXED_WEAPON_HEADER): $(WEAPON_SOURCE_HEADER) tools/sc64_weapon_lookup_index
 force-canonical-lookup-rebuild:
 force-canonical-lookup-config:
 build/canonical-lookup-config: force-canonical-lookup-config | build
-	@printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' > $@.tmp
+	@printf '%s\n' $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_CONFIG_KEY)) > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
-SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
+SOURCE_WEAPON_FLAGS := $(if $(ATTACK_POSE_WORD_ACTORS),-DSC64_UNIT_ATTACK_WORDS -I$(ATTACK_WORD_DIR)) -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
 # Cache only the immutable presentation duration for the four qualified source
 # weapon products. Empty the override to compare or disable it on those builds.
 CANONICAL_TRACE_DURATION_FLAGS ?= -DSC64_TRACE_DURATION_CACHE -DSC64_TRACE_PROFILE_INDEX_CACHE
