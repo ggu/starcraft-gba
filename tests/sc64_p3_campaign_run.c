@@ -243,7 +243,10 @@ static void step_raw(u16 held)
 #ifdef SC64_P34_NORMAL_HOME
     assert(route_purity_hash() == route_after);
 #endif
+    /* Draw after every update like common/main.c and the PX replay: selection
+     * picks read the facing and stride state that drawing advances. */
     game_update(held, pressed);
+    game_render();
 #ifdef SC64_P34_NORMAL_HOME
     route_after = route_purity_hash();
 #endif
@@ -843,7 +846,8 @@ static int forward_nexus_site(int *x_out, int *y_out)
 static int saving_for_expansion(void)
 {
     int x, y;
-    return side_building_count(B_NEXUS) == 1 &&
+    /* Saving is pointless once nothing gathers; then the bank buys units. */
+    return side_building_count(B_NEXUS) == 1 && side_mining_probes() > 0 &&
         minerals_near_nexus() < EXPANSION_HOME_LOW && forward_nexus_site(&x, &y) > 0;
 }
 
@@ -868,24 +872,22 @@ static int select_walking_probe(int w)
     return u[w].alive && u[w].selected && selected_count() == 1 && selected_building < 0;
 }
 
-/* The mineral order refuses a loaded Probe and nothing returns its cargo,
- * so a Probe left idle while carrying never mines again. Tapping the
- * Assimilator discards the cargo, and STOP frees it for the next mining
- * pass, as in the P1 and P2 controller. */
+/* Without typed cargo, the mineral order refuses a loaded Probe and nothing
+ * returns its cargo, so a Probe left idle while carrying never mines again.
+ * STOP discards the cargo and frees it for the next mining pass. Typed cargo
+ * accepts the mineral order and delivers first, so the mining pass takes
+ * loaded Probes directly. */
 static void free_loaded_probe(void)
 {
-    int refinery = -1, probe = -1;
-    for (int i = 0; i < MAX_BUILDINGS && refinery < 0; ++i)
-        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_ASSIMILATOR &&
-            !b[i].under_construction) refinery = i;
+#ifndef SC64_WORKER_CARGO_KIND
+    int probe = -1;
     for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
             u[i].order == ORDER_IDLE && u[i].carry) probe = i;
-    if (refinery < 0 || probe < 0 || !select_walking_probe(probe)) { ensure_normal_ui(); return; }
-    move_cursor(b[refinery].x, b[refinery].y);
-    tap(KEY_A);
+    if (probe < 0 || !select_walking_probe(probe)) { ensure_normal_ui(); return; }
     if (open_menu_row(MENU_STOP)) tap(KEY_A);
     ensure_normal_ui();
+#endif
 }
 
 /* Open a second mineral line before the starting bank is spent. */
@@ -963,6 +965,12 @@ static void queue_probe(void)
         }
 }
 
+#ifdef SC64_WORKER_CARGO_KIND
+#define LOADED_PROBE_MINES 1
+#else
+#define LOADED_PROBE_MINES 0
+#endif
+
 /* Idle Probes do not find work: starting Probes wait for an order and a spent
  * patch leaves its Probes standing on it. Send up to three each pass to the
  * least-worked visible patches near a Nexus. */
@@ -973,7 +981,7 @@ static void mine_idle_probes(void)
         ensure_normal_ui();
         for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
             if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-                u[i].order == ORDER_IDLE && !u[i].carry) probe = i;
+                u[i].order == ORDER_IDLE && (!u[i].carry || LOADED_PROBE_MINES)) probe = i;
         if (probe < 0) return;
         for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
             int depot = 0x7fffffff, workers = 0;
@@ -1031,6 +1039,51 @@ static void issue_defense_order(void)
     issue_attack_move(limit(x, 0, WORLD_W - 1), limit(y, 0, WORLD_H - 1));
 }
 
+/* Gather short of a Sunken line before attacking it. Fighters that arrive
+ * one re-aim at a time die to 400 HP Sunkens without breaking the line. */
+#define SUNKEN_RANGE 112
+#define STAGE_CLEARANCE (SUNKEN_RANGE + 32)
+#define STAGE_PATIENCE 1800
+static int stage_target = -1, stage_x, stage_y, stage_since, stage_done;
+
+static int foe_sunkens_near(int x, int y, int radius)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && (b[i].owner == ENEMY || b[i].owner == 4) &&
+            b[i].type == B_SUNKEN_COLONY && dist2(x, y, b[i].x, b[i].y) < radius * radius) ++n;
+    return n;
+}
+
+static int fighters_near(int x, int y, int radius, int *total)
+{
+    int n = 0;
+    *total = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
+            u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
+            ++*total;
+            if (dist2(x, y, u[i].x, u[i].y) < radius * radius) ++n;
+        }
+    return n;
+}
+
+/* Walk from the target toward the army until clear of every Sunken. */
+static int find_stage_point(int tx, int ty, int from_x, int from_y, int *sx, int *sy)
+{
+    int dx = from_x - tx, dy = from_y - ty;
+    int len = FAST_ABS(dx) > FAST_ABS(dy) ? FAST_ABS(dx) : FAST_ABS(dy);
+    if (len == 0) return 0;
+    for (int d = 160; d <= 480; d += 16) {
+        int x = tx + dx * d / len, y = ty + dy * d / len;
+        if (x < 16 || y < 16 || x >= WORLD_W - 16 || y >= WORLD_H - 16) return 0;
+        if (terrain_blocked(x / 16, y / 16) || foe_sunkens_near(x, y, STAGE_CLEARANCE)) continue;
+        *sx = x; *sy = y;
+        return 1;
+    }
+    return 0;
+}
+
 static void issue_sweep_order(void)
 {
     ensure_normal_ui();
@@ -1044,7 +1097,33 @@ static void issue_sweep_order(void)
             if (d >= best || (reach = closest_foe_building(u[i].x, u[i].y)) < 0) continue;
             best = d; army = i; target = reach;
         }
-    if (army >= 0) issue_attack_move(b[target].x, b[target].y);
+    if (army < 0) return;
+    int tx = b[target].x, ty = b[target].y, total;
+    if (foe_sunkens_near(tx, ty, 224) >= 2 &&
+        fighters_near(tx, ty, 256, &total) * 2 < total) {
+        if (stage_target != target) {
+            long cx_sum = 0, cy_sum = 0;
+            int n = 0;
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
+                    u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
+                    cx_sum += u[i].x; cy_sum += u[i].y; ++n;
+                }
+            stage_target = target;
+            stage_since = frame;
+            stage_done = 0;
+            if (!n || !find_stage_point(tx, ty, (int)(cx_sum / n), (int)(cy_sum / n),
+                                        &stage_x, &stage_y)) stage_since = frame - STAGE_PATIENCE;
+        }
+        /* Once gathered, commit: do not pull the attack back to the stage. */
+        if (!stage_done && frame - stage_since < STAGE_PATIENCE &&
+            fighters_near(stage_x, stage_y, 112, &total) * 4 < total * 3) {
+            issue_attack_move(stage_x, stage_y);
+            return;
+        }
+        stage_done = 1;
+    }
+    issue_attack_move(tx, ty);
 }
 
 static void print_blocker(void)

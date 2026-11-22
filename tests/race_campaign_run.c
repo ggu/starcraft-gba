@@ -112,7 +112,10 @@ static void controller_step(u16 held)
 #ifdef SC64_CONTROLLER_NORMAL_HOME
     if (route_purity_hash()!=controller_route_after) abort();
 #endif
+    /* Draw after every update like common/main.c and the PX replay: selection
+     * picks read the facing and stride state that drawing advances. */
     game_update(held, held & (u16)~controller_previous);
+    game_render();
 #ifdef SC64_CONTROLLER_NORMAL_HOME
     controller_route_after=route_purity_hash();
 #endif
