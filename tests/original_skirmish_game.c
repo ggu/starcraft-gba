@@ -159,6 +159,22 @@ static void check_exploration_restore(void)
     }
 }
 
+static void check_visibility_edges(void)
+{
+    game_init();
+    memset(visible, 0, sizeof visible);
+    SC64_GRID_SET(visible, 0, 1);
+    SC64_GRID_SET(visible, MAP_COLS * MAP_ROWS - 1, 1);
+    check(currently_visible(-15, -15) && currently_visible(15, 15),
+          "visibility lookup maps the fractional first cell to cell zero");
+    check(!currently_visible(-16, 0) && !currently_visible(0, -16),
+          "visibility lookup rejects the next negative cell on either axis");
+    check(currently_visible(WORLD_W - 1, WORLD_H - 1) &&
+          !currently_visible(WORLD_W, WORLD_H - 1) &&
+          !currently_visible(WORLD_W - 1, WORLD_H),
+          "visibility lookup keeps the last cell and rejects either outside edge");
+}
+
 /* Seed depletion rather than waiting for four full mineral fields to run out.
  * The match itself, and the save/load boundary, use normal button input. */
 static void check_cpu_local_mining_recovery(int map, int bots)
@@ -217,6 +233,7 @@ int main(void)
     gba_init();
     check_walkability_maps();
     check_exploration_restore();
+    check_visibility_edges();
     for (int map = 0; map < ORIGINAL_MAP_COUNT; map++)
         for (int bots = 1; bots <= 3; bots++) {
             check_cpu_local_mining_recovery(map, bots);

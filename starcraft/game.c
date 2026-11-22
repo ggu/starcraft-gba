@@ -10968,10 +10968,16 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 static int
 currently_visible(int x, int y)
 {
-	int col = x / 16, row = y / 16;
-	if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
-	    return 0;
-	return SC64_GRID_GET(visible, col + row * MAP_COLS);
+    if ((x | y) < 0) {
+        /* Signed division rounds coordinates from -15 through -1 to cell zero. */
+        if (x < -15 || y < -15) return 0;
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+    }
+    int col = (unsigned)x >> 4;
+    int row = (unsigned)y >> 4;
+    if (col >= MAP_COLS || row >= MAP_ROWS) return 0;
+    return SC64_GRID_GET(visible, col + row * MAP_COLS);
 }
 
 #ifndef SC64_IMPORTED_MISSION
