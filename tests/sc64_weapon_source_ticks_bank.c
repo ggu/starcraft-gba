@@ -112,6 +112,19 @@ int main(void)
 {
     static const int edges[] = {INT_MIN, -65536, -32768, -2048, -1, 0, 1, 2047, 2048, 32767, 65535, INT_MAX};
     unsigned long cases = 0, bank_hits = 0;
+    uintptr_t base = (uintptr_t)(const void *)sc64_weapon_source_profiles;
+    size_t stride = sizeof(sc64_weapon_source_profiles[0]);
+    size_t bytes = sizeof(sc64_weapon_source_profiles);
+    for (size_t offset = 0; offset <= bytes; ++offset) {
+        /* These addresses are checked only for bank membership. They are
+         * never dereferenced unless they name the start of a record. */
+        const Sc64WeaponSourceAttackProfile *p =
+            (const Sc64WeaponSourceAttackProfile *)(base + offset);
+        int expected = offset < bytes && offset % stride == 0 ?
+            (int)(offset / stride) : -1;
+        assert(sc64_weapon_source_profile_bank_index(p) == expected);
+    }
+    assert(sc64_weapon_source_profile_bank_index(0) == -1);
     for (unsigned pi = 0; pi < SC64_WEAPON_SOURCE_PROFILE_COUNT; ++pi) {
         const Sc64WeaponSourceAttackProfile *p = &sc64_weapon_source_profiles[pi];
         Sc64WeaponSourceAttackProfile copy = *p;
