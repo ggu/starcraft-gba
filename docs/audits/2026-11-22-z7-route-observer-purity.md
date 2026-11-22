@@ -61,8 +61,7 @@ On the `4aff72cf` steering build, ordinary Start and B save the corrected
 tape at call 31,892, frame 30,739. A fresh HOME process restores the save
 and replays 20 matching named observations through call 39,349 and
 frame 38,149. The save digest stays fixed during the continuation.
-The full uninterrupted steering-build replay and a fresh continuation
-through victory are separate checks. The pause receipt SHA-256 is
+The pause receipt SHA-256 is
 `010f7ad07b7e39565ea01c61e7fef835033a5018c29799e332dae13e022ff2a1`.
 The continuation receipt SHA-256 is
 `1ff8710d0e2dd334d885f7ca59f265cfdce420384a483a538a337e6fe370d4a5`.
@@ -71,6 +70,35 @@ The Zerg ROM SHA-256 is
 `b7a6231297cf783011acbe70c8d2a2b6f243114b1c651dd00933a9d829ee5f54`.
 The full ARM replay receipt SHA-256 is
 `492fa7315db38bd07da59d0a3aab755560133dbea9f97e2ade33b8d240b950b8`.
+
+## Full normal victory on the steering release
+
+The exact `c2624205` cartridge repeats the full corrected ordinary
+button tape and wins at frame 267,585. All 206 named checkpoints
+match. The two release ROMs match the sampled world fields, route
+counters, UI state, palette and both framebuffer page hashes.
+The displayed-page phase differs at two cuts.
+
+| Tape window | Mean guest cycles per call, missile trails → steering |
+| --- | ---: |
+| Entire 270,585-call tape | 1,411,541 → 1,385,425 |
+| Calls 71,261–93,896 | 1,544,871 → 1,516,264 |
+| Calls 152,303–170,438 | 1,674,097 → 1,641,111 |
+| Calls 222,902–243,327 | 1,375,089 → 1,341,575 |
+
+The full replay improves 1.85% across the combined detector and steering
+changes. These are emulated main-loop calls, including presentation
+waits, and dense combat remains above the 30 fps cycle budget.
+The steering-build victory receipt SHA-256 is
+`3651fd4fa509432c542cc4fbb7ea800f137fbd36f3c613ff6b1013afa04ff6ce`.
+
+A separate fresh HOME process restores the same frame-30,739 pause and
+plays 238,694 physical calls through victory at frame 267,585. All
+124 named continuation checkpoints match, with defeat clear and zero
+fault. The pause file is byte-identical after replay. A subsequent
+fresh-process victory journal readback is a separate gate.
+The continuation receipt SHA-256 is
+`529c2c0df2a73600b5a8c9d178d9740b13e0a79ba595457107b834e2c647be16`.
 
 ## Focused regression recipe
 

@@ -37,6 +37,17 @@ int main(void)
     b[0].under_construction = 0; u[10].alive = 0; tick_outcome(); assert(!won && !lost);
     u[10].alive = 1; tick_outcome(); assert(won && !lost);
 
+    /* The native mission stays active after all five SCVs die in combat. */
+    reset_world(); u[0].owner = SIDE; minerals = 40;
+    for (int i = 1; i <= 5; ++i) owned_unit(i, U_MARINE);
+    for (int i = 6; i <= 10; ++i) owned_unit(i, U_SCV);
+    owned_building(0, B_COMMAND, 0); owned_building(1, B_DEPOT, 0);
+    for (int i = 6; i <= 10; ++i) {
+        u[i].alive = 0;
+        tick_outcome();
+        assert(!lost && !won);
+    }
+
     /* A live owned building counts as Any Unit, even after a mobile wipe. */
     reset_world(); owned_building(0, B_DEPOT, 1); tick_outcome(); assert(!won && !lost);
     b[0].owner = ENEMY; tick_outcome(); assert(lost && !won);
