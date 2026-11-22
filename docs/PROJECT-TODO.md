@@ -1258,6 +1258,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cargo. Z10 also resumes an ordinary active compact journal on ARM.
   Verify a positive retired-seat compact journal on ARM, launched
   fighters, the other coupled survivors, and simultaneous outcomes.
+  The [November 20 preview](audits/2026-11-18-blood-bath-elimination-arm.md#november-20-composition-and-final-result-boundary)
+  reproduces CPU retirement on current Terran and matches 900 updates
+  after reload. Prepared Terran and P10 ARM fights in both modes also
+  pass final retirement, neutral worker transfer, the between-pass save
+  and fresh victory reload. The [native two-CPU Free for All opening](audits/2026-11-18-blood-bath-elimination-arm.md#native-two-cpu-free-for-all-opening)
+  establishes the lobby and passive mining. The next native capture needs
+  the last grounded building to fall while another CPU can still play.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
