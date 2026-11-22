@@ -132,6 +132,19 @@ the hostile original Nexuses are gone, and the mission records
 zero trigger faults. This run measures the named save snapshot and
 the input schedule.
 
+The paired uninterrupted and fresh-load runs both win at frame
+55,892. The ten retained checkpoints match units, buildings, economy,
+P7 persistence, fog and queued impact counts. Raw route diagnostics
+differ after load, and one checkpoint has different transient trace
+slot bytes. Both indexed video pages and the palette match at each
+cut, with the physical page addresses swapped at six cuts. The
+observer did not record which page was displayed.
+
+A third process loads the victory from HOME and exports the same
+journal bytes. The sampled victory state, heroes, units, buildings,
+economy, P7 persistence and fog restore. The terminal snapshot has
+two pending impacts. They are cleared in the loaded result screen.
+
 | Facility input or receipt | SHA-256 |
 | --- | --- |
 | Normal P10 ROM | `ae19f284f5447c269026cb5b651913028f2cc0379c8f0c36a0605611fc82edb0` |
@@ -139,3 +152,6 @@ the input schedule.
 | Prepared host target tape | `973cbb1b57b67337c80286f0f66e9550a1efe4b03f3dc62ae6bfa525cc50e93d` |
 | Facility ARM input tape | `34a82f4cbb54e0ceeb9a066804fd26c7c58bedfa15911255ed213e46b10c2fdb` |
 | Fresh HOME through victory receipt | `0f05a0636263ba98922c81fe5840aeccc29ab2d5876825baf8506db5a8e79e7d` |
+| Uninterrupted paired receipt | `a20c9fde9d97a157473ff6bd0565243fc1c9104400c64aa2c3c998ee42cb15df` |
+| Fresh HOME paired receipt and terminal readback | `8691c4b26147d70d0240a85c737833632c0968069e2debed6e5f1920eb44c8d7` |
+| Fresh run victory journal | `dee1bd8a66002d1e0dfde9fd8beabc7c7e99c2ea4cb35f1f3642007b4a05eb09` |
