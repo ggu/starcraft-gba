@@ -63,6 +63,15 @@ regular Protoss 10 victory replay matches all 81 world, fog, HUD,
 framebuffer and route cuts and the victory journal. It still averages
 11.01 emulated updates per second. Hardware frame pacing remains open.
 
+All 30 campaign entries start through the three normal HOME menus and
+advance gameplay after acknowledging any opening dialogue. Both sets
+pass 54 Custom Game start/save/reload cases each. Normal Showcase Free
+for All and preview Showcase Melee each pass a three-CPU Blood Bath
+continuation. The asset-free ROM is byte-identical to the control.
+The full local `./dev test` on `03288bd0` passes, including the
+1,176-test Python suite with 35 skips. It runs in an isolated RAM disk
+checkout to avoid the internal disk limit.
+
 The prior [native depot contact audit](2026-11-21-blood-bath-worker-opening.md#contact-follow-up)
 measures N64 worker contact at a structure footprint. This change
 preserves the current GBA deposit geometry. Keep contact parity in the
@@ -70,6 +79,73 @@ worker follow-up. For routing, prioritize earlier proof of reachability
 when openings leave a valid old route, without skipping a nearer depot
 that became reachable. The measured peak still includes about 870,000
 cycles of separate point floods.
+
+## Reachability after the Blood Bath opening
+
+A second read-only probe stops just before frame 19,359 invalidates
+the existing cache. The three partial depot fields already contain
+positive directions for every distinct origin queried at frame 19,360.
+The separate old point fields also contain a walkable witness from
+each origin to a legal goal cell. The grid diff is six openings in a
+2×3 rectangle and no closures. A scalar multi-source flood over both
+grids reproduces the old stored directions and finds the following
+changes among previously discovered cells.
+
+| Depot slot | Distinct requested origins | Old cells discovered | Old cells with changed first steps |
+| --- | ---: | ---: | ---: |
+| 0 | 4 | 109 | 0 |
+| 2 | 16 | 2,705 | 2 |
+| 3 | 10 | 660 | 0 |
+
+None of the requested origins changes its first step in this sample.
+Neither of the smaller fields touches an opened cell. Ten discovered
+cells in the larger field neighbor an opening. Wholesale reuse of the
+larger field would yield stale directions at two cells.
+
+A retained path can preserve its exact direction when its original
+length is strictly below the lower bound on any path through an
+opened cell. With no closures and identical root cells, use the sum
+of the Manhattan distances from the origin to an opening and from
+that opening to its nearest root. Strict inequality also excludes
+changes from equally short routes. This bound certifies 29 of the
+30 observed origins. The expensive first request for depot 2 has
+length 92 and an opening bound of 123. The one uncertified origin
+needs the ordinary field query.
+
+A private source trial records positive reachability for workers with
+an existing compatible depot, using the current origin cell, the
+depot geometry and a route field's discovered entries. A rebuilt grid
+with any closure cancels the proof. Depot ranking, ownership checks
+and movement still use the ordinary engine paths. Limiting the trial
+to building destruction changes the 3,600 paired update results as
+follows.
+
+| Metric | Dense continuation | Opening proof |
+| --- | ---: | ---: |
+| Mean guest cycles | 811,651 | 814,494 |
+| Nearest-rank p95 guest cycles | 1,099,651 | 1,123,064 |
+| Peak guest cycles | 3,566,597 | 3,279,220 |
+
+The original peak improves 8.06%. The first trial, which considered
+all invalidations, avoids 32 of the 34 peak depot lookups. Its next
+update rises from 1.67M to 2.20M external cycles. The destruction-only
+trial preserves every sampled world, visible and indexed page,
+palette and SRAM value. Route counters change when a proof bypasses a
+field query. Mean and p95 both regress, so keep the proof out of the
+cartridges. Next measure retaining the exact directions of untouched
+frontiers and certifying a retained direction only when an opened
+route cannot tie or improve it. Compare the following update and the
+whole replay to account for route-cache warming.
+
+The previously failed N64 Wasteland observer also runs again when the
+child receives the installed ares MoltenVK framework path. The isolated
+9,000-step normal-input replay from the archived USA ROM reports GPU
+ready and reproduces all three frame hashes and the final RDRAM hash
+from the retained selection sample. This confirms the recorded
+Wasteland witness. The same input in the current Terran candidate
+selects all five Marines and leaves all five SCVs unselected. It
+matches both unit-list observations from the prior Terran build.
+Blood Bath native mining contact remains a separate comparison.
 
 | Local evidence | SHA-256 |
 | --- | --- |
@@ -80,3 +156,10 @@ cycles of separate point floods.
 | Paired stack observation | `3bb681dffc60ea44a57fc5cbee9736bfcbe07c70f73963fd300a0b026eaa03d2` |
 | Dense Blood Bath replay | `fe78614d6febc993a31221da3d167a061151eaaff650fd268c6518be1295bd3a` |
 | Protoss 10 replay | `a9f38617e2dc39f3f1b55e53fd4e068c5e0d55d5a010081c2cb7fb4acc81e596` |
+| Pre-invalidation route observation | `3a78f9deb87921bcf59ceaece6d6b936be40dfa76bf6f75b29f3dd7f044ab8e9` |
+| Destruction-only proof replay | `00dbe1514b06602513c13ece8cd34e88139b2af1f71e60971212fd713ebe1fe3` |
+| Fresh native Wasteland final RDRAM | `39d363a89f1c3f6cc3b9ce06c7ea2742d036e5ae460e6a3f2f3bf1bc1406240d` |
+| 30-entry physical-button campaign start matrix | `bf2ee7dee428996c5523ce59c6ba8e4f9390c8b20359396ceade90dcaf7a761c` |
+| Asset-free suite log | `477f54803f37534a76b8a13fa48ac4931c6f68ceb3ddf69a22531c0d0b4034b4` |
+| Opening-path bound sample | `ebceed3322d90bc376b61c67ad96ec9f7c572704689d6456826b2b4c18169164` |
+| Current Terran Wasteland selection reply | `c54bf2c312d2e57831d3e17d7657219c7f6f77318b47c3d44ca999150c8530ee` |

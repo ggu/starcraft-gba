@@ -53,9 +53,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the FIFO and its packed result. Busy Blood Bath's worst update is
   3.01% faster with matching gameplay, video and saves. Its average
   cost improves 0.12%. The longest depot query still consumes 529,000
-  cycles. Next, measure whether current-origin witnesses can preserve
-  reachable choices after an opening. Check nearer or newly reachable
-  depots, worker crossings and exact saved replays.
+  cycles. Every distinct depot-query origin in the stall had a positive
+  witness before the six-cell opening. A destruction-only proof cuts
+  the worst update a further 8.06%, while the mean and p95 rise 0.35%
+  and 2.13%. Keep that trial out of the cartridges. Prioritize reuse of
+  exact retained directions when an opening cannot affect the path.
+  Measure the next update and full replay to capture cache-warming cost.
+  Include closer newly reachable depots and save/load continuation.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak

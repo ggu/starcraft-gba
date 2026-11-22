@@ -122,9 +122,10 @@ speed, pause navigation, confirmed exit and reloading a saved skirmish.
 
 ## Campaign progress
 
-The canonical Terran and Protoss profiles present ten missions each; Zerg
-presents nine, exposing 29 of 30 entries. All six Zerg chapters have current-source host
-controller wins and input-only ARM wins in the canonical Z6 build; Z5 and Z6
+The canonical Terran, Zerg and Protoss profiles each present ten missions.
+The qualification below includes earlier, smaller builds. The six-entry
+Z6 build has host controller wins and input-only ARM wins for all six
+chapters. Z5 and Z6
 also have exact fresh-process SRAM restores followed by continued wins. See
 the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md). P1–P5 have current-source host and input-only ARM wins in the canonical
 P5 build; P5 also has an exact fresh-process cargo SRAM restore and continued
@@ -150,8 +151,9 @@ after packed rendering; see the
 [Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
 None of these are physical GBA guarantees.
 
-The `zerg` alias and explicit `zerg-z9` use the nine-entry product; explicit
-`zerg-z7` and `zerg-z6` preserve their separate ROMs and save routes.
+Explicit `zerg-z9`, `zerg-z7` and `zerg-z6` preserve their respective
+nine-, seven- and six-entry ROMs and save routes. The `zerg` alias points
+to Z10.
 At runtime base `9ff7f7c`, an input-only replay of the ordinary-input
 controller tape wins on ARM with all 909 checkpoints matching. The replay
 probe ROM is built with the candidate flags and its own main loop. A
