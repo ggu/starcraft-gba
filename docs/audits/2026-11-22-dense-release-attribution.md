@@ -132,6 +132,17 @@ Contact-mask geometry and FIFO expansion have the largest measured
 inner costs. The detailed report SHA-256 is
 `5aa4bab70b3d117925e895826b6668ea99607d6c390c19b3ee38355444c62487`.
 
+A private Z10 trial applies the scalar early-axis gate directly in the
+normal ROM contact-steering kernel. It keeps the RAM endpoints and passes
+650,046 live-mask comparisons and 4,220,593 step checks under ASan and
+UBSan. The same late window matches frame and route counters. Full-loop
+mean changes from 1,606,097 to 1,606,079 cycles, while the contact-mask
+mean rises from 132,143 to 132,182. The trial stays local. Algorithmic
+reuse of exact contact work has higher priority than this branch.
+
+The candidate ROM SHA-256 is
+`01f8059999fb30a91743bf7011b61c61e44a5ed8b12a90dcebbd2ed5025ac958`.
+
 A separate P10 raster trial cached per-row spans for packed sprites.
 The better direct-mapped variant raises mean actor-depth cost from
 341,779 to 379,962 cycles per update in the 16-call profile and

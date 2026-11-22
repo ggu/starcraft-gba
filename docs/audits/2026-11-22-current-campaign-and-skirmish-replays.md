@@ -90,6 +90,12 @@ sampled world/result cuts. All four runs end in human defeat.
 | Showcase | 11,644 | `0x03004f20` | `5e90b9ace23e8930ac06107d5b1f6bdb5e0cdda6d2a2af27cdfc329ba8b5046e` |
 
 The results extend [earlier terminal testing](2026-11-12-skirmish-seat-options.md#current-terran-arm-terminal-and-save-checks)
-to the current builds. The existing flag stays opt-in. An active human
-win, native neutral survivor transfer, seeded Free for All compatibility
-and a sustained busy performance comparison remain priorities.
+to the current builds. Across the four profiles, eight fresh Free for
+All cross-loads preserve the world, resolved starts, SRAM bytes and 240
+continued updates in both directions. Normal ROMs refuse the four
+allied Melee journals, preserving the input SRAM. The combined cross-save
+receipt SHA-256 is
+`d1d7b0017daccdd4bc3aa706dc1120919e9b526b1b7b6ea32008acccb9f466c4`.
+
+The existing flag stays opt-in. Active human wins, native neutral
+survivor transfer and sustained busy performance remain priorities.
