@@ -55,9 +55,17 @@ points for subsequent builds.
 
 Across all 270,585 calls the replay averages 1,411,541 guest cycles
 per call, including menu and presentation waits. The mean corresponds
-to 11.89 emulated main-loop calls per second. Later ordinary pause,
-fresh HOME and victory should also be verified on the corrected tape.
-The full steering-build replay is a separate run.
+to 11.89 emulated main-loop calls per second.
+
+On the `4aff72cf` steering build, ordinary Start and B save the corrected
+tape at call 31,892, frame 30,739. A fresh HOME process restores the save
+and replays 20 matching named observations through call 39,349 and
+frame 38,149. The save digest stays fixed during the continuation.
+The full uninterrupted steering-build replay and a fresh continuation
+through victory are separate checks. The pause receipt SHA-256 is
+`010f7ad07b7e39565ea01c61e7fef835033a5018c29799e332dae13e022ff2a1`.
+The continuation receipt SHA-256 is
+`1ff8710d0e2dd334d885f7ca59f265cfdce420384a483a538a337e6fe370d4a5`.
 
 The Zerg ROM SHA-256 is
 `b7a6231297cf783011acbe70c8d2a2b6f243114b1c651dd00933a9d829ee5f54`.

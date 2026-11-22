@@ -149,9 +149,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores missing prefix state during controller probes. The corrected
   tape wins on the physical-button #711 ARM run at frame 267,585 with
   all 206 named observations matching. Two earlier pause and fresh HOME
-  tests reach frame 9,438 after one Hatchery reselection. Qualify a
-  later ordinary pause and fresh continuation on the corrected tape and
-  repeat the full win with the current steering build.
+  tests reach frame 9,438 after one Hatchery reselection. The corrected
+  tape now also pauses at frame 30,739 and resumes from fresh HOME
+  through frame 38,149 on the steering build. Complete the full
+  uninterrupted and fresh-resume victory runs on that build.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages
