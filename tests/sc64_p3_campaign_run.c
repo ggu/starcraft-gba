@@ -95,12 +95,13 @@ static int side_active_builders(void)
     return count;
 }
 
+/* Probes gathering minerals, the only income the army and a Nexus need. */
 static int side_mining_probes(void)
 {
     int n = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
-            (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS)) ++n;
+            u[i].order == ORDER_MINE) ++n;
     return n;
 }
 
@@ -1099,30 +1100,33 @@ static void issue_sweep_order(void)
         }
     if (army < 0) return;
     int tx = b[target].x, ty = b[target].y, total;
-    if (foe_sunkens_near(tx, ty, 224) >= 2 &&
-        fighters_near(tx, ty, 256, &total) * 2 < total) {
-        if (stage_target != target) {
-            long cx_sum = 0, cy_sum = 0;
-            int n = 0;
-            for (int i = 0; i < MAX_UNITS; ++i)
-                if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
-                    u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
-                    cx_sum += u[i].x; cy_sum += u[i].y; ++n;
-                }
-            stage_target = target;
-            stage_since = frame;
-            stage_done = 0;
-            if (!n || !find_stage_point(tx, ty, (int)(cx_sum / n), (int)(cy_sum / n),
-                                        &stage_x, &stage_y)) stage_since = frame - STAGE_PATIENCE;
-        }
-        /* Once gathered, commit: do not pull the attack back to the stage. */
-        if (!stage_done && frame - stage_since < STAGE_PATIENCE &&
-            fighters_near(stage_x, stage_y, 112, &total) * 4 < total * 3) {
+    int at_front = fighters_near(tx, ty, 256, &total);
+    if (stage_target != target && foe_sunkens_near(tx, ty, 224) >= 2 &&
+        at_front * 2 < total) {
+        long cx_sum = 0, cy_sum = 0;
+        int n = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
+                u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
+                cx_sum += u[i].x; cy_sum += u[i].y; ++n;
+            }
+        stage_target = target;
+        stage_since = frame;
+        stage_done = 0;
+        if (!n || !find_stage_point(tx, ty, (int)(cx_sum / n), (int)(cy_sum / n),
+                                    &stage_x, &stage_y)) stage_done = 1;
+    }
+    if (stage_target == target && !stage_done && frame - stage_since < STAGE_PATIENCE) {
+        int gathered = fighters_near(stage_x, stage_y, 112, &total);
+        if (gathered * 4 < total * 3) {
             issue_attack_move(stage_x, stage_y);
             return;
         }
-        stage_done = 1;
     }
+    /* Any attack on the target commits to it: losses or new arrivals must
+     * not pull the fight back to the stage. */
+    stage_target = target;
+    stage_done = 1;
     issue_attack_move(tx, ty);
 }
 
