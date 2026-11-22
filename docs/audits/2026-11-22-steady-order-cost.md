@@ -298,6 +298,22 @@ contributors and bounded storage for both pages. Retain moving
 camera cases in the benchmark. The census measures pixel
 equality. Render-cycle savings remain to be measured.
 
+Counting full-width work-page changes in the same fixed-camera
+windows gives an average of 37 changed rows and 6.31 changed
+eight-row bands in Outpost. Early and middle Crossfire average
+79.25 and 76.25 changed rows, or 10.56 and 10.13 bands out of 14.
+These are lower bounds on the rows that a conservative damage
+tracker would revisit. The row census receipt SHA-256 is
+`161e90bd4a097528006b93f3e17b24b8bd8b456c7bbe24d74c19467d513128c0`.
+
+The old work page differs from bare terrain in every row in the
+late Outpost cut and all three Crossfire cuts.
+Terrain stays stable during all 64 updates. Skipping only clean
+full-width rows would save no terrain transfer in these samples.
+An exact reuse trial will need smaller regions or retained
+composited bands. The terrain-restore census receipt SHA-256 is
+`9c40cfe4704a984474011c86f8fa34e8b0ada5fc9cf5e7bc1778ef85c9573d0e`.
+
 ## Detached attack sprite draw records
 
 Crossfire spends about 27,600 guest cycles per update resolving
@@ -423,6 +439,60 @@ with the corrected world-depth building check.
 | Exhaustive named-seat launch matrix | `9e8fa637a948f4e66ffb70d69b99607665d2d3ead3fff5cc87a4672becc80311` |
 | Pause save and fresh HOME matrix | `71c6395cd239cf8b4b8491d3d86d74d9c8f305c0eb8ea72886912154f6c82972` |
 
+## Visibility coordinate lookup
+
+The prior P10 link spends about 27,235 cycles per busy Outpost update
+in `currently_visible`. Its Thumb code uses signed-division correction
+on each axis and saves registers to the stack. The shared lookup now
+checks both signs together and shifts nonnegative coordinates directly.
+Coordinates from -15 to -1 still map to cell zero. Coordinates of -16
+or lower are outside the grid. The common linked path uses no stack.
+
+The byte and packed grids each match the earlier C calculation in
+1,578,123 ASan/UBSan comparisons. The fixture covers offsets around zero
+and both far edges, empty dimensions, non-power-of-two widths and
+integer extremes. The original-art skirmish fixture covers the first and
+last cells and the adjacent out-of-bounds cases. All four usual ARM
+builds have the same IWRAM and EWRAM link endpoints as the control.
+
+| Paired replay | Mean guest cycles saved |
+| --- | ---: |
+| Terran Outpost, 12,000 updates | 0.77% |
+| Terran Blood Bath, 12,000 updates | 0.56% |
+| Zerg Outpost, 12,000 updates | 0.81% |
+| Zerg Blood Bath, 12,000 updates | 0.63% |
+| Protoss Outpost, 12,000 updates | 0.87% |
+| Protoss Blood Bath, 12,000 updates | 0.63% |
+| Showcase Crossfire, 900 updates | 0.47% |
+| P10 fresh HOME victory, 9,489 updates | 0.73% |
+
+All 231 replay cuts match world state, both framebuffer pages, palette
+and route counters. The P10 continuation also matches its fog grids,
+weapon and HUD fingerprints and final SRAM. Its mean moves from
+1,502,844 to 1,491,932 cycles per update, about 11.25 emulated updates
+per second. The 30 campaign opening fingerprints and all 24 regular
+pause-save and fresh HOME cases also match, including saved SRAM bytes.
+All 1,134 normal Custom Game launches match the earlier map, human race,
+named or closed CPU seats and hall positions.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Coordinate comparison fixture | `42efec20460807a6979d86fd55a518a5d3f97bb905d8e68ae3b97460be250b75` |
+| Six Custom Games | `dbc98b62ef8a7de0132ed090ca96b89c978c80cb8f8dca562ed751c7b0456da2` |
+| P10 fresh HOME victory | `c28c76cf409873d428df3fffd61f7ee4df4451e6c361b6a7d302507a3bce7b09` |
+| Showcase Crossfire | `7086a496074cfdea19df7cb7d88d6338581611e52c430ff4c387f0c2dbfbab4f` |
+| Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular pause save and fresh HOME matrix | `f3d10f2b9f5e7354fee2e0a879df60a676f4fd8b73f796e73ca139994aed7350` |
+| Ordinary Custom Game launch matrix | `0955050b8a1dd809200f174a728a01c689deddbfb88d0b347a27c9a7c67b5d34` |
+
+On the retained Outpost frame 11,100, a read-only breakpoint census
+records no entries into the attacker-overlay branch of tracer drawing.
+The same cut matches world, both video pages, palette and route counters.
+An early exit for empty actor overlays cannot save cycles in this cut.
+Measure the projectile-overlay branch and wider fights before proposing
+a tracer shortcut. The one-frame receipt SHA-256 is
+`17be680573df0bde2e69793ffbfa0372f25bea1765d31bf0bca2d4e209d03e24`.
+
 ## Outpost resource sprite costs
 
 The ordinary late Outpost repeat matches the retained world,
@@ -433,9 +503,100 @@ mineral calls account for about 59,514 guest cycles per update and
 the geyser for 9,750. These are measured call costs, and the
 [earlier optional packed mineral path](2026-11-13-static-mineral-word-draw.md)
 gained about 695 cycles per update in its 1,000-update Outpost trial.
-Use the current busy window to evaluate the same exact compositor
-and retain the full match as a holdout. The local census receipt
-SHA-256 is `b2f13dc9e64ba200cfb8db0190f6dd355f02271b93a5e6ef4cc3b56cb38c4331`.
+The local census receipt SHA-256 is
+`b2f13dc9e64ba200cfb8db0190f6dd355f02271b93a5e6ef4cc3b56cb38c4331`.
+
+In the aligned word path used by all three regular race cartridges,
+the compositor now uses the loaded pixels for both opaque and mixed
+groups. Each byte with a zero source pixel keeps its destination
+pixel. The zero-byte test removes false matches for a source byte of
+one following a borrow from a lower byte. The host clip fixture
+covers this case, palette indices on both sides of bit seven and a
+clipped row. A separate sanitizer oracle passed 431,697 comparisons.
+
+| Paired ARM workload | Mean guest cycles saved |
+| --- | ---: |
+| Late Protoss Outpost, 16 updates | 0.47% |
+| Terran Outpost, 12,000 updates | 0.41% |
+| Terran Blood Bath, 12,000 updates | 0.21% |
+| Zerg Outpost, 12,000 updates | 0.42% |
+| Zerg Blood Bath, 12,000 updates | 0.23% |
+| Protoss Outpost, 12,000 updates | 0.53% |
+| Protoss Blood Bath, 12,000 updates | 0.26% |
+| P10 fresh HOME victory, 9,489 updates | 0.12% |
+
+The late Outpost window moves from 1,340,828 to 1,334,492 cycles
+per update. Across 16 late Outpost cuts and 120 long skirmish
+cuts, world state, both framebuffer pages, palette and route
+counters match. The P10 victory run matches all 81 cuts and
+final SRAM. It averages 1,490,148 cycles per update, or 11.26
+emulated updates per second. All 30 campaign openings and 24
+regular pause-save and fresh HOME continuations match, including
+the saved SRAM bytes.
+
+Each regular race build adds 16 bytes to IWRAM and uses the same
+EWRAM as its control. Z10 ends at `0x03004fd8`, leaving 40 bytes
+to the linker guard. Both tested Z10 busy windows record the same
+minimum system stack pointer of `0x03006870` before and after the
+change. The default source build and ordinary Showcase ROMs are
+byte-identical to their controls. Enabling the existing aligned word
+path in Showcase adds 0.19–0.36% cycles across three 16-update
+Crossfire windows despite matching all sampled frames. Keep the
+current build flags.
+
+A separate bottom-up depth-heap trial matches all 64 late Outpost
+and Crossfire cuts. It adds 0.30% cycles in Outpost and 0.32–0.49%
+in the two busy Crossfire windows. Keep the incremental heap.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Late Outpost | `6fae47ec8c69727468a01f694aae349cfd5da4dde30eec01730eb0d4da465ca0` |
+| Six Custom Games | `006a3c74eca0f111d58d5077c9dbfa1d545330ce338ab9bf0efd00fcbaac6e3e` |
+| P10 fresh HOME victory | `471e69e4bb28a9398fada4e9ccdff1769d76ec9c075043ef22fad020462f576f` |
+| Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular pause-save and fresh HOME matrix | `4ed2681e57b97484b59063126a3c2792d2a06f1725cc5049a434a94493bc925c` |
+| Z10 stack probe | `876c0ef38c7772e6fbc89bcafe582e37edebaf2e40ce0c134cfec715e8024dea` |
+| Showcase aligned word trial | `ff4d7840e8296a80799c2bc305c82804e66cfd45ec1e38abbd26f83002db34a6` |
+| Depth-heap trial | `cd642403f5f4d390847692415e392983807de3b4748936f952b40007e7087e2f` |
+
+## Opaque minimap raster copy
+
+The minimap copies a 24×24 opaque raster to x=197. At that destination
+phase, aligned source words can supply the interior of two consecutive
+destination words. The shared compositor preserves both neighboring
+pixels on each row and uses the existing pixel pairs for other
+alignments and horizontally clipped draws. The sanitizer fixture
+checks zero-valued pixels, row clipping, and both horizontal edges.
+
+| Paired ARM workload | Mean guest cycles saved |
+| --- | ---: |
+| Late Protoss Outpost, 16 updates | 0.53% |
+| Terran Outpost, 12,000 updates | 0.44% |
+| Terran Blood Bath, 12,000 updates | 0.37% |
+| Zerg Outpost, 12,000 updates | 0.44% |
+| Zerg Blood Bath, 12,000 updates | 0.41% |
+| Protoss Outpost, 12,000 updates | 0.56% |
+| Protoss Blood Bath, 12,000 updates | 0.46% |
+| Showcase Crossfire, 900 updates | 0.47% |
+| P10 fresh HOME victory, 9,489 updates | 0.38% |
+
+All 64 short Outpost and Crossfire cuts, 120 long-match cuts, 30
+sustained Crossfire cuts and 81 P10 observations match their controls
+in world state, both indexed framebuffer pages, palette and route
+counters. P10 victory SRAM, all 30 campaign openings and 24
+pause-save and fresh HOME cases also match. All four production links
+retain their IWRAM and EWRAM endpoints. The default ROM's SHA-256
+is unchanged. The P10 victory replay averages 1,484,463 guest cycles
+or 11.30 emulated updates per second.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Short Outpost and Crossfire cuts | `37c1608cf8d4cd9ec090d64b2f939614b74900c3b4cc95727ce05b9ad3818d75` |
+| Six Custom Games | `baa68e3319065264cd90a9c12b884b8450831e0c68bbb6174c8c9f8f4f48928c` |
+| Sustained Showcase Crossfire | `172e28f0232f2acb585e83ce7d38f6cc716e2e080bc4d5e8d28ed291bc54ad57` |
+| P10 fresh HOME victory | `23a834f176690f6991ff050c93be5eda8440f39b03dbfb3472c6092386de21a7` |
+| Campaign openings | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular pause-save and fresh HOME matrix | `bb3384b1407224e1fbbefa07a00c0454a60f798efbd6409d0394cf3a3d8cfdf3` |
 
 ## Automatic gathering in two Custom Game openings
 
@@ -693,6 +854,16 @@ The comparison confirms panning into darkness without revealing
 it and records the difference in cursor placement during the pan.
 
 ## Bounding the other steady costs
+
+The combat audio budget rejects five of 50 attack and death sound
+attempts in 48 Crossfire updates. The late Outpost and P10 replay
+samples record no calls to the effect emitter in 16 and 18 updates
+respectively. All 82 observed updates match the retained world state,
+framebuffer pages, palette and route counters. Skipping the visibility
+and actor lookup once the budget is full has little opportunity in
+these cuts. Keep the existing event order and focus on larger costs.
+The audio census receipt SHA-256 is
+`be2fcb108db8afa9d5de25652adab719ab57be685eb1588ade9b8d0fc6c714e2`.
 
 Earlier read-only target sampling on the same release observed 409
 queries and 1,899 owner-cell visits across three P10 updates. Of those

@@ -106,10 +106,25 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [shared weapon profile index](audits/2026-11-22-steady-order-cost.md#source-weapon-profile-index)
   removes two Thumb division calls. It saves 0.87% across the full
   Crossfire sample and slightly improves all six three-CPU means.
+  The [shared visibility lookup](audits/2026-11-22-steady-order-cost.md#visibility-coordinate-lookup)
+  cuts mean guest cycles 0.56–0.87% in the six three-CPU battles,
+  0.47% in Crossfire and 0.73% on the P10 victory tail. The measured
+  P10 pace rises to 11.25 emulated updates per second. Larger movement
+  and rendering costs still dominate the crowded scenes.
   The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
   attributes about 59,514 guest cycles per update to four mineral
-  blits and 9,750 to one geyser blit. Recheck the existing packed
-  mineral path at that busy cut and over the full match.
+  blits and 9,750 to one geyser blit. Reusing the loaded word for
+  mixed pixels saves 0.47% in that cut and 0.21–0.53% across all
+  six long three-CPU matches. The P10 victory replay averages 11.26
+  emulated updates per second. Enabling aligned word loads in
+  Showcase slows each of the three sampled Crossfire windows.
+  The [shared opaque minimap copy](audits/2026-11-22-steady-order-cost.md#opaque-minimap-raster-copy)
+  then saves 0.37–0.56% across the six three-CPU matches and 0.47%
+  across 900 Showcase updates. The P10 victory replay rises to
+  11.30 emulated updates per second with matching frames and SRAM.
+  Use the [page census](audits/2026-11-22-steady-order-cost.md#mode-4-page-update-coverage)
+  to bound a stationary-camera band reuse trial. Measure the cost
+  of tracking changes before relying on it in crowded fights.
   A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
@@ -397,6 +412,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The host renders before the next input so the overlapping-unit
   selection uses the painted camera. Add a separate fresh victory
   journal readback and extend the check to the next combined runtime.
+  The [rendered Protoss controller matrix](audits/2026-11-13-p3-p4-home-preparation.md#rendered-protoss-controllers-on-the-visibility-release)
+  reproduces all ten victories in independent HOST replay processes
+  on the visibility release. The P8 and P9 fresh-process paths match
+  all 327 continuation checkpoints. Reuse the unchanged P7 and P8
+  authored HOME tapes and verify the new frame-47,661 P3 HOME win on
+  the regular ARM cartridge.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)

@@ -166,6 +166,44 @@ test_begin_resets_clip(void)
     assert(gfx_test_pixel(4, 4) == 30);
 }
 
+static void
+test_aligned_sprite_transparency(void)
+{
+    static _Alignas(4) const u8 sprite[] = {
+        0, 1, 0x80, 0, 1, 0, 0xff, 0,
+        13, 15, 17, 19, 21, 23, 25, 27,
+    };
+    gfx_begin(43);
+    gfx_set_clip_y(17, 18);
+    gfx_blit_sprite(20, 17, 8, 2, sprite);
+    for (int i = 0; i < 8; ++i) {
+        assert(gfx_test_pixel(20 + i, 17) == (sprite[i] ? sprite[i] : 43));
+        assert(gfx_test_pixel(20 + i, 18) == 43);
+    }
+}
+
+static void
+test_opaque_word_shift(void)
+{
+    static _Alignas(4) u8 source[24 * 3];
+    static const int x_positions[] = {1, 197, 213, 217, -3};
+    for (unsigned i = 0; i < sizeof(source); ++i)
+        source[i] = (u8)(i * 29);
+    for (unsigned i = 0; i < sizeof(x_positions) / sizeof(x_positions[0]); ++i) {
+        int left = x_positions[i];
+        gfx_begin(43);
+        gfx_set_clip_y(130, 132);
+        gfx_blit_opaque(left, 129, 24, 3, source);
+        for (int y = 128; y <= 132; ++y)
+            for (int x = 0; x < WIDTH; ++x) {
+                int col = x - left;
+                u8 expected = y >= 130 && y < 132 && col >= 0 && col < 24
+                    ? source[(y - 129) * 24 + col] : 43;
+                assert(gfx_test_pixel(x, y) == expected);
+            }
+    }
+}
+
 int
 main(void)
 {
@@ -179,5 +217,7 @@ main(void)
     for (unsigned i = 0; i < sizeof(ranges) / sizeof(ranges[0]); ++i)
         check_clip_range(ranges[i][0], ranges[i][1]);
     test_invalid_ranges_are_ignored();
+    test_aligned_sprite_transparency();
+    test_opaque_word_shift();
     return 0;
 }

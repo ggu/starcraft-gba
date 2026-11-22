@@ -580,6 +580,27 @@ void gfx_blit_opaque(int x,int y,int width,int height,const u8 *src) {
  int top=y<0?-y:0,bottom=y+height>160?160-y:height;
 #endif
  GFX_TILE_TOUCH(x,y,x+width,y+height);
+ /* When drawing aligned source bytes at x % 4 == 1, reuse each word load
+    across two stores. Keep the neighboring pixels intact. */
+ if(x>=0 && x<=240-width && (x&3)==1 && width>=8 && !(width&3) &&
+    !(((uintptr_t)src|(uintptr_t)pixels)&3u)) {
+  typedef u32 __attribute__((may_alias)) word;
+  const word *in=(const word *)(src+top*width);
+  int words=width/4;
+  for(int row=top;row<bottom;++row,in+=words) {
+   volatile word *out=(volatile word *)(pixels+(y+row)*120+(x>>1));
+   word left=in[0];
+   out[0]=(out[0]&255u)|(left<<8);
+   for(int col=1;col<words;++col) {
+    word right=in[col];
+    out[col]=(left>>24)|(right<<8);
+    left=right;
+   }
+   volatile u16 *tail=(volatile u16 *)(out+words);
+   *tail=(*tail&0xff00u)|(u16)(left>>24);
+  }
+  return;
+ }
  int left=x<0?-x:0,right=x+width>240?240-x:width;
  for(int row=top;row<bottom;row++) {
   int col=left;const u8*s=src+row*width;
@@ -858,17 +879,24 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
 #endif
   for(;col+1<right;col+=2,d++){
 #ifdef GBA_SPRITE_WORDS
-   /* A quad is word-copied only when ROM and VRAM are both aligned. Mixed
-      quads fall through to the exact pair compositor; after one pair, both
-      alignments are off and that fallback remains in use until re-aligned. */
+   /* An aligned quad can use the pixels from its word load even when it
+      contains transparent lanes. Detect zero independently in each byte. */
    if(col+3<word_right && !((uintptr_t)d&3u)) {
     u32 pixels32=*(const u32 *)(const void *)(s+col);
-    if(!pixels32 || !(((pixels32-0x01010101u)&~pixels32&0x80808080u))) {
-     if(pixels32) *(volatile u32 *)(void *)d=pixels32;
-     col+=2;
-     ++d;
-     continue;
+    if(pixels32) {
+     /* A borrow from a lower byte can mark a byte of value 1 as
+        zero. Clear those matches using the original low bits. */
+     u32 zero_high=(pixels32-0x01010101u)&~(pixels32|(pixels32<<7))&0x80808080u;
+     volatile u32 *dst=(volatile u32 *)(void *)d;
+     if(zero_high) {
+      u32 preserve=(zero_high<<1)-(zero_high>>7);
+      pixels32|=*dst&preserve;
+     }
+     *dst=pixels32;
     }
+    col+=2;
+    ++d;
+    continue;
    }
 #endif
    u8 a=s[col],b=s[col+1];

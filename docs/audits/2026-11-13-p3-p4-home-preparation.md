@@ -196,3 +196,53 @@ frame 65,700. All 146 checkpoints, both heroes at extraction on frame
 | Current normal P10 ROM | `34859980af3065e5401e13b892adf204bea77fc6e65a1dc084f7cabef184baf5` |
 | Matching ELF | `2b92433c1dfc2201d1e8a383d8317f4bbeef50d285fe2b81e76364203414aeda` |
 | Current fresh-process victory receipt | `46ab9fb10974f026779bcc9c5c943c916124e250a259f54db4d71c5d5591f719` |
+
+## Rendered Protoss controllers on the visibility release
+
+The controller integration at `0695d287` uses the released game engine
+from `adbb22bf`. The Protoss HOST input producers now render between
+updates, as the replay and normal main loop do. The shared early-campaign
+controller enables that behavior for P1 and P2. The P7 and P8 ordinary
+HOME producers retain their authored dialogue handling.
+
+All ten ASan/UBSan HOST controller runs reach victory. Playing their
+recorded inputs in independent PX replay processes reproduces each win.
+
+| Mission | Replay victory frame | Fresh process checkpoints |
+| --- | ---: | ---: |
+| P1 | 15,305 | |
+| P2 | 33,698 | |
+| P3 | 49,729 | |
+| P4 | 86,150 | |
+| P5 | 5,056 | |
+| P6 | 92,986 | |
+| P7 | 55,892 | |
+| P8 | 106,409 | 77 |
+| P9 | 272,857 | 250 |
+| P10 | 48,593 | |
+
+The P8 and P9 replay prefixes each write a 32 KiB journal. A new
+process loads each journal with the title-screen L control. All 327
+continuation checkpoints and both terminal states match the uninterrupted
+paths. The separate ordinary HOME P7 and P8 authored tapes match their
+previous controller output byte for byte, as does the P8 pause journal.
+The ordinary HOME P3 producer also wins at frame 47,661 with both enemy
+building rosters empty and its route-state assertions passing. Replay
+that tape on the regular P10 ARM cartridge once the disk guard passes.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Ten-mission sanitized controller and replay matrix | `32b1bf563458a8863bf6b4b1dd831a339032c3ab6b4a50ab38d87614e240f03a` |
+| P7 and P8 ordinary HOME comparison | `28601acfc1c923fe0e9e810bb87caba42941db0e7e0c43950910d7e9492dcbe5` |
+| P3 ordinary HOME HOST tape | `ee03bc74391adc95bee8c381906a7a890fc31afbc380d55f9e7986a5dac031fb` |
+
+### P4 storm save fixture
+
+On `adbb22bf`, the carried fixture fails its first save from HOME,
+where the shared projectile pool has yet to be initialized. The
+fixture now starts a non-P4 world for its inactive-storm check. It
+uses the enclosing product's unit encoder and the existing save
+candidate helper to inject both malformed records with valid checksums.
+The loader rejects both records and preserves the live units and storm
+state. The original P4 and canonical P7 fixtures both pass under
+ASan/UBSan, including the pause, damage and framebuffer checks.
