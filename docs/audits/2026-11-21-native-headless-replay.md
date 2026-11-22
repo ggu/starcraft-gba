@@ -71,7 +71,13 @@ health, exact positions and simulation ticks. [Native save-selection record](202
 
 An independent local ares run on November 22 reproduced both ARGB hashes
 from the same opening commands. It completed 7,200 steps and reported
-GPU ready. Raynor loss and the zero-actor defeat boundary remain open.
+GPU ready. A separate physical-button replay of the current Terran baseline
+and route-compaction candidate matched all four sampled GBA world cuts. Both
+recorded 10/18 supply at frames 0, 1, 29 and 30, and the 40-mineral grant at
+frame 30. This confirms the two observed values across platforms. The native
+grant timing, Raynor loss and the zero-actor defeat boundary remain open. The
+paired GBA receipt SHA-256 is
+`327919258a563a00e1fb8aff65bab6dddaa5de9be9b681ff6f53051735637e23`.
 
 ## Blood Bath state and render-row observation
 

@@ -277,6 +277,14 @@ and preview race cartridges also pass all 54 Custom Game start, save
 and fresh-process continuation cases each. These emulator measurements
 do not establish physical GBA performance.
 
+The standard Terran build reproduces the qualified candidate ROM.
+`make -j4 unified test-unified test-sc64-terran-full-campaign` passes.
+The aggregate `./dev test` begins before all optional banks are staged
+and reports missing or stale generated inputs in the sprite roster case.
+After preparing those inputs, that case reports the same Control Tower
+vital overlay mismatch in Z4, Zerg and Protoss on both the baseline
+and the compaction source. The Terran subcase passes in both.
+
 | Private receipt | SHA-256 |
 | --- | --- |
 | Z7 diagnostic pair, matched cuts | `f05ec53f8dbca1bee8ec827ca7b2f7e56c6f19d5b8371cf79fbaee0ff94b1783` |
