@@ -53,22 +53,35 @@ static Sc64PointPrefix *sc64_point_prefix_free(void)
 
 /* The caller already checked stride and the open origin. Check for it after
  * whole 32-pop batches, preserving seed and neighbour order even on decline.
- * Showcase keeps this loop in ROM to reserve its IWRAM stack. */
+ * Showcase and the Zerg elimination build keep this loop in ROM to
+ * preserve the IWRAM stack reserve. */
 static int
-#ifndef SC64_SHOWCASE_ENABLED
+#if !defined(SC64_SHOWCASE_ENABLED) && \
+    !(defined(SC64_Z10_RUNTIME) && defined(SC64_NATIVE_SKIRMISH_ELIMINATION))
 GBA_HOT
 #endif
 __attribute__((noinline))
 sc64_point_prefix_expand(u8 *dense, int start, int stride, int cap,
-                         int *head, int tail)
+                         int *head, int tail, int *consumed)
 {
-    while (*head < tail && *head < SC64_POINT_PREFIX_LIMIT && dense[start] == 7u) {
+    *consumed = 0;
+    while (*head < tail && *consumed + *head < SC64_POINT_PREFIX_LIMIT && dense[start] == 7u) {
         int limit = *head + (cap - tail) / 4;
         if (limit > tail) limit = tail;
         if (limit > *head + SC64_POINT_PREFIX_BATCH)
             limit = *head + SC64_POINT_PREFIX_BATCH;
-        if (limit > SC64_POINT_PREFIX_LIMIT) limit = SC64_POINT_PREFIX_LIMIT;
-        if (limit <= *head) break;
+        if (limit > SC64_POINT_PREFIX_LIMIT - *consumed)
+            limit = SC64_POINT_PREFIX_LIMIT - *consumed;
+        if (limit <= *head) {
+            /* Reuse consumed queue slots without changing the remaining FIFO order. */
+            int pending = tail - *head;
+            if (pending > cap - 4 || !*head) break;
+            for (int i = 0; i < pending; ++i) bfs_queue[i] = bfs_queue[*head + i];
+            *consumed += *head;
+            *head = 0;
+            tail = pending;
+            continue;
+        }
         const u16 *read = bfs_queue + *head, *end = bfs_queue + limit;
         u16 *write = bfs_queue + tail;
         do {
@@ -134,19 +147,24 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     int goal_row = sc64_cell_row(goal);
     int goal_start = goal + goal_row * SC64_LINEAR_PAD + stride + 4;
     int origin_start = origin + sc64_cell_row(origin) * SC64_LINEAR_PAD + stride + 4;
-    int head = 0, tail = sc64_route_linear_seed(dense, goal_start, stride);
-    tail = sc64_point_prefix_expand(dense, origin_start, stride, cap, &head, tail);
+    int head = 0, consumed = 0, tail = sc64_route_linear_seed(dense, goal_start, stride);
+    tail = sc64_point_prefix_expand(dense, origin_start, stride, cap, &head, tail, &consumed);
     int pending = tail - head;
     if (pending > 0 && pending <= SC64_POINT_PREFIX_PENDING && dense[origin_start] != 7u) {
-        sc64_route_field_clear(field);
-        for (int i = 0; i < tail; ++i) {
-            int at = bfs_queue[i];
-            /* A queued interior cell has coordinates row 1..128 and
-             * column 4..131 at stride 136. Since 136*241 = 32768+8 and
-             * 8*128+241*131 < 32768, this recovers the exact row. */
-            int dense_row = (int)(((unsigned)at * 241u) >> 15);
-            int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
-            sc64_route_put_new(field, cell, dense[at]);
+        if (consumed) {
+            /* Only the dense grid still contains the whole discovered region. */
+            sc64_route_pack_linear(field, dense, cols, rows, stride);
+        } else {
+            sc64_route_field_clear(field);
+            for (int i = 0; i < tail; ++i) {
+                int at = bfs_queue[i];
+                /* A queued interior cell has coordinates row 1..128 and
+                 * column 4..131 at stride 136. Since 136*241 = 32768+8 and
+                 * 8*128+241*131 < 32768, this recovers the exact row. */
+                int dense_row = (int)(((unsigned)at * 241u) >> 15);
+                int cell = at - dense_row * SC64_LINEAR_PAD - cols - 4;
+                sc64_route_put_new(field, cell, dense[at]);
+            }
         }
         sc64_point_prefix_discard(prefix);
         prefix->goal = (u16)goal;
@@ -157,7 +175,7 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         /* Each discovered cell lies at most head edges from a seed. The
          * blocked-goal seeds can start one row away from the goal. Include
          * those rows without bookkeeping in the pop or packing loops. */
-        int radius = head + (dense[goal_start] != 0);
+        int radius = consumed + head + (dense[goal_start] != 0);
         prefix->restore_first_row = (u8)limit(goal_row + 1 - radius, 1, rows);
         prefix->restore_last_row = (u8)limit(goal_row + 1 + radius, 1, rows);
         memcpy(prefix->queue, bfs_queue + head, (size_t)pending * sizeof(*bfs_queue));
@@ -167,7 +185,8 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
         tail = sc64_route_expand_linear_from(dense, tail, stride, cap, head);
         if (tail < 0) return sc64_route_fill(slot, goal);
 #ifdef SC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE
-        sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail, goal);
+        if (consumed) sc64_route_pack_linear(field, dense, cols, rows, stride);
+        else sc64_route_pack_linear_complete(field, dense, cols, rows, stride, cap, tail, goal);
 #else
         sc64_route_pack_linear(field, dense, cols, rows, stride);
 #endif
@@ -175,7 +194,7 @@ static int __attribute__((noinline)) sc64_point_prefix_fill(int slot, int goal, 
     SC64_ROUTE_LOGN(slot) = sc64_route_open_count;
     SC64_ROUTE_PF(slot) = 0;
     SC64_ROUTE_KEEP_COUNT(FILL);
-    return tail;
+    return consumed + tail;
 }
 
 /* Once a reader requests undiscovered data, restore the directions already
@@ -234,7 +253,7 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
     if (pending <= cap) {
         memcpy(bfs_queue, prefix->queue, (size_t)pending * sizeof(*bfs_queue));
 #ifdef SC64_ROUTE_POINT_SECOND_EXACT_HIT
-        int head = 0, tail = pending;
+        int head = 0, consumed = 0, tail = pending;
         int can_park = !prefix->second_cutoff;
 #ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE
         /* An ordinary row can transfer to the free nearby-reader reserve
@@ -244,18 +263,22 @@ static int __attribute__((noinline)) sc64_point_prefix_complete(int slot)
 #endif
         if (cell >= 0 && can_park) {
             int start = cell + sc64_cell_row((unsigned)cell) * SC64_LINEAR_PAD + stride + 4;
-            tail = sc64_point_prefix_expand(dense, start, stride, cap, &head, tail);
+            tail = sc64_point_prefix_expand(dense, start, stride, cap, &head, tail, &consumed);
             int remaining = tail - head;
             if (remaining > 0 && remaining <= SC64_POINT_PREFIX_PENDING && dense[start] != 7u) {
-                /* The bounded loop does not compact. Only appended cells
-                 * need to be published, and each expands the restore span. */
-                for (int i = pending; i < tail; ++i) {
-                    int at = bfs_queue[i];
-                    int row = (int)(((unsigned)at * 241u) >> 15);
-                    int index = at - row * SC64_LINEAR_PAD - cols - 4;
-                    sc64_route_put_new(field, index, dense[at]);
-                    if (row < first_row) first_row = row;
-                    if (row > last_row) last_row = row;
+                if (consumed) {
+                    sc64_route_pack_linear(field, dense, cols, rows, stride);
+                    first_row = 1;
+                    last_row = rows;
+                } else {
+                    for (int i = pending; i < tail; ++i) {
+                        int at = bfs_queue[i];
+                        int row = (int)(((unsigned)at * 241u) >> 15);
+                        int index = at - row * SC64_LINEAR_PAD - cols - 4;
+                        sc64_route_put_new(field, index, dense[at]);
+                        if (row < first_row) first_row = row;
+                        if (row > last_row) last_row = row;
+                    }
                 }
                 Sc64PointPrefix *parked = prefix;
 #ifdef SC64_ROUTE_POINT_NEAR_RESERVE_PROBE

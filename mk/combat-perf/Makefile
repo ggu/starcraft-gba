@@ -231,11 +231,14 @@ test-sc64-route-point-tail: build/test-sc64-route-point-tail build/test-sc64-rou
 ROUTE_POINT_PREFIX_TEST_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_POINT_PREFIX_PROBE -DSC64_ROUTE_POINT_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_DISTANCE_PROBE -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
 build/test-sc64-route-point-prefix: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
 	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) $< -o $@
+build/test-sc64-route-point-prefix-compaction: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT $< -o $@
 build/test-sc64-route-point-prefix-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
 	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
 .PHONY: test-sc64-route-point-prefix
-test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64-route-point-prefix-range build/test-sc64-route-point-tail-baseline
+test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64-route-point-prefix-compaction build/test-sc64-route-point-prefix-range build/test-sc64-route-point-tail-baseline
 	./$< --point-prefix-only
+	./build/test-sc64-route-point-prefix-compaction --point-prefix-compaction-only
 	./$< --point-component-only
 	./$< --point-near-distance-only
 	./build/test-sc64-route-point-prefix-range
@@ -305,6 +308,7 @@ build/test-sc64-route-composed-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) mk/combat-
 	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
 .PHONY: test-sc64-route-composed
 test-sc64-route-composed: build/test-sc64-route-composed build/test-sc64-route-composed-far-read
+	./$< --point-prefix-compaction-only
 	./$< --point-component-only
 	./$< --point-certificate-only
 	./$< --point-near-distance-only

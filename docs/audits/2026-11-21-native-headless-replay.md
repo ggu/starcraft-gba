@@ -69,6 +69,10 @@ health, exact positions and simulation ticks. [Native save-selection record](202
 | First ARGB capture | `ba0080b165a39d80b34bd0f00e74ce462bb72abb77e32f89d2355c6c1088c897` |
 | Second ARGB capture | `df0da3a1853d11aa42df17addd32cd376d01886c6d6b97370622fba718d5c2b8` |
 
+An independent local ares run on November 22 reproduced both ARGB hashes
+from the same opening commands. It completed 7,200 steps and reported
+GPU ready. Raynor loss and the zero-actor defeat boundary remain open.
+
 ## Blood Bath state and render-row observation
 
 A separate local observer restored an ordinary Blood Bath step-zero state and

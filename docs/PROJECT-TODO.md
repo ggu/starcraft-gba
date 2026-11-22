@@ -27,6 +27,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Outpost Run windows. Pursue route stalls and the large shared draw
   passes against the current combined build.
   Qualify physical frame pacing on all three race cartridges.
+  [Compacting the pending point queue](audits/2026-11-22-dense-release-attribution.md#compact-the-pending-point-queue)
+  saves 3.61% in the archived late Z7 16-update window and moves
+  whole-run means by less than 0.1% in the measured replays. Record
+  a fresh late Z7 paired run and keep profiling the steady draw and
+  order costs. The current P10 victory tail still averages 10.92
+  emulated updates per second.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak

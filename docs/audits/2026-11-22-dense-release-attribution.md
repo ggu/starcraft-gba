@@ -219,3 +219,72 @@ resumption and full-budget decline against an independent BFS before
 using the matched tape to measure savings. The paired unmodified-queue
 receipt SHA-256 is
 `31251cb661755704992c26a57760461e9bb9f9292039d6d7a1f0459034e35199`.
+
+## Compact the pending point queue
+
+The shared point solver now keeps the pending FIFO in the same scratch
+buffer and reuses consumed slots when an expansion needs more room. The
+8,192-pop budget counts both consumed and retained slots. If compaction
+discards queue history, the existing dense-grid pack publishes all
+discovered directions. The neighbor and seed orders are unchanged.
+
+The simple and composed host suites force compaction on a winding
+128×128 corridor and compare parked, materialized and budget-declined
+fields to an independent BFS. The second-hit fixture additionally
+compacts while reparking. The composed field replay matches 386,646
+queries against its reference. The earlier near-root row assertion
+applies to a simple FIFO record. The composed solver can instead park a
+certificate-only record with no restore rows, so the composed suite
+runs the dedicated compaction case and its own certificate checks.
+
+The archived late Z7 paired run improves the 16-update mean from
+1,606,097 to 1,548,106 guest cycles (3.61%). Its next 2,987 updates
+average 1,358,652 and 1,359,770 cycles respectively (0.08% more).
+All 14 sampled world, framebuffer and palette cuts match. The paired
+archive compares two diagnostic builds on the preceding engine and
+isolates the queue change at the 8,192-pop cutoff.
+
+On the combined release, the 9,489-update P10 ordinary saved replay
+reaches victory in both builds. Its 81 world, framebuffer, fog, HUD,
+route and palette cuts and the exported SRAM match. The mean changes
+from 1,536,740 to 1,536,156 cycles per update (10.92 emulated updates
+per second). The normal Zerg Blood Bath match also matches 31 cuts and
+the saved SRAM over 3,600 updates. Its mean stays at 561,990 cycles.
+
+A separate Z7 holdout independently records the same ordinary pause
+save in both release builds. The controller continuation from that
+save matches 82 sampled world, framebuffer and palette cuts and route
+counters through original tape call 36,950. At one cut the display
+control selects different pages with identical contents. Total guest
+cycles rise 0.0245%. The saved continuation diverges from the older
+uninterrupted trace in both builds, so this pair provides bounded
+regression coverage. It does not cover the late wave or victory.
+
+The optional Blood Bath elimination build for Zerg places the expansion
+loop in ROM, as Showcase already does, to preserve the IWRAM stack
+reserve. Its IWRAM end moves to `0x03004eb0`, 336 bytes below the
+`0x03005000` guard. The normal Zerg build ends at `0x03004fd8`, with
+40 bytes of margin. The normal and preview Terran, Zerg, Protoss and
+Showcase images all pass the original link guards. The routing path is
+shared across them.
+
+Two separately launched preview matches drew different Blood Bath start
+sites. Its lobby seeds start placement from elapsed milliseconds. For
+the paired preview timing, both binaries load the same ordinary saved
+match from HOME. Its 31 cuts and exported SRAM match after 3,600 more
+updates. The mean stays within two guest cycles of 571,394. The normal
+and preview race cartridges also pass all 54 Custom Game start, save
+and fresh-process continuation cases each. These emulator measurements
+do not establish physical GBA performance.
+
+| Private receipt | SHA-256 |
+| --- | --- |
+| Z7 diagnostic pair, matched cuts | `f05ec53f8dbca1bee8ec827ca7b2f7e56c6f19d5b8371cf79fbaee0ff94b1783` |
+| P10 baseline | `faa0f19be8a5b5b076bfa818eb6b2867f1a877c0bf6bf9ba2ab5b690e47f573c` |
+| P10 compaction | `74f369fb6d0911cf9a520ee034076939ff018b7219f24986b3f15be453893349` |
+| Z7 current saved holdout, baseline | `7c71f83cd7755604155e5f3b71c310581471be65cb35787645eb702f7d573708` |
+| Z7 current saved holdout, compaction | `dce3fdfb2351bb7b79d6a6a673df9cdaa4a873469ded30df2e5bf63d5de1da51` |
+| Normal Custom Game save matrix | `7f62e023c85b518f5f16e9633bce211ea2fb588aee980d2987e6cf560d95d62b` |
+| Elimination preview saved replay, baseline | `a8193058d998ce53d94ecc63eb9a334e70e7171295c0befca2c0318353f6cc0f` |
+| Elimination preview saved replay, compaction | `9ed83022142c957f0fb3549764c465c47f9a206300e8e72efeaa0f91e2f560f6` |
+| Elimination preview Custom Game save matrix | `3457feb4ed924c66b513aa07ff44aa2e3cbf5b14f4f19d4adf832108b4f62ab0` |
