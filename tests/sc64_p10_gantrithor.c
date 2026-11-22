@@ -11,8 +11,13 @@
  *   ./sc64-p10-gantrithor OUTDIR            all checks, including the
  *                                           fresh-process save continuation
  *   ./sc64-p10-gantrithor --resume OUTDIR   (internal) fresh-process half
+ *   ./sc64-p10-gantrithor --resume-wide OUTDIR   (internal) eight-slot case
  *   ./sc64-p10-gantrithor --old-save FILE   load a SRAM image written by an
  *                                           older ROM and keep playing */
+/* The ordinary parent in this fixture represents an eight-slot test rule.
+ * The production rules and the campaign's existing rescue stock stay at four. */
+#define SC64_P7_HANGAR_CAPACITY_FOR_TYPE(type) \
+    ((type) == U_P7_CARRIER ? 8u : SC64_P7_CARRIER_CAPACITY)
 #include "../common/gba.c"
 #include "../starcraft/game.c"
 #include <assert.h>
@@ -107,12 +112,15 @@ static void run(unsigned n)
     }
 }
 
-static int gantrithor(void)
+static int find_unit(int type)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].type == U_P10_GANTRITHOR) return i;
+        if (u[i].alive && u[i].type == type) return i;
     return -1;
 }
+
+static int gantrithor(void)
+{ return find_unit(U_P10_GANTRITHOR); }
 
 static int count_state(int parent, unsigned state)
 {
@@ -528,6 +536,88 @@ static void check_in_process_save(void)
     printf("gantrithor: in-process save/load with children docked, in flight and building matches (digest %u)\n", a);
 }
 
+static int check_wide_hangar(int parent)
+{
+    assert(parent >= 0 && sc64_p7_carrier_parent_valid(parent));
+    assert(count_state(parent, SC64_P7_INTERCEPTOR_INSIDE) == 8 && !u[parent].carry);
+    assert(race_p7_carrier_training_live_world_valid());
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].type == U_P7_INTERCEPTOR && u[i].build == parent &&
+            sc64_p7_carrier_child_rank(&u[i]) == 7) return i;
+    assert(0 && "missing dock rank seven");
+    return -1;
+}
+
+static int stage_wide_hangar(void)
+{
+    static Unit candidate[MAX_UNITS];
+    int x, y;
+    memset(host_save, 0xff, sizeof(host_save));
+    start_p10();
+    run(3);
+    int rescue = gantrithor();
+    assert(rescue >= 0 && count_children(rescue) == 4);
+    quiet_spot(&x, &y);
+    int parent = spawn_unit(SIDE, U_P7_CARRIER, x, y);
+    assert(parent >= 0);
+    u[parent].raw_owner = SC64_P10_HUMAN_SLOT;
+    assert(sc64_p7_carrier_type_capacity(u[parent].type) == 8);
+    assert(sc64_p7_carrier_type_capacity(u[rescue].type) == 4);
+#ifdef RACE_AI_CARRIERS
+    RaceAiCensus census = {0};
+    census.have[AK_FLEET] = 1;
+    census.have[AK_ZEALOT] = RACE_AI_CARRIER_LINE;
+    census.units = race_ai_unit_cap() - 8;
+    assert(!race_ai_carrier_wanted(&census));
+    --census.units;
+    assert(race_ai_carrier_wanted(&census));
+#endif
+
+    minerals = 300;
+    assert(race_p7_carrier_training_queue(parent) && u[parent].carry == 1);
+#ifdef SC64_HUD_BUFFER_REUSE
+    int queued_key[SC64_HUD_KEY_COUNT] = {0};
+    sc64_hud_race_keys(queued_key, parent);
+#endif
+    memcpy(candidate, u, sizeof(candidate));
+    candidate[parent].carry = 6;
+    assert(!race_p7_carrier_training_candidate_valid(candidate, MAX_UNITS));
+
+    race_p7_carrier_training_source_tick();
+    assert(count_state(parent, SC64_P7_INTERCEPTOR_TRAINING) == 1);
+    memcpy(candidate, u, sizeof(candidate));
+    candidate[parent].carry = 5;
+    assert(!race_p7_carrier_training_candidate_valid(candidate, MAX_UNITS));
+    for (unsigned n = 0; n < SC64_P7_INTERCEPTOR_BUILD_TICKS; ++n)
+        race_p7_carrier_training_source_tick();
+    assert(count_state(parent, SC64_P7_INTERCEPTOR_INSIDE) == 1);
+    assert(race_p7_carrier_training_stock(parent, 2) == 2);
+
+    for (unsigned n = 0; n < SC64_P7_CARRIER_QUEUE_LIMIT; ++n)
+        assert(race_p7_carrier_training_queue(parent));
+    assert(minerals == 150 && u[parent].carry == 5);
+    assert(!race_p7_carrier_training_queue(parent) && minerals == 150);
+    assert(race_save_game() && race_load_game());
+    assert(count_children(parent) == 3 && u[parent].carry == 5);
+    race_p7_carrier_training_source_tick();
+    assert(count_state(parent, SC64_P7_INTERCEPTOR_TRAINING) == 1 && u[parent].carry == 4);
+    for (unsigned n = 0; n < 5 * SC64_P7_INTERCEPTOR_BUILD_TICKS; ++n)
+        race_p7_carrier_training_source_tick();
+    int last = check_wide_hangar(parent);
+    assert(race_p7_carrier_training_stock(parent, 1) == 0);
+    assert(!race_p7_carrier_training_queue(parent) && minerals == 150);
+
+    memcpy(candidate, u, sizeof(candidate));
+    sc64_p7_carrier_child_set_rank(&candidate[last], 6);
+    assert(!race_p7_carrier_training_candidate_valid(candidate, MAX_UNITS));
+#ifdef SC64_HUD_BUFFER_REUSE
+    int docked_key[SC64_HUD_KEY_COUNT] = {0};
+    sc64_hud_race_keys(docked_key, parent);
+    assert(queued_key[20] != docked_key[20]);
+#endif
+    return parent;
+}
+
 static void write_digests(FILE *out)
 {
     unsigned stop = (unsigned)frame + CONTINUE_UPDATES;
@@ -541,12 +631,12 @@ static void write_digests(FILE *out)
     fprintf(out, "final frame=%d screen=%d digest=%u\n", frame, screen, state_digest());
 }
 
-static int resume_main(const char *dir)
+static int resume_main(const char *dir, int wide)
 {
     char path[512];
     FILE *f;
-    int g;
-    snprintf(path, sizeof(path), "%s/gantrithor-save.sav", dir);
+    const char *name = wide ? "wide-hangar" : "gantrithor";
+    snprintf(path, sizeof(path), "%s/%s-save.sav", dir, name);
     f = fopen(path, "rb");
     if (!f || fread(host_save, 1, sizeof(host_save), f) != sizeof(host_save)) {
         perror(path); return 2;
@@ -556,10 +646,14 @@ static int resume_main(const char *dir)
     prior = 0;
     KEY_TAP(KEY_L);
     if (screen != SCREEN_PLAY || !race_p10_active()) { printf("resume failed\n"); return 3; }
-    g = gantrithor();
-    assert(g >= 0 && count_children(g) >= 3);
-    assert(count_state(g, SC64_P7_INTERCEPTOR_OUTSIDE) >= 1);
-    snprintf(path, sizeof(path), "%s/gantrithor-resume.txt", dir);
+    if (wide) {
+        check_wide_hangar(find_unit(U_P7_CARRIER));
+    } else {
+        int g = gantrithor();
+        assert(g >= 0 && count_children(g) >= 3);
+        assert(count_state(g, SC64_P7_INTERCEPTOR_OUTSIDE) >= 1);
+    }
+    snprintf(path, sizeof(path), "%s/%s-resume.txt", dir, name);
     f = fopen(path, "w");
     if (!f) { perror(path); return 2; }
     write_digests(f);
@@ -583,13 +677,15 @@ static int files_equal(const char *a, const char *b)
 
 /* A pause-menu save taken mid-fight reloads in a fresh process and
  * continues exactly as the uninterrupted run. */
-static void check_fresh_process_save(const char *self, const char *dir)
+static void check_fresh_process_save(const char *self, const char *dir, int wide)
 {
     char path[512], full[512], resumed[512];
     FILE *f;
     pid_t pid;
+    const char *name = wide ? "wide-hangar" : "gantrithor";
     int status = 0, g;
-    stage_fight(&g);
+    if (wide) g = stage_wide_hangar();
+    else stage_fight(&g);
     close_menus();
     for (int k = 0; k < 4 && (menu_open || mode != MODE_NORMAL); ++k) KEY_TAP(KEY_B);
     KEY_TAP(KEY_START);
@@ -597,12 +693,13 @@ static void check_fresh_process_save(const char *self, const char *dir)
     KEY_TAP(KEY_B);
     KEY_TAP(KEY_START);
     assert(screen == SCREEN_PLAY);
-    assert(count_state(g, SC64_P7_INTERCEPTOR_OUTSIDE) >= 1);
-    snprintf(path, sizeof(path), "%s/gantrithor-save.sav", dir);
+    if (wide) check_wide_hangar(g);
+    else assert(count_state(g, SC64_P7_INTERCEPTOR_OUTSIDE) >= 1);
+    snprintf(path, sizeof(path), "%s/%s-save.sav", dir, name);
     f = fopen(path, "wb");
     assert(f && fwrite(host_save, 1, sizeof(host_save), f) == sizeof(host_save));
     fclose(f);
-    snprintf(full, sizeof(full), "%s/gantrithor-full.txt", dir);
+    snprintf(full, sizeof(full), "%s/%s-full.txt", dir, name);
     f = fopen(full, "w");
     assert(f);
     write_digests(f);
@@ -611,18 +708,18 @@ static void check_fresh_process_save(const char *self, const char *dir)
     pid = fork();
     assert(pid >= 0);
     if (!pid) {
-        execl(self, self, "--resume", dir, (char *)0);
+        execl(self, self, wide ? "--resume-wide" : "--resume", dir, (char *)0);
         _exit(127);
     }
     assert(waitpid(pid, &status, 0) == pid);
     assert(WIFEXITED(status) && WEXITSTATUS(status) == 0);
-    snprintf(resumed, sizeof(resumed), "%s/gantrithor-resume.txt", dir);
+    snprintf(resumed, sizeof(resumed), "%s/%s-resume.txt", dir, name);
     if (!files_equal(full, resumed)) {
-        printf("gantrithor resume diverged: compare %s and %s\n", full, resumed);
+        printf("%s resume diverged: compare %s and %s\n", name, full, resumed);
         exit(5);
     }
-    printf("gantrithor: fresh-process save continuation matched the uninterrupted run (%u updates)\n",
-           CONTINUE_UPDATES);
+    printf("%s: fresh-process save continuation matched the uninterrupted run (%u updates)\n",
+           name, CONTINUE_UPDATES);
 }
 
 /* An SRAM image written by an older ROM: load it from the title screen,
@@ -657,7 +754,8 @@ static int old_save_main(const char *file)
 int main(int argc, char **argv)
 {
     gba_init();
-    if (argc == 3 && !strcmp(argv[1], "--resume")) return resume_main(argv[2]);
+    if (argc == 3 && !strcmp(argv[1], "--resume")) return resume_main(argv[2], 0);
+    if (argc == 3 && !strcmp(argv[1], "--resume-wide")) return resume_main(argv[2], 1);
     if (argc == 3 && !strcmp(argv[1], "--old-save")) return old_save_main(argv[2]);
     if (argc != 2) { fprintf(stderr, "usage: %s OUTDIR\n", argv[0]); return 2; }
     check_full_hangar();
@@ -667,7 +765,8 @@ int main(int argc, char **argv)
     check_actor_cap();
     check_hangarless_legacy_state();
     check_in_process_save();
-    check_fresh_process_save(argv[0], argv[1]);
+    check_fresh_process_save(argv[0], argv[1], 0);
+    check_fresh_process_save(argv[0], argv[1], 1);
     printf("p10 gantrithor host checks passed\n");
     return 0;
 }

@@ -183,19 +183,18 @@ class ResumeAndRecovery(unittest.TestCase):
 
     def morph(self, scenario, **kw):
         base = {"kind": "morph-hp", "scenario": ai.MORPH_SCENARIOS[scenario], "start_hp": 400,
-                "during_hp": 370, "during_max": 400, "final_hp": 270, "final_max": 300, "final_raw": 146,
+                "during_hp": 370, "during_max": 400, "final_hp": 370, "final_max": 400, "final_raw": 146,
                 "alive": 1, "charged": 50, "completed_at": 581, "reference": "00000000",
                 "resumed": "00000000", "ok": 1}
         base.update(kw)
         return [json.dumps(base)]
 
     def test_morph_hp_records(self):
-        ok = self.morph(0, during_hp=400, final_hp=300)
+        ok = self.morph(0, during_hp=400, final_hp=400)
         self.assertTrue(ai.evaluate(("morph-hp", "zerg", 1, 1, "t", 0), 0, "\n".join(ok), 1800)["ok"])
-        # Deducting at start (final 300 - 30 = 270 from a 370 snapshot is
-        # right; 170 is the old early-deduction value) must be rejected.
+        # Reject the historical 100 HP deduction on completion.
         with self.assertRaisesRegex(ai.RecordError, "disagrees"):
-            ai.validate_morph_hp(self.morph(0, final_hp=170), 0)
+            ai.validate_morph_hp(self.morph(0, final_hp=270), 0)
         with self.assertRaisesRegex(ai.RecordError, "disagrees"):
             ai.validate_morph_hp(self.morph(1, during_hp=150, final_hp=50), 1)
         with self.assertRaisesRegex(ai.RecordError, "disagrees"):

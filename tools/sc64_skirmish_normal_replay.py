@@ -14,7 +14,9 @@ import json
 from pathlib import Path
 import shutil
 
-from sc64_skirmish_controller_replay import validate_trace, verify_configuration, verify_terminal
+from sc64_skirmish_controller_replay import (
+    read_native_start, validate_trace, verify_configuration, verify_terminal,
+)
 from sc64_skirmish_sram_continuation import PhysicalGame
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
@@ -33,6 +35,7 @@ def snapshot(game):
         result[key] = [game.u32(symbol, 4 * i) for i in range(3)]
     for key in ('units', 'buildings'):
         result[key] = {'by_owner': dict(Counter(str(row[1]) for row in state[key]))}
+    result.update(read_native_start(game.u32, game.sizes))
     return result
 
 
@@ -83,6 +86,7 @@ def run(args):
                             raise RuntimeError('launch did not reach the battlefield')
                         verify_configuration(plan['start'], actual)
                 if tick == end:
+                    verify_configuration(plan['start'], actual)
                     verify_terminal(plan['terminal'], actual)
             except RuntimeError as error:
                 save_json(args.output / 'divergence.json', dict(tick=tick, actual=actual,

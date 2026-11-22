@@ -367,7 +367,7 @@ compare_rows(const Sc64ProjectileRow *a, const Sc64ProjectileRow *b)
     assert(a->raw_source_owner == b->raw_source_owner);
     assert(a->pending_damage_event == b->pending_damage_event);
     assert(a->next_link == b->next_link);
-    assert(a->reserved_snapshot_bits == b->reserved_snapshot_bits);
+    assert(a->launch_layer_plus1 == b->launch_layer_plus1);
 }
 
 static void
@@ -416,7 +416,7 @@ randomize_row(Sc64ProjectileRow *row, unsigned snapshot, unsigned ordinal)
     row->script_phase = (uint8_t)((snapshot + ordinal) & 3u);
     row->raw_source_owner = (uint8_t)((snapshot + ordinal) % 12u);
     row->pending_damage_event = (uint8_t)((snapshot + ordinal) & 1u);
-    row->reserved_snapshot_bits = 0;
+    row->launch_layer_plus1 = 0;
     /* next_link comes from the pool; set_row deliberately preserves it. */
 }
 
@@ -691,6 +691,73 @@ static void test_compact_resume_growth(void)
     assert(!memcmp(source_words, target_words, sizeof(source_words)));
 }
 
+static void test_launch_layers(void)
+{
+    uint16_t source_words[SC64_ARENA_WORDS], target_words[SC64_ARENA_WORDS];
+    Sc64Arena source = {source_words, SC64_ARENA_WORDS};
+    Sc64Arena target = {target_words, SC64_ARENA_WORDS};
+    uint8_t fixed[SC64_CODEC_BYTES], compact[2015], bad[SC64_CODEC_BYTES];
+    uint8_t id, native;
+    assert(sc64_pool_init(&source));
+    for (unsigned i = 0; i < SC64_POOL_CAPACITY; ++i) {
+        Sc64ProjectileRow row = compact_fixture_row(i);
+        row.destination_x_source = i & 1u ? 0 : 4095;
+        row.destination_y_source = 4095 - row.destination_x_source;
+        row.raw_source_owner = (uint8_t)(i % 8u);
+        row.launch_layer_plus1 = (uint8_t)(i % (SC64_PROJECTILE_MAX_LAYER + 2u));
+        assert(sc64_compact_pool_acquire(&source, SC64_POOL_CAPACITY, &id, &native));
+        assert(id == i && sc64_pool_set_row(&source, id, &row));
+    }
+    assert(!sc64_pool_acquire(&source, &id, &native));
+    assert(sc64_codec_encode(&source, fixed, sizeof(fixed)) && (fixed[2] & 0xe0u) == 0x20u);
+    assert(sc64_codec_decode(&target, fixed, sizeof(fixed)));
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+    assert(sc64_compact_codec_encode(&source, SC64_POOL_CAPACITY, compact, sizeof(compact)) == sizeof(compact));
+    assert(compact[0] == 0x8au && compact[1] == SC64_POOL_CAPACITY);
+    assert(sc64_compact_codec_decode(&target, compact, sizeof(compact), SC64_POOL_CAPACITY));
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+
+    /* Invalid depth values and unknown flags are rejected before writes. */
+    memcpy(bad, fixed, sizeof(fixed));
+    set_bits(bad, 3u * 8u + 161u, 22, 5);
+    assert(!sc64_codec_decode(&target, bad, sizeof(fixed)));
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+    memcpy(bad, fixed, sizeof(fixed));
+    bad[2] |= 0x40u;
+    assert(!sc64_codec_decode(&target, bad, sizeof(fixed)));
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+
+    memcpy(bad, compact, sizeof(compact));
+    const size_t start = 16u + 7u * SC64_POOL_CAPACITY;
+    set_bits(bad, start + 56u, 2, 2);
+    set_bits(bad, start + 70u, 1, 2);
+    set_bits(bad, start + 152u, 1, 1); /* 22 is outside the 0–21 domain. */
+    assert(!sc64_compact_codec_decode(&target, bad, sizeof(compact), SC64_POOL_CAPACITY));
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+    memcpy(bad, compact, sizeof(compact));
+    bad[0] |= 0x40u;
+    assert(!sc64_compact_codec_decode(&target, bad, sizeof(compact), SC64_POOL_CAPACITY));
+    assert(!memcmp(source_words, target_words, sizeof(source_words)));
+
+    /* No lossy conversion if a generic row cannot use the compact depth variant. */
+    Sc64ProjectileRow row;
+    assert(sc64_pool_get_row(&source, 1, &row));
+    row.destination_x_source = -1;
+    assert(sc64_pool_set_row(&source, 1, &row));
+    memset(bad, 0xa3, sizeof(bad));
+    assert(!sc64_compact_codec_encode(&source, SC64_POOL_CAPACITY, bad, sizeof(bad)));
+    for (unsigned i = 0; i < sizeof(bad); ++i) assert(bad[i] == 0xa3u);
+    row.destination_x_source = 1;
+    assert(sc64_pool_set_row(&source, 1, &row));
+    assert(sc64_pool_retire_live(&source, 1));
+    assert(sc64_pool_get_row(&source, 1, &row) && !row.launch_layer_plus1 && row.state == 3);
+    assert(sc64_pool_acquire_live(&source, &id, &native) && id == 1);
+    assert(sc64_pool_get_row(&source, id, &row) && !row.launch_layer_plus1);
+    assert(sc64_compact_pool_retire_live(&source, id));
+    assert(sc64_pool_get_row(&source, id, &row) && !row.launch_layer_plus1);
+    puts("Launch layers 0–20 and legacy sentinel fit both full 100-row packets");
+}
+
 static int reject_compact_row(void *context, uint8_t ordinal, const Sc64ProjectileRow *row)
 {
     unsigned *seen = context;
@@ -935,6 +1002,7 @@ main(void)
     test_live_acquire_rejects_bad_splices();
     test_compact_live_retire_rejects_bad_splices();
     test_compact_resume_growth();
+    test_launch_layers();
     test_order_oracle();
     test_random_transitions();
     test_arena_bounds_and_wide_fields();

@@ -165,10 +165,80 @@ static void test_initialized_world_save_after_unit_motion(void)
     assert(race_p6_runtime_state_valid());
 }
 
+#if defined(SC64_P6_PACKED_IMPACT_SAVE) && defined(SC64_IMPACT_EVENTS)
+static void test_packed_impact_save(void)
+{
+    static RaceImpactRecord wire, previous;
+    Sc64ImpactEvent expected[RACE_IMPACT_SAVE_CAPACITY];
+    u32 length;
+    int target = 0;
+
+    game_init();
+    race_mode = 0;
+    race_selected_mission = SC64_P6_GLOBAL_ID;
+    init_state();
+    while (target < MAX_UNITS && (!u[target].alive || u[target].owner != ENEMY)) ++target;
+    assert(target < MAX_UNITS && RACE_IMPACT_RAW_SAVE_CAPACITY == 2);
+
+    /* Preserve every historical length, and select the latest save across
+     * a change of length in either direction. */
+    for (int i = 0; i <= RACE_IMPACT_RAW_SAVE_CAPACITY + 1; ++i) {
+        if (i) race_impact_launch(target, 1, 1, SIDE, 0, U_DRAGOON, 40u + (unsigned)i);
+        assert(race_impact_count == i);
+        memcpy(expected, race_impact_rows, i * sizeof(expected[0]));
+        assert(race_save_game());
+        assert(save_read_latest(&wire, sizeof(wire), SAVE_VERSION, &length));
+        u32 tail = i ? sc64_impact_save_bytes((unsigned)i) : 0u;
+        if (i > RACE_IMPACT_RAW_SAVE_CAPACITY) tail = SC64_P6_IMPACT_MARKER_BYTES;
+        assert(length == sizeof(RaceSave) + tail);
+        race_impact_reset();
+        assert(race_load_game() && race_impact_count == i);
+        assert(!memcmp(race_impact_rows, expected, i * sizeof(expected[0])));
+    }
+
+    /* Reject distinct malformed envelopes before world or queue commit. */
+    previous = wire;
+    wire.impacts[0] ^= 1;
+    save_write(&wire, length, SAVE_VERSION);
+    assert(!race_load_game() && race_impact_count == 3);
+    wire = previous;
+    wire.save.buildings[MAX_BUILDINGS - 1].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] |= 0x80u;
+    save_write(&wire, length, SAVE_VERSION);
+    assert(!race_load_game() && race_impact_count == 3);
+    assert(!memcmp(race_impact_rows, expected, 3 * sizeof(expected[0])) && u[target].alive);
+    save_write(&previous, length, SAVE_VERSION);
+    assert(race_load_game() && race_impact_count == 3);
+
+    for (unsigned i = race_impact_count; i < RACE_IMPACT_SAVE_CAPACITY; ++i) {
+        race_impact_launch(target, 1, 1, SIDE, 0, U_DRAGOON, 100u + i);
+        assert(race_impact_count == i + 1);
+    }
+    memcpy(expected, race_impact_rows, sizeof(expected));
+    assert(race_save_game());
+    assert(save_read_latest(&previous, sizeof(previous), SAVE_VERSION, &length));
+    race_impact_launch(target, 1, 1, SIDE, 0, U_DRAGOON, 200u);
+    assert(race_impact_count == RACE_IMPACT_SAVE_CAPACITY + 1);
+    assert(!race_save_game());
+    u32 newer;
+    assert(save_read_latest(&wire, sizeof(wire), SAVE_VERSION, &newer));
+    assert(newer == length && !memcmp(&wire, &previous, length));
+    assert(race_load_game() && race_impact_count == RACE_IMPACT_SAVE_CAPACITY);
+    assert(!memcmp(race_impact_rows, expected, sizeof(expected)));
+
+    race_impact_reset();
+    assert(race_save_game());
+    assert(save_read_latest(&wire, sizeof(wire), SAVE_VERSION, &length) && length == sizeof(RaceSave));
+    assert(race_load_game() && race_impact_count == 0);
+}
+#endif
+
 int main(void)
 {
     test_union_and_candidate_identity();
     test_invalid_record_does_not_commit();
     test_initialized_world_save_after_unit_motion();
+#if defined(SC64_P6_PACKED_IMPACT_SAVE) && defined(SC64_IMPACT_EVENTS)
+    test_packed_impact_save();
+#endif
     return 0;
 }

@@ -33,11 +33,11 @@ def digest(path):
     return h.hexdigest()
 
 
-def read_types(elf):
+def read_types(elf, names=("U_SCV", "U_MARINE", "U_ZERGLING", "U_RAYNOR")):
     info = subprocess.run(["arm-none-eabi-readelf", "--debug-dump=info", elf], check=True,
                           capture_output=True, text=True).stdout
     result = {}
-    for name in ("U_SCV", "U_MARINE", "U_ZERGLING", "U_RAYNOR"):
+    for name in names:
         values = set(re.findall(rf"DW_AT_name\s*:.*\b{name}\s*\n"
                                 r"[^\n]*DW_AT_const_value\s*:\s*([0-9]+)", info))
         require(len(values) == 1, f"ELF does not name one value for {name}")
@@ -53,6 +53,22 @@ def find_roundtrip(events):
                       for d in range(len(ROUND_TRIP)))]
     require(len(starts) == 1 and starts[0] > 6, "expected the Wasteland pause/save/restart/reload sequence")
     return starts[0]
+
+
+def checkpoint(game, types, tick, state=None):
+    if state is None:
+        state = game.state()
+    owned = UNIT_FIELDS.index("owner") + 1
+    kind = UNIT_FIELDS.index("type") + 1
+
+    def count(owner, unit):
+        return sum(u[owned] == owner and u[kind] == types[unit] for u in state["units"])
+
+    hero = next((u for u in state["units"] if u[kind] == types["U_RAYNOR"]), None)
+    return dict(tick=tick, frame=state["frame"], minerals=state["minerals"],
+                marines=count(0, "U_MARINE"), scv=count(0, "U_SCV"), zerg=count(1, "U_ZERGLING"),
+                raynor_alive=int(hero is not None), raynor_owner=hero[owned] if hero else -1,
+                won=game.u32("won"), lost=game.u32("lost"))
 
 
 def replay(args):
@@ -129,18 +145,6 @@ def replay(args):
         require(result.keys() == set(COMMAND_FIELDS), "unexpected menu state widths")
         return result
 
-    def checkpoint(tick):
-        state = g.state()
-        owned = UNIT_FIELDS.index("owner") + 1
-        kind = UNIT_FIELDS.index("type") + 1
-        def count(owner, unit):
-            return sum(u[owned] == owner and u[kind] == types[unit] for u in state["units"])
-        hero = next((u for u in state["units"] if u[kind] == types["U_RAYNOR"]), None)
-        return dict(tick=tick, frame=state["frame"], minerals=state["minerals"],
-                    marines=count(0, "U_MARINE"), scv=count(0, "U_SCV"), zerg=count(1, "U_ZERGLING"),
-                    raynor_alive=int(hero is not None), raynor_owner=hero[owned] if hero else -1,
-                    won=g.u32("won"), lost=g.u32("lost"))
-
     saved = None
     try:
         require(g.u32("screen") == g.u32("frame") == g.front_field("page") == 0, "guest did not reach HOME")
@@ -176,7 +180,7 @@ def replay(args):
                 report["boundary"].append(dict(tick=tick, held=rsp.held, **command(),
                                                **{k: g.u32(k) for k in WORLD_FIELDS}))
             if tick + 1 in points:
-                state = checkpoint(tick + 1)
+                state = checkpoint(g, types, tick + 1)
                 report["checkpoints"].append(state)
                 differences = {k: (expected, state.get(k)) for k, expected in points[tick + 1].items()
                                if k != "state_hash" and state.get(k) != expected}

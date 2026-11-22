@@ -109,9 +109,9 @@ static void colony_morph_fraction(int target,unsigned initial,unsigned expected)
 }
 static void colony_morphs(void)
 {
-    colony_morph_fraction(B_SUNKEN_COLONY,100u*256u+128u,256u);
-    colony_morph_fraction(B_SUNKEN_COLONY,101u*256u+128u,256u+128u);
-    colony_morph_fraction(B_SUNKEN_COLONY,399u*256u+128u,299u*256u+128u);
+    colony_morph_fraction(B_SUNKEN_COLONY,128u,128u);
+    colony_morph_fraction(B_SUNKEN_COLONY,256u+128u,256u+128u);
+    colony_morph_fraction(B_SUNKEN_COLONY,399u*256u+128u,399u*256u+128u);
     colony_morph_fraction(B_SPORE_COLONY,100u*256u+128u,100u*256u+128u);
 }
 #endif

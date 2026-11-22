@@ -248,20 +248,28 @@ static void test_dark_templar_cloak(void)
         if (u[i].raw_type == 38 && u[i].owner == SIDE && hydra < 0) hydra = i;
     }
     assert(dt >= 0 && overlord >= 0 && hydra >= 0);
+    /* Give the automatic picker optical sight to isolate detection. */
+    memset(visible, 0xff, sizeof(visible));
     race_z8_update_cloak();
     if (dist2(u[overlord].x, u[overlord].y, u[dt].x, u[dt].y) >
         race_z8_overlord_detect_px() * race_z8_overlord_detect_px()) {
         assert(race_z8_unit_hidden_from_side(dt));
         assert(!SC64_CAN_ATTACK_FROM(u[hydra].type, dt, SIDE));
+        assert(!sc64_auto_target_candidate_allowed(u[hydra].type, dt, SIDE,
+                                                   u[hydra].raw_owner));
     }
     u[overlord].x = u[dt].x + race_z8_overlord_detect_px() - 1;
     u[overlord].y = u[dt].y;
     race_z8_update_cloak();
     assert(!race_z8_unit_hidden_from_side(dt));
     assert(SC64_CAN_ATTACK_FROM(u[hydra].type, dt, SIDE));
+    assert(sc64_auto_target_candidate_allowed(u[hydra].type, dt, SIDE,
+                                              u[hydra].raw_owner));
     u[overlord].x = u[dt].x + race_z8_overlord_detect_px() + 1;
     race_z8_update_cloak();
     assert(race_z8_unit_hidden_from_side(dt));
+    assert(!sc64_auto_target_candidate_allowed(u[hydra].type, dt, SIDE,
+                                               u[hydra].raw_owner));
     puts("Z8 hero Dark Templar cloak: shared source-fact Overlord range");
 }
 

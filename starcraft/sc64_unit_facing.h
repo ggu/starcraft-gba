@@ -54,31 +54,55 @@ sc64_facing_reset_slot(int slot)
     if ((unsigned)slot < MAX_UNITS) sc64_facing[slot] = 0;
 }
 
-/* Unit vectors for the 32 StarCraft directions, scaled by 256; y grows down. */
+#ifdef GBA_HOST
+/* Full dot-product reference for the 32 directions with Y increasing down. */
 static const s16 sc64_facing_vector[32][2] = {
     {0,-256},{50,-251},{98,-237},{142,-213},{181,-181},{213,-142},{237,-98},{251,-50},
     {256,0},{251,50},{237,98},{213,142},{181,181},{142,213},{98,237},{50,251},
     {0,256},{-50,251},{-98,237},{-142,213},{-181,181},{-213,142},{-237,98},{-251,50},
     {-256,0},{-251,-50},{-237,-98},{-213,-142},{-181,-181},{-142,-213},{-98,-237},{-50,-251}
 };
+#endif
 
 static int
 sc64_facing_direction(int dx, int dy)
 {
-    int first, last, best, best_dot;
+    int first, along, across;
     if (!dx && !dy) return 0;
-    /* Direction zero precedes the wrapping quadrant in the original table. */
-    if (dx < 0 && dy < 0) {
-        first=24; last=31; best=0; best_dot=dy * sc64_facing_vector[0][1];
+    if (dy < 0) {
+        if (dx < 0) {
+            first = 24;
+            along = -dx;
+            across = -dy;
+        } else {
+            first = 0;
+            along = -dy;
+            across = dx;
+        }
     } else {
-        first=dx>=0 ? (dy>=0 ? 8 : 0) : (dy>=0 ? 16 : 24);
-        last=first+8; best=first; best_dot=-0x7fffffff;
+        if (dx < 0) {
+            first = 16;
+            along = dy;
+            across = -dx;
+        } else {
+            first = 8;
+            along = dx;
+            across = dy;
+        }
     }
-    for (int d=first;d<=last;++d) {
-        int dot=dx*sc64_facing_vector[d][0]+dy*sc64_facing_vector[d][1];
-        if (dot>best_dot) {best_dot=dot;best=d;}
+    /* Adjacent dot products cross at increasing across/along ratios.
+     * Search the exact differences between the rounded direction vectors. */
+    if (across * 39 <= along * 32) {
+        if (across * 48 <= along * 14)
+            return first + (across * 50 > along * 5);
+        return first + 2 + (across * 44 > along * 24);
     }
-    return best;
+    if (across * 24 <= along * 44)
+        return first + 4 + (across * 32 > along * 39);
+    if (across * 14 <= along * 48) return first + 6;
+    /* At the wrapping boundary, direction zero wins an equal dot product. */
+    if (first == 24) return across * 5 >= along * 50 ? 0 : 31;
+    return first + 7 + (across * 5 > along * 50);
 }
 
 /* Called when a unit fires: face the target. */
@@ -90,13 +114,12 @@ sc64_facing_fire(const Unit *q, int tx, int ty)
     SC64_FACING_SET(slot, sc64_facing_direction(tx - q->x, ty - q->y));
 }
 
-/* Called before drawing a visible unit: face where it is going. */
-static void
-sc64_facing_track(const Unit *q)
+/* Return the next direction, or -1 when the facing stays unchanged. */
+static int
+sc64_facing_order_direction(const Unit *q)
 {
-    int slot = (int)(q - u), dx, dy;
-    if (slot < 0 || slot >= MAX_UNITS || q->order == ORDER_IDLE) return;
-    if (q->cd && q->order == ORDER_ATTACK_TARGET) return;
+    int dx, dy;
+    if (q->order == ORDER_IDLE || (q->cd && q->order == ORDER_ATTACK_TARGET)) return -1;
     if (sc64_race_unit_flying(q->type)) {
         dx = q->tx - q->x;
         dy = q->ty - q->y;
@@ -104,8 +127,18 @@ sc64_facing_track(const Unit *q)
         dx = q->path_x - q->x;
         dy = q->path_y - q->y;
     }
-    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return;
-    SC64_FACING_SET(slot, sc64_facing_direction(dx, dy));
+    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return -1;
+    return sc64_facing_direction(dx, dy);
+}
+
+/* Called before drawing a visible unit: face where it is going. */
+static void
+sc64_facing_track(const Unit *q)
+{
+    int slot = (int)(q - u);
+    if ((unsigned)slot >= MAX_UNITS) return;
+    int direction = sc64_facing_order_direction(q);
+    if (direction >= 0) SC64_FACING_SET(slot, direction);
 }
 
 static void
@@ -147,6 +180,17 @@ sc64_facing_blit(unsigned raw, int dir, int x, int y)
 static int sc64_walk_clock_frame = -1;
 static unsigned sc64_walk_clock_ticks;
 
+static inline const Sc64SpriteFrame *
+sc64_walk_pose_at(const Sc64UnitWalkCycle *cycle, int slot, unsigned source_tick,
+                  unsigned *step_out)
+{
+    unsigned tick = (source_tick + (unsigned)slot * 3u) % cycle->cycle_ticks;
+    unsigned step = 0;
+    while (step + 1 < cycle->count && cycle->steps[step + 1].tick <= tick) ++step;
+    if (step_out) *step_out = step;
+    return cycle->steps[step].frames;
+}
+
 /* The 32 directional frames (western ones pre-mirrored) of the walk pose a
  * moving unit shows now, or 0 when the source has no walk cycle for it. The
  * cycle runs on the game clock while the unit moves; the slot offsets its
@@ -160,11 +204,7 @@ sc64_walk_pose_step(unsigned raw, int slot, unsigned *step_out)
         sc64_walk_clock_frame = frame;
         sc64_walk_clock_ticks = (unsigned)frame * 4u / 5u;
     }
-    unsigned tick = (sc64_walk_clock_ticks + (unsigned)slot * 3u) % cycle->cycle_ticks;
-    unsigned step = 0;
-    while (step + 1 < cycle->count && cycle->steps[step + 1].tick <= tick) ++step;
-    if (step_out) *step_out = step;
-    return cycle->steps[step].frames;
+    return sc64_walk_pose_at(cycle, slot, sc64_walk_clock_ticks, step_out);
 }
 static const Sc64SpriteFrame *sc64_walk_pose(unsigned raw, int slot)
 { return sc64_walk_pose_step(raw, slot, 0); }
@@ -190,32 +230,59 @@ sc64_walk_blit(const Sc64SpriteFrame *pose, unsigned raw, unsigned step, int dir
 }
 #endif
 
+#ifdef SC64_RACES
+static unsigned
+sc64_facing_turret_raw(const Unit *q, int raw)
+{
+    if (q->type == U_SIEGE_TANK) return 31;
+    if (q->type == U_TANK) return 6;
+    if (q->type == U_GOLIATH && raw == 3) return 4;
+    return 0;
+}
+#endif
+
 /* Draw a unit with its facing frame, or its walk pose while it moves
  * (walk is sc64_walk_track's stride phase) or flies. Units without a source walk
- * cycle keep the one-pixel stride lift above ground row y. Siege Tanks draw
- * their hull and turret subunits (raw 5/6 in tank mode, 30/31 when sieged);
- * the sieged hull has a single frame. Muzzle/impact effects remain with the
- * stock VFX renderer. Returns 0 when no facing art exists for this unit. */
+ * cycle keep the one-pixel stride lift above ground row y. A unit with
+ * independent turret art either defers that part to the depth painter or
+ * paints it immediately in renderers without a depth queue. */
 static int
-sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
+sc64_facing_draw_parts(const Unit *q, int raw, int x, int y, int walk,
+                       int *turret_lift)
 {
     int dir, slot = (int)(q - u);
     if (raw < 0) return 0;
     dir = sc64_facing[slot] & SC64_FACING_MASK;
 #ifdef SC64_RACES
-    if (q->type == U_SIEGE_TANK || q->type == U_TANK) {
-        int sieged = q->type == U_SIEGE_TANK, lift = SC64_WALK_LIFT(walk);
+    unsigned turret = sc64_facing_turret_raw(q, raw);
+    int tank = turret == 6 || turret == 31;
+    int has_turret = turret && sc64_unit_facing_frames((unsigned short)turret) &&
+        (tank || sc64_unit_facing_frames((unsigned short)raw));
+    /* Older prepared Goliath banks only have a body. Keep drawing that
+     * body through the ordinary facing path when the subunit is absent. */
+    if (tank || has_turret) {
+        unsigned hull = tank ? (turret == 31 ? 30u : 5u) : (unsigned)raw;
+        int lift = SC64_WALK_LIFT(walk);
 #ifdef SC64_UNIT_WALK_FRAMES
-        /* Rolling treads replace the lift for the hull and its turret. */
         unsigned step = 0;
-        const Sc64SpriteFrame *pose = walk && !sieged ? sc64_walk_pose_step(5u, slot, &step) : 0;
-        if (pose) { sc64_walk_blit(pose, 5u, step, dir, x, y); lift = 0; }
+        const Sc64SpriteFrame *pose = walk && turret != 31 ?
+            sc64_walk_pose_step(hull, slot, &step) : 0;
+        if (pose) {
+            sc64_walk_blit(pose, hull, step, dir, x, y);
+            lift = 0;
+        }
         else
 #endif
-        if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y - lift)) return 0;
-        if (!sc64_facing_blit(sieged ? 31u : 6u, dir, x, y - lift)) return 0;
-        return 1;
+        if (!sc64_facing_blit(hull, dir, x, y - lift)) return 0;
+        if (!has_turret) return 0;
+        if (turret_lift) {
+            *turret_lift = lift;
+            return 1;
+        }
+        return sc64_facing_blit(turret, dir, x, y - lift);
     }
+#else
+    (void)turret_lift;
 #endif
 #ifdef SC64_UNIT_WALK_FRAMES
     /* A flyer's source cycle is its wingbeat or pulse, which continues
@@ -231,6 +298,23 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
 #endif
     return sc64_facing_blit((unsigned)raw, dir, x, y - SC64_WALK_LIFT(walk));
 }
+
+static inline int
+sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
+{
+    return sc64_facing_draw_parts(q, raw, x, y, walk, 0);
+}
+
+#if defined(SC64_WORLD_DEPTH) && defined(SC64_RACES)
+static void
+sc64_facing_draw_turret(unsigned slot, int lift)
+{
+    const Unit *q = &u[slot];
+    sc64_facing_blit(sc64_facing_turret_raw(q, sc64_unit_art_raw(q)),
+                     sc64_facing[slot] & SC64_FACING_MASK,
+                     q->x - camx, q->y - camy + 12 - lift);
+}
+#endif
 
 #define SC64_FACING_FIRE(q, target) sc64_facing_fire((q), target_x(target), target_y(target))
 #endif

@@ -4,6 +4,10 @@
 #include <assert.h>
 #include <stdio.h>
 
+#if defined(SC64_DEATH_SOURCE_DEPTH_LAYERS) && !defined(SC64_DEATH_WORLD_DEPTH)
+#error "Showcase must enable world depth for the current death bank"
+#endif
+
 static unsigned compare_source_pass(int under)
 {
     static u8 expected[240 * 160];
@@ -25,7 +29,12 @@ static unsigned compare_source_pass(int under)
         for (unsigned j = 0; j < art->layer_count; ++j) {
             const Sc64DeathSourceLayer *layer = &art->layers[j];
             unsigned frame;
-            if (layer->under != under ||
+#ifdef SC64_DEATH_WORLD_DEPTH
+            if ((layer->flags & SC64_DEATH_SOURCE_FIXED_LOW) ||
+                (e->actor_layer_plus1 && (layer->flags &
+                 (SC64_DEATH_SOURCE_ACTOR_SPRITE | SC64_DEATH_SOURCE_DETACHED_SPRITE)))) continue;
+#endif
+            if ((layer->flags & SC64_DEATH_SOURCE_UNDER) != under ||
                 !sc64_death_source_layer_frame(layer, age, &frame)) continue;
             const Sc64SpriteFrame *sprite =
                 sc64_death_image_frame(layer->image_id, (unsigned short)frame);
@@ -73,7 +82,7 @@ static int source_remnant_differs_from_fallback(const Sc64DeathVfx *e, u32 age)
     for (unsigned i = 0; i < art->layer_count; ++i) {
         const Sc64DeathSourceLayer *layer = &art->layers[i];
         unsigned frame;
-        if (!layer->under || !layer->remnant ||
+        if (!(layer->flags & SC64_DEATH_SOURCE_UNDER) || !layer->remnant ||
             !sc64_death_source_layer_frame(layer, age, &frame)) continue;
         const Sc64SpriteFrame *sprite =
             sc64_death_image_frame(layer->image_id, (unsigned short)frame);
@@ -90,6 +99,354 @@ static int source_remnant_differs_from_fallback(const Sc64DeathVfx *e, u32 age)
     return pixels_different != 0;
 }
 
+#ifdef SC64_DEATH_WORLD_DEPTH
+static void capture_death_overlap(u8 *pixels)
+{
+    gfx_begin(C_PANEL);
+    gfx_set_clip_y(12, 120);
+    draw_death_vfx(1);
+    sc64_draw_depth_ordered_actors();
+    draw_death_vfx(0);
+    assert(gfx_read_band(12, 108, pixels));
+    for (int y = 0; y < 160; ++y)
+        if (y < 12 || y >= 120)
+            for (int x = 0; x < 240; ++x) assert(gfx_test_pixel(x, y) == C_PANEL);
+}
+
+static void test_attached_death_tie(void)
+{
+    static _Alignas(4) u8 victim_pixels[240 * 108], peer_pixels[240 * 108], pair[240 * 108];
+    for (unsigned victim_in_front = 0; victim_in_front < 2; ++victim_in_front) {
+        game_init();
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        memset(m, 0, sizeof(m));
+        memset(visible, 0xff, sizeof(visible));
+        geyser_count = 0;
+        camx = camy = 0;
+        int first = spawn_unit(SIDE, victim_in_front ? U_MARINE : U_ZERGLING, 96, 52);
+        int second = spawn_unit(SIDE, victim_in_front ? U_ZERGLING : U_MARINE, 96, 52);
+        assert(first >= 0 && second > first);
+        int victim = victim_in_front ? second : first;
+        int peer = victim_in_front ? first : second;
+        u[victim].raw_type = 37;
+        assert(sc64_unit_world_layer(&u[victim]) == 4 && sc64_unit_world_layer(&u[peer]) == 4);
+
+        for (int dead = 0; dead < 2; ++dead) {
+            if (dead) {
+                death_vfx_scan();
+                u[victim].hp = 0;
+                u[victim].alive = 0;
+                death_vfx_scan();
+                frame += 5;
+                assert(death_vfx[0].source && death_vfx_actor_plus1[0] == victim + 1);
+            }
+            for (unsigned page = 0; page < 2; ++page) {
+                u[peer].alive = 0;
+                capture_death_overlap(victim_pixels);
+                u[peer].alive = 1;
+                u[victim].alive = 0;
+                Sc64DeathVfx effect = death_vfx[0];
+                death_vfx[0].style = 0;
+                capture_death_overlap(peer_pixels);
+                u[victim].alive = !dead;
+                death_vfx[0] = effect;
+                capture_death_overlap(pair);
+
+                unsigned overlap = 0;
+                for (unsigned i = 0; i < sizeof(pair); ++i) {
+                    if (peer_pixels[i] == C_PANEL || victim_pixels[i] == C_PANEL ||
+                        peer_pixels[i] == victim_pixels[i]) continue;
+                    assert(pair[i] == (victim_in_front ? victim_pixels[i] : peer_pixels[i]));
+                    ++overlap;
+                }
+                assert(overlap);
+                printf("PASS attached death tie, foreground victim %u, dead %d, page %u, %u pixels\n",
+                       victim_in_front, dead, page, overlap);
+                gfx_end();
+            }
+        }
+
+        /* A replacement actor can occupy the same slot and anchor while the
+         * old collapse is visible. The live actor gets the foreground. */
+        int reused = spawn_unit(SIDE, U_MARINE, 96, 52);
+        assert(reused == victim);
+        u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS + 1];
+        unsigned size = 0;
+        Sc64AttachedDeathQueue attached = {0};
+        sc64_depth_push_deaths(keys, &size, &attached);
+        assert(size == 0 && attached.count == 1);
+        u32 reused_key = sc64_depth_key(4, 52, DEPTH_UNIT, (unsigned)reused);
+        sc64_depth_push_key(keys, &size, reused_key);
+        u32 collapse = sc64_depth_pop_world(keys, &size, &attached);
+        assert(((collapse >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) == DEPTH_DEATH);
+        assert(sc64_depth_pop_world(keys, &size, &attached) == reused_key);
+
+        /* Fill the renderer pool, then replace its oldest entry. */
+        for (unsigned i = 1; i < SC64_DEATH_VFX_POOL; ++i)
+            death_vfx_spawn_slot(death_vfx, peer, 96, 52, SIDE);
+        assert(sc64_death_vfx_slot(death_vfx, SC64_DEATH_VFX_POOL, death_vfx_now()) == 0);
+        death_vfx_spawn_slot(death_vfx, peer, 96, 52, SIDE);
+        assert(death_vfx_actor_plus1[0] == peer + 1);
+        death_vfx_reset();
+        for (unsigned i = 0; i < SC64_DEATH_VFX_POOL; ++i)
+            assert(death_vfx_actor_plus1[i] == 0);
+    }
+}
+
+static void test_death_depth(void)
+{
+    static _Alignas(4) u8 actor_pixels[240 * 108], effect_pixels[240 * 108], pair[240 * 108];
+    static const struct {
+        int y, dy, type, elapsed, layer, effect_in_front, victim_raw, burrowed;
+    } cases[] = {
+        { 52, -3, U_TANK, 5, 4, 1, 37, 0 },
+        { 52,  3, U_TANK, 5, 4, 0, 37, 0 },
+        { 52,  0, U_WRAITH, 5, 4, 0, 37, 0 },
+        /* The same collapse stays behind a north Tank if the victim burrowed. */
+        { 52, -3, U_TANK, 5, 1, 0, 37, 1 },
+        {  1,  0, U_WRAITH, 5, 4, 0, 37, 0 },
+        { 106, 0, U_WRAITH, 5, 4, 0, 37, 0 },
+        { 52,  0, U_TANK, 30, 1, 0, 37, 0 },
+        { 52, -3, U_TANK, 5, 4, 1, 7, 0 },
+        { 52,  3, U_TANK, 5, 4, 0, 7, 0 },
+        { 52,  0, U_WRAITH, 5, 4, 0, 7, 0 },
+        /* Each gas structure spawns a separate burst one tier above itself. */
+        { 52,  3, U_TANK, 5, 5, 1, 110, 0 },
+        { 52,  0, U_WRAITH, 5, 5, 0, 110, 0 },
+        {  1,  0, U_WRAITH, 5, 5, 0, 110, 0 },
+        { 106, 0, U_WRAITH, 5, 5, 0, 110, 0 },
+        { 52,  3, U_TANK, 5, 5, 1, 149, 0 },
+        { 52,  0, U_WRAITH, 5, 5, 0, 157, 0 },
+        /* The Queen's attached image outlasts its detached sprite body. */
+        { 52,  0, U_WRAITH, 5, 19, 1, 45, 0 },
+        /* The nested Overlord image inherits layer 16, including after its
+         * parent image ends. At frame three both images share one turn. */
+        { 52,  0, U_WRAITH, 3, 16, 0, 42, 0 },
+        { 52,  0, U_WRAITH, 5, 16, 0, 42, 0 },
+        { 52,  0, U_TANK,   5, 16, 1, 42, 0 },
+        /* At source age 69, the Overmind's sprite holds two images while
+         * the newly spawned rubble retains its own layer-one key. */
+        { 52,  0, U_WRAITH, 87, 4, 0, 147, 0 },
+    };
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        game_init();
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        memset(m, 0, sizeof(m));
+        memset(visible, 0xff, sizeof(visible));
+        geyser_count = 0;
+        camx = camy = 0;
+        int y = cases[n].y;
+        int raw = cases[n].victim_raw;
+        int burst_image = 0;
+        if (raw == 110 || raw == 147 || raw == 149 || raw == 157) {
+            /* Showcase uses a staged building slot for the P10-only art. */
+            int type = raw == 110 ? B_REFINERY : raw == 147 ? B_HATCHERY :
+                       raw == 149 ? B_EXTRACTOR : B_ASSIMILATOR;
+            int victim = spawn_build(SIDE, type, 96, y, 0);
+            assert(victim >= 0);
+            b[victim].raw_type = raw;
+            death_vfx_scan();
+            b[victim].hp = 0;
+            b[victim].alive = 0;
+            burst_image = raw == 110 ? 334 : raw == 149 ? 60 : raw == 157 ? 215 : 0;
+        } else {
+            int type = raw == 7 ? U_SCV : raw == 42 ? U_OVERLORD :
+                       raw == 45 ? U_QUEEN : U_ZERGLING;
+            int victim = spawn_unit(SIDE, type, 96, y);
+            assert(victim >= 0);
+            u[victim].raw_type = raw;
+            if (cases[n].burrowed) {
+                assert(sc64_unit_world_layer(&u[victim]) == 4);
+                u[victim].flags |= 2u;
+                assert(sc64_unit_world_layer(&u[victim]) == 1);
+                u[victim].flags &= ~2u;
+                assert(sc64_unit_world_layer(&u[victim]) == 4);
+                u[victim].flags |= 2u;
+            }
+            death_vfx_scan();
+            u[victim].hp = 0;
+            u[victim].alive = 0;
+            if (raw == 45) burst_image = 58;
+        }
+        death_vfx_scan();
+        assert(death_vfx[0].source &&
+               death_vfx[0].actor_layer_plus1 ==
+                   (cases[n].burrowed ? 2 : raw == 42 ? 17 : raw == 45 ? 19 : 5));
+        frame += cases[n].elapsed;
+
+        u32 keys[SC64_DEATH_SOURCE_DEPTH_LAYERS];
+        unsigned size = 0;
+        Sc64AttachedDeathQueue attached = {0};
+        sc64_depth_push_deaths(keys, &size, &attached);
+        if (raw == 147) {
+            assert(size == 1 && attached.count == 1);
+            u32 rubble = sc64_depth_pop_world(keys, &size, &attached);
+            const Sc64DeathSource *art = sc64_death_source(raw);
+            assert((rubble >> DEPTH_LAYER_BITS) == 1 &&
+                   art->layers[rubble & DEPTH_SLOT_MASK].image_id == 111);
+        }
+        assert(size + attached.count == 1);
+        u32 key = sc64_depth_pop_world(keys, &size, &attached);
+        assert((key >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        if (raw == 147)
+            assert(sc64_death_source(raw)->layers[key & DEPTH_SLOT_MASK].image_id == 89);
+        if (burst_image) {
+            const Sc64DeathSource *art = sc64_death_source(raw);
+            unsigned index = (key & DEPTH_SLOT_MASK) % SC64_DEATH_SOURCE_MAX_LAYERS;
+            assert(art && index < art->layer_count);
+            assert(art->layers[index].image_id == burst_image &&
+                   (art->layers[index].flags & SC64_DEATH_SOURCE_DETACHED_SPRITE));
+        }
+        capture_death_overlap(effect_pixels);
+
+        if (raw == 42 || raw == 147) {
+            /* Independently composite all indexed bank images in the
+             * expected native sprite order (rubble first if present). */
+            const Sc64DeathSource *art = sc64_death_source(raw);
+            u32 age = sc64_death_vfx_age_su(death_vfx[0].birth, death_vfx_now());
+            unsigned drew = 0;
+            gfx_begin(C_PANEL);
+            gfx_set_clip_y(12, 120);
+            for (int remnant = 1; remnant >= 0; --remnant) {
+                for (unsigned i = 0; i < art->layer_count; ++i) {
+                    const Sc64DeathSourceLayer *piece = &art->layers[i];
+                    unsigned source_frame;
+                    if (piece->remnant != remnant ||
+                        !sc64_death_source_layer_frame(piece, age, &source_frame)) continue;
+                    const Sc64SpriteFrame *sprite =
+                        sc64_death_image_frame(piece->image_id, (unsigned short)source_frame);
+                    assert(sprite);
+                    death_vfx_blit(sprite, 96 + piece->x, y + 12 + piece->y);
+                    ++drew;
+                }
+            }
+            assert(drew == (raw == 147 ? 3u : cases[n].elapsed == 3 ? 2u : 1u));
+            assert(gfx_read_band(12, 108, pair));
+            assert(!memcmp(effect_pixels, pair, sizeof(pair)));
+        }
+
+        int actor = spawn_unit(SIDE, cases[n].type, 96, y + cases[n].dy);
+        assert(actor >= 0);
+        Sc64DeathVfx effect = death_vfx[0];
+        death_vfx[0].style = 0;
+        capture_death_overlap(actor_pixels);
+        death_vfx[0] = effect;
+        capture_death_overlap(pair);
+
+        unsigned overlap = 0;
+        for (unsigned i = 0; i < sizeof(pair); ++i) {
+            if (actor_pixels[i] == C_PANEL || effect_pixels[i] == C_PANEL ||
+                actor_pixels[i] == effect_pixels[i]) continue;
+            assert(pair[i] == (cases[n].effect_in_front ? effect_pixels[i] : actor_pixels[i]));
+            ++overlap;
+        }
+        assert(overlap && "death and live sprites must have distinguishable overlap pixels");
+        printf("PASS source death raw %d layer %d overlap at Y%d dY%d, %u pixels\n",
+               raw, cases[n].layer, y, cases[n].dy, overlap);
+    }
+}
+
+static void test_fallback_death_depth(void)
+{
+    static u8 actor[240 * 108], effect[240 * 108], pair[240 * 108];
+    static const struct {
+        int victim_type, victim_raw, actor_type, dy, age, layer, effect_in_front;
+    } cases[] = {
+        { U_ZERGLING, 37, U_TANK,  2, 5, 4, 0 },
+        { U_ZERGLING, 37, U_TANK, -2, 5, 4, 1 },
+        { U_ZERGLING, 37, U_TANK,  0, 36, 1, 0 },
+        { U_ZERGLING, 37, U_WRAITH, 0, 5, 4, 0 },
+        { U_WRAITH, 8, U_WRAITH, 0, 5, 19, 1 },
+    };
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        game_init();
+        memset(u, 0, sizeof(u));
+        memset(b, 0, sizeof(b));
+        memset(m, 0, sizeof(m));
+        memset(visible, 0xff, sizeof(visible));
+        geyser_count = 0;
+        camx = camy = 0;
+        int victim = spawn_unit(SIDE, cases[n].victim_type, 96, 52);
+        assert(victim >= 0);
+        /* An actor absent from the bank takes the normal fallback path. We
+         * stage the regular family afterwards to exercise each silhouette. */
+        assert(!sc64_death_source_valid(sc64_death_source(226)));
+        u[victim].raw_type = 226;
+        death_vfx_spawn_slot(death_vfx, victim, 96, 52, SIDE);
+        Sc64DeathVfx *row = &death_vfx[0];
+        assert(!row->source && row->actor_layer_plus1 == 5);
+        row->actor_layer_plus1 = cases[n].victim_type == U_WRAITH ? 19 : 5;
+        row->raw = cases[n].victim_raw;
+        row->style = sc64_death_vfx_style_for_raw(row->raw, 0);
+        Sc64DeathVfxTiming timing = sc64_death_vfx_timing(row->style);
+        row->burst_su = timing.burst_su;
+        row->remnant_start = timing.remnant_start;
+        row->total_su = timing.total_su;
+        frame += cases[n].age;
+        u[victim].alive = 0;
+
+        u32 keys[DEPTH_DEATH_PER_EFFECT];
+        unsigned count = 0;
+        Sc64AttachedDeathQueue attached = {0};
+        sc64_depth_push_deaths(keys, &count, &attached);
+        assert(count + attached.count == 1);
+        u32 key = sc64_depth_pop_world(keys, &count, &attached);
+        assert((key >> DEPTH_LAYER_BITS) == (unsigned)cases[n].layer);
+        for (unsigned page = 0; page < 2; ++page) {
+            capture_death_overlap(effect);
+            int slot = spawn_unit(SIDE, cases[n].actor_type, 96, 52 + cases[n].dy);
+            assert(slot >= 0);
+            Sc64DeathVfx saved = *row;
+            row->style = 0;
+            capture_death_overlap(actor);
+            *row = saved;
+            capture_death_overlap(pair);
+            u[slot].alive = 0;
+            unsigned overlap = 0;
+            for (unsigned i = 0; i < sizeof(pair); ++i) {
+                if (actor[i] == C_PANEL || effect[i] == C_PANEL || actor[i] == effect[i])
+                    continue;
+                assert(pair[i] == (cases[n].effect_in_front ? effect[i] : actor[i]));
+                ++overlap;
+            }
+            assert(overlap);
+            printf("PASS fallback death case %u page %u overlap %u pixels\n",
+                   n, page, overlap);
+            gfx_end();
+        }
+    }
+
+    /* A building can leave rubble while its burst is still running. */
+    game_init();
+    memset(visible, 0xff, sizeof(visible));
+    camx = camy = 0;
+    Sc64DeathVfxTiming timing = sc64_death_vfx_timing(SC64_DEATH_VFX_BUILDING_TERRAN);
+    for (unsigned i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
+        int slot = sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL,
+            death_vfx_now(), SC64_DEATH_VFX_BUILDING_TERRAN, 106, 96, 52,
+            20, &timing, 0, C_GREEN);
+        assert(slot == (int)i);
+        death_vfx[slot].actor_layer_plus1 = 5;
+    }
+    frame += 12;
+    u32 heap[SC64_DEATH_VFX_POOL * DEPTH_DEATH_PER_EFFECT];
+    unsigned count = 0;
+    Sc64AttachedDeathQueue attached = {0};
+    sc64_depth_push_deaths(heap, &count, &attached);
+    assert(count == SC64_DEATH_VFX_POOL * 2 && attached.count == 0);
+    for (unsigned i = 0; i < SC64_DEATH_VFX_POOL * 2u; ++i) {
+        u32 key = sc64_depth_pop(heap, &count);
+        assert((key >> DEPTH_LAYER_BITS) == (i < SC64_DEATH_VFX_POOL ? 1u : 5u));
+    }
+    memset(visible, 0, sizeof(visible));
+    sc64_depth_push_deaths(heap, &count, &attached);
+    assert(count == 0 && attached.count == 0);
+    puts("PASS full fallback pool queues rubble and bursts only in visible cells");
+}
+#endif
+
 int main(int argc, char **argv)
 {
     static const int captures[] = {0, 30, 60, 90, 120, 180, 240, 300, 360, 420};
@@ -97,6 +454,11 @@ int main(int argc, char **argv)
     unsigned capture = 0;
     assert(argc == 1 || argc == 2);
     gba_init();
+#ifdef SC64_DEATH_WORLD_DEPTH
+    test_attached_death_tie();
+    test_death_depth();
+    test_fallback_death_depth();
+#endif
     game_init();
     sc64_showcase_start(1); /* Siege Line: six tanks against 32 Zerglings. */
     screen = SCREEN_PLAY;

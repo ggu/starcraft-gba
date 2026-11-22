@@ -2,6 +2,8 @@
 #ifndef SC64_P7_TYPED_BUILDING_SAVE_H
 #define SC64_P7_TYPED_BUILDING_SAVE_H
 
+#include "sc64_save_bits.h"
+
 /* Generation-40 P7 building row. Canonical type determines maxhp; source
  * owner/type remain explicit so the imported scenario roster is verifiable. */
 static inline int sc64_zp_building_default_hp(int type);
@@ -29,13 +31,8 @@ static int sc64_p7_typed_building_get(const Sc64P7TypedBuildingSave *r,
                                       unsigned *bit, unsigned width,
                                       u32 *value)
 {
-    u32 v=0;
-    if (!r || !bit || !value || !width || width>32 || *bit>200 ||
-        width>200-*bit) return 0;
-    for (unsigned i=0; i<width; ++i, ++*bit)
-        v |= (u32)((r->bytes[*bit>>3] >> (*bit&7u))&1u) << i;
-    *value=v;
-    return 1;
+    return r && sc64_save_read_bits(r->bytes, sizeof(r->bytes) * 8u,
+                                    bit, width, value);
 }
 
 static int sc64_p7_typed_building_zero(const Sc64P7TypedBuildingSave *r)

@@ -2,6 +2,20 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+Start with the [world-depth harness cases](audits/2026-11-19-world-depth.md#harness-cases).
+The [native follow-up cases](audits/2026-11-21-native-depth-followup.md#replay-cases)
+cover same-row turrets, foreground ties, viewport edges and missile trails.
+The [building crop and sprite ID cases](audits/2026-11-21-world-depth-edge-and-ties.md#replay-cases)
+define edge clipping and exact-tie checks for the framebuffer replay harness.
+The [fallback death depth cases](audits/2026-11-21-fallback-world-depth.md#replay-cases)
+cover unbanked collapses, remains and bursts on both Mode 4 pages.
+The [mineral work layer case](audits/2026-11-21-world-depth-replay-contract.md#mineral-work-layer)
+covers the independent gathering effect, attached cargo and flyer overlap.
+The [shared depth parity cases](audits/2026-11-22-shared-depth-parity.md#replay-cases)
+cover opaque ground and group selection, fallback Tank parts, native burrow
+transitions and sprite retirement. The [mixed world-depth overlap cases](audits/2026-11-22-mixed-world-depth-overlap.md#harness-cases)
+add crowd picking, low-elevation trails and cross-kind ties.
+
 ## Protoss P10 candidate (2026-11-01)
 
 The explicit `protoss-p10` candidate (`SCPA`, generation 47) adds P10 to the

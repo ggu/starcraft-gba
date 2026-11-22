@@ -1,11 +1,14 @@
 #ifndef SC64_COMPACT_BUILDING_SAVE_H
 #define SC64_COMPACT_BUILDING_SAVE_H
 
+#include "sc64_save_bits.h"
+
 /* Versioned, slot-preserving building save codec for the opt-in T6 storage
  * profile. Every field in every slot is retained, including dead source
  * structures whose raw type/owner/position remain part of T4 save validation.
  * Live field bounds are checked before encoding; no value is saturated. */
 #define SC64_PACKED_BUILDING_SAVE_BYTES 28
+#define SC64_PACKED_BUILDING_SAVE_USED_BITS 217
 #define SC64_PACKED_BUILDING_HP_BIAS 131072
 
 typedef struct {
@@ -38,18 +41,16 @@ sc64_packed_building_put(Sc64PackedBuildingSave *row, unsigned *bit,
     return 1;
 }
 
+#ifdef SC64_COMPACT_BUILDING_FIXED_READER
+static inline __attribute__((always_inline)) int
+#else
 static int
+#endif
 sc64_packed_building_get(const Sc64PackedBuildingSave *row, unsigned *bit,
                          unsigned width, u32 *value)
 {
-    u32 result = 0;
-    if (!row || !bit || !value || !width || width > 32 ||
-        *bit > SC64_PACKED_BUILDING_SAVE_BYTES * 8u ||
-        width > SC64_PACKED_BUILDING_SAVE_BYTES * 8u - *bit) return 0;
-    for (unsigned i = 0; i < width; ++i, ++*bit)
-        result |= (u32)((row->bytes[*bit >> 3] >> (*bit & 7u)) & 1u) << i;
-    *value = result;
-    return 1;
+    return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
+                                      bit, width, value);
 }
 
 /* All values below are bounded by the current game representation: map
@@ -120,7 +121,7 @@ sc64_building_save_encode(Sc64PackedBuildingSave *row, const Building *bld,
      * first previously reserved bit at the end of the row. */
     SC64_PUT(1, (unsigned)bld->type >> 6);
 #undef SC64_PUT
-    if (bit != 217) return 0;
+    if (bit != SC64_PACKED_BUILDING_SAVE_USED_BITS) return 0;
     *row = encoded;
     return 1;
 }
@@ -153,7 +154,7 @@ sc64_building_save_decode(Building *out, const Sc64PackedBuildingSave *row)
     SC64_GET(16, decoded.flags); SC64_GET(2, decoded.larva);
     SC64_GET(9, decoded.larva_timer); SC64_GET(11, decoded.shield_remainder);
 #undef SC64_GET
-    if (bit != 216 || decoded.alive > 1 ||
+    if (bit != SC64_PACKED_BUILDING_SAVE_USED_BITS - 1 || decoded.alive > 1 ||
         (decoded.alive && decoded.hp < 0) || decoded.maxhp > 131071 ||
         decoded.owner > 4 || decoded.queue_head > 4 || decoded.queue_count > 5 ||
         decoded.level > 127 || decoded.raw_type > 255 ||

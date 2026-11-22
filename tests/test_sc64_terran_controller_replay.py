@@ -53,12 +53,12 @@ class ReplayPlanTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
                 replay._compare_trace_row({"host_tick": 77, **fields}, actual)
 
-    def test_t7_source_location_test_matches_half_scale_half_open_rectangle(self):
-        bounds = (100, 200, 300, 400)  # synthetic source-space rectangle
-        self.assertTrue(replay._point_in_source_location(50, 100, bounds))
-        self.assertTrue(replay._point_in_source_location(149, 199, bounds))
-        self.assertFalse(replay._point_in_source_location(150, 100, bounds))
-        self.assertFalse(replay._point_in_source_location(50, 200, bounds))
+    def test_t7_emitter_overlap_includes_its_edge_but_excludes_touching(self):
+        bounds = (100, 200, 120, 240)  # synthetic source-space rectangle
+        self.assertFalse(replay._emitter_overlaps_source_location(42, 100, bounds))
+        self.assertTrue(replay._emitter_overlaps_source_location(43, 100, bounds))
+        self.assertTrue(replay._emitter_overlaps_source_location(50, 127, bounds))
+        self.assertFalse(replay._emitter_overlaps_source_location(50, 128, bounds))
 
     def test_dense_controller_events_split_at_absolute_transition_ticks(self):
         inputs = [(tick, tick & 1) for tick in range(1, 11)]

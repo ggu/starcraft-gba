@@ -104,6 +104,7 @@ static unsigned defense_screen_order_retry_frame;
 static int policy_workers=8,policy_reserve=50,policy_hydras=12;
 static int policy_second_first=1,policy_retreat=0,policy_home_radius=220;
 static int policy_home_army_r;
+static int render_input_frames;
 static int macro_worker_goal=3;
 static int defense_attack_frame;
 static int workers_retreating;
@@ -381,6 +382,9 @@ static void step(u16 held)
     }
 #endif
     game_update(held,pressed);
+    /* The picker reads the camera and last painted walk state. A physical
+     * replay has a render between every two input updates. */
+    if (render_input_frames) game_render();
 #ifdef ROUTE_PURITY_DEBUG
     purity_after_update=route_purity_hash();purity_armed=1;
 #endif
@@ -6254,6 +6258,7 @@ int main(int argc,char **argv)
             else {if(value<128||value>400)return 2;policy_home_radius=(int)value;}
         }
         else if(!strcmp(argv[i],"--home-army-r"))policy_home_army_r=1;
+        else if(!strcmp(argv[i],"--render-input-frames"))render_input_frames=1;
         else if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=(u32)strtoul(argv[++i],0,10);
         else if(!strcmp(argv[i],"--start-delay")&&i+1<argc)start_delay=(unsigned)strtoul(argv[++i],0,10);
         else if(!strcmp(argv[i],"--hatch-site")&&i+2<argc) {
@@ -6265,7 +6270,7 @@ int main(int argc,char **argv)
         }
         else if(!strcmp(argv[i],"--force-late-air-at-frame")&&i+1<argc)
             late_air_force_frame=(unsigned)strtoul(argv[++i],0,10);
-        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--home-army-r] [--limit HOST_TICKS] [--start-delay FRAMES] [--trace PATH] [--probe-hatch-site X Y] [--force-late-air-at-frame FRAME]\n",argv[0]);return 2;}
+        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--home-army-r] [--render-input-frames] [--limit HOST_TICKS] [--start-delay FRAMES] [--trace PATH] [--probe-hatch-site X Y] [--force-late-air-at-frame FRAME]\n",argv[0]);return 2;}
     }
     if(!run_limit||run_limit>1000000u)return 2;
     mkdir(".local",0777);mkdir(".local/sc64",0777);

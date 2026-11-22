@@ -36,3 +36,230 @@ physical GBA speed or fresh SRAM continuation.
 
 - Host tape SHA-256: `59e1aa7c6524c9cf1b17d31b57858ee0e2d28c8bd0b16ee10dc3233722556bfe`.
 - Physical receipt SHA-256: `6bf6180b590954b836430cd23da435bcb7da4b76bfb3780a675fac4a49ef8ecd`.
+
+## November 20 fresh SRAM and result autosave
+
+The normal Terran build for `cd833c8c` uses the same controller tape.
+The observer opens Norad II from HOME, reveals all 15 briefing pages and
+deploys with Start. It reads checkpoints and feeds ordinary GBA buttons
+through the port-free mGBA observer. At tape call 19,659, frame 19,466,
+Raynor is in the first Dropship and no unit or building is selected.
+Start opens the pause menu and B saves the live game in journal bank 0.
+A fresh process presses L at HOME to load the same observed world,
+mission state and cursor. The camera reconstructed from that cursor
+matches at this cut.
+
+The next tape sample presses L to select the Dropship. Continuing
+directly from HOME suppresses that edge because the load itself used L.
+The observer pauses with Start, releases it, and resumes with Start.
+This samples the release of L without advancing the saved simulation.
+The uninterrupted and corrected fresh paths select slot 5 on tape call
+19,661 and reach the source goal at the same coordinates with the same
+remaining health on call 20,543. This is a controller replay correction.
+
+The run replays 23,849 gameplay calls and acknowledges all 13 authored
+dialogue pages. All 42 observations match, including nine after the
+reload. The checkpoint observer verifies 34 recorded state values and
+checks the campaign and per-player trigger clocks. The HOST tape leaves
+the Starport and Control Tower indices unset. The guest observes those
+buildings in slots 74 and 75 after production.
+
+At frame 23,536, Raynor and both Dropships are in source location 2,
+Norad survives, and the primary objective and completion bits are set
+without trigger faults. The second journal record is valid and the
+original pause record remains byte-identical. A third process loads the
+frozen win with Dropship slot 6 still selected and exports identical
+SRAM. A separate T10 check with the same ROM and observer restores
+frame 2,276 and reloads the frozen victory at frame 3,361.
+
+The T6 run averages 1,092,086 guest cycles per main loop, or 15.36
+emulated updates per second across 23,952 controller calls. This includes
+presentation, menus, save and load. Physical GBA performance remains
+unmeasured.
+
+An observer sampling individual updates measured the peak on the result
+autosave at tape call 23,849 and frame 23,536. It used 24,630,198 guest
+cycles on the uninterrupted route and 54,160,869 guest cycles on the
+fresh route with the pause record present. These counts cover the whole
+update. Attribution within the journal path still needs an instruction
+profile.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 6 --save-tick 19659 \
+  --trace "$T6_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `8abd3e731fd6db1c1c0ff449ea1426d4214213f0990c5613a3b7158b3eb611c4` |
+| Matching ELF | `357b901bdb96d325fe4388650ad2ea5d97b7ce801a7a8de14f278a913ce2e2db` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `59e1aa7c6524c9cf1b17d31b57858ee0e2d28c8bd0b16ee10dc3233722556bfe` |
+| Replay harness | `d0ad3fa7b8f692330dbe93711f25cf59ffe5b34af825fd2eded744538c9f097c` |
+| Checkpoint observer | `0b13fc5abebb43f4760ca54e16187191b46e7df42b7a9c109e09146994a27e8c` |
+| Pause SRAM | `f6bab6c2cdde4397e90621f1045aca1a01b6631ea87aa8dc8fb6d2778b636a1c` |
+| Victory SRAM and fresh readback | `af0fa049ba02103ef3944a3f8f324b45c9eb0abc5b8db23318d70969713a87bc` |
+| T6 replay and both journal checks | `de8db15b15b9b551cf9285cdc79beba35ab0e21523b437443ca1c5ab844c3041` |
+| T10 regression | `5d80269aed0f6a5315e9b23340dc63931094f404e24995e50c2ce61a4dd5b991` |
+
+
+## Compact unit read timing
+
+The normal Terran ROM at `cd833c8c` reads each field of its 38-byte
+compact unit rows one bit at a time. Trial `8bc3c7ce` calls the
+shared bounded byte reader. Every record keeps the same wire format.
+The writer, semantic validators and older-bank fallback use the
+same paths.
+
+The two ARM builds use the same prepared inputs and retain the same
+RAM endpoints. Both load the verified frame 19,466 pause bank through
+HOME and run the next 4,190 ordinary gameplay calls with the same input
+and dialogue handling. All 27 actor, selection and dialogue observations
+match. Each produces the exact previously verified victory image,
+retains the original first bank, and re-exports the same SRAM from
+the frozen-result load.
+
+| Measured update | Control cycles | Trial cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| HOME load of pause journal | 39,232,491 | 30,514,031 | 22.22% |
+| Victory autosave with the pause bank present | 54,160,869 | 40,885,763 | 24.51% |
+| HOME load of frozen victory | 41,585,079 | 32,874,369 | 20.95% |
+
+The table measures complete emulator updates. It captures three different
+save operations and leaves hardware timing separate. Compile-time and
+sanitizer checks cover old unit rows, 10,000 round trips, malformed
+owner and reserved bits, the other compact codecs and journal fallback.
+The composed ARM gate at `727c766f` preserves the ROM and RAM
+guards on all four profiles. Z10, P10 and Showcase are byte-identical
+to the `6ea84a03` controls. Normal Terran produces identical
+32 KiB journals during active Bunker construction and with four
+passengers loaded. Both fresh HOME continuations match their control
+worlds, resource banks and assignments through 600 updates. The ARM
+matrix receipt SHA-256 is
+`4a7b1cbb885a3c2f36df264b4060a650ecfef1b78a1b23e292fe5b1961c2201a`.
+
+The replay comparison receipt SHA-256 is
+`8c76801a0d3753b742bc0da11448a33a5e39ba9318f2d1eb3997e21b79f41aea`.
+
+
+### Instruction attribution at victory
+
+A read-only instruction trace of the original Terran ROM reproduces
+the same paused-bank victory and frozen-result SRAM. Its complete
+input-to-input interval takes 54,161,500 cycles. The game loop's
+counter measures 54,160,869 inside that interval. The instruction
+histogram, recorded stack totals and emulator clock delta agree.
+
+| Function on the original ROM | Inclusive cycles | Calls |
+| --- | ---: | ---: |
+| `race_save_game` | 51,792,193 | 1 |
+| `sc64_unit_save_decode` | 28,088,518 | 2,881 |
+| `sc64_packed_unit_get` | 14,240,077 | 25,936 |
+| `sc64_t6_runtime_program_valid` | 5,896,350 | 4 |
+
+The counts are nested. The T6 scenario adapter checks the immutable
+program before calling the generic runtime validator, which checks
+the same program again. Reuse the verified program within the
+adapter call while retaining its mutable-state checks and the generic
+validator's independent checks. Profile the composed runtime to
+measure the remaining journal cost. The profile receipt SHA-256 is
+`4b1b2e1925f8ed75f3cdf6de597c4de5584201c0577aa892dfc121882d37e4c7`.
+
+
+### Repeated program checks on the current build
+
+The normal Terran `b2087fac` and test `ebddf82d` ROMs repeat the same
+4,190-update Norad II suffix with 27 matching observations. They
+export identical victory and frozen-result journals. Factoring a
+source-level duplicate inside the scenario adapter changes the
+victory update from 40,885,763 to 40,886,141 cycles. The pause and
+frozen-result loads move by 25 and 268 cycles. The linked state
+validator already calls the immutable program validator once per
+invocation in both builds. The four profiled checks come from
+separate mission-state validations inside the journal operation.
+The trial stays out of the normal builds. The comparison receipt
+SHA-256 is
+`ddaa162492afc6b0f16f6af9ecd3378a0da6d9b79b4921f606c1668646897887`.
+
+
+### One full validation per journal candidate
+
+The normal Terran trial at `ea0874b2` copies the live T6 state into
+the save candidate before the full candidate check. At load it
+copies the already validated T6 state from the candidate to the
+load plan. The full candidate validation still runs independently
+on the selected and prior journal banks. Neither operation needs a
+second check of the same T6 state.
+
+The control is normal Terran release `b2087fac`. Both ROMs repeat
+the same 4,190 gameplay calls after loading the original pause
+journal at frame 19,466. All 27 sampled observations match. They
+keep the first bank and produce byte-identical 32 KiB victory
+journals and frozen-result re-exports. Both link with IWRAM
+`0x030048a8` and EWRAM `0x02038ddc`. The HOST checks include T6
+save and load, malformed candidate rejection, failed-save
+atomicity, and older-bank fallback.
+
+| Emulator update | Control cycles | Trial cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Pause HOME load | 30,514,031 | 28,725,640 | 5.86% |
+| Victory autosave with prior bank | 40,885,763 | 37,255,350 | 8.88% |
+| Frozen-result HOME load | 32,874,369 | 31,091,420 | 5.42% |
+
+The comparison receipt SHA-256 is
+`9e31b9dac726194747f6a4925e7cd2ef51b3b1ce1cc0b5e45b207973f79016fb`.
+The first composition after the campaign audit merges is byte-identical
+to the timed trial. Its source-boundary, doctor, default build and test,
+and prepared Unified build and test pass.
+
+### Composition with the attacker-image renderer
+
+The normal Terran control at `a9f0137c` and combined candidate at
+`afffebec` repeat the same fresh-load route. All 27 observations agree
+and both victory journals and fresh frozen-result re-exports match the
+earlier journal byte for byte. The T6 save fixture and 3-generation
+bank-selection fixture pass under sanitizers on the combined source.
+The default cartridge is byte-identical to the tested renderer release.
+All four normal products pass the ROM and RAM guards. Z10, P10 and
+Showcase are byte-identical to their renderer release builds. The
+Terran candidate retains the control's IWRAM `0x030048a8` and EWRAM
+`0x02038e5c` endpoints.
+
+| Emulator update | Control cycles | Combined cycles |
+| --- | ---: | ---: |
+| Pause HOME load | 30,516,047 | 28,727,633 |
+| Victory autosave with prior bank | 40,886,041 | 37,255,972 |
+| Frozen-result HOME load | 32,876,489 | 31,093,497 |
+
+The combined cartridge matrix SHA-256 is
+`e05b672c05c5ff24a56adf0d9a2b3f6cf5997b6c859709f54732616f00929e87`.
+The replay comparison SHA-256 is
+`8c4740890bf38fe7228edec2b0f84b4f9d670765aebb946896f3aaefe6d44196`.
+The result remains a one-update stall.
+
+### Remaining cost on the composed Terran
+
+The instruction observer samples the victory update of the same
+`01240c5e` Terran ROM. It repeats the 27 observations and byte-identical
+victory and re-export. The loop counter still reads 37,255,972 cycles.
+The observer spans 37,256,603 cycles between its instruction boundaries.
+
+| Function | Inclusive cycles | Self cycles | Calls |
+| --- | ---: | ---: | ---: |
+| `race_save_game` | 35,251,917 | 778,479 | 1 |
+| `race_worker_cargo_previous` | 18,976,015 | 123 | 1 |
+| `sc64_unit_save_decode` | 15,100,199 | 3,096,171 | 2,881 |
+| `race_t6_save_candidate_valid` | 7,189,640 | 127,480 | 2 |
+| `sc64_packed_unit_get` | 6,072,200 | 6,072,200 | 42,146 |
+| `save_write_selected` | 1,570,939 | 809,345 | 1 |
+
+The inclusive rows overlap. The generic compact-unit bit reads are
+a larger direct cost than the SRAM writer here. Prefer a fixed-width
+decoder comparison before changing the independent validation or bank
+write boundaries. Require identical accepted rows, rejection behavior,
+and output SRAM through the normal HOME, pause and result paths.
+The stack receipt SHA-256 is
+`be8797ef0b31a1fa0264aa3e1f16b0481300d24e07d4c9535857d080029fdac1`.

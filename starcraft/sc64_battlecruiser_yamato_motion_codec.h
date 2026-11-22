@@ -23,7 +23,11 @@ typedef struct {
     int16_t destination_x,destination_y;
     uint16_t speed,turn_rate;
     uint8_t heading,velocity_direction,lifetime,turning;
+    uint8_t draw_layer; /* Captured at release. Zero means a legacy row. */
 } Sc64BcMotionFields;
+
+enum { SC64_BC_YAMATO_MAX_DRAW_LAYER = 20 };
+
 static inline int sc64_bc_motion_pack(Sc64BcYamatoShot *shot,const Sc64BcMotionFields *m)
 {
     uint32_t x,y,packed;
@@ -31,7 +35,8 @@ static inline int sc64_bc_motion_pack(Sc64BcYamatoShot *shot,const Sc64BcMotionF
         m->x_q8>=1u<<20 || m->y_q8>=1u<<20 ||
         m->destination_x< -32 || m->destination_x>4159 ||
         m->destination_y< -32 || m->destination_y>4159 ||
-        (m->speed!=0 && m->speed!=SC64_BC_YAMATO_TOP_SPEED) || m->turn_rate>511 || m->turning>1) return 0;
+        (m->speed!=0 && m->speed!=SC64_BC_YAMATO_TOP_SPEED) || m->turn_rate>511 ||
+        m->turning>1 || m->draw_layer>SC64_BC_YAMATO_MAX_DRAW_LAYER) return 0;
     unsigned ex=(unsigned)(m->destination_x+32), ey=(unsigned)(m->destination_y+32);
     x=m->x_q8|((ex&4095u)<<20); y=m->y_q8|((ey&4095u)<<20);
     /* Flingy 158 starts at 0; its acceleration equals its top speed, and
@@ -39,7 +44,7 @@ static inline int sc64_bc_motion_pack(Sc64BcYamatoShot *shot,const Sc64BcMotionF
      * at a completed source tick are therefore 0 and 8533. */
     packed=(m->speed?1u:0u)|((uint32_t)m->velocity_direction<<1)|
            ((uint32_t)m->turn_rate<<9)|((uint32_t)m->turning<<18)|
-           ((ex>>12)<<19)|((ey>>12)<<20);
+           ((ex>>12)<<19)|((ey>>12)<<20)|((uint32_t)m->draw_layer<<21);
     memcpy(&shot->x_q8,&x,sizeof(x)); memcpy(&shot->y_q8,&y,sizeof(y));
     shot->age=(unsigned short)(m->lifetime|((unsigned)m->heading<<8));
     shot->motion=packed;
@@ -56,6 +61,8 @@ static inline int sc64_bc_motion_unpack(const Sc64BcYamatoShot *shot,Sc64BcMotio
     m->speed=(uint16_t)((p&1u)?SC64_BC_YAMATO_TOP_SPEED:0); m->velocity_direction=(uint8_t)(p>>1);
     m->turn_rate=(uint16_t)((p>>9)&511u); m->turning=(uint8_t)((p>>18)&1u);
     m->lifetime=(uint8_t)shot->age; m->heading=(uint8_t)(shot->age>>8);
-    return (p&0xffe00000u)==0;
+    /* Zero identifies older flight rows that did not save their layer. */
+    m->draw_layer=(uint8_t)((p>>21)&31u);
+    return (p&0xfc000000u)==0 && m->draw_layer<=SC64_BC_YAMATO_MAX_DRAW_LAYER;
 }
 #endif

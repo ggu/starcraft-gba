@@ -1,0 +1,265 @@
+# World depth replay assertions
+
+The [N64 render records](2026-11-21-native-depth-followup.md#native-sort-and-attachments)
+sort by elevation, world anchor Y for elevations 0–4, turret flag, then live
+sprite pool ID. The higher key draws in front. Attached images share their
+sprite's turn and lifetime. Detached effects receive their own sprite
+records. The GBA Mode 4 painter shares the elevation, Y and turret rules
+across Campaign, Custom Game and Showcase. Its final tie still uses kind
+and slot.
+
+## Fixed elevation loss
+
+The optional GBA VRAM death-effect pool stored the source-art bit and
+owner color but omitted the dying actor's elevation. A load preserved
+whatever happened to be in the destination's elevation field. The
+renderer uses that field for attached collapse images, relative
+detached sprites and fallback burst placement. A missing field could
+put a collapse in a legacy draw pass outside the world queue.
+
+The codec now stores the five elevation bits in the existing
+appearance halfword. Zero still means the actor elevation is
+unavailable. The row remains 20 bytes and lives in transient renderer
+storage. The normal Terran, Z10, P10 and Showcase cartridges use the
+EWRAM pool.
+
+`make test-sc64-death-vfx-storage` checks all 32 field values, both
+source-art bit values, the color boundaries and the first and last
+valid slots. It reads into a row with the opposite elevation bits set.
+The old codec fails that assertion. The fixed codec passes with
+AddressSanitizer and UndefinedBehaviorSanitizer.
+
+The same staged Showcase fixture then used both EWRAM and VRAM with
+the shared world-depth queue active. Both produced the same 21
+bank-backed overlap results, the same five fallback overlaps on each
+page, full-pool and fog results, and the same Siege Line death and
+expiration results.
+
+The ordinary Showcase Siege Line ARM replay also matches across
+storage. All 91 cuts match the world, effect rows, palette and both
+indexed framebuffer pages. Ninety cuts contain populated effect
+rows. The displayed-page bit differs at one capture boundary.
+Over 451 updates, mean guest cycles rise from 887,949 to 897,025 in
+the optional VRAM build. The normal four ARM ROMs match their
+existing release files byte for byte.
+
+The paired HOST log digest is
+`ee0f95c9b1aa7689f971c07a7733065752d7f5630d28e475f81d9e813bb71336`.
+The ARM comparison digest is
+`a326f99c7d32f33ebc1059d1fb641644dad9453b0213c8ea5f46ced79817882d`.
+
+## Replay cases
+
+Use `depth_pair` as the replay assertion ID for two overlapping
+sprites. Record one assertion per tested mode, case variant and
+framebuffer page. Retain the source revision, ROM and input-tape
+digests, camera, visibility, simulation tick, pose, palette and capture
+phase. For each actor record its fixture label, sprite anchor,
+elevation, effective Y, turret flag and tie ID. Identify which tie
+scheme supplied the ID. Record the expected and observed foreground
+and the number of distinguishing, incorrect and changed HUD pixels.
+
+Use isolated draws and both composition orders. This gives an
+order-sensitive mask even when an effect remaps the pixels behind
+it. Require a nonempty mask and zero incorrect pixels on each indexed
+page. Check the HUD rows 0–11 and 120–159 across flips. Record a
+selection result only for a case that exercises picking. Mark
+unavailable mode or storage combinations as unavailable.
+
+| Case ID | Variants | Assertion |
+| --- | --- | --- |
+| `missile-trail-after-impact-ground-y` | Repeat a short Vulture shot with a layer-3 Bunker on either side of its trail's birth Y. Capture impact, last live child and expiry. | The trail stays at its birth anchor and keeps the correct depth through impact. Use the high-layer Goliath, Wraith and Scout variants for the parent-plus-one check. [Native records and exact cuts](2026-11-22-detached-missile-trail-lifetime.md#replay-harness) |
+| `death-storage-depth` | Use the same scene and seed in EWRAM and a VRAM qualification build. Test an attached ground collapse with a Tank to its north and south, a burrowed collapse, an Overlord's attached images beside a Wraith and detached rubble. Add the fallback collapse and air burst cuts. | The loaded elevation, queue key, visible overlap and HUD match across storage. Confirm the VRAM flag and source death depth are both active. [Existing overlap setups](2026-11-21-fallback-world-depth.md#replay-cases) |
+| `same-y-attached-death-continuity` | Capture an opaque equal-elevation, equal-Y overlap alive, on the first attached death image, during actor-slot reuse, and on last-image retirement. Repeat with the victim's ID above and below its neighbor's. Include an independently detached effect with its own key. | Preserve the dying actor's ordering through the last attached image. On GBA the lower-slot collapse stays behind the Marine on both pages. The reused live actor draws in front on an exact slot tie. Retain native sprite IDs and the free-list head around retirement and reuse. [Fix and native lifetime witness](2026-11-21-attached-death-continuity.md) |
+| `worker-mining-effect-and-cargo` | Use an active SCV at a mineral edge and overlap its work effect with visible ground art. Move a Wraith across the effect on a separate cut. Repeat the ordinary gathering loop with a Probe and Drone. Capture approach, active work, loaded return, empty field, hidden worker or field, and each HUD boundary. Pause during work and resume from HOME. | The mineral and worker body sort at layer 4, the independent mining effect at layer 5, and the Wraith above both. Only active mineral work draws the effect. The returning ore badge shares the worker's turn. Require distinguishing masks for both overlap orders on both indexed pages. [Mining reference and fixture](#mineral-work-layer) |
+| `depth-after-terrain-page-flip` | Run an existing order-sensitive pair through a camera pan and a fog update so the cache uses both a cropped window and a full restore. Include opaque overlap across either cache split, a lifeless actor with attached art, and an independent effect. | After each successive page flip, compare the entire field and both HUD bands with a fresh render at the same camera and animation tick. Require the existing distinguishing mask for the overlap on both pages. Record storage selection, camera delta and cache reuse mode. [Terrain storage qualification](2026-11-22-terrain-cache-padding.md) |
+| `moving-flyer-double-tap` | Use the ordinary Z7 tape around calls 16,375–16,382. Include two friendly same-type flyers that change their foreground order between the two A edges. Repeat with different types, an expired window and replacement of the first actor. | The single tap picks the visible foreground flyer. A valid same-type second tap groups both. Record the two selected slots and both framebuffer pages. [Exact inputs and observed slots](2026-11-22-two-flyer-picker.md#moving-same-type-flyers-in-the-double-tap-window) |
+| `cross-layer-flyer-pick` | Place the layer-18 Wraith over the layer-16 Overlord. Use a cursor pixel inside both opaque body masks and closer to the Overlord's anchor. Reverse actor slots and repeat after flipping pages. | The Wraith's layer wins both the rendered pixel and the selection. Check transparent pixels and every fallback separately. [Bank-backed evidence](2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers) |
+| `fallback-projectile-world-depth` | Force the authored weapon fallback for a diagonal ground shot and capture its moving head and impact. Put a Tank on each side of the shot's current Y and then a Wraith across it. Repeat after replacing the target with an actor at another elevation. | A shot at a layer-3 Bunker draws at layer 4. It covers the northern Tank and passes behind the southern Tank and Wraith. It keeps its launch layer after slot reuse and draws once. [Setup and mode coverage](2026-11-22-fallback-projectile-world-depth.md#harness-cases) |
+
+The [native key witness](2026-11-21-world-depth-edge-and-ties.md#replay-cases)
+establishes the native sort and allocator rule. The exact death-tie
+case still needs an opaque N64 framebuffer cut. Use independent native
+and GBA replays and keep ROMs, saves and captures local.
+
+### Native pool ID and pixel evidence
+
+A fresh ares continuation of the same ordinary Blood Bath battle
+reproduces the two layer-4 Zergling records at update 17,144. At world
+`(46,152)`, sprite ID 1418 has key `0x2026058a`. At `(70,152)`, sprite
+ID 1330 has key `0x20260532` and sorts first. The local receipt SHA-256 is
+`a919322bffe77fafe1c0494b91f9b1610989ac8c3434cea4827ee38347399d57`.
+Both observations are from the same frozen update.
+
+A fresh restore at update 17,166 reproduced the equal-Y pair at
+`(80,142)` and `(62,142)` and captured a screenshot. All 1,156
+combinations of standing facings and flips have zero shared opaque
+pixels at that 18-pixel separation. The live image records have
+different extents from the standing bank. The screenshot lacks
+a measured viewport transform for that pair. The local receipt
+SHA-256 is `dae5acd908637950978d9d5ef77211febe1fff4ca85db646c1ce015f72299b46`.
+
+The paused 17,166 actor table maps the two friendly Zerglings from
+slots 98 and 135 to sprite IDs 438 and 1418 with keys
+`0x202381b6` and `0x2023858a`. A separate traversal from the native
+render-row head visits 438 immediately before 1418. Use that pair
+to check slot-to-sprite identity and row order. Then match both
+current image frames and facing masks to the screenshot callback
+before asserting a distinguishing foreground pixel. The paused
+state digest is
+`c6c4db6a76b44be9d64fca46ba8d06d53f2825879046c7f71d1dae7a17b5ab72`.
+
+Both native sprites point to linked image records whose owner
+back-pointers identify the corresponding sprite. For the next
+opaque-pixel cut, read the current animation frame, facing or
+flip, and crop from verified image records and associate the
+same stopped update with its framebuffer callback. At the
+nominal nine GBA pixels of separation, the available mask sweep
+has 136 facing/flip combinations with no overlap and 161 with
+no distinguishing pixel. Keep the exact pixel order pending
+until those image and callback fields are captured together.
+
+A separate isolated headless ares restore of that paused state ran one
+neutral frontend step and received one 640×240 callback. The native update
+counter was 17,166 before the step and 17,167 after it. Both 36-byte sprite
+records and their 60-byte head-image records were byte-identical across this
+interval. The heads are `0x801fc5c8` for 438 and `0x801d1800` for 1418;
+each head identifies image 54. Both sprite flags are `0x06`, including the
+observed `0x04` admission bit. Final visibility depends on viewport and
+fog processing. A synchronized callback, current image-frame masks and
+viewport transforms are still needed for opaque pixel and selection checks.
+
+The local observer was an isolated copy of the earlier read-only state-load
+prototype, patched only to point at a private copy of the checkpoint and
+re-signed. It reported one callback, no controller polls and GPU ready. Its
+binary SHA-256 is
+`165e5cf66779f6e8ca2583c33d5f9fcc83c7492226aec7e53d736c905d1a96c5`.
+The before and after RDRAM SHA-256 values are
+`55022f151ec5d08c4a598b39ff8a3e2e7c28d4ca4144eda026a288428ae02cca` and
+`5df1bef8263c8987d791084a0eb2e762b5879264d8919c59f48d9cd577d6d109`.
+The callback SHA-256 is
+`2b7259ce5ec17c7f139e74e0d375778522afb1a31a9e85b83650061e5d48ff20`.
+Keep the state, binary, RDRAM and callback local.
+
+For `pool-id-cross-kind-reuse`, record the camera and both sprite masks
+at the same native update. Require visible pixels inside the active
+viewport after fog, a nonempty order-sensitive mask, and the winner in
+the composed frame. Treat a sprite record flagged `0x04` as metadata.
+Keep the case pending until it captures both ID orders and the free-list
+change through last-image retirement and reuse.
+
+For `same-air-layer-ignore-y`, another exploratory ares continuation
+from a retained Scout checkpoint sampled updates 4,482 and 4,504. The
+layer-18 pair 1973 and 1969 has the higher key on the northern sprite at
+both cuts. Both records lack the draw-admission bit and their projected
+opaque masks are unverified. Qualify the case with a viewport-admitted
+pair. The source input history before this checkpoint is also unverified.
+The local receipt SHA-256 is
+`237ee88cfb9ce8f2ba88ddbb2b50c8be081b2d3d57ffcdc9755080559a385cde`.
+
+## Mineral work layer
+
+The native Blood Bath step-75 observation records visible SCV mining
+sprite ID 2105 on elevation 5. The SCV and mineral itself both use
+elevation 4. The independent sprite intersects 20 opaque SCV pixels and
+88 opaque mineral pixels in the retained source masks. An off-camera
+Probe's working sprite also uses elevation 5. Returning ore is attached
+to the worker in the step-9053 observation. [Native records](2026-11-21-shared-world-depth-regressions.md#n64-reference)
+
+A fresh ares continuation of an ordinary Blood Bath checkpoint
+reproduced the distinction at native update 62. The render rows contain
+workers 2138 and 2135 at layer 4 and their nearby type-340 sprites 2124
+and 2125 at layer 5. The four keys are `0x201ac85a`, `0x2032c857`,
+`0x2800084c` and `0x2800084d`. The final read-only RDRAM digest is
+`322c3ffbc3921c9b44ce55c813e29de4009f0d23dcebfa8e1db6b3e57e75c990`.
+The retained framebuffer digest is
+`f44e0051e4cb60715f36147b598b46f5984ef3722156624a861a987871fba0f8`.
+
+The shared GBA Mode 4 painter uses an original four-pixel cue at the
+worker–field midpoint while the mineral wait is active and within
+gathering range. The work effect takes the heap entry released by the
+worker body and is drawn at elevation 5. The effect uses the current
+worker and field state, including after HOME load, and adds no saved
+fields. Compare order within each platform's own framebuffer and
+palette. GBA cue pixels and animation timing are authored for this
+port. Exact native tie IDs and a composed native overlap mask remain
+separate assertions.
+
+Run `make test-sc64-mining-depth` with the normal Terran profile inputs
+prepared. Use the regular Campaign, Custom Game and Showcase entry points
+for replay wherever a gathering worker is available. For a screenshot
+where a flyer fully covers the cue, retain a second ground-only cut so
+the expected cue pixels are observable. Record worker slot, field slot and
+remaining minerals, work timer, cargo kind, all anchors and the
+effective depth keys. Keep native capture data local.
+
+The sanitizer fixture distinguishes three ground pixels and one flyer
+pixel on each indexed page. It checks fog and the inactive worker
+states, and fails if the work effect's queue insertion is disabled.
+An ordinary Terran-versus-Zerg Blood Bath replay on Z10 pans to the
+active mineral line and captures frame 113 while an SCV has 32 work
+updates left. Both pages change the four cue pixels at X 79–81 and
+Y 54–56. The world, HUD and palette agree. Both versions write the same
+32 KiB pause journal. A fresh HOME load matches the uninterrupted
+world at six checkpoints over the next 24 updates. The paired replay
+receipt is `be9c2ec5e6927d257909ca76f60b92b0b1f0b72d38f27b4b3cd7f358ae852ea0`.
+
+Terran, Z10, P10 and Showcase retain their ARM RAM endpoints. Campaign
+openings and Showcase Carrier Approach match the existing snapshots
+through frame 121. The three race cartridges pass all 54 ordinary
+Custom Game lobby, pause and fresh HOME continuations across both
+maps, all human races and one to three CPU seats. The matrix receipt
+is `197bffaae5d33bc6f0bffa3b60f692c8f9eae4250cc287a8dd92b391e64805de`.
+A 3,600-update three-CPU Blood Bath replay matches sampled gameplay,
+route counters and pause journal bytes. Mean emulated update cost
+rises from 921,678 to 923,198 guest cycles (+0.16%). Physical
+frame pacing remains open. The timing receipt is
+`8c6020da970e135a34f6155daa6769ff35cd7b96bbe4567c3f573b30032aded2`.
+
+## GBA same-Y reproducer
+
+Stage a Zergling and a Marine on the same world anchor in the HOST
+Showcase fixture. Both use elevation 4. Capture the two isolated draws
+and the combined draw with the Zergling in the lower slot, then repeat
+with it in the higher slot. Use a peer with a single draw turn so a
+separately sorted turret cannot enter the overlap mask. After the
+alive-to-dead scan, capture the Zergling's first attached collapse
+window at an offset of five frames. Assert the attached-image flag,
+elevation and anchor before comparing the images.
+
+| Zergling slot | Foreground alive | Foreground after death | Distinguishing pixels per page |
+| --- | --- | --- | --- |
+| Lower | Marine | Collapse | 65 alive, 58 after death |
+| Higher | Zergling | Collapse | 65 alive, 58 after death |
+
+The two indexed pages agree. The lower-slot case reproduces
+a visible order flip in the preceding painter, independent of an anchor
+or elevation change. The baseline HOST sanitizer observation digest is
+`1d83afc2ce220cc95a6659f0816ddca8cff0998d8ec3854d9359bcb88fe9455c`.
+
+The [shared renderer fix](2026-11-21-attached-death-continuity.md)
+passes the two-page fixture, actor-slot reuse, effect-slot
+replacement and renderer reset. Retain an ordinary native
+opaque overlap through last-image retirement and ID reuse.
+
+## Clean Blood Bath opportunity search
+
+One retail N64 Blood Bath run used ordinary ares input, pause and save
+copies. The observer read native rows from the copies. Each continuation
+resumed the last verified checkpoint from the preceding segment.
+
+| Native frame span | Samples | HP-zero or order-zero actors | Near-equal depth candidates | Receipt SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| 1,365–6,922 | 161 | 0 | 0 | `f6501f9fd83c69e2d17ec8506f12f874501284e8f786a7e2fed01ac2c01d167a` |
+| 6,922–9,791 | 241 | 0 | 0 | `0ef0ebe98ee2b6031e585c2706fa4942839311d30728f5e51487e77909af9a51` |
+| 9,791–12,866 | 241 | 0 | 0 | `2f236a5b8ae3f87996559a829f7cdb81f8410ec9cdb5cc3a586a4993009f7eae` |
+
+The last span sampled every 4–30 frames. The human building still had
+1,500 HP at frame 12,866. Actor rows can vanish during a morph, and the
+sampling intervals can miss short-lived images. A save-state sample
+also leaves active-camera opacity unobserved. Keep
+`same-y-attached-death-continuity` pending. For the next capture, put
+the camera on a visible fight and retain the adjacent render cuts from
+the last live pose through attached collapse and final image retirement.
+Record actor and sprite IDs at every cut and keep the same camera,
+palette and viewport for the overlap mask.

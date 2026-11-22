@@ -395,3 +395,134 @@ fall from 1,883,235 to 1,872,385 (0.58%), p95 from 2,179,910 to
 Qualify the other prepared profiles and saves before enabling the probe.
 
 - Paired detector range receipt SHA-256 `ae2d497db4c8981aa24bc0353455e87a76c9c42e7ec6e31e223ab52e75eae9fa`.
+
+##### P10 with the shared depth renderer
+
+On release `9dfba082`, the normal P10 recipe enables the range check when
+the validated rectangle path is present. The check uses the existing
+inclusive edge gap and integer distance for pairs inside its axis bounds.
+The separate optical visibility test and Cannon power gate stay in place.
+
+The physical P7 replay matches all 1,000 frame, route and terrain
+observations and 11 sampled world states, palettes and full indexed
+framebuffer pairs. These are the 958 advancing updates in that window.
+
+| Guest cycles | Release | Detector range check |
+| --- | ---: | ---: |
+| Mean | 1,766,498 | 1,755,536 |
+| p95 | 2,066,456 | 2,052,956 |
+| Maximum | 2,433,880 | 2,436,936 |
+| Mean orders | 841,983 | 831,148 |
+
+At the maximum update, simulation costs 6,940 fewer cycles while draw
+and presentation cost 9,996 more. Linked EWRAM and IWRAM endpoints stay
+at `0x0203b434` and `0x03004d78`. The detector source-tick function's
+compiled stack frame grows from 3,144 to 3,152 bytes. Linked ROM content
+grows by 392 bytes within the 32 MiB cartridge.
+At 11 read-only replay cuts, the 648 bytes below the reserved stack floor
+and above the linked image remain unchanged. The lowest observed changed
+stack byte is 8,208 bytes above that floor. This measures sampled writes.
+
+`make test-sc64-p7-detector-range` checks the inclusive thresholds under
+ASan and UBSan. The prepared owner-mask test matches 2,000 cases including
+optical, Cannon power, movement and source-owner changes. Forty frozen
+inputs match between ARM builds. The normal target reproduces the measured
+candidate bytes, SHA-256
+`4ebad7dfc416e3c498144f019ba1d2d471b7165388dd327dcf86871499a70c74`.
+The replay comparison SHA-256 is
+`217a33acda855a949299fc7ec68fb196a084eaa0e8c50942b8450825d3a850db`.
+The stack observation SHA-256 is
+`1caaf2120794bd66a7c74b74cbd96c28b59ac44522c7e406866856dd6e8605b7`.
+
+##### Composition with selection-ring depth
+
+The normal P10 cartridge with both changes passed ROM header, SRAM
+signature, and memory checks. The 40 private build input hashes and
+linked RAM endpoints matched release `108690d5`. The detector flag
+is scoped to P10 builds with validated rectangles. Campaign and custom
+games in that cartridge use the same detector path.
+
+Against `108690d5`, the same 958 advancing P7 updates averaged
+1,749,589 cycles, down from 1,760,602 (0.63%). The p95 fell from
+2,059,279 to 2,047,006. The peak rose from 2,427,848 to 2,437,534.
+All 1,000 timeline records and 11 sampled world, palette, and full
+indexed framebuffer pairs matched. The scalar sanitizer fixture passed.
+
+The composed ROM SHA-256 is
+`fe8da4798ad548b433627121ab31f4d9894eee60119d266936ace5159ed8f2c4`.
+The paired replay comparison SHA-256 is
+`028cfd891fd251456abac5efb25d8439a671104f08d1cdde10f53ab2ee45caac`.
+
+### Compose minimap dots during the HUD census
+
+Read-only breakpoints in the `ea041527` release P10 time the HUD
+census, existing minimap pass, and the extra supply scan on resource
+strip redraws. The captured frame and HUD counters match the retained
+normal replays. The Homeland row covers advancing gameplay calls.
+
+| Workload | Samples | HUD cycles | Census cycles | Minimap pass cycles | Additional supply cycles per update |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P10 Homeland | 117 | 131,075 | 22,107 | 86,369 | 1,199 |
+| Late three-AI Blood Bath | 124 | 76,438 | 14,836 | 55,078 | 365 |
+
+The prototype fuses only the minimap actor pass into the HUD census.
+It composites the 24×24 interior in 576 scratch bytes, in ascending
+building and then unit slots. The camera and stage-specific indicators
+draw afterward. A marker outside the interior uses the original scalar
+path, including its bottom-band invalidation. HUD page policy, fog,
+actor eligibility and player selection are shared with the reference.
+When the build lacks a maintained terrain raster, the staged draw
+uses the existing visible and explored counts and repaints the original
+panel border and margin. The tile renderer retains its own path.
+
+The opt-in `SC64_HUD_MINIMAP_CENSUS` preparations pass the P10 and Z10
+host ASan/UBSan fixtures. The scalar and fused indexed frames match
+with alternating poisoned pages, overlapping markers, fine fog, camera
+overlay, a marker crossing the minimap boundary, and the neighboring
+halfwords. The Z10
+classic terrain path exercises unseen black and visible overrides.
+The classic arena build also compiles and the default Foundry host
+sanitizer check passes.
+
+The maintained-raster P10 build at `44ed6ded` matches the retained
+11 Homeland and 32 Blood Bath world, fog, palette and framebuffer
+cuts, including both pages and the displayed page. All 1,000 Homeland
+timeline rows and 1,600 Blood Bath frame and route rows match.
+
+| ARM comparison window | Release update mean | Staged update mean | Release HUD mean | Staged HUD mean |
+| --- | ---: | ---: | ---: | ---: |
+| P10 Homeland, 958 advancing updates | 1,728,244 | 1,724,966 | 129,421 | 124,215 |
+| P10 Blood Bath, 1,000 late updates | 998,765 | 996,434 | 74,080 | 70,705 |
+
+Whole-update means improve 0.19% and 0.23%. Homeland p95 rises 0.17%.
+The 86K-cycle minimap scope includes visibility and marker projection
+that the fused implementation still has to perform. Its measured
+whole-HUD savings are about 5.2K and 3.4K cycles.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Homeland HUD phase timings | `7c4fab75399eaf73e029d59d219a36c4a4a351cf74e0b836821fea6c43ac5858` |
+| Blood Bath HUD phase timings | `a78b7e855699fb6690664229762f81e16bdb4fd97c5a662b41f97e9b9897ec02` |
+| Maintained-raster P10 ROM | `5c21618b687cdb6355f294b9c820dc0137e7d04857a7dfec187996ee85d144e5` |
+| Maintained-raster Homeland | `c6476885653a61bf29d69870b46c226ecd2f12e50a4a97fbb0bb8eafdebf449c` |
+| Maintained-raster Blood Bath | `2b4e808dc7d2b00bda27b753adf6827ea7d4c8552f0fa55fef0e99c6b14766bf` |
+| Classic-terrain Z10 ROM | `419569c9cdc16a167b7d8fcf8423b9a824483c8e715acb540299870c2d5b2d6b` |
+| Classic-terrain dense Z7 | `dc31d9d2af7d4d05caf9d9cda98d9d6e90bb3e17c2277aad6226dd6db1230c26` |
+
+The classic-terrain Z10 build at `6ffa7e68` matches all 131 historical
+Z7 checks, all 480 timeline and route rows, and eight sampled worlds,
+fog masks, palette and both framebuffer pages. The sampled hardware
+page also matches. In 477 advancing updates the mean moves from
+2,340,889 to 2,340,042 cycles, p95 from 3,389,340 to 3,386,870 and peak
+from 4,696,376 to 4,697,098. Its HUD mean rises from 144,587 to
+145,277 cycles. Both preview ROMs pass their header, SRAM signature
+and memory checks with the same prepared dependencies as release.
+The links use 584 additional EWRAM bytes and keep the same IWRAM end.
+
+The two terrain paths are available in the
+[source-only experiment](https://github.com/ggu/starcraft-gba/tree/6ffa7e68fa6a5cd409cfcfa01fc67c52d9ef548a).
+Keep the normal renderer. The measured whole-update gains are small,
+and the Z10 HUD work increases. The same release P7 window spends
+183,372 mean cycles restoring and painting the background and 810,395
+in orders. Profile those larger scopes before another HUD traversal
+change.

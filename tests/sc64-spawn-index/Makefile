@@ -15,3 +15,12 @@ test-sc64-spawn-index: build/test-sc64-spawn-index-legacy-flat build/test-sc64-s
 	./build/test-sc64-spawn-index-legacy-memo
 	./build/test-sc64-spawn-index-terran-flat
 	./build/test-sc64-spawn-index-terran-memo
+
+# Asset-free persistent index lifecycle and strict placement stress. The
+# prepared real-engine contact and Nydus fixtures remain separate checks.
+build/test-sc64-persistent-lifecycle: tests/sc64_contact_memo.c starcraft/sc64_persistent_collision.h starcraft/sc64_contact.h common/gba.h tests/sc64-spawn-index/Makefile | build
+	$(CLANG) $(SPAWN_INDEX_HOST_FLAGS) -DSC64_PERSISTENT_COLLISION -DSC64_NYDUS_ENABLED -DSC64_CONTACT_LOCAL_MEMO_PROBE -DSC64_CONTACT_DEFER_STEERING_MEMO $< -o $@
+.PHONY: test-sc64-persistent-lifecycle
+test-sc64-persistent-lifecycle: build/test-sc64-persistent-lifecycle
+	./build/test-sc64-persistent-lifecycle
+test: test-sc64-persistent-lifecycle

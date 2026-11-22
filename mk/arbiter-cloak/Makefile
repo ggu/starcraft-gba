@@ -11,6 +11,13 @@
 ARBITER_CLOAK_ARGS ?=
 ARBITER_CLOAK_DEPS = tests/sc64_arbiter_cloak_diff.c tests/sc64_arbiter_cloak_oracle.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile mk/arbiter-cloak/Makefile | build
 
+build/test-sc64-p7-detector-range: tests/sc64_p7_detector_range.c starcraft/sc64_p7_detector_range.h starcraft/sc64_p7_observer_rules.h mk/arbiter-cloak/Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $< -o $@
+.PHONY: test-sc64-p7-detector-range
+test-sc64-p7-detector-range: build/test-sc64-p7-detector-range
+	./build/test-sc64-p7-detector-range
+test-starcraft: test-sc64-p7-detector-range
+
 build/test-sc64-arbiter-cloak-p10: $(ARBITER_CLOAK_DEPS) $(PROTOSS_P10_INPUTS)
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-arbiter-cloak-p7: $(ARBITER_CLOAK_DEPS) $(PROTOSS_P7_CANONICAL_INPUTS)

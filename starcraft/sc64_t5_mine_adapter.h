@@ -176,7 +176,7 @@ sc64_t5_mine_explode(Unit *mine)
     if (!mine) return;
     center_x = mine->x * 2; center_y = mine->y * 2;
 #ifdef SC64_WEAPON_SOURCE_BANK_VERSION
-    if (!sc64_source_unit_vfx(mine,mine->x,mine->y,0))
+    if (!sc64_source_unit_vfx(mine,mine->x,mine->y,0,-1))
 #endif
         add_tracer(mine->x,mine->y,mine->x,mine->y,
             sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_BURST,C_ORANGE));

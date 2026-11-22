@@ -1306,21 +1306,16 @@ static void race_terran_tick(void)
 {
     if(race_selected_mission==SC64_RACE_MISSION_T2){backwater_update();}
     else {
-        int i,j,raynor_alive=0,raynor_found=0,marines=0,barracks=0,command=0,men=0;
+        int i,j;
         if(!mission_objective_stage&&frame>=30){RACE_TEXT_BOX_ROW(3,3);minerals=40;race_minerals[SIDE]=40;mission_objective_stage=1;race_campaign_set_message(12);}
         for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].type==U_RAYNOR&&u[i].owner==NEUTRAL)
             for(j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&dist2(u[i].x,u[i].y,u[j].x,u[j].y)<=20*20){
                 RACE_TEXT_BOX_ROW(2,1);RACE_TEXT_BOX_ROW(2,5);u[i].owner=SIDE;u[i].selected=0;race_campaign_set_message(13);break;}
-        for(i=0;i<MAX_UNITS;i++)if(u[i].alive){
-            if(u[i].owner==SIDE)++men;
-            if(u[i].type==U_RAYNOR){raynor_alive=1;raynor_found=u[i].owner==SIDE;}
-            else if(u[i].owner==SIDE&&u[i].type==U_MARINE)++marines;}
-        for(i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE){
-            if(b[i].type==B_BARRACKS)++barracks;else if(b[i].type==B_COMMAND)++command;}
-        if(!raynor_alive)RACE_TEXT_BOX_ROW(4,3);
-        else if(!command&&!barracks&&marines<=9&&minerals<=399)RACE_TEXT_BOX_ROW(8,3);
-        if(!raynor_alive||!men||(!command&&!barracks&&marines<=9&&minerals<=399))lost=1;
-        if(raynor_found&&marines>=10&&barracks>=1)won=1;
+        Sc64WastelandCounts c = sc64_wasteland_counts();
+        if(!c.raynor_alive)RACE_TEXT_BOX_ROW(4,3);
+        else if(!c.command&&!c.barracks&&c.marines<=9&&minerals<=399)RACE_TEXT_BOX_ROW(8,3);
+        if(!c.raynor_alive||!c.owned_actors||(!c.command&&!c.barracks&&c.marines<=9&&minerals<=399))lost=1;
+        if(c.raynor_found&&c.marines>=10&&c.completed_barracks>=1)won=1;
     }
     if(lost){won=0;race_campaign.phase=SC64_RACE_PHASE_FAILED;}
     else if(won){race_campaign.phase=SC64_RACE_PHASE_COMPLETE;race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;race_completed|=1<<race_selected_mission;}

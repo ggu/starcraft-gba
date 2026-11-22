@@ -107,11 +107,11 @@ field_ui_on_selected_building(void)
 /* What A does at the cursor, in interact()'s order (double tap, gas,
  * structure, attack, select, move); drives the hint row and attack cursor. */
 static int
-field_ui_a_action(int selected)
+field_ui_a_action_with_worker(int selected, int selected_worker)
 {
     int hx, hy, target;
 #ifdef SC64_FIELD_CURSOR_QUERY_PROBE
-    int worker, target_known = 0;
+    int target_known = 0;
 #endif
     if (mode == MODE_MOVE) return UI_A_MOVE_HERE;
     if (mode == MODE_ATTACK) return UI_A_ATTACK_HERE;
@@ -135,12 +135,7 @@ field_ui_a_action(int selected)
         dist2(cx, cy, unit_tap_x, unit_tap_y) <= UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS)
         return UI_A_SELECT;
 #endif
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
-    worker = find_selected_worker();
-    if (worker >= 0) {
-#else
-    if (find_selected_worker() >= 0) {
-#endif
+    if (selected_worker >= 0) {
         int refinery = nearest_refinery(cx, cy);
         if (refinery >= 0 && dist2(cx, cy, b[refinery].x, b[refinery].y) < 24 * 24)
             return UI_A_GAS;
@@ -151,13 +146,18 @@ field_ui_a_action(int selected)
     if (selected && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
 #ifdef SC64_FIELD_CURSOR_QUERY_PROBE
     if (!target_known) target = selection_target();
-    if (worker >= 0 && target < 0 && field_cursor_mineral_at() >= 0) return UI_A_MINE;
-#else
-    if (selected_worker_mineral_target() >= 0) return UI_A_MINE;
 #endif
+    if (selected_worker >= 0 && target < 0 && field_cursor_mineral_at() >= 0) return UI_A_MINE;
     if (target >= 0) return UI_A_SELECT;
     if (selected_building >= 0) return UI_A_DESELECT;
     return selected ? UI_A_MOVE : UI_A_NONE;
+}
+
+/* Direct callers and host fixtures still resolve the current selection. */
+static int __attribute__((unused))
+field_ui_a_action(int selected)
+{
+    return field_ui_a_action_with_worker(selected, find_selected_worker());
 }
 
 /* The renderer draws several frames per simulation update in crowded scenes,
@@ -171,9 +171,19 @@ field_ui_a_action(int selected)
 static void
 field_ui_refresh(void)
 {
+    int selected = 0, worker = -1;
     if ((u8)frame == ui_tick && (u8)(mode + 1) == ui_tick_mode) return;
     ui_tick = (u8)frame; ui_tick_mode = (u8)(mode + 1);
-    ui_action = (u8)(box_state == 2 ? UI_A_NONE : field_ui_a_action(selected_count()));
+    if (box_state == 2) { ui_action = UI_A_NONE; return; }
+    /* The hint only needs to know whether anything is selected and which
+     * friendly worker would service it. Find both in slot order. */
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) ||
+            SC64_SCARAB_CHILD(&u[i]) || !u[i].selected) continue;
+        selected = 1;
+        if (u[i].owner == SIDE && IS_WORKER(u[i].type)) { worker = i; break; }
+    }
+    ui_action = (u8)field_ui_a_action_with_worker(selected, worker);
 }
 
 static void

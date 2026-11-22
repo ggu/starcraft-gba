@@ -2,7 +2,36 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #define SC64_WEAPON_VFX_H
 
+enum {
+    SC64_TRACE_ATTACKER_OVER = 1,
+    SC64_TRACE_PROJECTILE = 2,
+    SC64_TRACE_ATTACKER_SPRITE = 4,
+    SC64_TRACE_ATTACKER_UNDER = 8,
+    SC64_TRACE_WITHOUT_FLIGHT_TRAILS = 16,
+    SC64_TRACE_ONLY_FLIGHT_TRAILS = 32,
+    SC64_TRACE_WITHOUT_IMPACT_CHILD = 64,
+    SC64_TRACE_ONLY_IMPACT_CHILD = 128,
+    SC64_TRACE_ATTACKER_IMAGE = SC64_TRACE_ATTACKER_OVER | SC64_TRACE_ATTACKER_UNDER,
+    SC64_TRACE_ATTACKER = SC64_TRACE_ATTACKER_IMAGE | SC64_TRACE_ATTACKER_SPRITE,
+    SC64_TRACE_ALL = SC64_TRACE_ATTACKER | SC64_TRACE_PROJECTILE
+};
+
 #include <stdint.h>
+
+static inline unsigned
+sc64_weapon_source_vfx_attacker_part(uint8_t opcode)
+{
+    switch (opcode) {
+    case 8: case 10: case 13:
+        return SC64_TRACE_ATTACKER_OVER;
+    case 9: case 11: case 14:
+        return SC64_TRACE_ATTACKER_UNDER;
+    case 15: case 16: case 17: case 19: case 20: case 21:
+        return SC64_TRACE_ATTACKER_SPRITE;
+    default:
+        return 0;
+    }
+}
 
 /* Visual styles tag the existing transient tracer without changing its
  * layout or the instant-damage combat model. The upper byte selects the
@@ -30,6 +59,25 @@ enum {
     ,SC64_TANK_SOURCE_TANK, SC64_TANK_SOURCE_SIEGE
 #endif
 };
+
+/* These fallback styles have one independent moving head. Source-attached
+ * flashes and composite effects still need their own image information. */
+static inline int
+sc64_weapon_vfx_has_moving_head(int style)
+{
+    switch (style) {
+    case SC64_WEAPON_VFX_STYLE_NEEDLE:
+    case SC64_WEAPON_VFX_STYLE_MISSILE:
+    case SC64_WEAPON_VFX_STYLE_PLASMA:
+    case SC64_WEAPON_VFX_STYLE_ACID:
+    case SC64_WEAPON_VFX_STYLE_SHELL:
+    case SC64_WEAPON_VFX_STYLE_ARC:
+    case SC64_WEAPON_VFX_STYLE_BEAM:
+        return 1;
+    default:
+        return 0;
+    }
+}
 
 /* Number of visible renderer calls for an authored style. Callers seed a
  * transient tracer with lifetime+1 and age it before drawing, so the first

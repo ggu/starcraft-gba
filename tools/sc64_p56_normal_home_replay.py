@@ -3,14 +3,17 @@
 """Replay a verified P4–P6 controller tape on a pinned normal P10 cartridge."""
 import argparse
 from collections import defaultdict
+import hashlib
 import json
 from pathlib import Path
 import resource
 import shutil
 import struct
 
+from sc64_carrier_release_physical import slot
+from sc64_p8_physical_save import P10_CARGO_TAGS, SLOT_SIZE
 from sc64_races_profile import dwarf_struct_layout
-from sc64_skirmish_sram_continuation import PhysicalGame, entity_rows
+from sc64_skirmish_sram_continuation import KEY_B, KEY_L, KEY_START, PhysicalGame, entity_rows
 from sc64_z7_normal_replay import input_hashes, require_unchanged
 
 
@@ -75,6 +78,13 @@ def run(args):
         require(hashes[str(path.resolve())] == getattr(args, name + "_sha256"), f"{name} hash mismatch")
     mission = args.mission
     stop, edges, checks, briefs, modals = plan(json.loads(args.trace.read_text()), args.pages.read_text(), mission)
+    cut = args.fresh_save_call
+    if cut is not None:
+        require(mission in (23, 25) and cut in checks and checks[cut]["screen"] == 1
+                and checks[cut]["mode"] == 0 and checks[cut]["kind"] == "periodic"
+                and all(not tick <= cut <= tick + 2 for tick in modals)
+                and next(mask for tick, mask in reversed(edges) if tick < cut) == 0,
+                "fresh SRAM cut must be a neutral P4 or P6 field checkpoint")
     if args.plan:
         return dict(calls=stop, checks=len(checks), briefing=len(briefs), dialogue=len(modals))
     require(args.out and shutil.disk_usage(args.out.parent).free >= int(5.25 * 2**30), "need new output and 5.25 GiB")
@@ -89,11 +99,21 @@ def run(args):
     _, runtime = dwarf_struct_layout(args.elf, runtime_name)
     _, model = dwarf_struct_layout(args.elf, state_name)
     _, campaign = dwarf_struct_layout(args.elf, "Sc64RaceCampaignState")
-    g = PhysicalGame(args.runner, args.rom, args.elf, args.out / "guest")
+    def open_game(name, **save):
+        directory = args.out / name
+        if args.quiet_guest:
+            directory.mkdir()
+            (directory / "headless.log").symlink_to("/dev/null")
+        return PhysicalGame(args.runner, args.rom, args.elf, directory, **save)
+
+    save_path = args.out / "saved.sav"
+    g = open_game("guest", save_output=save_path if cut is not None else None)
     r = g.rsp
     observations = []
     briefing_seen, dialogue_seen = [], []
     timing_start = r.clock()
+    prior_cycles, offset, journal = 0, 0, None
+
     def scalar(name):
         return int.from_bytes(r.read(g.sym[name], g.sizes[name]), "little")
     def field(raw, base, layout, name):
@@ -139,6 +159,12 @@ def run(args):
             for key, owner in (("side", 0), ("enemy3", 1), ("enemy6", 4)):
                 result[key] = sum(u[1:3] == (owner, 65) for u in units)
         return result
+
+    def persisted_world():
+        scenario = f"race_p{n}"
+        return dict(world=g.state(), scenario=r.read(g.sym[scenario], g.sizes[scenario]),
+                    controls=observe())
+
     caps = {i for i in range(500, stop, 500)} | set(checks) | set(briefs)
     caps |= {i for t in modals for i in (t, t+1, t+2)}
     modal_edges = defaultdict(list)
@@ -149,7 +175,7 @@ def run(args):
         require(scalar("screen") == scalar("frame") == g.front_field("page") == 0, "not fresh HOME")
         for tick in sorted(caps):
             require(shutil.disk_usage(args.out).free >= int(4.15 * 2**30), "disk floor")
-            r.play_to(tick, edges)
+            r.play_to(tick + offset, edges)
             count, page, armed, box = struct.unpack("<4H", r.read(0x06013fe0, 8))
             if tick in briefs:
                 q = tuple(g.front_field(k) for k in ("briefing_page", "briefing_pages", "briefing_revealed", "mission", "page"))
@@ -169,6 +195,45 @@ def run(args):
                 diff = {k: (checks[tick][k], v) for k, v in actual.items() if checks[tick][k] != v}
                 observations.append(dict(call=tick, state=actual, differences=diff))
                 require(not diff, f"checkpoint {tick}: {diff}")
+            if tick == cut:
+                require(r.held == count == armed == 0, "save cut input or dialogue is active")
+                saved = persisted_world()
+                g.step(KEY_START)
+                require(scalar("screen") == 2 and scalar("frame") == saved["controls"]["frame"],
+                        "START did not pause at the selected frame")
+                g.step(0)
+                g.step(KEY_B)
+                require(scalar("pause_notice") & 0xc0 == 0x40, "ordinary pause B did not save")
+                r.export_sram()
+                image = save_path.read_bytes()
+                inner, outer = P10_CARGO_TAGS
+                payload = slot(image, 0, outer, 1)
+                _, layout = dwarf_struct_layout(args.elf, "RaceSave")
+                require(image[SLOT_SIZE:] == b"\xff" * SLOT_SIZE
+                        and struct.unpack_from("<I", payload, layout["version"])[0] == inner,
+                        "unexpected fresh P10 journal format")
+                state = struct.unpack_from("<8I", payload, layout["state"])
+                require((state[0], state[2], state[7]) == (0, mission, saved["controls"]["frame"]),
+                        "journal has the wrong mission or frame")
+                journal = dict(call=cut, frame=state[7], sequence=1, payload_bytes=len(payload),
+                               tag=f"{outer:#010x}", sha256=hashlib.sha256(image).hexdigest())
+                prior_cycles = r.clock() - timing_start
+                g.close()
+                g = None
+                g = open_game("fresh", save_input=save_path)
+                r = g.rsp
+                timing_start = r.clock()
+                require(scalar("screen") == scalar("frame") == g.front_field("page") == 0,
+                        "reload did not start at fresh HOME")
+                g.step(KEY_L)
+                loaded = persisted_world()
+                require(scalar("race_selected_mission") == mission
+                        and all(loaded[key] == saved[key] for key in saved),
+                        "fresh HOME L changed the saved world, controls or trigger state")
+                r.set_keys(0)
+                offset = r.completed - cut
+                edges = [(t + offset, mask) for t, mask in edges if t >= cut]
+                (args.out / "save-cut.json").write_text(json.dumps(journal, indent=2) + "\n")
         raw = r.read(g.sym["race_campaign"], g.sizes["race_campaign"])
         actual = observations[-1]["state"]
         terminal = dict(screen=actual["screen"], won=actual["won"], lost=actual["lost"],
@@ -181,9 +246,14 @@ def run(args):
                 and terminal["phase"] == 3 and len(briefing_seen) == len(briefs)
                 and len(dialogue_seen) == len(modals), f"incomplete terminal state: {terminal}")
         require_unchanged(files, hashes)
-        cycles = r.clock() - timing_start
+        if cut is not None:
+            require(journal and hashlib.sha256(save_path.read_bytes()).hexdigest() == journal["sha256"],
+                    "SRAM changed during continuation")
+        cycles = prior_cycles + r.clock() - timing_start
         result = dict(result="won", mission=mission, calls=stop, cycles=cycles, updates_per_second=stop*16777216/cycles,
                       observations=observations, terminal=terminal, briefing=briefing_seen, dialogue=dialogue_seen, sha256=hashes)
+        if journal is not None:
+            result["fresh_save"] = journal
         (args.out / "result.json").write_text(json.dumps(result, indent=2) + "\n")
         return dict(calls=stop, checks=len(observations), briefing=len(briefs), dialogue=len(modals), rate=result["updates_per_second"])
     except Exception as exc:
@@ -191,7 +261,8 @@ def run(args):
             sha256=hashes, observations=observations, briefing=briefing_seen, dialogue=dialogue_seen), indent=2)+"\n")
         raise
     finally:
-        g.close()
+        if g is not None:
+            g.close()
 
 
 if __name__ == "__main__":
@@ -202,4 +273,6 @@ if __name__ == "__main__":
         cli.add_argument("--" + name + "-sha256", required=True)
     cli.add_argument("--out", type=Path)
     cli.add_argument("--plan", action="store_true")
+    cli.add_argument("--fresh-save-call", type=int, help="pause, save, and reload at a neutral P4 or P6 checkpoint")
+    cli.add_argument("--quiet-guest", action="store_true", help="discard emulator log chatter")
     print(json.dumps(run(cli.parse_args()), indent=2))

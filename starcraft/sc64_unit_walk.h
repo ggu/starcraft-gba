@@ -41,6 +41,29 @@ sc64_walk_reset_all(void)
     for (int i = 0; i < MAX_UNITS; ++i) sc64_walk_reset_slot(i);
 }
 
+#ifdef SC64_RACES
+static inline int
+sc64_walk_flyer_phase(const Unit *q)
+{
+    if (q->order == ORDER_IDLE || (q->cd && q->order == ORDER_ATTACK_TARGET) ||
+        (q->x == q->tx && q->y == q->ty)) return 0;
+    return (int)(((unsigned)frame >> 2) & 3) + 1;
+}
+#endif
+
+static inline unsigned
+sc64_walk_ground_key(const Unit *q)
+{
+    return ((unsigned)q->path_timer << SC64_WALK_KEY_SHIFT) & SC64_WALK_KEY_MASK;
+}
+
+static inline int
+sc64_walk_ground_phase(const Unit *q, unsigned bits, unsigned stepped)
+{
+    if (!stepped && !(bits & SC64_WALK_HOLD)) return 0;
+    return (int)(((unsigned)q->path_timer >> 1) & 3) + 1;
+}
+
 /* Called before drawing a visible unit. Returns 0 while the unit stands,
  * else stride phase 1..4: 1 and 3 plant a foot, 2 and 4 lift the body. */
 static int __attribute__((noinline))
@@ -49,19 +72,14 @@ sc64_walk_track(const Unit *q)
     int slot = (int)(q - u);
     if ((unsigned)slot >= MAX_UNITS) return 0;
 #ifdef SC64_RACES
-    if (sc64_race_unit_flying(q->type)) {
-        if (q->order == ORDER_IDLE || (q->cd && q->order == ORDER_ATTACK_TARGET) ||
-            (q->x == q->tx && q->y == q->ty)) return 0;
-        return (int)(((unsigned)frame >> 2) & 3) + 1;
-    }
+    if (sc64_race_unit_flying(q->type)) return sc64_walk_flyer_phase(q);
 #endif
     unsigned bits = SC64_WALK_BITS[slot];
-    unsigned key = ((unsigned)q->path_timer << SC64_WALK_KEY_SHIFT) & SC64_WALK_KEY_MASK;
+    unsigned key = sc64_walk_ground_key(q);
     unsigned stepped = (bits & SC64_WALK_KEY_MASK) != key;
     SC64_WALK_BITS[slot] = (u8)((bits & ~(SC64_WALK_KEY_MASK | SC64_WALK_HOLD)) |
                                 key | (stepped ? SC64_WALK_HOLD : 0));
-    if (!stepped && !(bits & SC64_WALK_HOLD)) return 0;
-    return (int)(((unsigned)q->path_timer >> 1) & 3) + 1;
+    return sc64_walk_ground_phase(q, bits, stepped);
 }
 
 /* Lift the body one pixel between footfalls. */

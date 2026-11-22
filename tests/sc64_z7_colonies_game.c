@@ -245,7 +245,7 @@ static void test_paid_in_place_morph_and_roundtrip(int damage_mode)
     forged.owner = ENEMY;
     assert(!race_z7_colony_morph_state_valid(&forged));
     forged = decoded;
-    forged.maxhp = SC64_Z7_SUNKEN_HP;
+    forged.maxhp = SC64_Z7_CREEP_HP - 1;
     assert(!race_z7_colony_morph_state_valid(&forged));
     forged = decoded;
     forged.shield_remainder = 1;
@@ -261,9 +261,8 @@ static void test_paid_in_place_morph_and_roundtrip(int damage_mode)
     }
     assert(building_complete(colony));
     assert(b[colony].type == B_SUNKEN_COLONY && b[colony].raw_type == 146 &&
-           b[colony].raw_owner == 3 && b[colony].maxhp == 300);
-    assert(b[colony].hp == (damage_mode == 1 ? 90 :
-                            damage_mode == 2 ? 280 : 290));
+           b[colony].raw_owner == 3 && b[colony].maxhp == 400);
+    assert(b[colony].hp == old_hp - (damage_mode == 2 ? 20 : 10));
     assert(!(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
            b[colony].shield == 0 && b[colony].shield_remainder == 0);
     int sunken_hp = b[colony].hp;
@@ -374,14 +373,23 @@ static void test_paid_spore_morph_and_native_weapon_scope(void)
     ground=spawn_unit(ENEMY,U_ZERGLING,x+8,y+8);
     air=spawn_unit(ENEMY,U_MUTALISK,x+12,y+12);
     assert(ground>=0 && air>=0);
+    update_exploration();
     int ground_hp=u[ground].hp, air_hp=u[air].hp;
     race_tick_defenses();
+#ifdef SC64_IMPACT_EVENTS
+    for (int tick=0; tick<256 && race_impact_count; ++tick)
+        race_impact_tick();
+    assert(!race_impact_count);
+#endif
     assert(u[ground].hp==ground_hp && u[air].hp==air_hp-15);
     b[colony].queue_progress=0;
     u[air].flags|=16; /* Cloaked actors remain undetected by this building path. */
     air_hp=u[air].hp;
     race_tick_defenses();
     assert(u[air].hp==air_hp);
+#ifdef SC64_IMPACT_EVENTS
+    assert(!race_impact_count);
+#endif
 }
 
 static void test_spore_morph_menu_dispatch(void)
@@ -571,7 +579,7 @@ static void test_real_campaign_sram_resume(void)
     }
     assert(building_complete(colony) && b[colony].type == B_SUNKEN_COLONY &&
            b[colony].raw_type == 146 && b[colony].raw_owner == 3 &&
-           b[colony].hp == 300 && b[colony].shield == 0);
+           b[colony].hp == 400 && b[colony].maxhp == 400 && b[colony].shield == 0);
 
     /* Spore source morphs preserve the same source row and use the packed
        morph flag through a cold HOME restore. */
@@ -617,9 +625,8 @@ static void test_real_campaign_sram_resume(void)
            b[colony].raw_type==SC64_Z7_SPORE_RAW && b[colony].hp==280);
     assert(race_save_game());
 
-    /* Death can occur after the normal pre/post production hooks. Use a
-       second canonical-world colony, retain its morph marker through save and
-       a HOME cold-load, then let the next real frame clean the dead row. */
+    /* Death after production clears the morph state before an immediate save.
+       Verify the dead row through HOME load and the next advancing frame. */
     site = find_legal_site(B_CREEP_COLONY, b[hatch].x + 120, b[hatch].y + 64);
     if (site < 0)
         site = find_legal_site(B_CREEP_COLONY, b[hatch].x - 120, b[hatch].y + 64);
@@ -634,7 +641,8 @@ static void test_real_campaign_sram_resume(void)
     hit_target(MAX_UNITS + colony, b[colony].hp + 1000,
                U_MARINE, ENEMY);
     assert(!b[colony].alive &&
-           (b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG));
+           !(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
+           b[colony].queue_progress == 0);
     assert(race_save_game());
     saved = race_data;
     save_write(&saved, sizeof(saved), SAVE_VERSION);
@@ -643,7 +651,8 @@ static void test_real_campaign_sram_resume(void)
     assert(!race_z7_active() && screen == SCREEN_TITLE);
     assert(race_load_game());
     assert(race_z7_active() && !b[colony].alive &&
-           (b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG));
+           !(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&
+           b[colony].queue_progress == 0);
     game_update(0, 0);
     assert(race_z7_active() && !b[colony].alive &&
            !(b[colony].flags & SC64_Z7_SUNKEN_MORPH_FLAG) &&

@@ -4,7 +4,7 @@
 
 /* Opt-in world probe. The command and update paths use the same ownership
  * checks, including for campaign actors. The journal has its own gate. */
-enum { SC64_NUKE_FLIGHT_LIMIT = 8, SC64_NUKE_NO_PAYER = 255 };
+enum { SC64_NUKE_NO_PAYER = 255 };
 enum { SC64_NUKE_ASCENT_TICKS = 90, SC64_NUKE_ALERT_TICKS = 45 };
 /* T8's missile reached the ground before the impact script began, and
  * the script's flash preceded HP loss. The latter is a bounded estimate
@@ -544,49 +544,114 @@ static void race_nuke_tick(void)
     }
 }
 
-static void race_nuke_draw_impact(int x, int y, unsigned tick)
+enum {
+    SC64_NUKE_DRAW_DOT, SC64_NUKE_DRAW_MISSILE, SC64_NUKE_DRAW_BURST,
+    SC64_NUKE_DRAW_IMPACT, SC64_NUKE_DRAW_PART_COUNT,
+};
+
+static int race_nuke_impact_draw_tick(const Sc64NukeWorldFlight *flight)
 {
-    if (tick / SC64_NUKE_BURST_SOURCE_TICKS < SC64_NUKE_BURST_FRAME_COUNT)
-        sc64_nuke_draw_frame(&sc64_nuke_burst_frames[tick / SC64_NUKE_BURST_SOURCE_TICKS], x, y);
-    if (tick / SC64_NUKE_IMPACT_SOURCE_TICKS < SC64_NUKE_IMPACT_FRAME_COUNT)
-        sc64_nuke_draw_frame(&sc64_nuke_impact_frames[tick / SC64_NUKE_IMPACT_SOURCE_TICKS],
-                             x, y + SC64_NUKE_IMPACT_SOURCE_Y / 2);
+    const Sc64NukeFlight *strike = &flight->strike;
+    if (flight->impact_tick) return flight->impact_tick - 1;
+    if (strike->phase != SC64_NUKE_DESCENDING) return -1;
+    return strike->age - strike->cadence.paint - strike->cadence.descent +
+        SC64_NUKE_DAMAGE_LEAD;
 }
 
-static void race_nuke_draw(void)
+/* Painting contributes at most dot + ascent, and impact at most burst +
+ * child. Descent before impact only contributes the missile itself. */
+static unsigned race_nuke_visible_parts(const Sc64NukeWorldFlight *flight)
+{
+    const Sc64NukeFlight *strike = &flight->strike;
+    if (!strike->phase && !flight->impact_tick) return 0;
+    int target_visible = strike->owner == SIDE || currently_visible(strike->x, strike->y);
+    int tick = race_nuke_impact_draw_tick(flight);
+    if (tick >= 0) {
+        if (!target_visible) return 0;
+        unsigned parts = 0;
+        if ((unsigned)tick / SC64_NUKE_BURST_SOURCE_TICKS < SC64_NUKE_BURST_FRAME_COUNT)
+            parts |= 1u << SC64_NUKE_DRAW_BURST;
+        if ((unsigned)tick / SC64_NUKE_IMPACT_SOURCE_TICKS < SC64_NUKE_IMPACT_FRAME_COUNT)
+            parts |= 1u << SC64_NUKE_DRAW_IMPACT;
+        return parts;
+    }
+    if (strike->phase == SC64_NUKE_DESCENDING)
+        return target_visible ? 1u << SC64_NUKE_DRAW_MISSILE : 0;
+    if (strike->phase != SC64_NUKE_PAINTING) return 0;
+    unsigned parts = target_visible ? 1u << SC64_NUKE_DRAW_DOT : 0;
+    if (strike->age < flight->ascent_ticks &&
+        (strike->owner == SIDE || currently_visible(flight->origin_x, flight->origin_y)))
+        parts |= 1u << SC64_NUKE_DRAW_MISSILE;
+    return parts;
+}
+
+static void race_nuke_draw_part(unsigned slot)
+{
+    const Sc64NukeWorldFlight *flight = &race_nuke_flights[slot / SC64_NUKE_DRAW_PART_COUNT];
+    const Sc64NukeFlight *strike = &flight->strike;
+    int x = strike->x - camx, y = strike->y - camy + 12;
+    switch (slot % SC64_NUKE_DRAW_PART_COUNT) {
+    case SC64_NUKE_DRAW_DOT: {
+        unsigned frame = strike->age / SC64_NUKE_DOT_SOURCE_TICKS % SC64_NUKE_DOT_FRAME_COUNT;
+        sc64_nuke_draw_frame(&sc64_nuke_dot_frames[frame], x, y);
+        break;
+    }
+    case SC64_NUKE_DRAW_MISSILE:
+        if (strike->phase == SC64_NUKE_PAINTING) {
+            int height = (int)race_nuke_travel(strike->age);
+            sc64_nuke_draw_frame(&sc64_nuke_missile_frames[0], flight->origin_x - camx,
+                                 flight->origin_y - camy + 12 - height);
+        } else {
+            unsigned elapsed = strike->age - strike->cadence.paint;
+            int height = (int)race_nuke_drop(strike->y) - (int)race_nuke_travel(elapsed);
+            sc64_nuke_draw_frame(&sc64_nuke_missile_frames[1], x, y - (height > 0 ? height : 0));
+        }
+        break;
+    case SC64_NUKE_DRAW_BURST: {
+        unsigned tick = (unsigned)race_nuke_impact_draw_tick(flight);
+        sc64_nuke_draw_frame(&sc64_nuke_burst_frames[tick / SC64_NUKE_BURST_SOURCE_TICKS], x, y);
+        break;
+    }
+    case SC64_NUKE_DRAW_IMPACT: {
+        unsigned tick = (unsigned)race_nuke_impact_draw_tick(flight);
+        sc64_nuke_draw_frame(&sc64_nuke_impact_frames[tick / SC64_NUKE_IMPACT_SOURCE_TICKS],
+                             x, y + SC64_NUKE_IMPACT_SOURCE_Y / 2);
+        break;
+    }
+    }
+}
+
+#ifdef SC64_WORLD_DEPTH
+_Static_assert(SC64_NUKE_FLIGHT_LIMIT * SC64_NUKE_DRAW_PART_COUNT <= DEPTH_SLOT_MASK + 1,
+               "painter keys must hold all nuclear flight parts");
+
+static void sc64_depth_push_nuke_effects(u32 *heap, unsigned *size)
 {
     if (!race_nuke_active_flights) return;
-    for (int i = 0; i < SC64_NUKE_FLIGHT_LIMIT; ++i) {
-        const Sc64NukeWorldFlight *f = &race_nuke_flights[i];
-        const Sc64NukeFlight *strike = &f->strike;
-        if (!strike->phase && !f->impact_tick) continue;
-        int x = strike->x - camx, y = strike->y - camy + 12;
-        if (f->impact_tick) {
-            if (strike->owner == SIDE || currently_visible(strike->x, strike->y))
-                race_nuke_draw_impact(x, y, f->impact_tick - 1);
-            continue;
-        }
-        if (strike->owner == SIDE || currently_visible(strike->x, strike->y)) {
-            if (strike->phase == SC64_NUKE_PAINTING)
-                sc64_nuke_draw_frame(&sc64_nuke_dot_frames[(strike->age / SC64_NUKE_DOT_SOURCE_TICKS) %
-                                                          SC64_NUKE_DOT_FRAME_COUNT], x, y);
-            if (strike->phase == SC64_NUKE_DESCENDING) {
-                unsigned elapsed = strike->age - strike->cadence.paint;
-                unsigned flash = strike->cadence.descent - SC64_NUKE_DAMAGE_LEAD;
-                if (elapsed >= flash) race_nuke_draw_impact(x, y, elapsed - flash);
-                else {
-                    int height = (int)race_nuke_drop(strike->y) - (int)race_nuke_travel(elapsed);
-                    sc64_nuke_draw_frame(&sc64_nuke_missile_frames[1], x, y - (height > 0 ? height : 0));
-                }
-            }
-        }
-        if (strike->phase == SC64_NUKE_PAINTING &&
-            strike->age < f->ascent_ticks &&
-            (strike->owner == SIDE || currently_visible(f->origin_x, f->origin_y))) {
-            int height = (int)race_nuke_travel(strike->age);
-            sc64_nuke_draw_frame(&sc64_nuke_missile_frames[0],
-                                 f->origin_x - camx, f->origin_y - camy + 12 - height);
+    /* Native sprite layer survives ascent and descent. The attaching
+     * imgol burst stays on the missile, and sprol adds its child at +1. */
+    unsigned missile_layer = sc64_world_actor_layer(SC64_NUKE_MISSILE_RAW, 18);
+    unsigned dot_layer = sc64_world_actor_layer(SC64_NUKE_GHOST_RAW, 4) + 1;
+    for (unsigned i = 0; i < SC64_NUKE_FLIGHT_LIMIT; ++i) {
+        const Sc64NukeWorldFlight *flight = &race_nuke_flights[i];
+        unsigned parts = race_nuke_visible_parts(flight);
+        for (unsigned part = 0; parts != 0; ++part, parts >>= 1) {
+            if (!(parts & 1u)) continue;
+            unsigned layer = part == SC64_NUKE_DRAW_DOT ? dot_layer :
+                missile_layer + (part == SC64_NUKE_DRAW_IMPACT);
+            sc64_depth_push(heap, size, layer, flight->strike.y, DEPTH_NUKE_EFFECT,
+                            i * SC64_NUKE_DRAW_PART_COUNT + part);
         }
     }
 }
+#else
+static void race_nuke_draw(void)
+{
+    if (!race_nuke_active_flights) return;
+    for (unsigned i = 0; i < SC64_NUKE_FLIGHT_LIMIT; ++i)
+        for (unsigned part = 0, parts = race_nuke_visible_parts(&race_nuke_flights[i]);
+             parts != 0; ++part, parts >>= 1)
+            if (parts & 1u) race_nuke_draw_part(i * SC64_NUKE_DRAW_PART_COUNT + part);
+}
+#endif
 #endif

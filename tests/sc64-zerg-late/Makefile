@@ -99,20 +99,81 @@ $(Z10_PROGRAM_HEADER): $(Z10_DESCRIPTOR) tools/sc64_zerg_late_program_pack.py to
 # The ordinary Z10 renderer needs the same exact static key for lookup and
 # capture. Compute it once per draw, as the other capable products do.
 ZERG_Z10_DEFENSE_FLAGS ?= $(CANONICAL_DEFENSE_FLAGS)
-ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE
+ZERG_Z10_FEATURES = -DSC64_Z10_DATA_ENABLED -DSC64_Z10_RUNTIME -DSC64_Z10_CAMPAIGN_ENTRY -DSC64_RENDER_KEY_ONCE -Ibuild/generated/z10 $(ZERG_Z10_DEFENSE_FLAGS) -DSC64_DEPOT_FIRST_NEAREST_PROBE \
+	$(filter -DSC64_MINIMAP_RASTER,$(CANONICAL_CACHE_FLAGS))
 ZERG_Z10_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z9_BANK),-I$(ZERG_Z10_BANK),$(ZERG_Z9_CANONICAL_FLAGS)) $(ZERG_Z10_FEATURES) $(CENSUS_FLAGS)
 # The packed frames belong to the qualified Z10 sprite bank.
 Z10_BUILDING_WORDS ?= 1
 ifneq ($(filter $(Z10_BUILDING_WORDS),0 1),$(Z10_BUILDING_WORDS))
 $(error Z10_BUILDING_WORDS must be 0 or 1)
 endif
+Z10_TERRAN_BUILDING_WORDS ?= $(CANONICAL_TERRAN_BUILDING_WORDS)
+ifneq ($(words $(filter 0 1,$(Z10_TERRAN_BUILDING_WORDS))),1)
+$(error Z10_TERRAN_BUILDING_WORDS must be 0 or 1)
+endif
+ifneq ($(filter $(Z10_TERRAN_BUILDING_WORDS),0 1),$(Z10_TERRAN_BUILDING_WORDS))
+$(error Z10_TERRAN_BUILDING_WORDS must be 0 or 1)
+endif
 SC64_BUILDING_WORDS_HEADER = build/generated/sc64_building_words_generated.h
 Z10_BUILDING_WORDS_FLAGS = $(if $(filter 1,$(Z10_BUILDING_WORDS)),-DSC64_BUILDING_WORDS_PROBE)
-Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
+Z10_TERRAN_BUILDING_WORD_DIR := build/generated/z10-terran-building-words
+Z10_TERRAN_BUILDING_WORD_HEADER := $(Z10_TERRAN_BUILDING_WORD_DIR)/sc64_building_words_generated.h
+# The extra bank must precede the normal -Ibuild/generated.
+Z10_TERRAN_BUILDING_WORD_INCLUDE := $(if $(and $(Z10_BUILDING_WORDS_FLAGS),$(filter 1,$(Z10_TERRAN_BUILDING_WORDS)),$(call sc64_can_pack_building_words,$(CFLAGS) $(ZERG_Z10_CANONICAL_FLAGS))),-I$(Z10_TERRAN_BUILDING_WORD_DIR))
+Z10_SELECTED_BUILDING_WORD_HEADER := $(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),$(Z10_TERRAN_BUILDING_WORD_HEADER),$(SC64_BUILDING_WORDS_HEADER))
+Z10_BUILDING_WORDS_KEY := $(Z10_BUILDING_WORDS)$(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),-terran)
+Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS_KEY)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
 ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
-build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(SC64_BUILDING_WORDS_HEADER)) | build
-	$(CC) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+# The standard Z10 cartridge can use the qualified custom Carrier journal.
+# Keep a reversible stock comparison with an independent fact-table cache.
+include mk/carrier-release/flags/Makefile
+Z10_CARRIER_RELEASE ?= 1
+ifneq ($(Z10_CARRIER_RELEASE),0)
+ifneq ($(Z10_CARRIER_RELEASE),1)
+$(error Z10_CARRIER_RELEASE must be 0 or 1)
+endif
+endif
+Z10_CARRIER_FLAGS := $(if $(filter 1,$(Z10_CARRIER_RELEASE)),$(SC64_CARRIER_RELEASE_FLAGS))
+Z10_CARRIER_SOURCES := $(if $(Z10_CARRIER_FLAGS),$(P7_INTERCEPTOR_FLIGHT_SOURCES))
+# Preserve the qualified layout with the order model before motion and codec.
+Z10_PROJECTILE_SOURCES := $(filter starcraft/sc64_interceptor_%.c,$(STARCRAFT))
+Z10_ARM_SOURCES := $(filter-out $(Z10_PROJECTILE_SOURCES),$(STARCRAFT)) $(Z10_CARRIER_SOURCES) $(Z10_PROJECTILE_SOURCES)
+# Actor flags, flight and collision radius use the existing immutable tables.
+Z10_FACT_TABLES ?= 1
+ifneq ($(words $(Z10_FACT_TABLES)),1)
+$(error Z10_FACT_TABLES must be 0 or 1)
+endif
+ifeq ($(filter 0 1,$(Z10_FACT_TABLES)),)
+$(error Z10_FACT_TABLES must be 0 or 1)
+endif
+# Combat eligibility can use the same generated bank on the normal Z10 path.
+Z10_COMBAT_FACTS ?= 1
+ifneq ($(Z10_COMBAT_FACTS),0)
+ifneq ($(Z10_COMBAT_FACTS),1)
+$(error Z10_COMBAT_FACTS must be 0 or 1)
+endif
+endif
+Z10_COMBAT_FACT_FLAGS := $(if $(and $(filter 1,$(Z10_FACT_TABLES)),$(filter 1,$(Z10_COMBAT_FACTS))),-DSC64_COMBAT_FACT_TABLE_PROBE)
+Z10_FACT_DIR := build/generated/z10-facts$(if $(Z10_CARRIER_FLAGS),-carrier)
+Z10_FACT_HEADER := $(Z10_FACT_DIR)/sc64_fact_tables_generated.h
+Z10_FACT_FLAGS = $(if $(filter 1,$(Z10_FACT_TABLES)),-DSC64_FACT_TABLES -I$(Z10_FACT_DIR) $(Z10_COMBAT_FACT_FLAGS))
+Z10_FACT_REFERENCE_FLAGS = $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(filter -D% -I%,$(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS)) $(Z10_CARRIER_FLAGS) $(Z10_COMBAT_FACT_FLAGS)
+Z10_FACT_SIGNATURE = $(subst ','"'"',$(strip $(Z10_FACT_TABLES) $(Z10_FACT_REFERENCE_FLAGS)))
+Z10_FACT_CONFIG := $(if $(shell test -f build/z10-facts-config && printf '%s\n' '$(Z10_FACT_SIGNATURE)' | cmp -s - build/z10-facts-config && printf matched),,force-z10-facts-rebuild)
+$(Z10_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) $(ZERG_Z10_CANONICAL_INPUTS) Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile tests/sc64-zerg-late/Makefile build/z10-facts-config $(Z10_FACT_CONFIG) | build
+	mkdir -p $(Z10_FACT_DIR)
+	$(CLANG) -std=c11 -O2 -Istarcraft $(Z10_FACT_REFERENCE_FLAGS) $< -o $(Z10_FACT_DIR)/generator
+	$(Z10_FACT_DIR)/generator > $@.tmp
+	mv $@.tmp $@
+.PHONY: force-z10-facts-config force-z10-facts-rebuild
+force-z10-facts-config:
+force-z10-facts-rebuild:
+build/z10-facts-config: force-z10-facts-config | build
+	@printf '%s\n' '$(Z10_FACT_SIGNATURE)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(Z10_ARM_SOURCES) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(Z10_SELECTED_BUILDING_WORD_HEADER)) build/z10-facts-config $(Z10_FACT_CONFIG) $(if $(Z10_FACT_FLAGS),$(Z10_FACT_HEADER)) | build
+	$(CC) $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(Z10_FACT_FLAGS) $(Z10_CARRIER_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(Z10_ARM_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -122,8 +183,14 @@ verify-zerg-z10: build/StarCraft-Zerg-Z10-Transport1-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z10
 zerg-z10: verify-zerg-z10
 
+.PHONY: test-sc64-z10-fact-tables
+build/test-sc64-z10-fact-tables: tests/sc64_fact_tables_check.c $(Z10_FACT_HEADER) $(wildcard starcraft/*.h) Makefile tests/sc64-zerg-late/Makefile | build
+	$(CLANG) $(Z8_HOST_FLAGS) -Istarcraft $(Z10_FACT_REFERENCE_FLAGS) -DSC64_FACT_TABLES -I$(Z10_FACT_DIR) $< -o $@
+test-sc64-z10-fact-tables: build/test-sc64-z10-fact-tables
+	./build/test-sc64-z10-fact-tables
+
 build/test-sc64-z10-sight-packed-rows: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_SIGHT_ROW_LUT_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_Z7_VISIBILITY_PACKED_ROWS -DSC64_Z7_VISIBILITY_SPARSE_ROWS,$(ZERG_Z10_RELEASE_FLAGS)) -DSC64_Z7_VISIBILITY_PACKED_ROWS $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-sight-packed-rows
 test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
 	./build/test-sc64-z10-sight-packed-rows
@@ -132,14 +199,18 @@ test-sc64-z10-sight-packed-rows: build/test-sc64-z10-sight-packed-rows
 force-z10-building-words-config:
 force-z10-building-words-rebuild:
 build/z10-building-words-config: force-z10-building-words-config | build
-	@printf '%s\n' '$(Z10_BUILDING_WORDS)' > $@.tmp
+	@printf '%s\n' '$(Z10_BUILDING_WORDS_KEY)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 $(SC64_BUILDING_WORDS_HEADER): $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
 	mkdir -p $(dir $@)
 	$(PYTHON) tools/sc64_building_words.py $< > $@.tmp
 	mv $@.tmp $@
-build/test-sc64-z10-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(SC64_BUILDING_WORDS_HEADER) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) -DSC64_BUILDING_WORDS_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+$(Z10_TERRAN_BUILDING_WORD_HEADER): $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
+	mkdir -p $(dir $@)
+	$(PYTHON) tools/sc64_building_words.py $< --append-frame command_center --append-frame barracks --append-frame supply_depot > $@.tmp
+	mv $@.tmp $@
+build/test-sc64-z10-building-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) $(Z10_SELECTED_BUILDING_WORD_HEADER) build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(ZERG_Z10_RELEASE_FLAGS) -DSC64_BUILDING_WORDS_PROBE $(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),-DSC64_Z10_TERRAN_BUILDING_WORDS_EXPECTED) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-building-words-pixels
 test-sc64-z10-building-words-pixels: build/test-sc64-z10-building-words-pixels
 	./build/test-sc64-z10-building-words-pixels

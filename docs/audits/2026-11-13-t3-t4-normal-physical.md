@@ -49,3 +49,117 @@ all scenarios, or frame rate on a physical GBA.
 | T4 HOST tape | `f10192aab83c53c616888b0430e354d9dc49f163d7e3a94796ff7ca362df7b7a` |
 | T3 replay receipt | `1ea3bc2d5d6bb63685d9f2f700c3748840d589494eb8ce02d92fa28a69e7c42c` |
 | T4 replay receipt | `2a600105ff8759b07e1156551b2e4ee798e35725aaa6258766c0c391b873424f` |
+
+## November 20 T3 fresh SRAM and result autosave
+
+The normal Terran ROM built from `afffebec` runs the exact
+Desperate Alliance HOST tape from the November 13 audit. The observer
+selects the mission at HOME, reveals 15 briefing pages and deploys
+with Start. All 54,000 advancing gameplay calls use neutral input.
+The observer acknowledges six dialogue pages at simulation frames 30,
+480, 36,000, 45,000, 52,200 and 54,000. Each press and release holds
+the current frame.
+
+At frame 26,993, four enemy waves have begun and the countdown has
+27,007 frames left. The player has 20 units, 12 buildings and an empty
+selection. Start pauses and B writes bank 0. A fresh emulator loads
+that journal with L at HOME. The observed world, mission state,
+countdown, selection and cursor match before continuation. The camera
+reconstructed from the cursor matches at this cut.
+
+All 54 periodic checkpoints match, along with launch and the result.
+Twenty-eight observations follow the fresh load. The base survives
+all eleven waves and the clock reaches zero at frame 54,000. The
+player retains 16 units and ten buildings. Bank 1 records the frozen
+win and leaves bank 0 byte-identical. A third emulator reloads the
+result through HOME and re-exports identical SRAM.
+
+The 54,082 measured controller calls average 589,210 guest cycles
+per main loop, or 28.47 emulated updates per second. The largest
+update is 30,769,720 cycles. These values include briefing, dialogue,
+rendering, save and load. Physical GBA performance remains unmeasured.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 3 --save-tick 26993 \
+  --trace "$T3_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `01240c5e95c1f0e648028dad75005e3185904c02e6c9b0577aa368d14e7958f3` |
+| Matching ELF | `85aa28c9206b11cd9baebdc9f33d8d9bf6de49fa624146480c1cf351d87dbc10` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `b212efeeaa935c800b1ac66004da915d37b17bbba31d84e8cac647cb2c626724` |
+| Replay harness | `cd4775adb7666127abefee211f45575f74682dd6fc81f045ee69850a326d766b` |
+| Pause SRAM | `f6eff38a038a36ae7ae8b1a611391d248bf720546202fd3f4f06ac574f80ce29` |
+| Victory SRAM and fresh readback | `6126131ce79069993de77566260d1c9150d95dd858b19b88f55b0ee10d787f81` |
+| T3 replay and both journal checks | `d16bf1760bf74bcb8c8b46330251255508a8436d441ae6108c20aac95dc8d239` |
+
+## November 20 T4 fresh SRAM and result autosave
+
+The Jacobs Installation replay uses the normal Terran death-depth
+cartridge from `cd833c8c`. The replay tools are based on `6ea84a03`.
+The intervening runtime changes are in the custom-game AI planner.
+
+The observer starts at HOME, reveals all eight briefing pages and plays
+8,943 gameplay calls with physical buttons. The retained HOST tape
+counts nine entry calls separately. At gameplay call 4,991, frame
+4,968, unit slot 70 is selected and the game is in field mode. Start
+opens Pause and B writes bank 0. A fresh process loads the save with L
+from HOME and restores the observed world, mission state, cursor and
+selected unit. The camera derived from the cursor matches at this cut.
+
+All ten observations match, including four after the reload. The
+observer acknowledges 11 gameplay pages with the simulation frame held.
+The result arrives at frame 8,911 with Raynor alive, slot 70 at
+(1218, 1016), switch 4 set, switch 7 clear and no trigger faults.
+The game writes bank 1 without changing the first bank. A third process
+loads the frozen victory with unit slot 70 still selected and exports
+identical SRAM. A separate T10 replay with the shared harness also wins
+and restores its frozen victory at frame 3,361.
+
+The 9,009 measured controller calls average 721,782 guest cycles per
+main loop, or 23.24 emulated updates per second. The largest update is
+40,900,276 cycles. The measurement includes UI, rendering, save and
+load. Hardware frame rate remains unmeasured.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 4 --save-tick 4991 \
+  --trace "$T4_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `8abd3e731fd6db1c1c0ff449ea1426d4214213f0990c5613a3b7158b3eb611c4` |
+| Matching ELF | `357b901bdb96d325fe4388650ad2ea5d97b7ce801a7a8de14f278a913ce2e2db` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| HOST tape | `f10192aab83c53c616888b0430e354d9dc49f163d7e3a94796ff7ca362df7b7a` |
+| Replay harness | `1a00633499c6fb8cbc44e990f4ff3328c2638772cce5559845aa32c0302cdb82` |
+| Checkpoint observer | `0c819ade9f9e31975e8c789f40dd3783a6276bfc7cc1d22b125733e5ca4a6de5` |
+| Pause SRAM | `8852e2cad249e10a1081f59babea7a838134eef4ab23a2058fa80f29556ffdb9` |
+| Victory SRAM and fresh readback | `a3d129b4805acc78b8b6ca72422585d0b47ef7d8a21885dc80728706d078c9b1` |
+| Replay and both journal checks | `29bfc1ed61f6b0fe34697c8c00989d5614ec71ac0e81a8361c203b64e0fffdc2` |
+| T10 regression | `7385746eb7904fcf48d76a655d3de34bc2583adb7b0c31c8167ac78626609200` |
+
+
+### Current packed-reader release
+
+The normal Terran ROM built from `b2087fac` repeats the same Jacobs
+Installation route. All ten observations match through the fresh
+load at frame 4,968 and victory at frame 8,911. The pause, victory
+and fresh result readback files are each byte-identical to the
+death-depth run. The current release `fb6968c2` uses the same
+compiled inputs. The 9,009 controller calls average 719,693 cycles
+or 23.31 emulated updates per second.
+
+The ROM and ELF SHA-256 values are
+`80cf073bd02d580b127ccfd710feaf65bf0e2c285a27c2d6411d452fb3200576`
+and `4ea80a38436e943fc9ca6f41812be27152a5abcb8e431ec07d7cabacd2fb87b1`.
+The comparison receipt SHA-256 is
+`fb0fb317d670cc484a1c515a49978a8376dec0140db27493e1ebd6a7d1fe5837`.

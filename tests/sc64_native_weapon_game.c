@@ -79,8 +79,8 @@ static void test_all_source_profiles(void)
             memset(tracers, 0, sizeof(tracers));
             int x0 = 112, y0 = 58;
             int x1 = x0 + heading_dx[heading], y1 = y0 + heading_dy[heading];
-            if (!sc64_source_emit(p->actor_raw, 0, p->weapon_id, p->mode,
-                                  x0, y0, x1, y1)) {
+            if (!sc64_source_emit(p->actor_raw, -1, p->weapon_id, p->mode,
+                                  x0, y0, x1, y1, -1)) {
                 fprintf(stderr, "source profile %u not emitted: raw=%u weapon=%u mode=%u variant=%u\n",
                         n, p->actor_raw, p->weapon_id, p->mode, p->variant);
                 assert(0 && "every generated source profile must be reachable from the engine emitter");
@@ -144,6 +144,1134 @@ static int make_unit(int owner, int type, unsigned raw, int x, int y)
     u[slot].shield = 0;
     return slot;
 }
+
+#ifdef SC64_PROJECTILE_DEPTH
+enum { BATTLEFIELD_BYTES = 240 * 108 };
+
+static void begin_depth_frame(void)
+{
+    gfx_begin(C_PANEL);
+    gfx_set_clip_y(12, 120);
+}
+
+static void capture_depth_frame(u8 *out)
+{
+    assert(gfx_read_band(12, 108, out));
+    assert_hud_untouched();
+}
+
+/* The same ground-target projectile covers a ground actor and passes behind
+ * a flyer. Isolate each sprite and require real distinguishable overlap. */
+static void test_moving_projectile_overlap(void)
+{
+    static _Alignas(4) u8 actor[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 projectile[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        const char *name;
+        int type, raw, y, target_air, bullet_in_front;
+    } cases[] = {
+        { "Tank", U_TANK, 5, 54, 0, 1 },
+        { "Wraith", U_WRAITH, 8, 54, 0, 0 },
+        { "Wraith with an air target", U_WRAITH, 8, 54, 1, 1 },
+        { "Wraith at the upper HUD", U_WRAITH, 8, 0, 0, 0 },
+        { "Tank at the lower HUD", U_TANK, 5, 107, 0, 1 },
+    };
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        reset_world();
+        memset(m, 0, sizeof(m));
+        geyser_count = 0;
+        int y = cases[n].y;
+        int blocker = make_unit(SIDE, cases[n].type, (unsigned)cases[n].raw, 112, y);
+        assert(sc64_unit_world_layer(&u[blocker]) == (cases[n].type == U_WRAITH ? 18u : 4u));
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        capture_depth_frame(actor);
+
+        int shooter = make_unit(SIDE, U_DRAGOON, 66, 32, y);
+        int air = cases[n].target_air;
+        int target = make_unit(ENEMY, air ? U_WRAITH : U_SCV, air ? 8 : 7, 208, y);
+        assert(sc64_source_unit_vfx(&u[shooter], u[target].x, u[target].y, air, target));
+        assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
+        unsigned overlap = 0;
+        while (tracers[0].life > 1) {
+            update_tracers();
+            if (sc64_trace_slots[0].release_life) continue;
+            assert(sc64_trace_slots[0].bullet_layer == (air ? 19 : 5));
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            capture_depth_frame(projectile);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += actor[i] != C_PANEL && projectile[i] != C_PANEL &&
+                           actor[i] != projectile[i];
+            if (overlap) break;
+        }
+        assert(overlap && "the test shot must cross both isolated sprite masks");
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
+            if (actor[i] == C_PANEL || projectile[i] == C_PANEL ||
+                actor[i] == projectile[i]) continue;
+            assert(pair[i] == (cases[n].bullet_in_front ? projectile[i] : actor[i]));
+        }
+        printf("PASS projectile depth against %s, %u overlap pixels\n", cases[n].name, overlap);
+    }
+}
+
+static void test_ground_projectile_world_y(void)
+{
+    static _Alignas(4) u8 actor[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 projectile[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_DRAGOON, 66, 32, 24);
+    int bunker = spawn_build(ENEMY, B_BUNKER, 208, 100, 0);
+    assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+    assert(sc64_source_unit_vfx(&u[shooter], b[bunker].x, b[bunker].y,
+                                0, MAX_UNITS + bunker));
+    assert(live_tracers() == 1 && sc64_trace_slots[0].bullet_layer == 4);
+
+    const Tracer *t = &tracers[0];
+    Sc64WeaponSourceVfxKey key;
+    assert(sc64_weapon_source_vfx_unpack((u32)t->color, &key));
+    const Sc64WeaponSourceAttackProfile *profile = sc64_weapon_source_trace_profile((u32)t->color);
+    assert(profile);
+    unsigned windup = sc64_weapon_source_trace_release_ticks(profile) +
+                      sc64_weapon_source_trace_startup_ticks(profile);
+    int launch_x, launch_y, px = 0, py = 0;
+    sc64_weapon_source_trace_launch_origin(profile, key.direction, t->x0, t->y0,
+                                          &launch_x, &launch_y);
+    Sc64WeaponSourceMotion motion = sc64_weapon_source_motion_prepare(
+        profile, launch_x, launch_y, t->x1, t->y1);
+    while (t->life > 1) {
+        update_tracers();
+        unsigned age = sc64_weapon_source_vfx_source_tick((unsigned)(sc64_tracer_duration(0) - t->life));
+        if (age < windup || age - windup >= motion.flight) continue;
+        assert(sc64_weapon_source_trace_position_motion(profile, launch_x, launch_y,
+            t->x1, t->y1, age - windup, &px, &py, &motion));
+        if (px >= 96 && px <= 136) break;
+    }
+    assert(t->life > 1 && !sc64_trace_slots[0].release_life);
+    assert(px >= 96 && px <= 136 && py - 3 > t->y0 && py + 3 < t->y1);
+    begin_depth_frame();
+    draw_tracer(0, SC64_TRACE_PROJECTILE);
+    capture_depth_frame(projectile);
+
+    /* Both Tank anchors are south of the shooter, but only one is south of
+     * the live projectile. A launch-Y key wrongly puts both Tanks in front. */
+    int tank = make_unit(SIDE, U_TANK, 5, px, py - 3);
+    assert(sc64_unit_world_layer(&u[tank]) == 4);
+    for (int south = 0; south <= 1; ++south) {
+        u[tank].y = py + (south ? 3 : -3);
+        begin_depth_frame();
+        draw_unit(&u[tank]);
+        capture_depth_frame(actor);
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        unsigned overlap = 0;
+        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
+            if (actor[i] == C_PANEL || projectile[i] == C_PANEL ||
+                actor[i] == projectile[i]) continue;
+            ++overlap;
+            assert(pair[i] == (south ? actor[i] : projectile[i]));
+        }
+        assert(overlap);
+        printf("PASS ground projectile Y against Tank to the %s, %u overlap pixels\n",
+               south ? "south" : "north", overlap);
+    }
+}
+
+static void test_fallback_projectile_depth(void)
+{
+    static _Alignas(4) u8 effect_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 actor_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 actual[BATTLEFIELD_BYTES];
+    static const struct {
+        int style, life, x, y;
+    } stages[] = {
+        { SC64_WEAPON_VFX_STYLE_PLASMA, 5, 104, 62 },
+        { SC64_WEAPON_VFX_STYLE_NEEDLE, 4, 72, 46 },
+        { SC64_WEAPON_VFX_STYLE_NEEDLE, 3, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_NEEDLE, 2, 152, 86 },
+        { SC64_WEAPON_VFX_STYLE_PLASMA, 2, 152, 86 },
+        { SC64_WEAPON_VFX_STYLE_MISSILE, 5, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_ACID, 5, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_SHELL, 5, 104, 62 },
+        { SC64_WEAPON_VFX_STYLE_ARC, 5, 112, 66 },
+        { SC64_WEAPON_VFX_STYLE_BEAM, 5, 112, 66 },
+    };
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int blocker = make_unit(SIDE, U_TANK, 5, 104, 62);
+    const int flyer = make_unit(ENEMY, U_WRAITH, 8, 152, 86);
+    const int plasma = sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_PLASMA, C_CYAN);
+    const int air_shot = sc64_emit_fallback_attack(72, 46, flyer, plasma);
+    assert(air_shot >= 0 && sc64_trace_slots[air_shot].bullet_layer == 19);
+    tracers[air_shot].life = 2;
+    u[blocker].alive = 0;
+    begin_depth_frame();
+    draw_unit(&u[flyer]);
+    draw_tracer(air_shot, SC64_TRACE_PROJECTILE);
+    capture_depth_frame(effect_in_front);
+    begin_depth_frame();
+    draw_tracer(air_shot, SC64_TRACE_PROJECTILE);
+    draw_unit(&u[flyer]);
+    capture_depth_frame(actor_in_front);
+    assert(memcmp(effect_in_front, actor_in_front, BATTLEFIELD_BYTES));
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    capture_depth_frame(actual);
+    assert(!memcmp(actual, effect_in_front, BATTLEFIELD_BYTES));
+    clear_tracers();
+    u[flyer].alive = 0;
+
+    for (unsigned s = 0; s < sizeof(stages) / sizeof(*stages); ++s) {
+        const int bunker = spawn_build(ENEMY, B_BUNKER, 152, 86, 0);
+        assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+        const int color = sc64_weapon_vfx_pack(stages[s].style, C_CYAN);
+        const int shot = sc64_emit_fallback_attack(72, 46, MAX_UNITS + bunker, color);
+        assert(shot >= 0 && sc64_trace_slots[shot].bullet_layer == 4);
+        tracers[shot].life = stages[s].life;
+        assert(sc64_trace_world_y((unsigned)shot) == stages[s].y);
+
+        /* A retired target can be replaced at another layer. The existing
+         * shot keeps its launch layer, including at its impact position. */
+        b[bunker].alive = 0;
+        int replacement = spawn_build(ENEMY, B_COMMAND, 600, 600, 0);
+        assert(replacement == bunker && sc64_building_world_layer((unsigned)replacement) == 4);
+        for (unsigned page = 0; page < 2; ++page) {
+            for (unsigned variant = 0; variant < 3; ++variant) {
+                Unit *cover = &u[variant == 2 ? flyer : blocker];
+                u[blocker].alive = variant != 2;
+                u[flyer].alive = variant == 2;
+                cover->x = stages[s].x;
+                cover->y = stages[s].y + (variant == 0 ? -2 : variant == 1 ? 2 : 0);
+                begin_depth_frame();
+                draw_unit(cover);
+                draw_tracer(shot, SC64_TRACE_PROJECTILE);
+                capture_depth_frame(effect_in_front);
+                begin_depth_frame();
+                draw_tracer(shot, SC64_TRACE_PROJECTILE);
+                draw_unit(cover);
+                capture_depth_frame(actor_in_front);
+                unsigned distinguishing = 0;
+                for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                    distinguishing += effect_in_front[i] != actor_in_front[i];
+                assert(distinguishing > 0);
+                begin_depth_frame();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                capture_depth_frame(actual);
+                if (memcmp(actual, variant ? actor_in_front : effect_in_front,
+                           BATTLEFIELD_BYTES)) {
+                    fprintf(stderr, "fallback stage %u page %u cover %u (%u pixels)\n",
+                            s, page, variant, distinguishing);
+                    assert(0 && "fallback projectile draw order");
+                }
+                /* A trace with no launch metadata uses the legacy pass. */
+                if (variant == 2) {
+                    sc64_trace_slots[shot].bullet_layer = 0;
+                    begin_depth_frame();
+                    sc64_draw_depth_ordered_actors();
+                    draw_tracers_pass(1);
+                    capture_depth_frame(actual);
+                    assert(!memcmp(actual, effect_in_front, BATTLEFIELD_BYTES));
+                    sc64_trace_slots[shot].bullet_layer = 4;
+                }
+                printf("PASS fallback stage %u page %u cover %u: %u distinguishing pixels\n",
+                       s, page, variant, distinguishing);
+            }
+            gfx_end();
+        }
+        clear_tracers();
+        b[replacement].alive = 0;
+    }
+    puts("PASS fallback projectile depth at launch, flight and impact on both pages");
+}
+
+static void test_stationary_projectile_depth(int tank_fallback)
+{
+    static _Alignas(4) u8 effect_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 actor_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        int type, raw, y, in_front;
+    } cases[] = {
+        { U_TANK, 5, 51, 0 },
+        { U_TANK, 5, 57, 1 },
+        { U_WRAITH, 8, 54, 1 },
+    };
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_SIEGE_TANK, 30, 32, 24);
+    int target = spawn_build(ENEMY, B_BUNKER, 112, 54, 0);
+    assert(target >= 0 && sc64_building_world_layer((unsigned)target) == 3);
+    if (tank_fallback) {
+#ifdef SC64_TANK_SOURCE_VFX
+        int tag = sc64_weapon_vfx_pack(SC64_TANK_SOURCE_SIEGE, 8);
+        int slot = add_tracer(30, 32, 112, 54, tag);
+        assert(slot == 0);
+        sc64_tank_fallback_depth(slot, shooter, MAX_UNITS + target);
+        update_tracers();
+        begin_depth_frame();
+        u[shooter].x = 100;
+        u[shooter].y = 80;
+        draw_tracer(slot, SC64_TRACE_ATTACKER_OVER);
+        assert(framebuffer_has_battlefield_pixels());
+        begin_depth_frame();
+        u[shooter].type = U_TANK;
+        draw_tracer(slot, SC64_TRACE_ATTACKER_OVER);
+        assert(!framebuffer_has_battlefield_pixels());
+        u[shooter].type = U_SIEGE_TANK;
+        u[shooter].x = 30;
+        u[shooter].y = 32;
+#else
+        assert(!tank_fallback);
+#endif
+    } else {
+        assert(sc64_source_unit_vfx(&u[shooter], 112, 54, 0, MAX_UNITS + target));
+        assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((u32)tracers[0].color);
+        assert(profile && profile->weapon_bullet_type == SC64_SOURCE_BULLET_APPEAR_TARGET_UNIT);
+        while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    }
+    assert(tracers[0].life > 1 && sc64_trace_slots[0].bullet_layer == 4);
+    assert(sc64_trace_world_y(0) == b[target].y);
+
+    /* A released effect keeps its depth and the captured impact point
+     * when its original target disappears. */
+    b[target].alive = 0;
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        int blocker = make_unit(SIDE, cases[n].type, (unsigned)cases[n].raw, 112, cases[n].y);
+        unsigned overlap = 0;
+        while (tracers[0].life > 1) {
+            /* Siege splash remaps the underlying palette. Compare both
+             * compositions directly instead of using isolated flat colors. */
+            begin_depth_frame();
+            draw_unit(&u[blocker]);
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            capture_depth_frame(effect_in_front);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            draw_unit(&u[blocker]);
+            capture_depth_frame(actor_in_front);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += effect_in_front[i] != actor_in_front[i];
+            if (overlap) break;
+            update_tracers();
+        }
+        assert(overlap && "the stationary effect must overlap the blocker");
+        for (int page = 0; page < 2; ++page) {
+            begin_depth_frame();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            assert_hud_untouched();
+            capture_depth_frame(pair);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
+                if (effect_in_front[i] == actor_in_front[i]) continue;
+                assert(pair[i] == (cases[n].in_front ? actor_in_front[i] : effect_in_front[i]));
+            }
+            gfx_end();
+        }
+        printf("PASS %s stationary projectile depth against raw %d at Y%d, %u overlap pixels\n",
+               tank_fallback ? "fallback" : "source", cases[n].raw, cases[n].y, overlap);
+        u[blocker].alive = 0;
+    }
+}
+
+#ifdef SC64_P4_STORM_ENABLED
+static void test_low_trail_depth(void)
+{
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES], reversed[BATTLEFIELD_BYTES], actual[BATTLEFIELD_BYTES];
+    reset_world(); memset(m, 0, sizeof(m)); geyser_count = 0;
+    int target = make_unit(ENEMY, U_DRONE, 41, 208, 54);
+    u[target].flags |= 2u;
+    assert(sc64_unit_world_layer(&u[target]) == 1);
+    assert(sc64_source_emit(2, -1, 4, 0, 32, 54, 208, 54, target));
+    while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    assert(sc64_trace_slots[0].bullet_layer == 2);
+    u[target].alive = 0;
+    int bunker = spawn_build(SIDE, B_BUNKER, 100, 45, 0);
+    assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+    unsigned differences = 0;
+    while (tracers[0].life > 1 && !differences) {
+        for (int x = 48; x <= 192 && !differences; x += 4) {
+            b[bunker].x = x;
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS);
+            draw_building_art(&b[bunker]);
+            draw_tracer(0, SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS);
+            capture_depth_frame(expected);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            draw_building_art(&b[bunker]);
+            capture_depth_frame(reversed);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) differences += expected[i] != reversed[i];
+        }
+        if (!differences) update_tracers();
+    }
+    assert(differences);
+    unsigned bad = 0, pages = 0;
+    for (unsigned page = 0; page < 2; ++page) {
+        begin_depth_frame(); pages |= 1u << gfx_backbuffer_index();
+        sc64_draw_depth_ordered_actors(); draw_tracers_pass(1); capture_depth_frame(actual);
+        unsigned mismatch = 0;
+        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) mismatch += actual[i] != expected[i];
+        fprintf(stderr, "low trail page %u: %u expected/reversed, %u actual/expected pixels\n", page, differences, mismatch);
+        bad += mismatch;
+        if (!page) gfx_end();
+    }
+    assert(pages == 3 && !bad);
+}
+
+static void test_low_trails_interleave_with_world_y(void)
+{
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES], comparison[BATTLEFIELD_BYTES];
+    const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+    const unsigned child = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS;
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    /* Put the southern shot in the first tracer slot so a slot-based sort
+     * would place its visible trail behind the northern one. */
+    for (int i = 0; i < 2; ++i) {
+        int y = i ? 49 : 58;
+        int target = make_unit(ENEMY, U_DRONE, 41, 208, y);
+        u[target].flags |= 2u;
+        assert(sc64_source_emit(2, -1, 4, 0, 32, y, 208, y, target));
+        u[target].alive = 0;
+    }
+    while (sc64_trace_slots[0].release_life && tracers[0].life > 1) update_tracers();
+    assert(sc64_trace_slots[0].bullet_layer == 2 && sc64_trace_slots[1].bullet_layer == 2);
+    int bunker = spawn_build(SIDE, B_BUNKER, 42, 54, 0);
+    assert(bunker >= 0 && sc64_building_world_layer((unsigned)bunker) == 3);
+
+    for (; tracers[0].life > 1; update_tracers()) {
+        Sc64WeaponTrailPick north = {.after = UINT32_MAX, .key = UINT32_MAX, .following = UINT32_MAX};
+        Sc64WeaponTrailPick south = north;
+        draw_tracer_parts(1, child, &north);
+        draw_tracer_parts(0, child, &south);
+        if (north.key == UINT32_MAX || south.key == UINT32_MAX) continue;
+        assert(north.y < b[bunker].y && b[bunker].y < south.y);
+        for (int x = north.x - 16; x <= south.x + 16; x += 2) {
+            b[bunker].x = x;
+            begin_depth_frame();
+            draw_tracer(1, parent);
+            draw_tracer(0, parent);
+            sc64_weapon_source_vfx_paint_trail(&north);
+            draw_building_art(&b[bunker]);
+            sc64_weapon_source_vfx_paint_trail(&south);
+            capture_depth_frame(expected);
+
+            begin_depth_frame();
+            draw_tracer(1, parent);
+            draw_tracer(0, parent);
+            draw_building_art(&b[bunker]);
+            sc64_weapon_source_vfx_paint_trail(&north);
+            sc64_weapon_source_vfx_paint_trail(&south);
+            capture_depth_frame(comparison);
+            unsigned early_overlap = 0;
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) early_overlap += expected[i] != comparison[i];
+
+            begin_depth_frame();
+            draw_tracer(1, parent);
+            draw_tracer(0, parent);
+            sc64_weapon_source_vfx_paint_trail(&north);
+            sc64_weapon_source_vfx_paint_trail(&south);
+            draw_building_art(&b[bunker]);
+            capture_depth_frame(comparison);
+            unsigned late_overlap = 0;
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) late_overlap += expected[i] != comparison[i];
+
+            if (!early_overlap || !late_overlap) continue;
+            unsigned pages = 0;
+            for (unsigned page = 0; page < 2; ++page) {
+                begin_depth_frame();
+                pages |= 1u << gfx_backbuffer_index();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                capture_depth_frame(comparison);
+                assert(!memcmp(expected, comparison, BATTLEFIELD_BYTES));
+                if (!page) gfx_end();
+            }
+            assert(pages == 3);
+            printf("PASS low trail birth rows %d and %d around bunker row %d: %u and %u differing pixels on both pages\n",
+                   north.y, south.y, b[bunker].y, early_overlap, late_overlap);
+            return;
+        }
+    }
+    assert(!"no distinct visible birth-row overlap");
+}
+
+static void test_detached_trail_survives_impact(void)
+{
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES], actual[BATTLEFIELD_BYTES];
+    const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int target = make_unit(ENEMY, U_DRONE, 41, 80, 54);
+    u[target].flags |= 2u;
+    assert(sc64_source_emit(2, -1, 4, 0, 64, 54, 80, 54, target));
+    while (sc64_trace_slots[0].release_life) update_tracers();
+    const Sc64TraceSlot *slot = &sc64_trace_slots[0];
+    const Tracer *trace = &tracers[0];
+    assert(slot->bullet_layer == 2 && slot->flight > 0 && slot->flight < 16);
+    Sc64WeaponSourceVfxKey key;
+    assert(sc64_weapon_source_vfx_unpack((u32)trace->color, &key));
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_trace_profile((u32)trace->color);
+    assert(profile && profile->projectile_image == 532);
+    int birth_x, birth_y;
+    sc64_weapon_source_trace_launch_origin(profile, key.direction, trace->x0,
+                                           trace->y0, &birth_x, &birth_y);
+    u[target].alive = 0;
+    int blocker = spawn_build(SIDE, B_BUNKER, birth_x, birth_y + 1, 0);
+    assert(blocker >= 0 && sc64_building_world_layer((unsigned)blocker) == 3);
+
+    /* Image 441 spawns at flight tick zero and lives for 16 source ticks.
+     * This short shot hits before then. Its single trail should outlive it
+     * at the original launch point, with no new births after impact. */
+    unsigned start = sc64_weapon_source_trace_release_ticks(profile) +
+                     sc64_weapon_source_trace_startup_ticks(profile);
+    unsigned cuts[] = {slot->flight, 15, 16};
+    unsigned distinguishing[2] = {0};
+    for (unsigned c = 0; c < sizeof(cuts) / sizeof(cuts[0]); ++c) {
+        unsigned age = cuts[c];
+        unsigned gba_age = sc64_weapon_source_vfx_first_gba_age(start + age);
+        while (trace->life && (unsigned)(sc64_tracer_duration(0) - trace->life) < gba_age)
+            update_tracers();
+        assert(trace->life &&
+               sc64_weapon_source_vfx_source_tick(sc64_tracer_duration(0) - trace->life) ==
+                   start + age);
+        for (int delta = -1; delta <= 1; delta += 2) {
+            b[blocker].y = birth_y + delta;
+            unsigned pages = 0;
+            for (unsigned page = 0; page < 2; ++page) {
+                begin_depth_frame();
+                draw_tracer(0, parent);
+                draw_building_art(&b[blocker]);
+                capture_depth_frame(actual);
+                begin_depth_frame();
+                draw_tracer(0, parent);
+                if (delta < 0) draw_building_art(&b[blocker]);
+                if (age < 16)
+                    sc64_weapon_source_vfx_draw_image(441, 0, age, key.direction, birth_x, birth_y);
+                if (delta > 0) draw_building_art(&b[blocker]);
+                capture_depth_frame(expected);
+                unsigned smoke_pixels = 0;
+                for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                    smoke_pixels += expected[i] != actual[i];
+                if (c == 0 && delta < 0) assert(smoke_pixels);
+                if (c == 2) assert(!smoke_pixels);
+                if (c == 0) {
+                    begin_depth_frame();
+                    draw_tracer(0, parent);
+                    if (delta > 0) draw_building_art(&b[blocker]);
+                    sc64_weapon_source_vfx_draw_image(441, 0, age, key.direction, birth_x, birth_y);
+                    if (delta < 0) draw_building_art(&b[blocker]);
+                    capture_depth_frame(actual);
+                    unsigned differences = 0;
+                    for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                        differences += expected[i] != actual[i];
+                    assert(differences);
+                    distinguishing[delta > 0] = differences;
+                }
+
+                begin_depth_frame();
+                pages |= 1u << gfx_backbuffer_index();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                assert_hud_untouched();
+                capture_depth_frame(actual);
+                assert(!memcmp(expected, actual, sizeof(expected)));
+                gfx_end();
+            }
+            assert(pages == 3);
+        }
+    }
+    printf("PASS detached Vulture trail across impact and expiry, "
+           "%u north and %u south order-sensitive pixels on both pages\n",
+           distinguishing[0], distinguishing[1]);
+}
+
+static void test_flight_trail_depth(void)
+{
+    static _Alignas(4) u8 trail[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct { unsigned raw, weapon, air, image; } cases[] = {
+        { 2, 4, 0, 532 }, { 8, 15, 1, 528 }, { 3, 8, 1, 529 },
+        { 70, 74, 1, 521 },
+    };
+    const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_FLIGHT_TRAILS;
+    const unsigned child = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_FLIGHT_TRAILS;
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        reset_world();
+        memset(m, 0, sizeof(m));
+        geyser_count = 0;
+        race_selected_mission = SC64_P4_GLOBAL_ID;
+        memset(&race_p4.storm, 0, sizeof(race_p4.storm));
+        Sc64PsionicStorm *storm = &race_p4.storm.storm[0];
+
+        /* Use the observed layer-5 missile plane for the Storm overlaps.
+         * Scout air fire targets a Dropship for a layer-17 missile. */
+        int scout = cases[n].raw == 70;
+        int target = make_unit(ENEMY, scout ? U_DROPSHIP : U_SCV,
+                               scout ? 11 : 7, 208, 54);
+        if (scout) {
+            int shooter = make_unit(SIDE, U_SCOUT, 70, 32, 54);
+            assert(sc64_source_unit_vfx(&u[shooter], 208, 54, 1, target));
+            u[shooter].alive = 0;
+        } else {
+            assert(sc64_source_emit(cases[n].raw, -1, cases[n].weapon, cases[n].air,
+                                    32, 54, 208, 54, target));
+        }
+        for (unsigned i = 1; i < MAX_TRACERS; ++i) tracers[i].life = 0;
+        const Sc64TraceSlot *slot = &sc64_trace_slots[0];
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((u32)tracers[0].color);
+        assert(profile && profile->projectile_image == cases[n].image);
+        const Sc64WeaponSourceAnimation *flight =
+            sc64_weapon_source_animation_lookup(cases[n].image, 2);
+        const Sc64WeaponSourceAnimation *death =
+            sc64_weapon_source_animation_lookup(cases[n].image, 1);
+        assert(flight && death && flight->overlay_count == 1);
+        const Sc64WeaponSourceOverlay *birth =
+            &sc64_weapon_source_overlays[flight->overlay_first];
+        const Sc64WeaponSourceAnimation *smoke =
+            sc64_weapon_source_animation_lookup(birth->image_id, 0);
+        assert(birth->opcode == 15 && smoke && smoke->loop_pc == UINT32_MAX);
+        assert(smoke->duration_ticks <= sc64_weapon_source_animation_visual_ticks(death));
+        while (slot->release_life && tracers[0].life > 1) update_tracers();
+        unsigned layer = scout ? 17 : 5;
+        assert(slot->bullet_layer == layer);
+        u[target].alive = 0;
+        unsigned pixel = BATTLEFIELD_BYTES;
+        while (tracers[0].life > 1 && pixel == BATTLEFIELD_BYTES) {
+            begin_depth_frame();
+            draw_tracer(0, child);
+            capture_depth_frame(trail);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i) {
+                if (trail[i] != C_PANEL && trail[i] != C_WHITE) {
+                    pixel = i;
+                    break;
+                }
+            }
+            if (pixel == BATTLEFIELD_BYTES) update_tracers();
+        }
+        assert(pixel < BATTLEFIELD_BYTES);
+
+        begin_depth_frame();
+        draw_tracer(0, SC64_TRACE_PROJECTILE);
+        capture_depth_frame(expected);
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+
+        storm->x = (int)(pixel % 240u);
+        storm->y = (int)(pixel / 240u);
+        storm->active = !scout;
+        int blocker = scout ? make_unit(SIDE, U_WRAITH, 8, storm->x, storm->y) : -1;
+        if (scout) assert(sc64_unit_world_layer(&u[blocker]) == layer + 1);
+        unsigned overlaps = 0;
+        for (int dx = -8; dx <= 8 && !overlaps; ++dx) {
+            if (scout) u[blocker].x = storm->x + dx;
+            begin_depth_frame();
+            draw_tracer(0, parent);
+            if (scout) draw_unit(&u[blocker]);
+            else draw_storm_marker(storm);
+            draw_tracer(0, child);
+            capture_depth_frame(expected);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            if (scout) draw_unit(&u[blocker]);
+            else draw_storm_marker(storm);
+            capture_depth_frame(pair);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlaps += expected[i] != pair[i];
+        }
+        assert(overlaps);
+        unsigned pages = 0;
+        for (unsigned page = 0; page < 2; ++page) {
+            begin_depth_frame();
+            pages |= 1u << gfx_backbuffer_index();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            capture_depth_frame(pair);
+            assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+            if (!page) gfx_end();
+        }
+        assert(pages == 3);
+        unsigned source_age = sc64_weapon_source_vfx_source_tick(
+            (unsigned)(sc64_tracer_duration(0) - tracers[0].life));
+        unsigned flight_start = sc64_weapon_source_trace_release_ticks(profile) +
+            sc64_weapon_source_trace_startup_ticks(profile);
+        printf("PASS source flight trail image %u layer %u over layer %u at tick %u "
+               "(flight [%u,%u)), %u order-sensitive pixels on both pages\n",
+               cases[n].image, layer + 1, scout ? layer + 1 : layer, source_age,
+               flight_start, flight_start + slot->flight, overlaps);
+        if (n != 0) {
+            if (scout) u[blocker].alive = 0;
+            storm->active = 0;
+            unsigned impact_age = sc64_weapon_source_vfx_first_gba_age(flight_start + slot->flight);
+            while (tracers[0].life && (unsigned)(sc64_tracer_duration(0) - tracers[0].life) < impact_age)
+                update_tracers();
+            assert(tracers[0].life);
+
+            begin_depth_frame();
+            draw_tracer(0, parent);
+            capture_depth_frame(pair);
+            draw_tracer(0, child);
+            capture_depth_frame(expected);
+            assert(memcmp(expected, pair, BATTLEFIELD_BYTES));
+
+            unsigned impact_pages = 0;
+            for (unsigned page = 0; page < 2; ++page) {
+                begin_depth_frame();
+                impact_pages |= 1u << gfx_backbuffer_index();
+                sc64_draw_depth_ordered_actors();
+                draw_tracers_pass(1);
+                assert_hud_untouched();
+                capture_depth_frame(pair);
+                assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                gfx_end();
+            }
+            assert(impact_pages == 3);
+            printf("PASS source flight trail image %u remains through impact on both pages\n",
+                   cases[n].image);
+            if (scout) continue;
+            storm->active = 1;
+        } else {
+            int blocker = make_unit(SIDE, U_WRAITH, 8, storm->x, storm->y);
+            int overlap = 0;
+            for (int dx = -8; dx <= 8 && !overlap; ++dx) {
+                u[blocker].x = storm->x + dx;
+                begin_depth_frame();
+                draw_tracer(0, parent);
+                draw_storm_marker(storm);
+                draw_tracer(0, child);
+                draw_unit(&u[blocker]);
+                capture_depth_frame(expected);
+                begin_depth_frame();
+                draw_tracer(0, parent);
+                draw_storm_marker(storm);
+                draw_unit(&u[blocker]);
+                draw_tracer(0, child);
+                capture_depth_frame(pair);
+                overlap = memcmp(expected, pair, BATTLEFIELD_BYTES) != 0;
+            }
+            assert(overlap);
+            begin_depth_frame();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            capture_depth_frame(pair);
+            assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+            u[blocker].alive = 0;
+        }
+
+        /* A layer-4 child stays below the layer-5 Storm. */
+        sc64_trace_slots[0].bullet_layer = 3;
+        camy = storm->y;
+        begin_depth_frame();
+        draw_tracer(0, SC64_TRACE_PROJECTILE);
+        draw_storm_marker(storm);
+        capture_depth_frame(expected);
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+        storm->active = 0;
+    }
+}
+#endif
+
+#ifdef SC64_P4_STORM_ENABLED
+/* Both source Death tracks create one SPROL at the impact point. Test
+ * the authored child independently of the parent-painter split. */
+static void test_detached_impact_depth(void)
+{
+    static _Alignas(4) u8 legacy[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 expected[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 reversed[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        int raw, weapon, air, image, target_type, target_raw, layer;
+    } cases[] = {
+        { 43, 48, 0, 511, U_SCV, 7, 5 },
+        { 144, 52, 1, 515, U_DROPSHIP, 11, 17 },
+    };
+    const unsigned parent = SC64_TRACE_PROJECTILE | SC64_TRACE_WITHOUT_IMPACT_CHILD;
+    const unsigned child = SC64_TRACE_PROJECTILE | SC64_TRACE_ONLY_IMPACT_CHILD;
+    const int x = 112, y = 54;
+    const Sc64WeaponSourceAnimation *splash = sc64_weapon_source_animation_lookup(512, 0);
+    assert(splash && splash->duration_ticks == 20 && splash->loop_pc == UINT32_MAX);
+
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        reset_world();
+        memset(m, 0, sizeof(m));
+        geyser_count = 0;
+        int shooter;
+        if (cases[n].air) {
+            int building = spawn_build(SIDE, B_SPORE_COLONY, 40, y, 0);
+            assert(building >= 0);
+            b[building].raw_type = cases[n].raw;
+            shooter = MAX_UNITS + building;
+        } else {
+            shooter = make_unit(SIDE, U_MUTALISK, cases[n].raw, 40, y);
+        }
+        int target = make_unit(ENEMY, cases[n].target_type, cases[n].target_raw, x, y);
+        assert(sc64_source_emit(cases[n].raw, shooter, cases[n].weapon,
+                                cases[n].air, 40, y, x, y, target));
+        assert(live_tracers() == 1);
+        const Sc64TraceSlot *slot = &sc64_trace_slots[0];
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((u32)tracers[0].color);
+        assert(profile && profile->projectile_image == cases[n].image);
+        const Sc64WeaponSourceAnimation *death =
+            sc64_weapon_source_animation_lookup((u16)cases[n].image, 1);
+        assert(death && death->duration_ticks == 1 && death->overlay_count == 1);
+        const Sc64WeaponSourceOverlay *spawn = &sc64_weapon_source_overlays[death->overlay_first];
+        assert(spawn->opcode == 15 && spawn->image_id == 512 && spawn->sprite_id == 365);
+        assert(spawn->source_tick == 0 && !spawn->x && !spawn->y);
+
+        while (slot->release_life && tracers[0].life > 1) update_tracers();
+        assert(slot->bullet_layer == cases[n].layer);
+        if (shooter >= MAX_UNITS) b[shooter - MAX_UNITS].alive = 0;
+        else u[shooter].alive = 0;
+        u[target].alive = 0;
+        unsigned impact_tick = sc64_weapon_source_trace_release_ticks(profile) +
+            sc64_weapon_source_trace_startup_ticks(profile) + slot->flight;
+        unsigned active_cuts = 0, overlap = 0;
+        while (tracers[0].life > 0) {
+            int age = sc64_tracer_duration(0) - tracers[0].life;
+            assert(age >= 0);
+            unsigned source_age = sc64_weapon_source_vfx_source_tick((unsigned)age);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_PROJECTILE);
+            capture_depth_frame(legacy);
+            begin_depth_frame();
+            sc64_draw_depth_ordered_actors();
+            draw_tracers_pass(1);
+            capture_depth_frame(pair);
+            assert(!memcmp(legacy, pair, BATTLEFIELD_BYTES));
+
+            begin_depth_frame();
+            draw_tracer(0, child);
+            capture_depth_frame(pair);
+            if (source_age < impact_tick || source_age - impact_tick >= splash->duration_ticks) {
+                assert(!framebuffer_has_battlefield_pixels());
+            } else {
+                begin_depth_frame();
+                sc64_weapon_source_vfx_draw_image(512, 0, source_age - impact_tick, 8, x, y);
+                capture_depth_frame(expected);
+                assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                if (framebuffer_has_battlefield_pixels()) ++active_cuts;
+                if (!overlap) {
+                    /* Dropship targeted by Spore yields parent 17, child
+                     * 18. Wraith 18 is behind the child with GBA's existing
+                     * kind tie. A point Storm at elevation 5 similarly
+                     * falls between Mutalisk's parent and child turns. */
+                    int blocker = -1;
+                    Sc64PsionicStorm *storm = &race_p4.storm.storm[0];
+                    if (!cases[n].air) {
+                        race_selected_mission = SC64_P4_GLOBAL_ID;
+                        memset(&race_p4.storm, 0, sizeof(race_p4.storm));
+                        storm->active = 1;
+                        storm->x = x;
+                        storm->y = y;
+                    } else {
+                        blocker = make_unit(SIDE, U_WRAITH, 8, x, y);
+                        assert(sc64_unit_world_layer(&u[blocker]) == 18);
+                    }
+                    for (int dx = -12; dx <= 12 && !overlap; ++dx) {
+                        if (blocker >= 0) u[blocker].x = x + dx;
+                        else storm->x = x + dx;
+                        begin_depth_frame();
+                        draw_tracer(0, parent);
+                        if (blocker >= 0) draw_unit(&u[blocker]);
+                        else draw_storm_marker(storm);
+                        draw_tracer(0, child);
+                        capture_depth_frame(expected);
+                        begin_depth_frame();
+                        draw_tracer(0, SC64_TRACE_PROJECTILE);
+                        if (blocker >= 0) draw_unit(&u[blocker]);
+                        else draw_storm_marker(storm);
+                        capture_depth_frame(reversed);
+                        for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                            overlap += expected[i] != reversed[i];
+                    }
+                    if (overlap) {
+                        unsigned pages = 0;
+                        for (unsigned page = 0; page < 2; ++page) {
+                            begin_depth_frame();
+                            pages |= 1u << gfx_backbuffer_index();
+                            sc64_draw_depth_ordered_actors();
+                            draw_tracers_pass(1);
+                            capture_depth_frame(pair);
+                            assert(!memcmp(expected, pair, BATTLEFIELD_BYTES));
+                            if (!page) gfx_end();
+                        }
+                        assert(pages == 3);
+                    }
+                    if (blocker >= 0) u[blocker].alive = 0;
+                    else storm->active = 0;
+                }
+            }
+            gfx_end();
+            update_tracers();
+        }
+        assert(active_cuts > 1 && overlap > 0);
+        printf("PASS detached impact image %d at layer %u, %u live cuts and %u order-sensitive pixels\n",
+               cases[n].image, slot->bullet_layer + 1u, active_cuts, overlap);
+    }
+}
+
+#endif
+
+static void test_attached_attacker_depth(void)
+{
+    static _Alignas(4) u8 shooter_without_muzzle[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 muzzle_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 blocker_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    static const struct {
+        int type, raw, shooter_y, blocker_dy, blocker_front;
+    } cases[] = {
+        { U_TANK, 5, 54, -3, 0 },
+        { U_TANK, 5, 54, 3, 1 },
+#ifdef SC64_UNIT_FACING
+        { U_VULTURE, 2, 54, 0, 0 },
+#endif
+        { U_WRAITH, 8, 54, 0, 1 },
+        { U_WRAITH, 8, 2, 0, 1 },
+        { U_WRAITH, 8, 106, 0, 1 },
+    };
+
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_SIEGE_TANK, 30, 40, 30);
+    assert(sc64_unit_world_layer(&u[shooter]) == 4);
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 30, 0, -1));
+    assert(live_tracers() == 1 && sc64_trace_slots[0].release_life);
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_trace_profile((u32)tracers[0].color);
+    assert(profile && profile->attack_image == 254);
+    update_tracers(); /* The new trace starts one update before age zero. */
+    while (tracers[0].life > 1 && sc64_weapon_source_vfx_source_tick(
+               (unsigned)(sc64_tracer_duration(0) - tracers[0].life)) < 2)
+        update_tracers();
+    assert(tracers[0].life && sc64_trace_slots[0].release_life);
+
+    /* This siege muzzle is a palette remap. Compare both paint orders at
+     * pixels changed by the attached image, excluding body-only overlap.
+     * The shooter moved after firing began, so the muzzle must follow it. */
+    u[shooter].x = 112;
+    int blocker = make_unit(SIDE, U_TANK, 5, u[shooter].x, 54);
+    for (unsigned n = 0; n < sizeof(cases) / sizeof(cases[0]); ++n) {
+        u[shooter].y = cases[n].shooter_y;
+        u[blocker].type = cases[n].type;
+        u[blocker].raw_type = cases[n].raw;
+        u[blocker].y = u[shooter].y + cases[n].blocker_dy;
+        unsigned overlap = 0;
+        for (int dx = -24; dx <= 24 && !overlap; ++dx) {
+            u[blocker].x = u[shooter].x + dx;
+            begin_depth_frame();
+#ifdef SC64_UNIT_FACING
+            if (cases[n].raw == 2) {
+                assert(sc64_facing_blit(30, 0, u[shooter].x, u[shooter].y + 12));
+                draw_unit(&u[blocker]);
+                sc64_facing_draw_turret((unsigned)shooter, 0);
+            } else
+#endif
+            {
+                draw_unit(&u[blocker]);
+                draw_unit(&u[shooter]);
+            }
+            capture_depth_frame(shooter_without_muzzle);
+            draw_tracer(0, SC64_TRACE_ATTACKER_IMAGE);
+            capture_depth_frame(muzzle_in_front);
+            begin_depth_frame();
+            draw_unit(&u[shooter]);
+            draw_tracer(0, SC64_TRACE_ATTACKER_IMAGE);
+            draw_unit(&u[blocker]);
+            capture_depth_frame(blocker_in_front);
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += muzzle_in_front[i] != shooter_without_muzzle[i] &&
+                           muzzle_in_front[i] != blocker_in_front[i];
+        }
+        assert(overlap && "the attached muzzle must overlap the blocker at its live anchor");
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        const u8 *expected = cases[n].blocker_front ? blocker_in_front : muzzle_in_front;
+        assert(!memcmp(pair, expected, BATTLEFIELD_BYTES));
+        printf("PASS attached siege muzzle at Y%d against raw %d at Y%d, %u overlap pixels\n",
+               u[shooter].y, cases[n].raw, u[blocker].y, overlap);
+    }
+
+    u[blocker].alive = 0;
+    u[shooter].y = 54;
+    u[shooter].owner = ENEMY;
+    memset(visible, 0, sizeof(visible));
+    assert(!currently_visible(u[shooter].x, u[shooter].y));
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    assert(!framebuffer_has_battlefield_pixels());
+    assert_hud_untouched();
+
+    /* Reuse the very same slot, raw type and anchor during wind-up. */
+    u[shooter].alive = 0;
+    assert(make_unit(SIDE, U_SIEGE_TANK, 30, 112, 54) == shooter);
+    assert(tracers[0].life && sc64_trace_slots[0].release_life);
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    capture_depth_frame(pair);
+    clear_tracers();
+    begin_depth_frame();
+    sc64_draw_depth_ordered_actors();
+    draw_tracers_pass(1);
+    capture_depth_frame(shooter_without_muzzle);
+    assert(!memcmp(pair, shooter_without_muzzle, BATTLEFIELD_BYTES));
+}
+
+static void test_detached_attack_sprite_depth(void)
+{
+    static _Alignas(4) u8 child_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 blocker_in_front[BATTLEFIELD_BYTES];
+    static _Alignas(4) u8 pair[BATTLEFIELD_BYTES];
+    reset_world();
+    memset(m, 0, sizeof(m));
+    geyser_count = 0;
+    int shooter = make_unit(SIDE, U_HYDRALISK, 38, 64, 54);
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 54, 0, -1));
+    Sc64TraceSlot *slot = &sc64_trace_slots[0];
+    assert(slot->attack_sprite_birth_life && !slot->attack_sprite_layer);
+    u[shooter].x = 112;
+    u[shooter].y = 60;
+    while (slot->attack_sprite_birth_life && tracers[0].life > 1) update_tracers();
+    assert(slot->attack_sprite_layer == 5);
+    assert(slot->attack_sprite_x == 112 && slot->attack_sprite_y == 60);
+    Sc64AttackSpriteDraw child;
+    assert(sc64_attack_sprite_draw_state(0, &child));
+    assert(child.image == 35 && child.age == 0);
+    assert(child.x != tracers[0].x0 && child.y > 44 && child.y < 76);
+
+    u[shooter].alive = 0;
+    int blocker = make_unit(SIDE, U_TANK, 5, child.x, child.y);
+    assert(blocker == shooter && slot->attacker_plus1 < 0);
+    /* Keep the main projectile out of the isolated attacker-child fixture. */
+    assert(slot->bullet_layer);
+    slot->release_life = 1;
+    int init_x = tracers[0].x0, init_y = tracers[0].y0;
+    for (int air = 0; air <= 1; ++air) {
+        u[blocker].type = air ? U_WRAITH : U_TANK;
+        u[blocker].raw_type = air ? 8 : 5;
+        unsigned overlap = 0;
+        for (int dx = -10; dx <= 10 && !overlap; ++dx) {
+            u[blocker].x = child.x + dx;
+            /* Use the previous standalone compositor as the isolated art
+             * reference, anchored at the captured spawn instead of emit. */
+            tracers[0].x0 = slot->attack_sprite_x;
+            tracers[0].y0 = slot->attack_sprite_y;
+            begin_depth_frame();
+            draw_unit(&u[blocker]);
+            draw_tracer(0, SC64_TRACE_ATTACKER_SPRITE);
+            capture_depth_frame(child_in_front);
+            begin_depth_frame();
+            draw_tracer(0, SC64_TRACE_ATTACKER_SPRITE);
+            draw_unit(&u[blocker]);
+            capture_depth_frame(blocker_in_front);
+            tracers[0].x0 = init_x;
+            tracers[0].y0 = init_y;
+            for (unsigned i = 0; i < BATTLEFIELD_BYTES; ++i)
+                overlap += child_in_front[i] != blocker_in_front[i];
+        }
+        assert(overlap);
+        begin_depth_frame();
+        sc64_draw_depth_ordered_actors();
+        draw_tracers_pass(1);
+        capture_depth_frame(pair);
+        assert(!memcmp(pair, air ? blocker_in_front : child_in_front, BATTLEFIELD_BYTES));
+        printf("PASS detached Hydralisk sprite versus %s, %u overlap pixels\n",
+               air ? "Wraith" : "Tank", overlap);
+    }
+
+    clear_tracers();
+    u[blocker].alive = 0;
+    shooter = make_unit(SIDE, U_HYDRALISK, 38, 112, 60);
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 60, 0, -1));
+    u[shooter].alive = 0;
+    assert(make_unit(SIDE, U_HYDRALISK, 38, 112, 60) == shooter);
+    while (slot->attack_sprite_birth_life && tracers[0].life > 1) update_tracers();
+    assert(tracers[0].life && !slot->attack_sprite_layer);
+    assert(!sc64_attack_sprite_draw_state(0, &child));
+
+    clear_tracers();
+    u[shooter].alive = 0;
+    shooter = make_unit(SIDE, U_SCOURGE, 47, 112, 60);
+    assert(sc64_source_unit_vfx(&u[shooter], 116, 60, 1, -1));
+    assert(slot->attack_sprite_layer == 19 && !slot->attack_sprite_birth_life);
+    u[shooter].alive = 0;
+    update_tracers();
+    assert(sc64_attack_sprite_draw_state(0, &child));
+    assert(child.image == 4 && child.x == 112 && child.y == 60);
+}
+
+static void test_projectile_release_layer(void)
+{
+    reset_world();
+    int shooter = make_unit(SIDE, U_DRAGOON, 66, 32, 54);
+    int target = make_unit(ENEMY, U_SCV, 7, 208, 54);
+    int foundation = spawn_build(ENEMY, B_BARRACKS, 208, 60, 1);
+    assert(foundation >= 0);
+    assert(sc64_source_unit_vfx(&u[shooter], u[target].x, u[target].y, 0, target));
+    Sc64TraceSlot *trace = &sc64_trace_slots[0];
+    assert(trace->bullet_layer == 5 && trace->depth_ref == target && trace->release_life);
+    while (tracers[0].life > trace->release_life + 1) update_tracers();
+    assert(trace->release_life && trace->bullet_layer == 5);
+    u[target].order = ORDER_BUILD;
+    u[target].target = foundation;
+    assert(sc64_unit_world_layer(&u[target]) == 5);
+    update_tracers();
+    assert(!trace->release_life && trace->bullet_layer == 6);
+    u[target].order = ORDER_IDLE;
+    update_tracers();
+    assert(sc64_unit_world_layer(&u[target]) == 4 && trace->bullet_layer == 6);
+
+    clear_tracers();
+    assert(sc64_source_unit_vfx(&u[shooter], 208, 54, 0, -1));
+    assert(trace->depth_ref == shooter && trace->release_life);
+    while (trace->release_life && tracers[0].life > 1) update_tracers();
+    assert(tracers[0].life && !trace->release_life && trace->bullet_layer == 5);
+
+    clear_tracers();
+    assert(sc64_source_unit_vfx(&u[shooter], u[target].x, u[target].y, 0, target));
+    assert(trace->depth_ref == target && trace->release_life);
+    u[target].alive = 0;
+    int replacement = make_unit(ENEMY, U_WRAITH, 8, 208, 54);
+    assert(replacement == target && trace->depth_ref == -1);
+    while (trace->release_life && tracers[0].life > 1) update_tracers();
+    assert(tracers[0].life && !trace->release_life && trace->bullet_layer == 5);
+}
+#endif
 
 static int sprite_frame_equal(const Sc64SpriteFrame *a, const Sc64SpriteFrame *b)
 {
@@ -295,7 +1423,7 @@ static void test_special_event_source_vfx(void)
                              SC64_P6_RAW_INFESTED_TERRAN, 120, 100);
     Sc64StockAttack attack;
     assert(sc64_stock_attack_select(SC64_P6_RAW_INFESTED_TERRAN, 0, &attack));
-    assert(sc64_source_unit_vfx(&u[infested], 121, 100, 0));
+    assert(sc64_source_unit_vfx(&u[infested], 121, 100, 0, -1));
     assert(has_source_tracer(SC64_P6_RAW_INFESTED_TERRAN, attack.weapon_id,
                              (unsigned)infested + 1u));
 #endif
@@ -305,7 +1433,7 @@ static void test_special_event_source_vfx(void)
     assert(trap >= 0);
     b[trap].raw_type = 211;
     b[trap].raw_owner = 6;
-    assert(sc64_source_building_vfx(&b[trap], 130, 100, 0));
+    assert(sc64_source_building_vfx(&b[trap], 130, 100, 0, -1));
     assert(has_source_tracer(211, 98, 0));
 #endif
 }
@@ -319,6 +1447,27 @@ int main(void)
     test_photon_cannon_defense_emission();
     test_archon_splash_emission();
     test_special_event_source_vfx();
+#ifdef SC64_PROJECTILE_DEPTH
+    test_moving_projectile_overlap();
+    test_ground_projectile_world_y();
+    test_fallback_projectile_depth();
+    test_stationary_projectile_depth(0);
+#ifdef SC64_TANK_SOURCE_VFX
+    test_stationary_projectile_depth(1);
+#endif
+#ifdef SC64_P4_STORM_ENABLED
+    test_detached_impact_depth();
+#endif
+#ifdef SC64_P4_STORM_ENABLED
+    test_low_trail_depth();
+    test_low_trails_interleave_with_world_y();
+    test_detached_trail_survives_impact();
+    test_flight_trail_depth();
+#endif
+    test_attached_attacker_depth();
+    test_detached_attack_sprite_depth();
+    test_projectile_release_layer();
+#endif
     puts("PASS native weapon source engine integration");
     return 0;
 }

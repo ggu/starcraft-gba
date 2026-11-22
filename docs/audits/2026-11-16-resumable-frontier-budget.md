@@ -215,3 +215,99 @@ combinations and arbitrary mid-battle saves.
 | --- | --- |
 | Eight skirmish comparisons | `85e78368c9c6be7ba1f9472af50ec7e2203e7a7234275a5af8c2dee0fd25dd6c` |
 | Protoss 10 victory comparison | `4f85ff68fda54ef92285f71cb7abc302ed2e0ccf7e265462843905da2a7ee94b` |
+
+## Cached range read on a compressed wide grid
+
+The opt-in experiment retains the endpoints of identical row and column
+runs, plus the origin and goal axes. Edges retain their original lengths.
+Dijkstra computes distances from the origin on graphs of at most 128
+intersections. A descent from the goal in left, right, up, down order
+matches the reverse FIFO's choice of parent. In an identical-column run
+a vertical step can move after a horizontal step, and in an identical-row
+run a horizontal step can move before a vertical step. These exchanges
+put the first shortest path in FIFO order on retained coordinates.
+
+The host oracle matches 2,084 queries, including 164 disconnected
+endpoints. Blocked endpoints and excess intersections take the existing
+path. The integration fixture checks that the cached read preserves the
+pending frontier, packed field, logical counters and route scratch tail.
+
+The same-source forced P10 pair, composed with release `0f4d63c4`, uses
+the existing long wall fixture. It queries a field of 16,270 reachable
+tiles using 77 intersections. The two reads return `(1608, 1624)`, with one
+logical build and zero hits. RAM endpoints match.
+
+| Work in ARM fixture | Prefix control | Compressed query |
+| --- | ---: | ---: |
+| Initial prefix fill | 103,402 | 103,402 |
+| Cached range read | 1,086,782 | 252,139 |
+| Later explicit full-field read | 271 | 1,085,534 |
+
+The immediate read saves 834,643 cycles (76.8%). The experiment leaves the
+prefix parked, and the observer verifies byte-identical pending, field,
+walkability and tail data before explicit completion. Afterwards all
+6,144 packed bytes equal the control and all 16,384 directions equal the
+independent FIFO. The later read shows that completion can still cause a
+stall. A parked slot also changes the available prefix budget, witness
+selection and retention on eviction.
+
+The ordinary-button Z9 probe samples 86 live 128-by-128 grids on Z10
+prefix-preview ROM `f38cdb2f` through controller call 31,500. All 31
+named checks in that window match. The samples contain 20 distinct
+grids. Each requires retaining all 128 rows and columns, for 16,384
+intersections before adding query endpoints. None could use the shortcut.
+Keep global axis compression out of production. The next route design
+should measure on real terrain and cover the exact and nearby-root
+completion stalls seen in dense Z7.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Forced P10 comparison | `faba21247030427ffc0597ec1fe42b13099ccf66bbf91dfa7d896cd03a8339e9` |
+| Z9 walkability sample | `b9298d8e5fa0ec179d07bece2e2c6e3abeec614de8429730be1fd5b149e3aff6` |
+
+
+## Z8 check on the current mineral-routing release
+
+The route code from #576 at `f556e9ba` was composed locally with release
+`916bb897`. The Z10 trial enabled point prefixes, the component and
+distance witnesses, and the second exact-hit cutoff. Prepared inputs
+and controller tape are identical to the release control. All 47
+world checkpoints, 24 two-page video samples and 19 HOST checks match.
+The frame, screen and dialogue timeline matches across all 46,487 calls.
+The paired replay is uninterrupted.
+
+| Metric | Control cycles | Point prefix cycles |
+| --- | ---: | ---: |
+| Mean advancing play update | 1,020,920 | 1,016,666 |
+| p95 advancing play update | 1,500,353 | 1,470,299 |
+| Peak advancing play update | 12,264,221 | 11,052,465 |
+| Call 33,800 entire observer interval | 12,264,714 | 11,052,958 |
+| Calls 33,889–33,896 mean observer interval | 3,281,773 | 2,517,638 |
+
+The mean gain on this full route is 0.42%. The 33,800 movement spike
+is 9.9% shorter. The route and reserved range-plane sanitizer checks
+pass. Z10 IWRAM ends at `0x03004ec8` and EWRAM at `0x02038328`, both
+within their guards. Terran, P10 and Showcase also pass the current
+five-flag links. All four profiles build successfully with 72 bytes or
+more below the IWRAM ceiling. Three-AI Blood Bath smoke pairs write the
+same pause journals and match the named world 240 updates past a fresh
+HOME load. The cross-profile build and save receipts have SHA-256
+`13eb58c2fa4379f1dc2934b9f16ddbd32853c2283ac092a47d3e47fc6c9e0608` and
+`2c69b7a22387a51834fa9226d5ee1aad0e29673dd5ee00c2117237ed8d94d911`.
+
+The current forced P10 long-wall ARM fixture returns `(1608, 1624)` and
+records one logical build and zero hits with either variant. The release
+fills the whole field in 1,087,127 cycles and reads the cached step in
+1,228 cycles. The five-flag preview parks the field in 103,404 cycles,
+then spends 1,086,880 completing it on the cached read. This reproduces
+the deferred range stall on the current code. The result SHA-256 is
+`0dbd4113fd903e1e5d91ff4d23fbfa794d83272ead9c2272e068b94e55e80861`.
+The second exact-hit flag still needs a normal selector entry and the
+cached-read cost needs a solution that can apply on real terrain.
+
+The trial ROM SHA-256 is
+`3b9e27ac57008b2a852a7cffc44802c252d85115289717ce810b9f6c570f78a6`.
+The replay receipt SHA-256 is
+`c78c41503fe8c112faa45ad0beef65808bffbb59e79394e56cb02f9e19dcc839`.
+The paired comparison SHA-256 is
+`ae04bf3920fc5f7166fef435b82ea8d2dcdb43ff9df95b5f6d67ddfef185d3e5`.

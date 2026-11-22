@@ -1,6 +1,8 @@
 #ifndef SC64_ZP_UNIT_SAVE_H
 #define SC64_ZP_UNIT_SAVE_H
 
+#include "sc64_save_bits.h"
+
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
 #define SC64_ZP_WIRE_VALIDATE sc64_zp_unit_fields_valid_for
 #define SC64_ZP_WIRE_ENCODE sc64_zp_unit_save_encode_for
@@ -53,14 +55,8 @@ static int sc64_zp_unit_put(Sc64ZpPackedUnitSave *row, unsigned *bit,
 static int sc64_zp_unit_get(const Sc64ZpPackedUnitSave *row, unsigned *bit,
                             unsigned width, u32 *value)
 {
-    u32 result = 0;
-    if (!row || !bit || !value || !width || width > 32 ||
-        *bit > SC64_ZP_PACKED_UNIT_SAVE_BYTES * 8u ||
-        width > SC64_ZP_PACKED_UNIT_SAVE_BYTES * 8u - *bit) return 0;
-    for (unsigned i = 0; i < width; ++i, ++*bit)
-        result |= (u32)((row->bytes[*bit >> 3] >> (*bit & 7u)) & 1u) << i;
-    *value = result;
-    return 1;
+    return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
+                                      bit, width, value);
 }
 
 static int sc64_zp_unit_is_zero(const Sc64ZpPackedUnitSave *row)

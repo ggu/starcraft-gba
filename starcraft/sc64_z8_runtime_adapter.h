@@ -75,7 +75,9 @@ static s8 race_z8_product_slot = -1;
 /* Derived each update (and on load): enemy hero Dark Templars that no human
  * detector reveals. They are not drawn and cannot be targeted by the human. */
 static u8 race_z8_hidden[(MAX_UNITS + 7) / 8];
+#ifndef SC64_TARGET_POLICY_PROBE
 static u8 race_z8_hidden_any;
+#endif
 
 static const u8 sc64_z8_owner_modes_expected[8] = { 2, 1, 1, 0, 2, 1, 2, 2 };
 

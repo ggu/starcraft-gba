@@ -48,7 +48,8 @@ typedef struct {
     uint16_t raw;           /* source unit id, or 0xffff when unknown */
     uint16_t burst_su, remnant_start, total_su;
     uint8_t style, extent;  /* style 0 marks a free slot */
-    uint8_t source;         /* 1 when compiled source frames drive it */
+    uint8_t source : 1;    /* compiled source frames drive it */
+    uint8_t actor_layer_plus1 : 5; /* live elevation at the death transition */
     uint8_t color;          /* owner color for authored infantry */
 } Sc64DeathVfx;
 
@@ -195,6 +196,7 @@ sc64_death_vfx_spawn(Sc64DeathVfx *pool, int count, uint32_t now, int style,
     e->style = (uint8_t)style;
     e->extent = (uint8_t)extent;
     e->source = (uint8_t)(source != 0);
+    e->actor_layer_plus1 = 0;
     e->color = (uint8_t)color;
     return slot;
 }

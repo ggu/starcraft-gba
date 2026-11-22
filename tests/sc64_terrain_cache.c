@@ -668,9 +668,10 @@ test_soft_fog_neighbor_cache(void)
 static void test_dirty_capture(void)
 {
     enum { Y = SC64_TERRAIN_CACHE_Y, H = SC64_TERRAIN_CACHE_HEIGHT,
-           SPLIT = Y + SC64_TERRAIN_CACHE_VRAM_ROWS };
+           SPLIT = Y + SC64_TERRAIN_CACHE_VRAM_ROWS,
+           RAM_TOP = Y + SC64_TERRAIN_CACHE_FAST_ROWS };
     _Alignas(4) u8 expected[240 * H], observed[240 * H];
-    const Sc64StaticDirtyRowsPlan plan = {3, {{Y+2,Y+7},{SPLIT-3,SPLIT+4},{Y+H-3,Y+H}}};
+    const Sc64StaticDirtyRowsPlan plan = {3, {{Y+2,Y+7},{SPLIT-3,RAM_TOP+4},{Y+H-3,Y+H}}};
     const Sc64StaticDirtyRowsPlan bad = {2, {{Y,Y+4},{Y+2,Y+8}}};
     for (int trial = 0; trial < 5; ++trial) {
         gfx_begin(20);
@@ -688,8 +689,13 @@ static void test_dirty_capture(void)
         if (trial) gfx_rect(0, Y, 240, 1, 98); /* must survive full fallback */
         assert(gfx_read_band(Y, H, expected));
         assert(sc64_terrain_capture_dirty(trial == 4 ? &bad : &plan, base, 1, 3, test_static_key) ==
-               (trial ? 0 : 15));
+               (trial ? 0 : 15 + SC64_TERRAIN_CACHE_PADDING_ROWS));
         assert(sc64_terrain_store(1, 3, trial == 4 ? &bad : &plan, base));
+#ifdef SC64_TERRAIN_CACHE_PADDING_ACTIVE
+        assert(!memcmp(expected + 240 * (SPLIT - Y), sc64_terrain_cache_pixels_padding,
+                       sizeof(sc64_terrain_cache_pixels_padding)));
+#endif
+        gfx_end();
         gfx_begin(88);
         assert(sc64_terrain_cache_restore());
         assert(gfx_read_band(Y, H, observed));

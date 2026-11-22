@@ -250,11 +250,20 @@ int main(int argc, char **argv) {
     int home=spawn_build(SIDE,B_HATCHERY,600,600,0);
     int refinery=spawn_build(SIDE,B_EXTRACTOR,650,600,0);
     int gas_worker=spawn_unit(SIDE,U_DRONE,635,600);
-    u[gas_worker].order=ORDER_GAS;u[gas_worker].target=refinery;
-    u[gas_worker].work_timer=0;int old_gas=gas;
-    update_orders();assert(u[gas_worker].carry==8);
-    u[gas_worker].x=b[home].x+24;u[gas_worker].y=b[home].y;
-    update_orders();assert(gas==old_gas+8&&!u[gas_worker].carry);
+    assert(home >= 0 && refinery >= 0 && gas_worker >= 0);
+    u[gas_worker].order = ORDER_GAS;
+    u[gas_worker].target = refinery;
+    u[gas_worker].work_timer = 0;
+    int old_gas = gas;
+    update_orders();
+    assert(!u[gas_worker].carry && gas == old_gas);
+    for (int tick = 1; tick < 60 && !u[gas_worker].carry; ++tick)
+        update_orders();
+    assert(u[gas_worker].carry == 8 && gas == old_gas);
+    u[gas_worker].x = b[home].x + 24;
+    u[gas_worker].y = b[home].y;
+    update_orders();
+    assert(gas == old_gas + 8 && !u[gas_worker].carry);
     /* Campaign worker production must gather local ore, not one of the
        authored skirmish arena's fixed patch indices in enemy territory. */
     init_mission(0);
@@ -283,6 +292,7 @@ int main(int argc, char **argv) {
     /* Construction remains unpaid and has no foundation while its Drone is
        walking; the pending order stores a building type, not a building slot. */
     game_init();race_mode=1;race_human=R_ZERG;race_bots=2;init_state();
+    race_add_owner_resources(SIDE, 150, 0);
     int before_minerals=minerals,before_gas=gas,foundations=0;
     assert(race_start_build(SIDE,1,B_SPAWNING_POOL,208,160));
     assert(u[1].order==ORDER_BUILD_PENDING&&u[1].target==B_SPAWNING_POOL);

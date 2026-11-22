@@ -34,6 +34,54 @@ static int hero_slot(void)
     return -1;
 }
 
+#ifdef SC64_WORLD_DEPTH
+static void test_storm_depth(Sc64PsionicStormState *state)
+{
+    enum { FIELD_BYTES = 240 * 108 };
+    static _Alignas(4) u8 storm[FIELD_BYTES], actor[FIELD_BYTES], pair[FIELD_BYTES];
+    const int x = 108, y = 52;
+    memset(u, 0, sizeof u);
+    memset(b, 0, sizeof b);
+    memset(m, 0, sizeof m);
+    geyser_count = 0;
+    camx = camy = 0;
+    sc64_psionic_storm_init(state);
+    state->storm[0] = (Sc64PsionicStorm){ .x = x, .y = y, .active = 1 };
+    assert(race_storm_for_draw() == state);
+
+    gfx_begin(C_PANEL);
+    draw_storm_marker(&state->storm[0]);
+    assert(gfx_read_band(12, 108, storm));
+    gfx_end();
+
+    const int types[] = { U_TANK, U_WRAITH };
+    for (unsigned j = 0; j < sizeof types / sizeof *types; ++j) {
+        int slot = spawn_unit(SIDE, types[j], x, y);
+        assert(slot >= 0 && sc64_unit_world_layer(&u[slot]) == (j ? 18u : 4u));
+        gfx_begin(C_PANEL);
+        draw_unit(&u[slot]);
+        assert(gfx_read_band(12, 108, actor));
+        gfx_end();
+
+        gfx_begin(C_PANEL);
+        sc64_draw_depth_ordered_actors();
+        assert(gfx_read_band(12, 108, pair));
+        gfx_end();
+        unsigned overlap = 0;
+        for (unsigned i = 0; i < FIELD_BYTES; ++i) {
+            if (storm[i] == C_PANEL || actor[i] == C_PANEL || actor[i] == storm[i])
+                continue;
+            ++overlap;
+            assert(pair[i] == (j ? actor[i] : storm[i]));
+        }
+        assert(overlap);
+        printf("Storm layer in mission %d against %s: %u overlap pixels\n",
+               race_selected_mission, j ? "Wraith" : "Tank", overlap);
+        u[slot].alive = 0;
+    }
+}
+#endif
+
 int main(void)
 {
     RaceSave good,bad;
@@ -119,6 +167,13 @@ int main(void)
     for(int i=0;i<100;++i) assert(race_p6_storm_tick(0));
     assert(!b[trap].alive && b[trap].hp==0);
     assert(race_p6.deaths_by_source[b[trap].raw_owner]==deaths+1);
+#endif
+#ifdef SC64_WORLD_DEPTH
+    test_storm_depth(&SPELL_STATE);
+#ifdef SC64_P4_STORM_ENABLED
+    race_selected_mission = SC64_P4_GLOBAL_ID;
+    test_storm_depth(&race_p4.storm);
+#endif
 #endif
     puts("Actual campaign spell controls/save/pause checks passed");
     return 0;

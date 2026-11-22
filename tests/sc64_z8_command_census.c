@@ -53,6 +53,26 @@ int main(void)
     assert(screen == SCREEN_PLAY && CENSUS_ACTIVE());
     assert(CENSUS_WORLD.command_count == sc64_z8_game_command_count);
 
+#ifdef SC64_COMMAND_RAW_VALIDATION_CACHE
+    /* Compare the memo with the original validator across every source raw
+     * ID, both actor kinds, malformed owners and compact-coordinate edges. */
+    u8 cache[2][SC64_Z8_RAW_UNIT_LIMIT] = {{0}};
+    const int coordinates[] = {-1, 0, 1, 32767};
+    const int owners[] = {-1, 0, SC64_Z8_SOURCE_OWNER_LIMIT - 1, SC64_Z8_SOURCE_OWNER_LIMIT};
+    for (int building = 0; building < 2; ++building)
+        for (int raw = -1; raw <= SC64_Z8_RAW_UNIT_LIMIT + 1; ++raw)
+            for (unsigned i = 0; i < sizeof coordinates / sizeof *coordinates; ++i)
+                for (unsigned j = 0; j < sizeof coordinates / sizeof *coordinates; ++j)
+                    for (unsigned k = 0; k < sizeof owners / sizeof *owners; ++k) {
+                        int l, t, r, b;
+                        int expected = sc64_z8_game_actor_validate(owners[k], raw,
+                            coordinates[i], coordinates[j], building, &l, &t, &r, &b);
+                        assert(sc64_command_validated_type(cache[building], owners[k], raw,
+                            coordinates[i], coordinates[j], building) == expected);
+                    }
+    puts("Command raw validation matches all compact-coordinate boundary cases");
+#endif
+
     Sc64Z8WorldView world = CENSUS_WORLD;
     const unsigned selectors[] = {0, 1, 2, 7, 8, 12, 13, 17, 18, 19, 20, 21};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
@@ -67,10 +87,17 @@ int main(void)
     world.active_mask = 3;
     u32 count;
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
+    world.force[1] = 5;
+    assert(compare(&world, SC64_Z8_SELECT_FORCE1, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
     u[slot] = (Unit){.alive = 1, .raw_owner = 0, .raw_type = 0, .type = U_MARINE,
                      .x = 42, .y = 42};
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 1);
     u[slot].raw_owner = 1;
+    assert(compare(&world, SC64_Z8_SELECT_FORCE1, 64, 0, 0, 2, 0, 0) == -1);
+    world.active_mask = 1;
+    assert(compare(&world, SC64_Z8_SELECT_FORCE1, 64, 0, 0, 2, 0, &count) == 1 && count == 0);
+    world.active_mask = 3;
+    world.force[1] = 2;
     assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
     u[slot].raw_owner = 11;
     assert(compare(&world, 17, 229, 0, 0, 2, 0, &count) == 1 && count == 0);
@@ -102,10 +129,36 @@ int main(void)
     assert(compare(&world, 0, 231, 1, 0, 2, 0, &count) == 1 && count == 1);
     b[building].under_construction = 0;
     assert(compare(&world, 0, 231, 0, 0, 2, 0, &count) == 1 && count == 1);
+    /* The raw-type memo is warm: each row still rechecks owner and both
+     * coordinates, even if the queried owner would exclude the row. */
+    b[building].raw_owner = -1;
+    assert(compare(&world, 1, 64, 0, 0, 2, 0, 0) == -1);
+    b[building].raw_owner = 0;
+    b[building].x = -1;
+    assert(compare(&world, 1, 64, 0, 0, 2, 0, 0) == -1);
+    b[building].x = 48;
     b[building].y = -1;
     assert(compare(&world, 1, 64, 0, 0, 2, 0, 0) == -1);
     b[building].alive = 0;
     assert(compare(&world, 0, 231, 0, 0, 2, 0, &count) == 1 && count == 0);
+
+    /* Reinitialize the game after warming the static raw memo. Reset and
+     * HOME-like initialization must not reuse prior actor or owner data. */
+    game_init();
+    race_mode = 0;
+    race_selected_mission = CENSUS_MISSION;
+    init_state();
+    assert(CENSUS_ACTIVE());
+    world = CENSUS_WORLD;
+    memset(u, 0, sizeof u);
+    memset(b, 0, sizeof b);
+    world.active_mask = 3;
+    u[slot] = (Unit){.alive = 1, .raw_owner = 1, .raw_type = 0, .type = U_MARINE,
+                     .x = 42, .y = 42};
+    assert(compare(&world, 0, 0, 0, 0, 2, 0, &count) == 1 && count == 0);
+    assert(compare(&world, 1, 0, 0, 0, 2, 0, &count) == 1 && count == 1);
+    u[slot].y = -1;
+    assert(compare(&world, 0, 0, 0, 0, 2, 0, 0) == -1);
 
     world.actor_at = custom_actor;
     world.actor_count = 1;

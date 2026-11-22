@@ -68,3 +68,55 @@ It does not measure real hardware or verify every campaign branch or save.
 - Matching ELF SHA-256: `00951a012354bf97ccd3d81682f8e4e7d2321381195c589b0d2d705b1abb8ab8`.
 - Physical observer SHA-256: `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549`.
 - Exact physical replay receipt SHA-256: `25b010e84ebd8df7bc9c5b5e433dee5c67e3a8f3d79a139c478643690ffd5448`.
+
+## November 20 fresh SRAM and result autosave
+
+The normal Terran ROM built from `afffebec` replays the retained
+paid-air probe tape with the earlier frame-126,331 win. Its gameplay
+starts at the frame-zero boundary. The observer opens Revolution
+from HOME, reveals all nine briefing pages and presses Start. It
+then supplies the unchanged gameplay button transitions from the
+tape and reads guest state using the matching ELF.
+
+At gameplay call 73,391, frame 72,076, the first attack of the
+12-Wraith wing has been issued. Raynor and Kerrigan are alive, the
+Starport and Control Tower are complete, and all 12 Wraiths are
+selected. Start pauses and B writes bank 0. A fresh emulator loads
+that record at HOME with L. The observed world, campaign and
+Revolution trigger state, control selection and cursor are the same
+as at the save. The camera derived from the cursor also matches.
+
+All 162 source observations match at 148 distinct gameplay calls.
+The fresh process matches 94 observations at 81 calls after loading.
+The observer acknowledges 14 authored gameplay pages with the
+simulation frame held. At frame 126,331, Raynor and Kerrigan survive,
+16 paid Wraiths remain, all hostile buildings are gone and the
+recorded trigger outcome is victory with zero faults. Bank 1 records
+the result and leaves bank 0 byte-identical. A third process loads
+the frozen victory, restores selected unit slot 2 and exports
+identical SRAM.
+
+The measured 127,959 controller calls average 800,843 guest cycles
+per main loop, or 20.95 emulated updates per second. The largest
+update takes 34,735,863 cycles. These timings cover rendering, UI,
+pause, save and load. Physical GBA performance remains unmeasured.
+
+Use the pinned local inputs to repeat the check.
+
+```sh
+python3 tools/sc64_t9_normal_replay.py --chapter 5 --save-tick 73391 \
+  --trace "$T5_TRACE" --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" \
+  --runner "$PHYSICAL_OBSERVER" --out "$NEW_RECEIPT_DIR"
+```
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Normal Terran ROM | `01240c5e95c1f0e648028dad75005e3185904c02e6c9b0577aa368d14e7958f3` |
+| Matching ELF | `85aa28c9206b11cd9baebdc9f33d8d9bf6de49fa624146480c1cf351d87dbc10` |
+| Physical observer | `f25b89241f1209d947dd275a2b953dfc0b7ee164e4f73fa63710855c0e63418d` |
+| Paid-air HOST tape | `1102fa2289606f3db298ed878a2ce4c2783a55f317d6f1062e41c5fc5b3cacc4` |
+| Replay harness | `a478103d82f6983e8ec273c5426c8128a169154f31193882559cdee2fb4a07a2` |
+| T5 checkpoint observer | `5ccb54216f058e356e2c4862cbf5cc50e38ba644b9ef57b1fdac3c8c6f6560c6` |
+| Pause SRAM | `c05a204e4b6adff751c23e750f1324ebc9f8fe6d90a1315dea8e53b463fdf1eb` |
+| Victory SRAM and fresh readback | `2ef8ee686161e3c8aa627ce3eb1162b3b1ea5f918fdd370033fe60b54a9306b6` |
+| T5 replay and both journal checks | `2e92579a3f33d849900384133bd415ab926a3e292a30d82e4f3bba5fb6fcb22c` |

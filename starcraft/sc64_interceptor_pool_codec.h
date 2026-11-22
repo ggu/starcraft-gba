@@ -11,6 +11,7 @@ extern "C" {
 #define SC64_CODEC_BYTES 2103u
 #define SC64_ARENA_WORDS 2408u
 #define SC64_END 127u
+#define SC64_PROJECTILE_MAX_LAYER 20u
 /* Runtime arena access is through volatile 16-bit words only. The caller
  * supplies aligned storage and keeps packet buffers disjoint from it. */
 typedef struct { volatile uint16_t *words; size_t word_count; } Sc64Arena;
@@ -25,7 +26,8 @@ typedef struct {
     int16_t remaining_time;
     uint8_t state, order_signal_bit0, movement_flags_low4, hit_flags_low2;
     uint8_t script_phase, raw_source_owner, pending_damage_event;
-    uint8_t next_link, reserved_snapshot_bits;
+    uint8_t next_link;
+    uint8_t launch_layer_plus1; /* zero for rows from legacy saves */
 } Sc64ProjectileRow;
 int sc64_pool_init(Sc64Arena *a);
 int sc64_pool_acquire(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index);
@@ -63,7 +65,7 @@ int sc64_pool_get_row(const Sc64Arena *a, uint8_t ordinal, Sc64ProjectileRow *ou
 /*
  * Writes projectile fields for an allocated ordinal but preserves intrusive
  * F_PREV/F_NEXT links. row->next_link is ignored. The caller must supply field
- * values inside the codec-v3 domains and keep row->state consistent with the
+ * values inside the codec domains and keep row->state consistent with the
  * ordinal's active/free list; pool_validate/encode enforce those conditions.
  */
 int sc64_pool_set_row(Sc64Arena *a, uint8_t ordinal, const Sc64ProjectileRow *row);

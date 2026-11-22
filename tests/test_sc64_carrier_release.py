@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Asset-free checks for the opt-in Carrier release vector and target dispatch."""
+"""Asset-free checks for Carrier profile selection and target dispatch."""
 import os
 from pathlib import Path
 import re
@@ -41,10 +41,10 @@ class CarrierReleaseTest(unittest.TestCase):
         return run(["make", "-s", "-f", "Makefile", "-f",
                     "mk/carrier-release/Makefile", *args], stdin)
 
-    def release_flags(self, *names):
+    def release_flags(self, *names, settings=()):
         program = ".PHONY: print-carrier-flags\nprint-carrier-flags:\n"
         program += "".join(f"\t@printf '%s\\n' '$({name})'\n" for name in names)
-        result = self.make("-f", "-", "print-carrier-flags", stdin=program)
+        result = self.make("-f", "-", *settings, "print-carrier-flags", stdin=program)
         self.assertEqual(result.returncode, 0, result.stderr)
         return [shlex.split(line) for line in result.stdout.splitlines()]
 
@@ -83,6 +83,55 @@ class CarrierReleaseTest(unittest.TestCase):
                       ["-DSC64_SHOWCASE_ENABLED", "-DSC64_SHOWCASE_CARRIER_PROBE"]):
             with self.subTest(flags=flags):
                 self.assertNotEqual(self.macros(*selector, *flags).returncode, 0)
+
+    def test_normal_z10_preserves_fact_and_target_flags(self):
+        names = ("Z10_CARRIER_FLAGS", "Z10_ARM_SOURCES", "Z10_FACT_FLAGS",
+                 "Z10_FACT_REFERENCE_FLAGS")
+        [selector] = self.release_flags("SC64_CARRIER_RELEASE_FLAGS")
+        [default] = self.release_flags("Z10_CARRIER_FLAGS")
+        self.assertEqual(default, selector)
+        combat_fact = "-DSC64_COMBAT_FACT_TABLE_PROBE"
+        for policy in ("0", "1"):
+            with self.subTest(target_policy=policy):
+                shared = (f"CANONICAL_TARGET_POLICY={policy}",)
+                off, stock_sources, stock_tables, stock_generator = self.release_flags(
+                    *names, settings=(*shared, "Z10_CARRIER_RELEASE=0"))
+                on, carrier_sources, carrier_tables, carrier_generator = self.release_flags(
+                    *names, settings=(*shared, "Z10_CARRIER_RELEASE=1"))
+                self.assertEqual(off, [])
+                self.assertEqual(on, selector)
+                model = "starcraft/sc64_interceptor_orders.c"
+                self.assertEqual(carrier_sources.count(model), 1)
+                self.assertEqual([source for source in carrier_sources if source != model],
+                                 stock_sources)
+                self.assertEqual(stock_tables,
+                                 ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts", combat_fact])
+                self.assertEqual(carrier_tables,
+                                 ["-DSC64_FACT_TABLES", "-Ibuild/generated/z10-facts-carrier", combat_fact])
+                self.assertEqual(stock_generator[-1:], [combat_fact])
+                self.assertEqual(carrier_generator, stock_generator[:-1] + selector + [combat_fact])
+                self.assertIn("-DSC64_BUILDING_WORDS_PROBE", carrier_generator)
+                self.assertIn("-DSC64_TARGET_FAST_LINK_PROBE", carrier_generator)
+                self.assertEqual("-DSC64_TARGET_POLICY_PROBE" in carrier_generator, policy == "1")
+                rollback = self.release_flags(
+                    "Z10_FACT_FLAGS", "Z10_FACT_REFERENCE_FLAGS",
+                    settings=(*shared, "Z10_CARRIER_RELEASE=1", "Z10_COMBAT_FACTS=0"))
+                self.assertEqual(rollback, [carrier_tables[:-1], carrier_generator[:-1]])
+        self.assertNotEqual(self.make("Z10_CARRIER_RELEASE=2", "carrier-release-plan").returncode, 0)
+
+    def test_normal_terran_links_only_the_selected_carrier_service(self):
+        names = ("TERRAN_CARRIER_FLAGS", "TERRAN_ARM_SOURCES")
+        [selector] = self.release_flags("SC64_CARRIER_RELEASE_FLAGS")
+        [default] = self.release_flags("TERRAN_CARRIER_FLAGS")
+        self.assertEqual(default, selector)
+        off, ordinary_sources = self.release_flags(*names, settings=("TERRAN_CARRIER_RELEASE=0",))
+        on, carrier_sources = self.release_flags(*names, settings=("TERRAN_CARRIER_RELEASE=1",))
+        self.assertEqual(off, [])
+        self.assertEqual(on, selector)
+        model = "starcraft/sc64_interceptor_orders.c"
+        self.assertEqual(carrier_sources.count(model), 1)
+        self.assertEqual([source for source in carrier_sources if source != model], ordinary_sources)
+        self.assertNotEqual(self.make("TERRAN_CARRIER_RELEASE=2", "carrier-release-plan").returncode, 0)
 
     def test_dispatch_maps_each_product_and_does_not_accept_unknowns(self):
         expected = [f"{name} {row[2]} {row[3]}" for name, row in PROFILES.items()]

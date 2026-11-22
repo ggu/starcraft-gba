@@ -118,22 +118,6 @@ race_t6_save_state_valid(const Sc64T6MissionState *state)
 }
 
 static int
-race_t6_save_pack(Sc64T6MissionState *dst, const Sc64T6MissionState *src)
-{
-    if (!dst || !race_t6_save_state_valid(src)) return 0;
-    *dst = *src;
-    return 1;
-}
-
-static int
-race_t6_save_expand(Sc64T6MissionState *dst, const Sc64T6MissionState *src)
-{
-    if (!dst || !race_t6_save_state_valid(src)) return 0;
-    *dst = *src;
-    return 1;
-}
-
-static int
 race_t6_save_candidate_queues_available(const RaceSave *candidate)
 {
     if (!candidate || candidate->state[0] != 0 ||

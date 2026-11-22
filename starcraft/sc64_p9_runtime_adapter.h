@@ -312,9 +312,15 @@ static int race_p9_kill_at(const Sc64P9SourceAction *a, unsigned trigger_owner)
             int selected = race_p9_actor_selected(i, a, trigger_owner, &rect);
             if (selected < 0) return -1;
             if (!selected || !pass) continue;
+            int damage = SC64_P9_KILL_DAMAGE;
             if (i < MAX_UNITS) invincible_units[i] = 0;
-            else invincible_buildings[i - MAX_UNITS] = 0;
-            hit_target_impl_ex((int)i, SC64_P9_KILL_DAMAGE, -1, -1, -1,
+            else {
+                unsigned slot = i - MAX_UNITS;
+                invincible_buildings[slot] = 0;
+                /* Keep the dead row's HP representable in the campaign journal. */
+                damage = b[slot].hp > 0 ? b[slot].hp : 1;
+            }
+            hit_target_impl_ex((int)i, damage, -1, -1, -1,
                                SC64_HIT_PRECOMPUTED_HP | SC64_HIT_SKIP_HALLUCINATION_SCALE);
         }
     return SC64_P9_ACTION_COMPLETE;

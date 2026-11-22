@@ -17,6 +17,9 @@
 #include "sc64_game_actor_facts.h"
 #include "sc64_fact_table_format.h"
 #include "sc64_p7_sight_policy.h"
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+#include "sc64_combat_facts.h"
+#endif
 #ifdef SC64_P7_RECT_TABLES
 #if !defined(SC64_FACT_TABLE_GENERATOR)
 #error "rectangle table generation requires the internal reference mode"
@@ -63,7 +66,7 @@
     X(SC64_P7_PROJECTILES_ENABLED) X(SC64_P7_CARRIER_TRAINING_ENABLED) \
     X(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) X(SC64_SHOWCASE_CARRIER_PROBE) \
     X(SC64_TERRAN_CARRIER_PROBE) X(SC64_ZERG_CARRIER_PROBE) X(SC64_NYDUS_ENABLED) \
-    X(SC64_FACT_SIGHT_TABLES) X(SC64_P7_RECT_TABLES) \
+    X(SC64_FACT_SIGHT_TABLES) X(SC64_P7_RECT_TABLES) X(SC64_COMBAT_FACT_TABLE_PROBE) \
     X(SC64_P8_DATA_ENABLED) X(SC64_P9_DATA_ENABLED) \
     X(SC64_P10_DATA_ENABLED) X(SC64_SKIRMISH_ROSTER) X(SC64_BATTLECRUISER_EXPERIMENT) \
     X(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) X(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) \
@@ -166,6 +169,19 @@ int main(void)
         printf("%s0x%04xu", t ? (t % 8 ? ", " : ",\n    ") : "\n    ", flags);
     }
     puts("\n};");
+#ifdef SC64_COMBAT_FACT_TABLE_PROBE
+    puts("#define SC64_COMBAT_FACT_TABLE_REVISION 1");
+    printf("_Static_assert(SC_RU_COUNT == %d, \"combat facts use another roster\");\n",
+           (int)SC_RU_COUNT);
+    printf("static const unsigned char sc64_fact_combat_table[%d] = {", (int)SC_RU_COUNT);
+    for (t = 0; t < SC_RU_COUNT; ++t) {
+        unsigned facts = sc64_combat_target_facts_reference(t);
+        if (sc64_race_unit_damage(t) > 0) facts |= SC64_COMBAT_GROUND_WEAPON;
+        if (sc64_race_unit_can_attack_air(t)) facts |= SC64_COMBAT_AIR_WEAPON;
+        printf("%s0x%02xu", t ? (t % 12 ? ", " : ",\n    ") : "\n    ", facts);
+    }
+    puts("\n};");
+#endif
 #ifdef SC64_FACT_SIGHT_TABLES
     printf("static const unsigned char sc64_fact_building_sight_radius_table[%d] = {",
            (int)SC_RB_COUNT);

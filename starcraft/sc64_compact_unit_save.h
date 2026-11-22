@@ -1,5 +1,15 @@
 #ifndef SC64_COMPACT_UNIT_SAVE_H
 #define SC64_COMPACT_UNIT_SAVE_H
+
+#include "sc64_save_bits.h"
+
+/* Late Terran journals use fixed-width reads in campaign and Custom Game.
+ * Keep the scalar implementation available for paired codec checks. */
+#if defined(SC64_LATE_TERRAN_STORAGE) && \
+    !defined(SC64_COMPACT_UNIT_LEGACY_READER) && !defined(SC64_COMPACT_UNIT_FIXED_READER)
+#define SC64_COMPACT_UNIT_FIXED_READER 1
+#endif
+
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
 #endif
@@ -54,19 +64,30 @@ sc64_packed_unit_put(Sc64PackedUnitSave *row, unsigned *bit,
     return 1;
 }
 
+#ifdef SC64_COMPACT_UNIT_FIXED_READER
+/* The decode sequence gives the compiler a constant position and width for
+ * each field. Byte loads also work for unaligned rows. */
+static inline __attribute__((always_inline)) u32
+sc64_packed_unit_get_fixed(const Sc64PackedUnitSave *row, unsigned offset,
+                           unsigned width)
+{
+    unsigned index = offset >> 3;
+    unsigned shift = offset & 7u;
+    u32 value = row->bytes[index];
+    if (shift + width > 8) value |= (u32)row->bytes[index + 1] << 8;
+    if (shift + width > 16) value |= (u32)row->bytes[index + 2] << 16;
+    if (shift + width > 24) value |= (u32)row->bytes[index + 3] << 24;
+    return width == 32 ? value : (value >> shift) & (((u32)1 << width) - 1);
+}
+#else
 static int
 sc64_packed_unit_get(const Sc64PackedUnitSave *row, unsigned *bit,
                      unsigned width, u32 *value)
 {
-    u32 result = 0;
-    if (!row || !bit || !value || !width || width > 32 ||
-        *bit > SC64_PACKED_UNIT_SAVE_BYTES * 8u ||
-        width > SC64_PACKED_UNIT_SAVE_BYTES * 8u - *bit) return 0;
-    for (unsigned i = 0; i < width; ++i, ++*bit)
-        result |= (u32)((row->bytes[*bit >> 3] >> (*bit & 7u)) & 1u) << i;
-    *value = result;
-    return 1;
+    return row && sc64_save_read_bits(row->bytes, sizeof(row->bytes) * 8u,
+                                      bit, width, value);
 }
+#endif
 
 static int
 sc64_packed_unit_is_zero(const Sc64PackedUnitSave *row)
@@ -176,10 +197,19 @@ SC64_COMPACT_DECODE(Unit *out, const Sc64PackedUnitSave *row,
         *out = decoded;
         return 1;
     }
+#ifdef SC64_COMPACT_UNIT_FIXED_READER
+#define SC64_UNIT_GET(width, dst) do { \
+    _Static_assert((width) > 0 && (width) <= 32, "packed unit field width"); \
+    if (bit > 303u - (width) || (bit & 7u) + (width) > 32) return 0; \
+    (dst) = (int)sc64_packed_unit_get_fixed(row, bit, (width)); \
+    bit += (width); \
+} while (0)
+#else
 #define SC64_UNIT_GET(width, dst) do { \
     if (!sc64_packed_unit_get(row, &bit, (width), &v)) return 0; \
     (dst) = (int)v; \
 } while (0)
+#endif
     SC64_UNIT_GET(11, decoded.x); SC64_UNIT_GET(11, decoded.y);
     SC64_UNIT_GET(18, v); decoded.hp = (int)v - SC64_PACKED_UNIT_HP_BIAS;
     SC64_UNIT_GET(17, decoded.maxhp); SC64_UNIT_GET(3, decoded.owner);

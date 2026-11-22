@@ -763,8 +763,36 @@ static void check_candidate_cursor_bounds(void)
     }
 }
 
+static void check_scripted_building_kill(void)
+{
+    game_init();
+    race_mode = 0;
+    race_selected_mission = SC64_P9_GLOBAL_ID;
+    init_state();
+    assert(screen == SCREEN_PLAY && b[10].alive && b[10].raw_type == 133);
+    const Sc64P9SourceAction *kill =
+        &sc64_p9_source_actions[sc64_p9_source_triggers[7].first_action + 1u];
+    Sc64Z8Rect region;
+    assert(kill->opcode == 23 && race_p9_rect(kill->location, &region));
+    assert(race_p9_actor_selected(MAX_UNITS + 10, kill, SC64_P9_HUMAN_SLOT, &region) == 1);
+    assert(race_p9_kill_at(kill, SC64_P9_HUMAN_SLOT) == SC64_P9_ACTION_COMPLETE);
+    assert(!b[10].alive && b[10].hp == 0);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    Sc64P7TypedBuildingSave row;
+    Building restored;
+    assert(sc64_p7_typed_building_encode(&row, &b[10], WORLD_W, WORLD_H));
+    assert(sc64_p7_typed_building_decode(&restored, &row, WORLD_W, WORLD_H));
+    assert(!restored.alive && restored.hp == 0 && restored.raw_type == 133);
+#endif
+    puts("P9 scripted Hive kill leaves its dead building row saveable");
+}
+
 int main(int argc,char **argv)
 {
+    if (argc == 2 && !strcmp(argv[1], "--scripted-kill-preflight")) {
+        check_scripted_building_kill();
+        return 0;
+    }
     check_candidate_cursor_bounds();
     if (argc == 2 && !strcmp(argv[1], "--cursor-preflight")) return 0;
     const char *path=argc>1?argv[1]:".local/traces/p9-controller.jsonl";

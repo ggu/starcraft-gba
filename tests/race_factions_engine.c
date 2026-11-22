@@ -159,6 +159,9 @@ int main(void)
         int gateway = spawn_build(SIDE, B_GATEWAY, 208, 160, 0);
         int zealot, probe;
         assert(gateway >= 0 && race_site_powered(SIDE, b[gateway].x, b[gateway].y));
+        /* Fund the paid queue and leave enough for the unpowered queue
+         * check and the Probe's Pylon. */
+        race_add_owner_resources(SIDE, 200, 0);
         assert(race_queue_unit(SIDE, gateway, U_ZEALOT));
         for (int f = 0; f < 800; ++f) race_tick_buildings();
         zealot = -1;
@@ -171,6 +174,7 @@ int main(void)
         for (int i = 0; i < MAX_BUILDINGS; ++i)
             if (b[i].alive && b[i].owner == SIDE && b[i].type == B_PYLON) b[i].alive = 0;
         assert(!race_site_powered(SIDE, b[gateway].x, b[gateway].y));
+        assert(race_owner_minerals(SIDE) >= 100);
         assert(!race_queue_unit(SIDE, gateway, U_ZEALOT));
 
         /* A Probe returns after reaching the Gateway warp-in site, and that
@@ -199,6 +203,7 @@ int main(void)
     race_skirmish_init(); screen = SCREEN_PLAY;
     {
         int drone = find_worker(SIDE, U_DRONE), pool;
+        race_add_owner_resources(SIDE, 150, 0);
         int before = race_owner_supply(SIDE);
         int before_minerals = race_owner_minerals(SIDE);
         assert(drone >= 0);

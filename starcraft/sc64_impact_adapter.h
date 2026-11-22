@@ -239,9 +239,59 @@ race_impact_tick(void)
 #endif
 }
 
+#ifdef SC64_P6_PACKED_IMPACT_SAVE
+/* The low bit of the last building byte belongs to the building type. The
+ * other seven bits are canonical zeros in a legacy P6 building row. The
+ * marker's four-byte tail is distinct from a legacy impact packet's length. */
+static const u8 race_impact_p6_marker[SC64_P6_IMPACT_MARKER_BYTES] = {'P','6','I','1'};
+
+static int race_impact_p6_write(void)
+{
+    u8 packet[SC64_P6_IMPACT_PAD_BYTES + 1] = {0};
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i)
+        if (race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] & 0xfeu)
+            return 0;
+    sc64_impact_encode(race_impact_rows, race_impact_count, packet);
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        unsigned bit = i * SC64_P6_IMPACT_PAD_BITS, byte = bit >> 3;
+        unsigned pair = packet[byte] | ((unsigned)packet[byte + 1] << 8);
+        race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] |=
+            (u8)(((pair >> (bit & 7u)) & 0x7fu) << 1);
+    }
+    memcpy(race_impact_record.impacts, race_impact_p6_marker, sizeof(race_impact_p6_marker));
+    save_write(&race_impact_record, sizeof(RaceSave) + sizeof(race_impact_p6_marker), SAVE_VERSION);
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i)
+        race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1] &= 1u;
+    return 1;
+}
+
+static int race_impact_p6_decode(Sc64ImpactEvent *candidate)
+{
+    u8 packet[SC64_P6_IMPACT_PAD_BYTES + 1] = {0};
+    if (memcmp(race_impact_record.impacts, race_impact_p6_marker, sizeof(race_impact_p6_marker)))
+        return -1;
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        unsigned bit = i * SC64_P6_IMPACT_PAD_BITS, byte = bit >> 3;
+        u8 *last = &race_data.buildings[i].bytes[SC64_PACKED_BUILDING_SAVE_BYTES - 1];
+        unsigned pair = ((unsigned)*last >> 1) << (bit & 7u);
+        packet[byte] |= (u8)pair;
+        packet[byte + 1] |= (u8)(pair >> 8);
+        *last &= 1u;
+    }
+    unsigned count = packet[offsetof(Sc64ImpactSaveHeader, count)];
+    if (count <= RACE_IMPACT_RAW_SAVE_CAPACITY || count > RACE_IMPACT_SAVE_CAPACITY)
+        return -1;
+    u32 bytes = sc64_impact_save_bytes(count);
+    for (unsigned i = bytes; i < SC64_P6_IMPACT_PAD_BYTES; ++i)
+        if (packet[i]) return -1;
+    return sc64_impact_decode(packet, bytes, RACE_IMPACT_SAVE_CAPACITY,
+                              MAX_UNITS + MAX_BUILDINGS, 5u, SC_RU_COUNT, candidate);
+}
+#endif
+
 /* Save: an empty queue keeps the historical RaceSave-length record. More
  * pending impacts than this profile's record holds refuse the save before
- * any SRAM write; they land within a second of play. */
+ * any SRAM write during play; they land within a second of play. */
 static int
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_WORKER_CARGO_KIND)
 race_impact_save_write(const GbaSaveSelection *previous
@@ -253,21 +303,25 @@ race_impact_save_write(const GbaSaveSelection *previous
 race_impact_save_write(void)
 #endif
 {
+    /* Loading a completed journal returns to a frozen result screen.
+     * Leave the live queue alone and omit damage that cannot run there. */
+    const unsigned impact_count = (race_data.state[18] || race_data.state[19]) ?
+                                  0 : race_impact_count;
 #if defined(SC64_SCARAB_ZL_CONTROLLER_HOST_STAGE) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
     (void)previous; /* This isolated stage fences all journal calls. */
 #endif
 #ifdef SC64_ZERG_CARRIER_PROBE
     if (race_mode) {
-        if (race_impact_count>RACE_IMPACT_ROWS || !race_p7_carrier_training_live_world_valid()) return 0;
+        if (impact_count>RACE_IMPACT_ROWS || !race_p7_carrier_training_live_world_valid()) return 0;
         u8 *wire=SC64_ZC_SCRATCH, *packet=wire+SC64_ZC_PACKET_WORK;
         unsigned n=race_p7_projectile_encode(packet);
         Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
         if (!n || !sc64_compact_codec_validate(packet,n,SC64_POOL_CAPACITY,
                                              race_showcase_projectile_row,&view)) return 0;
-        unsigned tail=race_impact_count ? sc64_impact_save_bytes(race_impact_count) : 0;
-        if (tail && !sc64_impact_encode(race_impact_rows,race_impact_count,wire+sizeof(RaceSave)))
+        unsigned tail=impact_count ? sc64_impact_save_bytes(impact_count) : 0;
+        if (tail && !sc64_impact_encode(race_impact_rows,impact_count,wire+sizeof(RaceSave)))
             return 0;
-        sc64_sk_transport_encode(wire+sizeof(RaceSave)+tail,&race_skirmish_transport_candidate);
+        race_sk_transport_wire_encode(wire+sizeof(RaceSave)+tail);
         n=sc64_zc_pack(wire,sizeof(RaceSave)+tail+SC64_TRANSPORT_TRAILER_BYTES,
                        packet,n,wire,RACE_IMPACT_RECORD_MAX);
         if (!n) return 0;
@@ -277,7 +331,10 @@ race_impact_save_write(void)
     }
 #endif
     u32 bytes = 0;
-    if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+    if (impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#ifdef SC64_P6_PACKED_IMPACT_SAVE
+    if (impact_count > RACE_IMPACT_RAW_SAVE_CAPACITY) return race_impact_p6_write();
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
 #define SC64_SILO_COMMIT_TAG (nuke_silo_tag ? SC64_NUKE_SILO_TRANSPORT_TAG : SC64_GUARDIAN_WRITE_TAG)
 #else
@@ -292,7 +349,7 @@ race_impact_save_write(void)
     memcpy(shots, race_data.battlecruiser_shots, sizeof(shots));
     for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
         if (shots[i].state) { mask |= 1u << i; offset += sizeof(shots[i]); }
-    if (race_impact_count) bytes = sc64_impact_save_bytes(race_impact_count);
+    if (impact_count) bytes = sc64_impact_save_bytes(impact_count);
     if (offset + bytes + SC64_TRANSPORT_TRAILER_BYTES > RACE_IMPACT_RECORD_MAX) return 0;
     race_data.state[28] = (race_data.state[28] & ~24u) | (mask << 3);
     offset = base;
@@ -301,8 +358,8 @@ race_impact_save_write(void)
             memcpy((u8 *)&race_impact_record + offset, &shots[i], sizeof(shots[i]));
             offset += sizeof(shots[i]);
         }
-    if (race_impact_count)
-        sc64_impact_encode(race_impact_rows, race_impact_count,
+    if (impact_count)
+        sc64_impact_encode(race_impact_rows, impact_count,
                            (u8 *)&race_impact_record + offset);
 #if defined(SC64_SHARED_TRANSPORT) && defined(SC64_WORKER_CARGO_KIND)
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
@@ -359,8 +416,7 @@ race_impact_save_write(void)
 #define SC64_GUARDIAN_WRITE_TAG SC64_TRANSPORT_SAVE_VERSION
 #endif
 #endif
-    sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
-                             &race_skirmish_transport_candidate);
+    race_sk_transport_wire_encode((u8 *)&race_impact_record + offset + bytes);
 #ifdef SC64_TERRAN_CARRIER_PROBE
     if (race_mode) {
         if (!race_p7_carrier_training_live_world_valid()) return 0;
@@ -388,8 +444,7 @@ race_impact_save_write(void)
                                   SC64_SILO_COMMIT_TAG)) return 0;
 #endif
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
-    sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
-                             &race_skirmish_transport_candidate);
+    race_sk_transport_wire_encode((u8 *)&race_impact_record + offset + bytes);
     save_write(&race_impact_record, offset + bytes + SC64_TRANSPORT_TRAILER_BYTES,
                SC64_TRANSPORT_SAVE_VERSION);
 #elif defined(SC64_WORKER_CARGO_KIND)
@@ -400,8 +455,7 @@ race_impact_save_write(void)
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
 #ifdef SC64_SHARED_TRANSPORT
     const u32 tags[]={SC64_SCARAB_TRANSPORT_SAVE_VERSION};
-    sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
-                             &race_skirmish_transport_candidate);
+    race_sk_transport_wire_encode((u8 *)&race_impact_record + offset + bytes);
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
                                  SC64_SCARAB_TRANSPORT_SAVE_VERSION,previous,tags,1)) return 0;
@@ -419,13 +473,12 @@ race_impact_save_write(void)
                          0xffff0000u, 0x42450000u);
 #endif
 #else
-    if (race_impact_count)
-        bytes = sc64_impact_encode(race_impact_rows, race_impact_count,
+    if (impact_count)
+        bytes = sc64_impact_encode(race_impact_rows, impact_count,
                                    race_impact_record.impacts);
 #ifdef SC64_SHARED_TRANSPORT
     if ((u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES > RACE_IMPACT_RECORD_MAX) return 0;
-    sc64_sk_transport_encode((u8 *)&race_impact_record + sizeof(RaceSave) + bytes,
-                             &race_skirmish_transport_candidate);
+    race_sk_transport_wire_encode((u8 *)&race_impact_record + sizeof(RaceSave) + bytes);
 #ifdef SC64_WORKER_CARGO_KIND
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,
@@ -545,8 +598,7 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     if (selected_tag != SC64_TRANSPORT_SAVE_VERSION || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
 #endif
     len -= SC64_TRANSPORT_TRAILER_BYTES;
-    if (!sc64_sk_transport_decode(&race_skirmish_transport_candidate,
-            (const u8 *)&race_impact_record + len, MAX_BUILDINGS)) return 0;
+    if (!race_sk_transport_wire_decode((const u8 *)&race_impact_record + len)) return 0;
 #if defined(SC64_WORKER_CARGO_KIND)
     selected_tag = selected_tag == SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION ?
         SC64_WORKER_CARGO_LEGACY_SAVE_VERSION : SAVE_VERSION;
@@ -617,8 +669,13 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
     if (len == sizeof(RaceSave)) return 1;
+#ifdef SC64_P6_PACKED_IMPACT_SAVE
+    if (len == sizeof(RaceSave) + sizeof(race_impact_p6_marker)) {
+        rows = race_impact_p6_decode(candidate);
+    } else
+#endif
     rows = sc64_impact_decode(race_impact_record.impacts, len - (u32)sizeof(RaceSave),
-                              RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
+                              RACE_IMPACT_RAW_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
                               SC_RU_COUNT, candidate);
 #endif
     if (rows < 0) return 0;

@@ -69,6 +69,23 @@ static inline int sc64_sk_transport_decode(Sc64SkTransportTech *out,
     return 1;
 }
 
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+/* The elimination preview uses the high bit of the first research byte.
+ * Its low bit is still the human completion bit. */
+enum { SC64_NEUTRAL_VENTRAL_BYTE = 3, SC64_NEUTRAL_VENTRAL_BIT = 0x80 };
+static inline int sc64_sk_transport_decode_elimination(Sc64SkTransportTech *out,
+    const uint8_t in[16], unsigned building_count, uint8_t *neutral)
+{
+    uint8_t clean[16];
+    if (!in || !neutral) return 0;
+    for (unsigned i = 0; i < sizeof(clean); ++i) clean[i] = in[i];
+    clean[SC64_NEUTRAL_VENTRAL_BYTE] &= (uint8_t)~SC64_NEUTRAL_VENTRAL_BIT;
+    if (!sc64_sk_transport_decode(out, clean, building_count)) return 0;
+    *neutral = !!(in[SC64_NEUTRAL_VENTRAL_BYTE] & SC64_NEUTRAL_VENTRAL_BIT);
+    return 1;
+}
+#endif
+
 /* The caller verifies a live, completed, idle Lair/Hive owned by this owner,
  * and prevents two jobs binding the same building. All payment is atomic. */
 static inline int sc64_sk_transport_start(Sc64SkTransportJob *j,

@@ -90,6 +90,7 @@ static void random_world(unsigned density, int invalid_owner, int inject_men_err
         u[i].raw_owner = invalid_owner && i == 0 ? 12 : (int)(local_random() % 8u);
         u[i].owner = u[i].raw_owner == 7 ? SIDE :
                      u[i].raw_owner == 3 ? ENEMY : RESCUABLE;
+        if (i % 13u == 1) u[i].owner = SIDE; /* Rescued, source owner retained. */
         u[i].x = (int)(local_random() % WORLD_W);
         u[i].y = (int)(local_random() % WORLD_H);
     }
@@ -101,6 +102,7 @@ static void random_world(unsigned density, int invalid_owner, int inject_men_err
         b[i].raw_owner = invalid_owner && i == 0 ? 12 : (int)(local_random() % 8u);
         b[i].owner = b[i].raw_owner == 7 ? SIDE :
                      b[i].raw_owner == 3 ? ENEMY : RESCUABLE;
+        if (i % 13u == 1) b[i].owner = SIDE;
         b[i].x = (int)(local_random() % WORLD_W);
         b[i].y = (int)(local_random() % WORLD_H);
     }

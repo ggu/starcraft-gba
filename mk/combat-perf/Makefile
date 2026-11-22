@@ -7,6 +7,18 @@
 # sampled-audio interrupt; host builds and other ROMs keep the polled gate.
 SC64_PRESENT_FLAGS ?= -DGBA_ASYNC_PRESENT
 
+# Pack the most frequently visible completed base buildings in each normal
+# product. Clear the option to compare with the preceding sprite banks.
+CANONICAL_TERRAN_BUILDING_WORDS ?= 1
+ifneq ($(words $(filter 0 1,$(CANONICAL_TERRAN_BUILDING_WORDS))),1)
+$(error CANONICAL_TERRAN_BUILDING_WORDS must be 0 or 1)
+endif
+ifneq ($(filter $(CANONICAL_TERRAN_BUILDING_WORDS),0 1),$(CANONICAL_TERRAN_BUILDING_WORDS))
+$(error CANONICAL_TERRAN_BUILDING_WORDS must be 0 or 1)
+endif
+sc64_defines = $(filter -D$(1) -D$(1)=%,$(2))
+sc64_can_pack_building_words = $(and $(call sc64_defines,SC64_UNIT_WORD_SPRITES,$(1)),$(if $(call sc64_defines,SC64_TILE_RENDERER,$(1)),,1))
+
 # Size cached route fields to the active map, so the fixed route bank holds
 # more of them on maps smaller than 128 by 128 (56 on the 64-by-64 custom
 # maps instead of 14). Answers are unchanged; fewer fields are rebuilt.
@@ -29,7 +41,23 @@ CANONICAL_PATH_GRID_UPDATE_FLAGS ?= -DSC64_PATH_GRID_INCREMENTAL
 
 # Snapshot Pylon power during defense passes. Campaign runtimes with Z/P
 # target lists can also restrict target searches to nearby spatial cells.
-CANONICAL_DEFENSE_FLAGS = -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
+CANONICAL_DEFENSE_CUSTOM_CELLS ?= 1
+CANONICAL_ZP_DEFENSE_OWNER_MASK ?= 1
+ifneq ($(CANONICAL_DEFENSE_CUSTOM_CELLS),0)
+ifneq ($(CANONICAL_DEFENSE_CUSTOM_CELLS),1)
+$(error CANONICAL_DEFENSE_CUSTOM_CELLS must be 0 or 1)
+endif
+endif
+ifneq ($(CANONICAL_ZP_DEFENSE_OWNER_MASK),0)
+ifneq ($(CANONICAL_ZP_DEFENSE_OWNER_MASK),1)
+$(error CANONICAL_ZP_DEFENSE_OWNER_MASK must be 0 or 1)
+endif
+endif
+DEFENSE_SPATIAL_FLAGS = -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
+DEFENSE_CUSTOM_CELL_FLAGS = $(DEFENSE_SPATIAL_FLAGS) -DSC64_DEFENSE_CUSTOM_CELLS_PROBE
+CANONICAL_DEFENSE_FLAGS = $(DEFENSE_SPATIAL_FLAGS) \
+	$(if $(filter 1,$(CANONICAL_DEFENSE_CUSTOM_CELLS)),-DSC64_DEFENSE_CUSTOM_CELLS_PROBE) \
+	$(if $(filter 1,$(CANONICAL_ZP_DEFENSE_OWNER_MASK)),-DSC64_DEFENSE_ZP_OWNER_MASK_PROBE)
 
 # Exact target-index rebuild and list insertion for the four shipped imported ROMs.
 # Set to 0 for a baseline comparison with the same imported inputs.
@@ -40,14 +68,42 @@ $(error CANONICAL_TARGET_INDEX must be 0 or 1)
 endif
 endif
 CANONICAL_TARGET_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_INDEX)),-DSC64_TARGET_BULK_REBUILD_PROBE -DSC64_TARGET_FAST_LINK_PROBE)
-CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_INDEX)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
+# Skip inactive cloak policies and exact redundant target checks.
+CANONICAL_TARGET_POLICY ?= 1
+ifneq ($(CANONICAL_TARGET_POLICY),0)
+ifneq ($(CANONICAL_TARGET_POLICY),1)
+$(error CANONICAL_TARGET_POLICY must be 0 or 1)
+endif
+endif
+# Use the armed-type facts where the generated combat table is available.
+CANONICAL_ARMED_TYPE_TABLE ?= 1
+ifneq ($(CANONICAL_ARMED_TYPE_TABLE),0)
+ifneq ($(CANONICAL_ARMED_TYPE_TABLE),1)
+$(error CANONICAL_ARMED_TYPE_TABLE must be 0 or 1)
+endif
+endif
+CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE) \
+	$(if $(filter 1,$(CANONICAL_ARMED_TYPE_TABLE)),-DSC64_Z7_ARMED_TABLE_PROBE)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE)
+CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:
 force-canonical-target-index-rebuild:
 build/canonical-target-index-config: force-canonical-target-index-config | build
-	@printf '%s\n' '$(CANONICAL_TARGET_INDEX)' > $@.tmp
+	@printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z8-game: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+
+# Reconcile the existing collision buckets on all four normal products.
+CANONICAL_COLLISION_ELFS := build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf
+$(CANONICAL_COLLISION_ELFS): CFLAGS += -DSC64_PERSISTENT_COLLISION_BUCKETS
+$(CANONICAL_COLLISION_ELFS): mk/combat-perf/Makefile
+
+.PHONY: test-sc64-custom-defense-cells
+test-sc64-custom-defense-cells: build/test-sc64-custom-defense-p10 build/test-sc64-custom-defense-terran
+	./build/test-sc64-custom-defense-p10
+	./build/test-sc64-custom-defense-terran
 
 # Optional differential of the per-profile tick cache, the 32-bit flight and
 # position paths against retained earlier code, over every prepared profile.
@@ -117,6 +173,15 @@ test-sc64-route-linear: build/test-sc64-route-linear-ref build/test-sc64-route-l
 	cmp build/route-linear-base.ref.state build/route-linear-probe.ref.state
 	cmp build/route-linear-base.ref.state build/route-linear-overflow.ref.state
 
+build/test-sc64-route-linear-empty-goal: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE $< -o $@
+.PHONY: test-sc64-route-linear-empty-goal
+test-sc64-route-linear-empty-goal: build/test-sc64-route-linear-ref build/test-sc64-route-linear-empty-goal
+	./build/test-sc64-route-linear-ref --emit build/route-linear-empty-goal.ref
+	./build/test-sc64-route-linear-empty-goal --emit build/route-linear-empty-goal.probe
+	cmp build/route-linear-empty-goal.ref build/route-linear-empty-goal.probe
+	cmp build/route-linear-empty-goal.ref.state build/route-linear-empty-goal.probe.state
+
 # Compare the same route and residency receipts with and without pointer FIFO
 # access, including the forced small queue that exercises fallback.
 ROUTE_LINEAR_POINTER_FLAGS = $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_POINTER_FIFO_PROBE
@@ -163,6 +228,95 @@ test-sc64-route-point-tail: build/test-sc64-route-point-tail build/test-sc64-rou
 	./$< --emit build/route-point-tail-candidate.ref
 	cmp build/route-point-tail-base.ref.state build/route-point-tail-candidate.ref.state
 
+ROUTE_POINT_PREFIX_TEST_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_POINT_PREFIX_PROBE -DSC64_ROUTE_POINT_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_COMPONENT_PROBE -DSC64_ROUTE_POINT_NEAR_DISTANCE_PROBE -DSC64_ROUTE_LINEAR_EMPTY_GOAL_PROBE
+build/test-sc64-route-point-prefix: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) $< -o $@
+build/test-sc64-route-point-prefix-compaction: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT $< -o $@
+build/test-sc64-route-point-prefix-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
+.PHONY: test-sc64-route-point-prefix
+test-sc64-route-point-prefix: build/test-sc64-route-point-prefix build/test-sc64-route-point-prefix-compaction build/test-sc64-route-point-prefix-range build/test-sc64-route-point-tail-baseline
+	./$< --point-prefix-only
+	./build/test-sc64-route-point-prefix-compaction --point-prefix-compaction-only
+	./$< --point-component-only
+	./$< --point-near-distance-only
+	./build/test-sc64-route-point-prefix-range
+	./build/test-sc64-route-point-tail-baseline --emit build/route-point-prefix-reference.ref
+	./$< --emit build/route-point-prefix-candidate.ref
+	cmp build/route-point-prefix-reference.ref.state build/route-point-prefix-candidate.ref.state
+
+build/test-sc64-route-point-certificate: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE $< -o $@
+build/test-sc64-route-point-certificate-range: tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
+.PHONY: test-sc64-route-point-certificate
+test-sc64-route-point-certificate: build/test-sc64-route-point-certificate build/test-sc64-route-point-certificate-range build/test-sc64-route-point-tail-baseline
+	./$< --point-certificate-only
+	./build/test-sc64-route-point-certificate-range
+	./build/test-sc64-route-point-tail-baseline --emit build/route-point-certificate-reference.ref
+	./$< --emit build/route-point-certificate-candidate.ref
+	cmp build/route-point-certificate-reference.ref.state build/route-point-certificate-candidate.ref.state
+
+ROUTE_POINT_FAR_TEST_FLAGS = $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ
+ROUTE_POINT_FAR_TEST_DEPS = tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h starcraft/sc64_route_point_far_read.h
+build/test-sc64-route-point-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_POINT_FAR_TEST_FLAGS) $< -o $@
+build/test-sc64-route-point-far-read-without-monotone-movement: $(ROUTE_POINT_FAR_TEST_DEPS) | build
+	$(CLANG) $(filter-out -DSC64_ROUTE_MONOTONE_PROBE,$(ROUTE_POINT_FAR_TEST_FLAGS)) -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
+.PHONY: test-sc64-route-point-far-read
+test-sc64-route-point-far-read: build/test-sc64-route-point-far-read build/test-sc64-route-point-far-read-without-monotone-movement
+	./$<
+	./build/test-sc64-route-point-far-read-without-monotone-movement
+
+ROUTE_POINT_RESERVE_FLAGS = $(filter-out -DSC64_ROUTE_MONOTONE_PROBE,$(ROUTE_POINT_PREFIX_TEST_FLAGS)) \
+	-DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE \
+	-DSC64_ROUTE_LINEAR_WORD_PACK_PROBE -DSC64_ROUTE_LINEAR_SPARSE_PACK_PROBE \
+	-DSC64_ROUTE_POINT_PREFIX_SPARSE_PACK_PROBE -DSC64_ROUTE_POINT_NEAR_DEMAND_PROBE \
+	-DSC64_ROUTE_POINT_NEAR_RESERVE_PROBE
+build/test-sc64-route-point-reserve: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) $< -o $@
+.PHONY: test-sc64-route-point-reserve
+test-sc64-route-point-reserve: build/test-sc64-route-point-reserve
+	./$< --point-near-distance-only
+	./$< --point-certificate-only
+	./$< --point-near-demand-only
+	./$< --sparse-linear-only
+
+build/test-sc64-route-point-cold-component-bypass: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) -DSC64_ROUTE_POINT_COLD_COMPONENT_BYPASS $< -o $@
+.PHONY: test-sc64-route-point-cold-component-bypass
+test-sc64-route-point-cold-component-bypass: build/test-sc64-route-point-cold-component-bypass
+	./$< --point-component-only
+
+build/test-sc64-route-small-component: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) -DSC64_ROUTE_POINT_COLD_COMPONENT_BYPASS -DSC64_ROUTE_SMALL_COMPONENT_PROBE $< -o $@
+.PHONY: test-sc64-route-small-component
+test-sc64-route-small-component: build/test-sc64-route-small-component
+	./$< --small-component-only
+
+build/test-sc64-route-point-warm-blocked-gap: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) -DSC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE $< -o $@
+.PHONY: test-sc64-route-point-warm-blocked-gap
+test-sc64-route-point-warm-blocked-gap: build/test-sc64-route-point-warm-blocked-gap
+	./$< --point-certificate-only
+
+ROUTE_POINT_COMPOSED_TEST_FLAGS = $(ROUTE_POINT_RESERVE_FLAGS) $(POINT_PREFIX_COMPOSED_FLAGS)
+build/test-sc64-route-composed: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) $< -o $@
+build/test-sc64-route-composed-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) mk/combat-perf/Makefile | build
+	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
+.PHONY: test-sc64-route-composed
+test-sc64-route-composed: build/test-sc64-route-composed build/test-sc64-route-composed-far-read
+	./$< --point-prefix-compaction-only
+	./$< --point-component-only
+	./$< --point-certificate-only
+	./$< --point-near-distance-only
+	./$< --point-near-demand-only
+	./$< --sparse-linear-only
+	./$< --small-component-only
+	./build/test-sc64-route-composed-far-read
+
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
 build/test-sc64-route-linear-word-pack-overflow: $(ROUTE_KEEP_TEST_DEPS) | build
@@ -178,6 +332,19 @@ test-sc64-route-linear-word-pack: build/test-sc64-route-linear-ref build/test-sc
 	cmp build/route-linear-word-ref build/route-linear-word-overflow
 	cmp build/route-linear-word-ref.state build/route-linear-word-candidate.state
 	cmp build/route-linear-word-ref.state build/route-linear-word-overflow.state
+
+ROUTE_LINEAR_SPARSE_FLAGS = $(ROUTE_POINT_TAIL_FLAGS) $(ROUTE_POINT_TAIL_CANDIDATE) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE
+build/test-sc64-route-linear-sparse-ref: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_SPARSE_FLAGS) $< -o $@
+build/test-sc64-route-linear-sparse: $(ROUTE_KEEP_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_LINEAR_SPARSE_FLAGS) -DSC64_ROUTE_LINEAR_SPARSE_PACK_PROBE $< -o $@
+.PHONY: test-sc64-route-linear-sparse
+test-sc64-route-linear-sparse: build/test-sc64-route-linear-sparse-ref build/test-sc64-route-linear-sparse
+	./build/test-sc64-route-linear-sparse --sparse-linear-only
+	./build/test-sc64-route-linear-sparse-ref --emit build/route-linear-sparse-ref
+	./build/test-sc64-route-linear-sparse --emit build/route-linear-sparse-probe
+	cmp build/route-linear-sparse-ref build/route-linear-sparse-probe
+	cmp build/route-linear-sparse-ref.state build/route-linear-sparse-probe.state
 
 # Randomized differential test of the incremental walkability update against
 # the whole-grid rebuild it replaces, over the footprint kinds of each product

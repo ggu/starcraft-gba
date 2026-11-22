@@ -10,10 +10,14 @@ static int race_late_can_lift(int type)
     return type == B_COMMAND || type == B_BARRACKS || type == B_FACTORY ||
            type == B_STARPORT || type == B_ENG_BAY || type == B_SCIENCE_FACILITY;
 }
+static int race_late_building_in_flight(const Building *q)
+{
+    return (q->flags & 4) && race_late_can_lift(q->type) && race_late_active();
+}
 static int race_late_airborne(int slot)
 {
-    return race_late_active() && slot >= 0 && slot < MAX_BUILDINGS &&
-           b[slot].alive && (b[slot].flags & 4) && race_late_can_lift(b[slot].type);
+    return (unsigned)slot < MAX_BUILDINGS && b[slot].alive &&
+           race_late_building_in_flight(&b[slot]);
 }
 static int race_late_landing_site(int slot, int x, int y)
 {

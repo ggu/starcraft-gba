@@ -232,10 +232,10 @@ race_t4_traps_tick(void)
                                                     candidate_count);
         if (target < 0) continue;
 #ifdef SC64_WEAPON_SOURCE_BANK_VERSION
-        if (!sc64_source_building_vfx(trap,target_x(target),target_y(target),0))
+        if (!sc64_source_building_vfx(trap,target_x(target),target_y(target),0,target))
 #endif
-            add_tracer(trap->x, trap->y, target_x(target), target_y(target),
-                       sc64_weapon_vfx_building_profile(trap->type));
+            sc64_emit_fallback_attack(trap->x, trap->y, target,
+                                      sc64_weapon_vfx_building_profile(trap->type));
         for (int hit = 0; hit < rule.factor && target_alive(target); ++hit)
             race_t4_trap_apply_hit(target, rule.damage, rule.damage_type);
         if (trap->alive) trap->queue_progress = SC64_T4_TRAP_COOLDOWN;
