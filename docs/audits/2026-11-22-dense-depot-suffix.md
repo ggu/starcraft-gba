@@ -187,6 +187,32 @@ reload cases pass on both variants, all four products and both maps.
 Retain a small disconnected-region holdout for future threshold
 tuning. The hardware pacing check remains open.
 
+The normal-button startup pass starts all 30 chapters, reads each
+briefing entry, and advances beyond the opening dialogue. The
+previously pinned Z1 HOME tape reaches victory at frame 50,669 with
+50 matching periodic checks and the Chrysalis alive. The separate
+opening save at frame 97 reloads and matches the next 120 neutral
+updates. A full same-tape reload from frame 984 first differs at
+frame 1,422 when the uninterrupted A action spends 50 minerals.
+Both #724 and the candidate clear the selected Hatchery on reload.
+The replay's next A selects it, while the uninterrupted A queues
+another Drone. The restored queue, wallet and world match through
+call 1,437. Qualify a normal reselection at a neutral input boundary.
+
+The two normal Showcase ROMs run all eight scenes from their hidden
+menu. All sampled world, two-page and palette fingerprints match,
+with the same losses at update 150 in each of the three Last Stand
+scenes and matching scene restarts. An ordinary Blood Bath scouting
+replay selects and moves an Overlord, then pans the camera along
+its route. The 4,800 advancing updates match all 41 sampled world,
+fog and display cuts. Mean cycles fall from 791,050 to 789,686.
+Four cuts see other units in the view. Use a sustained visible-fight
+workload for further actor-rendering qualification.
+
+The fresh asset-free suite passes on runtime `80047031`, including
+1,176 Python tests with 35 skips and the native sanitizer checks.
+The default ARM image is byte-identical to #724.
+
 | Local evidence | SHA-256 |
 | --- | --- |
 | Control Z10 ROM | `00b7bd4e6796519319a0e5470cc4f82ee502cdc29b96b543476bde1a5f23777a` |
@@ -212,3 +238,11 @@ tuning. The hardware pacing check remains open.
 | Follow-up facility sanitizer log | `007a73ea5c5ea435c41b37134e768b800ed662a7aad241d28f776fde865e980e` |
 | Follow-up 48-case Custom Game save/load matrix | `4a15eaf37f9e32aaf44c38bce41782a22244c4c8a77fcf4044e693ed8ab803c1` |
 | Follow-up Terran 10 fresh-SRAM victory | `c100e289d903babf4e80e1194f173c6e4abc298c932eecc51f27d7b6826d422c` |
+| All 30 candidate campaign starts | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Candidate Z1 pinned HOME-to-victory tape | `3c0b07f7408e478b6c035f08c91fabb55f088dfdba3965e2126817f6e180789f` |
+| Candidate Z1 opening fresh load | `8755e6931dcbcf5591c98891b0ece0b81f834cecb8b38a0419d98e48dd12e436` |
+| Candidate same-tape Z1 resume mismatch | `677c2a8d8042a99693b6d7c23f54e4df0330ea20644e67011b3bd66c5a139427` |
+| Showcase scene control | `8adb5e944d012edbc41f5cd19e702bfbdeed8ada21428d9f0205f2d271ca732b` |
+| Showcase scene candidate | `34f08029ad488d7228ace20012b0f7826009ec08e50fc8685858222e0b678298` |
+| Blood Bath scouting control | `6bd04d92180be267ad0c7e45dbad4dc439d6fb5c00684c73ebac8a61b02fba83` |
+| Blood Bath scouting candidate | `409c7d0411084981e63ccdc3dd3b8e7aa535692c65d24246a4e3929685488da0` |

@@ -67,8 +67,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   of live node visits in the short battle cut, then costs 0.60% on
   the full P10 replay and exceeds the Z10 stack reserve. The animation
   index cache saves 0.29% in 16 skirmish updates and 0.02% in the full
-  campaign run. Keep both trials local and profile the cost of repeated
-  overlay walks in sustained visible combat. A point-route
+  campaign run. Keep both trials local. In [visible Crossfire](audits/2026-11-22-steady-order-cost.md#visible-fights-in-protoss-crossfire),
+  uncompressed unit sprite blits take 130,161–148,318 guest cycles per
+  update. All 507 sampled calls draw attack poses. Qualify a selective
+  packed path with the original fallback and 32 MiB ROM limit in both
+  Crossfire and the ordinary three-computer match. A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
   whole-bucket bound excludes
@@ -2387,6 +2390,11 @@ save/source-owner and timing evidence; do not advertise unwired components.
   scrolling places its indicator at the edge before the camera clamps.
   The GBA D-pad centers the cursor over the interior. Account for this
   difference in subsequent normal-input camera and fog comparisons.
+- The [facility-transfer campaign checks](audits/2026-11-22-dense-depot-suffix.md#fresh-distant-requests-on-the-pacing-release)
+  confirm all 30 starts, an ordinary Z1 win from HOME and fresh SRAM
+  victories in T10 and P10. The Z1 same-tape fresh load from frame 984
+  misses a 50-mineral action at frame 1,422. Resolve the input and save
+  context at that cut before counting it as an equivalent continuation.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie

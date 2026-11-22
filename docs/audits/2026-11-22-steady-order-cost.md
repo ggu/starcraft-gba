@@ -98,6 +98,36 @@ repeated target eligibility and tracer admission work, alongside the
 separate route-stall cut. Player-driven battle pacing and hardware
 measurement remain open.
 
+## Visible fights in Protoss Crossfire
+
+The merged #724 Showcase build enters Crossfire through the normal
+hidden menu and runs with neutral controls. Profiled and unprofiled
+runs match all 32 full clock, world, tracer bank, route, palette and
+video samples. This gives a dense on-screen workload alongside the
+three-computer Outpost setup.
+
+| Mean guest cycles per update | Frames 40–55 | Frames 95–110 |
+| --- | ---: | ---: |
+| Full loop | 1,462,383 | 1,380,207 |
+| Game update | 486,099 | 402,542 |
+| Render | 839,388 | 847,815 |
+| Depth-ordered actors | 584,897 | 592,225 |
+| Byte sprites inside unit drawing | 130,161 | 148,318 |
+| Tracer part drawing inside actor depth | 119,725 | 109,255 |
+| Overlay walking inside tracer parts | 26,982 | 5,719 |
+
+The early and late overlay scopes vary even with similar call counts.
+A separate read-only census matches the 32 unprofiled cuts and maps
+all 507 direct unit byte-sprite calls to attack-pose source arrays.
+Those calls use 56 distinct frame pointers. The full bank has 1,651
+arrays and 1.23 MB of indexed pixels. Four phase copies with masks
+would need at least 9.84 MB, above the available ROM space. Qualify
+a bounded packed subset and retain the exact byte-sprite fallback.
+Retain the ordinary Outpost
+battle as a second workload. The historical mode-0 tile path falls
+back to Mode 4 for Custom Game and gave flat P7 timing. Its imported
+audio and RAM limits remain relevant. See [renderer validation](../VALIDATION.md#p7-mode-0-tile-renderer).
+
 ## Selection and detector query candidate
 
 The [combined draft](https://github.com/ggu/starcraft-gba/pull/724)
@@ -257,3 +287,6 @@ which repeated overlay walks can be elided before adding storage.
 | Target-bound full P10 replay | `6adc414f046423faf50b672d3e5cd14d86fb13fe3f40f7c44c4bfaeb3658c8f3` |
 | Indexed animation cache short battle | `37908f901f19d4081e8bba9a1c38f9658fec6785cdb67ee3b0840a4f500c441b` |
 | Indexed animation cache full P10 replay | `e07765af34580f7e451d64150d591ae8439d23a786c4c12a5b5a1a959ce1a855` |
+| Visible Crossfire instruction attribution | `0b001e9a886f937fa8b553f2a85fea6cb83107f7762ae304116c4ece51951545` |
+| Matched profiled and unprofiled Crossfire cuts | `50928c356289710d94fa8c52fbf83080ba87468224ce79eecfb8779070e63954` |
+| Crossfire attack-pose call census | `948d1c7e09a856e875f7b8e5f8689c9a4c553578eb3a4567763cb1d0074127b5` |
