@@ -65,6 +65,66 @@ update spans more than two such intervals. This measures neutral-input
 opening pace in an emulator. Active battle and physical GBA pacing
 remain qualification gaps.
 
+## Three-AI Custom Game battle pace
+
+The same map and seat choices run from ordinary new games on the
+merged #723 runtime. The human leaves the controls neutral during
+play. Each match advances 12,000 updates. Across the twenty
+600-update intervals, frame 10,801 through 11,401 is the slowest
+in all six cases. Every slow interval shows missing unit slots and
+reduced health or shields between its two cuts.
+
+| ROM | Map | Mean guest cycles | Emulated updates/s | End units |
+| --- | --- | ---: | ---: | ---: |
+| Terran | Outpost Run | 1,100,582 | 15.24 | 105 |
+| Terran | Blood Bath | 908,251 | 18.47 | 121 |
+| Zerg | Outpost Run | 1,255,362 | 13.36 | 117 |
+| Zerg | Blood Bath | 997,132 | 16.83 | 141 |
+| Protoss | Outpost Run | 1,267,466 | 13.24 | 116 |
+| Protoss | Blood Bath | 1,013,490 | 16.55 | 134 |
+
+The independent instruction attribution at Protoss Outpost frames
+11,100–11,115 matches the unprofiled run in guest cycles, world,
+palette, both video pages and route counters. The last cut has
+134 units and 58 buildings. Full-loop mean is 1,375,049 cycles.
+Orders account for 633,093 cycles and rendering for 529,808.
+Nearest-target search costs 139,078 within orders, including 48,936
+for candidate eligibility. Movement accounts for 140,507, and
+combat for 115,178. Within rendering, depth-ordered actors account
+for 320,937, with 96,034 in the tracer part draw. Inclusive samples
+nest. The route build counter stays at 652 while the hit counter
+moves from 18,511 to 18,545. Use this no-new-build battle cut for
+repeated target eligibility and tracer admission work, alongside the
+separate route-stall cut. Player-driven battle pacing and hardware
+measurement remain open.
+
+## Wasteland selection and Terran 7 continuation
+
+Two isolated runs of the authenticated USA N64 ROM use the same
+ordinary input sequence to launch Wasteland. The callback at runner
+step 8,999 is byte-identical in both. One branch holds R for ten
+runner steps beginning at 9,000, then releases it. The input log
+contains five pressed polls. At callback-observed step 9,999, five
+Marines have green selection indicators and the HUD offers Hold/Move,
+Stop and Attack. The neutral branch shows no selection. Both read
+40 minerals and 10/18 supply. These callback steps are asynchronous
+with native game updates.
+
+On the exact merged Terran GBA ROM, ordinary A acknowledgements
+clear opening transmissions in both branches. A clean R press and
+release selects the same five Marine slots, leaving the five SCVs
+unselected. The selection and different command band persist at
+frame 1,102, 1,000 advancing updates after the release cut. Neutral
+input in the control leaves selection empty. Both show 40 minerals
+and 10/18 supply at the before-input, release and later cuts. This
+compares the observed selection behavior across systems. Their
+runner steps and input dispatch timing are measured independently.
+
+Terran 7 on the same ROM wins after an ordinary pause and a fresh
+HOME load. All 15 checkpoints match the pinned input tape. The save
+is made at frame 2,289 and victory occurs at frame 3,931. The
+victory journal survives another fresh readback.
+
 ## Bounding the other steady costs
 
 Earlier read-only target sampling on the same release observed 409
@@ -91,6 +151,16 @@ from 41,537 to 45,064. The conditional scan stays out. Future audio
 work needs to reduce the duplicated actor traversal itself while
 preserving ordered event admission and slot reuse.
 
+A point-route trial skips the already discovered predecessor while
+keeping seed handling and the order of the other neighbors. The
+route sanitizer suites match the independent BFS and their compaction,
+parking and resumption cases. The canonical Z10 link exceeds its
+IWRAM reserve. Placing the loop in ROM in both the control and trial
+allows a paired 3,600-update Blood Bath comparison. Across 387 route
+builds, all 31 sampled state and video cuts and the exported SRAM
+match. Mean cycles are 575,794.18 and 575,794.06. Keep the trial local.
+The archived late Z7 battle still lacks a current paired measurement.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Control P10 replay | `2fc3cde69e257772fc454bbf2a2c1c13658589414757af09f3def32563045bc2` |
@@ -103,3 +173,13 @@ preserving ordered event admission and slot reuse.
 | Preview Protoss Custom Game matrix | `076ee6a8e277f2970dde40bab96837224908bd1bda380a0a139da6254bc1c4b2` |
 | Audio snapshot write trial | `d172e631be8bfa2bcee1a2b9408a873e06849d0d0e67a6cce75876baf1a9ec86` |
 | Three-AI Custom Game opening pace | `d3ca4076caf0274ad6723017b1eea3ae1eedb72db2c316c7e68cdce9edfb61e0` |
+| Six later Custom Game replays | `d639899cc4ef2f59be65aebed7473a56244170d7311306c31196b8c6f1d54a24` |
+| Three-AI Outpost attribution | `8288f35449fffd6f5da6442fb2f99f63c7922ad5f18c7937d7bd5ccf801624a9` |
+| Both matched Outpost cut files | `ae47fa6bed92fc8d3399c15fc0b5c8cb2d6988f45decf6b2c86242fc8afa7e4b` |
+| Native Wasteland before R, both branches | `8adb1b58ce96670e72c3b676fb51b8c641c25548a1d02f069139c1dcb0981c00` |
+| Native Wasteland selection capture | `01ad7c9ffcd1cf69c101a85963bf95b3ceec8cab6a51b71c29501f17fd96bd43` |
+| Native Wasteland neutral capture | `159d64db1ec8765d869f9492ececd6f1d5b6f349b2a29ba10c13f62035b4cd86` |
+| Current Terran Wasteland selection and neutral pair | `658041c8810e7c79eb83dc922dc740ba9efa01b482b82e85cf17490808e56ef7` |
+| Current Terran 7 fresh-SRAM victory | `e5843d9a9a1d8683dbfd46f230aa9232b70e686a964fa916cd320dc16ffcc551` |
+| Point predecessor ROM-placement control | `c7ce279873e286c66d5350a2c3ef162dc90625a2525c083797fcd5dd234c9176` |
+| Point predecessor trial | `fe3c3b42273aeda085567964ac667700dda3ce446f8f25e90b8677942848cbdc` |
