@@ -94,6 +94,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   contributors are stable. Retain moving-camera cases, with 105
   changed tiles on each pan update in one P10 window. Continue
   profiling movement and route work toward the two-VBlank budget.
+  [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
+  saves 0.63% in Crossfire and slightly increases both measured
+  Custom Game means. Keep it local. Count transparent row edges in
+  an ordinary fight before trialing generated row bounds.
   A point-route
   predecessor skip has flat timing in the 3,600-update Blood Bath holdout
   and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius

@@ -298,6 +298,42 @@ contributors and bounded storage for both pages. Retain moving
 camera cases in the benchmark. The census measures pixel
 equality. Render-cycle savings remain to be measured.
 
+## Detached attack sprite draw records
+
+Crossfire spends about 27,600 guest cycles per update resolving
+the position and source age of detached attack sprites. The painter
+resolves an admitted sprite once for ordering and again for drawing.
+A local trial reuses the draw record stored at admission. The first
+variant keeps up to eight records, and a second indexes the full
+bounded set by tracer slot. Both preserve the existing heap keys.
+
+| Replay | Control mean cycles | Slot-indexed trial |
+| --- | ---: | ---: |
+| Crossfire, 900 updates | 935,055 | 929,124 |
+| Protoss Outpost, 12,000 updates | 760,046 | 760,160 |
+| Protoss Blood Bath, 12,000 updates | 689,425 | 689,504 |
+| P10 fresh HOME victory, 9,489 updates | 1,503,782 | 1,503,862 |
+
+The slot-indexed trial matches all 151 sampled cuts, including both
+display pages, the world, and each workload's retained route and
+palette state. The campaign victory journal matches byte for byte.
+The eight-record variant has about the same Crossfire gain and
+slightly higher costs in both Custom Games. Keep both trials local.
+
+A separate census of 507 direct attack-pose byte-sprite calls in
+Crossfire finds 140,501 transparent edge pixels out of 267,934
+source pixels. That includes 2,539 entirely transparent rows. The
+census uses unclipped source rectangles, so it bounds the available
+work rather than measuring a cycle saving. The 56 distinct poses
+would use 2,708 bytes of two-byte row bounds before lookup overhead.
+Measure an equivalent Outpost sample before choosing a sidecar.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Slot-indexed Crossfire trial | `b94c5cfabe7a73025c0f8e01648747fc0c623f475ecdb7b2980386d9f6175979` |
+| Slot-indexed Custom Game trial | `6d87accdeec50ec16eaceca21acd5b543b8bb1ec5deb6813bcf2e2ef073a484b` |
+| Slot-indexed P10 trial | `0031a3876a0b9787bf9913bc4bacdd2da06c206ceb3d89fc8a888e30c36ba033` |
+
 ## Automatic gathering in two Custom Game openings
 
 A fresh native Melee setup selects Challenger, human Terran and
