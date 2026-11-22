@@ -1366,7 +1366,8 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int source_owner)
 {
     if (!SC64_CAN_ATTACK_FROM(attacker, target, live_owner)) return 0;
-#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+/* The cache path resolves the detection slot in detector_sees. */
+#if defined(SC64_SOURCE_SIGHT_ALL_RACES) && !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
     source_owner = sc64_p7_detector_current_slot(live_owner,
         race_protoss_query_slot(source_owner,live_owner));
 #endif
