@@ -64,6 +64,8 @@ the older after-world composition. The fixture checks both HUD bands.
 
 Terran, Z10, P10 and Showcase pass their ARM ROM and RAM guards.
 Campaign and Showcase opening cuts match at frames 61 and 121.
+All 54 normal Custom Game launch and fresh-load cases pass, covering
+both maps, all human races and one to three CPUs in each race ROM.
 The three-CPU Z10 Blood Bath holdout matches 31 world and video
 checkpoints, 16 fresh continuation cuts and the pause SRAM. Mean
 emulated cycles per update change from 817,911 to 818,261 (+0.04%).
@@ -74,4 +76,5 @@ fixture for the order-sensitive fallback pixels.
 | --- | --- |
 | Showcase weapon sanitizer fixture | `0423a96707267d3b51000c75bdfb73e80df3880bce82846c474419020bad9f8e` |
 | Campaign and Showcase openings | `fbe225ac9d8cf4fd226931decc3d07b21758baafa542c589017862be7506cccd` |
+| Custom Game launch and fresh-load matrix | `7c5f53ef23a75cfa5b76dd058cfdd34023d03da4a9d3c0bd3bdb27c3d4e0add3` |
 | Blood Bath comparison | `05129273d198af9e8a1aa52b6207873811af6e7bf2cbee6754b7de03d047369f` |
