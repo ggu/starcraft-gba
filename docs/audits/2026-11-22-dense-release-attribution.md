@@ -151,3 +151,53 @@ reserve. This trial stays local. The packed compositor already skips
 fully transparent groups and copies fully opaque groups directly.
 Profile mixed-word and byte-sprite coverage before revisiting span
 skipping.
+
+## Full FIFO completions
+
+On the same late Z7 replay, all six baseline point fills exhaust the
+1,024-pop prefix. They then spend another 52,404 pops on full FIFO
+completion. Increasing the cutoff to 2,048 and the parked frontier
+limit to 128 still leaves all six origins undiscovered. Each frontier
+fits at the cutoff. The 6,144 additional prefix pops replace exactly
+6,144 full FIFO pops, and every field still needs complete packing.
+
+Across all callers, the measured point-fill total rises from
+4,397,916 to 4,402,615 guest cycles for the 16-update window.
+The full mean moves from 1,606,097 to 1,605,900 cycles.
+The earlier table reports point-fill costs within recorded movement
+ancestry. This count includes calls through the rest of the orders
+path. A separate whole-bucket rejection trial lowers full mean to
+1,604,786 cycles on the same window. Both effects are smaller than
+0.1%. Keep the trials local and trace actual first visits, frontier
+widths and later demand to choose what work can be deferred.
+
+A separate early skirmish hostility branch preserves the sampled
+world, video, routing and SRAM. Mean cycles fall from 817,911
+to 817,286 on the 3,600-update Blood Bath sample and from 1,535,936
+to 1,533,977 on the 9,489-call P10 tail. Keep this branch local
+while pursuing larger reductions in the measured full-fill work.
+
+| Private receipt | SHA-256 |
+| --- | --- |
+| Prefix work baseline | `559fcd578378722c0b8c19d97f344d7f86995ab0dd5d1cdf00e109e6d252189b` |
+| 2,048-pop prefix trial | `8564ea0592bcadf0be1d2a8474f7e73a65cb1ee42e3c32d26c3cdd5b3fda1546` |
+| Whole-bucket rejection trial | `ba5bcd5121f060a9896b811fb2ed81b51151fba7df7df013d0288db5645c53a9` |
+| Early hostility Blood Bath | `a4e98491e150c67a3e03fef25ae215b4bfc9190375998184a2c7e75774f06db1` |
+| Early hostility P10 | `ec9ddd63c3d89f68e843620cc92b10ac6ea8cdb17f1786477e13e65206d8607c` |
+
+A diagnostic FIFO records the first origin visit for each of the
+six full completions at 7,855, 6,334, 5,469, 7,779, 6,272 and 5,400
+pops. Each full field completes after 9,758 pops. The six total
+pop counts match the release run. The actual origin hits all exceed
+4,096 pops and all fall within 8,192. A 32-pop boundary rounds their
+first observed hits to a total of 39,168 pops. The remaining 19,380
+pops (33.1%) could be deferred before charging for incomplete field
+packing and later reads. Pending queues count 63–78 records at the
+individual hits. Measure frontier widths at the actual batch
+boundaries and track later resumption and eviction.
+
+The instrumented replay matches retained checkpoints to call 78,020
+and the sampled frame and route counters. Its diagnostic window
+uses a separate FIFO in ROM. Use its receipt for work counts.
+The receipt SHA-256 is
+`819480138f209e7c420642f2dde0be79170a703859ed44c3f489840750c5ecb9`.

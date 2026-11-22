@@ -21,6 +21,10 @@ static int trace_first = 1;
 static int combined_arms_witness;
 static int blood_bath_witness;
 static int render_input_frames;
+#ifdef SC64_NATIVE_MELEE_STARTS
+static int option_melee;
+static unsigned option_start_order;
+#endif
 
 enum build_state { BUILD_NONE, BUILD_PENDING, BUILD_FOUNDATION };
 static struct {
@@ -84,19 +88,48 @@ static int launch_match(void)
             tap(KEY_RIGHT);
         if (race_front.bot_races[i] != option_bot_races[i]) return 0;
     }
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (option_melee) {
+        while (race_front.row < SC_FRONT_SKIRMISH_MODE_ROW) tap(KEY_DOWN);
+        if (race_front.row != SC_FRONT_SKIRMISH_MODE_ROW) return 0;
+        if (!race_front.skirmish_melee) tap(KEY_RIGHT);
+    }
+    if (option_start_order) {
+        /* Match the normal ARM launch observed from the same title input. */
+        unsigned ms;
+        for (ms = 0; ms < 10000; ++ms) {
+            int human, races[3];
+            unsigned order;
+            if (sc64_front_skirmish_native_resolve(&race_front, ms, &human, races, &order) &&
+                order == option_start_order) break;
+        }
+        if (ms == 10000) return 0;
+        gba_test_set_elapsed_milliseconds(ms);
+    }
+#endif
     while (race_front.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) tap(KEY_DOWN);
     tap(KEY_A);
     if (screen != SCREEN_PLAY || !race_mode || race_human != option_human ||
         race_bots != option_bots || race_skirmish_map != option_map) return 0;
     for (int i = 0; i < option_bots; ++i)
         if (race_bot_races[i] != option_bot_races[i]) return 0;
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (!!race_skirmish_melee != option_melee ||
+        (option_start_order && race_skirmish_start_order != option_start_order)) return 0;
+#endif
     if (trace) {
         trace_record("{\"kind\":\"start\",\"host_tick\":%u,\"frame\":%d,\"map\":%d,\"human_race\":%d,\"bots\":[",
                      host_ticks, frame, race_skirmish_map, race_human);
         for (int i = 0; i < race_bots; ++i)
             fprintf(trace, "%s{\"owner\":%d,\"race\":%d}", i ? "," : "",
                     race_bot_owner_ids[i], race_bot_races[i]);
-        fputs("]}", trace);
+        fputc(']', trace);
+#ifdef SC64_NATIVE_MELEE_STARTS
+        if (race_skirmish_start_order)
+            fprintf(trace, ",\"melee\":%u,\"start_order\":%u",
+                    race_skirmish_melee, race_skirmish_start_order);
+#endif
+        fputc('}', trace);
     }
     return 1;
 }
@@ -651,6 +684,21 @@ int main(int argc, char **argv)
     if (argc == 7 && !set_named_bot_races(argv[6])) goto invalid_args;
     const char *render = getenv("SC64_SKIRMISH_RENDER_INPUT_FRAMES");
     render_input_frames = render && strcmp(render, "1") == 0;
+    const char *melee = getenv("SC64_SKIRMISH_GAME_TYPE");
+    const char *order = getenv("SC64_SKIRMISH_START_ORDER");
+#ifdef SC64_NATIVE_MELEE_STARTS
+    option_melee = melee && strcmp(melee, "melee") == 0;
+    if (melee && !option_melee && strcmp(melee, "ffa") != 0) goto invalid_args;
+    if (order) {
+        value = strtol(order, &end, 10);
+        if (end == order || *end || value < 1 || value > 255 ||
+            option_map != SC64_MAP_BLOOD_BATH) goto invalid_args;
+        option_start_order = (unsigned)value;
+    }
+    if (option_melee && option_map != SC64_MAP_BLOOD_BATH) goto invalid_args;
+#else
+    if ((melee && strcmp(melee, "ffa") != 0) || order) goto invalid_args;
+#endif
     const char *witness = getenv("SC64_SKIRMISH_COMBINED_ARMS");
     if (witness && strcmp(witness, "1") == 0) {
         if ((option_map != 0 && option_map != 1) || option_human != R_TER ||
