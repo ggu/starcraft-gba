@@ -131,7 +131,12 @@ static int sc64_zc_tail(const u8 *tail,unsigned size)
     if (size < SC64_TRANSPORT_TRAILER_BYTES || size > SC64_ZC_TAIL_MAX) return 0;
     unsigned impact = size - SC64_TRANSPORT_TRAILER_BYTES;
     Sc64SkTransportTech tech;
+#ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
+    u8 neutral;
+    if (!sc64_sk_transport_decode_elimination(&tech,tail+impact,MAX_BUILDINGS,&neutral)) return 0;
+#else
     if (!sc64_sk_transport_decode(&tech,tail+impact,MAX_BUILDINGS)) return 0;
+#endif
     Sc64ImpactEvent rows[RACE_IMPACT_ROWS];
     return !impact || sc64_impact_decode(tail,impact,RACE_IMPACT_ROWS,
         MAX_UNITS+MAX_BUILDINGS,5,SC_RU_COUNT,rows)>0;

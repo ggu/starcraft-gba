@@ -109,8 +109,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [follow-up routing measurements](audits/2026-11-22-dense-release-attribution.md#full-fifo-completions)
   show that all six sampled point origins still need a full fill
   after 2,048 pops. Their first visits take 5,400–7,855 pops.
-  Compare an 8,192-pop cutoff on exact matched tapes and measure
-  later reads and queue evictions.
+  The 8,192-pop cutoff alone reaches the shared scratch limit after
+  4,412 pops. Compare in-place queue compaction on the exact tape and
+  measure later reads and queue evictions.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
@@ -282,6 +283,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   three-CPU opening. The dual-flag composition passes ordinary human
   defeat with two neutral survivors, a staged enemy transfer and
   an ordinary Terran victory one update after retiring the last CPU.
+  The [later native replay](audits/2026-11-18-blood-bath-elimination-arm.md#native-melee-defeat-and-neutral-workers)
+  retains the CPU alliances and transfers four surviving SCVs at
+  human defeat. The current preview also carries the compact Zerg
+  transport save fix and the unstarted Interceptor refund.
+  Keep launched and training Interceptor groups separate until
+  their retirement and journal paths are qualified.
   Verify ordinary enemy survivor transfer and broader active wins
   with other races and two or three CPUs.
   SD readback, physical frame pacing and broader native campaign
@@ -1258,6 +1265,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cargo. Z10 also resumes an ordinary active compact journal on ARM.
   Verify a positive retired-seat compact journal on ARM, launched
   fighters, the other coupled survivors, and simultaneous outcomes.
+  The [November 20 preview](audits/2026-11-18-blood-bath-elimination-arm.md#november-20-composition-and-final-result-boundary)
+  reproduces CPU retirement on current Terran and matches 900 updates
+  after reload. Prepared Terran and P10 ARM fights in both modes also
+  pass final retirement, neutral worker transfer, the between-pass save
+  and fresh victory reload. The [native two-CPU Free for All opening](audits/2026-11-18-blood-bath-elimination-arm.md#native-two-cpu-free-for-all-opening)
+  establishes the lobby and passive mining. The next native capture needs
+  the last grounded building to fall while another CPU can still play.
   The [native result observer](audits/2026-11-14-native-result-opening.md)
   now matches the archived opening under unchanged file limits and
   confirms the 31-decrement cadence and owner scan order. No live results
