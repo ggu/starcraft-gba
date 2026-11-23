@@ -190,6 +190,30 @@ palette and route counters. Keep the current traversal.
 The contact census receipt SHA-256 is
 `732ece93d68f41e886454d97e5ac5520442758a92fe92b60f03576190c3b1d4a`.
 
+### First-order audio on ARM
+
+The packaged Protoss 10 ROM and a trial using ARM instructions
+for the first-order decoder run the same neutral Melee inputs.
+The trial retains the same decoder source and layout of its
+persistent state. Disassembly confirms the changed instruction
+set. Both RAM endpoints match the stock cartridge. All 32 sampled
+world states, route counters, frames, video pages and palettes
+agree. Codec, mixer and Python/C stream tests pass on the host.
+
+| Mean guest cycles | Earlier, Thumb | Earlier, ARM | Late, Thumb | Late, ARM |
+| --- | ---: | ---: | ---: | ---: |
+| Whole loop | 757,329 | 762,780 | 1,350,466 | 1,381,937 |
+| First-order decoder | 12,433 | 17,753 | 68,048 | 98,303 |
+
+The trial raises whole-loop cost by 0.72% and 2.33% in the two
+windows. These are emulator measurements with the ordinary audio
+interrupts active. Keep Thumb decoding in the shared builds.
+
+| Local timing report | SHA-256 |
+| --- | --- |
+| Packaged Thumb control | `45a99a47d032f7004a61d8af6a9b44d0d6dc84de7bb70b967d778d775786b302` |
+| First-order ARM trial | `c87a93d27a4b4888b61a6295a79d168fa5747cbf3854569cdc801023d1526084` |
+
 ## Normal cartridge integration candidate
 
 The four normal build recipes enable the same existing lobby mode
