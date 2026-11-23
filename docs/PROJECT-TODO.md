@@ -837,7 +837,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Linear rank reconstruction](audits/2026-11-21-native-mineral-service-queue.md#linear-reconstruction-from-saved-ranks)
   cuts the authored 240-worker load preparation from 6.97 million
   cycles to about 208,000 with matching state. All four packed row
-  codecs feed the shared builder. Integrate it into the
+  codecs feed the shared builder and preserve a worker's cargo.
+  Integrate it into the
   [normal journal envelopes](audits/2026-11-21-native-mineral-service-queue.md#packed-journal-integration)
   and measure race economy and pacing before shared activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)

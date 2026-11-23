@@ -49,21 +49,24 @@ static void assert_dense_queue(const Sc64MineralFifo *fifo, unsigned patch)
 
 /* Decode actual wire rows, then construct the queue from those fields. */
 #define CHECK_CODEC(T, ENCODE, DECODE) do { \
-    Sc64MineralFifo fifo={0}; \
-    for (unsigned slot=0; slot<MAX_UNITS; ++slot) { \
-        unsigned rank=(slot*97u)%MAX_UNITS+1u; \
-        Unit expected=sample(), wire, decoded; T packed; \
-        expected.target=MAX_MINERALS-1; expected.work_timer=rank==1?45:0; \
-        wire=expected; wire.carry=8+(int)rank; \
-        assert(ENCODE(&packed,&wire,2048,2048)); \
-        assert(DECODE(&decoded,&packed,2048,2048)); \
-        assert(!memcmp(&decoded,&wire,sizeof decoded)); \
-        assert(sc64_mineral_fifo_stage_rank(&fifo,slot,(unsigned)decoded.target, \
-               (unsigned)(decoded.carry-8),(unsigned)decoded.work_timer,45)); \
-        decoded.carry=0; assert(!memcmp(&decoded,&expected,sizeof decoded)); \
+    for (unsigned cargo=0; cargo<=8; ++cargo) { \
+        Sc64MineralFifo fifo={0}; \
+        for (unsigned slot=0; slot<MAX_UNITS; ++slot) { \
+            unsigned rank=(slot*97u)%MAX_UNITS+1u; \
+            Unit expected=sample(), wire, decoded; T packed; \
+            expected.target=MAX_MINERALS-1; expected.work_timer=rank==1?45:0; \
+            expected.carry=(int)cargo; \
+            wire=expected; wire.carry=(int)((rank << 4) | cargo); \
+            assert(ENCODE(&packed,&wire,2048,2048)); \
+            assert(DECODE(&decoded,&packed,2048,2048)); \
+            assert(!memcmp(&decoded,&wire,sizeof decoded)); \
+            assert(sc64_mineral_fifo_stage_rank(&fifo,slot,(unsigned)decoded.target, \
+                   (unsigned)decoded.carry >> 4,(unsigned)decoded.work_timer,45)); \
+            decoded.carry &= 15; assert(!memcmp(&decoded,&expected,sizeof decoded)); \
+        } \
+        assert(sc64_mineral_fifo_finish_ranks(&fifo)); \
+        assert_dense_queue(&fifo,MAX_MINERALS-1); \
     } \
-    assert(sc64_mineral_fifo_finish_ranks(&fifo)); \
-    assert_dense_queue(&fifo,MAX_MINERALS-1); \
 } while (0)
 static void codecs(void) {
     CHECK_CODEC(Sc64PackedUnitSave,sc64_unit_save_encode,sc64_unit_save_decode);

@@ -144,9 +144,9 @@ Check the normal opening and AI economy timings separately.
 ### Queue order in existing-width save rows
 
 Test a new-policy row discriminator before changing the save size.
-An eligible queued worker has zero live cargo. Under an authenticated
-new save tag, serialized values 9–248 can carry that worker's rank
-1–240 on its patch. Decode and validate the ranks in a private
+The standalone rule admits queued workers with zero live cargo.
+Under a distinct save tag, serialized values 9–248 can carry ranks
+1–240 on a patch. Decode and validate the ranks in a private
 candidate, then restore the zero cargo value before the normal cargo
 and mission checks. The work timer remains independent, including
 when a worker has reached zero but still owns the service slot.
@@ -229,8 +229,8 @@ temporary byte per unit to order the staged entries.
 
 The packed-row fixture feeds the builder from actual compact, ZP,
 derived and P7 typed decoders. Each codec restores 240 shuffled
-ranks, the head timer, and the normalized unit fields. The fixture
-also covers the first and last of 144 patches, empty patch ranges,
+ranks with cargo values 0–8, the head timer and the normalized unit
+fields. The fixture also covers the first and last of 144 patches, empty patch ranges,
 separate queue tails and overloaded nonworker carry. The standalone
 and Frontier journal fixtures still pass fallback and failed-load
 atomicity. A fresh standalone ARM process loads the same 32 KiB SRAM
@@ -273,6 +273,16 @@ unpack. P10 preserves the custom-game research-jobs interpretation.
 The rank pass runs before worker cargo validation. Publish the
 prepared queue only after the selected world loads successfully.
 Legacy candidates keep their saved economy policy.
+
+The race gather path can reach mineral service with gas or unclassified
+cargo still on the worker. A packed queue therefore needs both rank and
+original cargo. The authored codec fixture qualifies
+`(rank << 4) | cargo` for every rank 1–240 and amount 0–8.
+The highest value is 3,848 and fits all four carry fields. Authenticate
+the packed layout and worker order before splitting this word. Restore
+the amount and preserve the cargo flags before running the existing
+worker validators. The standalone tag continues to use its original
+rank encoding.
 
 The raw stage uses namespace `0x4f`. With separate FIFO tags for
 base and custom envelopes, Terran and Z10 would need five accepted
