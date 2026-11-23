@@ -182,6 +182,48 @@ costs that still apply in changed regions.
 The local coverage receipt SHA-256 is
 `6e12d781e41aaf1a035851eaf6cb83104f81677043e102dd702811a916471fa2`.
 
+### Measured cost of skipping a certified quiet battlefield draw
+
+A replay-only build skips the battlefield pass for calls
+9,008–9,016, where the stock replay already shows that both
+physical pages are unchanged. The trial keeps simulation, audio,
+the HUD, overlays and page presentation active. All 32 sampled
+states, route counters, both display pages and palette match stock.
+The selected nine updates establish an optimistic timing measurement
+before runtime comparison or invalidation cost. The frame-number
+gate is local to the trial.
+
+| Mean guest cycles | Stock | Reused page |
+| --- | ---: | ---: |
+| Nine certified quiet updates | 742,158 | 594,804 |
+| All 16 earlier updates | 757,329 | 674,445 |
+
+The nine-update mean improves 19.85%, from 22.61 to 28.21
+emulated updates per second. It remains 33,012 cycles above
+the two-VBlank budget before adding a runtime guard. A safe
+implementation needs an exact contributor snapshot and checks for
+camera, fog, page clear, mode and overlay changes. Keep measuring
+orders and shared simulation costs alongside that implementation.
+
+The local attribution SHA-256 is
+`49a33950e9f362fb84529d9fe801811b58e287f66fbcbb4394078fd4d7ab2698`.
+
+### Sequential transfers for packed sprite pairs
+
+An ARM trial fetches two color and opacity pairs per sequential
+ROM transfer. Odd rows begin with one pair. Both host pixel
+fixtures pass, and 32 paired Protoss 10 Melee samples match
+frame, world, routes, both physical pages and palette.
+In the late window, packed raster calls fall from 69,352 to
+64,832 cycles per update. The whole loop falls from 1,350,466
+to 1,346,508, a 0.29% reduction. The earlier mean falls 0.46%.
+The trial increases Protoss 10 static IWRAM by 48 bytes and
+fails the Z10 linker guard for its 11 KiB stack reserve.
+Keep the current loop in the shared builds.
+
+The local attribution SHA-256 is
+`7bb64e17d60efc670423c48b3ca76b01bedb94f6ce1c00eb1aecf401786cbda5`.
+
 ### Restoring old actor pixels to terrain
 
 The same 64 advancing updates also compare the old work page with
@@ -271,6 +313,48 @@ orders and actor composition costs.
 The local trial attribution SHA-256 is
 `a7bec653dfdcdf0e1053c92b4e04680803b33d2363a34ee45c7f1505fbbbd49f`.
 
+### Shorter cloak-cache scans
+
+The trial cloak tick checks the few relevant runtime types
+directly when an actor lacks an explicit source type. Its type
+predicates and general type-to-source mapping use the same rows.
+Explicit source IDs still take precedence. The GBA Thumb path also
+checks unused unit rows with grouped word loads. Every byte,
+including padding and the trailing words, still participates.
+
+An isolated ARM fixture sets each bit separately across 48-, 52-,
+56- and 60-byte rows, and checks fully zero rows at each slot.
+All 13,856 checks pass. The host cloak differential matches its
+scalar reference across 24 worlds and 8,640 updates. All four
+normal cartridges retain their static RAM endpoints. The Terran
+and Zerg ROM hashes match the prior package.
+
+| Three-CPU Melee window | Mean guest cycles, stock → shared scan | p95, stock → shared scan |
+| --- | ---: | ---: |
+| Protoss 10, 8,401–9,000 | 766,169 → 760,863 | 904,103 → 899,148 |
+| Protoss 10, 10,801–11,400 | 1,040,170 → 1,034,282 | 1,350,192 → 1,355,686 |
+| Showcase, 8,401–9,000 | 756,315 → 751,544 | 891,401 → 890,774 |
+| Showcase, 10,801–11,400 | 913,889 → 909,270 | 1,145,718 → 1,143,908 |
+
+The paired replays match complete unit banks, world summaries,
+route counters, both display pages and palette at 84 checkpoints.
+The late Protoss mean improves 0.57% and its p95 rises 0.41%.
+The late Showcase mean improves 0.51% and its p95 falls 0.16%.
+These windows still miss the two-VBlank budget. All 20 ordinary
+skirmish save continuations and 30 campaign openings pass.
+Four historical campaign saves load and re-export with the same
+SRAM bytes. The full ordinary Protoss 10 HOME replay wins at
+frame 93,377 with all 37 checkpoints and three SRAM exports
+matching. Across all 94,852 calls the mean rises from 1,095,036
+to 1,098,010 guest cycles, a 0.27% increase. Keep the trial local
+and retain the larger orders and renderer work as priorities.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Protoss 10 sustained candidate | `19b61e33dc75ee2177b18d01d7dd0e8c878392ce7e865d562f593946f4ad3be7` |
+| Showcase sustained candidate | `5311f302d2d1f715278e113f374f901ad21a7aba121592b2c6962f08c1daa11b` |
+| Protoss 10 full victory and fresh readback | `e8a2fbb49fc04657b3ed237f04cc1dada5495b63f9384c173b2572ab440bce72` |
+
 ### Occupancy checks for steering rows
 
 The address census at the actual steering bucket-head load covers
@@ -305,6 +389,56 @@ Keep the trial local.
 
 The local attribution SHA-256 is
 `61438e1f78b36c7b72c503917ad4b0ca7ef5ef5cdeb8daf15c18eaff08b94aa2`.
+
+### Cycle ceiling for fusing blocked direct steps with steering
+
+On the pinned normal Protoss 10 build, breakpoints at the
+primary direct collision check's entry and return measure the
+calls immediately before the steering branch. All 16 ordinary
+three-CPU Melee updates at calls 11,385–11,400 match the earlier
+frame, world, route counters, both display pages and palette.
+
+The 465 checks that return blocked consume 433,535 inclusive
+guest cycles, or 27,096 per update. The observed per-update
+range is 21,388–54,021. The 922 clear checks consume 301,621
+cycles across the same updates. Interrupt time inside a check is
+included. The mean is therefore an upper bound on the cost
+that could disappear by avoiding the entire failed primary
+check. A shared traversal would still need to test the blocked
+direction and account for work on clear moves. Keep the current
+order and prioritize larger costs. A previous
+[fused traversal](2026-11-20-p7-recurring-orders.md)
+also slows late Blood Bath.
+
+The local census script SHA-256 is
+`c8fcced8866a301bb130786cfedbc22c2722fc56b84cd5a497c95aea2401c0c4`.
+
+### Visible sprite costs by source in late Melee
+
+A read-only source census on the same 16 cuts observes 640
+battlefield raster calls, split between 321 byte-sprite and 319
+packed-word calls. All cuts match the stock frame, world, route
+counters, both pages and palette. Byte sprites consume 119,084
+inclusive cycles per update and the packed calls consume 72,342.
+These cycle counts include interrupts that occur inside the
+calls and bound the drawing cost under observation.
+
+| Byte-sprite source | Calls across 16 cuts | Mean inclusive cycles per update |
+| --- | ---: | ---: |
+| Attack poses, 15 sources | 70 | 54,169 |
+| Weapon effects, 22 offsets | 155 | 38,419 |
+| Mineral sprite, one source | 80 | 24,078 |
+
+The most expensive individual byte-sprite source is an attack
+pose from raw actor 70, at 27,456 cycles per update. The next
+eight attack frames belong to raw actor 66. Use the observed
+coverage to target compositor changes and check the gains in
+longer skirmish and campaign replays. Even eliminating the
+entire 119,084-cycle byte-sprite portion would leave the
+1,350,466-cycle late update well above the two-VBlank budget.
+
+The local corrected census receipt SHA-256 is
+`7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970`.
 
 ### Reusing actor admission during the draw
 

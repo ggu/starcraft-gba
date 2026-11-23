@@ -86,6 +86,19 @@ reproduces snapshot failure without that path. The extended run reports
 GPU ready after 9,000 steps and captures one frame. It has no Raynor
 loss or mission outcome observation.
 
+A fresh November 23 ares replay extends the retained ordinary Wasteland
+opening to 11,000 runner steps. It exits successfully with GPU ready.
+The callbacks at steps 8,999, 9,999 and 10,999 produce three captures.
+The last retains the opening group, 40 minerals and 10/18 supply. The
+callback indices are runner steps. Native combat and mission-outcome
+qualification remain open.
+
+| Extended run receipt | SHA-256 |
+| --- | --- |
+| Input commands | `c8157dd05cd2a6d7d23ce98716316310ef5e42661eb950b591cad8df98b364cf` |
+| Runner status | `35065905c90be56be3d2268def90bb60cfe0b3eabdc3cee5040d0887bbf82793` |
+| Final ARGB capture | `a2f42c21b78c639ec361dc12b2bbc4e1f0bd20ca332dab8f9b9cbb7cbdf9d5d5` |
+
 ## Blood Bath state and render-row observation
 
 A separate local observer restored an ordinary Blood Bath step-zero state and

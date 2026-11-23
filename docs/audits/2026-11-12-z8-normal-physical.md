@@ -293,6 +293,130 @@ winning controller until there is a repeatable survival route.
 | Bounded defeat observer | `e7eca9d9cbbae7c22e7e8ae896d45995bb1d2df38dbc2231d7de8ab450825c3b` |
 | Earlier-retreat observer | `2955f45d383a350c277b7a60038833de1aced9842337a7963c475a10b6759379` |
 
+### Interception trials on the normal Z10 cartridge
+
+The observed attacker passes within the stationary Overlord's
+144-pixel detection radius by frame 21,658, 124 updates before
+defeat. The old route has three Hydralisks near the threatened
+area at frame 18,483 and none within 500 pixels by frame 19,454.
+The remaining army is too far away for a last-minute interception.
+
+Three fresh HOME runs detach from the old input tape at the
+earlier position. Each selects the three Hydralisks and moves
+them with ordinary buttons. The first holds near the objective.
+The second holds farther up the approach. The third gives an
+explicit attack order once the attacker is detectable. All three
+Hydralisks pursue in the last trial.
+
+| Trial | Attacker HP at arrival | Result frame |
+| --- | ---: | ---: |
+| Hold near the objective | 35 of 40 | Defeat at 21,782 |
+| Hold on the approach | 21 of 40 | Defeat at 21,782 |
+| Attack on the approach | 21 of 40 | Defeat at 21,782 |
+
+The approach trials both observe 40 HP at frame 21,680, 36 at
+21,700 and 21 at 21,720. The selected force survives. These samples
+give net damage and cannot establish exact shot or regeneration
+timing. Test earlier detection or a larger defending group on the
+approach before returning to the attack and mining route.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Attacker and detector paths | `17805bfe1483e00da5d673c64a5af75e95c86ca12179cb2327c40e794527c01e` |
+| Hold near the objective | `6ab7f1ce0a0242fc5356ff26928f8a6c115743f15ae2e9fe15790867d2162b2b` |
+| Hold on the approach | `d3345840c3c6a20f733fd894f422cf441dde92739560d3adceeafb2eed56f4c9` |
+| Explicit attack on the approach | `40d5511b700c6e00969cbd474b3a32e42120089c34731a4d5c56121085c4d1f8` |
+
+### Forward detection and fresh HOME continuation
+
+The next ordinary-input run sends the Overlord farther forward.
+Its movement is observed through arrival and it is idle at the
+new position by frame 20,000. The game's visibility flag shows the
+Dark Templar first revealed at frame 21,544. The three Hydralisks
+accept the attack order at frame 21,584. The target falls from
+40 HP to 16 by frame 21,700 and is absent by frame 21,800.
+The game stays in play through frame 23,100, beyond the old
+defeat at 21,782. Victory and defeat flags are both clear.
+
+A separate replay reproduces the interception, saves using Start
+and B at frame 23,101, and loads the SRAM with L from fresh HOME.
+The frame, result flags, resources, mission and 91 observed live
+unit records match between the original and loaded sessions.
+After aligning both sessions at frame 23,102, another 120 neutral
+updates produce matching observations at frame 23,222 with the
+attacker still absent. The guest exported the checkpoint used
+for this comparison successfully. The harness later returned an
+error on a redundant final export. These checks establish a
+repeatable recovery and continuation. The remainder of the
+mission and its victory sequence still need a winning replay.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Forward detection and interception | `9d15b57d5080fad49a2d499f67e0c89ee4d26d390192ff9431cecadf3ecf1edf` |
+| Fresh HOME comparison | `8a1c216ee9f9b71f940bfe51ebe50138239993dab2f9018a4d9ac38f8677c02f` |
+| Interception save | `2bbf10edccb8b208a77e7fa54e77d52421d0e062baf033f8ac3734d18bf90fc6` |
+
+### Production and the southern approach after interception
+
+These runs start with the verified fresh HOME load at frame 23,101.
+Ordinary training input pays for three Hydralisks at each of two
+Hatcheries. By frame 25,173 both queues empty and the live
+Hydralisk count rises from 11 to 17. Inputs at four other selected
+Hatcheries do not produce paid orders in this run. Breakpoints
+confirm that the first refusal, at frame 23,479, fails the
+completed-building prerequisite. The player's Hydralisk Den
+at the northern base drops to 7 HP at frame 23,470 and is gone
+by frame 23,475.
+
+A Drone places a replacement Den near the northern workers
+through ordinary input. The Den reaches its full 850 HP and
+completes by frame 24,313. At frame 24,765 a Hatchery accepts
+another Hydralisk order, paying 75 minerals and 25 gas and
+consuming one larva.
+
+The direct attack trial selects two southern Hydralisks and sends
+them toward the second Nexus. Across the next 4,000 updates the
+Nexus stays at 750 HP and both units settle near their starting
+area. A shorter duplicate observes active waypoints and zero
+retry counters while the units alternate by one or two pixels
+without advancing toward those waypoints.
+
+A fresh trial first issues a westward move through an intermediate
+waypoint. Both units reach it and advance toward the Nexus on a
+second attack order. The last observed survivor has 42 of 80 HP
+at frame 26,105. Both units are absent by frame 26,305, and the
+Nexus remains at 750 HP through frame 27,705. The waypoint bypasses
+the observed stall.
+
+In a separate recovery, six Hatcheries accept three Hydralisk
+orders each after the replacement completes. The live count
+rises to 29. Rallying the entire combat group on a southern
+Move order loses the northern force en route. The later southern
+box selects 21 combat units, including Kerrigan. Attack Move
+advances into the defenders and Kerrigan dies at frame 31,443
+with both target Nexuses at 750 HP. Stage the northern reinforcements
+in shorter moves and keep Kerrigan out of the assault group on
+the next replay. The current cartridge still needs a full win.
+
+The north and south Nydus endpoints are still linked at HOME
+load. During a neutral continuation the northern endpoint falls
+from 198 HP at frame 23,102 to 5 HP at 23,302 and both endpoints
+are gone by 23,327. A transfer through that link remains
+unverified. Test a defense before this loss or use a different
+route for the later reinforcements.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paid training and live arrivals | `059c9080369ec1fb559c41649852769320bc07791555127640a6cc076ed65bce` |
+| Prerequisite check at the first refused producer | `06ff44699e24c36e513ef7d3a38f2a6054e6987ad1dd493c64f448abae47fcce` |
+| Original Den health and loss | `371789bb70f214f9798927c852430c81efa418579881b4a04551e9169364bf65` |
+| Replacement Den and resumed production | `f9f626289b3673e069ef12d3e590a20f59a5fbc2e4cd9b7fe48058c11179b812` |
+| Direct attack | `f2891fa2f0d897df3de3fc7f0a857743884b358b025276cc855f8b21c6566375` |
+| Direct attack waypoint and retry samples | `a8e03004e93b8487552329280a569bcfa0adb8b0ebe1e5990049f60f6ed8802a` |
+| Intermediate waypoint assault | `9998e2fb3d7687270a837992ed13c467293561af661df3282c9651f4b5fd8cfe` |
+| Six-Hatchery production and combined assault | `2c4a9170b5fcee73250217df0308368037ed48883f0baf37144dddf2ffbc9584` |
+| Nydus link and health after load | `e8869ad4815123817c5e73ed9d606b2419b9208d49a076526fcd71ebf59ad204` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
