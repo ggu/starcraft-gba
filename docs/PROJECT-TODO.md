@@ -251,7 +251,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   outside the changed regions. Trial a whole-page reuse path for
   quiet play and keep reducing orders and paint costs for busy
   fights. Include mapped effects, depth ties, camera movement and
-  menu overlays in the reuse checks.
+  menu overlays in the reuse checks. [Forcing reuse on nine
+  certified quiet draws](audits/2026-11-22-native-custom-game-lobby.md#measured-cost-of-skipping-a-certified-quiet-battlefield-draw)
+  brings the mean from 742,158 to 594,804 guest cycles with
+  matching pages and state. Even this idealized test needs
+  33,012 more cycles saved per update for the two-VBlank
+  budget. [Packed sprite pair transfers](audits/2026-11-22-native-custom-game-lobby.md#sequential-transfers-for-packed-sprite-pairs)
+  cut 0.29% from the late loop and exceed the Z10 IWRAM guard.
   The [early Z7 sample](audits/2026-11-22-dense-release-attribution.md#early-z7-movement-and-target-indexing)
   measures 39,280 cycles per target index rebuild and 23,701 within
   its cell-link operation. Preserve canonical chain order in any local
@@ -824,9 +830,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   first differs at a sampled bank check and then restarts from a
   pause-menu shortcut. Resuming 25 unexpected pauses reaches
   defeat at frame 21,782 when an enemy Dark Templar enters the
-  trigger area. Kerrigan is alive. Qualify an ordinary interception
-  before this point, then use the verified mining route to sustain
-  the attack. The earlier HOST retreat loses by frame 59,745.
+  trigger area. Kerrigan is alive. Three [ordinary interception
+  trials](audits/2026-11-12-z8-normal-physical.md#interception-trials-on-the-normal-z10-cartridge)
+  preserve the defending group. Holding farther up the approach
+  improves net damage from five to 19 HP, and an explicit attack
+  matches the same health timeline. Reinforce the position or
+  try earlier detection before resuming the verified mining
+  route. The earlier HOST retreat loses by frame 59,745.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

@@ -182,6 +182,48 @@ costs that still apply in changed regions.
 The local coverage receipt SHA-256 is
 `6e12d781e41aaf1a035851eaf6cb83104f81677043e102dd702811a916471fa2`.
 
+### Measured cost of skipping a certified quiet battlefield draw
+
+A replay-only build skips the battlefield pass for calls
+9,008–9,016, where the stock replay already shows that both
+physical pages are unchanged. The trial keeps simulation, audio,
+the HUD, overlays and page presentation active. All 32 sampled
+states, route counters, both display pages and palette match stock.
+The selected nine updates establish an optimistic timing measurement
+before runtime comparison or invalidation cost. The frame-number
+gate is local to the trial.
+
+| Mean guest cycles | Stock | Reused page |
+| --- | ---: | ---: |
+| Nine certified quiet updates | 742,158 | 594,804 |
+| All 16 earlier updates | 757,329 | 674,445 |
+
+The nine-update mean improves 19.85%, from 22.61 to 28.21
+emulated updates per second. It remains 33,012 cycles above
+the two-VBlank budget before adding a runtime guard. A safe
+implementation needs an exact contributor snapshot and checks for
+camera, fog, page clear, mode and overlay changes. Keep measuring
+orders and shared simulation costs alongside that implementation.
+
+The local attribution SHA-256 is
+`49a33950e9f362fb84529d9fe801811b58e287f66fbcbb4394078fd4d7ab2698`.
+
+### Sequential transfers for packed sprite pairs
+
+An ARM trial fetches two color and opacity pairs per sequential
+ROM transfer. Odd rows begin with one pair. Both host pixel
+fixtures pass, and 32 paired Protoss 10 Melee samples match
+frame, world, routes, both physical pages and palette.
+In the late window, packed raster calls fall from 69,352 to
+64,832 cycles per update. The whole loop falls from 1,350,466
+to 1,346,508, a 0.29% reduction. The earlier mean falls 0.46%.
+The trial increases Protoss 10 static IWRAM by 48 bytes and
+fails the Z10 linker guard for its 11 KiB stack reserve.
+Keep the current loop in the shared builds.
+
+The local attribution SHA-256 is
+`7bb64e17d60efc670423c48b3ca76b01bedb94f6ce1c00eb1aecf401786cbda5`.
+
 ### Restoring old actor pixels to terrain
 
 The same 64 advancing updates also compare the old work page with
