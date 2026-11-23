@@ -980,10 +980,11 @@ allowing one paid Hydralisk order out of three attempted.
 
 Train a southern Overlord to raise capacity from 50 to
 66 and queue three Hydralisks. The neutral branch loses
-at frame 56,579. On a separate branch, the five northwest
-Hydralisks focus the detected Dark Templar at frame
-56,338. It is absent by 56,476, and fresh HOME at frame
-56,627 keeps the mission active past the earlier defeat.
+at frame 56,579. On a separate branch, the Dark Templar
+enters detection at frame 56,338, and the five northwest
+Hydralisks focus it at 56,375. It is absent by 56,476.
+Fresh HOME at frame 56,627 keeps the mission active past
+the earlier defeat.
 The northwest Overlord remains at 200 HP.
 
 The queued Hydralisks complete and another three finish
@@ -992,8 +993,7 @@ retains all six new Hydralisks at 80 HP, Kerrigan at
 400 HP and the three southern production buildings
 at full health. Gas is 484. The old southern detector
 is lost during the wait, cutting capacity to 50 with
-61 used. The new Overlord and northwest detector
-remain. Both objective Nexuses still stand.
+61 used. The new Overlord and northwest detector remain.
 
 | Local receipt | SHA-256 |
 | --- | --- |
