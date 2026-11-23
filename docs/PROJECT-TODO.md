@@ -729,6 +729,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
   updates per second. Foreground picks, the ordinary double-tap,
   six three-CPU matches and 24 fresh Custom Game loads agree.
+  A local P10 armed-type lookup on top of the shared cursor queries saves
+  2.39% and 2.37% in the P9 windows and 1.28% in the P10 tail.
+  The sampled state, display pages and final P10 SRAM match.
+  It frees 440 IWRAM bytes. Generate the facts for each exact
+  feature set and check the other applicable profiles before
+  activating the lookup.
   [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge
