@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_WORKER_CARGO_SAVE_H
 #define SC64_WORKER_CARGO_SAVE_H
+#include "sc64_race_save_unit_edit.h"
 #include "sc64_save_decode_context.h"
 #ifndef SC64_WORKER_CARGO_KIND
 #error "worker cargo save preparation needs explicit cargo semantics"
@@ -21,17 +22,7 @@ race_save_worker_cargo_prepare(RaceSave *candidate, unsigned width,
         if (!sc64_worker_cargo_state_valid(&decoded)) return 0;
         if (!legacy) continue;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
-        if (!sc64_p7_typed_unit_encode(&candidate->units[i],&decoded,width,height)) return 0;
-#elif defined(SC64_Z7_DERIVED_SAVE)
-        if (!sc64_derived_unit_encode(&candidate->units[i],&decoded,width,height)) return 0;
-#else
-        if (!sc64_zp_unit_save_encode(&candidate->units[i],&decoded,width,height)) return 0;
-#endif
-#else
-        if (!sc64_unit_save_encode(&candidate->units[i],&decoded,width,height)) return 0;
-#endif
+        if (!race_save_encode_unit(candidate,i,width,height,&decoded)) return 0;
 #else
         /* Only flags change; preserve every historical word verbatim. */
         candidate->units[i][offsetof(Unit,flags)/sizeof(int)]=(s16)decoded.flags;

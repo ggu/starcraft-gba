@@ -1256,29 +1256,7 @@ static int race_battery_save_unit(const RaceSave *candidate, unsigned slot,
     return 1;
 #endif
 }
-static int race_battery_save_encode_unit(RaceSave *candidate, unsigned slot,
-                                         unsigned ww, unsigned wh, const Unit *q)
-{
-    if (!candidate || !q || slot>=MAX_UNITS) return 0;
-#ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
-    return sc64_p7_typed_unit_encode(&candidate->units[slot],q,ww,wh);
-#elif defined(SC64_Z7_DERIVED_SAVE)
-    return sc64_derived_unit_encode(&candidate->units[slot],q,ww,wh);
-#else
-    return sc64_zp_unit_save_encode(&candidate->units[slot],q,ww,wh);
-#endif
-#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-    return sc64_unit_save_encode(&candidate->units[slot],q,ww,wh);
-#else
-    (void)ww; (void)wh;
-    for (unsigned j=0;j<RACE_UNIT_WORDS;++j) {
-        int n; memcpy(&n,(const u8 *)q+j*sizeof(int),sizeof(n));
-        candidate->units[slot][j]=(s16)n;
-    }
-    return 1;
-#endif
-}
+#include "sc64_race_save_unit_edit.h"
 static int race_battery_save_building(const RaceSave *, unsigned, Building *);
 static int race_battery_save_encode_building(RaceSave *candidate, unsigned slot,
                                              unsigned ww, unsigned wh,
@@ -1338,8 +1316,8 @@ static int race_battery_migrate_shield_phase(RaceSave *candidate, int width, int
         if (!rule || !rule->shields || legacy_p7) continue;
         if (actor.shield_remainder<0 || actor.shield_remainder>=320) return 0;
         actor.shield_remainder*=4;
-        if (!race_battery_save_encode_unit(candidate,i,(unsigned)width*16u,
-                                           (unsigned)height*16u,&actor)) return 0;
+        if (!race_save_encode_unit(candidate,i,(unsigned)width*16u,
+                                   (unsigned)height*16u,&actor)) return 0;
     }
     candidate->state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]=SC64_SHIELD_PHASE_SAVE_MARKER;
     return 1;
