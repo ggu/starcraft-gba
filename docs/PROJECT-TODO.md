@@ -760,10 +760,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   All 12 snapshots match the archived field and display checks.
   [P10 on the same cartridge](audits/2026-11-13-normal-campaign-matrix.md#p10-on-the-packaged-protoss-cartridge)
   wins from the retained frame-36,761 pause and re-exports its result.
-  The historical full HOME route first differs in gas at frame
-  17,263 and diverges before victory. Regenerate the opening from
-  the current controls and verify a fresh start through the win.
-  Apply these result checks to the remaining missions on the current builds.
+  The [regenerated full HOME route](audits/2026-11-13-p10-normal-home.md#november-23-packaged-full-home-win)
+  wins from a fresh start at frame 93,377 with all 37 checkpoints
+  matching. It restores both the frame-30,847 pause and the victory
+  journal. Apply these result checks to the remaining missions on
+  the current builds.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints
   through victory. Separate fresh HOME loads restore the in-progress
