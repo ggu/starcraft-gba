@@ -89,6 +89,23 @@ and movement work. Use an ordinary gameplay replay before making
 any frame-pacing claim. The local timing receipt SHA-256 is
 `6f14d292d8991570f05be996ce860df68741779708aa1325e8e7510778345f5f`.
 
+The authored Transit Yard three-CPU replay uses the same title,
+setup and ordinary controller tape on Foundry. Both configurations
+select map 0, player 0 and CPU factions 1, 2 and 0. Their state
+differs by controller update 2,000. The baseline wins at game
+frame 14,727. The contention build wins at game frame 12,502,
+between controller updates 12,660 and 12,680. Later inputs on
+the full tape start a new game in the contention build.
+
+Through controller updates 100–12,000 the baseline averages
+29.446 emulated updates per second and the contention build
+averages 29.518. Gameplay diverges during this window, so the
+cadences describe the two runs and leave the isolated runtime
+cost to the authored order-pass fixture. The baseline receipt
+SHA-256 is `a17fcbf041ccef18522ee21335482e349782751e100e0b92b020502be394d7db`.
+The finer candidate victory receipt is
+`3b7f303aadb28f2b98868fe6d8ee3ae3841d369873289ea7068cc6c3b8525d2b`.
+
 The prototype stays opt-in. Qualify the opening with duplicate
 valid targets, exact native alternate ranking, ordinary saves
 and reloads, campaign income, and busy Custom Game timing before

@@ -309,6 +309,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   catches an approaching worker changing its target while another
   worker holds the old patch. The [shared contention prototype](audits/2026-11-21-blood-bath-worker-opening.md#shared-mineral-contention-prototype)
   preserves held timers and checks for reachable free alternatives.
+  Both variants win the authored Transit Yard three-CPU tape,
+  with different economy states and victory frames.
   Qualify duplicate opening targets, the native alternate ranking,
   ordinary saves and reloads, and busy game cost before enabling it.
   The [shared steering change](audits/2026-11-22-open-steering-directions.md)
