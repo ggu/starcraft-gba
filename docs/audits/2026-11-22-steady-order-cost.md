@@ -395,6 +395,88 @@ mixed visible workload before adding draw-time scanning.
 | Aligned zero-word run fixture | `dda33f09302607cf627cf5ef8104941b8c04ec12b43a9c3bd3f677be3a49ecac` |
 | Mixed run with misaligned destinations | `0e5be3c3c2ac1494deed16d1414052f9c008228c8c2bcce26e2b6ffc478a0cfb` |
 
+### Precomputed row bounds
+
+An optional compositor reads the first and last opaque source
+column for each row. It skips empty rows and reads the phase
+words only between the clipped endpoints. The packed frame
+layout stays the same. A local converter emits the bounds
+only when explicitly requested and returns them only for a
+matching raster. Authored host fixtures passed 2,372
+differential cases with scene clipping and again without it.
+The ARM trial compared every pixel on the destination page
+against a scalar oracle for all eight authored fixtures in
+all three builds.
+
+| Authored case, cycles per draw | Existing packed IWRAM | Bounded ROM | Bounded IWRAM |
+| --- | ---: | ---: | ---: |
+| Sparse 32×24 | 4,870 | 9,206 | 3,285 |
+| Blank 48×24 | 6,006 | 1,942 | 693 |
+| Dense 32×24 | 5,598 | 18,886 | 6,693 |
+| Two transparent columns at each edge | 5,214 | 15,862 | 5,493 |
+| Sparse 31×25, odd destination | 5,074 | 9,719 | 3,466 |
+| Sparse left clip | 4,056 | 9,208 | 3,287 |
+| Sparse right clip | 3,518 | 8,198 | 2,885 |
+| Sparse vertical HUD clip | 2,548 | 4,868 | 1,763 |
+
+The IWRAM trial uses 608 additional bytes of that section.
+The ROM placement costs more on every tested nonempty
+fixture. The IWRAM placement saves 18–33% on the sparse
+cases, costs 20% on dense art and costs 5% when only two
+columns are transparent at each edge. Keep both paths local.
+Before spending IWRAM on a second compositor, price a
+whole-frame crop on a mixed scene, where transparent edges
+are often too narrow to skip an aligned word.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored ARM runner | `f6361053fe49b323f475802d942ab0928cbee18ef300f3fe408c5f0fe5677385` |
+| ARM timing results | `7ceaac2e92c4db13c29bffd6bf9d81c413f7cb526a84fc28d0791eab6b9311d8` |
+
+### Whole-frame transparent crop
+
+This trial removes the outer rectangle of transparent
+pixels before phase packing. The draw adds the crop's
+left and top to the original destination and uses the
+existing packed compositor. All 11 authored cases in
+both ARM builds match the scalar oracle across the full
+destination page. The mixed fixture includes dense and
+blank controls. The draw wrapper reads a frame pointer
+in both builds and loads two signed offsets in the crop
+build. Empty images use their original frame.
+
+| Authored case, cycles per draw | Original | Cropped |
+| --- | ---: | ---: |
+| Sparse 32×24 | 4,905 | 2,463 |
+| Dense 32×24 | 5,633 | 5,663 |
+| Narrow transparent edge | 5,249 | 4,463 |
+| Sparse 31×25, odd destination | 5,109 | 2,599 |
+| Sparse right clip | 3,553 | 2,063 |
+| Small 12×14 | 1,699 | 1,207 |
+| Dense 12×14 | 1,853 | 1,883 |
+
+The two offset loads and additions cost 30 cycles in the
+dense controls. IWRAM section size remains 5,680 bytes in
+both fixtures. The measured gains cover authored draws only.
+
+The read-only census of all 16 retained late P10 Melee cuts
+(11,385–11,400) checks the widest and tallest opaque extent
+in each recorded call. All 319 packed draws use tight
+rectangles already, for zero removable groups across
+182,468 groups counted against all four phases. One of 321
+byte draws has five removable pixel slots out of 160,965
+in the sample. Keep the crop prototype local. If a future
+bank has measurable whole-frame margins, preserve frame
+identity, apply offsets after mirroring and drawing
+placement, and align culling with the rendered pixels.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Crop fixture with runtime offset loads | `2cc7dad7146efea171ffb67fd5722f4c55254e1fcea3b20cfa68e411104ebb67` |
+| ARM timing results | `5f9e32c37499c07a60ab8fe2343f1217eca70542efc9c2e9e5aed581edcb2eea` |
+| Retained P10 Melee source-call evidence | `7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970` |
+| Crop census | `760de111b9dfc950b6c5c662ab6e9bde00a15c0b8aaa4296a7621ec322bdc222` |
+
 ## Shared heading for projectiles and unit facing
 
 Projectile creation and delayed-impact launch now use the same
