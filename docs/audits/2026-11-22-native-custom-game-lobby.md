@@ -111,6 +111,42 @@ which contact queries recur as units move between cells.
 | Zero-width audio shortcut | `5e5f894297453c646e9365750629f2133439126ede99fd851593ec52a17b4345` |
 | Single-direction contact bound | `24c992c419e196db6be74229ac4372a25bea01808439f8a9352bcca9ede9697a` |
 
+## Same-page battlefield changes during Melee
+
+Replaying the same four windows with both Mode 4 page addresses
+observed independently gives these mean changes on the work page.
+The camera and palette stay fixed throughout. The work page is
+identified by the renderer's backbuffer index. The other physical
+page stays byte-identical, including at two samples where DISPCNT
+still shows the previous displayed page.
+
+| Window | Draws with identical battlefield pixels | Changed rows | Changed 16×16 tiles | Contiguous tile spans | Changed pixels |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Terran 9,001–9,016 | 15/16 | 0.06 | 0.06 | 0.06 | 0.06 |
+| Protoss 9,001–9,016 | 12/16 | 1.13 | 0.25 | 0.25 | 7.13 |
+| Terran 11,385–11,400 | 0/16 | 86.69 | 30.19 | 7.94 | 2,039.94 |
+| Protoss 11,385–11,400 | 0/16 | 83.75 | 30.56 | 8.56 | 1,695.19 |
+
+The battlefield has 108 rows and 105 tiles, including the shorter
+bottom row. Identical final pixels are an upper bound on safe reuse.
+An exact damage tracker must retain per-page contributor coverage,
+invalidate both old and new bounds when a contributor changes, and
+redraw every intersecting contributor in painter order. The late
+windows leave approximately 585,000 Terran cycles and 772,000 Protoss
+cycles after subtracting all renderer time. The 30 fps goal in these
+windows also requires cheaper orders and other simulation work.
+
+An alternate sprite loop reads aligned source pairs as halfwords.
+Both host pixel and 32 ARM state/display checks pass. The first
+version exceeds the IWRAM guard. A smaller version fits and reduces
+Protoss IWRAM by 24 bytes, while increasing the earlier and late
+update costs by 0.02% and 0.07%. Keep the existing loop.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Same-page battlefield census | `c186965ee7f40727d40d5e6c016459cfb2268694a009c22d6f4340f9994912df` |
+| Halfword source trial | `ebba58f187ebbc9f59072b4b9e04bbadaaf4f09f2d683b0935bc03ce4c82a955` |
+
 ## Normal cartridge integration candidate
 
 The four normal build recipes enable the same existing lobby mode
