@@ -39,3 +39,50 @@ all 61 named observations in that prefix.
 | Combined Blood Bath replay | `7bbe1bda3c207236474a24b09fde9e77974ca3e181bf73350dd53c7fd6889f66` |
 | Custom Game fresh HOME matrix | `31fa35ccba191e0b299c2dc4b5e3ae8094e97ecd2367339eda288f87b44e5caa` |
 | Combined Z7 named prefix | `d509b47a6381c0f148d79eeba2198b66f82c0d68dbce9478316e12b7c56e79fe` |
+
+## Reuse the prepared walk grid
+
+The intended-step terrain check prepares the walk grid
+before blocked steering. The contact query and its memo
+leave the grid alone. Read it directly for each open
+direction that can improve the current score, with the
+existing bounds and same-cell allowance. Keep the exact
+squared distance, direction order and tie rule.
+
+An ASan/UBSan fixture extracting both source loops
+matches all 393,216 selected directions and non-origin
+terrain probe sequences across three map geometries.
+The fixture exercises every open mask, speed zero,
+blocked cells, equal scores and map edges.
+
+A separate authored ARM fixture compares 512 selections
+per batch. The mixed batch uses the direction counts
+observed in 503 steering calls across 16 retained Outpost
+updates. The walk grid is valid before and after every
+call. The most common counts are five open directions
+(169 calls) and three (102 calls), with 29 empty masks.
+All recorded world, video, palette and route cuts match
+the retained replay. The timing batches use authored
+terrain and the matching tested compiler settings.
+
+| Candidate directions | Normal cycles, before → after | Size-optimized cycles, before → after |
+| --- | ---: | ---: |
+| None | 44,096 → 47,680 | 59,456 → 63,552 |
+| One | 131,751 → 128,636 | 138,523 → 136,432 |
+| Random masks | 247,896 → 219,660 | 260,704 → 243,568 |
+| Seven | 342,278 → 294,765 | 358,717 → 330,934 |
+| Observed mask-count mix | 228,000 → 203,592 | 240,963 → 226,616 |
+
+The isolated empty-mask fixture costs more. The mixed
+batch saves 10.7% and 6.0% respectively. This measures the
+selection loop, and full-game and cartridge timing are
+still open. An earlier exact linear-distance rewrite
+raises the authored selection costs and stays local.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored ARM fixture | `d63e0295ab0bb6ff829dedd81cabc1e4d41227ab4dd8dddf02a217f138697f37` |
+| ARM timing output | `c7a072a5ec2114046e3b6a73e28ba48f0ea8085a3b62625c3f179d950365c0ff` |
+| Exact-source differential driver | `a28da5db3e2b862b406a7da8eed286f763436ca790d918bcc70203c446d83438` |
+| Outpost steering masks and grid validity | `f75c75ed516a7e4c4de13592a82e42204f8832dad5548f93eb348730ceb41971` |
+| Rejected linear-ranking timings | `c03e256e5276b342ccf6f57600be5c2bae130649479ef3817354b2d55f1d985a` |

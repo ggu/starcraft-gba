@@ -78,6 +78,33 @@ bank credit unresolved.
 
 ## GBA follow-up
 
+### Ordinary predecessor save with simultaneous service
+
+Start an ordinary Custom Game on Blood Bath in the
+normal Terran transport ROM. Double-tap A on an opening
+SCV to select four workers, then order them to the
+visible mineral patch 12. At game frame 125 two empty
+SCVs target that patch in the same mining order, with
+remaining timers of 31 and 44. A third is still arriving
+and the fourth has cargo.
+
+An ordinary pause save and a separate fresh HOME load
+restore both work records at frame 125. After 100 neutral
+updates the uninterrupted and resumed runs match all
+recorded live-unit and building fields, mineral bytes
+and player and race wallets. This is a predecessor
+save fixture for maintaining concurrent legacy service
+while introducing a new explicit policy.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Ordinary Terran ROM | `f2b98f3e36f03999743304366285a3f09b5b64b78dac6e71a9658b437c09d97a` |
+| Contested patch and fresh HOME receipt | `b129dedbbae6cb558ca5c8160fae56dca2f4baeb0bcaa285c87d01da9627bf5e` |
+| Legacy two-timer SRAM | `67663cce0b7c3e38c8a49bbfdb46e1a6cb79bbf4da9be8936b6a25fa6a552759` |
+| Physical-button driver | `1c79baedf55e2078dbc8aab6aa71e714caf149fc9c807c9675d757c29e5c18e6` |
+
+### Shared policy design
+
 The shared GBA gather path starts an individual mineral wait at contact.
 Multiple ready workers can start timers on a single patch. Its
 `worker_continue_minerals` separately handles depleted destinations
@@ -99,10 +126,18 @@ the claim at zero. Matching native FIFO across fresh loads requires
 retaining queue order. Preserve that order
 explicitly if the prototype promises it.
 
+The optional patch-contention flag currently reconstructs
+a claim from in-range nonzero timers each update, favoring
+the lowest eligible slot when timers overlap. A waiting
+worker may seek a free alternative every 16 updates.
+The flag has no persisted mode marker or wait-list order.
+The native service and the ordinary predecessor fixture
+provide separate acceptance cases for the next policy.
+
 Use two or more same-patch workers in each race. Check a save with one
 worker in service and two waiters, then continue through the exact
-handoff, deposit, and later pickup. Add cancellation and exhaustion cuts
-and a predecessor save with two positive timers. Compare uninterrupted
+handoff, deposit, and later pickup. Add cancellation and exhaustion cuts.
+Use the predecessor save above to verify both legacy timers. Compare uninterrupted
 and fresh HOME continuations on every normal product before activation.
 Check the normal opening and AI economy timings separately.
 
