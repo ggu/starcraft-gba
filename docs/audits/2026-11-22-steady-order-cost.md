@@ -661,6 +661,17 @@ stays at 50 through neutral update 73 and reaches 58 at update 74,
 after 2.470 seconds measured by the emulated GBA main-loop clock.
 It has 114 minerals at 9.027 seconds and 122 at 11.034 seconds.
 
+A fresh N64 session repeats the qualified Blood Bath input
+through runner step 6,409. Its three RAM captures at steps
+6,000, 6,309 and 6,409 and the video requested at steps
+4,500 and 5,600 match the retained run byte for byte. The
+controller tape also matches. The observer verifies the
+hybrid transition and completes within its 64 MiB output cap.
+This reproduces the existing first-credit bracket. The
+exact native game update remains unknown.
+The local input receipt SHA-256 is
+`7eb5d4fea7d80b864a41711ddc944a1974170960dd794fc8195c2cb8928b0c77`.
+
 A further native replay with the same hall anchors shows 66 minerals
 beside elapsed-seconds value 19 and 90 beside value 28. The GBA
 wallet for elapsed second 19 ranges from 186 to 194, and its wallet
