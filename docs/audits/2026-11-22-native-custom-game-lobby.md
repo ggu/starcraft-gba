@@ -147,6 +147,41 @@ update costs by 0.02% and 0.07%. Keep the existing loop.
 | Same-page battlefield census | `c186965ee7f40727d40d5e6c016459cfb2268694a009c22d6f4340f9994912df` |
 | Halfword source trial | `ebba58f187ebbc9f59072b4b9e04bbadaaf4f09f2d683b0935bc03ce4c82a955` |
 
+### Sprite coverage on the current physical pages
+
+The `1f0ad66e` Protoss 10 cartridge reaches the same neutral
+three-CPU Melee windows on ordinary inputs. Breakpoints at the
+sprite compositors record the screen rectangle, source identity,
+clip and call order. Treat non-ROM pixel or lookup addresses as
+changed. The 24 cuts match the control frames, route counters,
+world summaries, both display pages and palette.
+
+The model follows each physical work page. It marks a region when
+its ordered sprite contributions change or its final pixels differ.
+The first two cuts in each window initialize the two pages. Values
+below cover the remaining ten draws per window. Sprite area
+counts overlapping rectangles independently. The whole-call count
+lists rectangles that avoid every marked region. The area column
+also counts portions of calls that intersect a marked region.
+
+| Window and region | Mean regions marked | Whole calls outside marked regions | Sprite area outside marked regions |
+| --- | ---: | ---: | ---: |
+| Earlier, 16×16 | 0.3 | 60 of 61 | 99.98% |
+| Late, 8×16 | 65.2 | 50 of 402 | 24.42% |
+| Late, 16×16 | 39.6 | 50 of 402 | 21.35% |
+| Late, 32×16 | 24.0 | 50 of 402 | 19.87% |
+
+All 50 whole-call skips in the late window are byte-sprite
+compositions. All 195 packed-word calls intersect a marked region.
+This measures rectangle area on the sampled workload. A shipping
+tracker also needs terrain, shapes, text and overlay coverage.
+Measure a fixed-camera whole-page fast path in the quiet window
+and keep late battle optimization focused on paint and simulation
+costs that still apply in changed regions.
+
+The local coverage receipt SHA-256 is
+`6e12d781e41aaf1a035851eaf6cb83104f81677043e102dd702811a916471fa2`.
+
 ### Restoring old actor pixels to terrain
 
 The same 64 advancing updates also compare the old work page with
@@ -213,6 +248,63 @@ interrupts active. Keep Thumb decoding in the shared builds.
 | --- | --- |
 | Packaged Thumb control | `45a99a47d032f7004a61d8af6a9b44d0d6dc84de7bb70b967d778d775786b302` |
 | First-order ARM trial | `c87a93d27a4b4888b61a6295a79d168fa5747cbf3854569cdc801023d1526084` |
+
+### Packed saturation in the shared mixer
+
+A second trial replaces the scalar clipping fallback in the packed
+PCM mixer. A sanitized scalar comparison checks 1,890,318 pairs of
+reachable lane sums from two, three and four voices. The mixer
+fixture passes and the Protoss 10 memory endpoints match stock.
+Both paired ARM observers agree at all 32 samples for frame, world
+state, route counters, both video pages and palette.
+
+| Mean guest cycles | Earlier, stock | Earlier, trial | Late, stock | Late, trial |
+| --- | ---: | ---: | ---: | ---: |
+| Whole loop | 757,329 | 758,107 | 1,350,466 | 1,347,383 |
+| Audio IRQ | 17,924 | 18,704 | 119,261 | 116,179 |
+
+The late window saves 0.23% across the whole loop. The earlier
+window rises 0.10% and includes one more audio interrupt across
+16 updates. Keep the trial local and concentrate on the shared
+orders and actor composition costs.
+
+The local trial attribution SHA-256 is
+`a7bec653dfdcdf0e1053c92b4e04680803b33d2363a34ee45c7f1505fbbbd49f`.
+
+### Occupancy checks for steering rows
+
+The address census at the actual steering bucket-head load covers
+calls 11,385–11,387 on the packaged Terran cartridge. Of 104 row
+spans, nine are empty, and dropping them would avoid 15 of the
+184 bucket-head byte loads. A separate row bitmap would require
+104 additional word loads and 2,048 bytes of EWRAM for the
+128-by-128 grid. World state, route counters, both display pages
+and palette match the stock run in all three updates.
+
+Keep the existing steering traversal. The census covers steering
+queries. Measure direct queries separately before changing their
+traversal.
+
+### Coalesced visible runs in the effect raster
+
+The trial groups consecutive visible tiles into runs shared by a
+whole tile row. It clips the runs at the screen and map edges and
+reverses source rows only when they have visible pixels. The
+sanitized raster fixture checks the bound on visibility reads and
+matches a pixel oracle with a 256-pixel crop across alternating
+visible tiles, both edges and a reversed frame. The existing mapped
+and unmodified raster checks pass.
+
+The current Protoss 10 Melee trial matches frame, state, route
+counters, both Mode 4 pages and palette at all 32 samples. Both
+static RAM endpoints match. The earlier mean stays at 757,329
+guest cycles. The late mean falls from 1,350,466 to 1,350,404,
+and the raster itself falls from 44,619 to 44,544 cycles. The
+visible portion of each effect still requires the same composition.
+Keep the trial local.
+
+The local attribution SHA-256 is
+`61438e1f78b36c7b72c503917ad4b0ca7ef5ef5cdeb8daf15c18eaff08b94aa2`.
 
 ### Reusing actor admission during the draw
 
