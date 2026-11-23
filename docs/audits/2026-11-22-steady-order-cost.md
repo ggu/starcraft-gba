@@ -764,9 +764,16 @@ Both replays match the retained world, both framebuffer pages, palette
 and route samples. The 105 viewport rejections consume 25,565 guest
 cycles from raster entry to return, about 3,196 per update. That leaves
 little headroom inside the final check. Neither workload exercises
-partial fog. Keep the trial local. Measure time spent preparing effect
-draws before the viewport check, then pair any earlier rejection with
-a visible-fight holdout.
+partial fog. Keep the trial local.
+
+A nested trace of the same eight Outpost updates attributes all 105
+rejected rasters to 82 of 426 tracer calls. Those 82 calls spend
+511,770 guest cycles from tracer entry to their first raster,
+about 63,971 per update. All 426 tracer calls together cost 787,611
+cycles. The preparation total includes any timeline and overlay
+work needed by the painter, so it is an attribution, not a savings
+estimate. Identify work that an earlier bound can safely skip, and
+qualify unchanged depth ordering and trail picks in a visible fight.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -775,6 +782,7 @@ a visible-fight holdout.
 | Separate fallback ARM results | `b61bede9e95f61e803d4ef659ff932b0992b8acf31f81683be1dbb2237638123` |
 | Outpost raster census | `d0d360dc2a3da44aabbf82823dc2cd967bc2df075cfad0b0a42a1d7cc30200db` |
 | Outpost raster entry-to-return timing | `8c42be687db0ef0b77890733bcc1da1ba4525bd5328717c123ad15528904056d` |
+| Outpost nested tracer timing | `f294995a856fe7b7807377ef5c7d6937645fd484aefc2008b26389e2435ef713` |
 | Crossfire raster census | `ba93b109c4b900c94c13aa64557dfb0148bce73091acc26e8d2926f827752e8b` |
 
 ## Outpost resource sprite costs
