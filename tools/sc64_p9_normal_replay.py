@@ -21,6 +21,21 @@ from sc64_skirmish_sram_continuation import (
 )
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
+MIB = 1024 * 1024
+FILE_LIMIT = 16 * MIB
+OUTPUT_BUDGET = 32 * MIB
+DISK_RESERVE = 256 * MIB
+
+
+def check_storage(out, pending=0):
+    used = sum(p.stat(follow_symlinks=False).st_blocks * 512
+               for p in out.rglob('*')) if out.is_dir() else 0
+    if used + pending > OUTPUT_BUDGET:
+        raise RuntimeError('P9 replay exceeded its 32 MiB output budget')
+    if shutil.disk_usage(out.parent).free < DISK_RESERVE + OUTPUT_BUDGET - used:
+        raise RuntimeError('P9 replay needs 256 MiB free plus its remaining output budget')
+
+
 def main():
     if not __debug__:
         raise RuntimeError("Replay validation requires Python assertions")
@@ -31,8 +46,10 @@ def main():
     parser.add_argument('--stop', type=int, help='stop after this many calls instead of replaying to victory')
     parser.add_argument('--fresh-save', action='store_true',
                         help='resume the tape from a real pause-menu save in a new emulator process')
+    parser.add_argument('--verify-result-save', action='store_true',
+                        help='also verify and reload the victory journal after a full fresh-save replay')
     args = parser.parse_args()
-    resource.setrlimit(resource.RLIMIT_FSIZE, (16 * 1024**2, 16 * 1024**2))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (FILE_LIMIT, FILE_LIMIT))
     files = (args.trace, args.pages, args.rom, args.elf, args.runner, Path(__file__),
              Path(__file__).with_name('sc64_p10_tape_save.py'))
     pins = input_hashes(files)
@@ -41,6 +58,8 @@ def main():
     stop = plan['stop'] if args.stop is None else args.stop
     if not 0 < stop <= plan['stop']:
         parser.error('--stop must fall within the tape')
+    if args.verify_result_save and (not args.fresh_save or stop != plan['stop']):
+        parser.error('--verify-result-save requires a full --fresh-save replay')
     save_cut = save_window(plan, stop) if args.fresh_save else None
     assert plan['final']['screen'] == 3 and plan['final']['won'] == 1 and not plan['final']['lost']
     records = defaultdict(list)
@@ -78,20 +97,24 @@ def main():
     campaign = dwarf_struct_layout(args.elf, 'Sc64RaceCampaignState')[1]
     runtime = dwarf_struct_layout(args.elf, 'Sc64P9PersistentState')[1]
     runner_size, runner = dwarf_struct_layout(args.elf, 'Sc64P9Runner')
+    if save_cut:
+        _, layout = dwarf_struct_layout(args.elf, 'RaceSave')
+    check_storage(args.out)
     args.out.mkdir()
+
     def open_game(name, **options):
+        check_storage(args.out)
         guest = args.out / name
         guest.mkdir()
         (guest / 'headless.log').symlink_to('/dev/null')
         return PhysicalGame(args.runner, args.rom, args.elf, guest, **options)
 
     save_path = args.out / 'p9-pause.sav'
+    victory_path = args.out / 'p9-victory.sav'
     g = open_game('guest', **({'save_output': save_path} if save_cut else {}))
     r, sym, sizes = g.rsp, g.sym, g.sizes
     transitions, offset, journal, prefix = plan['transitions'], 0, None, None
-    saved_world = None
-    if save_cut:
-        _, layout = dwarf_struct_layout(args.elf, 'RaceSave')
+    saved_world = pause_image = victory_journal = None
 
     def n(k, layout=None, field=None):
         off = 0 if layout is None else layout[field]
@@ -106,6 +129,17 @@ def main():
         return dict(world=world, campaign=r.read(sym['race_p9'], sizes['race_p9']),
                     controls={k: n(k) for k in ('cx', 'cy', 'camx', 'camy',
                                                  'mode', 'selected_building', 'menu_open', 'menu_last')})
+
+    def journal_bank(image, index, expected_frame, victory):
+        inner, outer = P10_CARGO_TAGS
+        payload = slot(image, index, outer, index + 1)
+        assert len(payload) >= layout['state'] + 80
+        assert struct.unpack_from('<I', payload, layout['version'])[0] == inner
+        state = struct.unpack_from('<20I', payload, layout['state'])
+        assert (state[0], state[1], state[2], state[7]) == (0, 2, 28, expected_frame)
+        assert (state[3], state[18], state[19]) == (int(victory) << 28, int(victory), 0)
+        return dict(frame=expected_frame, sequence=index + 1, payload_bytes=len(payload),
+                    tag=f'{outer:#010x}', sha256=hashlib.sha256(image).hexdigest())
 
     def modal():
         return struct.unpack('<4H', r.read(0x06013FE0, 8))
@@ -147,8 +181,7 @@ def main():
         if save_cut:
             boundaries.update(save_cut)
         for call in sorted(boundaries):
-            if shutil.disk_usage(args.out).free < 4 << 30:
-                raise RuntimeError('disk guard')
+            check_storage(args.out)
             r.play_to(call + offset, transitions)
             if save_cut and call == save_cut[0]:
                 count, _, armed, _ = modal()
@@ -158,23 +191,20 @@ def main():
             if save_cut and call == save_cut[1]:
                 assert n('screen') == 2 and n('pause_notice') & 0xc0 == 0x40 and r.held == 0
                 assert saved_world == persisted_world(), 'ordinary pause changed the saved world'
+                check_storage(args.out)
                 r.export_sram()
-                image = save_path.read_bytes()
-                inner, outer = P10_CARGO_TAGS
-                payload = slot(image, 0, outer, 1)
-                assert image[SLOT_SIZE:] == b'\xff' * SLOT_SIZE
-                assert len(payload) >= layout['state'] + 32
-                assert struct.unpack_from('<I', payload, layout['version'])[0] == inner
-                state = struct.unpack_from('<8I', payload, layout['state'])
-                assert (state[0], state[2], state[7]) == (0, 28, saved_world['world']['frame'])
-                assert state[7] + 1 == plan['save']['frame']
-                journal = dict(call=call, frame=state[7], sequence=1, payload_bytes=len(payload),
-                               tag=f'{outer:#010x}', sha256=hashlib.sha256(image).hexdigest(),
-                               under_construction=plan['save']['under_construction'])
+                pause_image = save_path.read_bytes()
+                assert pause_image[SLOT_SIZE:] == b'\xff' * SLOT_SIZE
+                saved_frame = saved_world['world']['frame']
+                assert saved_frame + 1 == plan['save']['frame']
+                journal = dict(call=call, under_construction=plan['save']['under_construction'],
+                               **journal_bank(pause_image, 0, saved_frame, False))
                 prefix = timing_delta(before, timing_snapshot(r, sym, sizes), call)
                 g.close()
+                assert g.proc.returncode == 0, 'pause runner failed to exit cleanly'
                 g = None
-                g = open_game('fresh', save_input=save_path)
+                g = open_game('fresh', save_input=save_path,
+                              save_output=victory_path if args.verify_result_save else None)
                 r, sym, sizes = g.rsp, g.sym, g.sizes
                 before = timing_snapshot(r, sym, sizes)
                 assert n('screen') == n('frame') == g.front_field('page') == 0
@@ -186,7 +216,7 @@ def main():
                 offset = r.completed - (call + 1)
                 transitions = [(tick + offset, mask) for tick, mask in transitions if tick > call]
                 (args.out / 'save-cut.json').write_text(json.dumps(journal, indent=2) + '\n')
-                print('Reloaded', call, 'at frame', state[7], 'from fresh HOME', flush=True)
+                print('Reloaded', call, 'at frame', saved_frame, 'from fresh HOME', flush=True)
             rows = checks.get(call, ())
             active = modal() if rows else None
             for row in rows:
@@ -215,6 +245,7 @@ def main():
                     expected = {k: row[k] for k in obs}
                     if obs != expected:
                         (args.out / 'divergence.json').write_text(json.dumps(dict(row=row, expected=expected, observed=obs), indent=2) + '\n')
+                        check_storage(args.out)
                         raise ValueError(f'first observed divergence at {call}: {obs} != {expected}')
                     observations.append(dict(call_index=call, label=row['label'], **obs))
                     print('Matched', call, row['label'], obs['frame'], 'switches', obs['switches'], flush=True)
@@ -231,17 +262,54 @@ def main():
             assert result_state['switches']&3==3 and result_state['faults']==0
             assert runner_size > runner['outcome']
             assert r.read(sym['race_p9'] + runtime['runner'] + runner['outcome'], 1) == b'\x01'
-        require_unchanged(files, pins)
         timing = timing_delta(before, timing_snapshot(r, sym, sizes), stop - (save_cut[1] if save_cut else 0))
         if save_cut:
-            assert journal and hashlib.sha256(save_path.read_bytes()).hexdigest() == journal['sha256']
+            assert journal and save_path.read_bytes() == pause_image
             timing = join_timing(prefix, timing)
+        if args.verify_result_save:
+            victory_world = persisted_world()
+            check_storage(args.out)
+            r.export_sram()
+            victory_image = victory_path.read_bytes()
+            assert victory_image[:SLOT_SIZE] == pause_image[:SLOT_SIZE], 'victory overwrote the pause bank'
+            victory_journal = journal_bank(victory_image, 1, n('frame'), True)
+            g.close()
+            assert g.proc.returncode == 0, 'victory runner failed to exit cleanly'
+            g = None
+            readback = args.out / 'p9-victory-readback.sav'
+            g = open_game('victory-load', save_input=victory_path, save_output=readback)
+            r, sym, sizes = g.rsp, g.sym, g.sizes
+            assert n('screen') == n('frame') == g.front_field('page') == 0
+            g.step(KEY_L)
+            assert (n('screen'), n('won'), n('lost'), n('race_completed')) == (3, 1, 0, 1 << 28)
+            loaded = persisted_world()
+            assert loaded == victory_world, ('victory reload diverged',
+                                            [k for k in loaded if loaded[k] != victory_world[k]])
+            g.step(0, 8)
+            assert n('screen') == 3 and persisted_world() == loaded
+            check_storage(args.out)
+            r.export_sram()
+            assert readback.read_bytes() == victory_path.read_bytes() == victory_image
+            victory_journal.update(fresh_load=True, neutral_result_updates=8)
+        require_unchanged(files, pins)
         result = dict(status='won' if result_state else 'prefix', calls=stop, briefing=briefing,
                       pages=pages, checkpoints=observations, final=result_state, sha256=pins, timing=timing)
         if journal:
             result['fresh_save'] = journal
             result['post_load_checkpoints'] = sum(row['call_index'] > journal['call'] for row in observations)
-        (args.out / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
+        if victory_journal:
+            result['victory_autosave'] = victory_journal
+        g.close()
+        assert g.proc.returncode == 0, 'replay runner failed to exit cleanly'
+        g = None
+        report = (json.dumps(result, indent=2) + '\n').encode('utf-8')
+        assert len(report) <= FILE_LIMIT, 'P9 replay report exceeds its per-file limit'
+        check_storage(args.out, pending=len(report))
+        temporary = args.out / 'result.tmp'
+        with temporary.open('xb') as file:
+            file.write(report)
+        check_storage(args.out)
+        temporary.rename(args.out / 'result.json')
         print(result['status'], stop, len(briefing), len(pages), len(observations), result['timing'], flush=True)
     finally:
         if g is not None:
