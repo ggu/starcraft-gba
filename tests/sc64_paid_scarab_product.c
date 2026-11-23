@@ -13,6 +13,8 @@
  *   recharge, shuttle a recharging Reaver with a part-built Scarab saves and loads; a loaded Reaver dies
  *                     with its Shuttle and the save after it works
  *   birth             a Scarab born into a slot freed this update switches the target index off
+ *   restock0, lift    an empty placed enemy Reaver established by a launch attempt still restocks; a
+ *                     Science Facility that lifts mid-flight is neither homed on nor splashed
  *   save-write FILE   real race_save_game() with orders in production and a
  *                     Scarab in flight, then 600 updates of digests
  *   save-read FILE    a fresh process loads it and must match every digest
@@ -1049,6 +1051,74 @@ static void birth_slot(void)
     puts("birth PASS");
 }
 
+/* An empty placed enemy Reaver in reach on the first update: the launch attempt establishes its row and
+ * fires nothing, and the service must still be awake to restock it. */
+static void restock_empty(void)
+{
+    int rv[8], n, r, z;
+    unsigned a[4], c[4];
+    start_campaign(SC64_P8_GLOBAL_ID);
+    n = enemy_reavers(rv, 8);
+    assert(n >= 1);
+    r = rv[0];
+    u[r].carry = 0; u[r].work_timer = 0;             /* as before the first end of update: this one alone */
+    sc64_psc_hint = 0;
+    z = spawn_unit(SIDE, U_PROBE, u[r].x + 70, u[r].y);
+    assert(z >= 0 && (unsigned)frame <= SC64_PSC_PLACED_FRAMES);
+    u[z].order = ORDER_IDLE; u[z].tx = u[z].x; u[z].ty = u[z].y;
+    /* The first update's combat step in reach of a target: the launch attempt establishes the row at stock 0 and
+     * fires nothing. */
+    race_paid_scarab_launch(&u[r], z);
+    assert((u[r].carry & SC64_PSC_INIT) && race_paid_scarab_stock(r) == 0 && scarab_in_flight(r) < 0);
+    assert(sc64_psc_hint == 1);                      /* established by a reader that did nothing: the service is awake */
+    pad(0);
+    printf("restock0: after update 1 the Reaver %s (carry %d), hint %d\n",
+           (u[r].carry & SC64_PSC_INIT) ? "is established" : "is not established", u[r].carry, sc64_psc_hint);
+    assert(sc64_psc_hint == 1);
+    assert(race_paid_scarab_stock(r) == 0);
+    for (int t = 0; t < 140; ++t) pad(0);            /* the first Scarab: one per 105 ticks, about 131 updates */
+    assert(race_paid_scarab_stock(r) == 1 || race_paid_scarab_queued(r) == 1);
+    /* The earliest save the writer accepts, the uninterrupted continuation, and a fresh load of that save. */
+    for (int t = 0; t < 40 && !race_save_game(); ++t) pad(0);
+    assert(race_save_game());
+    for (int k = 0; k < 4; ++k) { for (int t = 0; t < 150; ++t) pad(0); a[k] = state_digest(); }
+    printf("restock0: uninterrupted, the Reaver holds %d after %d updates\n", race_paid_scarab_stock(r), frame);
+    assert(race_paid_scarab_stock(r) >= 3);
+    gba_init(); game_init();
+    assert(race_load_game() && !race_mode);
+    for (int k = 0; k < 4; ++k) { for (int t = 0; t < 150; ++t) pad(0); c[k] = state_digest(); assert(a[k] == c[k]); }
+    puts("restock0 PASS (restock starts on schedule; the save and a fresh load match the uninterrupted run)");
+}
+
+/* A Science Facility that lifts while a Scarab is on its way: the Scarab drops it as a target and the
+ * explosion leaves it alone. */
+static void lift_facility(void)
+{
+    int hx, hy, r = arena(&hx, &hy), t, f, hp, shot;
+    for (t = 0; t < SC_RB_COUNT && sc64_race_raw_building(t) != 116; ++t) ;
+    assert(t < SC_RB_COUNT);
+    f = spawn_build(ENEMY, t, hx, hy, 0);
+    assert(f >= 0);
+    b[f].hp = b[f].maxhp; b[f].under_construction = 0; b[f].queue_count = 0;
+    invalidate_path_grid();
+    sc64_visibility_reset(); update_exploration();
+    race_paid_scarab_trained(r); u[r].carry = SC64_PSC_INIT | 5;
+    hp = b[f].hp + b[f].shield;
+    attack(r, MAX_UNITS + f);
+    shot = -1;
+    for (int n = 0; n < 400 && shot < 0; ++n) { step(1); shot = scarab_in_flight(r); }
+    assert(shot >= 0 && u[shot].target == MAX_UNITS + f);
+    b[f].flags |= 4;                                 /* it lifts off after the launch */
+    assert(race_bc_facility_airborne(f));
+    step(2);
+    assert(u[shot].alive && u[shot].target == -1);   /* the Scarab no longer homes on it */
+    for (int n = 0; n < 120 && scarab_in_flight(r) >= 0; ++n) step(1);
+    assert(scarab_in_flight(r) < 0);
+    printf("lift: the lifted facility kept %d of %d points\n", b[f].hp + b[f].shield, hp);
+    assert(b[f].hp + b[f].shield == hp);
+    puts("lift PASS");
+}
+
 static void campaign_write(const char *path)
 {
     unsigned digests[7]; int rv[8], n;
@@ -1152,6 +1222,8 @@ int main(int argc, char **argv)
     else if (argc == 2 && !strcmp(argv[1], "recharge")) recharge();
     else if (argc == 2 && !strcmp(argv[1], "shuttle")) shuttle();
     else if (argc == 2 && !strcmp(argv[1], "birth")) birth_slot();
+    else if (argc == 2 && !strcmp(argv[1], "restock0")) restock_empty();
+    else if (argc == 2 && !strcmp(argv[1], "lift")) lift_facility();
     else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);

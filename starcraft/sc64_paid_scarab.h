@@ -172,7 +172,12 @@ static int sc64_psc_load(Unit *q, Sc64PscState *s)
 {
     int established = (q->carry & SC64_PSC_INIT) != 0;
     if (!sc64_psc_peek(q, s)) return 0;
-    if (!established) sc64_psc_store(q, s);
+    if (!established) {
+        sc64_psc_store(q, s);
+        /* A row established by a reader that goes on to do nothing (a launch with no Scarab held) must still
+         * get its restock: wake the service. */
+        sc64_psc_hint = 1;
+    }
     return 1;
 }
 
@@ -350,14 +355,23 @@ static int sc64_psc_resolve(int target, unsigned packet_q8, int *shield_loss)
     return (int)(damage / 256u);
 }
 
-/* A lifted Terran building flies: a Scarab neither homes on it nor splashes it. The Protoss P10 product
- * has no lifting building (SC64_TERRAN_LATE_RUNTIME is off), so this is 0 there; a product that
- * compiles the service with Terran flight gets the engine's own predicate. */
-#ifdef SC64_TERRAN_LATE_RUNTIME
-#define SC64_PSC_AIRBORNE_BUILDING(slot) race_late_airborne(slot)
-#else
-#define SC64_PSC_AIRBORNE_BUILDING(slot) 0
+/* A lifted Terran building flies: a Scarab neither homes on it nor splashes it. The P10 product compiles
+ * the Battlecruiser Science Facility flight (its human side is Terran), so a lifted Science Facility is
+ * skipped through that service's predicate; a product with the Terran late-campaign flight gets its own. */
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+static int race_bc_facility_airborne(int slot);   /* sc64_battlecruiser_facility_flight.h, included later */
 #endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#define SC64_PSC_LATE_AIRBORNE(slot) race_late_airborne(slot)
+#else
+#define SC64_PSC_LATE_AIRBORNE(slot) 0
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+#define SC64_PSC_FACILITY_AIRBORNE(slot) race_bc_facility_airborne(slot)
+#else
+#define SC64_PSC_FACILITY_AIRBORNE(slot) 0
+#endif
+#define SC64_PSC_AIRBORNE_BUILDING(slot) (SC64_PSC_LATE_AIRBORNE(slot) || SC64_PSC_FACILITY_AIRBORNE(slot))
 
 /* Splash around runtime pixel (px,py) for a Scarab of `owner`. */
 static void race_paid_scarab_explode(int px, int py, int owner, int primary)

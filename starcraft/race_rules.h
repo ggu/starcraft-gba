@@ -144,7 +144,7 @@ enum {
     /* P10 source raw 82, the Gantrithor hero Carrier. Appended likewise. */
     U_P10_GANTRITHOR,
 #endif
-#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_PAID_SCARAB)
+#ifdef SC64_SCARAB_RUNTIME
     /* Appended identity only: production and lifecycle are separate services. */
     U_SCARAB,
 #endif
@@ -186,13 +186,31 @@ enum {
     U_NUKE_WIRE_MISSILE = SC_RU_LEGACY_COUNT,
 #endif
 #endif
+#if defined(SC64_PAID_SCARAB)
+    /* The paid service's actor follows every staged appended identity (Cocoon, Egg, Ghost, nuke missile),
+     * so none of their historical ids moves and saves of the staged builds keep loading. Where no staged
+     * identity is compiled in (the P10 product) it takes the first id past the legacy ones. */
 #if defined(SC64_NUKE_ACTIVE_JOURNAL) || defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
+    U_SCARAB,
+#else
+    U_SCARAB = SC_RU_LEGACY_COUNT,
+#endif
+    SC_RU_COUNT
+#elif defined(SC64_NUKE_ACTIVE_JOURNAL) || defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
     (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
     SC_RU_COUNT
 #else
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
 #endif
 };
+/* A saved unit row may carry a type at or past the legacy bound only when a staged feature vouches for it; the
+ * paid Scarab is the one such type of the P10 product. */
+#ifdef SC64_PAID_SCARAB
+#define SC64_PSC_TYPE_PAST_LEGACY_OK(t) ((t) == U_SCARAB)
+#else
+#define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
 /* The compact mechanics decode can represent the appended Ghost; the
  * journal preflight checks the exact feature tag before publishing it. */
@@ -229,7 +247,7 @@ _Static_assert(U_SHARED_EGG_STAGE < 64, "staged Egg requires a six-bit identity"
 #endif
 #endif
 #if !defined(SC64_NUKE_ACTIVE_JOURNAL) && !defined(SC64_NUKE_FALLBACK_GHOST) && !defined(SC64_GUARDIAN_COCOON_STAGE) && \
-    (!defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_Z7_EGG_PRODUCTION))
+    (!defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_Z7_EGG_PRODUCTION)) && !defined(SC64_PAID_SCARAB)
 _Static_assert(SC_RU_COUNT == SC_RU_LEGACY_COUNT, "legacy unit IDs changed");
 #endif
 enum {

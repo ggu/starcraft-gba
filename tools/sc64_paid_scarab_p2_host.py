@@ -79,7 +79,13 @@ def main():
     print(f"save written by the pause menu at call {saved.group(1)}, frame {saved.group(2)}, Scarab in flight")
     ok = ref.returncode == 0 and res.returncode == 0 and len(a) == len(b) == len(c) == 12 and a == b == c
     print(f"{len(b)} samples: uninterrupted tape == tape with the save: {a == b}; fresh process == saving process: {b == c}")
-    hits = re.findall(r"hits=(\d+)", (out / "run.out").read_text())
+    # The Scarab in flight at the save point must land in each of the three continuations, on the same
+    # target, in the same frame, with the same hits: other Scarabs' hits prove nothing about it.
+    own = [re.findall(r"OWN-IMPACT frame=(\d+) target=(-?\d+) hits=(\d+)", (out / n).read_text()) for n in ("ref.out", "run.out", "resume.out")]
+    if any(len(o) != 1 or int(o[0][2]) < 1 for o in own) or not (own[0] == own[1] == own[2]):
+        sys.exit(f"the saved Scarab's own impact differs or is missing in the continuations: {own}")
+    print(f"saved Scarab's own impact (ref, run, resume): frame {own[0][0][0]} target {own[0][0][1]} hits {own[0][0][2]}")
+    hits = re.findall(r"^S frame=.* hits=(\d+)", (out / "run.out").read_text(), re.M)
     print(f"Scarab hits at the last sample: {hits[-1] if hits else '?'}")
     if not hits or int(hits[-1]) < 1:
         sys.exit("the saved Scarab (or its fight) hit nothing: the check proves nothing about a Scarab in flight")

@@ -1,5 +1,8 @@
 #ifndef SC64_DERIVED_SAVE_H
 #define SC64_DERIVED_SAVE_H
+#ifndef SC64_PSC_TYPE_PAST_LEGACY_OK
+#define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0   /* standalone codec tests: no paid-Scarab type */
+#endif
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
 #endif
@@ -83,7 +86,7 @@ static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
   unsigned k = 0;
   static const Unit zero = {0};
   if (!out || !q || !ww || !wh || ww > 2048 || wh > 2048 || q->type < 0 ||
-      (q->type >= SC_RU_LEGACY_BOUND
+      (q->type >= SC_RU_LEGACY_BOUND && !SC64_PSC_TYPE_PAST_LEGACY_OK(q->type)
 #ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
        && q->type != SC64_SHARED_EGG_TYPE
 #endif

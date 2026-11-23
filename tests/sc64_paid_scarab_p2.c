@@ -157,9 +157,32 @@ static void sample_now(void)
            s >= 0 ? u[s].x : -1, s >= 0 ? u[s].y : -1, alive, all_hp, all_sh, hit_count, nh, hp_sum, sh_sum, state_digest());
 }
 
+/* The Scarab that is in flight at the save point, followed to its own impact. Each continuation (the
+ * uninterrupted tape, the tape with the save, the fresh process) must show that impact, and the same one. */
+static int track_slot = -1, track_parent = -1, track_target = -1, own_frame = -1, own_hits;
+static void track_begin(void)
+{
+    int sc = human_scarab();
+    assert(sc >= 0);
+    track_slot = sc; track_parent = u[sc].build; track_target = u[sc].target;
+    own_frame = -1; own_hits = 0;
+    printf("TRACKED Scarab slot %d of Reaver %d aimed at %d\n", track_slot, track_parent, track_target);
+}
+static void track_poll(void)
+{
+    if (track_slot < 0 || own_frame >= 0) return;
+    if (u[track_slot].alive && u[track_slot].type == U_SCARAB && u[track_slot].build == track_parent) return;
+    own_frame = frame;
+    for (unsigned i = 0; i < hit_count; ++i)
+        if (hit_log[i].frame + 1 >= (unsigned)frame && hit_log[i].frame <= (unsigned)frame &&
+            hit_log[i].target == track_target) ++own_hits;
+    printf("OWN-IMPACT frame=%d target=%d hits=%d\n", own_frame, track_target, own_hits);
+}
+
 /* Called after every update once the sampling base frame is known. */
 static void maybe_sample(void)
 {
+    track_poll();
     while (sample_base >= 0 && next_sample < SAMPLES && frame >= sample_base + sample_after[next_sample]) {
         sample_now(); ++next_sample;
     }
@@ -239,12 +262,12 @@ static int play(const char *mode, const char *sav, int first_call)
             }
             if (c == save_start + SAVE_LEN - 1) {      /* the A press: unpaused, still the same world frame */
                 assert(saved && screen == SCREEN_PLAY);
-                sample_base = frame; next_sample = 0; hit_count = 0;
+                sample_base = frame; next_sample = 0; hit_count = 0; track_begin();
             }
         }
         if (!strcmp(mode, "ref") && c == save_start - 1) {
             assert(human_scarab() >= 0);
-            sample_base = frame; next_sample = 0; hit_count = 0;
+            sample_base = frame; next_sample = 0; hit_count = 0; track_begin();
             printf("REF base frame %d (the uninterrupted tape, Scarab in flight)\n", frame);
         }
         if (!strcmp(mode, "resume")) { /* sample_base set by main */ }
@@ -270,7 +293,7 @@ int main(int argc, char **argv)
     if (!strcmp(mode, "resume")) {
         frame_with(KEY_L);                    /* the real load action from the title */
         assert(screen == SCREEN_PLAY && human_scarab() >= 0);
-        sample_base = frame; next_sample = 0; hit_count = 0;
+        sample_base = frame; next_sample = 0; hit_count = 0; track_begin();
         printf("RESUMED at frame %d with a Scarab in flight\n", frame);
         maybe_sample();                       /* offset 0: the loaded state itself */
         play("resume", argv[3], save_start + SAVE_LEN);

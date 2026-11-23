@@ -10,6 +10,9 @@
 #define SC64_COMPACT_UNIT_FIXED_READER 1
 #endif
 
+#ifndef SC64_PSC_TYPE_PAST_LEGACY_OK
+#define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0   /* standalone codec tests: no paid-Scarab type */
+#endif
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
 #endif
@@ -112,7 +115,7 @@ SC64_COMPACT_VALIDATE(const Unit *q, unsigned world_width,
         q->hp >= SC64_PACKED_UNIT_HP_BIAS || (q->alive && q->hp < 0) ||
         q->maxhp < 0 || q->maxhp > 131071 || q->owner < 0 || q->owner > 4 ||
         q->type < 0 || q->type >= 64 || SC_RU_LEGACY_BOUND > 64 ||
-        (q->type >= SC_RU_LEGACY_BOUND
+        (q->type >= SC_RU_LEGACY_BOUND && !SC64_PSC_TYPE_PAST_LEGACY_OK(q->type)
 #ifdef SC64_GUARDIAN_DISTINCT_STAGE
          && q->type != U_GUARDIAN_STAGE
 #endif

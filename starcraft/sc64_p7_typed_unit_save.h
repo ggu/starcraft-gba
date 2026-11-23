@@ -17,6 +17,9 @@
 #define SC64_TYPED_WIRE_ARG
 #endif
 #define SC64_P7_TYPED_UNIT_SAVE_H
+#ifndef SC64_PSC_TYPE_PAST_LEGACY_OK
+#define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0   /* standalone codec tests: no paid-Scarab type */
+#endif
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
 #endif
@@ -109,7 +112,7 @@ static int SC64_TYPED_WIRE_CANONICAL(int type, int *maxhp, int *armor,
         return 1;
     }
 #endif
-    if (type < 0 || type >= SC_RU_LEGACY_BOUND || type >= 64) return 0;
+    if (type < 0 || (type >= SC_RU_LEGACY_BOUND && !SC64_PSC_TYPE_PAST_LEGACY_OK(type)) || type >= 64) return 0;
     rule = sc64_race_unit_rule(type);
     hp = sc64_zp_actor_default_hp(type);
     if (!hp && rule) hp = rule->hp;
