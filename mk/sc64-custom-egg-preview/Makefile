@@ -9,6 +9,9 @@ SC64_P10_RESEARCH_EGG_FACT := $(SC64_P10_RESEARCH_EGG_FACT_DIR)/sc64_fact_tables
 # The preview stays on the base vector without the paid Scarab service: the Egg keeps id 53 here and in the
 # research probe (the service's actor follows it there), so a save moves between them unchanged.
 SC64_EGG_PREVIEW_P10_FLAGS = $(patsubst -I$(P10_FACT_V2_DIR),-I$(SC64_EGG_PREVIEW_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS))
+# The preview's inputs, shared by the ROM and the host preview: the P10 list with the preview's fact table in
+# place of the product's, and without the paid-only inputs.
+SC64_EGG_PREVIEW_P10_INPUTS = $(filter-out $(P10_FACT_V2_HEADER) $(P10_SCARAB_FACT_HEADER) $(P10_PLACED_HANGAR_HEADER),$(PROTOSS_P10_INPUTS)) $(SC64_EGG_PREVIEW_FACT)
 SC64_EGG_PREVIEW_DEPS := $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.ld Makefile mk/sc64-custom-egg-preview/Makefile
 
 $(SC64_EGG_PREVIEW_FACT): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile mk/sc64-custom-egg-preview/Makefile
@@ -34,7 +37,7 @@ endef
 $(eval $(call SC64_EGG_PREVIEW_PRODUCT,terran,$(TERRAN_ROM_FLAGS),,starcraft-terran,StarCraft-Terran-Transport1-GBA,SC TERRAN 10,SCT8,$(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS) $(BC_INPUTS),terran))
 $(eval $(call SC64_EGG_PREVIEW_PRODUCT,zerg,$(ZERG_Z9_RELEASE_FLAGS),,starcraft-zerg-z9,StarCraft-Zerg-Z9-Transport1-GBA,SC ZERG Z9,SCZ9,$(ZERG_Z9_CANONICAL_INPUTS),zerg))
 $(eval $(call SC64_EGG_PREVIEW_PRODUCT,z7,$(ZERG_Z7_RELEASE_FLAGS),,starcraft-zerg-z7,StarCraft-Zerg-Z7-Transport1-GBA,SC ZERG Z7,SCZ7,$(ZERG_Z7_CANONICAL_INPUTS),z7))
-$(eval $(call SC64_EGG_PREVIEW_PRODUCT,protoss,$(SC64_EGG_PREVIEW_P10_FLAGS),$(P7_INTERCEPTOR_FLIGHT_SOURCES),starcraft-protoss-p10,StarCraft-Protoss-P10-Transport1-GBA,SC PROTOSS10,SCPA,$(filter-out $(P10_FACT_V2_HEADER) $(P10_SCARAB_FACT_HEADER) $(P10_PLACED_HANGAR_HEADER),$(PROTOSS_P10_INPUTS)) $(SC64_EGG_PREVIEW_FACT),protoss))
+$(eval $(call SC64_EGG_PREVIEW_PRODUCT,protoss,$(SC64_EGG_PREVIEW_P10_FLAGS),$(P7_INTERCEPTOR_FLIGHT_SOURCES),starcraft-protoss-p10,StarCraft-Protoss-P10-Transport1-GBA,SC PROTOSS10,SCPA,$(SC64_EGG_PREVIEW_P10_INPUTS),protoss))
 $(eval $(call SC64_EGG_PREVIEW_PRODUCT,showcase,$(SHOWCASE_FLAGS),$(P7_INTERCEPTOR_FLIGHT_SOURCES),starcraft-showcase,StarCraft-Showcase-Transport1-GBA,SC SHOWCASE,SCSH,$(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS) $(BC_INPUTS),showcase))
 
 # P10 compound SRAM probe. The separate output must never replace a normal
@@ -70,7 +73,7 @@ $(SC64_P10_RESEARCH_EGG_ROOT)/compound: $(SC64_P10_RESEARCH_EGG_HOST_DEPS) $(SC6
 $(SC64_P10_RESEARCH_EGG_ROOT)/stock-research: $(SC64_P10_RESEARCH_EGG_HOST_DEPS) $(PROTOSS_P10_INPUTS)
 	mkdir -p $(@D)
 	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
-$(SC64_P10_RESEARCH_EGG_ROOT)/egg-preview: $(SC64_P10_RESEARCH_EGG_HOST_DEPS) $(SC64_EGG_PREVIEW_FACT)
+$(SC64_P10_RESEARCH_EGG_ROOT)/egg-preview: $(SC64_P10_RESEARCH_EGG_HOST_DEPS) $(SC64_EGG_PREVIEW_P10_INPUTS)
 	mkdir -p $(@D)
 	$(CLANG) $(P8_HOST_FLAGS) $(SC64_EGG_PREVIEW_P10_FLAGS) -DSC64_SHARED_EGG_CUSTOM_SERVICE $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 test-sc64-protoss-research-egg-probe: $(addprefix $(SC64_P10_RESEARCH_EGG_ROOT)/,compound stock-research egg-preview)

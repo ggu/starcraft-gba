@@ -208,8 +208,14 @@ enum {
  * paid Scarab is the one such type of the P10 product. */
 #ifdef SC64_PAID_SCARAB
 #define SC64_PSC_TYPE_PAST_LEGACY_OK(t) ((t) == U_SCARAB)
+/* Stock P10 writes an in-flight Scarab as type SC_RU_LEGACY_COUNT with raw type 85. A build that puts a staged
+ * identity at that id (the Egg, the nuke missile) reads the same pair as its own U_SCARAB; any other raw type
+ * at that id stays the staged identity's row, so its own type and raw checks still apply. */
+#define SC64_PSC_STOCK_SCARAB_ROW(type, raw) (U_SCARAB != SC_RU_LEGACY_COUNT && (type) == SC_RU_LEGACY_COUNT && (raw) == 85)
+#define SC64_PSC_TRANSLATE_STOCK(q) do { if (SC64_PSC_STOCK_SCARAB_ROW((q).type, (q).raw_type)) (q).type = U_SCARAB; } while (0)
 #else
 #define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0
+#define SC64_PSC_TRANSLATE_STOCK(q) ((void)0)
 #endif
 #ifdef SC64_NUKE_SILO_JOURNAL
 /* The compact mechanics decode can represent the appended Ghost; the

@@ -18,7 +18,11 @@
 #endif
 #define SC64_P7_TYPED_UNIT_SAVE_H
 #ifndef SC64_PSC_TYPE_PAST_LEGACY_OK
+#ifdef SC64_PAID_SCARAB
+#error "include race_rules.h before this codec in a paid-Scarab build"
+#endif
 #define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0   /* standalone codec tests: no paid-Scarab type */
+#define SC64_PSC_TRANSLATE_STOCK(q) ((void)0)
 #endif
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
@@ -216,6 +220,7 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
     GET(11, q.path_y); GET(9, q.shield); GET(8, v); q.raw_type = (int)v - 1;
     GET(4, v); q.raw_owner = (int)v - 1; GET(14, q.flags);
     GET(11, q.shield_remainder);
+    SC64_PSC_TRANSLATE_STOCK(q);
     if (!SC64_TYPED_READ(1) || v != 1 || bit != 224 ||
         !SC64_TYPED_WIRE_CANONICAL(q.type, &maxhp, &armor, &maxshield SC64_TYPED_WIRE_ARG)) return 0;
     q.maxhp = maxhp; q.armor = armor;

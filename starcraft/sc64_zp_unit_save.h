@@ -17,7 +17,11 @@
 #define SC64_ZP_WIRE_ARG
 #endif
 #ifndef SC64_PSC_TYPE_PAST_LEGACY_OK
+#ifdef SC64_PAID_SCARAB
+#error "include race_rules.h before this codec in a paid-Scarab build"
+#endif
 #define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0   /* standalone codec tests: no paid-Scarab type */
+#define SC64_PSC_TRANSLATE_STOCK(q) ((void)0)
 #endif
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
@@ -179,6 +183,7 @@ static int SC64_ZP_WIRE_DECODE(Unit *out, const Sc64ZpPackedUnitSave *row,
     decoded.raw_owner = (int)v - 1; SC64_ZP_GET(16, decoded.flags);
     SC64_ZP_GET(11, decoded.shield_remainder);
 #undef SC64_ZP_GET
+    SC64_PSC_TRANSLATE_STOCK(decoded);
     if (bit != 280 || !SC64_ZP_WIRE_VALIDATE(&decoded, world_width,
                                                   world_height SC64_ZP_WIRE_ARG)) return 0;
     *out = decoded;

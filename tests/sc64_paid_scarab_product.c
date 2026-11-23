@@ -687,6 +687,16 @@ static void t_save_write(const char *path)
     printf("saved: Reaver %d (2 held, 3 ordered, mid-build), Scarab %d in flight\n",
            saved_reaver, saved_shot);
 }
+/* The same world with the Scarab's raw type changed: a pair no stock build writes. The writer may refuse it; if
+ * it does not, the staged probes must reject the image (tests/sc64_psc_stock_row.c reads it). */
+static void t_save_write_badraw(const char *path)
+{
+    world_with_state();
+    u[saved_shot].raw_type = 84;
+    if (!race_save_game()) { puts("save-write-badraw: the product's own writer refuses the pair"); remove(path); return; }
+    write_sram(path);
+    puts("save-write-badraw: written (raw type 84 on the in-flight Scarab)");
+}
 static void t_save_read(const char *path)
 {
     char side[512]; FILE *f; unsigned want[7]; int rv, sh, held, ordered, progress, life;
@@ -1094,7 +1104,7 @@ static void restock_empty(void)
  * explosion leaves it alone. */
 static void lift_facility(void)
 {
-    int hx, hy, r = arena(&hx, &hy), t, f, hp, shot;
+    int hx, hy, r = arena(&hx, &hy), t, f, hp, shot, w, whp;
     for (t = 0; t < SC_RB_COUNT && sc64_race_raw_building(t) != 116; ++t) ;
     assert(t < SC_RB_COUNT);
     f = spawn_build(ENEMY, t, hx, hy, 0);
@@ -1104,17 +1114,25 @@ static void lift_facility(void)
     sc64_visibility_reset(); update_exploration();
     race_paid_scarab_trained(r); u[r].carry = SC64_PSC_INIT | 5;
     hp = b[f].hp + b[f].shield;
+    /* A grounded witness next to the facility, inside the splash: the explosion must happen and must hurt it. */
+    w = spawn_unit(ENEMY, U_PROBE, hx, hy + 44);
+    assert(w >= 0);
+    u[w].order = ORDER_IDLE; u[w].tx = u[w].x; u[w].ty = u[w].y;
+    whp = u[w].hp + u[w].shield;
     attack(r, MAX_UNITS + f);
     shot = -1;
     for (int n = 0; n < 400 && shot < 0; ++n) { step(1); shot = scarab_in_flight(r); }
     assert(shot >= 0 && u[shot].target == MAX_UNITS + f);
+    assert(u[w].hp + u[w].shield == whp);            /* untouched before the explosion */
     b[f].flags |= 4;                                 /* it lifts off after the launch */
     assert(race_bc_facility_airborne(f));
     step(2);
     assert(u[shot].alive && u[shot].target == -1);   /* the Scarab no longer homes on it */
     for (int n = 0; n < 120 && scarab_in_flight(r) >= 0; ++n) step(1);
     assert(scarab_in_flight(r) < 0);
-    printf("lift: the lifted facility kept %d of %d points\n", b[f].hp + b[f].shield, hp);
+    printf("lift: the lifted facility kept %d of %d points; the witness went from %d to %d\n",
+           b[f].hp + b[f].shield, hp, whp, u[w].alive ? u[w].hp + u[w].shield : 0);
+    assert(!u[w].alive || u[w].hp + u[w].shield < whp);   /* the Scarab exploded rather than expiring */
     assert(b[f].hp + b[f].shield == hp);
     puts("lift PASS");
 }
@@ -1227,6 +1245,7 @@ int main(int argc, char **argv)
     else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);
+    else if (argc == 3 && !strcmp(argv[1], "save-write-badraw")) t_save_write_badraw(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-read")) t_save_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "old-read")) t_old_read(argv[2]);
     else { fprintf(stderr, "usage: see header comment\n"); return 2; }

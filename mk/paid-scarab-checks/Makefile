@@ -64,6 +64,28 @@ PSC_P2_SRC := tests/sc64_paid_scarab_p2.c
 $(PSC_DIR)/p2: $(PSC_P2_SRC) tests/sc64_text_box_replay.h $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/paid-scarab-checks/Makefile | build
 	@mkdir -p $(PSC_DIR)
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(PSC_P2_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+# A stock P10 save with a Scarab in flight, read by the staged probes in a fresh process. Stock P10 numbers the
+# Scarab SC_RU_LEGACY_COUNT; the research/Egg probe and the active nuke probe keep their staged identity there
+# and put U_SCARAB behind it, so their codecs translate the stock pair (type SC_RU_LEGACY_COUNT, raw 85) only.
+# The nuke probe needs the private prepared nuke inputs and is skipped, said so, without them.
+PSC_STAGED_SRC := tests/sc64_psc_stock_row.c
+.PHONY: test-sc64-paid-scarab-staged
+$(PSC_DIR)/stock-row-egg: $(PSC_STAGED_SRC) $(SC64_EGG_PREVIEW_DEPS) $(SC64_P10_RESEARCH_EGG_INPUTS) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) mk/paid-scarab-checks/Makefile | build
+	@mkdir -p $(PSC_DIR)
+	$(CLANG) $(P8_HOST_FLAGS) $(SC64_P10_RESEARCH_EGG_FLAGS) $(PSC_STAGED_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-paid-scarab-staged: $(PSC_DIR)/product $(PSC_DIR)/stock-row-egg
+	rm -f $(PSC_DIR)/stock.sav $(PSC_DIR)/stock.sav.state $(PSC_DIR)/stock-bad.sav
+	./$(PSC_DIR)/product save-write $(PSC_DIR)/stock.sav
+	./$(PSC_DIR)/product save-write-badraw $(PSC_DIR)/stock-bad.sav
+	./$(PSC_DIR)/stock-row-egg pairs
+	./$(PSC_DIR)/stock-row-egg read $(PSC_DIR)/stock.sav
+	./$(PSC_DIR)/stock-row-egg reject $(PSC_DIR)/stock-bad.sav
+	@if [ -f $(SC64_NUKE_ASSET_DIR)/sc64_nuke_source_generated.h ]; then set -e; \
+		$(MAKE) $(SC64_NUKE_STRIKE_P10_FACT_HEADER) $(SC64_NUKE_RUNTIME_ASSETS); \
+		$(CLANG) $(SC64_NUKE_FIXTURE_FLAGS) $(SC64_NUKE_RUNTIME_FLAGS) $(SC64_NUKE_STRIKE_FLAGS) $(patsubst -I$(P10_SCARAB_FACT_DIR),-I$(SC64_NUKE_STRIKE_P10_FACT_DIR),$(PROTOSS_P10_FLAGS)) $(PSC_STAGED_SRC) $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $(PSC_DIR)/stock-row-nuke; \
+		./$(PSC_DIR)/stock-row-nuke pairs; ./$(PSC_DIR)/stock-row-nuke read $(PSC_DIR)/stock.sav; \
+		./$(PSC_DIR)/stock-row-nuke reject $(PSC_DIR)/stock-bad.sav; \
+	else echo "test-sc64-paid-scarab-staged: the prepared nuke inputs are absent; the nuke-probe reader was not built or run"; fi
 .PHONY: test-sc64-paid-scarab-p2 check-sc64-paid-scarab-p2-arm
 test-sc64-paid-scarab-p2: $(PSC_DIR)/p2 build/protoss-px/p2/trace.jsonl tools/sc64_paid_scarab_p2_host.py tools/sc64_paid_scarab_p2_tape.py
 	$(PYTHON) tools/sc64_paid_scarab_p2_host.py $(PSC_DIR)/p2 build/protoss-px/p2/trace.jsonl.raw $(PSC_DIR)/p2run

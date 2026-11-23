@@ -463,8 +463,14 @@ static void sc64_psc_flight_tick(int slot)
     } else arrived = q->x == q->tx && q->y == q->ty;
     if (arrived) {
         int owner = q->owner, px = q->x, py = q->y;
+#ifdef SC64_TEST_DETONATION_OBSERVER
+        SC64_TEST_DETONATION_OBSERVER(slot);   /* HOST checks only: names the Scarab whose hits follow */
+#endif
         race_paid_scarab_remove(slot);
         race_paid_scarab_explode(px, py, owner, target);
+#ifdef SC64_TEST_DETONATION_OBSERVER
+        SC64_TEST_DETONATION_OBSERVER(-1);
+#endif
         return;
     }
     aimx = q->tx; aimy = q->ty;

@@ -11,7 +11,11 @@
 #endif
 
 #ifndef SC64_PSC_TYPE_PAST_LEGACY_OK
+#ifdef SC64_PAID_SCARAB
+#error "include race_rules.h before this codec in a paid-Scarab build"
+#endif
 #define SC64_PSC_TYPE_PAST_LEGACY_OK(t) 0   /* standalone codec tests: no paid-Scarab type */
+#define SC64_PSC_TRANSLATE_STOCK(q) ((void)0)
 #endif
 #ifndef SC_RU_LEGACY_BOUND
 #define SC_RU_LEGACY_BOUND SC_RU_COUNT
@@ -232,6 +236,7 @@ SC64_COMPACT_DECODE(Unit *out, const Sc64PackedUnitSave *row,
     decoded.raw_owner = (int)v - 1; SC64_UNIT_GET(16, decoded.flags);
     SC64_UNIT_GET(11, decoded.shield_remainder);
 #undef SC64_UNIT_GET
+    SC64_PSC_TRANSLATE_STOCK(decoded);
     if (bit != 303 || !SC64_COMPACT_VALIDATE(&decoded, world_width,
                                                     world_height SC64_COMPACT_STAGE_ARG)) return 0;
     if ((row->bytes[SC64_PACKED_UNIT_SAVE_BYTES - 1] & 0x80u) != 0) return 0;

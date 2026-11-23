@@ -25,6 +25,8 @@
 #include "sc64_text_box_replay.h"
 #define SC64_TEST_HIT_OBSERVER psc_hit
 static void psc_hit(int target, int damage, int source, int owner);
+#define SC64_TEST_DETONATION_OBSERVER psc_det
+static void psc_det(int slot);
 #include "../starcraft/game.c"
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,9 +46,20 @@ static int event_count, total_ticks, save_start = -1;
 
 static struct { unsigned frame; int target, damage; } hit_log[MAX_LOG];
 static unsigned hit_count;
+/* The Scarab followed from the save point: its slot, its target, the frame of its own detonation (-1 while it
+ * flies, -2 if it ended without one) and the hits that detonation (and no other) caused. */
+static int detonating = -1, track_slot = -1, track_target = -1, track_life, own_frame = -1, own_hits, own_printed;
+static void psc_det(int slot)
+{
+    detonating = slot;
+    if (slot >= 0 && slot == track_slot && own_frame == -1) own_frame = frame;
+    if (slot < 0 && own_frame >= 0 && track_slot >= 0 && !own_printed && (own_printed = 1))
+        printf("OWN-IMPACT frame=%d target=%d hits=%d\n", own_frame, track_target, own_hits);
+}
 static void psc_hit(int target, int damage, int source, int owner)
 {
     (void)owner;
+    if (source == U_REAVER && detonating >= 0 && detonating == track_slot && own_frame >= 0) ++own_hits;
     if (source == U_REAVER && hit_count < MAX_LOG) {
         hit_log[hit_count].frame = (unsigned)frame;
         hit_log[hit_count].target = target; hit_log[hit_count].damage = damage;
@@ -159,24 +172,26 @@ static void sample_now(void)
 
 /* The Scarab that is in flight at the save point, followed to its own impact. Each continuation (the
  * uninterrupted tape, the tape with the save, the fresh process) must show that impact, and the same one. */
-static int track_slot = -1, track_parent = -1, track_target = -1, own_frame = -1, own_hits;
 static void track_begin(void)
 {
     int sc = human_scarab();
     assert(sc >= 0);
-    track_slot = sc; track_parent = u[sc].build; track_target = u[sc].target;
-    own_frame = -1; own_hits = 0;
-    printf("TRACKED Scarab slot %d of Reaver %d aimed at %d\n", track_slot, track_parent, track_target);
+    track_slot = sc; track_target = u[sc].target; track_life = u[sc].work_timer;
+    own_frame = -1; own_hits = 0; own_printed = 0;
+    printf("TRACKED Scarab slot %d aimed at %d, %d ticks of flight left\n", track_slot, track_target, track_life);
 }
+/* The tracked Scarab keeps flying when its Reaver dies, so the parent slot proves nothing: it is the same
+ * Scarab while its row is live and its life only counts down. It ends by its own detonation (psc_det) or, if
+ * the row goes or is reborn first, without one, which the host check refuses. */
 static void track_poll(void)
 {
-    if (track_slot < 0 || own_frame >= 0) return;
-    if (u[track_slot].alive && u[track_slot].type == U_SCARAB && u[track_slot].build == track_parent) return;
-    own_frame = frame;
-    for (unsigned i = 0; i < hit_count; ++i)
-        if (hit_log[i].frame + 1 >= (unsigned)frame && hit_log[i].frame <= (unsigned)frame &&
-            hit_log[i].target == track_target) ++own_hits;
-    printf("OWN-IMPACT frame=%d target=%d hits=%d\n", own_frame, track_target, own_hits);
+    if (track_slot < 0 || own_frame != -1) return;
+    if (u[track_slot].alive && u[track_slot].type == U_SCARAB && u[track_slot].work_timer <= track_life) {
+        track_life = u[track_slot].work_timer;
+        return;
+    }
+    own_frame = -2;
+    printf("OWN-GONE frame=%d: the tracked Scarab ended without detonating\n", frame);
 }
 
 /* Called after every update once the sampling base frame is known. */
