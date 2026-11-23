@@ -160,8 +160,10 @@ static RaceSave race_data;
 #ifdef SC64_ZERG_CARRIER_PROBE
 #define SC64_ZERG_CARRIER_TAG SC64_SAVE_TAG_ZERG_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
 #define SC64_ZC_SCRATCH ((u8 *)&sc64_zp_route_save_scratch)
+#ifndef SC64_PACKED_MINERAL_FIFO
 static const u32 race_zc_tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
                                  SC64_TRANSPORT_SAVE_VERSION,SC64_ZERG_CARRIER_TAG};
+#endif
 static u8 race_zc_packet[SC64_ZC_PACKET_MAX];
 static u16 race_zc_size;
 static u8 race_zc_authenticated;
@@ -174,6 +176,25 @@ static u8 race_zc_authenticated;
 static u8 race_tc_packet[SC64_TC_PACKET_MAX];
 static u16 race_tc_size;
 static u8 race_tc_authenticated;
+#endif
+#ifdef SC64_PACKED_MINERAL_FIFO
+#if !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_WORKER_CARGO_KIND) || \
+    (!defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)) || \
+    defined(SC64_SHARED_NUKE_PROBE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) || defined(SC64_SHOWCASE_CARRIER_PROBE) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE) || \
+    defined(SC64_P6_PACKED_IMPACT_SAVE) || \
+    defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) || \
+    (defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) && \
+     (!defined(SC64_RESEARCH_SRAM_PRODUCT) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL)))
+#error "Packed mineral FIFO requires a qualified packed transport layout"
+#endif
+#include "sc64_packed_mineral_fifo_tags.h"
+
+/* Separate from the route/save scratch. Only the finally selected candidate
+ * publishes this queue, and each preparation resets it before building. */
+static Sc64MineralFifo race_fifo_candidate;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE
 #include "sc64_guardian_wire.h"
@@ -1971,6 +1992,55 @@ static int race_research_jobs_candidate_scan(const RaceSave *candidate,
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
 #include "sc64_nuke_strike_journal.h"
 #endif
+#ifdef SC64_PACKED_MINERAL_FIFO
+#include "sc64_packed_mineral_fifo_save.h"
+
+static int race_fifo_candidate_eligible(const RaceSave *save, unsigned slot,
+                                         const Unit *worker, unsigned width,
+                                         unsigned height)
+{
+    (void)slot;
+    Mineral patch;
+#ifdef SC64_ZP_FULL_STORAGE
+    if (!race_save_decode_mineral(save, (unsigned)worker->target, width, height,
+                                  &patch)) return 0;
+#else
+    patch = save->minerals_map[worker->target];
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!save->state[0] && save->state[2] == SC64_T6_GLOBAL_ID &&
+        sc64_t6_burrowed_get(&save->t6, slot)) return 0;
+#endif
+    return worker_mineral_fifo_matches_patch(worker, &patch, worker->target,
+                                              width, height);
+}
+
+static int race_fifo_write_ranks(void)
+{
+    if (!mineral_fifo_enabled) return 1;
+    const unsigned width = WORLD_W, height = WORLD_H;
+    for (unsigned slot = 0; slot < MAX_UNITS; ++slot)
+        if (u[slot].alive && IS_WORKER(u[slot].type) && u[slot].order == ORDER_MINE &&
+            u[slot].work_timer && !mineral_fifo.patch[slot]) return 0;
+    for (unsigned patch = 0; patch < MAX_MINERALS; ++patch) {
+        unsigned rank = 0;
+        for (unsigned link = mineral_fifo.head[patch]; link;
+             link = mineral_fifo.next[link - 1u]) {
+            unsigned slot = link - 1u;
+            Unit worker = u[slot];
+            if (worker_mineral_fifo_live_slot_at_patch(slot, &worker, &m[patch], (int)patch)) {
+                if (!sc64_packed_mineral_fifo_rank_unit(&worker, ++rank)) return 0;
+            } else {
+                if (!worker.alive || !IS_WORKER(worker.type) ||
+                    worker.order != ORDER_MINE || !worker.work_timer) continue;
+                worker.work_timer = 0;
+            }
+            if (!race_save_encode_unit(&race_data, slot, width, height, &worker)) return 0;
+        }
+    }
+    return 1;
+}
+#endif
 
 static int race_save_game(void) {
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
@@ -3052,6 +3122,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
+#ifdef SC64_PACKED_MINERAL_FIFO
+    if (!race_fifo_write_ranks()) return 0;
+#endif
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
     if (!race_nuke_save_write_strikes(&nuke_writer_auth)) return 0;
 #endif
@@ -3100,6 +3173,9 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_PACKED_MINERAL_FIFO
+    Sc64StageSaveAuth mineral_fifo_auth;
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     Sc64NukeSaveAuth nuke_silo_auth;
     u16 nuke_silo_receipts[MAX_BUILDINGS];
@@ -3365,6 +3441,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_PACKED_MINERAL_FIFO
+    if ((plan->mineral_fifo_auth.features & SC64_STAGE_SAVE_MINERAL_FIFO) &&
+        !race_save_prepare_mineral_fifo(&race_data, (unsigned)width * 16u,
+                                        (unsigned)height * 16u, &plan->mineral_fifo_auth,
+                                        &race_fifo_candidate, race_fifo_candidate_eligible
+                                        SC64_GCTX_ARG)) return 0;
+#endif
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
     /* Remove journal-only actor rows before ordinary migrations or mission
      * validation. The detached plan holds their authenticated state. */
@@ -4711,6 +4794,20 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
 #endif
+#ifdef SC64_PACKED_MINERAL_FIFO
+    if (tag == SC64_FIFO_BASE_TAG
+#ifdef SC64_FIFO_CUSTOM_TAG
+        || tag == SC64_FIFO_CUSTOM_TAG
+#endif
+       ) {
+        if (!race_mineral_fifo_authenticate(&plan->mineral_fifo_auth, &race_data, tag, len)) return 0;
+#ifdef SC64_RESEARCH_SRAM_PRODUCT
+        tag = tag == SC64_FIFO_CUSTOM_TAG ? SC64_FIFO_CUSTOM_ORIGINAL : SC64_TRANSPORT_SAVE_VERSION;
+#else
+        tag = SC64_TRANSPORT_SAVE_VERSION;
+#endif
+    }
+#endif
 #ifdef SC64_COMPOUND_FLASH_Z10_HOST_STAGE
     /* Only the compound reader calls this stage, after validating its full
      * outer checksum and fixed header. Bind the token to this scratch record. */
@@ -4913,7 +5010,11 @@ static int race_zc_prepare(const void *raw,u32 len,u32 tag,void *context)
 {
     RaceLoadPlan *plan=context;
     if (raw!=SC64_ZC_SCRATCH || !plan) return 0;
-    race_zc_authenticated=(tag==SC64_ZERG_CARRIER_TAG);
+    race_zc_authenticated=(tag==SC64_ZERG_CARRIER_TAG
+#ifdef SC64_PACKED_MINERAL_FIFO
+                           || tag==SC64_FIFO_CUSTOM_TAG
+#endif
+                           );
     race_zc_size=2;
     race_zc_packet[0]=race_zc_packet[1]=0;
     if (!race_zc_authenticated)
@@ -4924,6 +5025,10 @@ static int race_zc_prepare(const void *raw,u32 len,u32 tag,void *context)
     race_zc_size=(u16)size;
     memcpy(race_zc_packet,SC64_ZC_SCRATCH+SC64_ZC_PACKET_WORK,size);
     memset(plan,0,sizeof(*plan));
+#ifdef SC64_PACKED_MINERAL_FIFO
+    if (tag == SC64_FIFO_CUSTOM_TAG &&
+        !race_mineral_fifo_authenticate(&plan->mineral_fifo_auth, &race_data, tag, len)) return 0;
+#endif
     unsigned impact=len-sizeof(RaceSave)-SC64_TRANSPORT_TRAILER_BYTES;
     const u8 *tail=SC64_ZC_SCRATCH+sizeof(RaceSave);
     if (!race_sk_transport_wire_decode(tail+impact))
@@ -4939,7 +5044,11 @@ static int race_zc_prepare(const void *raw,u32 len,u32 tag,void *context)
 static int race_tc_prepare(const void *raw,u32 len,u32 tag,void *context)
 {
     if (raw!=(const void *)&race_impact_record) return 0;
-    race_tc_authenticated=(tag==SC64_TERRAN_CARRIER_TAG);
+    race_tc_authenticated=(tag==SC64_TERRAN_CARRIER_TAG
+#ifdef SC64_PACKED_MINERAL_FIFO
+                           || tag==SC64_FIFO_CUSTOM_TAG
+#endif
+                           );
     race_tc_size=2;
     race_tc_packet[0]=race_tc_packet[1]=0;
     if (race_tc_authenticated) {
@@ -4947,7 +5056,7 @@ static int race_tc_prepare(const void *raw,u32 len,u32 tag,void *context)
             sizeof(race_impact_record),race_tc_packet,&race_tc_size);
         if (!decoded) return 0;
         len=decoded;
-        tag=SC64_TRANSPORT_SAVE_VERSION;
+        if (tag == SC64_TERRAN_CARRIER_TAG) tag=SC64_TRANSPORT_SAVE_VERSION;
     } else if (len>sizeof(race_impact_record)) return 0;
     return race_worker_cargo_prepare_selected(&race_impact_record,len,tag,context);
 }
@@ -4955,7 +5064,11 @@ static int race_tc_prepare(const void *raw,u32 len,u32 tag,void *context)
 static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
 #ifdef SC64_ZERG_CARRIER_PROBE
     return save_select_prepared(SC64_ZC_SCRATCH,RACE_IMPACT_RECORD_MAX,
+#ifdef SC64_PACKED_MINERAL_FIFO
+           race_fifo_tags,sizeof(race_fifo_tags)/sizeof(race_fifo_tags[0]),
+#else
            race_zc_tags,sizeof(race_zc_tags)/sizeof(race_zc_tags[0]),
+#endif
            race_zc_prepare,plan,selection);
 #else
 #ifdef SC64_SHARED_TRANSPORT
@@ -4969,6 +5082,8 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_SHARED_EGG_TRANSPORT_SAVE_VERSION};
 #elif defined(SC64_GUARDIAN_COCOON_STAGE)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
+#elif defined(SC64_PACKED_MINERAL_FIFO)
+#define tags race_fifo_tags
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
@@ -5017,6 +5132,9 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #endif
 #endif
 #endif /* Z10 Carrier probe */
+#ifdef SC64_PACKED_MINERAL_FIFO
+#undef tags
+#endif
 }
 static int race_worker_cargo_previous(GbaSaveSelection *selection) {
     RaceLoadPlan plan;
@@ -5616,6 +5734,11 @@ static int race_load_game(void) {
 #endif
 #elif defined(SC64_SHARED_NUKE_PROBE)
     race_nuke_reset();
+#endif
+#ifdef SC64_PACKED_MINERAL_FIFO
+    mineral_fifo_enabled = (plan.mineral_fifo_auth.features & SC64_STAGE_SAVE_MINERAL_FIFO) != 0;
+    if (mineral_fifo_enabled) mineral_fifo = race_fifo_candidate;
+    else memset(&mineral_fifo, 0, sizeof(mineral_fifo));
 #endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }

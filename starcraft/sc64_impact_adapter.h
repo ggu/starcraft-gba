@@ -303,6 +303,11 @@ race_impact_save_write(const GbaSaveSelection *previous
 race_impact_save_write(void)
 #endif
 {
+#ifdef SC64_PACKED_MINERAL_FIFO
+#define SC64_FIFO_WRITE_TAG(tag) race_mineral_fifo_write_tag(tag)
+#else
+#define SC64_FIFO_WRITE_TAG(tag) (tag)
+#endif
     /* Loading a completed journal returns to a frozen result screen.
      * Leave the live queue alone and omit damage that cannot run there. */
     const unsigned impact_count = (race_data.state[18] || race_data.state[19]) ?
@@ -325,9 +330,13 @@ race_impact_save_write(void)
         n=sc64_zc_pack(wire,sizeof(RaceSave)+tail+SC64_TRANSPORT_TRAILER_BYTES,
                        packet,n,wire,RACE_IMPACT_RECORD_MAX);
         if (!n) return 0;
-        return previous ? save_write_selected(wire,n,SC64_ZERG_CARRIER_TAG,previous,
+        return previous ? save_write_selected(wire,n,SC64_FIFO_WRITE_TAG(SC64_ZERG_CARRIER_TAG),previous,
+#ifdef SC64_PACKED_MINERAL_FIFO
+                        race_fifo_tags,sizeof(race_fifo_tags)/sizeof(race_fifo_tags[0])) :
+#else
                         race_zc_tags,sizeof(race_zc_tags)/sizeof(race_zc_tags[0])) :
-                        save_write_first(wire,n,SC64_ZERG_CARRIER_TAG);
+#endif
+                        save_write_first(wire,n,SC64_FIFO_WRITE_TAG(SC64_ZERG_CARRIER_TAG));
     }
 #endif
     u32 bytes = 0;
@@ -377,6 +386,9 @@ race_impact_save_write(void)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
+#ifdef SC64_PACKED_MINERAL_FIFO
+#define tags race_fifo_tags
+#else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
     ,SC64_SHOWCASE_CARRIER_TAG
@@ -397,6 +409,7 @@ race_impact_save_write(void)
 #endif
 #endif
 };
+#endif
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
 #define SC64_GUARDIAN_WRITE_TAG SC64_SHOWCASE_CARRIER_TAG
 #elif defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL)
@@ -428,9 +441,9 @@ race_impact_save_write(void)
             offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,race_tc_packet,packet,
             (u8 *)&race_impact_record,sizeof(race_impact_record));
         if (!wire) return 0;
-        return previous ? save_write_selected(&race_impact_record,wire,SC64_TERRAN_CARRIER_TAG,
+        return previous ? save_write_selected(&race_impact_record,wire,SC64_FIFO_WRITE_TAG(SC64_TERRAN_CARRIER_TAG),
                     previous,tags,sizeof(tags)/sizeof(tags[0])) :
-                    save_write_first(&race_impact_record,wire,SC64_TERRAN_CARRIER_TAG);
+                    save_write_first(&race_impact_record,wire,SC64_FIFO_WRITE_TAG(SC64_TERRAN_CARRIER_TAG));
     }
 #endif
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
@@ -439,9 +452,9 @@ race_impact_save_write(void)
 #else
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_SILO_COMMIT_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+                                 SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG),previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_SILO_COMMIT_TAG)) return 0;
+                                  SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG))) return 0;
 #endif
 #elif defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
     race_sk_transport_wire_encode((u8 *)&race_impact_record + offset + bytes);
@@ -495,6 +508,9 @@ race_impact_save_write(void)
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #define SC64_GUARDIAN_WRITE_TAG SC64_GUARDIAN_TRANSPORT_SAVE_VERSION
 #else
+#ifdef SC64_PACKED_MINERAL_FIFO
+#define tags race_fifo_tags
+#else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_ZERG_CARRIER_PROBE
     ,SC64_ZERG_CARRIER_TAG
@@ -512,6 +528,7 @@ race_impact_save_write(void)
 #endif
 #endif
 };
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOURNAL
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL
@@ -535,9 +552,9 @@ race_impact_save_write(void)
 #else
     if (previous) {
         if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                 SC64_SILO_COMMIT_TAG,previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+                                 SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG),previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
     } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                                  SC64_SILO_COMMIT_TAG)) return 0;
+                                  SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG))) return 0;
 #endif
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
@@ -561,9 +578,10 @@ race_impact_save_write(void)
 #endif
 #endif
 #undef SC64_SILO_COMMIT_TAG
-#ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
+#if defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE) || defined(SC64_PACKED_MINERAL_FIFO)
 #undef tags
 #endif
+#undef SC64_FIFO_WRITE_TAG
     return 1;
 }
 

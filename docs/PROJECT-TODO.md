@@ -840,10 +840,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   codecs feed the shared builder and preserve a worker's cargo.
   [Authored packed journal candidates](audits/2026-11-21-native-mineral-service-queue.md#authored-packed-journal-candidates)
   now exercise all four codecs through the SRAM selector, including
-  rejected newer candidates and half-range fallback. Next compose the
-  production [journal envelopes](audits/2026-11-21-native-mineral-service-queue.md#packed-journal-integration)
-  with the world-specific service checks, then measure resume,
-  memory headroom, race economy and pacing before shared activation.
+  rejected newer candidates and half-range fallback. The
+  [shared product opt-in](audits/2026-11-21-native-mineral-service-queue.md#shared-product-opt-in)
+  now connects those rows to the base, Carrier and research-jobs
+  envelopes. Qualify a fresh-process resume from active and empty queues,
+  protect older parallel saves, check the memory guards, and compare race
+  economy and busy-match pacing before shared release activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.

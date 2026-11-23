@@ -1538,11 +1538,21 @@ static int target_hostile_masks_valid;
 #include "sc64_targets.h"
 #endif
 static Mineral m[MAX_MINERALS];
+#if defined(SC64_MINERAL_FIFO) && defined(SC64_PACKED_MINERAL_FIFO)
+#error "Mineral FIFO profiles are mutually exclusive"
+#endif
+#if defined(SC64_PACKED_MINERAL_FIFO) && \
+    (!defined(SC64_RACES) || !defined(SC64_WORKER_CARGO_KIND) || \
+     defined(SC64_MINERAL_PATCH_CONTENTION_PROBE))
+#error "Packed mineral FIFO needs shared races and exclusive mineral service"
+#endif
 #ifdef SC64_MINERAL_FIFO
 #if defined(SC64_RACES) || defined(SC64_IMPORTED_MISSION) || \
     defined(SC64_WORKER_CARGO_KIND) || defined(SC64_MINERAL_PATCH_CONTENTION_PROBE)
 #error "The mineral FIFO stage requires the standalone raw save journal"
 #endif
+#endif
+#if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
 #include "sc64_mineral_fifo.h"
 static Sc64MineralFifo mineral_fifo;
 static int mineral_fifo_enabled;
@@ -3084,7 +3094,7 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
-#ifdef SC64_MINERAL_FIFO
+#if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     sc64_mineral_fifo_remove(&mineral_fifo, (unsigned)i);
 #endif
 #ifdef SC64_SHARED_NUKE_PROBE
@@ -5487,6 +5497,8 @@ hit_stock_building_target(const Building *source,int target,int damage)
 
 #ifdef SC64_MINERAL_FIFO
 #include "sc64_mineral_fifo_game.h"
+#elif defined(SC64_PACKED_MINERAL_FIFO)
+#include "sc64_mineral_fifo_runtime.h"
 #endif
 #include "sc64_game_save.h"
 
@@ -5607,7 +5619,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
-#ifdef SC64_MINERAL_FIFO
+#if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     memset(&mineral_fifo, 0, sizeof(mineral_fifo));
     mineral_fifo_enabled = 1;
 #endif
@@ -9144,7 +9156,7 @@ target_lists_unavailable:
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
 #endif
     SC64_PSC_WORLD_TICK();
-#ifdef SC64_MINERAL_FIFO
+#if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     if (mineral_fifo_enabled) worker_mineral_fifo_begin();
 #endif
 #ifdef SC64_MINERAL_PATCH_CONTENTION_PROBE
