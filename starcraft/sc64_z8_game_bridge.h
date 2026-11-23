@@ -189,13 +189,12 @@ sc64_command_validated_type(u8 *cache, int owner, int raw, int x, int y, int bui
     return (int)cache[raw] - 2;
 }
 #endif
-/* Command does not use location, cargo, or invincibility. Keep the same
- * provider validation for every live slot (even a nonmatching owner/type)
- * before consulting the query, and inspect the pools again on every call
- * so preceding trigger actions take effect immediately. */
+/* Command and Bring both validate every live row before filtering. Bring
+ * additionally tests cargo and geometry only for matching candidates.
+ * Rescan the live pools on every call so prior trigger actions are visible. */
 static int
-sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *c,
-                           unsigned trigger_owner, u32 *out)
+sc64_z8_game_direct_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *c,
+                          unsigned trigger_owner, const Sc64Z8Rect *rect, u32 *out)
 {
     int completed = sc64_z8_condition_counts_completed(c);
     unsigned count = 0;
@@ -235,6 +234,14 @@ sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (completed && q->type == U_Z7_EGG) continue;
 #endif
+        if (rect) {
+            Sc64Z8ActorView actor;
+            if (SC64_TRANSPORT_LOADED(q)) continue;
+            if (sc64_z8_game_actor_at(0, i, &actor) != 1) return -1;
+            int overlap = sc64_z8_world_overlap(&actor, rect);
+            if (overlap < 0) return -1;
+            if (!overlap) continue;
+        }
         ++count;
     }
 
@@ -257,11 +264,30 @@ sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *
         if ((completed && q->under_construction) ||
             (c->unit != 229u && c->unit != 231u && c->unit != (unsigned)q->raw_type))
             continue;
+        if (rect) {
+            Sc64Z8ActorView actor;
+            if (sc64_z8_game_actor_at(0, MAX_UNITS + i, &actor) != 1) return -1;
+            int overlap = sc64_z8_world_overlap(&actor, rect);
+            if (overlap < 0) return -1;
+            if (!overlap) continue;
+        }
         ++count;
     }
 
     *out = count;
     return 1;
+}
+static int
+sc64_z8_game_command_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *c,
+                           unsigned trigger_owner, u32 *out)
+{
+    return sc64_z8_game_direct_count(world, c, trigger_owner, 0, out);
+}
+static int
+sc64_z8_game_bring_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *c,
+                         unsigned trigger_owner, const Sc64Z8Rect *rect, u32 *out)
+{
+    return sc64_z8_game_direct_count(world, c, trigger_owner, rect, out);
 }
 #endif
 
@@ -275,6 +301,7 @@ sc64_z8_game_bind_actor_pool(Sc64Z8WorldView *world)
     world->actor_at = sc64_z8_game_actor_at;
 #ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
     world->command_count = sc64_z8_game_command_count;
+    world->bring_count = sc64_z8_game_bring_count;
 #endif
 }
 

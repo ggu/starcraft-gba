@@ -78,6 +78,8 @@ typedef struct Sc64Z8WorldView {
      * and this query must use actor_at; -1 is a census fault. */
     int (*command_count)(const struct Sc64Z8WorldView *, const Sc64Z8Condition *,
                          unsigned trigger_owner, u32 *out);
+    int (*bring_count)(const struct Sc64Z8WorldView *, const Sc64Z8Condition *,
+                       unsigned trigger_owner, const Sc64Z8Rect *, u32 *out);
 #endif
 } Sc64Z8WorldView;
 
@@ -199,6 +201,10 @@ sc64_z8_world_count(void *context, const Sc64Z8Condition *c,
 #ifdef SC64_Z8_DIRECT_COMMAND_CENSUS
     if (c->opcode == 2 && w->command_count) {
         int status = w->command_count(w, c, trigger_owner, out);
+        if (status) return status;
+    }
+    if (c->opcode == 3 && w->bring_count) {
+        int status = w->bring_count(w, c, trigger_owner, rect, out);
         if (status) return status;
     }
 #endif
