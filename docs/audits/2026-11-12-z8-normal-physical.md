@@ -642,6 +642,27 @@ longer detector coverage remains necessary.
 | Early guard pause SRAM | `c4bc47dd795f7886058289079a06258c446ffaabe65e7b461a54c5e509ee2529` |
 | Earlier attack on the northwest approach | `df867c2c2fbe41c4acbc874a2b472362beeb5e19629aa80cacdec5bca8a91c73` |
 
+### Two-detector northwest formations
+
+Three replays start from the same early guard checkpoint at
+frame 32,901. Each routes a second Overlord to the northwest
+and tests a different formation for the original three
+Hydralisks and Overlord: the staged guard, a forward guard,
+and Hydralisks held near the rear detector. The direct attack
+orders occur at frames 47,374, 47,331 and 47,509 respectively.
+
+All three end in defeat at frame 47,628 with the fourth
+Templar at 21 HP. The sampled guard units remain at full
+health. These trials do not establish that two detectors
+cannot stop the attacker: they show only that these three
+formations and orders did not do so from this checkpoint.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Staged guard, two detectors | `808fc0950c1c95c7a9cb6990648671364cb7b75a48ff437917a2be75a0c32aef` |
+| Forward guard, two detectors | `c3f431c83653070fdf8c7424870ad6112de8c3b16ae1e2a8408d9cd7e39c53ba` |
+| Rear Hydralisks, two detectors | `5706cef748bcacbcf94ea1583fe451af8d3a53bc7826b8fa49d167ba56e31146` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

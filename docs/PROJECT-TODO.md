@@ -289,8 +289,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   builder trial. Count actual queued completions in the later Z7 battle.
   The [P10 point-route trace](audits/2026-11-22-dense-release-attribution.md#point-route-reuse-in-a-current-protoss-campaign-window)
   observes one fill and two requests at the same goal and origin.
-  Verify the stored field and later hits before attempting to park
-  shorter FIFO frontiers. The [native mining trace](audits/2026-11-22-steady-order-cost.md#mineral-targets-spread-between-native-seconds-12-and-15)
+  The [topology follow-up](audits/2026-11-22-dense-release-attribution.md#point-routing-after-p10-building-destruction)
+  ties the 651,606-cycle refill to building destruction. Four old
+  directions become stale, while the queried origin keeps its
+  ordered predecessor. A longer probe saves 449,708 cycles on
+  that update and raises the full P10 mean by 0.94%. Keep it local.
+  Target first-fill cost without losing cheap repeat queries or
+  preserving stale directions. Qualify the [small-component probe](audits/2026-11-21-z8-current-point-certificate.md#complete-fields-for-small-components)
+  on ARM, including declined requests. The [native mining trace](audits/2026-11-22-steady-order-cost.md#mineral-targets-spread-between-native-seconds-12-and-15)
   brackets the first observed patch reassignment between seconds
   12 and 15 in Blood Bath. Match opening assignment separately
   from measured worker service duration.
@@ -905,8 +911,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   eight-gas credit intervals from about 870 to 182 game updates.
   Two economy-only branches and the renewed assault all lose
   at frame 56,579. The fourth Dark Templar takes the northwest
-  route. Use the earlier post-Cannon save while the three
-  northwest Hydralisks are still alive.
+  route. The [two-Overlord guard trials](audits/2026-11-12-z8-normal-physical.md#two-detector-northwest-formations)
+  use the earlier post-Cannon save. Three formations all leave the
+  fourth Templar at 21 HP when the objective triggers defeat at
+  frame 47,628. Bring more Hydralisks to the northwest while
+  preserving southern production, then qualify a fresh HOME load
+  after the fourth interception.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

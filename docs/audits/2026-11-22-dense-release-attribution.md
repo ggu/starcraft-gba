@@ -176,6 +176,55 @@ Protoss window leaves the late Z7 queue lifetime open.
 | 120-call repeat and point consumers | `f26e685ee98285b741e4c11263a9bb7f673ccbee6d26350659de60cfdc0b0e49` |
 | Focused facility and flood call sites | `6522697302bbd5c40fd66fc5e69a20bf567b779ee901060d81c6512c7cb30a9a` |
 
+### Point routing after P10 building destruction
+
+The follow-up ARM trace qualifies four matching replay cuts and
+tracks origin 10,188 and goal 2,708 across two topology changes.
+Before the changes, the slot-6 point prefix retains 67 queued
+cells and serves repeat requests in about 1,127 inclusive guest
+cycles. Building destruction opens six cells at call 44,940 and
+four more at 44,945. The first change invalidates the slot. At
+44,963, the lookup takes 651,606 cycles to publish its replacement
+with 68 queued cells. The next two sampled requests hit that
+replacement in about 1,127 cycles each. The parked frontier and
+field remain unchanged across the hits, even as the transient
+scratch changes. There is no live physical donor in this window.
+
+Recomputing canonical FIFO directions on the captured grids
+validates all 7,637 known directions on the old grid. Two change
+after the first opening and four after the second. The queried
+origin retains the same 112-step ordered route and first predecessor
+on all three grids. Another equally short route uses reopened
+cells, so path validity and distance alone cannot certify the old
+field. The existing bounded monotone probe returns the exact
+predecessor on all three grids after 1,176 node visits. It hits
+the bound at each of 512, 768 and 1,024 visits.
+
+The local ARM trial raises the probe limit from 512 to 1,536 only
+for blocked goals on 128-column grids at Manhattan distance 96
+or farther. The update ending at call 44,963 drops from 2,096,254
+to 1,646,546 guest cycles, including presentation. Over the full
+9,489-update continuation, the mean rises from 1,451,475 to
+1,465,165 cycles (+0.94%). Both runs win. All 122 sampled world,
+weapon, fog, palette, HUD and framebuffer cuts agree, as does the
+exported SRAM. Route counters differ at 121 cuts. The earlier and
+later 600-update three-AI Melee windows have matching sampled
+state, with mean cycles near 766,000 and 1,040,000 in both builds.
+The three host monotone test variants pass. Keep the larger
+probe budget local and measure first-fill savings with reuse
+before revisiting it.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Slot and parked frontier lifetime | `d341a99d990c8abc14ba7bb140e1f409dd7506fb92c81033667b1c23766c1e9e` |
+| Grid invalidations and openings | `5a702f3aeb1159fdfd7a972dd51db6797fc3b521bb1fe728f40638948b4a5158` |
+| Offline ordered FIFO comparison | `2980684c0c9a4d4ff9c94e0e0a4c8f412a715ed14d57746d6244d497a9a1a19d` |
+| Offline monotone probe | `10e612933b97e72505e4d6c1144b87e2bf6c86163fd6c26078bb1da8b80eb98c` |
+| Stock full P10 continuation | `9a4f3b406856c12063e79ba4ee6b6d7c65660975b9299bf623e165ff8ffa580d` |
+| Longer-probe full P10 continuation | `3ad44058fb76c98454d923f2fc166c52d046d191a21dfd2b94c88dbf8b04ebcc` |
+| Stock three-AI Melee windows | `756569a4f93d2d61e74f4f4aeb388dad9e9b50ab9aa843ddfe59e4e2daed3a2d` |
+| Longer-probe three-AI Melee windows | `f09931c98ad508dde2794cc19adc20d57bced2fec5271dce771ecd2809c39858` |
+
 ## Full FIFO completions
 
 On the same late Z7 replay, all six baseline point fills exhaust the
