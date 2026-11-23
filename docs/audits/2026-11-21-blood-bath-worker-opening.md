@@ -30,6 +30,9 @@ alternate search during approach observed at the northwest
 start. The later sampled worker has not begun service or
 received cargo. The capture does not trace the exact branch
 or the candidate ranking for this particular change.
+At step 6,505, patch 56 is the nearest other live patch by
+squared center distance from both SCV 69 and patch 49. This
+sample leaves both ranking origins possible.
 
 The observer qualified three RAM cuts, two frame copies and
 unchanged input pins. Its step counter is an observer clock.
@@ -39,6 +42,57 @@ unchanged input pins. Its step counter is an observer clock.
 | 6,505 | 49 | `34f0aa0c84aef7e012e6aebf2249b555d04e14d49932ba1bfb362588dd4ffc84` |
 | 6,515 | 56 | `f097c9fe998b17ae0c01b5db74236ed74f2b626aedaab8d8d5891cb33aedc3d6` |
 | 6,525 | 56 | `7a17b6b29fa9020f2adafe5296a866ea4851b53aca0893f7733e34690a99de0e` |
+
+### Shared mineral contention prototype
+
+`SC64_MINERAL_PATCH_CONTENTION_PROBE` checks for contention
+at the mineral work radius in both worker order paths. Each
+order pass reconstructs one temporary claimant per mineral
+slot from eligible workers with remaining work timers. If an
+older save contains multiple partial timers on one patch, the
+lowest eligible unit slot works first and the other timers keep
+their remaining work. A patch claimed during an update becomes
+available on the next update after its worker finishes or leaves.
+A worker with an invalidated depot cache can hold a claim for one
+update while it discovers that no home remains.
+
+An empty waiting worker without partial work can choose a known,
+unoccupied, reachable patch. The prototype reuses the existing
+depletion search's cluster radius, route check and slot ordering.
+It staggers each worker's alternate search across 16 updates.
+The worker waits when the search has no eligible result. Gas,
+loaded depot returns and the existing opening assignments still
+follow their existing rules. Claims need at most one byte per
+mineral slot and use the existing saved target, timer and frame.
+
+The authored host fixture covers simultaneous arrivals, old
+duplicate timers, no alternate, hidden and unreachable patches,
+and loaded return. It also saves and reloads duplicate timers in
+the default profile. Run `make test-sc64-mineral-contention`
+for the default and Frontier variants.
+The same fixture also passes with prepared race inputs, cargo
+kinds and nearest-depot selection. That run checks that the
+explicit gather flag survives a contention retarget.
+
+| Authored ARM Frontier order workload | Probe off mean cycles | Probe on mean cycles |
+| --- | ---: | ---: |
+| Four miners at separate patches | 47,330 | 50,878 |
+| Sixteen miners at separate patches | 38,551 | 43,587 |
+| Twenty-four workers at one patch, no alternative | 34,231 | 39,323 |
+| Twenty-four workers at one patch, alternatives nearby | 34,212 | 74,252 |
+
+The emulator measures the order pass over 16 updates per setup
+with the game wait states. The first two setups match all sampled
+worker state. The last two deliberately differ as workers wait
+or retarget. Much of the last increase coincides with new route
+and movement work. Use an ordinary gameplay replay before making
+any frame-pacing claim. The local timing receipt SHA-256 is
+`6f14d292d8991570f05be996ce860df68741779708aa1325e8e7510778345f5f`.
+
+The prototype stays opt-in. Qualify the opening with duplicate
+valid targets, exact native alternate ranking, ordinary saves
+and reloads, campaign income, and busy Custom Game timing before
+enabling a shared release flag.
 
 ## Formation experiment
 

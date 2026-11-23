@@ -686,6 +686,25 @@ Neither trial supplies additional firepower to the northwest guard.
 | Two Hydralisks on the western route | `5802b06483f82b246382d488031498d192ed4f6669cb06d079c76a433f105fa3` |
 | Five Hydralisks and an Overlord via the top edge | `210c7f38babd300f5888158ab37a5fddda29469a6b15d33cfb92916f2a953a3e` |
 
+### Lower corridor and Overlord transport
+
+The lower route from the same frame 26,125 save brings the
+five northern Hydralisks toward (1,450, 600) and then west.
+Only two remain by frame 27,971 and all five are gone by
+28,700. The Overlord reaches (168, 266) at 32,587 with 200 HP.
+The mission remains active and the northwest guard has lost
+one Hydralisk while unattended. The separate controller trace
+SHA-256 is `38fe9ae23909679f124a9896cae280b9229b6e8800457c88a71aa3cb4626fef8`.
+
+The retained Z10 cartridge has the shared transport service and
+the Z6 Overlord path. In this Z8 campaign save, the race-mode
+Ventral Sacs route and the Z6 mission route are both unavailable.
+Fresh HOME readback at frame 26,125 confirms race mode is off and
+the shared transport research bytes are zero. The shared research
+menu also requires race mode. The successful Overlord flight
+therefore supplies detection without carrying the Hydralisks.
+Native Z8 transport availability remains a parity check.
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

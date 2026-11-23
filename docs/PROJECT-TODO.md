@@ -307,8 +307,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   while native workers still share a patch at second 12. A [fresh
   native replay](audits/2026-11-21-blood-bath-worker-opening.md#observed-retarget-during-approach)
   catches an approaching worker changing its target while another
-  worker holds the old patch. Qualify contention separately from
-  service duration and preserve valid saved mine targets.
+  worker holds the old patch. The [shared contention prototype](audits/2026-11-21-blood-bath-worker-opening.md#shared-mineral-contention-prototype)
+  preserves held timers and checks for reachable free alternatives.
+  Qualify duplicate opening targets, the native alternate ranking,
+  ordinary saves and reloads, and busy game cost before enabling it.
   The [shared steering change](audits/2026-11-22-open-steering-directions.md)
   skips distance and terrain checks for actor-blocked directions. The
   P10 victory tail improves 0.93% in mean cycles and the matched Blood
@@ -925,8 +927,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fourth Templar at 21 HP when the objective triggers defeat at
   frame 47,628. [Two reinforcement routes](audits/2026-11-12-z8-normal-physical.md#northern-hydra-reinforcement-attempts)
   through the north lose their Hydralisks or stall before reaching
-  the guard. Stage the northwest reserve earlier or use a verified
-  Nydus transfer while preserving southern production, then
+  the guard. The [lower corridor](audits/2026-11-12-z8-normal-physical.md#lower-corridor-and-overlord-transport)
+  loses all five Hydralisks. The Overlord gets through, and its
+  transport gates are unavailable in this stock Z8 save. Stage
+  the northwest reserve earlier or use a verified Nydus transfer
+  while preserving southern production, then
   qualify a fresh HOME load after the fourth interception.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
