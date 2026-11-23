@@ -108,6 +108,23 @@ remains open.
 | Fresh-load receipt | `3afbb7b70bf3a0197d13e5bf4b658c8d6c7da6d1994c60e1d8833af5f4cb6d20` |
 | World checkpoint comparison | `7806a0659f5e59f7593d0e2dc0b75d578c0fbd458ede3f42e9fe704ad833c2a8` |
 
+## November 23 current controller comparison
+
+The older physical-button tape no longer follows the prior victory
+route on the current regular Z10. The route-table build and direct
+Bring candidate agree on call indices, physical input counts, frames,
+screens and dialogue counts throughout their 36,496-call common prefix.
+The emulator's per-file log limit stopped both comparisons.
+
+The same current host controller was then compiled with the
+prepared Z10 feature and input vectors for both sources. It destroys
+the second Nexus and loses Kerrigan at frame 62,535. The two complete
+63,637-call input tapes and the pause SRAM agree byte for byte. Mineral
+reserves stay under 60 after the second objective falls. The replay
+needs an economy refresh and a new ordinary victory witness on the
+current Z10. The shared controller tape SHA-256 is
+`c83249a72f856617df0fa50c5a1b69ab7a6daa7d94bd7a6e0553bbd8cf787a8e`.
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
