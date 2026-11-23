@@ -1060,6 +1060,43 @@ attackers and six Drones for a new production branch.
 | Independent fresh HOME shields and attacker survival | `803642ccec8a96099c4885619d82ed9144bf51f63a6ab2cc32680f79ea239862` |
 | Southern regroup and fresh HOME | `0b1f796778503bb706aa1f70c66f42d68e70dd240ef1c55ca6146eb85b646c31b4` |
 
+### Rebuild the eastern attack to eleven Hydralisks
+
+From the frame-60,626 Cannon-clear save, train two
+Overlords and three Hydralisks in the south. Fresh HOME
+at frame 63,932 has supply 63/82, 409 gas, and all eight
+original attackers alive. The three new Hydralisks are
+at full health. Group all eleven with the two Overlords,
+and verify that the selection survives fresh HOME at
+frame 64,983. Kerrigan stays separate at 400 HP.
+
+The Pylon falls at frame 66,244, and seven Hydralisks
+remain for the Nexus order. All seven fall. Fresh HOME
+at frame 66,460 shows the Nexus at 750 HP and 523 shields,
+with the mission active. The earlier direct attempt
+depleted 670 shields from the same full value.
+
+A direct bypass from the eleven-unit formation splits
+the force into eastern and western routes. No Nexus
+damage is observed during the 1,800-update trial. The
+last selected surviving Hydralisk fires at the Pylon.
+Fresh HOME at frame 66,877 shows the Nexus at 750 HP
+and 750 shields and the Pylon at 244 HP and one shield.
+Kerrigan remains at 400 HP. The formation checkpoint
+preserves the entire force for staging closer to one
+approach before committing it.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Train two Overlords and three Hydralisks | `2e71b60696938355505d5b35db522895acf816c55e43003d4fe92bf2dfc829a1` |
+| Frame-63,932 HOME SRAM | `685c5f34facb1ad6061f0466d4ff23ce8ce3b54ae647ed64abe4d39bab769645` |
+| Form and reload the eleven-Hydralisk force | `fd0dc3fe5a1fa52822fae134dc81cfb94eeb71d595acecce51624739ada66d2e` |
+| Frame-64,983 HOME SRAM | `d183a4e95023269b0fbf76b9e35b304ff29206388e02d3f51c9bc37c6d5c9cc8` |
+| Pylon and Nexus attack trace | `3f71039d42b6a3752ca93b4d20d156193cde8d32336e056dff5a7135056a14d6` |
+| Frame-66,460 HOME SRAM | `42d790027e45f91c58009c9a9b076bfeaee53b6b86ac1c04a0f43d9792a44c7b` |
+| Direct bypass trace | `f8e9f1c8861ca940edb5e8bfb3abb72cf506582800d38a952c45946631b6a139` |
+| Frame-66,877 HOME SRAM | `2e5671fb9b0a38abee46de8e3bf675344d09a55d6ac654e2d10a9254b2a7f35a` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

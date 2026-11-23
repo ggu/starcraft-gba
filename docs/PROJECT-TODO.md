@@ -75,6 +75,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   in 129 sampled scans. Speed-major packing saves ROM and improves
   only the larger authored groups. Prioritize the work leading up
   to each geometry lookup.
+  [Prepared walk-grid steering](audits/2026-11-22-open-steering-directions.md#reuse-the-prepared-walk-grid)
+  saves 6.0–10.7% in authored ARM selection batches with the
+  observed Outpost mask mix. All 503 observed calls already have
+  a valid grid, and 393,216 exact-source comparisons match.
+  Measure the combined release frame cost during a busy battle.
   The [merged selection and detector query changes](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
   saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
   Custom Game replays with matching state and video. Profile repeated
@@ -806,9 +811,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   show one worker in service and FIFO handoffs in an ordinary four-seat
   Blood Bath. [A later contested patch](audits/2026-11-21-native-mineral-service-queue.md#contested-service-later-in-blood-bath)
   also removes its waiter and transfers service within five native
-  updates of an eight-ore debit. Qualify a saved service policy, the remaining
-  depot travel and unloading, and campaign and CPU economy before
-  normal activation.
+  updates of an eight-ore debit. In the
+  [ordinary GBA predecessor save](audits/2026-11-21-native-mineral-service-queue.md#ordinary-predecessor-save-with-simultaneous-service),
+  two SCVs service one patch concurrently and resume exactly
+  after HOME. Keep that continuation valid while qualifying a
+  saved service policy, depot travel and unloading, and campaign
+  and CPU economy for new matches.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.
@@ -1001,9 +1009,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and Kerrigan. The [eastern assault](audits/2026-11-12-z8-normal-physical.md#eastern-outer-defenses-and-nexus-shield-readings)
   removes the outer Cannon and Pylon. The direct attack takes
   the first Nexus down to 80/750 shields before losing seven
-  Hydralisks. Rallying the existing reserves still gives eight
-  attackers. Continue from the Cannon-clear save to raise supply
-  and train a larger force for the direct lane.
+  Hydralisks. The [rebuilt formation](audits/2026-11-12-z8-normal-physical.md#rebuild-the-eastern-attack-to-eleven-hydralisks)
+  increases the force to eleven Hydralisks at fresh HOME frame
+  64,983. Attacking the Pylon first leaves seven for the Nexus.
+  A direct bypass splits the force and leaves the Nexus at full
+  health and shields. Stage the eleven together near one approach
+  before issuing the objective attack.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
