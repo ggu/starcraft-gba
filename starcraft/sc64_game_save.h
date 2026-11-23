@@ -23,7 +23,13 @@ save_game(void)
     return race_save_game();
 #endif
 #else
+#ifdef SC64_MINERAL_FIFO
+    GbaSaveSelection previous;
+    int have_previous = worker_mineral_fifo_select(&previous);
+    data.version = mineral_fifo_enabled ? SC64_MINERAL_FIFO_SAVE_VERSION : SAVE_VERSION;
+#else
     data.version = SAVE_VERSION;
+#endif
     memcpy(data.units, u, sizeof(u));
     memcpy(data.buildings, b, sizeof(b));
     memcpy(data.minerals_map, m, sizeof(m));
@@ -72,7 +78,15 @@ save_game(void)
 #elif defined(SC_ORIGINAL_SKIRMISH)
     data.skirmish_map = original_skirmish_map;
 #endif
+#ifdef SC64_MINERAL_FIFO
+    if (mineral_fifo_enabled && !worker_mineral_fifo_encode()) return 0;
+    int saved = have_previous
+        ? save_write_selected(&data, sizeof(data), data.version, &previous, mineral_fifo_save_tags, 2)
+        : save_write_first(&data, sizeof(data), data.version);
+    if (!saved) return 0;
+#else
     save_write(&data, sizeof(data), SAVE_VERSION);
+#endif
     toast(7);
     return 1;
 #endif
@@ -110,14 +124,27 @@ load_game(void)
 #endif
     return loaded;
 #else
+#ifdef SC64_MINERAL_FIFO
+    GbaSaveSelection selected;
+    if (!worker_mineral_fifo_select(&selected) || !raw_game_save_apply(1)) return 0;
+    mineral_fifo = prepared_mineral_fifo;
+    mineral_fifo_enabled = selected.tag == SC64_MINERAL_FIFO_SAVE_VERSION;
+    return 1;
+}
+
+static int
+raw_game_save_apply(int apply)
+{
+#else
+    if (!save_read(&data, sizeof(data), SAVE_VERSION) || data.version != SAVE_VERSION)
+	return 0;
+#endif
     int i, j, computed_supply = 0, computed_cap =
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
         0;
 #else
         20;
 #endif
-    if (!save_read(&data, sizeof(data), SAVE_VERSION) || data.version != SAVE_VERSION)
-	return 0;
 #ifdef SC64_IMPORTED_MISSION
     if (data.mission_objective_stage < 0 || data.mission_objective_stage > 1)
 	return 0;
@@ -181,6 +208,9 @@ load_game(void)
 	data.train_type < U_MARINE || data.train_type > U_MEDIC ||
 	data.weapons_level < 0 || data.weapons_level > 2 || data.armor_level < 0 || data.armor_level > 2)
 	return 0;
+#ifdef SC64_MINERAL_FIFO
+    if (!apply) return 1;
+#endif
     memcpy(u, data.units, sizeof(u));
     /* Older non-race saves recorded the current upgrade in newly spawned
      * units. Armor is derived from type and the live upgrade is applied on

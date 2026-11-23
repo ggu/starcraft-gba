@@ -105,6 +105,10 @@ worker_continue_minerals(Unit *q)
 static int
 worker_gather_ready(Unit *q)
 {
+#ifdef SC64_MINERAL_FIFO
+    if (mineral_fifo_enabled && q->order == ORDER_MINE && IS_WORKER(q->type))
+        return worker_mineral_fifo_ready(q);
+#endif
 #ifdef SC64_MINERAL_PATCH_CONTENTION_PROBE
     if (q->order == ORDER_MINE && IS_WORKER(q->type)) {
         const unsigned slot = (unsigned)(q - u);

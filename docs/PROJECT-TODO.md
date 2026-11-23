@@ -829,8 +829,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and CPU economy for new matches.
   The [packed row feasibility check](audits/2026-11-21-native-mineral-service-queue.md#queue-order-in-existing-width-save-rows)
   round-trips all 240 proposed waiter ranks through four codecs with
-  independent timers. Qualify the new save tag and transactional
-  queue reconstruction before enabling the policy.
+  independent timers. The [standalone FIFO stage](audits/2026-11-21-native-mineral-service-queue.md#standalone-fifo-and-journal)
+  passes arrival order and journal fallback checks on both standalone
+  profiles. A fresh ARM process restores the queue and matches 50
+  updates. Eight independent workers add about 3,929 guest cycles per
+  orders pass in the authored ARM fixture. Integrate the transactional
+  queue reconstruction into the packed journals and measure race
+  economy and pacing before shared activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.
