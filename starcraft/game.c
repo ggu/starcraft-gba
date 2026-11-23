@@ -8265,68 +8265,7 @@ add_owner_resources(int owner, int ore, int vespene)
 }
 #endif
 
-enum { SC64_MINERAL_SEARCH_RADIUS = 192 };
-
-/* Continue an established mineral job within its former mineral cluster.
- * OpenBW bounds depleted-field searches to 12 source tiles (192 pixels at
- * this engine's half scale). Reuse the normal route predicate; never assign
- * an undiscovered human field or select an unreachable closer field.
- * The engine does not retain source terrain elevation/worker field queues,
- * so this is bounded continuation, not an exact native allocation policy. */
-static int __attribute__((noinline))
-worker_continue_minerals(Unit *q)
-{
-    const int distance_limit = SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS + 1;
-    int best = -1, best_d = distance_limit;
-    int origin_x, origin_y;
-    if (q->target < 0 || q->target >= MAX_MINERALS) return 0;
-    origin_x = m[q->target].x;
-    origin_y = m[q->target].y;
-    /* Rank in slot order before routing. A reachable minimum wins; on a
-     * miss, repeat the original scan without the unreachable minimum. */
-    int known_miss = -1;
-    do {
-        for (int i = 0; i < MAX_MINERALS; ++i) {
-            int d, nx, ny;
-            if (i == known_miss) continue;
-            if (m[i].amount <= 0 || m[i].x < 0 || m[i].y < 0 ||
-                m[i].x >= WORLD_W || m[i].y >= WORLD_H) continue;
-            if (q->owner == SIDE) {
-                int cell = m[i].x / 16 + (m[i].y / 16) * MAP_COLS;
-                if (!SC64_GRID_GET(explored, cell) && !SC64_GRID_GET(visible, cell))
-                    continue;
-            }
-            d = dist2(origin_x, origin_y, m[i].x, m[i].y);
-            if (d >= best_d) continue;
-            if (known_miss >= 0 && !path_next_tile(q->x, q->y, m[i].x, m[i].y, &nx, &ny))
-                continue;
-            best = i;
-            best_d = d;
-        }
-        int nx, ny;
-        if (known_miss >= 0 || best < 0 ||
-            path_next_tile(q->x, q->y, m[best].x, m[best].y, &nx, &ny)) break;
-        known_miss = best;
-        best = -1;
-        best_d = distance_limit;
-    } while (1);
-    if (best < 0) return 0;
-    q->target = best;
-    q->tx = m[best].x; q->ty = m[best].y;
-    q->path_timer = q->path_retry = 0;
-    q->work_timer = 0;
-    q->build = -1;
-    return 1;
-}
-
-/* A resource wait advances only while the worker is at its target. Existing
- * saved nonzero timers remain remaining work; no new persistent state. */
-static int
-worker_gather_ready(Unit *q)
-{
-    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? 45 : 60;
-    return --q->work_timer == 0;
-}
+#include "sc64_worker_minerals.h"
 
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
 /* Leave combat orders in fast RAM. Keeping the less frequent worker return
@@ -9395,6 +9334,9 @@ target_lists_unavailable:
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
 #endif
     SC64_PSC_WORLD_TICK();
+#ifdef SC64_MINERAL_PATCH_CONTENTION_PROBE
+    worker_mineral_claims_begin();
+#endif
     for (i = 0; i < MAX_UNITS; i++) {
 	Unit *q = &u[i];
 	if (!q->alive)

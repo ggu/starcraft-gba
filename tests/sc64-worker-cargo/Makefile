@@ -14,6 +14,17 @@ WORKER_CARGO_p7_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURC
 WORKER_CARGO_p10_SOURCES = $(WORKER_CARGO_p7_SOURCES)
 WORKER_CARGO_showcase_SOURCES = $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c
 
+MINERAL_CONTENTION_FLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -fsanitize=address,undefined -DGBA_HOST -DSC64_MINERAL_PATCH_CONTENTION_PROBE -Icommon
+MINERAL_CONTENTION_DEPS = tests/sc64_mineral_contention_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h tests/sc64-worker-cargo/Makefile
+build/test-sc64-mineral-contention-default: $(MINERAL_CONTENTION_DEPS) | build
+	$(CLANG) $(MINERAL_CONTENTION_FLAGS) $< common/gba.c -o $@
+build/test-sc64-mineral-contention-frontier: $(MINERAL_CONTENTION_DEPS) | build
+	$(CLANG) $(MINERAL_CONTENTION_FLAGS) -DSC64_SKIRMISH -DSC_ORIGINAL_SKIRMISH -DSC64_FRONTIER_ROUTE_CACHE $< common/gba.c -o $@
+.PHONY: test-sc64-mineral-contention
+test-sc64-mineral-contention: build/test-sc64-mineral-contention-default build/test-sc64-mineral-contention-frontier
+	./build/test-sc64-mineral-contention-default
+	./build/test-sc64-mineral-contention-frontier
+
 define SC64_WORKER_GATHER_FIXTURE
 build/test-sc64-worker-gather-$(1): tests/sc64_worker_gather_game.c $(STARCRAFT) $$(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile tests/sc64-worker-cargo/Makefile | build
 	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(WORKER_CARGO_CPPFLAGS) $$(WORKER_CARGO_$(1)_FLAGS) -DSC64_WORKER_CARGO_KIND $$< common/gba.c $$(WORKER_CARGO_$(1)_SOURCES) -o $$@
