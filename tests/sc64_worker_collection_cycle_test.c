@@ -4,6 +4,12 @@
 #include "sc64_worker_gather_game.c"
 #undef main
 
+#ifdef SC64_NATIVE_MINERAL_WAIT_PROBE
+enum { EXPECTED_MINERAL_WAIT = 102 };
+#else
+enum { EXPECTED_MINERAL_WAIT = 45 };
+#endif
+
 static void cycle(int race, int worker_type, int depot_type, int refinery_type, int is_gas)
 {
     reset_scene(race, race == R_TER ? R_ZERG : R_TER);
@@ -15,7 +21,7 @@ static void cycle(int race, int worker_type, int depot_type, int refinery_type, 
     u[w].order=is_gas ? ORDER_GAS : ORDER_MINE;
     u[w].target=is_gas ? 1 : 2;
     u[w].build=-1; u[w].work_timer=0;
-    int duration=is_gas ? 60 : 45;
+    int duration=is_gas ? 60 : EXPECTED_MINERAL_WAIT;
     for(int trip=0; trip<2; ++trip) {
         for(int i=0; i<duration-1; ++i) {
             one_tick();
@@ -46,7 +52,7 @@ static void mismatch_and_no_home(int race, int worker_type)
     m[2].x=128; m[2].y=96; m[2].amount=5;
     u[w].order=ORDER_MINE; u[w].target=2; u[w].build=-1;
     u[w].carry=6; u[w].flags |= SC64_WORKER_CARGO_GAS | SC64_WORKER_GATHER_PENDING;
-    for(int i=0;i<44;i++) {
+    for(int i=0;i<EXPECTED_MINERAL_WAIT-1;i++) {
         one_tick(); assert(u[w].carry==6 && m[2].amount==5 && !minerals && !gas);
         assert(sc64_worker_cargo_is_gas(&u[w]));
     }
