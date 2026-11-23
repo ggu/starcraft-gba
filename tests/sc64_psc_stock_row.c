@@ -25,6 +25,51 @@ static int scarabs(int type)
     return n;
 }
 
+/* The P7 typed row codec, with the Scarab row of the loaded world re-typed as the stock build writes it and
+ * as no build writes it. Fields are patched in the encoded row (LSB-first bit packing). */
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#define ROW_ENC(r, q) sc64_p7_typed_unit_encode_for(r, q, WORLD_W, WORLD_H, 1)
+#define ROW_DEC(o, r) sc64_p7_typed_unit_decode_for(o, r, WORLD_W, WORLD_H, 1)
+#else
+#define ROW_ENC(r, q) sc64_p7_typed_unit_encode(r, q, WORLD_W, WORLD_H)
+#define ROW_DEC(o, r) sc64_p7_typed_unit_decode(o, r, WORLD_W, WORLD_H)
+#endif
+static void row_patch(Sc64P7TypedUnitSave *r, unsigned off, unsigned width, unsigned val)
+{
+    for (unsigned i = 0; i < width; ++i, ++off) {
+        u8 m = (u8)(1u << (off & 7u));
+        if ((val >> i) & 1u) r->bytes[off >> 3] |= m; else r->bytes[off >> 3] &= (u8)~m;
+    }
+}
+static void codec_rows(void)
+{
+    enum { TYPE_BIT = 43, RAW_BIT = 186 };   /* x11 y11 hp18 owner3 | type6 ... shield9 | raw8 */
+    int s = -1;
+    Sc64P7TypedUnitSave row, bad;
+    Unit out;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type == U_SCARAB) { s = i; break; }
+    assert(s >= 0 && u[s].raw_type == 85);
+    assert(ROW_ENC(&row, &u[s]));
+    memset(&out, 0, sizeof(out));
+    assert(ROW_DEC(&out, &row) && out.type == U_SCARAB && out.raw_type == 85);
+    /* The stock pair: id SC_RU_LEGACY_COUNT, raw 85 -> this build's Scarab. */
+    bad = row; row_patch(&bad, TYPE_BIT, 6, SC_RU_LEGACY_COUNT);
+    memset(&out, 0, sizeof(out));
+    assert(ROW_DEC(&out, &bad) && out.type == U_SCARAB && out.raw_type == 85);
+    /* The staged id with any other raw type is not a Scarab and is not translated. */
+    for (unsigned raw = 0; raw < 255; ++raw) {
+        if (raw == 85) continue;
+        bad = row; row_patch(&bad, TYPE_BIT, 6, SC_RU_LEGACY_COUNT); row_patch(&bad, RAW_BIT, 8, raw + 1);
+        memset(&out, 0, sizeof(out));
+        if (ROW_DEC(&out, &bad)) assert(out.type == SC_RU_LEGACY_COUNT && out.raw_type == (int)raw);
+    }
+#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+    bad = row; row_patch(&bad, TYPE_BIT, 6, SC_RU_LEGACY_COUNT); row_patch(&bad, RAW_BIT, 8, 84 + 1);
+    assert(!ROW_DEC(&out, &bad));            /* the Egg id with a Scarab-like row but the wrong raw type */
+#endif
+    puts("codec rows PASS (stock pair translated; the staged id with another raw type is never a Scarab)");
+}
+
 static void read_stock(const char *path)
 {
     FILE *f = fopen(path, "rb");
@@ -38,6 +83,7 @@ static void read_stock(const char *path)
            scarabs(U_SCARAB), (int)U_SCARAB, scarabs(SC_RU_LEGACY_COUNT), (int)SC_RU_LEGACY_COUNT);
     assert(scarabs(U_SCARAB) >= 1);
     assert(scarabs(SC_RU_LEGACY_COUNT) == 0);
+    codec_rows();
     /* The loaded world runs on: the Scarab flies and lands as in the product. */
     for (int t = 0; t < 400; ++t) game_update(0, 0);
     puts("read PASS");

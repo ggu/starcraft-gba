@@ -1115,7 +1115,7 @@ static void lift_facility(void)
     race_paid_scarab_trained(r); u[r].carry = SC64_PSC_INIT | 5;
     hp = b[f].hp + b[f].shield;
     /* A grounded witness next to the facility, inside the splash: the explosion must happen and must hurt it. */
-    w = spawn_unit(ENEMY, U_PROBE, hx, hy + 44);
+    w = spawn_unit(ENEMY, U_PROBE, hx, hy + 16);   /* the splash reaches 30 px; the facility is 96 x 64 */
     assert(w >= 0);
     u[w].order = ORDER_IDLE; u[w].tx = u[w].x; u[w].ty = u[w].y;
     whp = u[w].hp + u[w].shield;
@@ -1126,6 +1126,7 @@ static void lift_facility(void)
     assert(u[w].hp + u[w].shield == whp);            /* untouched before the explosion */
     b[f].flags |= 4;                                 /* it lifts off after the launch */
     assert(race_bc_facility_airborne(f));
+    invalidate_path_grid();                          /* a lifted building frees its footprint */
     step(2);
     assert(u[shot].alive && u[shot].target == -1);   /* the Scarab no longer homes on it */
     for (int n = 0; n < 120 && scarab_in_flight(r) >= 0; ++n) step(1);
