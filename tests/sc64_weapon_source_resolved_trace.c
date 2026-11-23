@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <stdint.h>
+#include <limits.h>
 /* Hand-authored bank that forces a trace into a NULL active phase after Init.
  * The draw key aliases projectile id 100 to image 200; animation zero selects
  * frame 1, while the NULL overlay frame falls back to frame 0. */
@@ -192,5 +193,44 @@ int main(void)
     sc64_weapon_source_vfx_draw_trace(packed, 50, 50, 80, 50, 1, gba_age);
     assert(draw_count == 1);
     assert(drawn[0] == test_pixels + 2);
+
+    /* FOLLOW uses captured endpoint interpolation in the projectile-only
+     * renderer. Its proof must remain conservative at every clip edge and
+     * must never discard the non-raster trail-pick side effect. */
+    Sc64WeaponSourceAttackProfile follow = test_profile;
+    follow.weapon_bullet_type = SC64_SOURCE_BULLET_FOLLOW;
+    uint16_t rx, ry;
+    assert(sc64_weapon_source_vfx_bounds_unpack(
+        sc64_weapon_source_vfx_cached_bounds(), &rx, &ry));
+#define CULL(x0,y0,x1,y1,parts,pick) \
+    sc64_weapon_source_vfx_trace_parts_provably_offscreen_resolved( \
+        key, &follow, (x0), (y0), (x1), (y1), 0, 0, (parts), (pick))
+    const unsigned projectile = SC64_TRACE_PROJECTILE;
+    /* The two-pixel frame at x=240 straddles the right edge: its anchor
+     * is outside the viewport, but its leftmost pixel is still visible. */
+    draw_count = 0;
+    sc64_weapon_source_vfx_draw_image_frame_resolved(200, &test_keyed_image,
+        &sc64_weapon_source_frames[1], 0, 240, 50);
+    assert(draw_count == 1);
+    assert(!CULL(240, 50, 240, 50, projectile, 0));
+    /* The anchor can be offscreen while the conservative sprite footprint
+     * still touches the clip; one pixel beyond that bound can be rejected. */
+    assert(!CULL(-(int)rx, 50, -(int)rx, 50, projectile, 0));
+    assert(CULL(-(int)rx-1, 50, -(int)rx-1, 50, projectile, 0));
+    assert(!CULL(239+(int)rx, 50, 239+(int)rx, 50, projectile, 0));
+    assert(CULL(240+(int)rx, 50, 240+(int)rx, 50, projectile, 0));
+    assert(!CULL(50, -(int)ry, 50, -(int)ry, projectile, 0));
+    assert(CULL(50, -(int)ry-1, 50, -(int)ry-1, projectile, 0));
+    assert(!CULL(50, 107+(int)ry, 50, 107+(int)ry, projectile, 0));
+    assert(CULL(50, 108+(int)ry, 50, 108+(int)ry, projectile, 0));
+    assert(CULL(-1000, 50, -900, 50, projectile, 0));
+    assert(!CULL(-1000, 50, 1000, 50, projectile, 0));
+    assert(!CULL(-1000, 50, -900, 50,
+                 projectile | SC64_TRACE_ATTACKER_IMAGE, 0));
+    assert(!CULL(-1000, 50, -900, 50, projectile, 1));
+    assert(!CULL(INT_MIN, 50, INT_MIN, 50, projectile, 0));
+    follow.weapon_bullet_type = 255u;
+    assert(!CULL(-1000, 50, -900, 50, projectile, 0));
+#undef CULL
     return 0;
 }

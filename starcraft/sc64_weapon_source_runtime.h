@@ -234,6 +234,8 @@ sc64_weapon_source_animation_visual_ticks(const Sc64WeaponSourceAnimation *anim)
     return end > UINT32_MAX ? UINT32_MAX : (uint32_t)end;
 }
 
+/* The FOLLOW viewport check uses this function's captured endpoint envelope.
+ * Revisit that check if the projection starts using a live target position. */
 static inline int
 sc64_weapon_source_trace_position_motion(const Sc64WeaponSourceAttackProfile *p,
                                          int x0, int y0, int x1, int y1,

@@ -785,6 +785,57 @@ in a visible fight.
 | Outpost nested tracer timing | `f294995a856fe7b7807377ef5c7d6937645fd484aefc2008b26389e2435ef713` |
 | Crossfire raster census | `ba93b109c4b900c94c13aa64557dfb0148bce73091acc26e8d2926f827752e8b` |
 
+### Viewport bounds for captured FOLLOW effects
+
+The same Outpost cuts trace all 105 rejected rasters to projectile-only
+FOLLOW draws. Both anchors were outside the viewport in every case.
+The earlier bounds check excluded FOLLOW, so these draws reached the
+renderer. With the retained camera, endpoints, launch projection and
+66-by-61-pixel envelope radii, all 105 would reject before animation and
+raster preparation. The read-only replay matches the eight retained
+world, framebuffer, palette and route samples.
+
+The shared renderer now uses that proof for projectile-only FOLLOW
+draws with signed-16-bit geometry and no trail-pick output. The current
+projection samples the fixed segment from launch to captured target,
+including child births. The existing frame and child-offset bounds
+cover that segment. Calls that collect trail picks still use the
+existing path to produce painter keys. The sanitizer fixture exercises
+every clip edge, a partially visible frame with an offscreen anchor,
+a segment crossing the viewport, combined parts and invalid geometry.
+
+Four authored ARM cases run 64 draws each with the actual Mode 4
+blitters. Both builds produce identical framebuffer hashes.
+
+| Draw case | Baseline cycles | Candidate cycles | Candidate culls |
+| --- | ---: | ---: | ---: |
+| Offscreen FOLLOW | 289,753 | 11,792 | 64 |
+| FOLLOW crossing with both anchors offscreen | 334,633 | 341,673 | 0 |
+| Visible FOLLOW | 309,345 | 309,345 | 0 |
+| Visible FLY | 309,345 | 309,345 | 0 |
+
+The crossing case exercises the expanded bounds and draws the same
+two pixels. The far-off case finishes with the original blank page.
+The mixed fixture uses 82 far-off draws out of 426, plus visible
+horizontal, reversed and vertical crossings. Both optimization
+levels reproduce eight changed pixels and the same full framebuffer.
+The speed-optimized build uses 2,225,418 versus 1,929,054 cycles
+(13.32% fewer). The size-optimized build uses 2,320,682 versus
+1,981,509 cycles (14.61% fewer).
+
+Measure current cartridge frame pacing in sustained battles with
+both camera positions before using these figures for FPS claims.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Outpost trajectory and call-site replay | `a7b0ccfd5924d5532996fd2617fc5875e5e7114581b5bfca6c6e0b0b7346464f` |
+| Outpost expanded-bounds replay | `a153287f5b1bab6cd66816882bd871de952f0da0bdaad7605349661f958b7337` |
+| Authored ARM fixture | `78a0d1de6a2f45becac0dc801429ae3b6f45f843ba693fda14eefc50538e2103` |
+| ARM timings and framebuffer checks | `9467874673ce94a1e895ee6342abe61e102386f7123241df5d812d000395f831` |
+| Authored mixed ARM fixture | `99d105fa7a9374df1346a7f47dc33b6fa1da5a34c18074f8e15b8681a53509c1` |
+| Mixed ARM timing, speed-optimized | `79e1028622e952f99501695fc028f1fdf0c5a307c03d4a9b9b56f46eb99f100d` |
+| Mixed ARM timing, size-optimized | `09f45e87190d75a774cdd5dafbf6b9ee8fd27104f3a8ce92203ff004266850c7` |
+
 ## Outpost resource sprite costs
 
 The ordinary late Outpost repeat matches the retained world,
