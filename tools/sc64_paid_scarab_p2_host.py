@@ -43,24 +43,31 @@ def main():
     if r.returncode:
         sys.exit(r.stderr)
     import os
-    env = dict(os.environ, FIND_FRAME=frame)
-    r = run([program, "find", expanded], env=env)
-    m = re.search(r"after call (\d+): frame (\d+), Reaver stock (\d+)", r.stdout)
-    if not m:
-        sys.exit("no human Scarab in flight found\n" + r.stdout + r.stderr)
-    call = int(m.group(1))
-    print(f"first human Scarab in flight: call {call}, frame {m.group(2)}, Reaver stock {m.group(3)}")
     chosen = None
-    for after in range(call, call + 120):
-        run([sys.executable, here / "sc64_paid_scarab_p2_tape.py", expanded, out / "p2", "--after", after]).check_returncode()
-        (out / "p2.sav").unlink(missing_ok=True)
-        r = run([program, "run", out / "p2-save.json", out / "p2.sav"])
-        (out / "run.out").write_text(r.stdout)
-        if r.returncode == 0:
-            chosen = after
+    for attempt in range(40):
+        env = dict(os.environ, FIND_FRAME=frame)
+        r = run([program, "find", expanded], env=env)
+        m = re.search(r"after call (\d+): frame (\d+), Reaver stock (\d+)", r.stdout)
+        if not m:
+            sys.exit("no human Scarab in flight found\n" + r.stdout + r.stderr)
+        call = int(m.group(1))
+        print(f"human Scarab in flight: call {call}, frame {m.group(2)}, Reaver stock {m.group(3)}")
+        for after in range(call, call + 120):
+            run([sys.executable, here / "sc64_paid_scarab_p2_tape.py", expanded, out / "p2", "--after", after]).check_returncode()
+            (out / "p2.sav").unlink(missing_ok=True)
+            r = run([program, "run", out / "p2-save.json", out / "p2.sav"])
+            (out / "run.out").write_text(r.stdout)
+            if r.returncode == 0:
+                chosen = after
+                break
+            if r.returncode == 4:
+                break          # the controller holds a button for a long stretch here: the Scarab is gone by the first neutral call
+            if r.returncode != 3:
+                sys.exit(f"run failed with {r.returncode}\n{r.stdout}\n{r.stderr}")
+        if chosen is not None:
+            print(f"first human Scarab in flight: call {call}, frame {m.group(2)}, Reaver stock {m.group(3)}")
             break
-        if r.returncode != 3:
-            sys.exit(f"run failed with {r.returncode}\n{r.stdout}\n{r.stderr}")
+        frame = str(int(m.group(2)) + 40)    # try a Scarab fired later
     if chosen is None:
         sys.exit("no neutral call near the flight lets the campaign writer save")
     ref = run([program, "ref", out / "p2-ref.json"])

@@ -174,6 +174,26 @@ static u16 held_at(int c)
     return held;
 }
 
+enum { FIND_CALLS = 120000 };
+static unsigned char fly[FIND_CALLS];
+static int fly_frame[FIND_CALLS], fly_stock[FIND_CALLS];
+static u16 fly_held[FIND_CALLS];
+
+/* The first neutral call that lies inside a Scarab's flight with room to spare: the pause menu opens
+ * on that call and the flight must still be on when the menu has written the save (a few calls later). */
+static void pick_flight_call(int calls)
+{
+    int from = getenv("FIND_FRAME") ? atoi(getenv("FIND_FRAME")) : 0;
+    for (int n = 1; n + 8 < calls && n + 8 < FIND_CALLS; ++n) {
+        int all = fly_held[n] == 0 && fly_frame[n] >= from;
+        for (int k = n - 1; all && k <= n + 8; ++k) all = fly[k];
+        if (!all) continue;
+        printf("FIRST human Scarab in flight after call %d: frame %d, Reaver stock %d, neutral call inside the flight\n",
+               n, fly_frame[n], fly_stock[n]);
+        return;
+    }
+}
+
 enum { SAVE_LEN = 4 };   /* START, neutral, B (SRAM write), A (unpause): no world tick of their own */
 
 static unsigned char before_save[sizeof host_save];
@@ -192,12 +212,10 @@ static int play(const char *mode, const char *sav, int first_call)
             printf("C call=%d frame=%d screen=%d minerals=%d gas=%d reavers=%d scarabs=%d digest=%u\n", c + 1, frame, screen, minerals, gas, rv, sc, state_digest());
         }
         if (!strcmp(mode, "find")) {
-            if (human_scarab() >= 0 && (!getenv("FIND_FRAME") || frame >= atoi(getenv("FIND_FRAME")))) {
-                static int announced;
-                if (!announced) printf("FIRST human Scarab in flight after call %d: frame %d, Reaver stock %d, Scarab at %d,%d, held %u\n",
-                       c, frame, stock_of_first_reaver(), u[human_scarab()].x, u[human_scarab()].y, (unsigned)held);
-                announced = 1;
-                if (!getenv("FINDALL")) return 0;
+            /* Record every call; the pick is made after the pass, once the whole flight is known. */
+            if (c < FIND_CALLS) {
+                fly[c] = (unsigned char)(human_scarab() >= 0);
+                fly_frame[c] = frame; fly_stock[c] = stock_of_first_reaver(); fly_held[c] = held;
             }
             continue;
         }
@@ -205,7 +223,10 @@ static int play(const char *mode, const char *sav, int first_call)
             if (c == save_start + 1) memcpy(before_save, host_save, sizeof host_save);
             if (c == save_start + 2) {                 /* the B press: the pause menu has written SRAM */
                 FILE *f;
-                assert(screen == SCREEN_PAUSE && human_scarab() >= 0);
+                if (!(screen == SCREEN_PAUSE && human_scarab() >= 0)) {
+                    printf("NOT SAVED: screen=%d scarab=%d frame=%d call=%d held=%u\n", screen, human_scarab(), frame, c, (unsigned)held);
+                    return 4;
+                }
                 if (!memcmp(before_save, host_save, sizeof host_save)) {
                     /* save_game() refused this update (the campaign writer is picky about some updates). */
                     printf("REFUSED: the pause menu wrote nothing at call %d, frame %d\n", c, frame);
@@ -230,6 +251,7 @@ static int play(const char *mode, const char *sav, int first_call)
         maybe_sample();
         if (next_sample >= SAMPLES && strcmp(mode, "expand")) break;
     }
+    if (!strcmp(mode, "find")) pick_flight_call(total_ticks);
     return 0;
 }
 
@@ -275,7 +297,10 @@ int main(int argc, char **argv)
                call_count - (unsigned)total_ticks);
         return 0;
     }
-    if (play(mode, argc > 3 ? argv[3] : NULL, 0) == 3) return 3;
+    {
+        int played = play(mode, argc > 3 ? argv[3] : NULL, 0);
+        if (played == 3 || played == 4) return played;
+    }
     if (!strcmp(mode, "find") && getenv("FINDALL")) {
         printf("Scarab hits in the whole mission: %u\n", hit_count);
         for (unsigned i = 0; i < hit_count && i < 40; ++i)
