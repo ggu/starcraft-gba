@@ -440,6 +440,51 @@ entire 119,084-cycle byte-sprite portion would leave the
 The local corrected census receipt SHA-256 is
 `7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970`.
 
+### Whole-call savings available to retained rendering
+
+The same normal Protoss replay records each visible raster
+call's ordered source, clipped footprint and inclusive cycles
+in one pass. It compares prior and current contributors on
+each physical page and adds regions whose indexed pixels
+change. Source arguments are sampled at the entry breakpoint
+before the callee changes the stack pointer. Non-ROM inputs
+always invalidate their regions. All 16 frame, world, route,
+palette and paired page checks match stock. The first two cuts
+initialize the stored pages.
+
+| Region size | Mean marked regions | Whole calls outside marked regions | Mean cycles in those calls |
+| --- | ---: | ---: | ---: |
+| 8×16 | 58.29 | 66 / 558 | 23,865 |
+| 16×16 | 35.29 | 66 / 558 | 23,865 |
+| 32×16 | 22.00 | 62 / 558 | 21,088 |
+
+The measured raster calls use 194,891 cycles per update across
+the scored cuts. Eliminating the entire whole-call portion
+would save 23,865 at either finer region size before the
+required contributor tracking and terrain restoration. This
+counts only whole draws. Partial redraws need additional
+measurement, including their restore cost and exact
+depth-ordered recomposition. The 1,350,466-cycle late profile
+is still 788,674 cycles above the two-VBlank budget. Prioritize
+larger shared changes alongside the quiet-page reuse trial.
+
+Local census receipt SHA-256
+`bde7943f1ebdbde3110290d0d87c824b3fcb5d355eddddb361efda945ee2a1ee`.
+
+### Reusing indexed target coordinates
+
+The trial passes the target coordinates already loaded inside
+the spatial query to its eligibility check. Existing callers
+retain their original checks. The sanitized target differential
+passes with occupancy enabled. The 600-update late Melee window
+matches all 20 state, frame, route, display and palette cuts with
+the same static RAM endpoints.
+
+The mean falls from 1,040,170 to 1,039,851 cycles per update
+and p95 rises from 1,350,192 to 1,353,144. Keep the existing
+target query. Local timing receipt SHA-256
+`76de729d4bf36224329140e0e34bce84abcefe2eb6c279312e819665f8962ffe`.
+
 ### Skipping over-budget combat sound lookups
 
 A shared observer trial checks the frame's existing sound effect

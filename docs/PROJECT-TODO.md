@@ -274,6 +274,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   concentrated in attack poses and weapon effects. Use it to
   select compositor trials and measure busy rendering and orders
   together against the two-VBlank budget.
+  The [timed per-page census](audits/2026-11-22-native-custom-game-lobby.md#whole-call-savings-available-to-retained-rendering)
+  bounds whole-call reuse at 23,865 cycles per busy update
+  before new tracking and restoration. Measure partial
+  recomposition before implementing a persistent contributor
+  cache. [Reusing indexed target coordinates](audits/2026-11-22-native-custom-game-lobby.md#reusing-indexed-target-coordinates)
+  saves about 320 cycles on average and raises p95. Keep it local.
   The [audio observer budget trial](audits/2026-11-22-native-custom-game-lobby.md#skipping-over-budget-combat-sound-lookups)
   raises both sustained Melee means by about 0.2%. Keep the
   existing observer and target larger composition and order costs.
@@ -882,6 +888,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   run from the same save stays active past that frame. Put
   detector-backed defense at the northwest objective before
   advancing the main group.
+  [Three successive interceptions](audits/2026-11-12-z8-normal-physical.md#three-dark-templar-interceptions-and-a-fresh-home-save)
+  now survive a fresh HOME load at frame 46,916. The third
+  attacker beats passive detection and falls to an earlier
+  explicit attack. Preserve the guard, train replacements
+  for the eastern assault and keep detecting later attackers.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
