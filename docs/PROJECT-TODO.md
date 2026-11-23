@@ -724,9 +724,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   visibility and the 360-pixel worker search radius. Scout and
   transfer workers before depletion, then verify a new ordinary ARM
   victory.
-  Profile the cursor's hostile scan during the same held-button
-  inputs. The earlier [distance-first query](audits/2026-11-13-p10-field-cursor-cost.md)
-  improved P10. Update its oracle for the shared foreground picker.
+  The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
+  save another 1.24% over the full P9 victory and reload and 1.33%
+  over the P10 victory tail. The P9 mean reaches 12.31 emulated
+  updates per second. Foreground picks, the ordinary double-tap,
+  six three-CPU matches and 24 fresh Custom Game loads agree.
   [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge

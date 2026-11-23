@@ -67,3 +67,39 @@ fresh-process SRAM, or the other race products. The probe stays off.
 - Control receipt SHA-256: `d8b2919ddc66671328f2932041f85484268258acba1927784f8ab1407a8b1f47`.
 - Candidate receipt SHA-256: `1e554b63e6183ffc8b95a6189b837e3f8a2482286cc9dba561809a425825c46e`.
 - Matched ordered video/state receipt SHA-256: `aa16bad817241888dc4c7184e9773ecfe2efc28d727bd5d0aed1f928dab1752a`.
+
+## Current four-cartridge candidate
+
+The shared cursor path is composed over the direct Bring census.
+The default build and all four regular ARM profiles use the same
+distance-first queries. The host differential retains the original
+query as its separate reference build.
+
+The P10 victory replay matches all 81 ordered cuts and final SRAM.
+Its mean falls from 1,484,787 to 1,464,990 cycles per update over
+9,489 updates, a 1.33% saving. In the two matched 16-update P9
+windows, the combined cursor change saves a further 3.89% and
+0.38% beyond direct Bring. The earlier hostile scan falls from
+about 50,900 to 13,694 cycles per update. The 32 sampled worlds,
+display pages, palettes and route counts agree.
+
+An ordinary-button replay on both P10 builds restores the same
+P9 pause journal, then presses A twice over a crowded selection.
+The first press selects one of 27 nearby candidates, actor slot
+95. The second selects 14 actors of the same type. All six cuts
+agree on selection state, cursor, camera, both display pages and
+palette. The separate Terran foreground fixture checks opaque
+cross-layer picks, painter ties and visibility, with matching
+ASan/UBSan output. The four ARM builds retain their RAM ends.
+All 30 campaign openings match, and all 24 regular Custom Game
+pause and fresh HOME cases pass. Six 12,000-update three-CPU
+matches across both maps agree on all 120 sampled cuts. Guest cycle
+totals decrease by 0.012–0.115% across these six matches.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P9 instruction windows | `fb9b4ec58c53a6d75053bfd1ed23b3045722b874c8460a698bc83b52e9bf9379` |
+| P10 victory tail | `ccc6b12c7ac12a617b1282fd072ed92314f891f2e6d51304ce95ebd8f72177bc` |
+| P10 crowded double-tap | `67fbf75f93a5ae70ae3aadfe4c46da081b188ab873394c6f790ec6d96e0aba74` |
+| Custom Game timing matrix | `5ab87d5efa509ed543d217a703625dcf3758b545d58f722b2d9d18cf2b9ea3cd` |
+| Custom Game saves | `0790a5c3378dd81349b8988de78be00f6ad6329228248d40cf97357ae75e669f` |
