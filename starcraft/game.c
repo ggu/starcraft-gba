@@ -4437,7 +4437,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
     int col1 = (x + max_distance) / SC64_TARGET_CELL_SIZE;
     int row1 = (y + max_distance) / SC64_TARGET_CELL_SIZE;
     u32 col_mask, row_mask;
-    int p, col, row;
+    int p;
     u8 hostile_mask;
     if (col0 < 0) col0 = 0;
     if (row0 < 0) row0 = 0;
@@ -4455,17 +4455,20 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
     for (p = 0; hostile_mask; ++p, hostile_mask >>= 1) {
         if (!(hostile_mask & 1u)) continue;
         u32 columns = (sc64_target_owner_columns[p] & col_mask) >> col0;
-        if (!columns || !(sc64_target_owner_rows[p] & row_mask)) continue;
-        for (row = row0; row <= row1; ++row) {
-            if (!(sc64_target_owner_rows[p] & ((u32)1u << row))) continue;
+        if (!columns) continue;
+        u32 occupied_rows = (sc64_target_owner_rows[p] & row_mask) >> row0;
+        const Sc64TargetIndex *owner_head = sc64_target_head[p];
+        for (int row_cell = row0 * SC64_TARGET_GRID_COLS + col0; occupied_rows;
+             occupied_rows >>= 1, row_cell += SC64_TARGET_GRID_COLS) {
+            if (!(occupied_rows & 1u)) continue;
+            const Sc64TargetIndex *row_head = owner_head + row_cell;
             /* The published owner summary can include stale set bits.
-             * A clear bit still rules out this column in every row. */
+             * A clear bit still rules out the corresponding rows or columns. */
             u32 occupied = columns;
-            for (col = col0; occupied; ++col, occupied >>= 1) {
+            for (const Sc64TargetIndex *head = row_head; occupied; ++head, occupied >>= 1) {
                 if (!(occupied & 1u)) continue;
-                int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
-                for (entity = sc64_target_head[p][cell]; entity != SC64_TARGET_NONE;
+                for (entity = *head; entity != SC64_TARGET_NONE;
                      entity = sc64_target_next[entity]) {
                     int candidate_x, candidate_y;
                     if (entity < MAX_UNITS) {
