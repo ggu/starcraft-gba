@@ -932,8 +932,11 @@ def cases(ticks, criteria="development"):
             for s in range(len(AIR_PIN_SCENARIOS)):
                 for human, bots in ((0, "z"), (1, "p"), (2, "z")):
                     out.append(("air-pin", profile, 1, human, bots, s))
+            # Blood Bath Free for All runs the native Bunker and Battery
+            # openings, whose larger banks the readiness gate admits; the
+            # Outpost Terran lobby keeps a low-bank Terran start under test.
             for s in range(len(NO_ORE_SCENARIOS)):
-                for map_id, human, bots in ((1, 1, "t"), (0, 0, "z"), (1, 1, "p")):
+                for map_id, human, bots in ((1, 1, "t"), (0, 1, "t"), (0, 0, "z"), (1, 1, "p")):
                     out.append(("no-ore", profile, map_id, human, bots, s))
             # One opponent of each race against each human race on both maps:
             # when and with what its first offensive leaves. Then whether an
