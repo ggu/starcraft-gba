@@ -432,3 +432,100 @@ world. The next eight neutral updates leave the frozen world and entire
 32 KiB SRAM image identical. The separate P8 result journal receipt
 SHA-256 is `57edff8a688b3980637729d10dd83f8873aad8193d933158a0ec53c90ce1f21c`.
 These are emulator checks on the recorded routes and save points.
+
+## November 23 batched target-index cartridge
+
+The `d1efbae7` Protoss 10 ROM uses the retained ordinary P3 route.
+It writes a pause journal at frame 20,000 on call 20,395 and loads
+it in a fresh process. All 49 recorded checks agree. Victory occurs
+at frame 47,661 on call 48,168, with both enemy building banks empty.
+The third fresh HOME process restores the victory journal. The route
+uses the earlier frame-20,000 cut in the audit.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P3 full replay and fresh journal loads | `1d26e318a7451b8cdcb77b3deca0e92da6c2d9dc624ef8ae77969c52dfeea8d5` |
+| P3 pause journal | `16786e21f396875b2e942fd0e6ec6fd2615549a1ad88a702626ec19336651a4f` |
+| P3 victory journal | `a0ed4a552a52a2289c29ea3ebb4fd1395d346801416637cbf12e46056c7bcdc5` |
+
+The same release's Zerg 10 ROM also wins Z1 from ordinary HOME.
+All 50 periodic observations and the final observation agree on
+the retained input route. It finishes at frame 50,669 after 50,856
+physical updates, with the Chrysalis alive and 30 Hydralisks.
+This check covers the uninterrupted route. A fresh pause load on
+the current cartridge is still open. The full receipt SHA-256 is
+`6cb9f21b57e8636a1e68efdc3d3800b1437fb1e0ffdde3260df374823b0aea5c`.
+
+On the same release's Protoss 10 ROM, P8 restores its ordinary
+pause at frame 30,949 from fresh HOME and wins at frame 104,113.
+All 40 recorded checks, eight briefing pages and 12 dialogue pages
+match, without observed frame drift. The available receipt covers
+the pause journal and the finish of the route. A separate result
+journal readback on this build remains open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P8 fresh pause load and full victory | `5d6e287b1ac3cfaf24a7b1679b7fa5041d1e1aa7b9eac9315433185112f9ca24` |
+| P8 pause journal | `e074c498d189521570812bf9052b0254f9777d4d2690ebb1149316d71ee0d79a` |
+
+## November 23 Melee-enabled cartridge
+
+The packaged `7f7eab41` Zerg 10 ROM passes the ordinary Z1 route
+with a pause at game frame 984, on tape call 1,000. The fresh HOME
+load restores the same sampled state. Two neutral route updates
+carry the ordinary A reselect, and the remaining input tape matches
+all 50 periodic observations and the final observation. Victory is
+at frame 50,669 with the Chrysalis alive and 30 Hydralisks. A third
+fresh HOME load restores the frozen result and exports identical SRAM.
+
+The same release's Protoss 10 ROM repeats the P3 route with all 49
+observations, its frame-20,000 pause and its frame-47,661 victory.
+Both journals match the earlier batched-build run byte for byte.
+The result also restores in a third fresh process.
+
+P8 on the same Protoss 10 ROM matches 106,011 recorded calls through
+victory, including all 40 named observations, eight briefing pages
+and 12 dialogue pages. A fresh HOME load restores the frame-30,949
+pause. The route wins at frame 104,113 and writes a sequence-2 bank
+while preserving the pause bank. HOME + L in a third fresh process
+restores the result and sampled mission state. Eight neutral updates
+leave the result stable, and the exported 32 KiB SRAM is byte-identical
+to the victory export.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z1 fresh-load victory and result readback | `02c0eed6f34a21d732ca575d43020e8069fe0f4331e6b3de57e3a3e8462f66ca` |
+| Z1 pause journal | `926bc03330532b9763b3e1d5e3aa1fc0970c40e4b99e1d9ed4a48f53da86fdb6` |
+| Z1 victory journal | `fd6b53a2e5be9d898d44e93c39e203a6148a3f7f4efc7309a77ca29036b936d2` |
+| P3 fresh-load victory and result readback | `1a8c4081494bab05368e98d1443b34ab2fd464dfa5bbd4324b87322aa94801f2` |
+| P8 fresh-load victory and result readback | `eaa15bacd4fcc94480c20bf35090713a983f519edffec40fa163328ed36f3f09` |
+| P8 victory and readback SRAM | `9f7b140a4a222fe297c07c2848d05131af14c66b113e32169d3b0e0756860923` |
+
+### P10 on the packaged Protoss cartridge
+
+The historical full HOME input replay on `7f7eab41` first differs
+at call 17,710, frame 17,263, with 416 gas on the current cartridge
+and 566 in the archive. The other sampled fields agree at that cut.
+A diagnostic replay records larger differences in army, workers and
+cursor position later. Its own pause journal restores at frame
+36,761. The historical modal expected at call 46,740 never opens,
+and the run ends without a verified win.
+
+A separate test loads the retained authenticated pause at frame
+36,761 from HOME and plays 9,489 recorded calls. It reaches victory
+at frame 46,057. Another fresh HOME process restores the mission
+result and preserves the exact 32 KiB journal through eight
+neutral updates. There are 81 sampled cuts. The stored world
+fingerprints differ from the historical target-index receipt, so
+the test proves the current seeded win and save round trip under
+these inputs. The route averages 11.50 emulated main-loop updates
+per second. The [regenerated full HOME route](2026-11-13-p10-normal-home.md#november-23-packaged-full-home-win)
+wins from a fresh start on the same cartridge, with its own pause
+and victory journals.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First full HOME replay difference | `577fb6094ef7896a23ab89754582a5ecebe4e9b7f7749101416961f0c593a1e9` |
+| Full HOME diagnostic continuation | `d5124e5d59fe723713cb563efa02399c9a309c0837f831a5a9c1ba857c67d849` |
+| Seeded victory and result readback | `6191432fa2def6b858f0f2f66e1c94d4fed08c843b312c85e901831baed7784a` |
+| Seeded victory and readback SRAM | `25b0b97c72ffb92721aaf597f15719c7d05d9682a499c32b7f10cb304e00ae58` |

@@ -245,3 +245,62 @@ raw validation caching.
 | Victory and fresh readback SRAM | `f77d58315d7cbfe62604d5fdb8f2df34fa6fc9705f6f09526164d13269a3dec9` |
 | Six three-CPU matches | `b3826e59900d6a91af7b0e0858d5c69468f741e35cf8138a9ac2ff88cc55ae48` |
 | Custom Game fresh continuation matrix | `d39e46b0081b6626e0e190feabb94c550487e5bc2563ff2bf8878d2c3f74056e` |
+
+### Inline validation for cached actor types
+
+The normal Protoss and Zerg products already use the specialized
+location scan through PR #747. This trial inlines the common memo hit
+for a validated raw type in both shared scanners. Each live row still
+checks its owner and current coordinates. An unresolved or out-of-range
+type goes through the existing validator. Bring still checks current
+completion, cargo and location using the existing actor geometry.
+
+| Mean cycles per sampled update | First window, control → trial | Second window, control → trial |
+| --- | ---: | ---: |
+| Command and Bring scanners | 52,393 → 34,844 | 53,149 → 35,314 |
+| Whole loop | 1,089,720 → 1,071,698 | 1,090,299 → 1,072,435 |
+
+The two 16-update windows start at input calls 33,134 and 34,934
+after the retained ordinary P9 pause loads. Frames, world, both
+indexed pages, palette and route counters match at all 32 cuts.
+Whole-loop cost falls by 1.65% and 1.64%.
+The 9,489-update P10 seeded victory tail saves 0.54%. All 81 recorded
+cuts, the victory journal and fresh result re-export match the packaged
+control. The regenerated P10 full HOME run saves 0.62% over all 94,852
+calls. All 37 checkpoints, briefing and dialogue observations, pause
+journal, victory journal and fresh result re-export match. These are
+emulator measurements.
+
+All four prepared links pass their original RAM guards with identical
+EWRAM and IWRAM endpoints. Terran and Showcase ROMs are byte-identical
+to their controls. The 30 campaign openings, four predecessor campaign
+save loads, 20 Custom Game continuations and 20 cross-version cases
+repeat the packaged receipts. The Protoss and Zerg sanitizer fixtures
+also match the shared slow provider across the actor and geometry cases.
+The complete P9 comparison replays 281,447 recorded input calls.
+All 93 checkpoints and 11 briefing pages match through victory
+at frame 272,857.
+Fresh HOME restores the pause and the victory. The pause, victory and
+fresh victory re-export each match the packaged control byte for byte.
+Whole-route mean falls from 1,356,949 to 1,343,995 guest cycles per
+call, a 0.95% reduction. The emulated cadence rises from 12.36 to 12.48
+calls per second.
+
+A 3,600-update Z10 three-CPU Blood Bath continuation matches all 31
+state and display cuts, per-update timing, route counters and exported
+SRAM. Both builds average 29.45 emulated updates per second there,
+with p95 at 683,654 cycles. The late P10 Melee window at calls
+10,801–11,400 also matches all 21 cuts and the measured timing. Its
+mean is 1,040,170 cycles per update and p95 is 1,350,192 cycles.
+Heavy Melee still needs work to reach the two-VBlank budget.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Packaged P9 attribution | `9242fc4c4699bd5a256747c66620760629828be9d0e294b601522f97f555dc2e` |
+| Inline validation P9 attribution | `b37cae335a6a2632f50162509676b18617d5d05288abb58f1939153b32988192` |
+| Inline validation P10 seeded win | `d14bdae7ef35ff7f4584b51a24feee2e6d8739f5c8b367d3762fd96f79d5f306` |
+| Inline validation P10 full HOME win | `a018c1ee1cc0fd42631ae5a91101db087adf0466f680ea532e0115ce556d0605` |
+| Full P9 comparison | `93151835a97657694c868c183a81ec82aac9f41c9ff1ee49af472e299761f48c` |
+| Full P9 optimized victory and result readback | `8a233d7b13b57be2e1361cc4bbf18db793f163efc64985c002b5f5a785133983` |
+| Z10 Blood Bath optimized continuation | `c994f4ef8a0e1187b8eea81937c63cf5ce8c1815684e768eeed081094eb85c74` |
+| P10 late Melee optimized window | `213f4fc562f898c29042ecc220575ed48397588430c052d00a1dc0f9f191ecd0` |

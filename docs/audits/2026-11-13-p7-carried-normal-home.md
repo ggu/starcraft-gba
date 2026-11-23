@@ -155,3 +155,27 @@ two pending impacts. They are cleared in the loaded result screen.
 | Uninterrupted paired receipt | `a20c9fde9d97a157473ff6bd0565243fc1c9104400c64aa2c3c998ee42cb15df` |
 | Fresh HOME paired receipt and terminal readback | `8691c4b26147d70d0240a85c737833632c0968069e2debed6e5f1920eb44c8d7` |
 | Fresh run victory journal | `dee1bd8a66002d1e0dfde9fd8beabc7c7e99c2ea4cb35f1f3642007b4a05eb09` |
+
+## November 23 Melee-enabled cartridge
+
+P7 repeats the archived ordinary controller route on packaged
+Protoss 10 at `7f7eab41`. The normal HOME path saves at frame
+8,845 on call 9,096. A fresh process restores the named mission
+state. The two replay segments match the recorded frame at all
+4,928 input transitions. Victory follows at frame 55,892 on
+call 57,636, with all three heroes alive and zero trigger faults.
+
+A third process restores the result from HOME. Eight neutral
+updates leave the re-exported 32 KiB SRAM byte-identical to
+the victory journal. Across all 12 pre-save, post-load and result
+cuts, the fields recorded by the facility release agree with
+the current cartridge. Both physical video pages and the palette
+also match at every cut. The two transient impacts pending at
+victory are cleared when the result is restored, as in the
+facility replay.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Pause and result replay | `d221274865613359e3e1382fa9aaf5c13e51a1c30e971c4a3ea79d725e710c4e` |
+| Twelve matched snapshots | `20a1bf7b197e4bdbab1df12174c96dc65200f4723bdcd9735f1c205ab998b0d0` |
+| Victory and readback SRAM | `dee1bd8a66002d1e0dfde9fd8beabc7c7e99c2ea4cb35f1f3642007b4a05eb09` |

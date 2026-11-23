@@ -172,8 +172,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak
-  falls another 5.09%, while p95 rises 0.32%. Keep it opt-in pending
-  broader combined replays and the Showcase runtime stack watermark.
+  falls another 5.09%, while p95 rises 0.32%. On the current combined
+  source the isolated placement of the facility kernel exceeds the
+  Z10 IWRAM reserve. The broader placement preview still needs new
+  combined replay and runtime stack measurements. The nearby-root
+  reserve itself already ships in the shared composed route defaults.
   The [shared changed-row sight path](audits/2026-11-22-shared-sparse-sight.md)
   cuts the Protoss 10 campaign tail by 7.87% and the tested Terran
   Outpost battle window by 0.48%. An isolated generated-header path
@@ -698,23 +701,72 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   normal activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
-  The normal Terran ROM still exposes Blood Bath as Free for All.
+  The November 23 normal Terran release exposes Blood Bath as Free for All.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
   Free for All loads or Melee rejections. Random seats and four
   legacy campaign saves also pass. The last full three-CPU
   Melee samples average 16–20 emulated updates per second.
-  Fresh-pause defeats match on all four products. Verify an active
-  win and qualify a normal-product build before enabling the
-  option by default.
-  The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
-  already differs in first patch assignment. Check native formation and
-  worker travel before using a longer service delay to fit the income.
+  Fresh-pause defeats match on all four preview products. The
+  [normal-product candidate](audits/2026-11-22-native-custom-game-lobby.md#normal-cartridge-integration-candidate)
+  keeps the RAM guards and repeats the campaign and skirmish
+  startup and save checks, including the single-CPU active Terran
+  win. Confirm local release integration, hardware pacing and
+  active multi-CPU results. The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
+  place the largest costs in orders and depth-ordered drawing.
+  Prioritize repeated contact work and safe reuse across the two
+  video pages. Trials in raster fog lookup, audio decoding and a
+  single-direction contact bound did not improve these samples.
+  The [same-page census](audits/2026-11-22-native-custom-game-lobby.md#same-page-battlefield-changes-during-melee)
+  finds 27 identical battlefield draws in 32 earlier updates and about
+  30 of 105 changed tiles per late update. In the same windows,
+  restoring the old work page to bare terrain would touch all
+  108 rows and require 341–531 aligned runs on average. Prioritize
+  reusing unchanged contributors before trying sparse terrain
+  transfers. Keep camera and scene transitions on the full-render
+  path. The [contact census](audits/2026-11-22-native-custom-game-lobby.md#terrain-filtering-in-the-contact-scan)
+  finds at most two new early exits in 80 Terran queries. The
+  [ARM decoder trial](audits/2026-11-22-native-custom-game-lobby.md#first-order-audio-on-arm)
+  increases late Protoss Melee cycles by 2.33%. Reusing
+  [unit admission checks](audits/2026-11-22-native-custom-game-lobby.md#reusing-actor-admission-during-the-draw)
+  reduces the late 600-update mean by 0.20%, while p95 rises
+  0.46%. Late orders and drawing still need work to reach the
+  two-VBlank budget.
+  The [packaged Terran matched opening](audits/2026-11-22-steady-order-cost.md#packaged-terran-melee-mineral-opening)
+  still gathers faster at the same Blood Bath corners. In the sampled
+  seconds, the GBA has at most one worker actively mining each targeted
+  patch, whereas the four native SCVs initially approach the same patch.
+  The qualified native rerun confirms the claim precedes its positive
+  work timer. Check first assignment and worker travel before tuning
+  service time.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
-- **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
+- **Current cartridge campaign saves.** [T1 on the packaged Terran ROM](audits/2026-11-17-save-ui-product-matrix.md#november-23-packaged-terran-t1)
+  wins at frame 10,120, with the frame-6,214 pause and victory reloading
+  in fresh HOME processes. [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
   writes a new journal at the actual victory. A fresh HOME load
   restores RESULT and re-exports the same 32 KiB SRAM. The other
   campaign result journals still need a common current-build gate.
+  [P3 on the batched target-index cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-batched-target-index-cartridge)
+  restores frame 20,000 and reaches victory at frame 47,661.
+  The 49 observations and a third-process result load pass.
+  The same release wins Z1 from HOME with all 51 observations
+  matching. The [Melee-enabled Zerg cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-melee-enabled-cartridge)
+  restores the Z1 pause at frame 984 and matches all 51 observations
+  through victory and the fresh result load. The Melee-enabled
+  Protoss cartridge also repeats P3 with identical pause and result
+  journals. On the [Melee-enabled Protoss cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-melee-enabled-cartridge),
+  P8 matches all 40 checks, restores its pause and wins at frame
+  104,113. A third HOME process restores the victory and exports
+  identical SRAM. The same ROM also passes [P7 pause, victory and
+  result reload](audits/2026-11-13-p7-carried-normal-home.md#november-23-melee-enabled-cartridge).
+  All 12 snapshots match the archived field and display checks.
+  [P10 on the same cartridge](audits/2026-11-13-normal-campaign-matrix.md#p10-on-the-packaged-protoss-cartridge)
+  wins from the retained frame-36,761 pause and re-exports its result.
+  The [regenerated full HOME route](audits/2026-11-13-p10-normal-home.md#november-23-packaged-full-home-win)
+  wins from a fresh start at frame 93,377 with all 37 checkpoints
+  matching. It restores both the frame-30,847 pause and the victory
+  journal. Apply these result checks to the remaining missions on
+  the current builds.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints
   through victory. Separate fresh HOME loads restore the in-progress
@@ -726,8 +778,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   lowers total cycles by 15.59–16.12% with matching sampled
   state and pixels. The [full P9 victory and result save](audits/2026-11-13-p9-normal-home.md#full-victory-and-journal-with-direct-location-counts)
   match all 93 checkpoints and all three SRAM exports. The replay
-  goes from 11.14 to 12.16 emulated calls per second. Continue
-  checking location conditions with the other campaign providers.
+  goes from 11.14 to 12.16 emulated calls per second. The specialized
+  location scan already ships in the shared bridge.
+  [Inline cached validation](audits/2026-11-13-p9-normal-home.md#inline-validation-for-cached-actor-types)
+  saves another 1.64–1.65% in two current P9 windows, 0.95% over
+  the full P9 victory and 0.62% through the full P10 victory.
+  Both full runs match their pause, result and readback journals.
+  Busy skirmish windows match their existing timing. Continue
+  checking other campaign providers and reducing steady shared costs.
   The [current Z8 comparison](audits/2026-11-12-z8-normal-physical.md#november-23-current-controller-comparison)
   matches the input tape and pause SRAM on the baseline and Bring
   builds. Both controllers lose after the first Nexus falls and mineral
@@ -741,8 +799,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [instrumented recovery trials](audits/2026-11-12-z8-normal-physical.md#observed-mineral-returns-in-the-recovery-trials)
   fail earlier than stock. A scout move stalls near a Hatchery,
   and changing worker priority increases early returns while
-  Kerrigan still dies. Verify movement and gather completion and
-  track the hero's retreat before another full ARM attempt.
+  Kerrigan still dies. In the [late survival trace](audits/2026-11-12-z8-normal-physical.md#late-hero-survival-on-the-melee-release),
+  she takes sustained damage while idle. An ordinary move toward
+  a nearby friendly unit reaches its destination and delays defeat
+  to frame 78,849. A separate [worker transfer](audits/2026-11-12-z8-normal-physical.md#observed-deposits-after-the-worker-transfer)
+  yields 22 deposits from a stocked field. Kerrigan's later retreat
+  condition finds no eligible rally, and the host run loses at
+  frame 69,355. Keep the verified mining route while testing a
+  repeatable retreat and attack before another full ARM attempt.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
