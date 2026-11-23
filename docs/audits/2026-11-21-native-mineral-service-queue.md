@@ -52,6 +52,30 @@ in the search had 20 ore in a defeat-suppressed Blood Bath state.
 The final pickup, same-cluster target choice, route and first deposit
 from a naturally depleted patch remain open in an ordinary session.
 
+## Contested service later in Blood Bath
+
+Twenty-five neutral snapshots from the retained ordinary
+Blood Bath match cover native updates 19,488–19,613.
+At update 19,553, mineral patch 11 holds 172 ore with
+one active claim. Owner-2 SCV 120 is working in order 87,
+phase 5. SCV 130 has the same resource claim, is waiting
+in order 86, phase 2, has zero cargo, and is the head of
+the wait list.
+
+At update 19,558, the patch has 164 ore and the head is
+empty. SCV 130 is now working in order 87, phase 5, and
+SCV 120 has released the patch. The active count is one
+at both endpoints. This brackets the queue removal,
+reserve debit and handoff within five native updates.
+The samples leave the intermediate active count and the
+bank credit unresolved.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Sampled native records | `32e5ca1e79a78cc8b2d7a3373cf25908e7890b85105ec264478efdcd2c9cc7ae` |
+| Retained waiting snapshot | `4ba6a4e9ba72574b7257cb1ec30edef8d6750cb3e81b0c5f8b592e373cedd3de` |
+| Final native snapshot | `2b3ad6ca5c24a278687c198a105aa101649faf6cde5a5eee0368238f204e9116` |
+
 ## GBA follow-up
 
 The shared GBA gather path starts an individual mineral wait at contact.

@@ -1006,6 +1006,60 @@ is lost during the wait, cutting capacity to 50 with
 | Two southern reinforcement batches and fresh HOME | `0a7dca37562094509f5617e490146aaeb3465a77a1bab6588911b46dc529e88f` |
 | Frame-58,760 HOME SRAM | `7ed8d0f99510327ff700d287b7d78adae9945aa1cca1bbb9bb40b0bd59886113` |
 
+### Eastern outer defenses and Nexus shield readings
+
+Start from the frame-58,760 southern reserve. Move toward
+(1750, 1750), then double-tap a Hydralisk at the waypoint
+to select ten Hydralisks and leave the Drones behind.
+Attack the outer Cannon at (1840, 1504). Fresh HOME at
+frame 60,626 retains eight attacking Hydralisks and all
+six Drones, with the Cannon absent. The southern Den is
+at 356/850 HP. Kerrigan has 400 HP. The first mixed-group
+attempt also destroyed the Cannon, with nine attacking
+Hydralisks and only one of six selected Drones surviving.
+
+The follow-up destroys the eastern Pylon, leaving seven
+attackers and full-health Kerrigan at fresh HOME frame
+61,867. Direct and southern approaches from this save
+both lose all seven attackers. Observe the Nexus's
+shields separately from its 750 HP to see the damage.
+
+| Fresh HOME cut | Nexus HP | Nexus shields |
+| --- | ---: | ---: |
+| 61,867, after Pylon destruction | 750 | 750 |
+| 62,380, direct eastern attack | 750 | 80 |
+| 62,359, southern firing lane | 750 | 356 |
+| 62,376, remaining-Cannon approach | 750 | 750 |
+
+Positions around (1792, 1202) are roughly 80 pixels from
+the target center at (1712, 1208). The GBA Hydralisk's
+64-pixel ground range plus the 18-pixel building allowance
+admits that distance. The observed shield losses establish
+that the seven-unit direct attack hits. The follow-up must
+sustain damage after the shields fall. Kerrigan remains
+at 400 HP in all three failed branches.
+
+Two reinforcement attempts from the Cannon-clear save
+did not assemble a larger force. The first rally selection
+left six original Hydralisks unselected near the Cannon.
+A deliberate southern regroup retains seven originals and
+adds one reserve Hydralisk at frame 62,305. The second
+reserve starts at 5 HP and is lost during the rally.
+The earlier Cannon-clear save retains eight healthier
+attackers and six Drones for a new production branch.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Hydralisk-only Cannon assault | `7d5300742db4aba49e3fe54a4cb8c411624522b8247ddb8edfae14d524c5cc59` |
+| Frame-60,626 HOME SRAM | `b5f09458f597587d3cb4fa083250954842d6611060bd0adcf915b1a7e1b859c7` |
+| Pylon assault and fresh HOME | `f8f057eb79a48fa14f2d84c8b3d340040a9d6f75c8790ab07a563553a6472b27` |
+| Frame-61,867 HOME SRAM | `a16d5e29c6c2ba554279bf69c42499169c4a7d34ca954928c14c425a0e086f06` |
+| Direct eastern attack | `c33b3693237f84aff8148ff1c92db0a703d2c1fcb7e49ae1cc6bacda6f79e68d` |
+| Southern firing lane | `239481c782d97e6bf3bdece7353e0c79592f94bd8d02b163f4eaea0566a49486` |
+| Remaining-Cannon approach | `3035a422b113598072de6ff353c9298109f2ad7670ca41f1b4d103ebc2d719b7` |
+| Independent fresh HOME shields and attacker survival | `803642ccec8a96099c4885619d82ed9144bf51f63a6ab2cc32680f79ea239862` |
+| Southern regroup and fresh HOME | `0b1f796778503bb706aa1f70c66f42d68e70dd240ef1c55ca6146eb85b646c31b4` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

@@ -70,6 +70,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   in-bounds endpoints. The separate authored ARM cases show lower
   in-bounds query costs. The blocked movement scan is the larger
   measured cost and still needs a broader reduction.
+  The [collision lookup census](audits/2026-11-22-steady-order-cost.md#collision-table-layout-and-lookup-count)
+  finds one to six geometry lookups per scan, with no repeated tuple
+  in 129 sampled scans. Speed-major packing saves ROM and improves
+  only the larger authored groups. Prioritize the work leading up
+  to each geometry lookup.
   The [merged selection and detector query changes](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
   saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
   Custom Game replays with matching state and video. Profile repeated
@@ -798,8 +803,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   native HUD gains 268. The opt-in 102-update mining wait reduces
   that GBA gain to 320–352 and passes a fresh active-wait save.
   [Native patch queues](audits/2026-11-21-native-mineral-service-queue.md)
-  now show one worker in service and FIFO handoffs in an ordinary
-  four-seat Blood Bath. Qualify a saved service policy, the remaining
+  show one worker in service and FIFO handoffs in an ordinary four-seat
+  Blood Bath. [A later contested patch](audits/2026-11-21-native-mineral-service-queue.md#contested-service-later-in-blood-bath)
+  also removes its waiter and transfers service within five native
+  updates of an eight-ore debit. Qualify a saved service policy, the remaining
   depot travel and unloading, and campaign and CPU economy before
   normal activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
@@ -991,8 +998,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   establishes a Pool and Den, intercepts the northwest Templar
   before the frame-56,579 loss boundary, and trains six more
   Hydralisks. Fresh HOME at frame 58,760 retains the reserve
-  and Kerrigan. Restore southern detection and supply before
-  reattempting the Cannon and Nexus approach.
+  and Kerrigan. The [eastern assault](audits/2026-11-12-z8-normal-physical.md#eastern-outer-defenses-and-nexus-shield-readings)
+  removes the outer Cannon and Pylon. The direct attack takes
+  the first Nexus down to 80/750 shields before losing seven
+  Hydralisks. Rallying the existing reserves still gives eight
+  attackers. Continue from the Cannon-clear save to raise supply
+  and train a larger force for the direct lane.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
