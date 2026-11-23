@@ -823,6 +823,25 @@ on a different clock from simulation updates.
 | First three RAM cuts | `fd2efc7a7b45a6ec15f94e47d40e5921f6e1efe62aa2134aff12b7c840c35da6` |
 | Qualified repeat ares run | `db375866fed03099398018aa1f05f3982691232f484c71f76b1d81e1c345667d` |
 
+### Paired mineral assignments through elapsed second 18
+
+A fresh ordinary-menu run of the packaged Terran cartridge
+samples the same matched start through GBA guest seconds 0, 12,
+15 and 18. All four GBA SCVs retain their four distinct initial
+assignments on every sampled update. Every patch has at most one
+working SCV with a positive timer and empty cargo. The GBA wallet
+is 122–130 at second 12, 146–154 at second 15, and 170 at
+second 18.
+
+In the pinned N64 cuts, three SCVs still target patch 49 at
+second 12 while the fourth returns cargo. At second 15 one SCV
+targets patch 56. These are independent emulator-clock windows
+with a continuous GBA sample and three N64 snapshots. They
+show an assignment difference before any clock adjustment.
+The native retarget rule and service cadence still need
+separate qualification. The paired receipt SHA-256 is
+`91ef12addc5949747d4b5280c1f35dbcaa3ba5b579ec1bdbe09dc9aa479d458f`.
+
 ## Protoss campaign continuation and replay controls
 
 The exact routing release wins P5 after an ordinary pause save at
