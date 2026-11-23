@@ -1312,6 +1312,59 @@ cycles from 1,327,411 to 1,384,514. Keep this trial local.
 | Occupied bounds census | `6bc8ad020d02d4ba7c5deebd10231c31699ade418e25c5bae9b46bbdc40bd67d` |
 | Late Outpost pair | `97e3e2ca5dd5df38d7fb8e5ae99d410f86edcae3474c85a685c27d5d547839f5` |
 
+### Collision table layout and lookup count
+
+The authored geometry table covers 210 radius and speed
+planes, each with 65×65 offsets. An offset outside the
+strict radius-plus-speed axis bounds blocks no steps.
+Removing those zero cells gives a 333,410-byte table
+including plane offsets. Padding cropped rows to powers of
+two simplifies row addressing and uses 463,016 bytes.
+Grouping by speed allows one stride and origin lookup per
+scan and uses 561,950 bytes. Using a 64×64 core and a
+129-byte edge for the only plane that needs it uses
+860,289 bytes.
+
+The authored ARM batches each read 512 eligible table
+entries. The answer digests match in every batch. The
+values below use mixed radius and speed
+queries, with each baseline compiled against the same
+test loop as its candidate.
+
+| Layout | Bytes including directory | Existing cycles | Trial cycles |
+| --- | ---: | ---: | ---: |
+| Existing layout | 887,250 | — | — |
+| Cropped square | 333,410 | 23,078 | 28,205 |
+| Power-of-two cropped row stride | 463,016 | 23,078 | 26,669 |
+| Speed-major, groups of eight | 561,950 | 21,160 | 21,491 |
+| Speed-major, groups of 32 | 561,950 | 20,680 | 20,387 |
+| 64×64 core and separate edge | 860,289 | 23,590 | 24,117 |
+
+In a read-only study of Outpost frames 11,100, 11,105,
+11,110 and 11,115, the returned ROM masks match the
+modeled traversal on all 129 observed scans. World, both
+video pages, palette and route counters match the retained
+replay. The 1,511 modeled node visits produce 309 eligible
+geometry lookups, with one to six per scan and no repeated
+geometry tuple within a scan. A bucket can be skipped if
+its whole cell lies outside the directions that can still
+be blocked under the non-increasing-distance rule. That
+test can skip 12 of the 453 occupied visits and 56 nodes
+before paying for its own arithmetic. These bounds apply
+to the sampled replay and include the existing full-mask
+early exit.
+
+The 32-entry benchmark's grouping benefit has no measured
+counterpart in these four cuts. Keep the layouts local and
+look for reductions before the geometry lookup.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Cropped and padded authored timings | `4f68da8f056bf8f79e8373156151260e0ae206d4757fb622c76de67ee13bcacc` |
+| Grouped-speed authored timings | `2f16480d19388ae3ae2bd2bcc1a33710632e61b131d2c6f4b2e5531f48fa9b91` |
+| 64-wide stride authored timings | `8bb53ecb083c6b5e658a92db4bf05451a3fdc03f2da2a70c5f1e3dfc236dd602` |
+| Observed-mask Outpost census | `80b842424e9269210dd782ee43a7229921b5b645fa04fc994bc1b557f782c75d` |
+
 Hoisting the collision mask table's speed offset removes two
 redundant axis checks after the radius gate. The tighter lookup
 matches both 16-update P10 windows and all 81 victory-tail cuts.
