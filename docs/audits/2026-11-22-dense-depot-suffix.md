@@ -373,6 +373,21 @@ peak from 3,306,306 to 3,286,156 cycles and the following update from
 786,269. All route counters, 31 world and indexed-page cuts, and
 final SRAM match. The display-page selector differs at 15 updates.
 The link frees 16 IWRAM bytes with the same EWRAM endpoint.
-The other regular products still need to be checked before activation.
-The local replay receipt SHA-256 is
-`62d25c6a5ee68ec1fd5bd5f281ed45102d5eeff9c501966371d3500ccda743b2`.
+All four regular builds save 16 IWRAM bytes and keep the same
+EWRAM endpoint. The Z10 replay reproduces the trial ROM byte for byte.
+The independent FIFO oracle matches 1,038 maps and every packed
+output byte. The 30 campaign starts match and 24 ordinary Custom Game
+save and fresh HOME cases pass. All 120 sampled cuts of six separate
+three-CPU runs match, with 0.003–0.010% fewer total cycles per match.
+The 9,489-update P10 victory replay matches all 81 cuts and its
+final SRAM, with mean cost within 0.001%. The first 40,000 calls of
+the current P9 tape match the named checkpoints and preserve the
+frame-32,071 pause save through a fresh HOME load.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z10 saved replay | `62d25c6a5ee68ec1fd5bd5f281ed45102d5eeff9c501966371d3500ccda743b2` |
+| Six three-CPU replays | `8338907144d8a87dc8a4f90ee7a735437c57ff267bd0748d46d44f523b7ad4a2` |
+| P10 victory replay | `9deb6d85f7ab5b0b56e423ea5416cc304b0a1400710d3a697aab743a76e440ff` |
+| Campaign starts | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular save continuations | `f69f914f8eede79c2f0d84918dc7fca1b7472222ef4577b5c5b128ef170c8cb6` |
