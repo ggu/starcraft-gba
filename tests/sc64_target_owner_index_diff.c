@@ -183,6 +183,23 @@ static void check_move_and_overflow(void) {
     compare_checked_rebuild();
 }
 
+static void check_all_distinct_cells(void) {
+    const int side=SC64_TARGET_CELL_SIZE;
+    world_w=SC64_TARGET_GRID_COLS*side;
+    world_h=SC64_TARGET_GRID_ROWS*side;
+    for(int i=0;i<MAX_UNITS;i++) {
+        u[i]=(Unit){.alive=1,.owner=i%5,.x=(i%SC64_TARGET_GRID_COLS)*side,
+                    .y=(i/SC64_TARGET_GRID_COLS)*side};
+    }
+    for(int i=0;i<MAX_BUILDINGS;i++) {
+        int cell=MAX_UNITS+i;
+        b[i]=(Building){.alive=1,.owner=i%5,.x=(cell%SC64_TARGET_GRID_COLS)*side,
+                        .y=(cell/SC64_TARGET_GRID_COLS)*side};
+    }
+    compare_checked_rebuild();
+    assert(sc64_target_index_active && sc64_target_dirty_count==SC64_TARGET_ENTITY_COUNT);
+}
+
 int main(void) {
     for(int round=0;round<5000;round++) {
         for(int i=0;i<MAX_UNITS;i++) {
@@ -206,6 +223,7 @@ int main(void) {
     }
     check_geometry_and_membership();
     check_move_and_overflow();
+    check_all_distinct_cells();
     sc64_target_index_end();
     puts("owner-list index differential: 10000 randomized builds, geometry, crossings and overflow passed");
     return 0;

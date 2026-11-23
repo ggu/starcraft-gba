@@ -21,6 +21,8 @@ class TargetOwnerIndexTest(unittest.TestCase):
                     ("stock", ()),
                     ("bulk", ("-DSC64_TARGET_BULK_REBUILD_PROBE",)),
                     ("fast", ("-DSC64_TARGET_BULK_REBUILD_PROBE", "-DSC64_TARGET_FAST_LINK_PROBE")),
+                    ("batch", ("-DSC64_TARGET_BULK_REBUILD_PROBE", "-DSC64_TARGET_FAST_LINK_PROBE",
+                               "-DSC64_TARGET_BATCH_DIRTY_PROBE")),
                 ):
                     with self.subTest(profile=profile, implementation=label):
                         subprocess.run(["clang", "-std=c11", "-O1", "-g", "-Wall", "-Wextra",

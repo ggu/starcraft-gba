@@ -170,6 +170,38 @@ outside the default build.
 | Fused control | `a1a008ed9dffdd9fb6c8294bf0373fe990c83796070dc6045d33d523ebf4b89d` |
 | Fused rebuild | `2d34beb6788dfe386e510047cddd33f8b2fdf3a648890b206763c311cdf0d9d0` |
 
+## Batch the fresh dirty-cell count
+
+The optional `SC64_TARGET_BATCH_DIRTY_PROBE` holds the dirty-cell count
+locally while rebuilding from validated owner lists. Each entity can add
+at most one entry to the empty dirty list. A compile-time bound covers
+the case where every unit and building occupies a unique cell. A partial
+rebuild still publishes its occupied prefix for the next clear. Relocation
+and the standalone builder retain the checked counter.
+
+All 12 sanitizer configurations pass across the three target grids.
+The oracle compares ordered links and dirty lists, invalid geometry,
+crossings and overflow recovery, and now fills every actor slot with a
+distinct cell. All four ARM links retain their EWRAM and IWRAM ends.
+The P10 build with the trial disabled reproduces the current release ROM
+byte for byte.
+
+| Matched P10 workload | Mean guest cycles with cursor | With batch count | Change |
+| --- | ---: | ---: | ---: |
+| Earlier 16-update P9 window | 1,096,589 | 1,090,538 | −0.55% |
+| Later 16-update P9 window | 1,097,055 | 1,091,118 | −0.54% |
+| 9,489-update P10 victory | 1,464,990 | 1,460,178 | −0.33% |
+
+The target index accounts for 5,602 and 5,709 fewer cycles per update
+in the two P9 windows. All 32 sampled P9 worlds, framebuffers, palettes
+and route counts match. The P10 victory matches all 81 ordered cuts
+and exports identical 32 KiB SRAM. These are emulator timings.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P9 instruction windows | `ef320144e03b4a72d328aac003a910795969f3dda92ccb518020e22595a37aac` |
+| P10 victory tail | `c677652aa26566fe892e6435c392821437c807ce1f98f9f9b619a14a091c1b58` |
+
 ## Strict reuse on the generated-bounds release
 
 The November 22 trial applies the draft to `aa1d49c8`. It verifies
