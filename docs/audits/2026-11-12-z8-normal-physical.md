@@ -918,6 +918,94 @@ base during the detector transfer.
 | Reaver and fresh HOME trace | `4d026dc8787102b3a83c40c190c1c7dbb85ff3776a4d2161da881dda8349eb3c` |
 | Frame-39,680 HOME SRAM | `27b57d29d1f27c7ea32261900f24c96e6d6d4a8e5af9a14a8cd9380d83729446` |
 
+### Hold the northern approach and evacuate workers
+
+Move the northern force to (1400, 400) from frame 39,680.
+The approaching Dragoon is gone by frame 40,252 and the
+next Zealot by frame 40,552. Fresh HOME at frame 41,353
+retains six Hydralisks and the 96-HP Ultralisk. All eight
+Drones and all eight buildings are at full health. A
+neutral branch advances 5,000 updates with no entering
+enemy of the surveyed types in the northern area. Fresh
+HOME at frame 46,355 has 613 gas and the same buildings.
+Seven mineral Drones are now idle.
+
+On a separate branch from frame 41,353, fly a replacement
+Overlord toward the northwest while the northern force
+holds. Intercept the approaching Templar with the southern
+detector and guard near (1350, 1800). The Templar is
+absent at frame 46,922. Fresh HOME at frame 46,924
+retains Kerrigan at 400 HP, the southern guard, all eight
+Drones and all eight buildings. Gas is 645. The northwest
+Overlord is still moving at (364, 384).
+
+Another northern wave enters by frame 48,441. A neutral
+flight gets the detector to (227, 384), while the northern
+economy is lost and no further Templar is seen through
+7,000 updates. On the evacuation branch, transfer seven
+mineral Drones and then the gas Drone through the Nydus.
+Fresh HOME at frame 48,594 retains all eight Drones at
+40 HP at the southern exit, both guards and Kerrigan.
+All eight buildings are still at full health, gas is 709,
+and four enemies are approaching the northern base.
+Gas production is paused.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Northern interception and fresh HOME trace | `6a74636cf6dfa0030ecb820234d71047550167fb7192f187d3dd802b241b2841` |
+| Frame-41,353 HOME SRAM | `8efdb57f212aef3de4808f327efddbdd507f2c49c2e865c47aa85012d0386ce8` |
+| Frame-46,355 HOME SRAM | `cbf43e84c37793218e6f8557421f23117caee45eb27e065256051ed7b9b847bf` |
+| Southern interception and fresh HOME trace | `482b1c6d26680ff5b56512186dc7e37721d001a516b967e73638c94c7cf78f8b` |
+| Frame-46,924 HOME SRAM | `63acf668cc11946614e8b2556d7103359e80cfc397eaf668184ccb2817c1be9f` |
+| Final worker evacuation and fresh HOME trace | `aeefaed1d5f217be547cc3a130b6251ed98903128dccf3ad48cb4c8edfed0845` |
+| Frame-48,594 HOME SRAM | `a1a4562e2876fcbe3156591ce179bc57b38b3adcf32990c23c288912286c3cc3` |
+
+### Southern objective probe and production recovery
+
+An attack from the frame-48,594 evacuation save sends two
+Hydralisks, two Zerglings and an Overlord toward the outer
+eastern defenses while Kerrigan stays behind. Both
+Hydralisks and Zerglings are gone by frame 50,352. The
+outer Cannon remains at 100 HP, the eastern Nexus at
+750 HP, and Kerrigan at 400 HP.
+
+Use the evacuated workers to build a Spawning Pool at
+(1792, 1792) and a Hydralisk Den at (1752, 1856) on
+another branch. Both complete at full health and the
+southern Hatchery produces a Hydralisk. Fresh HOME at
+frame 54,812 retains the southern Hatchery, Pool and
+Den at 1,250, 750 and 850 HP, respectively. Kerrigan
+remains at 400 HP and gas is 634. Supply was 47/50,
+allowing one paid Hydralisk order out of three attempted.
+
+Train a southern Overlord to raise capacity from 50 to
+66 and queue three Hydralisks. The neutral branch loses
+at frame 56,579. On a separate branch, the Dark Templar
+enters detection at frame 56,338, and the five northwest
+Hydralisks focus it at 56,375. It is absent by 56,476.
+Fresh HOME at frame 56,627 keeps the mission active past
+the earlier defeat.
+The northwest Overlord remains at 200 HP.
+
+The queued Hydralisks complete and another three finish
+at the southern Hatchery. Fresh HOME at frame 58,760
+retains all six new Hydralisks at 80 HP, Kerrigan at
+400 HP and the three southern production buildings
+at full health. Gas is 484. The old southern detector
+is lost during the wait, cutting capacity to 50 with
+61 used. The new Overlord and northwest detector remain.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Eastern objective probe | `791b76e61a7b1b0ea205ab44dee650e2d5e0404872d7398a22c98f4a924d6302` |
+| Worker spread and southern Pool | `fc5c7c3a3eeed7d5c2bade4c468ad4069993c17d1f39f41dda0f22b351c1b59a` |
+| Southern Den | `0622252d8265a67df99ae573f5cedd6a65d8540d531b6650c817e452c317971d` |
+| Southern production and fresh HOME | `9add7d83caba0e6cecbbabeebccdbc5cefec36d8cb2852aefba3ef7f5e9e66dd` |
+| Frame-54,812 HOME SRAM | `b58a38f2ecdff66381870b873f5a7d52296b460ae93f81e8c15eb80359d05b45` |
+| Northwest Templar defense and fresh HOME | `84e630f7c6419b0aae3635b18176ccdb5c440b423858672a8a2d1ca37463460d` |
+| Two southern reinforcement batches and fresh HOME | `0a7dca37562094509f5617e490146aaeb3465a77a1bab6588911b46dc529e88f` |
+| Frame-58,760 HOME SRAM | `7ed8d0f99510327ff700d287b7d78adae9945aa1cca1bbb9bb40b0bd59886113` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

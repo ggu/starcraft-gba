@@ -3964,10 +3964,10 @@ formation_route_pair(int sx, int sy, int slot_x, int slot_y, int tx, int ty,
 }
 #endif
 
-/* Cheap direct routing handles the open map. Run the full BFS only when the
- * straight corridor intersects terrain or a structure. */
-static int GBA_HOT
-direct_path_clear(int x, int y, int tx, int ty)
+/* Preserve the checked path for coordinates outside the map, including
+ * the truncation of negative pixel coordinates in the existing query. */
+static int __attribute__((noinline))
+direct_path_clear_reference(int x, int y, int tx, int ty)
 {
     /* Movement advances both axes, then the remaining axis. Testing a
      * sampled straight line accepts a different route and can repeatedly
@@ -3990,6 +3990,52 @@ direct_path_clear(int x, int y, int tx, int ty)
 	    if (!is_traversable(x / 16, y / 16, -1)) return 0;
 	    previous_cell = cell;
 	}
+    }
+    return 1;
+}
+
+/* Movement advances both axes first, then continues on the longer axis.
+ * With in-bounds endpoints, every crossed cell is in the walk grid.
+ * Simultaneous boundary crossings visit only the resulting diagonal cell. */
+static int GBA_HOT __attribute__((noinline))
+direct_path_clear(int x, int y, int tx, int ty)
+{
+    if (x == tx && y == ty) return 1;
+    int cols = MAP_COLS, rows = MAP_ROWS;
+    if ((unsigned)x >= (unsigned)(cols * 16) ||
+        (unsigned)tx >= (unsigned)(cols * 16) ||
+        (unsigned)y >= (unsigned)(rows * 16) ||
+        (unsigned)ty >= (unsigned)(rows * 16))
+        return direct_path_clear_reference(x, y, tx, ty);
+
+    int cell = (x >> 4) + (y >> 4) * cols;
+    int target_cell = (tx >> 4) + (ty >> 4) * cols;
+    if (cell == target_cell) return 1;
+    if (!path_grid_valid) build_path_grid();
+
+    int dx = tx - x, dy = ty - y;
+    int col_step = dx < 0 ? -1 : 1;
+    int row_step = dy < 0 ? -cols : cols;
+    int ax = FAST_ABS(dx), ay = FAST_ABS(dy);
+    int diagonal = ax < ay ? ax : ay;
+    int x_edge = dx < 0 ? (x & 15) + 1 : 16 - (x & 15);
+    int y_edge = dy < 0 ? (y & 15) + 1 : 16 - (y & 15);
+    while (x_edge <= diagonal || y_edge <= diagonal) {
+        int next_edge = x_edge < y_edge ? x_edge : y_edge;
+        if (x_edge == next_edge) {
+            cell += col_step;
+            x_edge += 16;
+        }
+        if (y_edge == next_edge) {
+            cell += row_step;
+            y_edge += 16;
+        }
+        if (!SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    int tail_step = ax < ay ? row_step : col_step;
+    while (cell != target_cell) {
+        cell += tail_step;
+        if (!SC64_GRID_GET(path_walkable, cell)) return 0;
     }
     return 1;
 }
