@@ -214,6 +214,10 @@ cycles (0.37%) and the mean reaches 12.36 emulated updates per second.
 | Six three-CPU matches | `fdcb7c5d949f968ff6da1438a61576307f1634d916bec88a28e14b87ed4929ba` |
 | Full P9 victory and SRAM readback | `90fac9b7bf721731c8343ad435d9b2173eb7a6a56608db5bc6f6bbb4c1bd9c25` |
 
+The normal product recipes now include this count with the other
+target-index flags. The build stamp forces existing outputs to relink.
+`CANONICAL_TARGET_INDEX=0` still selects the regular checked reference.
+
 ## Strict reuse on the generated-bounds release
 
 The November 22 trial applies the draft to `aa1d49c8`. It verifies
