@@ -440,6 +440,34 @@ entire 119,084-cycle byte-sprite portion would leave the
 The local corrected census receipt SHA-256 is
 `7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970`.
 
+### Skipping over-budget combat sound lookups
+
+A shared observer trial checks the frame's existing sound effect
+budget before doing screen and raw-actor lookups for attack,
+death and completed-building cues. The selection and order
+responses still take their ordinary paths and the observer
+records each actor's state for the next update.
+
+The sanitizer fixtures for audio hooks, codec and mixer pass.
+The default observer fixture matches the control's simulation
+hash, event totals and alert totals. The current ARM Protoss
+Melee trial holds the static RAM endpoints and matches the
+control frame, units, world, route counters, both pages and
+palette at all 42 cuts. Each timing window measures 600 updates.
+
+| Window | Mean cycles, stock → trial | p95, stock → trial |
+| --- | ---: | ---: |
+| 8,401–9,000 | 766,169 → 767,662 | 904,103 → 905,493 |
+| 10,801–11,400 | 1,040,170 → 1,041,909 | 1,350,192 → 1,354,181 |
+
+The earlier mean rises 0.20% and the later mean rises 0.17%.
+Keep the existing observer. The [earlier effect budget census](2026-11-22-steady-order-cost.md#bounding-the-other-steady-costs)
+also shows few rejected events in other campaign and skirmish
+samples.
+
+The local candidate timing receipt SHA-256 is
+`aacf6f5d8396b662fba91188da3690fe2524242bd6ffb5ecc3c3d98ee4fc892c`.
+
 ### Reusing actor admission during the draw
 
 The trial passes the depth queue's body or charge-only admission
