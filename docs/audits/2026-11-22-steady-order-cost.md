@@ -350,6 +350,51 @@ Measure an equivalent Outpost sample before choosing a sidecar.
 | Slot-indexed Custom Game trial | `6d87accdeec50ec16eaceca21acd5b543b8bb1ec5deb6813bcf2e2ef073a484b` |
 | Slot-indexed P10 trial | `0031a3876a0b9787bf9913bc4bacdd2da06c206ceb3d89fc8a888e30c36ba033` |
 
+### Transparent edge and word-run trials
+
+Four retained late P10 Melee cuts at calls 11,385–11,388
+match the world, route, palette and both displayed pages.
+The read-only census covers 84 byte draws, 1,410 visible
+rows and 23,736 visible source pixels. After clipping and
+the odd first pixel, 594 rows have matching source and
+destination word alignment. A leading and trailing aligned
+zero scan can omit 2,356 visible pixels. It removes at least
+two words in 126 rows and never removes a whole visible row.
+In the existing aligned pair loop, 276 additional zero words
+follow a blank quad and can be skipped across the four cuts.
+These are opportunity counts on the retained `1f0ad66e` ROM.
+
+The authored ARM benchmarks compare a per-row edge scan,
+a run scan only after an aligned zero word, and a variant
+that also scans source-aligned words after a blank scalar
+pair. All eight cases for each tested build match a scalar
+oracle across the full framebuffer. The measured cycles
+include the call and loop around 40 repeated draws per case.
+
+| Authored sprite case | Baseline cycles per draw | Trial cycles per draw |
+| --- | ---: | ---: |
+| Edge scan, sparse 32×24 | 18,136 | 12,867 |
+| Edge scan, dense 32×24 | 16,856 | 20,011 |
+| Aligned run, sparse 32×24 | 7,745 | 7,271 |
+| Aligned run, blank 48×24 | 9,601 | 6,359 |
+| Aligned run, dense 32×24 | 9,793 | 9,839 |
+| Mixed run, sparse 32×24 at misaligned destination | 13,761 | 10,002 |
+| Mixed run, dense 32×24 at misaligned destination | 12,385 | 12,986 |
+| Mixed run, right clip | 10,001 | 10,890 |
+
+The initial edge trial uses `-Os`; the two run trials use
+`-O2` and the same word and scene-clip capabilities. The
+gain depends on existing alignment and long transparent
+spans. Keep the three scans local given the dense and clipped
+regressions. Measure a certified row-bound compositor on a
+mixed visible workload before adding draw-time scanning.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Edge scan fixture | `bd14fec8242bac7e6999f8411829b87fd3e55ae585105dd9d5647cc9d9a914e6` |
+| Aligned zero-word run fixture | `dda33f09302607cf627cf5ef8104941b8c04ec12b43a9c3bd3f677be3a49ecac` |
+| Mixed run with misaligned destinations | `0e5be3c3c2ac1494deed16d1414052f9c008228c8c2bcce26e2b6ffc478a0cfb` |
+
 ## Shared heading for projectiles and unit facing
 
 Projectile creation and delayed-impact launch now use the same
