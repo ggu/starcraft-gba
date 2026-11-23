@@ -875,6 +875,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the Cannon gone. Continue from that save, hold reinforcements
   outside attack range until they can advance together, and keep
   Kerrigan in reserve.
+  The [next rally](audits/2026-11-12-z8-normal-physical.md#second-dark-templar-defeat-after-the-southern-attack)
+  qualifies a fresh load with 22 Hydralisks at the forward
+  position. The attack clears another Cannon and Pylon and
+  trips the separate Dark Templar defeat condition. A neutral
+  run from the same save stays active past that frame. Put
+  detector-backed defense at the northwest objective before
+  advancing the main group.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
