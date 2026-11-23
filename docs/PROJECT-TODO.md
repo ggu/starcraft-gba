@@ -713,8 +713,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   location checks take 242,186–260,553 cycles per update, or about
   18–20% of the main loop. A [direct Bring trial](audits/2026-11-13-p9-normal-home.md#direct-location-count-trial)
   lowers total cycles by 15.59–16.12% with matching sampled
-  state and pixels. Finish the ordinary victory and result save,
-  and verify location conditions in the other campaign providers.
+  state and pixels. The [full P9 victory and result save](audits/2026-11-13-p9-normal-home.md#full-victory-and-journal-with-direct-location-counts)
+  match all 93 checkpoints and all three SRAM exports. The replay
+  goes from 11.14 to 12.16 emulated calls per second. Continue
+  checking location conditions with the other campaign providers.
   Profile the cursor's hostile scan during the same held-button
   inputs. The earlier [distance-first query](audits/2026-11-13-p10-field-cursor-cost.md)
   improved P10. Update its oracle for the shared foreground picker.
