@@ -753,6 +753,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rebuild each account for about 80,000 cycles per update. Use
   the paired samples to measure these passes across changing
   live populations and confirm any gain in the late Zerg workload.
+  A [fresh target-index counter trial](audits/2026-11-12-target-index-bulk.md#batch-the-fresh-dirty-cell-count)
+  saves about 5,600 cycles per rebuild in the two P9 samples and
+  0.33% over the P10 victory tail. The six three-CPU games and 24
+  fresh loads agree. Full P9 victory uses 0.37% fewer cycles,
+  with all 93 checkpoints and all three SRAM exports matching.
+  Finish normal-product build qualification before activation.
   A local P10 armed-type lookup on top of the shared cursor queries saves
   2.39% and 2.37% in the P9 windows and 1.28% in the P10 tail.
   The sampled state, display pages and final P10 SRAM match.
