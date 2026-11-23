@@ -147,6 +147,49 @@ update costs by 0.02% and 0.07%. Keep the existing loop.
 | Same-page battlefield census | `c186965ee7f40727d40d5e6c016459cfb2268694a009c22d6f4340f9994912df` |
 | Halfword source trial | `ebba58f187ebbc9f59072b4b9e04bbadaaf4f09f2d683b0935bc03ce4c82a955` |
 
+### Restoring old actor pixels to terrain
+
+The same 64 advancing updates also compare the old work page with
+the bare cached terrain. The old and new cache bytes agree at
+every cut, and the camera, fog and palette match. The nonwork page
+also stays byte-identical before and after each draw.
+
+| Window | Mean affected pixels | Mean affected 16×16 tiles | Mean aligned halfword runs | Mean bytes in exact runs |
+| --- | ---: | ---: | ---: | ---: |
+| Terran 9,001–9,016 | 3,696 | 57 | 341 | 4,162 |
+| Protoss 9,001–9,016 | 4,246 | 63 | 356 | 4,653 |
+| Terran 11,385–11,400 | 5,603 | 73.5 | 498 | 6,273 |
+| Protoss 11,385–11,400 | 6,496 | 80.125 | 531 | 7,143 |
+
+All 108 rows have at least one difference. One enclosing span
+per row copies the full 25,920 bytes in every sample because
+the edge pixels differ. Omitting the two outermost columns for
+a diagnostic reduces the span counts, but the late windows
+still average 286 Terran and 396 Protoss exact runs. These
+are pixel coverage counts. They exclude discovery and transfer
+setup cost and the work to redraw each changed contributor. The
+simultaneous final-page and bare-terrain measurements point toward
+retaining unchanged overlays instead of redrawing them after
+hundreds of small transfers.
+
+The terrain restore receipt SHA-256 is
+`705d71ee45bdc0468e7edeefb5df97f70f79af28daefee0c1755f7239cb5ad51`.
+
+### Terrain filtering in the contact scan
+
+Four Terran cuts on the same replay sample all 80 uncached contact
+calls. Terrain accepts all eight candidate directions for 75 calls
+and five directions for the other five. In two calls, the returned
+mask blocks every terrain-valid direction while leaving at least
+one invalid direction unblocked. Two calls is the upper bound for
+newly available early exits in these cuts. The census does not show how many additional bucket
+visits could be avoided or whether the terrain precheck saves cycles.
+All four cuts match the pinned frame, world, both video pages,
+palette and route counters. Keep the current traversal.
+
+The contact census receipt SHA-256 is
+`732ece93d68f41e886454d97e5ac5520442758a92fe92b60f03576190c3b1d4a`.
+
 ## Normal cartridge integration candidate
 
 The four normal build recipes enable the same existing lobby mode

@@ -716,10 +716,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   single-direction contact bound did not improve these samples.
   The [same-page census](audits/2026-11-22-native-custom-game-lobby.md#same-page-battlefield-changes-during-melee)
   finds 27 identical battlefield draws in 32 earlier updates and about
-  30 of 105 changed tiles per late update. Test exact contributor
-  coverage and dirty-tile replay on each work page. Keep camera and
-  scene transitions on the full-render path. Late orders still need
-  work to reach the two-VBlank budget.
+  30 of 105 changed tiles per late update. In the same windows,
+  restoring the old work page to bare terrain would touch all
+  108 rows and require 341–531 aligned runs on average. Prioritize
+  reusing unchanged contributors before trying sparse terrain
+  transfers. Keep camera and scene transitions on the full-render
+  path. The [contact census](audits/2026-11-22-native-custom-game-lobby.md#terrain-filtering-in-the-contact-scan)
+  finds at most two new early exits in 80 Terran queries. Late
+  orders still need work to reach the two-VBlank budget.
   The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   already differs in first patch assignment. Check native formation and
   worker travel before using a longer service delay to fit the income.
@@ -736,9 +740,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores the Z1 pause at frame 984 and matches all 51 observations
   through victory and the fresh result load. The Melee-enabled
   Protoss cartridge also repeats P3 with identical pause and result
-  journals. P8 on the batched target-index release restores its pause
-  and wins at frame 104,113 with all 40 checks matching. Qualify
-  its result journal readback on the current product.
+  journals. On the [Melee-enabled Protoss cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-melee-enabled-cartridge),
+  P8 matches all 40 checks, restores its pause and wins at frame
+  104,113. A third HOME process restores the victory and exports
+  identical SRAM. Apply these result checks to the remaining
+  missions on the current builds.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints
   through victory. Separate fresh HOME loads restore the in-progress
@@ -765,8 +771,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [instrumented recovery trials](audits/2026-11-12-z8-normal-physical.md#observed-mineral-returns-in-the-recovery-trials)
   fail earlier than stock. A scout move stalls near a Hatchery,
   and changing worker priority increases early returns while
-  Kerrigan still dies. Verify movement and gather completion and
-  track the hero's retreat before another full ARM attempt.
+  Kerrigan still dies. In the [late survival trace](audits/2026-11-12-z8-normal-physical.md#late-hero-survival-on-the-melee-release),
+  she takes sustained damage while idle. An ordinary move toward
+  a nearby friendly unit reaches its destination and delays defeat
+  to frame 78,849. The run ends with no workers and the surviving
+  Nexus undamaged. Pair the retreat with a verified worker transfer
+  and renewed income before another full ARM attempt.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

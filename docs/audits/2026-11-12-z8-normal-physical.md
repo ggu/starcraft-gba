@@ -185,6 +185,39 @@ gather completion together with the timing of Kerrigan's retreat.
 | Scout move | `bec380cd70fae4e7c700a0fe6fc2235550ce49cb728c307662e9a4d3057ac130` |
 | Delayed worker priority reversal | `7e3c380dc483f558ac3626b54c4cf1e78f2e2537962cdb39e15ffbfe239206b8` |
 
+### Late hero survival on the Melee release
+
+An instrumented host run on `964193dd` reproduces the stock tape
+and loss at frame 62,535. Kerrigan is idle and unselected in the
+sampled late interval. Between frames 58,780 and 62,380 her health
+falls from 392 to 12 beside a visible enemy. The controller's raid
+lookup reports no active raid throughout that interval.
+
+A host trial searches for a completed friendly town hall farther than
+160 pixels from Kerrigan, clear of visible enemies within 320 pixels
+of the hall. The search runs on health-loss updates while an enemy
+is visible within 240 pixels of Kerrigan. None of the 99 searches
+finds a destination. The controller issues no retreat input and
+repeats the stock loss and pause journal.
+
+A separate fallback issues an ordinary Move toward a visible
+friendly combat unit farther from the immediate threat. Kerrigan
+accepts the order at frame 58,900, moves over the next 101 frames,
+and reaches the rally point by frame 59,101 with 372 HP. She
+still has 372 HP at frame 62,501. A later attack reaches her
+and the host run loses at frame 78,849. It ends after 79,977
+calls with zero Drones, four army units, and the surviving Nexus
+at 1,500 HP. This confirms the retreat works through the old loss
+window. Check worker arrival and deposits as well as hero survival
+before attempting a full normal-cartridge run.
+
+| Local observer trace | SHA-256 |
+| --- | --- |
+| Stock late hero trace | `0d4ad88e855768e40fb4026a48adca2896f9766a6ceeddc70c2d4e7df3ae15e5` |
+| Town-hall retreat probe | `eb61fb08fffbe21a3673e2689fabebedf48e4d7f4c439a22900b3c156c246409` |
+| Friendly rally retreat input tape | `7845f3b22bcfa33725f71b5931e176d494a908c3af915fff94916c1fd829dba9` |
+| Friendly rally retreat observer trace | `483bb5137ebc2738c85e3ea37b28224b21ea6e971ce7e90523255ff023d4b925` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

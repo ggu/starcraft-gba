@@ -483,9 +483,20 @@ observations, its frame-20,000 pause and its frame-47,661 victory.
 Both journals match the earlier batched-build run byte for byte.
 The result also restores in a third fresh process.
 
+P8 on the same Protoss 10 ROM matches 106,011 recorded calls through
+victory, including all 40 named observations, eight briefing pages
+and 12 dialogue pages. A fresh HOME load restores the frame-30,949
+pause. The route wins at frame 104,113 and writes a sequence-2 bank
+while preserving the pause bank. HOME + L in a third fresh process
+restores the result and sampled mission state. Eight neutral updates
+leave the result stable, and the exported 32 KiB SRAM is byte-identical
+to the victory export.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Z1 fresh-load victory and result readback | `02c0eed6f34a21d732ca575d43020e8069fe0f4331e6b3de57e3a3e8462f66ca` |
 | Z1 pause journal | `926bc03330532b9763b3e1d5e3aa1fc0970c40e4b99e1d9ed4a48f53da86fdb6` |
 | Z1 victory journal | `fd6b53a2e5be9d898d44e93c39e203a6148a3f7f4efc7309a77ca29036b936d2` |
 | P3 fresh-load victory and result readback | `1a8c4081494bab05368e98d1443b34ab2fd464dfa5bbd4324b87322aa94801f2` |
+| P8 fresh-load victory and result readback | `eaa15bacd4fcc94480c20bf35090713a983f519edffec40fa163328ed36f3f09` |
+| P8 victory and readback SRAM | `9f7b140a4a222fe297c07c2848d05131af14c66b113e32169d3b0e0756860923` |
