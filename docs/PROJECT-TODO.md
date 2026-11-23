@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-23. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-24. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -59,6 +59,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   drop to 13.24–18.47 emulated updates per second. In the sampled
   no-new-route-build Protoss Outpost cut, targeting alone costs 139,078
   cycles within orders and tracer passes cost 96,034 within rendering.
+  The [occupied-row query loop](audits/2026-11-22-steady-order-cost.md#iterate-the-published-target-row-mask)
+  reads each hostile owner's row mask once and stops after its last
+  occupied row. Authored ARM batches save 0.7–7.8% across the
+  speed- and size-optimized query builds. Measure the change during
+  a full busy battle before attributing a frame-rate gain.
   The [merged selection and detector query changes](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
   saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
   Custom Game replays with matching state and video. Profile repeated
@@ -436,8 +441,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   isolate the Barracks payment. A separate
   [Blood Bath observer](audits/2026-11-21-native-headless-replay.md#blood-bath-state-and-render-row-observation)
   verifies the Command Center, worker and mineral sprite keys in
-  live render rows. Extend campaign opening and event timing
-  coverage. The [native Custom Game lobby captures](audits/2026-11-22-native-custom-game-lobby.md)
+  live render rows. A [later Blood Bath observation](audits/2026-11-21-native-headless-replay.md#later-blood-bath-worker-orders)
+  records a neutral SCV alternating between a mineral and its Command
+  Center over 1,645 native updates. Resolve the native resource bank
+  and per-update service transitions to compare later mineral income.
+  Extend campaign opening
+  and event timing coverage. The [native Custom Game lobby captures](audits/2026-11-22-native-custom-game-lobby.md)
   show the map and seat controls, race cycling, and no difficulty field
   in the sampled Challenger and Blood Bath settings.
   The [matched Blood Bath Melee opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
@@ -958,10 +967,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   retains all six units. Fresh HOME at frame 27,641 also retains
   three Hydralisks transported south and three trained there.
   A Drone assigned to the idle Extractor restores gas after
-  a fresh HOME load at frame 28,908. Continue from that save,
-  protect the northern mining base from the approaching
-  Reaver, and prepare the northwest guard for the fourth
-  Dark Templar.
+  a fresh HOME load at frame 28,908. The [northern defense](audits/2026-11-12-z8-normal-physical.md#keep-the-northern-extractor-working)
+  defeats the Reaver and four Dragoons and keeps gas collection
+  active through a fresh HOME at frame 30,626. A later southern
+  reserve adds three Hydralisks. A [southern interception](audits/2026-11-12-z8-normal-physical.md#southern-interception-and-northwest-detector)
+  uses the existing southern detector, and a replacement
+  Overlord reaches the northwest guard at frame 40,031.
+  [Reinforcing the north first](audits/2026-11-12-z8-normal-physical.md#reinforce-the-north-through-the-nydus)
+  defeats the next wave and preserves eight Drones, 357 gas
+  and Kerrigan at fresh HOME frame 39,680. Protect the northern
+  workers while getting a replacement detector to the northwest guard.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

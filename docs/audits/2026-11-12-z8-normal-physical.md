@@ -829,6 +829,95 @@ gas route.
 | Frame-28,908 HOME SRAM | `5c0f669623345a043b23322b8583efcdedab608ac5d881de163442dfc81ba343` |
 | Extractor fresh HOME and 500-update continuation | `d9471a6f7837b29db3f59e806dbe6f208edd1093676d0e4b026fdc5a2518fe5b` |
 
+### Keep the northern Extractor working
+
+From frame 28,908, the two northern Ultralisks can defeat
+the approaching Reaver alone, leaving one at 4 HP. A better
+branch box-selects those Ultralisks and six Zerglings and
+focuses the Reaver. By frame 29,338 it is gone, both
+Ultralisks are at 400 HP and three Zerglings survive.
+Reassign the Drone to the Extractor. Fresh HOME at frame
+29,626 shows 32 gas and an active gas order.
+
+Track each approaching Dragoon with the cursor and issue
+direct attacks. After four such eliminations, fresh HOME
+at frame 30,626 retains Ultralisks at 191 and 343 HP, two
+Zerglings, and eight northern Drones. The gas order remains
+active, gas is at 72, and the surveyed northern area has
+no enemies. All eight northern and southern buildings
+remain at full health.
+
+The southern Hatchery then adds three 80-HP Hydralisks.
+Fresh HOME at frame 32,594 retains them, five western
+Hydralisks, and Kerrigan at 400 HP. Gas has recovered to
+77. The western Overlord is already absent in this save.
+An unattended continuation ends in defeat at frame
+34,840 after the Dark Templar takes the southern approach.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First mixed-defense trace | `01c27f6368edd460b7936b0df79fb5e21d71b8442bd0de3b4da0056c32c969e8` |
+| Frame-29,626 HOME SRAM | `849cb351886f8067eb08fb0be44d63a24eb9cf210f7ef1f9d58dac992e4c4317` |
+| Four-Dragoon defense trace | `1cadb9b4e4c7fae2ac0acc40353720a81389a66fe05b7cf0769563b05a6b13a1` |
+| Frame-30,626 HOME SRAM | `0b67ba54b978887c81202c502765e03e3c2633c7e5367e0d1f3bed7ea1cd6d2a` |
+| Southern reserve trace | `70c5dcd180f57afaf1ea6507cb81abaf4a10861dd96a3017bcc1d40b225c9127` |
+| Frame-32,594 HOME SRAM | `5ea7da5d48ddd251c0f4a2db8264ec8d0025b3e691128d06763c3cecfe947957` |
+
+### Southern interception and northwest detector
+
+From frame 32,594, hold the existing southern Overlord
+near (1320, 1789) and send two Hydralisks and two Zerglings
+toward (1310, 1710), with Kerrigan staying behind. The
+40-HP Dark Templar enters detection at frame 34,633.
+An ordinary direct attack at frame 34,646 leaves it at
+6 HP by frame 34,697. It is absent at frame 34,747.
+Fresh HOME at frame 34,998 retains both Hydralisks at
+80 HP, the Overlord at 200 HP and Kerrigan at 400 HP.
+
+From that save, fly a separate northern Overlord toward
+(299, 384). Fresh HOME at frame 40,031 has the five
+northwest Hydralisks and full-health replacement detector
+in position, and the southern force is intact. The Drone
+has gathered 365 gas, but the northern Extractor has
+104 HP, the northern canal has 151 HP, and the northern
+Spawning Pool and Hydralisk Den are gone. Supply is 53/52.
+The earlier save preserves more of the northern economy.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Southern interception and fresh HOME trace | `e06ada5af303a2abe94fa3bb6152f6f58c17fa9a726c5a8864f382f044175782` |
+| Frame-34,998 HOME SRAM | `c9ba1245c72b2ea5a29d8b635ef8accebc7964f4203a43e192bcebd21e7c468e` |
+| Northwest detector flight and fresh HOME trace | `33c61a4ecfc00633001f843323f5176b28b71b42526caf4a712ff615cba9285d` |
+| Frame-40,031 HOME SRAM | `3f2ec81640bc880669ce38f6c85bad2f753aa5eebeee5c8db63b905f3910726a` |
+
+### Reinforce the north through the Nydus
+
+A direct defense from frame 40,031 loses both Ultralisks
+and the gas Drone. The Reaver and three Dragoons are
+already around the damaged Extractor. An earlier branch
+from frame 34,998 sends six reserve Hydralisks north through
+the Nydus as a box-selected group. Fresh HOME at frame
+35,753 has all six at 80 HP at the northern exit and the
+southern Templar guard still in place.
+
+Group the reinforcements with the northern Ultralisks and
+focus the approaching Dragoons and Reaver. Fresh HOME at
+frame 39,680 retains six Hydralisks at 80, 80, 80, 80,
+80 and 35 HP, one Ultralisk at 96 HP, all eight Drones and
+357 gas. All eight buildings are at full health. The
+second Ultralisk is lost. Kerrigan remains at 400 HP
+and the southern guard is present. A later Overlord
+flight reaches the northwest guard by frame 44,458,
+while the northern Hatchery and all eight Drones fall.
+Resume from the earlier save and defend the northern
+base during the detector transfer.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Northern wave trace | `4ae3f3fc7743faf66cd51f87a0f39c832c3ac68d41db969a9e1b5157b603cbb6` |
+| Reaver and fresh HOME trace | `4d026dc8787102b3a83c40c190c1c7dbb85ff3776a4d2161da881dda8349eb3c` |
+| Frame-39,680 HOME SRAM | `27b57d29d1f27c7ea32261900f24c96e6d6d4a8e5af9a14a8cd9380d83729446` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

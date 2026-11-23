@@ -158,3 +158,30 @@ Record target pointer, order and phase on each observed game update in a
 separate controlled neutral continuation before estimating target-selection or
 reacquisition cadence. Isolate any combat acquisition case from mining's own
 service and target-selection rules.
+
+### Later Blood Bath worker orders
+
+A fresh emulator continuation loads the retained ordinary AI-match
+checkpoint with F3 and takes two F2 snapshots in an isolated config
+and save directory. Gameplay controls stay neutral. The two snapshots
+record the following native worker slot positions and order IDs.
+
+| Native update | Owner-2 SCV slot 66 | Owner-2 SCV slot 67 |
+| ---: | --- | --- |
+| 19,444 | (233, 189), order 90, Command Center 65 | (299, 148), order 87, mineral 16 with claim |
+| 19,868 | (276, 203), order 86, mineral 16 with claim | (299, 82), order 85, mineral 7 |
+| 21,089 | (198, 187), order 90, Command Center 65 | (202, 208), order 85, mineral 14 |
+
+Both worker slots have 60 HP in each observation. The current target
+pointer at offset `0x5c` in the [native worker record](2026-11-21-native-mineral-service-queue.md)
+resolves to an active actor in all six observations. A mineral
+claim is a matching nonzero resource pointer at offset `0xcc`.
+The sparse order samples and unattributed resource bank leave
+the duration of each mineral service phase and the exact deposit
+cadence unresolved.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native update 19,444 seed state | `4db6e4cf342abd2af5b3409d6ad3b9f9298b1a12e529d5484bde09eed7eab7be` |
+| Native update 19,868 snapshot | `f1ad28386562bc1da1ff518d88ef4fa4571dce872e2b5ca462443ad1a8ba1805` |
+| Native update 21,089 snapshot | `64064866a7220e78d743fe3c034fd0f87d74a302f2bdca892dc7ccc4ea656d25` |

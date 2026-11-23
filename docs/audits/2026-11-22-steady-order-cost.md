@@ -98,6 +98,52 @@ repeated target eligibility and tracer admission work, alongside the
 separate route-stall cut. Player-driven battle pacing and hardware
 measurement remain open.
 
+### Iterate the published target row mask
+
+The indexed nearest-target query already maintains a
+per-owner row mask. Shift the masked bits down to the
+first row of the search and consume them in order. This
+reads the owner mask once and stops at its last set bit.
+For each visited row, walk the corresponding cell heads
+from the first clipped column.
+Conservative stale bits still permit an unnecessary visit.
+The cell order, distance comparisons and eligibility
+checks remain the same.
+
+Each authored ARM batch runs 512 queries through the shared
+search body over 144 unit and 64 building slots. Query
+answer digests match with the new row loop. The timed span
+includes the query input generation and digest accumulation.
+IWRAM is 32 bytes smaller with the normal compiler setting
+and 48 bytes smaller with its size-optimized query setting.
+
+A separate sanitizer run compares both exact query bodies
+in 262,144 calls across 256 authored worlds, including
+edge rows and columns, moved units, stale positive bits,
+dead buildings and both hostility paths. Every answer
+matches.
+
+| Placement span | Search radius | Normal cycles, before → after | Size-optimized cycles, before → after |
+| ---: | ---: | ---: | ---: |
+| 2,048 | 90 | 990,134 → 913,289 | 1,196,920 → 1,130,508 |
+| 1,024 | 64 | 1,048,982 → 985,032 | 1,241,906 → 1,180,142 |
+| 512 | 90 | 2,129,854 → 2,072,209 | 2,540,293 → 2,447,823 |
+| 128 | 64 | 5,442,837 → 5,386,910 | 6,804,279 → 6,758,675 |
+
+Iterating just the row bits slowed the size-optimized
+query in all four batches. Walking the cell heads as part
+of the same change gives savings in both compiler modes.
+The authored measurements qualify the query loop only.
+Full-frame campaign and Custom Game performance
+measurements are still open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored ARM fixture | `304b9c76936634898cc5e37e469fd98b7c9460db45c1ba04d2bcb113773792f1` |
+| Normal ARM timing output | `efea963a269806a929b2011e26eb4083316bee976cfc169801d43fea8f959a3c` |
+| Size-optimized ARM timing output | `6bcfabd71d31135cb3fca7f5714d8eba990190f9c1e67877aac796af9222c3f6` |
+| Authored host differential runner | `ae763c1c6b53f62c2fe31bede694e7df354cfa67b50fb2e7a12f9ba9d1e1af56` |
+
 ## Visible fights in Protoss Crossfire
 
 The merged #724 Showcase build enters Crossfire through the normal
@@ -117,6 +163,10 @@ three-computer Outpost setup.
 | Overlay walking inside tracer parts | 26,982 | 5,719 |
 
 The early and late overlay scopes vary even with similar call counts.
+The retained stack records contain 446 and 594 tracer-part calls
+and 148 and 137 overlay walks, respectively. Neither window records
+a call to the ground-trail depth helper. Reusing ground-trail picks
+would need a workload that actually exercises that helper.
 A separate read-only census matches the 32 unprofiled cuts and maps
 all 507 direct unit byte-sprite calls to attack-pose source arrays.
 Those calls use 56 distinct frame pointers. The full bank has 1,651
