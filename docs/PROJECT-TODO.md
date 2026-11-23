@@ -833,9 +833,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   passes arrival order and journal fallback checks on both standalone
   profiles. A fresh ARM process restores the queue and matches 50
   updates. Eight independent workers add about 3,929 guest cycles per
-  orders pass in the authored ARM fixture. Integrate the transactional
-  queue reconstruction into the packed journals and measure race
-  economy and pacing before shared activation.
+  orders pass in the authored ARM fixture.
+  [Linear rank reconstruction](audits/2026-11-21-native-mineral-service-queue.md#linear-reconstruction-from-saved-ranks)
+  cuts the authored 240-worker load preparation from 6.97 million
+  cycles to about 208,000 with matching state. All four packed row
+  codecs feed the shared builder and preserve a worker's cargo.
+  Integrate it into the
+  [normal journal envelopes](audits/2026-11-21-native-mineral-service-queue.md#packed-journal-integration)
+  and measure race economy and pacing before shared activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.

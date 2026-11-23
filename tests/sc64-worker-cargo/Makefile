@@ -32,10 +32,13 @@ build/test-sc64-mineral-fifo-default: $(MINERAL_FIFO_DEPS) | build
 	$(CLANG) $(MINERAL_FIFO_FLAGS) $< $(MINERAL_FIFO_TEST_SRAM) -o $@
 build/test-sc64-mineral-fifo-frontier: $(MINERAL_FIFO_DEPS) | build
 	$(CLANG) $(MINERAL_FIFO_FLAGS) -DSC64_SKIRMISH -DSC_ORIGINAL_SKIRMISH -DSC_FRONTIER_ROUTE_CACHE $< $(MINERAL_FIFO_TEST_SRAM) -o $@
+build/test-sc64-mineral-fifo-packed: tests/sc64_mineral_fifo_packed.c $(wildcard starcraft/*.h) tests/sc64-worker-cargo/Makefile | build
+	$(CLANG) $(MINERAL_FIFO_FLAGS) $< -o $@
 .PHONY: test-sc64-mineral-fifo
-test-sc64-mineral-fifo: build/test-sc64-mineral-fifo-default build/test-sc64-mineral-fifo-frontier
+test-sc64-mineral-fifo: build/test-sc64-mineral-fifo-default build/test-sc64-mineral-fifo-frontier build/test-sc64-mineral-fifo-packed
 	./build/test-sc64-mineral-fifo-default
 	./build/test-sc64-mineral-fifo-frontier
+	./build/test-sc64-mineral-fifo-packed
 
 define SC64_WORKER_GATHER_FIXTURE
 build/test-sc64-worker-gather-$(1): tests/sc64_worker_gather_game.c $(STARCRAFT) $$(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile tests/sc64-worker-cargo/Makefile | build

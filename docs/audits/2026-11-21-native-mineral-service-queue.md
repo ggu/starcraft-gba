@@ -144,9 +144,9 @@ Check the normal opening and AI economy timings separately.
 ### Queue order in existing-width save rows
 
 Test a new-policy row discriminator before changing the save size.
-An eligible queued worker has zero live cargo. Under an authenticated
-new save tag, serialized values 9–248 can carry that worker's rank
-1–240 on its patch. Decode and validate the ranks in a private
+The standalone rule admits queued workers with zero live cargo.
+Under a distinct save tag, serialized values 9–248 can carry ranks
+1–240 on a patch. Decode and validate the ranks in a private
 candidate, then restore the zero cargo value before the normal cargo
 and mission checks. The work timer remains independent, including
 when a worker has reached zero but still owns the service slot.
@@ -217,6 +217,85 @@ activating the mode there.
 | Authored ARM fixture | `f23ef06bdbbf093760bb786868d402633b49e057c4c32ad4d1abb1a830d51159` |
 | ARM continuation and timing | `83c7e46bca413c4c131c82767b813bfe7d8beba5a3bb1cd4676cc228623abc48` |
 | Standalone SRAM image | `bf05ad30a2b9f4054f9008f371a37ddfb62b185d51c1dc70fc851ef955d4181d` |
+
+### Linear reconstruction from saved ranks
+
+The standalone reader now stages each validated row once. The shared
+builder assigns a contiguous span to each patch, places each worker at
+its recorded rank, and then links the spans in order. Duplicate ranks,
+gaps and a nonzero waiter timer fail before live queue publication.
+The builder uses the detached queue arrays during preparation and one
+temporary byte per unit to order the staged entries.
+
+The packed-row fixture feeds the builder from actual compact, ZP,
+derived and P7 typed decoders. Each codec restores 240 shuffled
+ranks with cargo values 0–8, the head timer and the normalized unit
+fields. The fixture also covers the first and last of 144 patches, empty patch ranges,
+separate queue tails and overloaded nonworker carry. The standalone
+and Frontier journal fixtures still pass fallback and failed-load
+atomicity. A fresh standalone ARM process loads the same 32 KiB SRAM
+image and matches 50 uninterrupted updates with the new builder.
+
+An authored ARM fixture compares the previous and new reconstruction
+at the larger 240-unit and 144-patch bounds. The two implementations
+produce matching normalized unit rows and queue bytes in every case.
+
+| Ranked workers and occupied patches | Previous cycles | New cycles |
+| --- | ---: | ---: |
+| 0 workers | 22,776 | 11,190 |
+| 8 workers on 2 patches | 120,160 | 60,132 |
+| 96 workers on 24 patches | 1,647,730 | 117,420 |
+| 240 workers on 1 patch | 6,970,529 | 208,096 |
+
+These timings cover queue and row preparation in an authored load
+fixture. Whole-journal SRAM copying, compact decode and gameplay
+frame timings need separate measurements.
+
+### Packed journal integration
+
+The default Make recipes expand to worker cargo and shared transport
+on all four products. Terran and Z10 also enable Carrier release,
+P10 enables the research-jobs journal, and standard Showcase uses
+base transport.
+
+| Normal product | Current custom-game writer | Current campaign writer | Current accepted tags |
+| --- | --- | --- | ---: |
+| Terran | Terran Carrier envelope, namespace `0x4d` | Base transport | 3 |
+| Z10 | Zerg Carrier envelope, namespace `0x4e` | Base transport | 3 |
+| P10 | Research-jobs transport, namespace `0x45` | Base transport | 4 |
+| Showcase | Base transport | Base transport where available | 2 |
+
+Preserve each payload layout and bind the FIFO marker to explicitly
+approved outer and inner version pairs. Keep the selected journal
+token intact while passing the layout's original logical tag to
+its existing decoder. Terran and Z10 normalize ranks after Carrier
+unpack. P10 preserves the custom-game research-jobs interpretation.
+The rank pass runs before worker cargo validation. Publish the
+prepared queue only after the selected world loads successfully.
+Legacy candidates keep their saved economy policy.
+
+The race gather path can reach mineral service with gas or unclassified
+cargo still on the worker. A packed queue therefore needs both rank and
+original cargo. The authored codec fixture qualifies
+`(rank << 4) | cargo` for every rank 1–240 and amount 0–8.
+The highest value is 3,848 and fits all four carry fields. Authenticate
+the packed layout and worker order before splitting this word. Restore
+the amount and preserve the cargo flags before running the existing
+worker validators. The standalone tag continues to use its original
+rank encoding.
+
+The raw stage uses namespace `0x4f`. With separate FIFO tags for
+base and custom envelopes, Terran and Z10 would need five accepted
+tags each and P10 would need six. The ordinary selector currently
+allows five. The separate P10 research-and-Egg preview already uses
+six tags under its own capacity guard. Qualify those preview
+combinations separately from the normal products.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored ARM rank comparison fixture | `5d80f0eb6f5607c646b758ec93bb7d204233108e5faa2a5b6c03d258d6aa1fa7` |
+| Rank comparisons and cycle counts | `f430d447d9306dcf83cf871c7193fed1dffcc379026f9c96b3dddfed9b7bce2c` |
+| Standalone ARM continuation with the new builder | `eeebe595bd5b8b5db04aa732cc979f40796e97cc041732eba68089f48c5f1b57` |
 
 ## Evidence
 
