@@ -327,6 +327,35 @@ approach before returning to the attack and mining route.
 | Hold on the approach | `d3345840c3c6a20f733fd894f422cf441dde92739560d3adceeafb2eed56f4c9` |
 | Explicit attack on the approach | `40d5511b700c6e00969cbd474b3a32e42120089c34731a4d5c56121085c4d1f8` |
 
+### Forward detection and fresh HOME continuation
+
+The next ordinary-input run sends the Overlord farther forward.
+Its movement is observed through arrival and it is idle at the
+new position by frame 20,000. The game's visibility flag shows the
+Dark Templar first revealed at frame 21,544. The three Hydralisks
+accept the attack order at frame 21,584. The target falls from
+40 HP to 16 by frame 21,700 and is absent by frame 21,800.
+The game stays in play through frame 23,100, beyond the old
+defeat at 21,782. Victory and defeat flags are both clear.
+
+A separate replay reproduces the interception, saves using Start
+and B at frame 23,101, and loads the SRAM with L from fresh HOME.
+The frame, result flags, resources, mission and 91 observed live
+unit records match between the original and loaded sessions.
+After aligning both sessions at frame 23,102, another 120 neutral
+updates produce matching observations at frame 23,222 with the
+attacker still absent. The guest exported the checkpoint used
+for this comparison successfully. The harness later returned an
+error on a redundant final export. These checks establish a
+repeatable recovery and continuation. The remainder of the
+mission and its victory sequence still need a winning replay.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Forward detection and interception | `9d15b57d5080fad49a2d499f67e0c89ee4d26d390192ff9431cecadf3ecf1edf` |
+| Fresh HOME comparison | `8a1c216ee9f9b71f940bfe51ebe50138239993dab2f9018a4d9ac38f8677c02f` |
+| Interception save | `2bbf10edccb8b208a77e7fa54e77d52421d0e062baf033f8ac3734d18bf90fc6` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
