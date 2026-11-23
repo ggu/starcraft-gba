@@ -770,10 +770,10 @@ A nested trace of the same eight Outpost updates attributes all 105
 rejected rasters to 82 of 426 tracer calls. Those 82 calls spend
 511,770 guest cycles from tracer entry to their first raster,
 about 63,971 per update. All 426 tracer calls together cost 787,611
-cycles. The preparation total includes any timeline and overlay
-work needed by the painter, so it is an attribution, not a savings
-estimate. Identify work that an earlier bound can safely skip, and
-qualify unchanged depth ordering and trail picks in a visible fight.
+cycles. The preparation total includes timeline and overlay work
+the painter may still need. Identify work that an earlier bound
+can safely skip, and qualify unchanged depth ordering and trail picks
+in a visible fight.
 
 | Local receipt | SHA-256 |
 | --- | --- |

@@ -156,8 +156,8 @@ values with timers 0, 1, 31, 44 and 45 in the compact, ZP,
 derived and P7 typed codecs. All 4,800 row round trips reproduce
 the codec inputs and normalization restores the original zero cargo.
 The fixture exercises individual row widths. It follows the derived
-codec's requirement for the omitted weapon field. It does not
-exercise worker classification or the complete journal.
+codec's requirement for the omitted weapon field. Worker
+classification and the complete journal still need integration tests.
 
 Qualify the membership rules for empty workers, including approaches,
 cancellation, job replacement and slot reuse. Reject mismatched
