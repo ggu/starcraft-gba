@@ -270,10 +270,13 @@ static int sc64_psc_campaign_ai(const Unit *q)
 
 static int sc64_psc_parent_tick(int slot)
 {
-    Sc64PscState s;
+    Sc64PscState s, was;
     Unit *q = &u[slot];
     int ai;
-    if (!sc64_psc_load(q, &s)) return 0;
+    /* Peek, and store only a row that changes: a load wakes the service for every Reaver, and an idle one (a
+     * human's reinforcement that has not fired) must stay unestablished, as in a run that was never loaded. */
+    if (!sc64_psc_peek(q, &s)) return 0;
+    was = s;
     ai = sc64_psc_campaign_ai(q);
 #ifndef SC64_PSC_NO_CAMPAIGN_RESTOCK /* diagnosis knob, as RACE_AI_NO_CARRIERS */
     if (ai && !s.queued && s.stock < sc64_psc_capacity(q->owner)) { s.queued = 1; s.progress = 0; }
@@ -282,7 +285,8 @@ static int sc64_psc_parent_tick(int slot)
     if (s.queued && ++s.progress >= sc64_psc_build_ticks()) {
         ++s.stock; --s.queued; s.progress = 0;
     }
-    sc64_psc_store(q, &s);
+    if (s.stock != was.stock || s.queued != was.queued || s.cooldown != was.cooldown || s.progress != was.progress)
+        sc64_psc_store(q, &s);
     return s.queued || s.cooldown || ai;
 }
 
@@ -308,6 +312,14 @@ static void race_paid_scarab_launch(Unit *q, int target)
     if (!s.stock || s.cooldown) return;
     if (target < MAX_UNITS && sc64_race_unit_flying(u[target].type)) return;
     if (sc64_psc_hint && sc64_psc_flying_of(slot) >= 0) return;
+    /* A Scarab is an actor too: it may not take a slot that queued building products, a scripted P7 Carrier
+     * create or a paid Interceptor order already hold. Short of one unreserved slot it stays in the Reaver. */
+#ifdef SC64_SHARED_SCOURGE_COMBAT
+    if (!race_product_slots_available(1)) return;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(1)) return;
+#endif
     child = spawn_unit(q->owner, U_SCARAB, q->x, q->y);
     if (child < 0) return; /* full actor pool: the Scarab stays in the Reaver */
     u[child].raw_type = SC64_PSC_RAW; u[child].raw_owner = q->raw_owner;
@@ -417,17 +429,23 @@ static void race_paid_scarab_explode(int px, int py, int owner, int primary)
 
 /* ---- flight, once per source tick ---- */
 
-/* True if the runtime pixel is not walkable. Cells inside the inflated
- * footprint of the Scarab's own building target are open to it. */
+/* True if the runtime pixel is not walkable. The cells of the Scarab's own building target (the cell rectangle
+ * the path grid blocks for that building, and no wider) are open to it, so it can reach the building's edge.
+ * A wall, cliff or other building outside that rectangle stays closed. A cell inside the rectangle that terrain
+ * or a neighbouring footprint also blocks cannot be told from the target's own and is open too (see
+ * docs/PAID-SCARABS.md). */
 static int sc64_psc_blocked(int x, int y, int target)
 {
     if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return 1;
     if (is_traversable(x / 16, y / 16, -1)) return 0;
     if (target >= MAX_UNITS) {
-        const Building *v = &b[target - MAX_UNITS];
-        int raw = v->raw_type >= 0 ? v->raw_type : sc64_race_raw_building(v->type);
-        int d = sc64_siege_distance(raw, v->x, v->y, x, y);
-        if (d >= 0 && d <= 40) return 0;
+        PathFootprint f;
+        int c0, c1, r0, r1, world[4] = { 0, 0, 0, 0 };
+        path_fp_describe(target - MAX_UNITS, &f);
+        if (f.kind != PFP_NONE) {
+            path_fp_rect(&f, &c0, &c1, &r0, &r1, world);
+            if (x / 16 >= c0 && x / 16 <= c1 && y / 16 >= r0 && y / 16 <= r1) return 0;
+        }
     }
     return 1;
 }

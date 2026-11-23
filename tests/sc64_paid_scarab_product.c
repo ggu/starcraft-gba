@@ -1185,6 +1185,206 @@ static void trigger_scan(void)
     puts("trigger PASS");
 }
 
+/* A building target behind other buildings. The Scarab may enter the target's own cells and nothing else: a ring
+ * of Pylons two cells out closes the way (a Scarab used to cross anything within 20 px of the target's bounds),
+ * and the same ring with a gap is a detour it flies. Returns whether the Hatchery lost points. */
+static int ring_fixture(int gap)
+{
+    int hx, hy, r = arena(&hx, &hy), h, t, c0, c1, r0, r1, world[4] = { 0, 0, 0, 0 }, np = 0, before, hit, rx = 0;
+    PathFootprint f;
+    h = enemy_hatchery(hx, hy);
+    path_fp_describe(h, &f);
+    assert(f.kind != PFP_NONE);
+    path_fp_rect(&f, &c0, &c1, &r0, &r1, world);
+    {
+        int x0 = (c0 - 2) * 16 + 8, x1 = (c1 + 3) * 16 + 8, y0 = (r0 - 2) * 16 + 8, y1 = (r1 + 3) * 16 + 8;
+        rx = x0 - 40;
+        for (int x = x0; x <= x1; x += 24)
+            for (int y = y0; y <= y1; y += 24) {
+                int edge = x < x0 + 24 || x > x1 - 24 || y < y0 + 24 || y > y1 - 24;
+                int open_side = x < x0 + 24 && y > (y0 + y1) / 2 - 36 && y < (y0 + y1) / 2 + 36;
+                if (!edge || (gap && open_side)) continue;
+                t = spawn_build(SIDE, B_PYLON, x, y, 0);
+                assert(t >= 0);
+                b[t].hp = b[t].maxhp; b[t].under_construction = 0; ++np;
+            }
+    }
+    invalidate_path_grid(); sc64_visibility_reset(); update_exploration();
+    before = hp_total(MAX_UNITS + h);
+    place(&u[r], rx, hy);
+    u[r].carry = SC64_PSC_INIT | 1; u[r].work_timer = 0;
+    printf("ring: rect cells %d..%d x %d..%d, Reaver at %d,%d, Hatchery at %d,%d\n", c0, c1, r0, r1, rx, hy, b[h].x, b[h].y);
+    attack(r, MAX_UNITS + h);
+    wait_launch(r);
+    stand_down(r);
+    for (int n = 0; n < 200 && count_scarabs(); ++n) step(1);
+    hit = hp_total(MAX_UNITS + h) < before;
+    printf("ring: %d Pylons, %s: Hatchery %s\n", np, gap ? "gap on the Reaver's side" : "closed", hit ? "hit" : "untouched");
+    return hit;
+}
+/* The exception itself: a blocked cell outside the cell
+ * rectangle the path grid blocks for the Hatchery, is closed to a Scarab aimed at it; the Hatchery's own cells are open. */
+static void neighbour_cells(void)
+{
+    int hx, hy, r = arena(&hx, &hy), h, p, c0, c1, r0, r1, world[4] = { 0, 0, 0, 0 }, closed = 0, open = 0;
+    PathFootprint f;
+    (void)r;
+    h = spawn_build(ENEMY, B_PYLON, hx, hy, 0);          /* a small target, so a neighbour's cells lie near its bounds */
+    assert(h >= 0);
+    b[h].hp = b[h].maxhp; b[h].under_construction = 0;
+    path_fp_describe(h, &f);
+    path_fp_rect(&f, &c0, &c1, &r0, &r1, world);
+    printf("neighbour: target Pylon footprint kind %d, cells %d..%d x %d..%d\n", (int)f.kind, c0, c1, r0, r1);
+    p = spawn_build(SIDE, B_PYLON, (c1 + 1) * 16 + 8, (r0 + r1 + 1) * 8, 0);   /* touching the target's right side */
+    assert(p >= 0);
+    b[p].hp = b[p].maxhp; b[p].under_construction = 0;
+    invalidate_path_grid(); sc64_visibility_reset(); update_exploration();
+    for (int cy = r0 - 3; cy <= r1 + 3; ++cy)
+        for (int cx = c0 - 3; cx <= c1 + 4; ++cx) {
+            int px = cx * 16 + 8, py = cy * 16 + 8;
+            int inside = cx >= c0 && cx <= c1 && cy >= r0 && cy <= r1;
+            if (is_traversable(cx, cy, -1)) continue;
+            if (inside) { assert(!sc64_psc_blocked(px, py, MAX_UNITS + h)); ++open; }
+            else { assert(sc64_psc_blocked(px, py, MAX_UNITS + h)); ++closed; }
+        }
+    printf("neighbour: %d blocked cells of the target's own footprint are open, %d blocked cells outside it stay closed\n", open, closed);
+    assert(open > 0 && closed > 0);
+}
+static void ring_test(void)
+{
+    neighbour_cells();
+    assert(!ring_fixture(0));       /* closed: not reached through the Pylons */
+    assert(ring_fixture(1));        /* a gap: the detour reaches it */
+    puts("ring PASS");
+}
+
+/* A launch needs an actor slot the shared commitments have not claimed: a queued building product, a scripted
+ * P7 Carrier create, a paid Interceptor order. The pool is filled until exactly the committed slots are left. */
+static Unit slots_saved[MAX_UNITS];
+static int fill_pool_leaving(int leave)
+{
+    int freed = 0;
+    memcpy(slots_saved, u, sizeof u);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (sc64_unit_slot_available(i)) {
+            if (freed < leave) ++freed; else u[i].alive = 1;
+        }
+    return freed;
+}
+static void unfill_pool(void) { memcpy(u, slots_saved, sizeof u); }
+static void slot_commitments(void)
+{
+    int hx, hy, r = arena(&hx, &hy), h, z, left;
+    /* a queued building product holds one slot */
+    h = enemy_hatchery(hx, hy);
+    z = enemy_unit(U_PROBE, u[r].x + 70, u[r].y);
+    race_paid_scarab_trained(r); u[r].carry = SC64_PSC_INIT | 5;
+    b[h].queue_head = 0; b[h].queue_count = 1; b[h].queue[0] = U_ZEALOT;
+    left = fill_pool_leaving(1);
+    assert(left == 1);
+    race_paid_scarab_launch(&u[r], z);
+    assert(scarab_in_flight(r) < 0 && race_paid_scarab_stock(r) == 5);   /* the last slot is the product's */
+    b[h].queue_count = 0;
+    race_paid_scarab_launch(&u[r], z);
+    assert(scarab_in_flight(r) >= 0 && race_paid_scarab_stock(r) == 4);  /* uncommitted: it launches */
+    unfill_pool();
+    /* P7: three scripted Carrier creates are still to come */
+    start_campaign(SC64_P7_GLOBAL_ID);
+    {
+        int rv[8], n = enemy_reavers(rv, 8), pending = 3, e;
+        assert(n >= 1 && race_p7_active());
+        for (unsigned m = race_p7.created_mask & 7u; m; m &= m - 1u) --pending;
+        assert(pending >= 1);
+        e = rv[0];
+        z = spawn_unit(SIDE, U_PROBE, u[e].x + 70, u[e].y);
+        assert(z >= 0);
+        u[e].carry = SC64_PSC_INIT | 5; u[e].work_timer = 0;
+        left = fill_pool_leaving(pending);
+        assert(left == pending);
+        race_paid_scarab_launch(&u[e], z);
+        assert(scarab_in_flight(e) < 0 && race_paid_scarab_stock(e) == 5);
+        unfill_pool();
+        left = fill_pool_leaving(pending + 1);
+        assert(left == pending + 1);
+        race_paid_scarab_launch(&u[e], z);
+        assert(scarab_in_flight(e) >= 0 && race_paid_scarab_stock(e) == 4);
+        unfill_pool();
+        printf("slots: a launch is refused with exactly the committed slots left (%d pending Carrier creates) and goes ahead with one more\n", pending);
+    }
+    puts("slots PASS");
+}
+
+/* Scarabs are ammunition, not units: a custom-game bot that has reached its unit cap still refills an empty Reaver. */
+static void ai_at_cap(void)
+{
+    int owner, r = -1, cap, x = 0, y = 0, before;
+    RaceAiCensus c;
+    start_custom();
+    owner = race_bot_owner_ids[0];
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == owner) { x = u[i].x; y = u[i].y; break; }
+    assert(x && y);
+    race_add_owner_resources(owner, 5000, 0);
+    r = spawn_unit(owner, U_REAVER, x + 40, y + 40);
+    assert(r >= 0);
+    race_paid_scarab_trained(r);
+    cap = race_ai_unit_cap();
+    for (int guard = 0; guard < MAX_UNITS; ++guard) {
+        race_ai_census(owner, &c);
+        if (c.units + c.queued_units >= cap) break;
+        assert(spawn_unit(owner, U_ZEALOT, x + 80 + guard, y) >= 0);
+    }
+    race_ai_census(owner, &c);
+    assert(c.units + c.queued_units >= cap);
+    assert(race_paid_scarab_stock(r) == 0 && race_paid_scarab_queued(r) == 0);
+    before = race_owner_minerals(owner);
+    race_ai_plan(owner);
+    printf("ai cap: %d of %d units, Reaver queued %d, bank %d -> %d\n", c.units + c.queued_units, cap,
+           race_paid_scarab_queued(r), before, race_owner_minerals(owner));
+    assert(race_paid_scarab_queued(r) == 1);
+    assert(race_owner_minerals(owner) <= before - (int)sc64_psc_price());
+    puts("aicap PASS");
+}
+
+/* A load wakes the service, and that must not write state on an idle Reaver the uninterrupted run leaves alone
+ * (a human's reinforcement Reaver that has not fired yet): its actor bytes match after the load. */
+static void idle_check(int custom)
+{
+    int h = -1, x = 0, y = 0, carry_a, work_a, hp_a, x_a, y_a, carry_b, work_b, hp_b, x_b, y_b;
+    unsigned digest_a, digest_b;
+    if (custom) {
+        /* No computer-owned Reaver keeps the service awake: only a load wakes it. */
+        arena(&x, &y);
+        for (int k = 0; k < 400; ++k) step(1);
+        assert(!sc64_psc_hint);
+        x -= 96;
+    } else {
+        start_campaign(SC64_P8_GLOBAL_ID);
+        for (int k = 0; k < 30; ++k) pad(0);
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE) { x = u[i].x; y = u[i].y; break; }
+    }
+    assert(x && y);
+    h = spawn_unit(SIDE, U_REAVER, x + 24, y + 40);
+    assert(h >= 0 && u[h].carry == 0 && u[h].work_timer == 0);       /* a reinforcement: never established */
+    u[h].order = ORDER_IDLE; u[h].tx = u[h].x; u[h].ty = u[h].y; u[h].selected = 0;
+    for (int t = 0; t < 40 && !race_save_game(); ++t) step(1);
+    assert(race_save_game());
+    for (int t = 0; t < 120; ++t) step(1);
+    carry_a = u[h].carry; work_a = u[h].work_timer; hp_a = u[h].hp; x_a = u[h].x; y_a = u[h].y;
+    digest_a = state_digest();
+    gba_init(); game_init();
+    assert(race_load_game() && race_mode == (custom ? 1 : 0));
+    assert(u[h].alive && u[h].type == U_REAVER && u[h].carry == 0);  /* the load itself writes nothing */
+    for (int t = 0; t < 120; ++t) step(1);
+    carry_b = u[h].carry; work_b = u[h].work_timer; hp_b = u[h].hp; x_b = u[h].x; y_b = u[h].y;
+    digest_b = state_digest();
+    printf("idle after load: Reaver %d carry %d/%d work %d/%d hp %d/%d at %d,%d / %d,%d; digests %u %u\n", h, carry_a, carry_b,
+           work_a, work_b, hp_a, hp_b, x_a, y_a, x_b, y_b, digest_a, digest_b);
+    assert(carry_a == 0 && carry_b == 0 && work_a == work_b && hp_a == hp_b && x_a == x_b && y_a == y_b);
+    assert(digest_a == digest_b);
+    printf("idleload %s PASS\n", custom ? "custom game" : "campaign");
+}
+static void idle_after_load(void) { idle_check(1); idle_check(0); puts("idleload PASS"); }
+
 static void campaign_write(const char *path)
 {
     unsigned digests[7]; int rv[8], n;
@@ -1291,6 +1491,10 @@ int main(int argc, char **argv)
     else if (argc == 2 && !strcmp(argv[1], "restock0")) restock_empty();
     else if (argc == 2 && !strcmp(argv[1], "lift")) lift_facility();
     else if (argc == 2 && !strcmp(argv[1], "trigger")) trigger_scan();
+    else if (argc == 2 && !strcmp(argv[1], "slots")) slot_commitments();
+    else if (argc == 2 && !strcmp(argv[1], "aicap")) ai_at_cap();
+    else if (argc == 2 && !strcmp(argv[1], "ring")) ring_test();
+    else if (argc == 2 && !strcmp(argv[1], "idleload")) idle_after_load();
     else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);

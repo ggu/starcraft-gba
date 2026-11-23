@@ -34,24 +34,40 @@ def parse_host(text: str):
     return {k: int(v) for k, v in ids.items()}, samples
 
 
-def sample(game, ids):
+def target_points(st, ident):
+    """Hit points and shields of the tracked Scarab's target, found by the identity the HOST sample gives
+    (owner, type, position); -1, -1 when it is gone. Buildings do not move, and a unit target is matched where
+    the HOST had it at the same frame."""
+    owner, typ, x, y = ident
+    if typ < 0:
+        return -1, -1
+    for row in list(st["units"]) + list(st["buildings"]):
+        if (row[1], row[2], row[3], row[4]) == (owner, typ, x, y):
+            return row[5], row[6]
+    return -1, -1
+
+
+def sample(game, ids, ident=(-1, -1, -1, -1)):
     st = game.state()
     rows = st["units"]
     owner, typ, x, y, hp, sh, carry = (cont.UNIT_FIELDS.index(n) + 1 for n in
                                        ("owner", "type", "x", "y", "hp", "shield", "carry"))
     scarabs = [r for r in rows if r[typ] == ids["U_SCARAB"] and r[owner] == ids["SIDE"]]
     reavers = [r for r in rows if r[typ] == ids["U_REAVER"] and r[owner] == ids["SIDE"]]
-    return {"frame": st["frame"], "minerals": st["minerals"], "gas": st["gas"],
+    tgthp, tgtsh = target_points(st, ident)
+    return {"frame": st["frame"], "minerals": st["minerals"], "gas": st["gas"], "tgthp": tgthp, "tgtsh": tgtsh,
             "stock": (reavers[0][carry] & 15) if reavers else -1,
             "scarabs": 1 if scarabs else 0,
             "sx": scarabs[0][x] if scarabs else -1, "sy": scarabs[0][y] if scarabs else -1,
             "units": len(rows), "allhp": sum(r[hp] for r in rows), "allsh": sum(r[sh] for r in rows)}
 
 
-def play_samples(game, events, first_call, frames, ids, out):
+def play_samples(game, events, first_call, host, ids, out):
     """Advance one update at a time from first_call, sampling when the frame counter reaches each target."""
     call = first_call
-    for target in frames:
+    for h in host:
+        target = h["frame"]
+        ident = (h["tgtowner"], h["tgttype"], h["tgtx"], h["tgty"])
         for _ in range(4000):
             st_frame = game.u32("frame")
             if st_frame >= target:
@@ -60,7 +76,7 @@ def play_samples(game, events, first_call, frames, ids, out):
             call += 1
         else:
             raise RuntimeError(f"frame counter stuck at {st_frame}, screen {game.u32('screen')}, target {target}, call {call}")
-        out.append(sample(game, ids))
+        out.append(sample(game, ids, ident))
     return call
 
 
@@ -101,7 +117,7 @@ def main():
         st = g1.state()
         at_save = {"frame": st["frame"], "screen": st["screen"]}
         g1.rsp.export_sram()
-        play_samples(g1, events, start + SAVE_LEN, frames, ids, first)
+        play_samples(g1, events, start + SAVE_LEN, host, ids, first)
     finally:
         g1.close()
 
@@ -118,14 +134,14 @@ def main():
         prior = [h for t, h in events if t <= start + SAVE_LEN]
         if shifted and shifted[0][0] != g2.rsp.completed:
             shifted.insert(0, (g2.rsp.completed, prior[-1] if prior else 0))
-        play_samples(g2, shifted, g2.rsp.completed, frames, ids, second)
+        play_samples(g2, shifted, g2.rsp.completed, host, ids, second)
         g2.rsp.export_sram()
     finally:
         g2.close()
 
     report = {"rom": rom.name, "tape": tape_path.name, "save_start_call": start, "at_save": at_save,
               "host_base_frame": frames[0], "loaded_in_fresh_process": loaded, "checks": []}
-    keys = ("frame", "minerals", "gas", "stock", "scarabs", "sx", "sy", "units", "allhp", "allsh")
+    keys = ("frame", "minerals", "gas", "stock", "scarabs", "sx", "sy", "units", "allhp", "allsh", "tgthp", "tgtsh")
     ok = True
     first_divergent = None
     for i, h in enumerate(host):
@@ -136,6 +152,14 @@ def main():
         if not (row["p1_eq_host"] and row["p2_eq_p1"]) and first_divergent is None:
             first_divergent = h["frame"]
         ok = ok and row["p1_eq_host"] and row["p2_eq_p1"]
+    # The tracked Scarab's hit must have dealt damage on the ROM: the target's points fall between the first sample
+    # (before the impact) and the last (after it), in both processes.
+    pts = [(c["arm_p1"]["tgthp"] + c["arm_p1"]["tgtsh"], c["arm_p2"]["tgthp"] + c["arm_p2"]["tgtsh"]) for c in report["checks"]]
+    first_pts, last_pts = pts[0], pts[-1]
+    report["target_points_first_last"] = {"p1": [first_pts[0], last_pts[0]], "p2": [first_pts[1], last_pts[1]]}
+    damaged = host[0]["tgttype"] >= 0 and first_pts[0] > last_pts[0] >= -2 and first_pts[1] > last_pts[1] >= -2
+    report["target_damaged_after_impact"] = damaged
+    ok = ok and damaged
     report["all_match"] = ok
     report["first_divergent_frame"] = first_divergent
     (outdir / "report.json").write_text(json.dumps(report, indent=1))

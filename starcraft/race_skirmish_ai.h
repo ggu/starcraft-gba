@@ -1411,7 +1411,20 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
             c->reserve_minerals = saved_m; c->reserve_gas = saved_g;
         }
     }
-    if (committed >= unit_cap) return;
+    if (committed >= unit_cap) {
+#ifdef RACE_AI_REAVERS
+        /* Scarabs are ammunition, not units: a capped owner still refills its Reavers, keeping the same
+         * worker-floor reserve the rest of the pass keeps. */
+        int floor_reserve = 0;
+        if (c->depots && c->ore_patches &&
+            race_ai_count(c, race_ai_key(c->worker_raw)) < RACE_AI_WORKER_FLOOR)
+            floor_reserve = sc64_race_unit_rule(c->worker_type)->minerals;
+        c->reserve_minerals += floor_reserve;
+        race_ai_stock_reavers(c);
+        c->reserve_minerals -= floor_reserve;
+#endif
+        return;
+    }
     /* Keep the price of a worker while almost none are left. An owner that
      * spends its last minerals on army after a raid can never mine again. */
     if (c->depots && c->ore_patches &&

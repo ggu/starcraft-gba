@@ -165,9 +165,18 @@ static void sample_now(void)
     }
     int alive = 0; long all_hp = 0, all_sh = 0;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) { ++alive; all_hp += u[i].hp; all_sh += u[i].shield; }
-    printf("S frame=%d minerals=%d gas=%d stock=%d scarabs=%d sx=%d sy=%d units=%d allhp=%ld allsh=%ld hits=%u hitlive=%d hitHP=%ld hitSH=%ld digest=%u\n",
+    /* The tracked Scarab's target (a building or a unit): its identity, so the ARM run can find it, and its points. */
+    int tt = track_target, towner = -1, ttype = -1, tx = -1, ty = -1, thp = -1, tsh = -1;
+    if (tt >= 0 && tt < MAX_UNITS && u[tt].alive) {
+        towner = u[tt].owner; ttype = u[tt].type; tx = u[tt].x; ty = u[tt].y; thp = u[tt].hp; tsh = u[tt].shield;
+    } else if (tt >= MAX_UNITS && tt < MAX_UNITS + MAX_BUILDINGS && b[tt - MAX_UNITS].alive) {
+        const Building *tb = &b[tt - MAX_UNITS];
+        towner = tb->owner; ttype = tb->type; tx = tb->x; ty = tb->y; thp = tb->hp; tsh = tb->shield;
+    }
+    printf("S frame=%d minerals=%d gas=%d stock=%d scarabs=%d sx=%d sy=%d units=%d allhp=%ld allsh=%ld hits=%u hitlive=%d hitHP=%ld hitSH=%ld tgtowner=%d tgttype=%d tgtx=%d tgty=%d tgthp=%d tgtsh=%d digest=%u\n",
            frame, minerals, gas, stock_of_first_reaver(), s >= 0 ? 1 : 0,
-           s >= 0 ? u[s].x : -1, s >= 0 ? u[s].y : -1, alive, all_hp, all_sh, hit_count, nh, hp_sum, sh_sum, state_digest());
+           s >= 0 ? u[s].x : -1, s >= 0 ? u[s].y : -1, alive, all_hp, all_sh, hit_count, nh, hp_sum, sh_sum,
+           towner, ttype, tx, ty, thp, tsh, state_digest());
 }
 
 /* The Scarab that is in flight at the save point, followed to its own impact. Each continuation (the
