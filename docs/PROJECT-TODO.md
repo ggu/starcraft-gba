@@ -97,7 +97,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in
-  an ordinary fight before trialing generated row bounds.
+  an ordinary fight before trialing generated row bounds. In the
+  [transparent word census](audits/2026-11-22-steady-order-cost.md#transparent-edge-and-word-run-trials),
+  the edge probe finds 9.93% removable visible pixels across four
+  retained P10 Melee updates. Draw-time scanning saves cycles on
+  sparse fixtures and increases dense or clipped costs. Keep it
+  local and measure certified row bounds on mixed workloads.
   The [shared projectile heading lookup](audits/2026-11-22-steady-order-cost.md#shared-heading-for-projectiles-and-unit-facing)
   preserves launch and impact direction through exact ties. It
   cuts guest cycles slightly in six ordinary battles, the P10
@@ -931,10 +936,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   through the north lose their Hydralisks or stall before reaching
   the guard. The [lower corridor](audits/2026-11-12-z8-normal-physical.md#lower-corridor-and-overlord-transport)
   loses all five Hydralisks. The Overlord gets through, and its
-  transport gates are unavailable in this stock Z8 save. Stage
-  the northwest reserve earlier or use a verified Nydus transfer
-  while preserving southern production, then
-  qualify a fresh HOME load after the fourth interception.
+  transport gates are unavailable in this stock Z8 save. The
+  [early western Nydus](audits/2026-11-12-z8-normal-physical.md#early-western-nydus-and-hatchery)
+  moves two Hydralisks west and the existing Hatchery trains a
+  fifth. [Mobile defense](audits/2026-11-12-z8-normal-physical.md#mobile-defense-past-the-early-ground-attack)
+  preserves five Hydralisks, a full-health Overlord and the damaged
+  Hatchery through a fresh HOME load at frame 9,685. Carry this
+  reserve forward through the first Dark Templar interception and
+  preserve local production before attempting the fourth.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

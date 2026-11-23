@@ -705,6 +705,81 @@ menu also requires race mode. The successful Overlord flight
 therefore supplies detection without carrying the Hydralisks.
 Native Z8 transport availability remains a parity check.
 
+### Early western Nydus and Hatchery
+
+A fresh HOME load at frame 4,861 from the frame 4,859 pause
+save retains two friendly Nydus links. The north entrance at
+(1,632, 256) links to the west exit at (400, 192). Both are at
+250 HP. Earlier qualified transfers use the separate southern
+link. The historical replay has the western endpoint down to
+128 HP by 9,737 and the pair gone by 14,599.
+
+Ordinary unit selection and A at the north entrance send a
+Drone through at full health. Two eastern Hydralisks also
+cross on a separate run. A fresh HOME load at frame 7,135
+recovers those two and the two original western Hydralisks,
+all at 80 HP, grouped near the 200-HP Overlord. All four
+canal endpoints remain at full health.
+
+The western area already has a completed Hatchery. A new
+Hatchery foundation starts legally on a separate branch and
+is destroyed before completion. On a fresh load of the rally
+save, the existing Hatchery accepts three Hydralisk orders.
+At frame 7,705, a fresh HOME load recovers the first new Hydra
+at 80 HP, with the other two still queued. The four original
+guard Hydras and their detector are present.
+
+### Mobile defense past the early ground attack
+
+Three 100-HP Zealots approach well before the first Dark
+Templar documented later in the campaign. Holding the five
+Hydralisks and Overlord near (300, 200) and issuing an attack
+loses the group and two newly produced Hydralisks by 9,100.
+
+From the unchanged production save, the five-Hydralisk group
+retreats north and alternates direct attacks with movement.
+By frame 9,382, fresh HOME recovers all five and their Overlord
+after the three initial attackers disappear. Two separately
+produced Hydralisks are lost. The remaining enemy at (297, 168)
+falls during a subsequent ordinary direct-attack run. The fresh
+HOME load at frame 9,685 recovers five Hydralisks at 80, 80, 80,
+64 and 50 HP, plus the 200-HP Overlord. No enemy is observed in
+the surveyed western area. The completed Hatchery has 647/1,250
+HP and three larvae. The mission is active, and the continuation
+has yet to reach the first Dark Templar interception.
+
+These continuations use the retained ordinary Z10 ROM with
+SHA-256 `86f25892cb127bcd325c954e02d9ae5aa3122635901c167a74b85ff569109105`.
+Existing saves were copied before use. Controller runs and fresh
+HOME loads used ordinary buttons and read-only state checks.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Early pause source | `73044e9968b1dc903d68298f571da6e6351284497b5a9b074b89eefacc7f55f5` |
+| Two-Hydralisk transfer trace | `e08d8abf3f6e2e2a75e54ee1ecb8f500741ae64e7bcabf3b69ea2f5830584799` |
+| Four-Hydralisk rally and fresh load | `3832778ec39e37a2ef4c11a65d9c564a5cafc2424b868895ea0daabccceb8b50` |
+| First local production and fresh load | `a294c12993e743375bc094c972d2ed2345c453ef7fec563d89b0ae6dc0708136` |
+| Static defense loss | `1e2f25f3fa6e1f07ba01e1a0d13d2b8f91b06f313e0a9a184daa56abb4260dc2` |
+| Mobile defense and first fresh load | `5c2a604ad642d03a698955c2239796fa217e152ef6355a55ee8baa2edc36d7d3` |
+| Follow-up attack and fresh load | `a0bc440d39e35380a5e16dc8178379b2d56a9e9caee30d9d3fa908d3eeff3278` |
+| Frame-9,685 HOME continuation SRAM | `d0759141780cec67904b5e5ca69038d8343560c57a799cd2ae9881c2bbb7aacc` |
+
+### Native Overlord research permission
+
+The retained native Z8 scenario matches the recorded source
+hash. Its human upgrade restrictions start Ventral Sacs at
+level zero and permit level one. The same human slot allows
+Overlords and Lairs. This is scenario data evidence. Native
+controls still need a reachable research and boarding test.
+
+The current GBA custom transport research job is scoped to
+race mode, while Z6 has a separate campaign policy. The save
+loader clears custom research state in campaigns and accepts
+loaded campaign Overlords only under the Z6 policy. A new
+campaign policy would need the same explicit owner and unit
+admission in controls, research and validation, with fresh
+HOME coverage for in-progress research and loaded cargo.
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
