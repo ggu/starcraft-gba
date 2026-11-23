@@ -500,3 +500,30 @@ to the victory export.
 | P3 fresh-load victory and result readback | `1a8c4081494bab05368e98d1443b34ab2fd464dfa5bbd4324b87322aa94801f2` |
 | P8 fresh-load victory and result readback | `eaa15bacd4fcc94480c20bf35090713a983f519edffec40fa163328ed36f3f09` |
 | P8 victory and readback SRAM | `9f7b140a4a222fe297c07c2848d05131af14c66b113e32169d3b0e0756860923` |
+
+### P10 on the packaged Protoss cartridge
+
+The historical full HOME input replay on `7f7eab41` first differs
+at call 17,710, frame 17,263, with 416 gas on the current cartridge
+and 566 in the archive. The other sampled fields agree at that cut.
+A diagnostic replay records larger differences in army, workers and
+cursor position later. Its own pause journal restores at frame
+36,761. The historical modal expected at call 46,740 never opens,
+and the run ends without a verified win.
+
+A separate test loads the retained authenticated pause at frame
+36,761 from HOME and plays 9,489 recorded calls. It reaches victory
+at frame 46,057. Another fresh HOME process restores the mission
+result and preserves the exact 32 KiB journal through eight
+neutral updates. There are 81 sampled cuts. The stored world
+fingerprints differ from the historical target-index receipt, so
+the test proves the current seeded win and save round trip under
+these inputs. The route averages 11.50 emulated main-loop updates
+per second. A complete current start-to-victory route remains open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First full HOME replay difference | `577fb6094ef7896a23ab89754582a5ecebe4e9b7f7749101416961f0c593a1e9` |
+| Full HOME diagnostic continuation | `d5124e5d59fe723713cb563efa02399c9a309c0837f831a5a9c1ba857c67d849` |
+| Seeded victory and result readback | `6191432fa2def6b858f0f2f66e1c94d4fed08c843b312c85e901831baed7784a` |
+| Seeded victory and readback SRAM | `25b0b97c72ffb92721aaf597f15719c7d05d9682a499c32b7f10cb304e00ae58` |
