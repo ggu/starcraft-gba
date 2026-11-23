@@ -1138,6 +1138,53 @@ static void lift_facility(void)
     puts("lift PASS");
 }
 
+/* The shared trigger scans (Command and Bring census over the live pools) validate every live row before they
+ * filter, and a row that fails validation aborts the scan. A Scarab in flight (hp 20, flags 16, raw 85, idle,
+ * build = parent) is such a row: it must validate, and a census taken while it flies must succeed and count it. */
+static void trigger_scan(void)
+{
+    int rv[8], n, r, z, sc, live = 0, tried = 0;
+    Sc64Z8WorldView world;
+    Sc64Z8Condition cond;
+    Sc64Z8Rect all = { 0, 0, 32767, 32767 };
+    u32 count = 0;
+    start_campaign(SC64_P8_GLOBAL_ID);
+    n = enemy_reavers(rv, 8);
+    assert(n >= 1);
+    r = rv[0];
+    z = spawn_unit(SIDE, U_PROBE, u[r].x + 70, u[r].y);
+    assert(z >= 0);
+    u[z].order = ORDER_IDLE; u[z].tx = u[z].x; u[z].ty = u[z].y;
+    race_paid_scarab_trained(r); u[r].carry = SC64_PSC_INIT | 5;
+    attack(r, z);
+    sc = -1;
+    for (int t = 0; t < 400 && sc < 0; ++t) { pad(0); sc = scarab_in_flight(r); }
+    assert(sc >= 0);
+    assert(u[sc].raw_type == 85 && u[sc].flags == 16 && u[sc].order == ORDER_IDLE && u[sc].build == r);
+    memset(&world, 0, sizeof world);
+    sc64_z8_game_bind_actor_pool(&world);
+    world.active_mask = 0xffu;
+    memset(&cond, 0, sizeof cond);
+    cond.player = SC64_Z8_SELECT_ALL_PLAYERS; cond.unit = 229u;
+    for (int round = 0; round < 12 && sc >= 0 && u[sc].alive && u[sc].type == U_SCARAB; ++round) {
+        Sc64Z8ActorView view;
+        int l, t, rr, bt, expect = 0;
+        /* The Scarab row itself passes the validation every scan applies to it. */
+        assert(sc64_z8_game_actor_validate(u[sc].raw_owner, u[sc].raw_type, u[sc].x, u[sc].y, 0, &l, &t, &rr, &bt) >= 0);
+        assert(sc64_z8_game_actor_at(0, (unsigned)sc, &view) == 1 && view.alive && view.type_known);
+        for (int i = 0; i < MAX_UNITS; ++i) expect += u[i].alive && u[i].raw_owner < 8;
+        for (int i = 0; i < MAX_BUILDINGS; ++i) expect += b[i].alive && b[i].raw_owner < 8;
+        assert(sc64_z8_game_command_count(&world, &cond, 0, &count) == 1);
+        assert((int)count == expect);
+        assert(sc64_z8_game_bring_count(&world, &cond, 0, &all, &count) == 1);
+        live = (int)count; ++tried;
+        for (int t2 = 0; t2 < 8; ++t2) pad(0);        /* the real trigger pass runs on every one of these */
+    }
+    assert(tried >= 3 && live > 0);
+    printf("trigger: Command and Bring scans succeeded %d times with a Scarab in flight (last census %d actors)\n", tried, live);
+    puts("trigger PASS");
+}
+
 static void campaign_write(const char *path)
 {
     unsigned digests[7]; int rv[8], n;
@@ -1243,6 +1290,7 @@ int main(int argc, char **argv)
     else if (argc == 2 && !strcmp(argv[1], "birth")) birth_slot();
     else if (argc == 2 && !strcmp(argv[1], "restock0")) restock_empty();
     else if (argc == 2 && !strcmp(argv[1], "lift")) lift_facility();
+    else if (argc == 2 && !strcmp(argv[1], "trigger")) trigger_scan();
     else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);
