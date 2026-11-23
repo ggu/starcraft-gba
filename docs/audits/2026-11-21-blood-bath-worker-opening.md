@@ -19,6 +19,27 @@ Order 85 resolves a missing target in native code at `0x80132ab8`. It calls `0x8
 
 The 102-update GBA wait probe already shows 82 minerals at update 151. The nominal 5:4 update conversion puts the observed native first-delivery interval at (215, 235] GBA updates. This measures the opening lead. A separate warm-window measurement is needed to assign the remaining income difference to travel or deposit geometry.
 
+### Observed retarget during approach
+
+A fresh bounded ares run of the matched southwest Terran start
+narrows SCV 69's patch change to observer steps 6,505–6,515.
+At all three cuts it has order 85, phase 1, zero cargo, zero
+claim and a zero work timer. SCV 71 holds patch 49 throughout,
+and SCV 72 waits at that patch. This is consistent with the
+alternate search during approach observed at the northwest
+start. The later sampled worker has not begun service or
+received cargo. The capture does not trace the exact branch
+or the candidate ranking for this particular change.
+
+The observer qualified three RAM cuts, two frame copies and
+unchanged input pins. Its step counter is an observer clock.
+
+| Observer step | SCV 69 target | RAM cut SHA-256 |
+| --- | ---: | --- |
+| 6,505 | 49 | `34f0aa0c84aef7e012e6aebf2249b555d04e14d49932ba1bfb362588dd4ffc84` |
+| 6,515 | 56 | `f097c9fe998b17ae0c01b5db74236ed74f2b626aedaab8d8d5891cb33aedc3d6` |
+| 6,525 | 56 | `7a17b6b29fa9020f2adafe5296a866ea4851b53aca0893f7733e34690a99de0e` |
+
 ## Formation experiment
 
 The [opt-in source](https://github.com/ggu/starcraft-gba/commit/8dcd0f3934ed8e7c8f2364afaa57d4ce6dc1bc9f) changes `race_skirmish_init` after imported map and seat resolution. The human Terran starts at the observed half-scale hall offsets in Blood Bath Free for All. The four workers have reachable, distinct fields and legal `ORDER_MINE` rows with zero cargo and work timers. The northwest start uses the observed settled targets. The other orientations retain their current distinct-patch order. If an expected patch or route cannot be resolved, initialization uses the existing opening. The path query follows current hall placement and grid invalidation. Verify the other seat orientations on ARM and qualify Zerg and Protoss independently before widening.

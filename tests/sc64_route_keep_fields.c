@@ -1825,11 +1825,46 @@ static void check_small_component_fill(void)
             memset(unpublished, 0x5a, sizeof(unpublished));
             assert(sc64_route_try_small_component(unpublished, first, cols, cols, stride, cap) < 0);
             for (unsigned i = 0; i < sizeof(unpublished); ++i) assert(unpublished[i] == 0x5a);
+#ifdef SC64_ROUTE_SMALL_COMPONENT_RESUME_PROBE
+            if (case_index != 0) {
+                int head = -1, tail = -1;
+                sc64_small_route_first = (u8)(top + 1);
+                sc64_small_route_last = (u8)(top + 15);
+                assert(sc64_route_try_small_component_internal(unpublished, first, cols, cols,
+                                                               stride, cap, &head, &tail) < 0);
+                if (case_index == 1) assert(head == -1 && tail == -1);
+                else assert(head >= 0 && tail > 0);
+            }
+#endif
+            sc64_small_route_first = (u8)(top + 1);
+            sc64_small_route_last = (u8)(top + 15);
             assert(sc64_route_fill_linear(unpublished, first) >= 0);
             check_small_component_bytes(unpublished, first);
             if (change >= 0) desired[change] = !desired[change];
         }
     }
+#ifdef SC64_ROUTE_SMALL_COMPONENT_RESUME_PROBE
+    /* Exercise a stopped FIFO with pending work, including later expansion
+     * beyond the hinted stripe after the proof has been made. */
+    memset(desired, 0, sizeof(desired));
+    for (int row = 25; row <= 29; ++row)
+        for (int col = 10; col <= 110; ++col)
+            desired[row * cols + col] = 1;
+    for (int row = 30; row <= 36; ++row) desired[row * cols + 110] = 1;
+    build_path_grid();
+    sc64_small_route_first = 21;
+    sc64_small_route_last = 35;
+    const int large_goal = 10 + 27 * cols;
+    const int cap = sc64_route_linear_queue_cap(cols, cols);
+    int head = -1, tail = -1;
+    assert(sc64_route_try_small_component_internal(unpublished, large_goal, cols, cols,
+                                                   stride, cap, &head, &tail) < 0);
+    assert(head >= 0 && head < tail && tail > SC64_ROUTE_SPARSE_LIMIT);
+    sc64_small_route_first = 21;
+    sc64_small_route_last = 35;
+    assert(sc64_route_fill_linear(unpublished, large_goal) >= 0);
+    check_small_component_bytes(unpublished, large_goal);
+#endif
     puts("Small components preserve packed routes, slot accounting and safe rejection on escape, capacity or blocked goals.");
 }
 #endif

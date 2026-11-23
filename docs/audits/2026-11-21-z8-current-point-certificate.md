@@ -583,3 +583,53 @@ on ordinary game replays, including large-component declines.
 | --- | --- |
 | Mixed ARM timings, build commands and packed field hashes | `e7d89e7cb2fb7717eb1ebc1e981f8bdccf7e6352a794e1e8cac2dd4f8e3eb7a5` |
 | Independent FIFO field hashes and counts | `f7ea80224fa06c6843b88822d22b31f41f48783559e90831e09db41b85757f97` |
+
+### Resuming an oversized small-component fill
+
+`SC64_ROUTE_SMALL_COMPONENT_RESUME_PROBE` retains the queue when
+the narrow fill reaches capacity. Before reusing it, the probe checks
+that no discovered boundary cell has a walkable neighbor outside the
+stripe. That covers all cells already processed by the restricted
+FIFO. It then loads the remaining rows and resumes the same ordered
+queue. An already discovered escape still requires a full restart.
+An escape discovered later is handled by the resumed full-grid FIFO.
+The hint is cleared on capacity decline, and the destination is packed
+only after the full field completes. Resume state is local to the call.
+
+An authored ARM fixture uses a learned 15-row hint, ten accepted
+requests and four declines across 18 fills. All three variants match
+an independent ordered FIFO on every complete packed field. The table
+uses the game wait-state setting and the normal IWRAM attribute for the
+full FIFO helper. Tests use direct fills and omit gameplay work.
+
+| Synthetic workload | Probe off cycles | Small probe cycles | Small probe with resume cycles |
+| --- | ---: | ---: | ---: |
+| Closed 945-cell strip | 291,938 | 343,891 | 307,239 |
+| Boundary already discovered | 291,990 | 343,943 | 341,042 |
+| Boundary reached later | 291,990 | 343,943 | 307,291 |
+| Completed 385-cell field | 261,794 | 316,463 | 278,181 |
+| All 18 fills | 3,451,642 | 2,900,502 | 2,739,247 |
+
+Resume saves 5.56% across this sequence relative to the original small
+probe. Within the two strip cases that can resume, it recovers about
+70% of the extra cycles attributable to the original capacity decline.
+The unsafe boundary case remains much slower than a full fill alone.
+The separate default-wait-state run saves 6.28% against the small probe
+across the same sequence. Keep both options off in regular ROMs while
+measuring the mix of accepted requests, resumes and restarts in the
+late Z7 replay. The existing cold-component bypass can dispatch from
+the point-prefix path into the same linear fill, so measure that path
+before extrapolating from direct calls.
+
+The host regression `make test-sc64-route-small-component-resume`
+checks the 385-cell case, a rejected escape, and a queue that resumes
+before a later escape. It checks the full packed field against a fresh
+ordered BFS and preserves the failed-attempt destination bytes.
+The two full host runs match route build totals and cache residency
+across 386,646 queries with and without resumption enabled.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| ARM with IWRAM helper and game wait states | `6e043f6d67d7735f120c01fdb5ad5e4162841a70e123cc8b8433ee8777cd532c` |
+| ARM with default wait states and ROM code | `c021a8d39e49d522bdceb8b82759570ed7bdf5a8b825617ce6bcb2f2eb1799f1` |
+| Matching host cache residency stream | `86acaa0076c87e87fde81aa312fa2105e550e0a36023fa86d37329b04ef3999c` |

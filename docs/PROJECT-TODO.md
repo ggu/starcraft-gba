@@ -297,12 +297,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Target first-fill cost without losing cheap repeat queries or
   preserving stale directions. The [small-component ARM sequence](audits/2026-11-21-z8-current-point-certificate.md#mixed-arm-small-component-fills)
   saves 35.49% on a synthetic warm-up, ten reused spans and one
-  decline with exact field bytes. Measure accepted requests and
-  declines in the late Z7 workload before enabling the probe.
+  decline with exact field bytes. [Resuming a certified queue](audits/2026-11-21-z8-current-point-certificate.md#resuming-an-oversized-small-component-fill)
+  saves another 5.56% against the small probe in a separate
+  18-fill synthetic sequence with IWRAM and game wait states.
+  Measure accepted requests, resumes and full restarts in the
+  late Z7 workload before enabling either route option.
   The [paired mineral opening](audits/2026-11-22-steady-order-cost.md#paired-mineral-assignments-through-elapsed-second-18)
   shows four distinct GBA patch assignments from the first update
-  while native workers still share a patch at second 12. Match
-  opening assignment separately from measured service duration.
+  while native workers still share a patch at second 12. A [fresh
+  native replay](audits/2026-11-21-blood-bath-worker-opening.md#observed-retarget-during-approach)
+  catches an approaching worker changing its target while another
+  worker holds the old patch. Qualify contention separately from
+  service duration and preserve valid saved mine targets.
   The [shared steering change](audits/2026-11-22-open-steering-directions.md)
   skips distance and terrain checks for actor-blocked directions. The
   P10 victory tail improves 0.93% in mean cycles and the matched Blood
@@ -917,9 +923,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   route. The [two-Overlord guard trials](audits/2026-11-12-z8-normal-physical.md#two-detector-northwest-formations)
   use the earlier post-Cannon save. Three formations all leave the
   fourth Templar at 21 HP when the objective triggers defeat at
-  frame 47,628. Bring more Hydralisks to the northwest while
-  preserving southern production, then qualify a fresh HOME load
-  after the fourth interception.
+  frame 47,628. [Two reinforcement routes](audits/2026-11-12-z8-normal-physical.md#northern-hydra-reinforcement-attempts)
+  through the north lose their Hydralisks or stall before reaching
+  the guard. Stage the northwest reserve earlier or use a verified
+  Nydus transfer while preserving southern production, then
+  qualify a fresh HOME load after the fourth interception.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

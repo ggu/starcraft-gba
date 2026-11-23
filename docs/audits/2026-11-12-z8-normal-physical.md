@@ -663,6 +663,29 @@ formations and orders did not do so from this checkpoint.
 | Forward guard, two detectors | `c3f431c83653070fdf8c7424870ad6112de8c3b16ae1e2a8408d9cd7e39c53ba` |
 | Rear Hydralisks, two detectors | `5706cef748bcacbcf94ea1583fe451af8d3a53bc7826b8fa49d167ba56e31146` |
 
+### Northern Hydra reinforcement attempts
+
+At fresh HOME frame 32,901, two additional healthy Hydralisks
+are available near the northern Hatcheries. An ordinary westward
+movement order leaves one dead and the other at 24 HP by frame
+33,924. A second order stalls the survivor south of the route.
+Neither reaches the northwest guard. The original group attacks
+the fourth Templar directly at frame 47,330. The Templar again
+triggers defeat at 47,628 with 21 HP.
+
+An earlier HOME load at frame 26,125 has five Hydralisks and an
+Overlord near the Hatcheries. The larger group attempts the top
+edge through (1,500, 60) and (1,100, 60). Four Hydralisks disappear
+en route. At frame 30,859 only the Overlord has reached the later
+waypoint. One original guard Hydralisk has also disappeared while
+the guard is unattended. The branch is still active at that cut.
+Neither trial supplies additional firepower to the northwest guard.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Two Hydralisks on the western route | `5802b06483f82b246382d488031498d192ed4f6669cb06d079c76a433f105fa3` |
+| Five Hydralisks and an Overlord via the top edge | `210c7f38babd300f5888158ab37a5fddda29469a6b15d33cfb92916f2a953a3e` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

@@ -296,6 +296,12 @@ build/test-sc64-route-small-component: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_ro
 test-sc64-route-small-component: build/test-sc64-route-small-component
 	./$< --small-component-only
 
+build/test-sc64-route-small-component-resume: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
+	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) -DSC64_ROUTE_POINT_COLD_COMPONENT_BYPASS -DSC64_ROUTE_SMALL_COMPONENT_PROBE -DSC64_ROUTE_SMALL_COMPONENT_RESUME_PROBE $< -o $@
+.PHONY: test-sc64-route-small-component-resume
+test-sc64-route-small-component-resume: build/test-sc64-route-small-component-resume
+	./$< --small-component-only
+
 build/test-sc64-route-point-warm-blocked-gap: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
 	$(CLANG) $(ROUTE_POINT_RESERVE_FLAGS) -DSC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE $< -o $@
 .PHONY: test-sc64-route-point-warm-blocked-gap
