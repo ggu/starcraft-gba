@@ -732,8 +732,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores frame 20,000 and reaches victory at frame 47,661.
   The 49 observations and a third-process result load pass.
   The same release wins Z1 from HOME with all 51 observations
-  matching. P8 restores its pause and matches through frame
-  40,299. Finish P8's victory and verify the Z1 fresh pause load.
+  matching. The [Melee-enabled Zerg cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-melee-enabled-cartridge)
+  restores the Z1 pause at frame 984 and matches all 51 observations
+  through victory and the fresh result load. The Melee-enabled
+  Protoss cartridge also repeats P3 with identical pause and result
+  journals. P8 on the batched target-index release restores its pause
+  and wins at frame 104,113 with all 40 checks matching. Qualify
+  its result journal readback on the current product.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints
   through victory. Separate fresh HOME loads restore the in-progress

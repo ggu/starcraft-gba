@@ -157,3 +157,9 @@ opening checks, ordinary skirmish save continuations, cross-version
 load and rejection cases, and Random seat checks reproduce the earlier
 receipts. The normal Terran candidate reproduces the active Melee
 victory through a fresh pause load and a third-process result readback.
+
+The current opening fixture passes all 234 configurations under
+ASan and UBSan on each of the four profile vectors. It also checks
+CPU hostility and target choice in both match types, Random seats,
+match-word rejection, and preservation of diplomacy after SRAM load
+and match restart.

@@ -456,9 +456,36 @@ This check covers the uninterrupted route. A fresh pause load on
 the current cartridge is still open. The full receipt SHA-256 is
 `6cb9f21b57e8636a1e68efdc3d3800b1437fb1e0ffdde3260df374823b0aea5c`.
 
-The current P8 tape completes an ordinary pause and restores it
-from fresh HOME. The bounded first pass matches 17 observations
-through call 41,177, frame 40,299. The remaining route through
-victory and result load needs the complete run. The pause image
-SHA-256 is
-`e074c498d189521570812bf9052b0254f9777d4d2690ebb1149316d71ee0d79a`.
+On the same release's Protoss 10 ROM, P8 restores its ordinary
+pause at frame 30,949 from fresh HOME and wins at frame 104,113.
+All 40 recorded checks, eight briefing pages and 12 dialogue pages
+match, without observed frame drift. The available receipt covers
+the pause journal and the finish of the route. A separate result
+journal readback on this build remains open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P8 fresh pause load and full victory | `5d6e287b1ac3cfaf24a7b1679b7fa5041d1e1aa7b9eac9315433185112f9ca24` |
+| P8 pause journal | `e074c498d189521570812bf9052b0254f9777d4d2690ebb1149316d71ee0d79a` |
+
+## November 23 Melee-enabled cartridge
+
+The packaged `7f7eab41` Zerg 10 ROM passes the ordinary Z1 route
+with a pause at game frame 984, on tape call 1,000. The fresh HOME
+load restores the same sampled state. Two neutral route updates
+carry the ordinary A reselect, and the remaining input tape matches
+all 50 periodic observations and the final observation. Victory is
+at frame 50,669 with the Chrysalis alive and 30 Hydralisks. A third
+fresh HOME load restores the frozen result and exports identical SRAM.
+
+The same release's Protoss 10 ROM repeats the P3 route with all 49
+observations, its frame-20,000 pause and its frame-47,661 victory.
+Both journals match the earlier batched-build run byte for byte.
+The result also restores in a third fresh process.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z1 fresh-load victory and result readback | `02c0eed6f34a21d732ca575d43020e8069fe0f4331e6b3de57e3a3e8462f66ca` |
+| Z1 pause journal | `926bc03330532b9763b3e1d5e3aa1fc0970c40e4b99e1d9ed4a48f53da86fdb6` |
+| Z1 victory journal | `fd6b53a2e5be9d898d44e93c39e203a6148a3f7f4efc7309a77ca29036b936d2` |
+| P3 fresh-load victory and result readback | `1a8c4081494bab05368e98d1443b34ab2fd464dfa5bbd4324b87322aa94801f2` |
