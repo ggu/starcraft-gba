@@ -295,11 +295,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   ordered predecessor. A longer probe saves 449,708 cycles on
   that update and raises the full P10 mean by 0.94%. Keep it local.
   Target first-fill cost without losing cheap repeat queries or
-  preserving stale directions. Qualify the [small-component probe](audits/2026-11-21-z8-current-point-certificate.md#complete-fields-for-small-components)
-  on ARM, including declined requests. The [native mining trace](audits/2026-11-22-steady-order-cost.md#mineral-targets-spread-between-native-seconds-12-and-15)
-  brackets the first observed patch reassignment between seconds
-  12 and 15 in Blood Bath. Match opening assignment separately
-  from measured worker service duration.
+  preserving stale directions. The [small-component ARM sequence](audits/2026-11-21-z8-current-point-certificate.md#mixed-arm-small-component-fills)
+  saves 35.49% on a synthetic warm-up, ten reused spans and one
+  decline with exact field bytes. Measure accepted requests and
+  declines in the late Z7 workload before enabling the probe.
+  The [paired mineral opening](audits/2026-11-22-steady-order-cost.md#paired-mineral-assignments-through-elapsed-second-18)
+  shows four distinct GBA patch assignments from the first update
+  while native workers still share a patch at second 12. Match
+  opening assignment separately from measured service duration.
   The [shared steering change](audits/2026-11-22-open-steering-directions.md)
   skips distance and terrain checks for actor-blocked directions. The
   P10 victory tail improves 0.93% in mean cycles and the matched Blood

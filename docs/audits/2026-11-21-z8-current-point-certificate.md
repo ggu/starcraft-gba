@@ -552,3 +552,34 @@ qualifying the ordinary Z7 timing window.
 | --- | --- |
 | Release | `019a26c86a47ba76095ada1a07d5263750dbcf6a82f43f73d12347509440b34f` |
 | Deferred transfer | `fa2a6814912bb0af2982b43828caf69f3282afba58da830c9f2703165aefe076` |
+
+### Mixed ARM small-component fills
+
+An asset-free ARM harness runs the linear fill on an authored
+128×128 grid with the probe off and on. It clears each output to
+the unreachable code before timing. The first 361-cell fill learns
+a 15-row span. The next ten requests use the hint, with ten distinct
+roots across those requests. The final request fills a 1,920-cell
+region after it exceeds the probe's capacity and clears the hint.
+All twelve full 6,144-byte fields are identical between variants
+and match a separate ordered FIFO calculation.
+
+| Synthetic fills | Probe off cycles | Probe on cycles |
+| --- | ---: | ---: |
+| Initial fill | 345,115 | 360,880 |
+| Ten hint-assisted fills | 3,446,020 | 1,703,245 |
+| Capacity decline and full fill | 802,019 | 898,850 |
+| Total | 4,593,154 | 2,962,975 |
+
+The matched sequence uses 35.49% fewer emulated cycles with the
+probe. The declined request costs 96,831 additional cycles. These
+are direct fill calls on a synthetic grid, measured by the headless
+mGBA observer. The test uses default wait states and the host
+fixture's code placement. It excludes slot lookup, topology
+handling and rendering. The probe stays opt-in pending measurements
+on ordinary game replays, including large-component declines.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Mixed ARM timings, build commands and packed field hashes | `e7d89e7cb2fb7717eb1ebc1e981f8bdccf7e6352a794e1e8cac2dd4f8e3eb7a5` |
+| Independent FIFO field hashes and counts | `f7ea80224fa06c6843b88822d22b31f41f48783559e90831e09db41b85757f97` |
