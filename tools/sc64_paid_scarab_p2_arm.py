@@ -31,43 +31,67 @@ def parse_host(text: str):
     for line in text.splitlines():
         if line.startswith("S "):
             samples.append({k: int(v) for k, v in re.findall(r"(\w+)=(-?\d+)", line)})
-    return {k: int(v) for k, v in ids.items()}, samples
+    tracked = re.search(r"TRACKED Scarab slot (\d+) aimed at (-?\d+)", text)
+    if not tracked:
+        raise RuntimeError("the HOST output names no tracked Scarab")
+    return {k: int(v) for k, v in ids.items()}, samples, int(tracked.group(1)), int(tracked.group(2))
 
 
-def target_points(st, ident):
-    """Hit points and shields of the tracked Scarab's target, found by the identity the HOST sample gives
-    (owner, type, position); -1, -1 when it is gone. Buildings do not move, and a unit target is matched where
-    the HOST had it at the same frame."""
-    owner, typ, x, y = ident
-    if typ < 0:
-        return -1, -1
-    for row in list(st["units"]) + list(st["buildings"]):
-        if (row[1], row[2], row[3], row[4]) == (owner, typ, x, y):
-            return row[5], row[6]
-    return -1, -1
+def read_actor(game, bank, slot):
+    """alive, hit points and shields of one slot of the unit ('u') or building ('b') bank, read straight from memory."""
+    stride, layout = (game.unit_stride, game.unit_layout) if bank == "u" else (game.building_stride, game.building_layout)
+    row = game.rsp.read(game.sym[bank] + slot * stride, stride)
+    def get(name, signed=True):
+        o, w = layout[name], layout.widths[name]
+        return int.from_bytes(row[o:o + w], "little", signed=signed and w > 1)
+    return {"alive": int(bool(get("alive", False))), "hp": get("hp"), "shield": get("shield"), "type": get("type", False)}
 
 
-def sample(game, ids, ident=(-1, -1, -1, -1)):
+def find_target(game, scarab_slot, ids):
+    """The tracked Scarab's target as (bank, slot), taken from the Scarab's own row at the save point."""
+    row = game.rsp.read(game.sym["u"] + scarab_slot * game.unit_stride, game.unit_stride)
+    lay = game.unit_layout
+    def get(name, signed=True):
+        o, w = lay[name], lay.widths[name]
+        return int.from_bytes(row[o:o + w], "little", signed=signed and w > 1)
+    if not get("alive", False) or get("type", False) != ids["U_SCARAB"]:
+        raise RuntimeError(f"slot {scarab_slot} is not a live Scarab at the save point")
+    target = get("target")
+    units = game.sizes["u"] // game.unit_stride
+    buildings = game.sizes["b"] // game.building_stride
+    if 0 <= target < units:
+        return "u", target
+    if units <= target < units + buildings:
+        return "b", target - units
+    raise RuntimeError(f"the tracked Scarab has no valid target ({target})")
+
+
+def sample(game, ids, tgt=None):
     st = game.state()
     rows = st["units"]
     owner, typ, x, y, hp, sh, carry = (cont.UNIT_FIELDS.index(n) + 1 for n in
                                        ("owner", "type", "x", "y", "hp", "shield", "carry"))
     scarabs = [r for r in rows if r[typ] == ids["U_SCARAB"] and r[owner] == ids["SIDE"]]
     reavers = [r for r in rows if r[typ] == ids["U_REAVER"] and r[owner] == ids["SIDE"]]
-    tgthp, tgtsh = target_points(st, ident)
-    return {"frame": st["frame"], "minerals": st["minerals"], "gas": st["gas"], "tgthp": tgthp, "tgtsh": tgtsh,
+    if tgt:
+        a = read_actor(game, tgt[0], tgt[1])
+        tgtalive, tgthp, tgtsh = a["alive"], (a["hp"] if a["alive"] else -1), (a["shield"] if a["alive"] else -1)
+    else:
+        tgtalive, tgthp, tgtsh = 0, -1, -1
+    return {"frame": st["frame"], "minerals": st["minerals"], "gas": st["gas"],
+            "tgtalive": tgtalive, "tgthp": tgthp, "tgtsh": tgtsh,
             "stock": (reavers[0][carry] & 15) if reavers else -1,
             "scarabs": 1 if scarabs else 0,
             "sx": scarabs[0][x] if scarabs else -1, "sy": scarabs[0][y] if scarabs else -1,
             "units": len(rows), "allhp": sum(r[hp] for r in rows), "allsh": sum(r[sh] for r in rows)}
 
 
-def play_samples(game, events, first_call, host, ids, out):
+def play_samples(game, events, first_call, host, ids, out, tgt):
     """Advance one update at a time from first_call, sampling when the frame counter reaches each target."""
     call = first_call
     for h in host:
         target = h["frame"]
-        ident = (h["tgtowner"], h["tgttype"], h["tgtx"], h["tgty"])
+
         for _ in range(4000):
             st_frame = game.u32("frame")
             if st_frame >= target:
@@ -76,7 +100,7 @@ def play_samples(game, events, first_call, host, ids, out):
             call += 1
         else:
             raise RuntimeError(f"frame counter stuck at {st_frame}, screen {game.u32('screen')}, target {target}, call {call}")
-        out.append(sample(game, ids, ident))
+        out.append(sample(game, ids, tgt))
     return call
 
 
@@ -104,7 +128,7 @@ def main():
     tape = json.loads(tape_path.read_text())
     events = [(e["tick"], e["held"]) for e in tape["events"]]
     start = tape["save_start"]
-    ids, host = parse_host(host_path.read_text())
+    ids, host, track_slot, track_target = parse_host(host_path.read_text())
     frames = [h["frame"] for h in host]
     sram = outdir / "flight.sav"
     for p in (sram, outdir / "p2.sav"):
@@ -117,7 +141,8 @@ def main():
         st = g1.state()
         at_save = {"frame": st["frame"], "screen": st["screen"]}
         g1.rsp.export_sram()
-        play_samples(g1, events, start + SAVE_LEN, host, ids, first)
+        tgt = find_target(g1, track_slot, ids)
+        play_samples(g1, events, start + SAVE_LEN, host, ids, first, tgt)
     finally:
         g1.close()
 
@@ -134,14 +159,15 @@ def main():
         prior = [h for t, h in events if t <= start + SAVE_LEN]
         if shifted and shifted[0][0] != g2.rsp.completed:
             shifted.insert(0, (g2.rsp.completed, prior[-1] if prior else 0))
-        play_samples(g2, shifted, g2.rsp.completed, host, ids, second)
+        tgt2 = find_target(g2, track_slot, ids)
+        play_samples(g2, shifted, g2.rsp.completed, host, ids, second, tgt2)
         g2.rsp.export_sram()
     finally:
         g2.close()
 
     report = {"rom": rom.name, "tape": tape_path.name, "save_start_call": start, "at_save": at_save,
               "host_base_frame": frames[0], "loaded_in_fresh_process": loaded, "checks": []}
-    keys = ("frame", "minerals", "gas", "stock", "scarabs", "sx", "sy", "units", "allhp", "allsh", "tgthp", "tgtsh")
+    keys = ("frame", "minerals", "gas", "stock", "scarabs", "sx", "sy", "units", "allhp", "allsh", "tgtalive", "tgthp", "tgtsh")
     ok = True
     first_divergent = None
     for i, h in enumerate(host):

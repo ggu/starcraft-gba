@@ -303,6 +303,40 @@ static void race_paid_scarab_remove(int slot)
     q->alive = 0;
 }
 
+/* A Scarab is an actor too: it may not take a slot that queued building products, a scripted P7 Carrier
+ * create, a paid Interceptor order or the active mission's scripted creates (P4, P5) already hold, which are
+ * the commitments ordinary production honours. */
+static int sc64_psc_slot_unreserved(void)
+{
+#ifdef SC64_SHARED_SCOURGE_COMBAT
+    if (!race_product_slots_available(1)) return 0;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(1)) return 0;
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
+        unsigned committed = race_p4_reserved_units(), free_slots = 0;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
+        for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
+            for (int q = 0; q < b[slot].queue_count; ++q)
+                committed += (unsigned)sc64_race_product_count(b[slot].queue[(b[slot].queue_head + q) % 5]);
+        if (committed + 1u > free_slots) return 0;
+    }
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P5_GLOBAL_ID) {
+        unsigned committed = race_p5_reserved_units(), free_slots = 0;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += sc64_unit_slot_available(slot);
+        for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
+            for (int q = 0; q < b[slot].queue_count; ++q)
+                committed += (unsigned)sc64_race_product_count(b[slot].queue[(b[slot].queue_head + q) % 5]);
+        if (committed + 1u > free_slots) return 0;
+    }
+#endif
+    return 1;
+}
+
 /* Called by tick_combat once the Reaver is in reach of `target` with its
  * generic weapon ready: launch a Scarab if it may. Out of reach, the generic
  * chase moves it; with none held, nothing happens. */
@@ -315,14 +349,7 @@ static void race_paid_scarab_launch(Unit *q, int target)
     if (!s.stock || s.cooldown) return;
     if (target < MAX_UNITS && sc64_race_unit_flying(u[target].type)) return;
     if (sc64_psc_hint && sc64_psc_flying_of(slot) >= 0) return;
-    /* A Scarab is an actor too: it may not take a slot that queued building products, a scripted P7 Carrier
-     * create or a paid Interceptor order already hold. Short of one unreserved slot it stays in the Reaver. */
-#ifdef SC64_SHARED_SCOURGE_COMBAT
-    if (!race_product_slots_available(1)) return;
-#endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available(1)) return;
-#endif
+    if (!sc64_psc_slot_unreserved()) return;   /* short of one unreserved actor slot the Scarab stays in the Reaver */
     child = spawn_unit(q->owner, U_SCARAB, q->x, q->y);
     if (child < 0) return; /* full actor pool: the Scarab stays in the Reaver */
     u[child].raw_type = SC64_PSC_RAW; u[child].raw_owner = q->raw_owner;
@@ -432,23 +459,17 @@ static void race_paid_scarab_explode(int px, int py, int owner, int primary)
 
 /* ---- flight, once per source tick ---- */
 
-/* True if the runtime pixel is not walkable. The cells of the Scarab's own building target (the cell rectangle
- * the path grid blocks for that building, and no wider) are open to it, so it can reach the building's edge.
- * A wall, cliff or other building outside that rectangle stays closed. A cell inside the rectangle that terrain
- * or a neighbouring footprint also blocks cannot be told from the target's own and is open too (see
- * docs/PAID-SCARABS.md). */
+/* True if the runtime pixel is not walkable. The cells the path grid blocks for the Scarab's own building target
+ * (path_building_blocks_cell: the grid's own per-cell footprint test, in either grid build) are open to it, so it
+ * can reach the building's edge. A wall, cliff or other building's cell outside that footprint stays closed. A
+ * cell inside the footprint that terrain or a neighbouring footprint also blocks cannot be told from the
+ * target's own and is open too (see docs/PAID-SCARABS.md). */
 static int sc64_psc_blocked(int x, int y, int target)
 {
     if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return 1;
     if (is_traversable(x / 16, y / 16, -1)) return 0;
     if (target >= MAX_UNITS) {
-        PathFootprint f;
-        int c0, c1, r0, r1, world[4] = { 0, 0, 0, 0 };
-        path_fp_describe(target - MAX_UNITS, &f);
-        if (f.kind != PFP_NONE) {
-            path_fp_rect(&f, &c0, &c1, &r0, &r1, world);
-            if (x / 16 >= c0 && x / 16 <= c1 && y / 16 >= r0 && y / 16 <= r1) return 0;
-        }
+        if (path_building_blocks_cell(target - MAX_UNITS, x / 16, y / 16)) return 0;
     }
     return 1;
 }

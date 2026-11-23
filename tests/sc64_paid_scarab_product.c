@@ -1190,12 +1190,10 @@ static void trigger_scan(void)
  * and the same ring with a gap is a detour it flies. Returns whether the Hatchery lost points. */
 static int ring_fixture(int gap)
 {
-    int hx, hy, r = arena(&hx, &hy), h, t, c0, c1, r0, r1, world[4] = { 0, 0, 0, 0 }, np = 0, before, hit, rx = 0;
-    PathFootprint f;
+    int hx, hy, r = arena(&hx, &hy), h, t, c0, c1, r0, r1, np = 0, before, hit, rx = 0;
     h = enemy_hatchery(hx, hy);
-    path_fp_describe(h, &f);
-    assert(f.kind != PFP_NONE);
-    path_fp_rect(&f, &c0, &c1, &r0, &r1, world);
+    c0 = hx / 16 - 2; c1 = hx / 16 + 2; r0 = hy / 16 - 2; r1 = hy / 16 + 2;   /* its 5 x 5 cells (checked below) */
+    assert(path_building_blocks_cell(h, hx / 16, hy / 16));
     {
         int x0 = (c0 - 2) * 16 + 8, x1 = (c1 + 3) * 16 + 8, y0 = (r0 - 2) * 16 + 8, y1 = (r1 + 3) * 16 + 8;
         rx = x0 - 40;
@@ -1222,33 +1220,32 @@ static int ring_fixture(int gap)
     printf("ring: %d Pylons, %s: Hatchery %s\n", np, gap ? "gap on the Reaver's side" : "closed", hit ? "hit" : "untouched");
     return hit;
 }
-/* The exception itself: a blocked cell outside the cell
- * rectangle the path grid blocks for the Hatchery, is closed to a Scarab aimed at it; the Hatchery's own cells are open. */
+/* The exception itself. A Pylon's cell window is 5 x 5 but the grid blocks only the cells whose centres are within
+ * 18 px: a cell inside the window and outside the circle, blocked by a neighbouring Pylon, is not the target's own
+ * and stays closed to a Scarab aimed at the target; the target's own blocked cells are open. */
 static void neighbour_cells(void)
 {
-    int hx, hy, r = arena(&hx, &hy), h, p, c0, c1, r0, r1, world[4] = { 0, 0, 0, 0 }, closed = 0, open = 0;
-    PathFootprint f;
+    int hx, hy, r = arena(&hx, &hy), h, p, opened = 0, closed_window = 0, closed_outside = 0;
     (void)r;
-    h = spawn_build(ENEMY, B_PYLON, hx, hy, 0);          /* a small target, so a neighbour's cells lie near its bounds */
+    h = spawn_build(ENEMY, B_PYLON, hx, hy, 0);
     assert(h >= 0);
     b[h].hp = b[h].maxhp; b[h].under_construction = 0;
-    path_fp_describe(h, &f);
-    path_fp_rect(&f, &c0, &c1, &r0, &r1, world);
-    printf("neighbour: target Pylon footprint kind %d, cells %d..%d x %d..%d\n", (int)f.kind, c0, c1, r0, r1);
-    p = spawn_build(SIDE, B_PYLON, (c1 + 1) * 16 + 8, (r0 + r1 + 1) * 8, 0);   /* touching the target's right side */
+    p = spawn_build(SIDE, B_PYLON, hx + 40, hy + 8, 0);      /* its circle reaches into the target's window */
     assert(p >= 0);
     b[p].hp = b[p].maxhp; b[p].under_construction = 0;
     invalidate_path_grid(); sc64_visibility_reset(); update_exploration();
-    for (int cy = r0 - 3; cy <= r1 + 3; ++cy)
-        for (int cx = c0 - 3; cx <= c1 + 4; ++cx) {
+    for (int cy = hy / 16 - 4; cy <= hy / 16 + 4; ++cy)
+        for (int cx = hx / 16 - 4; cx <= hx / 16 + 6; ++cx) {
             int px = cx * 16 + 8, py = cy * 16 + 8;
-            int inside = cx >= c0 && cx <= c1 && cy >= r0 && cy <= r1;
+            int window = cx >= hx / 16 - 2 && cx <= hx / 16 + 2 && cy >= hy / 16 - 2 && cy <= hy / 16 + 2;
+            int own = window && dist2(px, py, hx, hy) < 18 * 18;
             if (is_traversable(cx, cy, -1)) continue;
-            if (inside) { assert(!sc64_psc_blocked(px, py, MAX_UNITS + h)); ++open; }
-            else { assert(sc64_psc_blocked(px, py, MAX_UNITS + h)); ++closed; }
+            if (own) { assert(!sc64_psc_blocked(px, py, MAX_UNITS + h)); ++opened; }
+            else { assert(sc64_psc_blocked(px, py, MAX_UNITS + h)); if (window) ++closed_window; else ++closed_outside; }
         }
-    printf("neighbour: %d blocked cells of the target's own footprint are open, %d blocked cells outside it stay closed\n", open, closed);
-    assert(open > 0 && closed > 0);
+    printf("neighbour: %d of the target's own cells open, %d blocked cells in its window but outside its circle closed, %d farther out closed\n",
+           opened, closed_window, closed_outside);
+    assert(opened > 0 && closed_window > 0 && closed_outside > 0);
 }
 static void ring_test(void)
 {
@@ -1310,6 +1307,63 @@ static void slot_commitments(void)
         assert(scarab_in_flight(e) >= 0 && race_paid_scarab_stock(e) == 4);
         unfill_pool();
         printf("slots: a launch is refused with exactly the committed slots left (%d pending Carrier creates) and goes ahead with one more\n", pending);
+    }
+    /* P4: the mission's scripted creates are reserved by ordinary production, so by a launch too */
+    start_campaign(SC64_P4_GLOBAL_ID);
+    {
+        int rv[8], n = enemy_reavers(rv, 8), e, reserved = (int)race_p4_reserved_units(), px = 0, py = 0;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner != SIDE) { px = u[i].x; py = u[i].y; break; }
+        printf("slots: P4 world: %d enemy Reavers at the start, %d scripted creates reserved\n", n, reserved);
+        assert(reserved >= 1 && px && py);
+        e = n >= 1 ? rv[0] : spawn_unit(ENEMY, U_REAVER, px, py);   /* a Reaver the mission's triggers would place */
+        assert(e >= 0);
+        z = spawn_unit(SIDE, U_PROBE, u[e].x + 70, u[e].y);
+        assert(z >= 0);
+        u[e].carry = SC64_PSC_INIT | 5; u[e].work_timer = 0;
+        left = fill_pool_leaving(reserved);
+        assert(left == reserved);
+        race_paid_scarab_launch(&u[e], z);
+        assert(scarab_in_flight(e) < 0 && race_paid_scarab_stock(e) == 5);
+        unfill_pool();
+        left = fill_pool_leaving(reserved + 1);
+        assert(left == reserved + 1);
+        race_paid_scarab_launch(&u[e], z);
+        assert(scarab_in_flight(e) >= 0 && race_paid_scarab_stock(e) == 4);
+        /* what is left is exactly the scripted creates: they still fit */
+        {
+            unsigned free_now = 0;
+            for (int i = 0; i < MAX_UNITS; ++i) free_now += sc64_unit_slot_available(i);
+            assert((int)free_now >= reserved);
+        }
+        unfill_pool();
+        printf("slots: P4 launch refused with exactly the %d scripted creates' slots left, goes ahead with one more\n", reserved);
+    }
+    /* P7 again, with every scripted create done: a paid Interceptor order is the only reservation */
+    start_campaign(SC64_P7_GLOBAL_ID);
+    {
+        int rv[8], n = enemy_reavers(rv, 8), e, carrier = -1;
+        assert(n >= 1 && race_p7_active());
+        race_p7.created_mask = 7;                     /* all three Carrier creates have happened */
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && sc64_p7_carrier_parent_type(u[i].type) && sc64_p7_carrier_parent_valid(i)) { carrier = i; break; }
+        assert(carrier >= 0);
+        u[carrier].carry = 1;                         /* one paid Interceptor order */
+        assert(sc64_p7_carrier_paid_queue_valid(&u[carrier]));
+        e = rv[0];
+        z = spawn_unit(SIDE, U_PROBE, u[e].x + 70, u[e].y);
+        assert(z >= 0);
+        u[e].carry = SC64_PSC_INIT | 5; u[e].work_timer = 0;
+        left = fill_pool_leaving(1);
+        assert(left == 1);
+        race_paid_scarab_launch(&u[e], z);
+        assert(scarab_in_flight(e) < 0 && race_paid_scarab_stock(e) == 5);
+        unfill_pool();
+        left = fill_pool_leaving(2);
+        assert(left == 2);
+        race_paid_scarab_launch(&u[e], z);
+        assert(scarab_in_flight(e) >= 0 && race_paid_scarab_stock(e) == 4);
+        unfill_pool();
+        puts("slots: a paid Interceptor order alone holds the last slot");
     }
     puts("slots PASS");
 }
