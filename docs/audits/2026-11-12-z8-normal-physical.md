@@ -158,6 +158,33 @@ The wider-radius input tape SHA-256 is
 `2e97076792d32848adb3e258f19c124a18c4163914f8ef75792bf0c15194ccb3`.
 The stock and attempt-only tape hash is the same `c83249a7` hash above.
 
+### Observed mineral returns in the recovery trials
+
+The next two host trials instrument actual mineral returns. An idle
+Drone accepts a scout move near a completed Hatchery at frame 34,046.
+Several stocked fields become visible, but the Drone stalls in its
+move order. A second trial retains the wider search and reverses idle
+worker selection after frame 30,000. Both use ordinary controller input.
+
+| Controller trial | Minerals returned, frames 30,000–39,999 | Minerals returned, frames 40,000–59,999 | Loss frame |
+| --- | ---: | ---: | ---: |
+| Stock | 24 | 320 | 62,535 |
+| Wider visible-field search | 0 | 136 | 79,353 |
+| Scout move | 8 | 8 | 59,939 |
+| Wider search with delayed worker priority reversal | 64 | 192 | 60,598 |
+
+The accepted scout move does not establish arrival or a return trip.
+The trials leave the remaining objective intact and fail to qualify a
+victory. Keep the controller changes experimental. Check movement and
+gather completion together with the timing of Kerrigan's retreat.
+
+| Local input and return trace | SHA-256 |
+| --- | --- |
+| Stock | `6340fcfbb69703246e2a1cc5873233932236211833c22fb18e87cf526dba11a3` |
+| Wider visible-field search | `fcd6bc8719169f56d6c060cb35fe88ef0b0f060de9373f4bc00e15e6b9f089be` |
+| Scout move | `bec380cd70fae4e7c700a0fe6fc2235550ce49cb728c307662e9a4d3057ac130` |
+| Delayed worker priority reversal | `7e3c380dc483f558ac3626b54c4cf1e78f2e2537962cdb39e15ffbfe239206b8` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

@@ -696,6 +696,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four-seat Blood Bath. Qualify a saved service policy, the remaining
   depot travel and unloading, and campaign and CPU economy before
   normal activation.
+  A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
+  brackets the first service claim at ares steps 5,941–5,955.
+  The normal Terran ROM still exposes Blood Bath as Free for All.
+  Qualify the existing Melee option on the regular products with
+  the four-profile ARM guards, ordinary save/reload, legacy FFA
+  compatibility and live skirmish timing before enabling it.
   The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   already differs in first patch assignment. Check native formation and
   worker travel before using a longer service delay to fit the income.
@@ -726,7 +732,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory. A 1,500-pixel search delays the host loss from frame
   62,535 to 79,353. The separate attempt-order change reproduces
   the stock failure. Measure scouting and actual cargo returns
-  before treating the wider worker search as a recovery.
+  before treating the wider worker search as a recovery. Two
+  [instrumented recovery trials](audits/2026-11-12-z8-normal-physical.md#observed-mineral-returns-in-the-recovery-trials)
+  fail earlier than stock. A scout move stalls near a Hatchery,
+  and changing worker priority increases early returns while
+  Kerrigan still dies. Verify movement and gather completion and
+  track the hero's retreat before another full ARM attempt.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
