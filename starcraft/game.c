@@ -4276,7 +4276,13 @@ move_toward(Unit * q, int tx, int ty)
 	    if (!(open & 1u)) continue;
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
-	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell)) {
+	    if (cost >= best_cost) continue;
+	    /* The intended-step terrain check already prepared the walk grid. */
+	    int col = sx / 16, row = sy / 16;
+	    if ((unsigned)col >= (unsigned)MAP_COLS || (unsigned)row >= (unsigned)MAP_ROWS)
+		continue;
+	    int cell = col + row * MAP_COLS;
+	    if (cell == from_cell || SC64_GRID_GET(path_walkable, cell)) {
 		best = i;
 		best_cost = cost;
 	    }
