@@ -104,3 +104,25 @@ test-sc64-depot-owner-capability:
 	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DEXPECT_OWNER_LIST_ON tests/sc64_depot_owner_capability.c
 	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_DISABLED -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c
 	$(CLANG) -std=c11 -Werror -fsyntax-only -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DEPOT_OWNER_LIST_DISABLED -DSC64_DEPOT_OWNER_LIST_PROBE -DEXPECT_OWNER_LIST_OFF tests/sc64_depot_owner_capability.c
+
+# Asset-free shared packed FIFO lifecycle and eligibility checks.
+build/test-sc64-packed-mineral-fifo-runtime: tests/sc64_packed_mineral_fifo_runtime.c starcraft/sc64_mineral_fifo.h starcraft/sc64_mineral_fifo_runtime.h tests/sc64-worker-cargo/Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-packed-mineral-fifo-runtime
+test-sc64-packed-mineral-fifo-runtime: build/test-sc64-packed-mineral-fifo-runtime
+	./build/test-sc64-packed-mineral-fifo-runtime
+test-sc64-mineral-fifo: test-sc64-packed-mineral-fifo-runtime
+
+# Asset-free tag mapping and authentication policy across released layouts.
+define SC64_PACKED_FIFO_TAGS
+build/test-sc64-packed-fifo-tags-$(1): tests/sc64_packed_mineral_fifo_tags.c starcraft/sc64_packed_mineral_fifo_tags.h starcraft/sc64_stage_save_auth.h starcraft/sc64_save_tag_namespace.h common/gba.c common/gba.h tests/sc64-worker-cargo/Makefile | build
+	$$(CLANG) $$(filter-out -DSC64_MINERAL_FIFO,$$(MINERAL_FIFO_FLAGS)) -DSC64_PACKED_MINERAL_FIFO -DSC64_WORKER_CARGO_KIND -DSC64_SHARED_HP_REGEN $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call SC64_PACKED_FIFO_TAGS,base,))
+$(eval $(call SC64_PACKED_FIFO_TAGS,terran,-DSC64_TERRAN_CARRIER_PROBE))
+$(eval $(call SC64_PACKED_FIFO_TAGS,zerg,-DSC64_ZERG_CARRIER_PROBE))
+$(eval $(call SC64_PACKED_FIFO_TAGS,research,-DSC64_RESEARCH_SRAM_PRODUCT))
+.PHONY: test-sc64-packed-fifo-tags
+test-sc64-packed-fifo-tags: $(addprefix build/test-sc64-packed-fifo-tags-,base terran zerg research)
+	@for test in $^; do ./$$test || exit $$?; done
+test-sc64-mineral-fifo: test-sc64-packed-fifo-tags

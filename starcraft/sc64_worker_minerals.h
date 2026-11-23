@@ -105,7 +105,7 @@ worker_continue_minerals(Unit *q)
 static int
 worker_gather_ready(Unit *q)
 {
-#ifdef SC64_MINERAL_FIFO
+#if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     if (mineral_fifo_enabled && q->order == ORDER_MINE && IS_WORKER(q->type))
         return worker_mineral_fifo_ready(q);
 #endif

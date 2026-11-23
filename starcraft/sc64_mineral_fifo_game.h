@@ -2,69 +2,11 @@
 /* Mineral queue lifecycle and raw journal preparation. Included by game.c. */
 #include "sc64_mineral_fifo_rank.h"
 
-enum { MINERAL_CARGO_MAX = 8, MINERAL_SERVICE_TICKS = 45 };
+#include "sc64_mineral_fifo_runtime.h"
 #define SC64_MINERAL_FIFO_SAVE_VERSION \
     ((SAVE_VERSION & ~SC64_SAVE_TAG_NAMESPACE_MASK) | SC64_SAVE_TAG_MINERAL_FIFO_NAMESPACE)
-
 static const u32 mineral_fifo_save_tags[] = {SAVE_VERSION, SC64_MINERAL_FIFO_SAVE_VERSION};
 static Sc64MineralFifo prepared_mineral_fifo;
-static u8 mineral_fifo_serviced[(MAX_MINERALS + 7) / 8];
-
-static inline __attribute__((always_inline)) int
-worker_mineral_fifo_at_patch(const Unit *worker, const Mineral *patch, int index)
-{
-    return worker->alive && IS_WORKER(worker->type) && worker->order == ORDER_MINE &&
-        worker->target == index && patch->amount > 0 &&
-        (unsigned)patch->x < (unsigned)WORLD_W && (unsigned)patch->y < (unsigned)WORLD_H &&
-        dist2(worker->x, worker->y, patch->x, patch->y) <= MINERAL_WORK_RANGE * MINERAL_WORK_RANGE;
-}
-
-static void
-worker_mineral_fifo_prune(Sc64MineralFifo *fifo, Unit *units, const Mineral *patches)
-{
-    for (int i = 0; i < MAX_MINERALS; ++i) {
-        unsigned link = fifo->head[i], previous = 0;
-        while (link) {
-            unsigned slot = link - 1u;
-            Unit *worker = &units[slot];
-            link = fifo->next[slot];
-            if (!worker->carry && worker_mineral_fifo_at_patch(worker, &patches[i], i)) {
-                previous = slot + 1u;
-                continue;
-            }
-            if (worker->order == ORDER_MINE && worker->target == i) worker->work_timer = 0;
-            sc64_mineral_fifo_unlink(fifo, (unsigned)i, slot, previous);
-        }
-    }
-}
-
-static void
-worker_mineral_fifo_begin(void)
-{
-    memset(mineral_fifo_serviced, 0, sizeof(mineral_fifo_serviced));
-    worker_mineral_fifo_prune(&mineral_fifo, u, m);
-}
-
-static int
-worker_mineral_fifo_ready(Unit *worker)
-{
-    unsigned slot = (unsigned)(worker - u);
-    unsigned patch = (unsigned)worker->target;
-    if (mineral_fifo.patch[slot] != patch + 1u) {
-        worker->work_timer = 0;
-        if (!sc64_mineral_fifo_append(&mineral_fifo, patch, slot)) return 0;
-    }
-    if (mineral_fifo.head[patch] != slot + 1u) return 0;
-    u8 bit = (u8)(1u << (patch & 7u));
-    u8 *serviced = &mineral_fifo_serviced[patch >> 3];
-    if (*serviced & bit) return 0;
-    if (!worker->work_timer) worker->work_timer = MINERAL_SERVICE_TICKS;
-    if (--worker->work_timer) return 0;
-    /* Release for the next orders pass, independent of actor slot order. */
-    *serviced |= bit;
-    sc64_mineral_fifo_remove(&mineral_fifo, slot);
-    return 1;
-}
 
 /* Encode only scratch rows. Retiring a canceled or depleted job here matches
  * pruning at the start of the uninterrupted world's next orders pass. */
@@ -111,7 +53,8 @@ worker_mineral_fifo_decode(void)
         }
         int patch = worker->target, rank = worker->carry - MINERAL_CARGO_MAX;
         if ((unsigned)patch >= MAX_MINERALS ||
-            !worker_mineral_fifo_at_patch(worker, &data.minerals_map[patch], patch) ||
+            !worker_mineral_fifo_matches_patch(worker, &data.minerals_map[patch], patch,
+                                               WORLD_W, WORLD_H) ||
             !sc64_mineral_fifo_stage_rank(&prepared_mineral_fifo, (unsigned)i,
                 (unsigned)patch, (unsigned)rank, (unsigned)worker->work_timer,
                 MINERAL_SERVICE_TICKS)) return 0;

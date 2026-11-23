@@ -303,32 +303,67 @@ both of its parallel work timers and an empty queue. An invalid pair or
 a tag without the FIFO feature cannot authorize rank decoding. A failed
 selection leaves SRAM and the caller's selection token byte-identical.
 
-The feature pairs in these fixtures belong to their authored envelopes.
-Production activation still needs explicit pairs for each released
-transport layout, the world-specific eligibility check, and publication
-of the queue after the actual load. Keep the original selection token
-when passing the transport decoder its expected layout tag. The writer
-must protect the same set of accepted predecessor tags as the reader.
+#### Shared product opt-in
 
-The raw stage uses namespace `0x4f`. With separate FIFO tags for
-base and custom envelopes, Terran and Z10 would need five accepted
-tags each and P10 would need six. The ordinary selector currently
-allows five. The separate P10 research-and-Egg preview already uses
-six tags under its own capacity guard. Qualify those preview
-combinations separately from the normal products.
+`SC64_PACKED_MINERAL_FIFO` connects the shared worker runtime to the
+real race journal adapters. New worlds use FIFO when this flag is enabled.
+The outer tag preserves that policy even for an empty queue. A selected
+older tag keeps parallel service, its existing timers, and its ordinary
+write format after restore. Gas and non-mining orders keep their own
+timers.
+
+| Payload layout | Opt-in tag namespace | Total tags accepted by its product |
+| --- | --- | ---: |
+| Base transport | `0x50` | 3 for Showcase |
+| Terran Carrier custom game | `0x51` | 5 for Terran |
+| Zerg Carrier custom game | `0x52` | 5 for Z10 |
+| Research-jobs custom game | `0x53` | 6 for P10 |
+
+The writer ranks only eligible queued workers in detached rows, after
+ordinary save validation and before envelope packing. Carrier layouts
+unpack first on load. The rank reader then checks the outer/inner pair,
+mode and candidate geometry. The original SRAM selection token stays
+intact, and the prepared queue publishes only at the end of a successful
+world load. The raw standalone journal still owns namespace `0x4f`.
+Compound preview journals require separate qualification.
+
+The focused local target exercises the shared worker runtime and
+production tag policy with authored worlds and records. The real SRAM
+selector checks predecessor fallback at the three-, five- and six-tag
+limits. ARM syntax checks exercise the opt-in in Terran, Z10, P10 and
+Showcase with retained profile flags. Product saves, loads and continuous
+play still need end-to-end testing before the release flags enable it.
+
+An authored ARM7TDMI fixture in mGBA timed a single service pass with
+four workers per patch. These are operation counts in guest cycles for
+the queue walk and service checks against a parallel timer loop.
+
+| Pre-enqueued miners | Parallel timer loop | FIFO pass |
+| ---: | ---: | ---: |
+| 8 | 730 | 15,956 |
+| 24 | 1,990 | 25,656 |
+| 72 | 5,770 | 54,756 |
+
+The fixture starts each head with 20 ticks remaining and advances only
+the heads under FIFO. It excludes travel, completed harvest, save/load,
+audio and rendering. Use a busy-match trace to attribute the queue
+work before promoting the feature.
 
 Reserve live and detached queues in EWRAM. The saved-plan representation
 is 768 bytes per queue at 240 units and 144 patches. Older guarded links
 at source `1f0ad66e` show 11,952–22,084 bytes of EWRAM reserve across the
 four products and as little as 32 bytes of IWRAM reserve. These links
-predate this candidate work. Recheck all four products at the integrated
-head, with the final detached plan and runtime allocations.
+predate this candidate work. The packed orders pass calls the queue walk
+in ROM. Recheck all four memory guards with the new live and detached
+queues, then measure continuous play and busy matches.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | Authored ARM rank comparison fixture | `5d80f0eb6f5607c646b758ec93bb7d204233108e5faa2a5b6c03d258d6aa1fa7` |
 | Rank comparisons and cycle counts | `f430d447d9306dcf83cf871c7193fed1dffcc379026f9c96b3dddfed9b7bce2c` |
 | Standalone ARM continuation with the new builder | `eeebe595bd5b8b5db04aa732cc979f40796e97cc041732eba68089f48c5f1b57` |
+| Authored packed ARM runtime fixture | `dc6e2a7669e5ffd1f5672890335df91a2c53ba07285afb4a55a2acb13334064f` |
+| Packed ARM runtime cycle results | `bcc7aa05a18aceaf49ff362af9583be4cdcb0088cb27e6cf3a3c090927e4552f` |
 
 ## Evidence
 
