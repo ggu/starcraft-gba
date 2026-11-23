@@ -183,11 +183,11 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
     int i;
     for (i = 0; i < MAX_UNITS; i++)
         if (u[i].alive &&
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
             field_cursor_near(x, y, u[i].x, u[i].y, 9) &&
 #endif
             u[i].owner == ENEMY &&
-#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifdef SC64_FIELD_CURSOR_QUERY_REFERENCE
             dist2(x, y, u[i].x, u[i].y) < 9 * 9 &&
 #endif
             currently_visible(u[i].x, u[i].y)) {
@@ -196,11 +196,11 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
         }
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive &&
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
             field_cursor_near(x, y, b[i].x, b[i].y, 16) &&
 #endif
             b[i].owner == ENEMY &&
-#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifdef SC64_FIELD_CURSOR_QUERY_REFERENCE
             dist2(x, y, b[i].x, b[i].y) < 16 * 16 &&
 #endif
             currently_visible(b[i].x, b[i].y)) {

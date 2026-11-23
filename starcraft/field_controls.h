@@ -70,11 +70,11 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
     int i;
     for (i = 0; i < MAX_UNITS; i++)
         if (u[i].alive &&
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
             field_cursor_near(x, y, u[i].x, u[i].y, 9) &&
 #endif
             !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && owners_hostile(SIDE, u[i].owner) &&
-#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifdef SC64_FIELD_CURSOR_QUERY_REFERENCE
             dist2(x, y, u[i].x, u[i].y) < 9 * 9 &&
 #endif
             currently_visible(u[i].x, u[i].y)) {
@@ -83,11 +83,11 @@ ui_hostile_at(int x, int y, int *tx, int *ty)
         }
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive &&
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
             field_cursor_near(x, y, b[i].x, b[i].y, 16) &&
 #endif
             owners_hostile(SIDE, b[i].owner) &&
-#ifndef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifdef SC64_FIELD_CURSOR_QUERY_REFERENCE
             dist2(x, y, b[i].x, b[i].y) < 16 * 16 &&
 #endif
             currently_visible(b[i].x, b[i].y)) {
@@ -110,14 +110,14 @@ static int
 field_ui_a_action_with_worker(int selected, int selected_worker)
 {
     int hx, hy, target;
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
     int target_known = 0;
 #endif
     if (mode == MODE_MOVE) return UI_A_MOVE_HERE;
     if (mode == MODE_ATTACK) return UI_A_ATTACK_HERE;
     if (mode == MODE_BUILD) return UI_A_PLACE;
     if (mode != MODE_NORMAL) return UI_A_NONE;
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
     /* Most updates have no pending double tap. Preserve its priority, but
      * defer the selection scan until after gas, building and hostile hints
      * unless a double tap can still match. */
@@ -144,7 +144,7 @@ field_ui_a_action_with_worker(int selected, int selected_worker)
         race_building_trains(b[selected_building].type))
         return b[selected_building].under_construction ? UI_A_NONE : UI_A_TRAIN;
     if (selected && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
     if (!target_known) target = selection_target();
 #endif
     if (selected_worker >= 0 && target < 0 && field_cursor_mineral_at() >= 0) return UI_A_MINE;

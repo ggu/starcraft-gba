@@ -1790,10 +1790,14 @@ sc64_route_fill_dense(u8 *field, int goal)
         __builtin_memcpy(__builtin_assume_aligned(row + 68, 4), &border, 4);
         for (int x = 4; x < 68; x += 8) {
             u32 bits = *walk++;
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+            __builtin_memcpy(__builtin_assume_aligned(row + x, 4), sc64_dense_pairs[bits], 8);
+#else
             __builtin_memcpy(__builtin_assume_aligned(row + x, 4),
                              &sc64_dense_words[bits & 15u], 4);
             __builtin_memcpy(__builtin_assume_aligned(row + x + 4, 4),
                              &sc64_dense_words[bits >> 4], 4);
+#endif
         }
     }
     if (dense[start] == 7u) {

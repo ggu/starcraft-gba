@@ -273,6 +273,36 @@ Prior trials with bounded partial fields often recouped the
 deferred work on later reads. Compare frontier lifetime and
 publication costs before retrying that design. [Earlier trials](2026-11-21-dense64-prefix-and-placement.md#resumable-point-flood)
 
+### Opening distance and retained point directions
+
+A read-only replay on `c84883de` matches the uninterrupted clocks at
+all five cuts around the Blood Bath stall. For each failed donor read,
+it captures the old packed directions, live walkability and the
+opening log entries newer than that donor. An independent FIFO rebuild
+uses the current seeds and neighbour order.
+
+| Frame | Origin | Goal | Retained and rebuilt length | First direction in both | Obstacle-free bound through an opening | Live-grid bound through an opening |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| 19,360 | 1,900 | 2,872 | 31 | West | 27 | 31 |
+| 19,360 | 1,838 | 2,933 | 32 | West | 26 | 34 |
+| 19,360 | 1,776 | 2,809 | 37 | West | 25 | 37 |
+| 19,360 | 3,406 | 3,322 | 74 | North | 58 | 74 |
+| 19,361 | 1,712 | 3,260 | 46 | South | 34 | 46 |
+
+The obstacle-free lower bound certified zero of the five reads. Exact
+distances on the live grid could certify one. Four paths through an opening
+tie the retained distance, even though the independent rebuild chooses the
+same first step in each case. Reusing those donors requires a proof of
+the canonical FIFO tie order as well as distance. The replay measured
+the existing gate, with no candidate change to its cycle cost.
+
+The Z10 ROM SHA-256 is
+`89921b3c2491b8cc69de5b1adb4d5e95bf46ec9e4bb16f554c0451e932b756ea`.
+The local capture SHA-256 is
+`229372598d16c3b77b9b1925164eec204b3b30071868376fac58efad6872aafb`.
+
+### Queue cursor replay
+
 The shared dense point fill now keeps read and write pointers into
 its existing queue. Seeds and neighbour order stay the same.
 Each discovered cell is marked before it is queued, so the existing
@@ -311,3 +341,53 @@ system stack pointer of `0x03006870` and IRQ stack pointer of
 | P10 victory replay | `9c3023cf704be3eaa7078ea775a19caf74828df53662dbb99be5903afdea1648` |
 | Regular save continuations | `6154e0caecd19c3a3f4a3b0ce15cabbc31cb2f886567f965de5f1c190536df61` |
 | Peak stack comparison | `f10c2fc3e8216768733b53ad8d4d4b26317a7034c5da6785ef2387612d75019a` |
+
+### Dense point setup and output trials
+
+A stand-alone ARM probe compared the current dense point kernel with
+two existing helpers. The 256-entry pair table initializes eight
+walkability bytes per lookup. The aligned packer writes four groups
+of eight directions in three words. Each trial uses the same 48
+synthetic 64×64 grids and goals, including completely open and
+blocked grids. Discovery counts and complete packed-field digests
+agree for every fixture.
+
+| Setup | Packing | Mean guest cycles per fill |
+| --- | --- | ---: |
+| Nibble table | Byte stores | 137,752 |
+| Pair table | Byte stores | 133,144 |
+| Nibble table | Aligned word stores | 145,907 |
+| Pair table | Aligned word stores | 140,791 |
+
+The pair table alone saves 4,608 cycles on each isolated fill. Four
+such savings would amount to about 0.56% of the measured Blood Bath
+peak if the production link preserves them. The word writer adds
+cycles in this kernel. The probe used synthetic topology and
+measured the kernel inside the guest. The local receipt SHA-256 is
+`7ae1275aa95284086c005e8f1d4010da97e99a5f1d642ad70a7eb96dd9cfd412`.
+
+The regular Z10 pair-table trial lowers the same saved Blood Bath
+peak from 3,306,306 to 3,286,156 cycles and the following update from
+1,557,995 to 1,536,660. Across 3,600 updates, p95 falls from
+1,054,737 to 1,050,286 and the mean clock interval from 786,560 to
+786,269. All route counters, 31 world and indexed-page cuts, and
+final SRAM match. The display-page selector differs at 15 updates.
+The link frees 16 IWRAM bytes with the same EWRAM endpoint.
+All four regular builds save 16 IWRAM bytes and keep the same
+EWRAM endpoint. The Z10 replay reproduces the trial ROM byte for byte.
+The independent FIFO oracle matches 1,038 maps and every packed
+output byte. The 30 campaign starts match and 24 ordinary Custom Game
+save and fresh HOME cases pass. All 120 sampled cuts of six separate
+three-CPU runs match, with 0.003–0.010% fewer total cycles per match.
+The 9,489-update P10 victory replay matches all 81 cuts and its
+final SRAM, with mean cost within 0.001%. The first 40,000 calls of
+the current P9 tape match the named checkpoints and preserve the
+frame-32,071 pause save through a fresh HOME load.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z10 saved replay | `62d25c6a5ee68ec1fd5bd5f281ed45102d5eeff9c501966371d3500ccda743b2` |
+| Six three-CPU replays | `8338907144d8a87dc8a4f90ee7a735437c57ff267bd0748d46d44f523b7ad4a2` |
+| P10 victory replay | `9deb6d85f7ab5b0b56e423ea5416cc304b0a1400710d3a697aab743a76e440ff` |
+| Campaign starts | `20cd9a6a4f0c3650ad5d1a529dfe1b72c73a765481cfec6102fee2a5e1a38f7c` |
+| Regular save continuations | `f69f914f8eede79c2f0d84918dc7fca1b7472222ef4577b5c5b128ef170c8cb6` |

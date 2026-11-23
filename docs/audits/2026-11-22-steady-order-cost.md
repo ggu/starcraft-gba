@@ -669,6 +669,39 @@ gains are 24 minerals on native and 72–80 in the corresponding GBA
 clock brackets. The clocks were sampled independently. Separating
 formation, travel, patch contention and depot contact remains next.
 
+The retained native actor cuts show all four human SCVs targeting the
+same mineral patch at elapsed second 3. One SCV is mining and three
+are waiting. At second 9 one carries ore to the Command Center, one
+mines and two wait. By second 19 the workers have spread to three
+patches. This uses the human Command Center and owner from the
+matched-corner lobby to identify the four live workers.
+
+On the pinned GBA Terran Melee preview, the starting four SCVs are
+already in their first work cycle on four different patches after
+one update. No sampled update across elapsed seconds 0, 3, 9, 11,
+19 or 28 has two SCVs with an active timer for the same patch.
+That makes opening assignment and travel a separate difference from
+the service timer. Check formation and first target choice in a
+fresh native start before fitting a mining wait to the wallet.
+The scoped comparison receipt SHA-256 is
+`c5e68db3124a9f016ec2a2c1f0b801625c37818b3e5e6ac1bb4f48e3e8b851b2`.
+
+A fresh ares boot follows the same ordinary Blood Bath input to
+runner step 6,000. The read-only cut at elapsed second 0 shows all
+four human SCVs near the Command Center, moving toward patch 49
+with zero cargo and zero work timers. At second 1, each still has
+the same target and has moved toward it. At second 3, one worker
+holds the service claim and three wait with zero timers. The final
+RDRAM cut matches the previous step-6,000 dump byte for byte. This
+narrows the opening gap to initial placement, patch choice and
+travel as well as service timing. The sampled cuts do not establish
+the precise update at which the first worker starts service.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Fresh ares capture | `2444078b4f6be7fd5c45f774b34f974800e1eb0bc4e6f9e17b332d82a3827` |
+| Three worker-state cuts | `64b46adf2d8384873cccc4091c580f25f1a8a9982ec6b92c6bcb954617b59eed` |
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Native input and binary pins | `548aa5ea47118533bf1fcdf7b680afe50aa127862e56dcf2e245cd9ed4328579` |

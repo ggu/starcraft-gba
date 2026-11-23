@@ -1,4 +1,4 @@
-"""Compare the asset-free field cursor probe with the original queries."""
+"""Compare the asset-free field cursor queries with the original path."""
 import os
 from pathlib import Path
 import subprocess
@@ -11,7 +11,7 @@ class FieldCursorQuery(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
             receipts = []
-            for option in ([], ["-DSC64_FIELD_CURSOR_QUERY_PROBE"]):
+            for option in ([], ["-DSC64_FIELD_CURSOR_QUERY_REFERENCE"]):
                 exe = Path(directory) / "cursor"
                 subprocess.run([
                     os.environ.get("CLANG", "clang"), "-std=c11", "-O1",

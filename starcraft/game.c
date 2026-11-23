@@ -6247,7 +6247,7 @@ clear_selection(void)
     selected_building = -1;
 }
 
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
 /* Cursor reach is small. Reject far axes before squaring, while retaining
  * the same strict circle and slot-order tie behavior. */
 static inline int
@@ -6279,7 +6279,7 @@ static inline __attribute__((always_inline)) int
 selection_unit_candidate(int i)
 {
     return u[i].alive && u[i].owner == SIDE &&
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
            field_cursor_in_box(cx, cy, u[i].x, u[i].y, 31) &&
 #endif
            !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i])
@@ -6296,7 +6296,7 @@ static inline __attribute__((always_inline)) int
 selection_building_candidate(int i)
 {
     return b[i].alive && b[i].owner == SIDE
-#ifdef SC64_FIELD_CURSOR_QUERY_PROBE
+#ifndef SC64_FIELD_CURSOR_QUERY_REFERENCE
            && field_cursor_in_box(cx, cy, b[i].x, b[i].y, 26)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
