@@ -400,16 +400,18 @@ sc64_weapon_source_vfx_anchor_may_be_visible(int x, int y,
  * does not recursively draw child overlays. The bank-derived frame+offset
  * radius includes normal/mirror crop origins and all LO table offsets. */
 static inline int
-sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey key,
-                                                 const Sc64WeaponSourceAttackProfile *profile,
-                                                 int x0, int y0,
-                                                 int x1, int y1,
-                                                 int camx, int camy)
+sc64_weapon_source_vfx_trace_parts_provably_offscreen_resolved(
+    Sc64WeaponSourceVfxKey key, const Sc64WeaponSourceAttackProfile *profile,
+    int x0, int y0, int x1, int y1, int camx, int camy,
+    unsigned parts, int collects_trail)
 {
     if (!profile || !profile->projectile_image) return 0;
-    /* Follow, bounce, and range-extension trajectories are not covered by the
-     * renderer's straight endpoint interpolation proof. Preserve those. */
-    if (!sc64_weapon_source_vfx_motion_has_proven_bounds(
+    /* The projectile-only FOLLOW preview currently uses the captured
+     * straight segment in trace_position_motion(), including child births.
+     * Keep this proof scoped to raster work with no trail pick output. */
+    int captured_follow = profile->weapon_bullet_type == SC64_SOURCE_BULLET_FOLLOW &&
+                          parts == SC64_TRACE_PROJECTILE && !collects_trail;
+    if (!captured_follow && !sc64_weapon_source_vfx_motion_has_proven_bounds(
             profile->weapon_bullet_type)) return 0;
     /* Normal map coordinates fit signed 16 bits. The largest possible
      * signed-byte source offset times a signed 16-bit direction component,
@@ -451,6 +453,7 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         return 0;
 #endif
     }
+    if (captured_follow) return 0;
     int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
     uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
     uint64_t abs_dy = (uint64_t)(dy < 0 ? -dy : dy);
@@ -477,6 +480,15 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
     if (y1 > hi_y) hi_y = y1;
     return sc64_weapon_source_vfx_bounds_miss_clip(lo_x, hi_x, lo_y, hi_y,
         camx, camy, radius_x, radius_y);
+}
+
+static inline int
+sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
+    Sc64WeaponSourceVfxKey key, const Sc64WeaponSourceAttackProfile *profile,
+    int x0, int y0, int x1, int y1, int camx, int camy)
+{
+    return sc64_weapon_source_vfx_trace_parts_provably_offscreen_resolved(
+        key, profile, x0, y0, x1, y1, camx, camy, SC64_TRACE_ALL, 0);
 }
 
 static inline int

@@ -98,10 +98,10 @@ draw_tracer_parts(int i, unsigned parts
                 actor_x, actor_y, camx, camy) &&
             !sc64_weapon_source_vfx_anchor_may_be_visible(
                 tracers[i].x1, tracers[i].y1, camx, camy) &&
-            sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
+            sc64_weapon_source_vfx_trace_parts_provably_offscreen_resolved(
                 key,profile,
                 tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
-                camx, camy)) {
+                camx, camy, parts, trail != 0)) {
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             diag_cull+=gba_clock()-dt;
 #endif
