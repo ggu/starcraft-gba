@@ -764,6 +764,71 @@ HOME loads used ordinary buttons and read-only state checks.
 | Follow-up attack and fresh load | `a0bc440d39e35380a5e16dc8178379b2d56a9e9caee30d9d3fa908d3eeff3278` |
 | Frame-9,685 HOME continuation SRAM | `d0759141780cec67904b5e5ca69038d8343560c57a799cd2ae9881c2bbb7aacc` |
 
+### Western reinforcements and the first Dark Templar
+
+From the frame-9,685 western save, queue three Hydralisks in
+the existing Hatchery. Fresh HOME at frame 11,310 recovers
+eight Hydralisks, a full-health Overlord, and the 647-HP
+Hatchery with three larvae and an empty queue. One Hydralisk
+has 2 HP. A box selection and a move toward (340, 80) regroup
+all nine units, with the selection intact at fresh HOME
+frame 11,638.
+
+Holding near (150, 270) against three ground attackers and
+trying to finish the full group leaves only three Hydralisks.
+On the successful branch, focus the approaching Reaver, then
+withdraw the five surviving Hydralisks toward (120, 300).
+Move the Overlord separately to (218, 383) and box-select the
+Hydralisks for the interception. The 40-HP Dark Templar
+enters detection at frame 21,544 near (325, 471). All five
+Hydralisks accept a direct attack at frame 21,591, and the
+Templar is gone at frame 21,676.
+
+Retreat the Hydralisks toward (120, 300) again and save.
+Fresh HOME at frame 21,883 recovers the five Hydralisks
+at 80, 80, 80, 80 and 64 HP and the 200-HP Overlord. After
+320 neutral updates, the mission remains active with the
+Templar absent and four ground attackers still near (340,
+136). This branch uses the same retained Z10 ROM and
+ordinary controller inputs as the preceding defense.
+
+After the interception, the northern Hatchery trains three
+full-health Hydralisks. Give each the Nydus order individually
+and check that it arrives before selecting the next. Fresh HOME
+at frame 25,643 retains all three at the southern exit and both
+canals at 250 HP. The southern Hatchery then trains three more
+Hydralisks using the remaining 75 gas. Fresh HOME at frame
+27,641 retains six new full-health units in the south, the two
+earlier southern Hydralisks, and the western guard with its
+Overlord. The mission remains active with zero gas. Further
+Hydralisk production needs a fresh gas income.
+
+Give a Drone a gather order at the idle Extractor near
+(1824, 240). Gas reaches 24 before the save and stays at
+24 on fresh HOME at frame 28,908. After 500 neutral updates,
+the worker is still gathering and gas reaches 40. Supply
+capacity fell from 84 to 68 before the save. A northern
+Reaver is advancing while the Spawning Pool takes damage in the
+500-update continuation. Defend this base to sustain the
+gas route.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Reinforcement trace | `0a5b993c9efba0ffb468a086ef707637c24a2f99157b189786d51bc51ee55a7d` |
+| Frame-11,310 HOME SRAM | `061753383f4d0895035dd50e71447514216d57f77176e1e597efec81b1173439` |
+| Regroup trace | `5ea802893769a3cdc9c15a26738519ceeecf724f51039a0a9ec7094db1eb2e5b` |
+| Frame-11,638 HOME SRAM | `54dec7edc80a61e1d73c96e2db32f55b30ba9e8d9bc868d75458ebfa9ae35e45` |
+| Interception trace | `e1aceec77adccec551ff9d4a6f857e612c3773669ec3122bd089cbf70b65accf` |
+| Frame-21,883 HOME SRAM | `7967c0b18c1e9cb62e5a782db8819cde1ae2894509050f758acea00d99cce203` |
+| Fresh HOME and 320-update continuation | `58a0c00a83422f41e7b4103f6d1f44676633aaa4b68e63206da748b4673db710` |
+| Third canal transfer and fresh HOME trace | `aa4564f4be551626f8bace6d2ee991d0c06a77b7840c14ad03ade0ece20b3d4e` |
+| Frame-25,643 HOME SRAM | `85412b1e0d5b7d3c7dcadfdc62f1cf0c4fd6137ba33bc5cf39daa59b898eb180` |
+| Southern production and fresh HOME trace | `ec68c73edf2009df140b356e1f4377fbb33be75a5ee92ef605c00cb2e9c2a789` |
+| Frame-27,641 HOME SRAM | `c70dfaf602773831c8e9c5f632a483943cbeea3409705f6e7ac1b2dcc997f5a3` |
+| Extractor order trace | `c0b408fe8c736dd9c31a660e8a1ab4aff2fc9a87b54d6106b1b16af205e3878d` |
+| Frame-28,908 HOME SRAM | `5c0f669623345a043b23322b8583efcdedab608ac5d881de163442dfc81ba343` |
+| Extractor fresh HOME and 500-update continuation | `d9471a6f7837b29db3f59e806dbe6f208edd1093676d0e4b026fdc5a2518fe5b` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

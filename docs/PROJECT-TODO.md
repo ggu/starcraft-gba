@@ -101,8 +101,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [transparent word census](audits/2026-11-22-steady-order-cost.md#transparent-edge-and-word-run-trials),
   the edge probe finds 9.93% removable visible pixels across four
   retained P10 Melee updates. Draw-time scanning saves cycles on
-  sparse fixtures and increases dense or clipped costs. Keep it
-  local and measure certified row bounds on mixed workloads.
+  sparse fixtures and increases dense or clipped costs.
+  [Precomputed row bounds](audits/2026-11-22-steady-order-cost.md#precomputed-row-bounds)
+  save 18–33% on sparse authored ARM cases in IWRAM but cost
+  20% on dense art and require another 608 bytes of IWRAM.
+  Keep the trial local. [Whole-frame cropping](audits/2026-11-22-steady-order-cost.md#whole-frame-transparent-crop)
+  saves 15–50% on authored padded ARM cases when offsets
+  are read at runtime. Measure frame edges and full-frame
+  timing on a mixed visible scene before enabling it.
   The [shared projectile heading lookup](audits/2026-11-22-steady-order-cost.md#shared-heading-for-projectiles-and-unit-facing)
   preserves launch and impact direction through exact ties. It
   cuts guest cycles slightly in six ordinary battles, the P10
@@ -941,9 +947,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   moves two Hydralisks west and the existing Hatchery trains a
   fifth. [Mobile defense](audits/2026-11-12-z8-normal-physical.md#mobile-defense-past-the-early-ground-attack)
   preserves five Hydralisks, a full-health Overlord and the damaged
-  Hatchery through a fresh HOME load at frame 9,685. Carry this
-  reserve forward through the first Dark Templar interception and
-  preserve local production before attempting the fourth.
+  Hatchery through a fresh HOME load at frame 9,685.
+  [Western reinforcements and interception](audits/2026-11-12-z8-normal-physical.md#western-reinforcements-and-the-first-dark-templar)
+  train three more Hydralisks, regroup the army, and intercept
+  the first Dark Templar with five surviving Hydralisks and an
+  Overlord positioned forward. Fresh HOME at frame 21,883
+  retains all six units. Fresh HOME at frame 27,641 also retains
+  three Hydralisks transported south and three trained there.
+  A Drone assigned to the idle Extractor restores gas after
+  a fresh HOME load at frame 28,908. Continue from that save,
+  protect the northern mining base from the approaching
+  Reaver, and prepare the northwest guard for the fourth
+  Dark Templar.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
