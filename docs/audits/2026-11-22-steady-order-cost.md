@@ -795,6 +795,12 @@ renderer. With the retained camera, endpoints, launch projection and
 raster preparation. The read-only replay matches the eight retained
 world, framebuffer, palette and route samples.
 
+An ordinary-input camera holdout pans to (520, 790) before the same
+eight cuts. All 105 FOLLOW raster rectangles intersect the viewport
+there, and none satisfy the proposed rejection. The world and route
+samples match the neutral-camera run. This checks the candidate
+geometry against the retained cartridge's draws.
+
 The shared renderer now uses that proof for projectile-only FOLLOW
 draws with signed-16-bit geometry and no trail-pick output. The current
 projection samples the fixed segment from launch to captured target,
@@ -833,6 +839,7 @@ both camera positions before using these figures for FPS claims.
 | --- | --- |
 | Outpost trajectory and call-site replay | `a7b0ccfd5924d5532996fd2617fc5875e5e7114581b5bfca6c6e0b0b7346464f` |
 | Outpost expanded-bounds replay | `a153287f5b1bab6cd66816882bd871de952f0da0bdaad7605349661f958b7337` |
+| Outpost panned-camera holdout | `13eb1378441c2b5db88b293f8395922102e15e5bf1b14424064db644a47e062b` |
 | Authored sanitizer differential | `5df6921e9d8f33c890120803459214758eac60be24710d39e8acc3012836db98` |
 | Authored ARM fixture | `78a0d1de6a2f45becac0dc801429ae3b6f45f843ba693fda14eefc50538e2103` |
 | ARM timings and framebuffer checks | `9467874673ce94a1e895ee6342abe61e102386f7123241df5d812d000395f831` |
