@@ -79,6 +79,31 @@ resources at result. The original tape and extended proof both
 capture the ordinary physical lobby and battle inputs. An ordinary
 win with a surviving enemy worker remains a separate case.
 
+## November 23 current Terran preview
+
+The normal-input Terran route with one Zerg CPU wins on the current
+preview at frame 41,413. It resolves start order 11 with base IDs 3
+and 2. The final state has 54 Terran units and 14 Terran buildings,
+with no Zerg actors remaining. The ordinary ARM replay averages
+21.33 emulated main-loop calls per second.
+
+A separate paired run saves at frame 7,840. Resuming in the same
+process and loading at fresh HOME match all 35 semantic state cuts.
+Both paths win at frame 41,413 and export identical result SRAM.
+A third process reloads the victory and re-exports the same bytes
+with the same result and lobby. The comparison covers semantic game
+state and the saved journal.
+
+The paired continuation receipt SHA-256 is
+`af1530042c914ef0766099eb31cfa23c1861e5625538ade9cbc7fb1b97411da5`.
+The result journal SHA-256 is
+`8f0034e56dffd73517256d62b997963405a46d451344b69b27a1a4f3d6847c78`.
+
+The normal Terran integration candidate, with batched target indexing,
+matches the complete continuation receipt and both result processes.
+Its ROM SHA-256 is
+`247c72ed93293190994dc489f8e4910c124dc48e2828e2c0657edba4da8c3f18`.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Native Melee lobby screenshot | `5af262d6f37f2a9fe04b874d7a5d3aa95a2481fcbe632fc7c9cfbc19eb03efba` |
