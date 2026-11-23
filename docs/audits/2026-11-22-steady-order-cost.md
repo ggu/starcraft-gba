@@ -712,12 +712,22 @@ used the separately configured Melee preview. Qualify that mode on
 the regular release profiles before using it as a retail-ROM parity
 baseline.
 
+The same match can launch on the November 23 current-source preview.
+The human and CPU hall coordinates agree with the previous matched
+corners. All four GBA SCVs have different patch assignments in the
+first update, whereas all four native SCVs approach patch 49. At
+elapsed second 19 the GBA wallet is 170–178, rising to 234–258 at
+second 28. The native samples read 66 and 90. These are brackets on
+each emulator's own clock. They separate opening assignments from
+the amount of service time.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Fresh ares capture | `2444078b4f6be7fd5c45f774b34f974800e1eb0bc4e6f9e17b332d82a3827` |
 | Three worker-state cuts | `64b46adf2d8384873cccc4091c580f25f1a8a9982ec6b92c6bcb954617b59eed` |
 | Service-boundary ares capture | `b18f352f2e8943eef033f57db091a8c9f4e47ff4df780804e1fbfb748201c4ba` |
 | Service-boundary worker observations | `938de5dff9f51ce22fa5288cf15e546417c05765565827bc60a72dcd70988754` |
+| Current GBA Melee preview and native matched corners | `5e19d18c1661d85ecbf239a5078477c6c339cef5faf9fb1ee7d8920fc4f99590` |
 
 | Local receipt | SHA-256 |
 | --- | --- |

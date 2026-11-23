@@ -699,9 +699,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The normal Terran ROM still exposes Blood Bath as Free for All.
-  Qualify the existing Melee option on the regular products with
-  the four-profile ARM guards, ordinary save/reload, legacy FFA
-  compatibility and live skirmish timing before enabling it.
+  The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
+  passes 20 ordinary save continuations and 20 cross-version
+  Free for All loads or Melee rejections. Qualify Random seats,
+  busy matches, campaign saves and complete Melee results
+  before enabling it on the regular products.
   The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   already differs in first patch assignment. Check native formation and
   worker travel before using a longer service delay to fit the income.
