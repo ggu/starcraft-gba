@@ -70,3 +70,90 @@ the pause in the original process, on all four profiles.
 | Four legacy campaign save loads | `853448855dc39fdc1f62ad41950075d474dde4f99a6dba9ee7296b6cd7b7bd9e` |
 | Four three-CPU Melee runs | `4750d836940d7d906147bd0df5897ca6cf7a7b0c6c2538f989393c13d6041e35` |
 | Three-CPU defeats after fresh HOME load | `6838dd54bd2a5bdea0fbc087e3b08b45b8283534fa71aecba0cf71d8cc893340` |
+
+## Instructions in late three-CPU Melee
+
+Ordinary neutral replays on Terran and Protoss match paired
+unprofiled runs at 32 cuts per product. Every cut matches game
+state, route counters, both video pages, palette and elapsed guest
+cycles. The instruction histograms and call stacks balance at
+each sampled update.
+
+| Mean guest cycles | Terran updates 9,001–9,016 | Terran updates 11,385–11,400 | Protoss updates 9,001–9,016 | Protoss updates 11,385–11,400 |
+| --- | ---: | ---: | ---: | ---: |
+| Whole loop | 689,180 | 970,140 | 759,876 | 1,353,772 |
+| Orders | 342,700 | 413,254 | 359,536 | 502,125 |
+| Uncached contact mask within orders | 111,785 | 91,215 | 47,225 | 53,861 |
+| Rendering | 213,032 | 385,028 | 247,108 | 581,950 |
+| Depth-ordered actors within rendering | 64,704 | 218,656 | 86,691 | 389,867 |
+| Audio IRQ | 14,972 | 43,839 | 17,770 | 119,233 |
+
+The Protoss late window spends 96,720 cycles on tracer drawing and
+about 108,071 in the ordinary sprite blitter. Audio's first-order
+decoder alone accounts for about 68,018 cycles. The nested values
+overlap their enclosing stages. In these late windows both profiles
+miss the 30 fps budget. These are emulator measurements.
+
+Three bounded probes preserve the state and display samples. A
+per-tile-row visibility cache in the projectile raster changes the
+Protoss late mean by about 9 cycles. A zero-width audio decoder
+shortcut raises that whole-loop mean by about 36 cycles. A
+single-direction contact bucket bound raises the Terran means by
+0.58% and 0.34%. Keep all three out of normal builds. Measure actor
+and terrain work that can be reused across the two video pages, and
+which contact queries recur as units move between cells.
+
+| Local instruction report | SHA-256 |
+| --- | --- |
+| Terran baseline | `e58feac2b13368c56edcd90ce45590058d733d4a8933495277e13d936a346fa3` |
+| Protoss baseline | `c9fb55c51e18157705f615c94e25fce99e56f14c62e60d950202d0d714c2ff97` |
+| Projectile fog cache | `63a97f37c0d43edefb5c06a451d47eeab8e257b3824a3501d8ad2ed8c08da88d` |
+| Zero-width audio shortcut | `5e5f894297453c646e9365750629f2133439126ede99fd851593ec52a17b4345` |
+| Single-direction contact bound | `24c992c419e196db6be74229ac4372a25bea01808439f8a9352bcca9ede9697a` |
+
+## Same-page battlefield changes during Melee
+
+Replaying the same four windows with both Mode 4 page addresses
+observed independently gives these mean changes on the work page.
+The camera and palette stay fixed throughout. The work page is
+identified by the renderer's backbuffer index. The other physical
+page stays byte-identical, including at two samples where DISPCNT
+still shows the previous displayed page.
+
+| Window | Draws with identical battlefield pixels | Changed rows | Changed 16×16 tiles | Contiguous tile spans | Changed pixels |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Terran 9,001–9,016 | 15/16 | 0.06 | 0.06 | 0.06 | 0.06 |
+| Protoss 9,001–9,016 | 12/16 | 1.13 | 0.25 | 0.25 | 7.13 |
+| Terran 11,385–11,400 | 0/16 | 86.69 | 30.19 | 7.94 | 2,039.94 |
+| Protoss 11,385–11,400 | 0/16 | 83.75 | 30.56 | 8.56 | 1,695.19 |
+
+The battlefield has 108 rows and 105 tiles, including the shorter
+bottom row. Identical final pixels are an upper bound on safe reuse.
+An exact damage tracker must retain per-page contributor coverage,
+invalidate both old and new bounds when a contributor changes, and
+redraw every intersecting contributor in painter order. The late
+windows leave approximately 585,000 Terran cycles and 772,000 Protoss
+cycles after subtracting all renderer time. The 30 fps goal in these
+windows also requires cheaper orders and other simulation work.
+
+An alternate sprite loop reads aligned source pairs as halfwords.
+Both host pixel and 32 ARM state/display checks pass. The first
+version exceeds the IWRAM guard. A smaller version fits and reduces
+Protoss IWRAM by 24 bytes, while increasing the earlier and late
+update costs by 0.02% and 0.07%. Keep the existing loop.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Same-page battlefield census | `c186965ee7f40727d40d5e6c016459cfb2268694a009c22d6f4340f9994912df` |
+| Halfword source trial | `ebba58f187ebbc9f59072b4b9e04bbadaaf4f09f2d683b0935bc03ce4c82a955` |
+
+## Normal cartridge integration candidate
+
+The four normal build recipes enable the same existing lobby mode
+tested in the preview. The proposed build combines it with the
+batched target index. All four memory checks pass, with the same
+IWRAM endpoints as the standalone preview. The current campaign
+opening checks, ordinary skirmish save continuations, cross-version
+load and rejection cases, and Random seat checks reproduce the earlier
+receipts. The normal Terran candidate reproduces the active Melee
+victory through a fresh pause load and a third-process result readback.

@@ -698,15 +698,28 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   normal activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
-  The normal Terran ROM still exposes Blood Bath as Free for All.
+  The November 23 normal Terran release exposes Blood Bath as Free for All.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
   Free for All loads or Melee rejections. Random seats and four
   legacy campaign saves also pass. The last full three-CPU
   Melee samples average 16–20 emulated updates per second.
-  Fresh-pause defeats match on all four products. Verify an active
-  win and qualify a normal-product build before enabling the
-  option by default.
+  Fresh-pause defeats match on all four preview products. The
+  [normal-product candidate](audits/2026-11-22-native-custom-game-lobby.md#normal-cartridge-integration-candidate)
+  keeps the RAM guards and repeats the campaign and skirmish
+  startup and save checks, including the single-CPU active Terran
+  win. Confirm local release integration, hardware pacing and
+  active multi-CPU results. The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
+  place the largest costs in orders and depth-ordered drawing.
+  Prioritize repeated contact work and safe reuse across the two
+  video pages. Trials in raster fog lookup, audio decoding and a
+  single-direction contact bound did not improve these samples.
+  The [same-page census](audits/2026-11-22-native-custom-game-lobby.md#same-page-battlefield-changes-during-melee)
+  finds 27 identical battlefield draws in 32 earlier updates and about
+  30 of 105 changed tiles per late update. Test exact contributor
+  coverage and dirty-tile replay on each work page. Keep camera and
+  scene transitions on the full-render path. Late orders still need
+  work to reach the two-VBlank budget.
   The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   already differs in first patch assignment. Check native formation and
   worker travel before using a longer service delay to fit the income.
@@ -715,6 +728,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   writes a new journal at the actual victory. A fresh HOME load
   restores RESULT and re-exports the same 32 KiB SRAM. The other
   campaign result journals still need a common current-build gate.
+  [P3 on the batched target-index cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-batched-target-index-cartridge)
+  restores frame 20,000 and reaches victory at frame 47,661.
+  The 49 observations and a third-process result load pass.
+  The same release wins Z1 from HOME with all 51 observations
+  matching. P8 restores its pause and matches through frame
+  40,299. Finish P8's victory and verify the Z1 fresh pause load.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints
   through victory. Separate fresh HOME loads restore the in-progress

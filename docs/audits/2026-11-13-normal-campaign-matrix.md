@@ -432,3 +432,33 @@ world. The next eight neutral updates leave the frozen world and entire
 32 KiB SRAM image identical. The separate P8 result journal receipt
 SHA-256 is `57edff8a688b3980637729d10dd83f8873aad8193d933158a0ec53c90ce1f21c`.
 These are emulator checks on the recorded routes and save points.
+
+## November 23 batched target-index cartridge
+
+The `d1efbae7` Protoss 10 ROM uses the retained ordinary P3 route.
+It writes a pause journal at frame 20,000 on call 20,395 and loads
+it in a fresh process. All 49 recorded checks agree. Victory occurs
+at frame 47,661 on call 48,168, with both enemy building banks empty.
+The third fresh HOME process restores the victory journal. The route
+uses the earlier frame-20,000 cut in the audit.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P3 full replay and fresh journal loads | `1d26e318a7451b8cdcb77b3deca0e92da6c2d9dc624ef8ae77969c52dfeea8d5` |
+| P3 pause journal | `16786e21f396875b2e942fd0e6ec6fd2615549a1ad88a702626ec19336651a4f` |
+| P3 victory journal | `a0ed4a552a52a2289c29ea3ebb4fd1395d346801416637cbf12e46056c7bcdc5` |
+
+The same release's Zerg 10 ROM also wins Z1 from ordinary HOME.
+All 50 periodic observations and the final observation agree on
+the retained input route. It finishes at frame 50,669 after 50,856
+physical updates, with the Chrysalis alive and 30 Hydralisks.
+This check covers the uninterrupted route. A fresh pause load on
+the current cartridge is still open. The full receipt SHA-256 is
+`6cb9f21b57e8636a1e68efdc3d3800b1437fb1e0ffdde3260df374823b0aea5c`.
+
+The current P8 tape completes an ordinary pause and restores it
+from fresh HOME. The bounded first pass matches 17 observations
+through call 41,177, frame 40,299. The remaining route through
+victory and result load needs the complete run. The pause image
+SHA-256 is
+`e074c498d189521570812bf9052b0254f9777d4d2690ebb1149316d71ee0d79a`.
