@@ -242,6 +242,57 @@ a complete mission win open.
 | Ordinary worker transfer tape | `73cf0e274ffc3247c445675287d66f1439fc5edf685e52a9c5d6662997bf1883` |
 | Deposit and hero observer trace | `70a1f0d80265bcd8086eac9492e3e83c7baaf74d022841053cf40c4749d753da` |
 
+### November 23 replay of the historical winning tape
+
+The recovered tape matches the SHA-256 of the November 13 winning
+controller above. A fresh HOME replay on the `1f0ad66e` normal Z10
+ROM runs the first 20,000 calls unchanged. Its earliest seven
+retained HOST checks match. At call 16,538, frame 16,091, the old
+HOST bank is 1,305 minerals and 406 gas. The current ARM bank is
+1,313 minerals and 398 gas. The frame, screen and result flags
+agree. This is the first sampled discrepancy. The exact historical
+ARM ROM from the earlier verification record is absent from the
+searched worktrees, so the cause of the earlier bank discrepancy
+remains open.
+
+At CSV call 18,423, the old tape's Select shortcut opens the pause
+menu on the new ARM run. The button combination at call 18,425
+includes R, which restarts the mission from the pause menu. The
+historical HOST tape continues in the field through those inputs.
+The base run ends in play at frame 17 without a result. The current
+field control clears an existing selection on Select and opens the
+pause menu when the selection is empty. Use the current field
+controls when refreshing the controller tape.
+
+A diagnostic replay responds to each unintended field pause with
+neutral and Start, using physical inputs only. It handles 25 such
+pauses before the first result. The replay advances in the original
+mission past the early R-button resets, then loses at frame 21,782,
+tape call 22,376. Kerrigan is alive with 299 HP. Between frames
+21,750 and 21,782 the scheduler marks trigger 15 done and transitions
+the human outcome to defeat. The existing trigger condition detects
+an enemy hero Dark Templar reaching the designated area. Verify
+the interception leading into that result when adapting the tape.
+
+A separate HOST trial issues the hero's retreat earlier after the
+verified worker transfer. The move is accepted at frame 53,570
+and Kerrigan reaches the rally near `(1574, 1743)`. She has 400 HP
+at frame 59,279. The run loses at frame 59,745 with two Drones and a
+1,500 HP Nexus remaining. This trial ends 9,610 frames earlier
+than the worker-only run. Keep the earlier retreat out of the
+winning controller until there is a repeatable survival route.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current Z10 ROM | `86f25892cb127bcd325c954e02d9ae5aa3122635901c167a74b85ff569109105` |
+| Historical tape | `b3d9f36b4f7a33b70dfbf12fc4437f7c5c42ca1c86876b5610cabf7324d5b4eb` |
+| Fresh HOME prefix | `e9bca5af637660b0dfcbbf2a245dc680e4c047c3d20bc0c6aea7799808c8e962` |
+| Fresh HOME update log | `90c01fb6f680c99740656f34414112ba9aecf8d3136a4baa6add71ce180ca621` |
+| Pause recovery replay | `4ca8c261186fde9af4026e14a6e2e2e17688d861bfe4ae9b5bd9fd467981ed56` |
+| Recovered physical pauses | `18a496fa7b428af1c2a2533086ccd47be4c08462a351c312ca74b046118e290a` |
+| Bounded defeat observer | `e7eca9d9cbbae7c22e7e8ae896d45995bb1d2df38dbc2231d7de8ab450825c3b` |
+| Earlier-retreat observer | `2955f45d383a350c277b7a60038833de1aced9842337a7963c475a10b6759379` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
