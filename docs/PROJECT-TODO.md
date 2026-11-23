@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-22. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-23. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -166,6 +166,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four openings tie the retained route length. Even exact live-grid
   distances would certify only one read. Prioritize the full-fill cost
   and require canonical FIFO tie ordering for any donor reuse.
+  The [shared two-word walkability table](audits/2026-11-22-dense-depot-suffix.md#dense-point-setup-and-output-trials)
+  cuts the same Z10 peak by 0.61% and frees 16 IWRAM bytes in each
+  regular build. The six long skirmishes show little change in mean cost.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak
@@ -706,6 +709,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   through victory. Separate fresh HOME loads restore the in-progress
   construction save and the victory journal. The longer route averages
   11.14 emulated calls per second. Focus on steady crowded gameplay cost.
+  In [two post-save P9 windows](audits/2026-11-13-p9-normal-home.md#cost-of-the-post-save-location-checks),
+  location checks take 242,186–260,553 cycles per update, or about
+  18–20% of the main loop. A [direct Bring trial](audits/2026-11-13-p9-normal-home.md#direct-location-count-trial)
+  lowers total cycles by 15.59–16.12% with matching sampled
+  state and pixels. Finish the ordinary victory and result save,
+  and verify location conditions in the other campaign providers.
+  Profile the cursor's hostile scan during the same held-button
+  inputs. The earlier [distance-first query](audits/2026-11-13-p10-field-cursor-cost.md)
+  improved P10. Update its oracle for the shared foreground picker.
   [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge

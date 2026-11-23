@@ -164,3 +164,55 @@ the November 20 route. Crowded gameplay timing on GBA SP remains open.
 | Pause SRAM | `519c27ed6b72767e891208b68e113159a7b6d52b80b36d9ef86baeefa9153277` |
 | Victory and readback SRAM | `f77d58315d7cbfe62604d5fdb8f2df34fa6fc9705f6f09526164d13269a3dec9` |
 | Full replay receipt | `f326c5705e93d21928d16e0a8ab779867f00f9f0b54d09d1793c98d9509e1c19` |
+
+### Cost of the post-save location checks
+
+Two 16-call windows on the same regular cartridge use the fresh
+pause journal and the recorded ordinary buttons. The instruction
+profiler matches the uninstrumented run at all 32 sampled cuts in
+guest cycles, named world, indexed display pages, palette and route
+counters. The call ranges are 33,134–33,149 and 34,934–34,949.
+
+| Mean guest cycles per update | First window | Second window |
+| --- | ---: | ---: |
+| Main loop | 1,351,643 | 1,312,859 |
+| Simulation update | 884,864 | 884,698 |
+| Orders | 389,599 | 390,812 |
+| P9 runtime tick | 276,382 | 275,466 |
+| Shared actor-world count | 242,186 | 260,553 |
+
+Actor reads within the count cost about 188,000 and 203,000 cycles.
+The direct Command provider already filters the live pools without
+constructing an actor view. A location-sensitive Bring count still
+constructs a view for every live row. Measure a direct Bring path
+that validates every live row and computes exact geometry only for
+eligible actors. Preserve cargo, construction, invalid rows and
+changes made by earlier trigger actions. Inclusive scopes overlap.
+These short windows measure one part of the replay on an emulator.
+
+The attribution receipt SHA-256 is
+`5ebc36359fe31a3487dd644c835d561eb0f8bff116a1e7590759e5878a9ebcf2`.
+
+### Direct location-count trial
+
+A live-pool trial keeps validation and rescans the same slots on
+every query. It computes a full actor view only for matching
+location candidates. The compiler specializes the existing Command
+path so its scan has no per-match rectangle branch.
+
+| Mean guest cycles per update | First window | Second window |
+| --- | ---: | ---: |
+| Actor-world count, current | 242,186 | 260,553 |
+| Actor-world count, candidate | 52,592 | 53,348 |
+| Main loop, current | 1,351,643 | 1,312,859 |
+| Main loop, candidate | 1,140,985 | 1,101,228 |
+
+The mean falls 15.59% and 16.12% in these windows, to 14.70
+and 15.24 emulated updates per second. World, both indexed pages,
+palette and route counters match all 32 sampled cuts. A separate
+9,489-update P10 victory tail matches 81 cuts and final SRAM. Its
+mean rises 0.022%, compared with 0.233% in the first shared-scanner
+trial. The full P9 route and result journal are separate release
+checks. The P9 attribution and specialized P10 tail receipts are
+`66bf6844678e551b79b85f61e4c768796573e4cce416747296a5d29334217921` and
+`839bc809a8c7d141f2f3f5a3de32c963695fde837be60985ab49828a7f6219ea`.
