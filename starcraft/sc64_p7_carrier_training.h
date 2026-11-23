@@ -427,11 +427,13 @@ static int race_p7_carrier_training_queue(int carrier)
 static int race_p7_carrier_training_queue_selected(void)
 {
     int queued = 0;
+#ifdef SC64_PAID_SCARAB
+    /* The row reads BUILD INTERCEPTOR when a Carrier-class actor is selected, BUILD SCARAB otherwise:
+     * buy only what it names. */
+    if (!race_p7_carrier_training_selected()) return race_paid_scarab_queue_selected();
+#endif
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && race_p7_carrier_training_queue(i)) ++queued;
-#ifdef SC64_PAID_SCARAB
-    queued += race_paid_scarab_queue_selected();
-#endif
     return queued;
 }
 

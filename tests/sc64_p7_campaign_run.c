@@ -971,7 +971,7 @@ int main(int argc,char **argv)
                 done_wave=p7_wave_no;release_at=frame+1500;
                 last_order=frame;
             }
-        }
+        } else p7_hold=0;   /* the locked Nexus died, or no wave is on: there is nothing to hold for */
         if(frame-last_order>=480){
             int ax=0,ay=0;army_center(&ax,&ay);
             int threat_x=-1,threat_y=-1,threat=nearest_hero_threat(&threat_x,&threat_y);

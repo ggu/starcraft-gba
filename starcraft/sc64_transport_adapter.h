@@ -271,6 +271,7 @@ static void race_transport_destroy_cargo(int carrier)
             if (sc64_race_raw_unit(u[i].type)==83) race_scarab_human_parent_lost(i);
 #endif
             if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
+            SC64_PSC_CLEAR_SLOT(i);
             u[i].hp = 0; u[i].alive = u[i].selected = 0;
             u[i].order = ORDER_IDLE; u[i].target = -1;
         }

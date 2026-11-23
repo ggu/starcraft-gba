@@ -8,6 +8,11 @@
  *                     splash against the rule table, buildings, shields
  *   loss              target lost, path lost, Reaver death, slot reuse
  *   validate          malformed Reaver and Scarab rows are rejected
+ *   cold, retrain     placed stock from the first update (stale hint, restart, failed load); a Reaver trained
+ *                     after the others died restocks
+ *   recharge, shuttle a recharging Reaver with a part-built Scarab saves and loads; a loaded Reaver dies
+ *                     with its Shuttle and the save after it works
+ *   birth             a Scarab born into a slot freed this update switches the target index off
  *   save-write FILE   real race_save_game() with orders in production and a
  *                     Scarab in flight, then 600 updates of digests
  *   save-read FILE    a fresh process loads it and must match every digest
@@ -625,18 +630,16 @@ static void validate(void)
     BAD(S->build = MAX_UNITS);
     BAD(S->build = shot);                                    /* parent is not a Reaver */
     BAD(S->raw_type = 83);                                   /* type and raw disagree */
-    BAD(copy[r].alive = 0);                                  /* dead Reaver still holding state */
+    {   /* A dead row's state is never read (a reuse clears it): stale state in one is not a malformed world. */
+        memcpy(copy, u, sizeof copy); copy[r].alive = 0; copy[shot].build = -1;   /* its Scarab flies on, detached */
+        assert(race_paid_scarab_candidate_valid(copy, MAX_UNITS));
+    }
     {   /* Two Scarabs for one Reaver. */
         int second = -1;
         for (int i = 0; i < MAX_UNITS; ++i) if (!u[i].alive && i != shot) { second = i; break; }
         BAD(Unit *T = &copy[second]; *T = *S; T->alive = 1);
     }
-    {   /* A dead Scarab row must be clean. */
-        int dead = -1;
-        for (int i = 0; i < MAX_UNITS; ++i) if (!u[i].alive) { dead = i; break; }
-        BAD(copy[dead].type = U_SCARAB; copy[dead].raw_type = 85; copy[dead].work_timer = 4);
-    }
-    puts("validate PASS (21 malformed worlds rejected)");
+    puts("validate PASS (19 malformed worlds rejected, stale dead rows ignored)");
 }
 
 /* ---- saves ---- */
@@ -842,6 +845,210 @@ static void placed_hangar(void)
     puts("placed hangar PASS");
 }
 
+/* ---- starting stock, wake-up, battery saves, cargo death, birth into a freed slot ---- */
+
+/* The stock every placed P7 Reaver holds, read straight after each of the first updates. */
+static void check_p7_placed_stock(int updates)
+{
+    int rv[16], n = 0;
+    for (int k = 0; k < updates; ++k) {
+        pad(0);
+        n = 0;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type == U_REAVER) rv[n++] = i;
+        assert(n == 4);
+        for (int j = 0; j < n; ++j)
+            assert(race_paid_scarab_stock(rv[j]) == (u[rv[j]].raw_owner == 0 ? 5 : 0));
+    }
+}
+
+/* The first world tick meets rows nobody has established yet: give the placed ones back their raw state and tick. */
+static void tick_unestablished(void)
+{
+    int rv[16], n = 0;
+    assert((unsigned)frame <= SC64_PSC_PLACED_FRAMES);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].type == U_REAVER) { u[i].carry = 0; u[i].work_timer = 0; rv[n++] = i; }
+    assert(n == 4);
+    sc64_psc_hint = 1;
+    race_paid_scarab_world_tick();
+    for (int j = 0; j < n; ++j) {
+        int want = u[rv[j]].raw_owner == 0 ? 5 : 0;
+        assert(race_paid_scarab_stock(rv[j]) == want);
+        assert(u[rv[j]].carry & SC64_PSC_INIT);
+        assert(((u[rv[j]].carry & 15) == want) || want == 0);   /* what the tick stored is the source count */
+    }
+}
+
+static void cold_start(void)
+{
+    static Unit bad[MAX_UNITS];
+    /* 1. A world start puts the service to sleep, and a tick that meets an unestablished placed Reaver
+     * gives it the source hangar count, not a full load (P7: owner 0 holds 5, owner 4 holds 0). */
+    sc64_psc_hint = 1;
+    start_custom();                                  /* a world with no Reaver in it */
+    assert(sc64_psc_hint == 0);
+    start_campaign(SC64_P7_GLOBAL_ID);
+    assert((unsigned)frame < 8);
+    tick_unestablished();
+    check_p7_placed_stock(8);
+    puts("cold start: an unestablished placed Reaver read by the first world tick holds the source count");
+    /* 2. The same process, started again after a world that restocked. */
+    for (int t = 0; t < 200; ++t) pad(0);
+    sc64_psc_hint = 1;
+    start_custom();                                  /* a world with no Reaver in it */
+    assert(sc64_psc_hint == 0);
+    start_campaign(SC64_P7_GLOBAL_ID);
+    tick_unestablished();
+    check_p7_placed_stock(8);
+    puts("cold start: same-process restart gives the same stock");
+    /* 3. A rejected candidate leaves the hint alone, and so does a failed load. */
+    check_p7_placed_stock(2);
+    sc64_psc_hint = 0;
+    memcpy(bad, u, sizeof bad);
+    for (int i = 0; i < MAX_UNITS; ++i) if (bad[i].alive && bad[i].type == U_REAVER) { bad[i].carry = 5; break; }
+    assert(!race_paid_scarab_candidate_valid(bad, MAX_UNITS) && sc64_psc_hint == 0);
+    assert(race_paid_scarab_candidate_valid(u, MAX_UNITS) && sc64_psc_hint == 0);
+    memset(host_save, 0, sizeof host_save);
+    assert(!race_load_game() && sc64_psc_hint == 0);
+    start_campaign(SC64_P7_GLOBAL_ID);
+    tick_unestablished();
+    check_p7_placed_stock(8);
+    puts("cold start PASS (hint reset, restart, failed validation and failed load)");
+}
+
+static void retrain(void)
+{
+    int rv[8], n, owner, raw_owner, x, y, s;
+    start_campaign(SC64_P8_GLOBAL_ID);
+    for (int k = 0; k < 4; ++k) pad(0);
+    n = enemy_reavers(rv, 8);
+    assert(n >= 1);
+    owner = u[rv[0]].owner; raw_owner = u[rv[0]].raw_owner; x = u[rv[0]].x; y = u[rv[0]].y;
+    for (int k = 0; k < n; ++k) kill_actor(rv[k]);
+    for (int t = 0; t < 600 && sc64_psc_hint; ++t) pad(0);
+    assert(sc64_psc_hint == 0);                      /* nothing left to tick: the service sleeps */
+    s = spawn_unit(owner, U_REAVER, x + 24, y + 24);
+    assert(s >= 0);
+    u[s].raw_owner = raw_owner;
+    race_paid_scarab_trained(s);
+    assert(sc64_psc_hint == 1 && race_paid_scarab_stock(s) == 0);
+    for (int t = 0; t < 5 * 131 + 60; ++t) pad(0);
+    printf("retrain: an enemy Reaver trained after the others died holds %d after %d updates\n",
+           race_paid_scarab_stock(s), 5 * 131 + 60);
+    assert(race_paid_scarab_stock(s) == 5);
+    puts("retrain PASS");
+}
+
+static void recharge(void)
+{
+    int r, bat = -1, order, progress, probe = -1;
+    unsigned a[4], c[4];
+    /* The Shield Battery of this vector is the P7 one: its order and its owner rules are the campaign's. */
+    start_campaign(SC64_P7_GLOBAL_ID);
+    for (int k = 0; k < 4; ++k) pad(0);
+    for (int i = 0; i < MAX_BUILDINGS && bat < 0; ++i)
+        if (b[i].alive && b[i].owner == SIDE && sc64_battery_raw_building(&b[i]) == 172) bat = i;
+    for (int i = 0; i < MAX_UNITS && probe < 0; ++i)
+        if (u[i].alive && u[i].owner == SIDE) probe = i;
+    assert(probe >= 0);
+    if (bat < 0) {   /* the human has none at the start: stand one next to its first actor */
+        int pylon = spawn_build(SIDE, B_PYLON, u[probe].x + 80, u[probe].y, 0);
+        assert(pylon >= 0);
+        b[pylon].hp = b[pylon].maxhp; b[pylon].under_construction = 0; b[pylon].queue_count = 0;
+        bat = spawn_build(SIDE, B_P7_SHIELD_BATTERY, u[probe].x + 80, u[probe].y + 48, 0);
+        assert(bat >= 0);
+        b[bat].raw_type = 172; b[bat].raw_owner = 7; b[bat].hp = b[bat].maxhp;
+        b[bat].under_construction = 0; b[bat].queue_count = 0;
+        invalidate_path_grid();
+    }
+    r = spawn_unit(SIDE, U_REAVER, b[bat].x + 48, b[bat].y + 48);
+    assert(r >= 0);
+    u[r].raw_type = 83; u[r].raw_owner = 7; u[r].order = ORDER_IDLE; u[r].tx = u[r].x; u[r].ty = u[r].y;
+    race_paid_scarab_trained(r);
+    u[r].carry = SC64_PSC_INIT | 2 | (3 << 4); u[r].work_timer = 50; u[r].shield = 10;
+    b[bat].queue_progress = SC64_P7_BATTERY_MAX_ENERGY_Q8 / 2; b[bat].level = 0;
+    order = race_battery_recharge_order();
+    assert(race_battery_unit_valid(r, bat));
+    u[r].order = order; u[r].target = bat;
+    for (int t = 0; t < 12; ++t) pad(0);
+    assert(u[r].alive && u[r].order == order && race_paid_scarab_queued(r) == 3 && u[r].work_timer > 50);
+    progress = u[r].work_timer;
+    /* The save must accept a recharging Reaver with a part-built Scarab, and load it back. */
+    assert(race_save_game());
+    for (int k = 0; k < 4; ++k) { for (int t = 0; t < 40; ++t) pad(0); a[k] = state_digest(); }
+    gba_init(); game_init();
+    assert(race_load_game() && !race_mode);
+    assert(u[r].alive && u[r].order == order && race_paid_scarab_queued(r) == 3 && u[r].work_timer == progress);
+    for (int k = 0; k < 4; ++k) { for (int t = 0; t < 40; ++t) pad(0); c[k] = state_digest(); assert(a[k] == c[k]); }
+    printf("recharge: saved and reloaded a recharging Reaver with 3 ordered and %d ticks of progress\n", progress);
+    /* No Battery path wipes the progress: running dry, losing the Battery, or a new command. */
+    progress = u[r].work_timer;
+    u[r].order = order; u[r].target = bat;
+    b[bat].queue_progress = 0;                       /* the next service tick cancels */
+    for (int t = 0; t < 12; ++t) pad(0);
+    assert(u[r].order == ORDER_IDLE && u[r].work_timer >= progress);       /* the build went on, none was wiped */
+    assert(race_paid_scarab_stock(r) + race_paid_scarab_queued(r) == 5);
+    u[r].order = order; u[r].target = bat; progress = u[r].work_timer;
+    race_battery_clear_building_references(bat);
+    assert(u[r].order == ORDER_IDLE && u[r].work_timer == progress);
+    puts("recharge PASS");
+}
+
+static void shuttle(void)
+{
+    int hx, hy, r = arena(&hx, &hy), sh, raw = 69, loaded = 0;
+    unsigned a[3], c[3];
+    assert(sc64_race_unit_from_raw(raw) >= 0);
+    sh = spawn_unit(SIDE, sc64_race_unit_from_raw(raw), u[r].x + 24, u[r].y);
+    assert(sh >= 0 && race_transport_carrier_type(&u[sh]));
+    u[sh].order = ORDER_IDLE; u[sh].tx = u[sh].x; u[sh].ty = u[sh].y;
+    assert(race_transport_request_board(r, sh));
+    for (int t = 0; t < 300 && !loaded; ++t) { step(1); loaded = SC64_TRANSPORT_LOADED(&u[r]); }
+    assert(loaded && u[r].carry != 0);
+    kill_actor(sh);
+    step(1);
+    printf("shuttle: the loaded Reaver %s (carry %d, work %d)\n", u[r].alive ? "survived" : "died with its Shuttle",
+           u[r].carry, u[r].work_timer);
+    assert(!u[r].alive && u[r].carry == 0 && u[r].work_timer == 0);
+    assert(race_paid_scarab_candidate_valid(u, MAX_UNITS));
+    assert(race_save_game());
+    for (int k = 0; k < 3; ++k) { step(60); a[k] = state_digest(); }
+    start_custom();
+    assert(race_load_game());
+    for (int k = 0; k < 3; ++k) { step(60); c[k] = state_digest(); assert(a[k] == c[k]); }
+    puts("shuttle PASS (state shed at the cargo death, save and reload after it)");
+}
+
+static void birth_slot(void)
+{
+    int hx, hy, r = arena(&hx, &hy), victim, h, t0, child, freed;
+    victim = enemy_unit(U_ZEALOT, hx + 200, hy);
+    step(2);
+    h = enemy_hatchery(hx, hy); t0 = MAX_UNITS + h;
+    race_paid_scarab_trained(r); u[r].carry = SC64_PSC_INIT | 5 | (60 << 7);   /* cooling down: it holds its fire for now */
+    step(2);
+    u[r].carry = SC64_PSC_INIT | 5;
+    /* The index structures as an update builds them: every live unit, the victim included, is linked. */
+    sc64_unit_buckets_begin(); sc64_target_index_begin(); target_lists_valid = 1;
+    assert(sc64_unit_bucket_active && sc64_target_index_active && sc64_target_cell[victim] != 0xffffu);
+    kill_actor(victim);                              /* the slot dies in this update, still linked */
+    freed = -1;
+    for (int i = 0; i < MAX_UNITS && freed < 0; ++i) if (!u[i].alive) freed = i;   /* what spawn_unit will take */
+    assert(freed == victim);
+    assert(sc64_unit_bucket_active && sc64_target_index_active && target_lists_valid);   /* a death alone leaves them on */
+    race_paid_scarab_launch(&u[r], t0);
+    child = scarab_in_flight(r);
+    assert(child >= 0);
+    printf("birth: the Scarab took slot %d (the victim's); buckets %d, target index %d, owner lists %d afterwards\n", child,
+           sc64_unit_bucket_active, sc64_target_index_active, target_lists_valid);
+    assert(child == victim);
+    assert(!sc64_unit_bucket_active && !sc64_target_index_active && !target_lists_valid);
+    step(3);
+    for (int i = 0; i < MAX_UNITS; ++i)              /* nothing aims at the live Scarab */
+        if (u[i].alive && u[i].target == child) assert(0);
+    puts("birth PASS");
+}
+
 static void campaign_write(const char *path)
 {
     unsigned digests[7]; int rv[8], n;
@@ -940,6 +1147,11 @@ int main(int argc, char **argv)
     else if (argc == 2 && !strcmp(argv[1], "save-process")) save_in_process();
     else if (argc == 2 && !strcmp(argv[1], "campaign")) campaign();
     else if (argc == 2 && !strcmp(argv[1], "placed")) placed_hangar();
+    else if (argc == 2 && !strcmp(argv[1], "cold")) cold_start();
+    else if (argc == 2 && !strcmp(argv[1], "retrain")) retrain();
+    else if (argc == 2 && !strcmp(argv[1], "recharge")) recharge();
+    else if (argc == 2 && !strcmp(argv[1], "shuttle")) shuttle();
+    else if (argc == 2 && !strcmp(argv[1], "birth")) birth_slot();
     else if (argc == 3 && !strcmp(argv[1], "campaign-write")) campaign_write(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "campaign-read")) campaign_read(argv[2]);
     else if (argc == 3 && !strcmp(argv[1], "save-write")) t_save_write(argv[2]);

@@ -53,7 +53,7 @@
  * (sc64_paid_scarab.h). -DRACE_AI_NO_REAVERS keeps the service but not the play. */
 #if defined(SC64_PAID_SCARAB) && !defined(RACE_AI_NO_REAVERS)
 #define RACE_AI_REAVERS 1
-#define SC64_PSC_PRICE_FOR_AI 15        /* must match the U_SCARAB rule row */
+#define SC64_PSC_PRICE_FOR_AI ((int)sc64_race_unit_rule(U_SCARAB)->minerals)
 #endif
 
 enum {
@@ -308,7 +308,7 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
     for (i = 0; i < MAX_UNITS; ++i) {
         const Unit *q = &u[i];
         if (!q->alive) continue;
-#ifdef RACE_AI_REAVERS
+#ifdef SC64_PAID_SCARAB
         if (q->type == U_SCARAB) continue; /* ammunition in flight is not army */
 #endif
         if (SC64_TRANSPORT_LOADED(q)) {

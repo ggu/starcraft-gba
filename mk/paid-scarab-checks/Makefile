@@ -19,7 +19,7 @@ $(PSC_DIR)/product: $(PSC_DEPS) | build
 	$(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(PROTOSS_P10_FLAGS) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 .PHONY: test-sc64-paid-scarab test-sc64-paid-scarab-old
 test-sc64-paid-scarab: $(PSC_DIR)/product
-	for t in economy combat splash loss validate save-process campaign placed; do ./$(PSC_DIR)/product $$t || exit 1; done
+	for t in economy combat splash loss validate save-process campaign placed cold retrain recharge shuttle birth; do ./$(PSC_DIR)/product $$t || exit 1; done
 	rm -f $(PSC_DIR)/scarab.sav $(PSC_DIR)/scarab.sav.state
 	./$(PSC_DIR)/product save-write $(PSC_DIR)/scarab.sav
 	./$(PSC_DIR)/product save-read $(PSC_DIR)/scarab.sav
@@ -27,13 +27,24 @@ test-sc64-paid-scarab: $(PSC_DIR)/product
 	./$(PSC_DIR)/product campaign-write $(PSC_DIR)/camp.sav
 	./$(PSC_DIR)/product campaign-read $(PSC_DIR)/camp.sav
 	$(MAKE) test-sc64-paid-scarab-old
+# A save written by the unchanged base code must load here. PSC_BASE_TREE is an unchanged
+# default-branch checkout; it is only read: the fixture is compiled from a scratch directory
+# that holds the product source and links to the checkout's own sources and generated inputs.
+ifeq ($(strip $(PSC_BASE_TREE)),)
+test-sc64-paid-scarab-old:
+	@echo "test-sc64-paid-scarab-old: set PSC_BASE_TREE to an unchanged default-branch checkout; skipped"
+else
+PSC_OLD_DIR := $(PSC_DIR)/old-tree
 test-sc64-paid-scarab-old: $(PSC_DIR)/product
-	@if [ -z "$(PSC_BASE_TREE)" ]; then echo "test-sc64-paid-scarab-old: set PSC_BASE_TREE to an unchanged default-branch checkout; skipped"; exit 0; fi
-	cp $(PSC_SRC) $(PSC_BASE_TREE)/tests/
-	cd $(PSC_BASE_TREE) && $(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(patsubst -I$(P10_SCARAB_FACT_DIR),-I$(P10_FACT_V2_DIR),$(filter-out $(PROTOSS_SCARAB_FLAGS),$(PROTOSS_P10_FLAGS))) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o ../psc-old-writer
+	rm -rf $(PSC_OLD_DIR)
+	mkdir -p $(PSC_OLD_DIR)/tests
+	cp $(PSC_SRC) $(PSC_OLD_DIR)/tests/
+	for d in starcraft common build .local; do ln -s $(abspath $(PSC_BASE_TREE))/$$d $(PSC_OLD_DIR)/$$d; done
+	cd $(PSC_OLD_DIR) && $(CLANG) $(P8_HOST_FLAGS) -I$(SC64_RESEARCH_COVER_DIR) $(patsubst -I$(P10_SCARAB_FACT_DIR),-I$(P10_FACT_V2_DIR),$(filter-out $(PROTOSS_SCARAB_FLAGS),$(PROTOSS_P10_FLAGS))) $(PSC_SRC) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $(CURDIR)/$(PSC_DIR)/psc-old-writer
 	rm -f $(PSC_DIR)/old.sav $(PSC_DIR)/old.sav.state
-	$(PSC_BASE_TREE)/../psc-old-writer old-write $(CURDIR)/$(PSC_DIR)/old.sav
+	./$(PSC_DIR)/psc-old-writer old-write $(PSC_DIR)/old.sav
 	./$(PSC_DIR)/product old-read $(PSC_DIR)/old.sav
+endif
 
 # Ordinary controls end to end (pad input only): chain, Reaver, Scarabs, attack,
 # real pause-menu save with a Scarab in flight, fresh-process load and continuation.

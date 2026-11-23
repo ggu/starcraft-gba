@@ -29,6 +29,16 @@ static void race_scarab_probe_target_invalidate(int ref);
 static int race_paid_scarab_candidate_valid(const Unit *actors, int count);
 static const char *race_carrier_menu_label(void);
 #define PSC_LABEL() race_carrier_menu_label()
+/* A loaded world may hold a flight or a Reaver with work: wake the service once the actors are in
+ * place. A new world starts with it asleep. */
+#define SC64_PSC_WORLD_LOADED() (sc64_psc_hint = 1)
+#define SC64_PSC_WORLD_RESET() (sc64_psc_hint = 0)
+/* The Reaver's Scarab build progress lives in work_timer, which a Shield Battery order must not wipe,
+ * and which the recharge save check must accept for a Reaver. */
+#define SC64_PSC_BATTERY_WORK(q) do { if ((q)->type != U_REAVER) (q)->work_timer = 0; } while (0)
+#define SC64_PSC_RECHARGE_WORK_OK(a) ((a)->type == U_REAVER)
+/* A dead cargo Reaver sheds its state like any other death. */
+#define SC64_PSC_CLEAR_SLOT(i) race_paid_scarab_clear_slot(i)
 /* STOP keeps a Reaver's Scarabs and orders. */
 #define SC64_PSC_KEEP_STATE(q) if ((q).type != U_REAVER)
 /* In reach, a Reaver fights only with a Scarab it holds: never the generic hit. */
@@ -37,6 +47,11 @@ static const char *race_carrier_menu_label(void);
 #define SC64_PSC_WORLD_TICK() \
     do { if (sc64_psc_hint && (unsigned)frame % 5u != 0u) race_paid_scarab_world_tick(); } while (0)
 #else
+#define SC64_PSC_WORLD_LOADED() ((void)0)
+#define SC64_PSC_WORLD_RESET() ((void)0)
+#define SC64_PSC_BATTERY_WORK(q) ((q)->work_timer = 0)
+#define SC64_PSC_RECHARGE_WORK_OK(a) 0
+#define SC64_PSC_CLEAR_SLOT(i) ((void)0)
 #define PSC_LABEL() "BUILD INTERCEPTOR"
 #define SC64_PSC_KEEP_STATE(q)
 #define SC64_PSC_FIRE(q, target)

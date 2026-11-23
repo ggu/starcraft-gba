@@ -3271,6 +3271,13 @@ spawn_unit(int owner, int type, int x, int y)
         } else
             sc64_unit_bucket_move(&u[i]);
     }
+#ifdef SC64_PAID_SCARAB
+    if (SC64_SCARAB_BIRTH(&u[i])) {
+        /* The slot may be a dead unit's, still linked in the target index and the owner lists. */
+        sc64_target_index_end();
+        target_lists_valid = 0;
+    }
+#endif
 #endif
     if (owner == SIDE)
 	supply_used += unit_supply(type);
@@ -5794,6 +5801,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    SC64_PSC_WORLD_RESET();   /* a new world: nothing in flight, nothing restocking */
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_reset();
 #endif

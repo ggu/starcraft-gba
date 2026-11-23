@@ -124,17 +124,55 @@ static inline void sc64_psc_store(Unit *q, const Sc64PscState *s)
 static int race_paid_scarab_parent(const Unit *q)
 { return q->alive && q->type == U_REAVER && (q->raw_type == -1 || q->raw_type == SC64_PSC_PARENT_RAW); }
 
-/* Read a Reaver's state; a row that was never established is given its full
- * load here (a placed, reinforced, rescued or pre-service Reaver). */
-static int sc64_psc_load(Unit *q, Sc64PscState *s)
+/* The hangar count a mission's source map gives this placed Reaver, matched by mission, source
+ * owner and position (a few pixels of slack: it may have taken a step). -1: a Reaver of a covered
+ * mission that is not a placed row (reinforced, rescued, made by a trigger); it starts full later. */
+static int sc64_psc_placed_stock(const Unit *q)
+{
+    int best = -1, best_d = 0x7fffffff;
+    if (race_mode || (unsigned)race_selected_mission >= 32u) return 0;
+    if (!((SC64_PLACED_HANGAR_COVERED_MASK >> race_selected_mission) & 1u)) return 0; /* no source CHK here */
+    for (unsigned i = 0; i < SC64_PLACED_HANGAR_COUNT; ++i) {
+        const Sc64PlacedHangar *h = &sc64_placed_hangar[i];
+        int dx = q->x - (int)h->x_px, dy = q->y - (int)h->y_px, d = dx * dx + dy * dy;
+        if (h->mission != race_selected_mission || h->owner != q->raw_owner || d > 12 * 12 || d >= best_d) continue;
+        best = h->hangar; best_d = d;
+    }
+    return best;
+}
+
+/* What an unestablished Reaver holds: its source hangar count while a mission's first updates are
+ * running (a placed Reaver), otherwise a full load (reinforced, rescued or pre-service). Looking it up
+ * here, not only at the end of an update, keeps any earlier reader from handing a placed enemy Reaver
+ * a full load. */
+static int sc64_psc_initial_stock(const Unit *q)
+{
+    int capacity = (int)sc64_psc_capacity(q->owner), placed;
+    if ((unsigned)frame <= SC64_PSC_PLACED_FRAMES) {
+        placed = sc64_psc_placed_stock(q);
+        if (placed >= 0) return placed > capacity ? capacity : placed;
+    }
+    return capacity;
+}
+
+/* Read a Reaver's state without writing it: a row that was never established reads as its initial load. */
+static int sc64_psc_peek(const Unit *q, Sc64PscState *s)
 {
     unsigned capacity = sc64_psc_capacity(q->owner);
     if (!race_paid_scarab_parent(q) || !sc64_psc_decode(q->carry, q->work_timer, capacity, s))
         return 0;
     if (!s->init) {
-        s->init = 1; s->stock = capacity; s->queued = s->cooldown = s->progress = 0;
-        sc64_psc_store(q, s);
+        s->init = 1; s->stock = (unsigned)sc64_psc_initial_stock(q); s->queued = s->cooldown = s->progress = 0;
     }
+    return 1;
+}
+
+/* Read a Reaver's state for a change: an unestablished row is established (stored) here. */
+static int sc64_psc_load(Unit *q, Sc64PscState *s)
+{
+    int established = (q->carry & SC64_PSC_INIT) != 0;
+    if (!sc64_psc_peek(q, s)) return 0;
+    if (!established) sc64_psc_store(q, s);
     return 1;
 }
 
@@ -143,6 +181,7 @@ static void race_paid_scarab_trained(int slot)
 {
     if (slot >= 0 && slot < MAX_UNITS && u[slot].type == U_REAVER) {
         u[slot].carry = SC64_PSC_INIT; u[slot].work_timer = 0;
+        sc64_psc_hint = 1;   /* a computer-owned Reaver restocks on the timer: wake the service */
     }
 }
 
@@ -166,7 +205,7 @@ static int race_paid_scarab_can_queue(int slot)
     Unit *q;
     if (slot < 0 || slot >= MAX_UNITS) return 0;
     q = &u[slot];
-    if (!sc64_psc_load(q, &s) || SC64_TRANSPORT_LOADED(q)) return 0;
+    if (!sc64_psc_peek(q, &s) || SC64_TRANSPORT_LOADED(q)) return 0;
     return s.queued < SC64_PSC_QUEUE_LIMIT &&
            s.stock + s.queued < sc64_psc_capacity(q->owner) &&
            race_owner_minerals(q->owner) >= (int)sc64_psc_price();
@@ -205,12 +244,12 @@ static int race_paid_scarab_menu_available(void)
 static int race_paid_scarab_stock(int slot)
 {
     Sc64PscState s;
-    return slot >= 0 && slot < MAX_UNITS && sc64_psc_load(&u[slot], &s) ? (int)s.stock : -1;
+    return slot >= 0 && slot < MAX_UNITS && sc64_psc_peek(&u[slot], &s) ? (int)s.stock : -1;
 }
 static int race_paid_scarab_queued(int slot)
 {
     Sc64PscState s;
-    return slot >= 0 && slot < MAX_UNITS && sc64_psc_load(&u[slot], &s) ? (int)s.queued : -1;
+    return slot >= 0 && slot < MAX_UNITS && sc64_psc_peek(&u[slot], &s) ? (int)s.queued : -1;
 }
 
 /* ---- source tick: production and cooldown, once per source tick ---- */
@@ -311,6 +350,15 @@ static int sc64_psc_resolve(int target, unsigned packet_q8, int *shield_loss)
     return (int)(damage / 256u);
 }
 
+/* A lifted Terran building flies: a Scarab neither homes on it nor splashes it. The Protoss P10 product
+ * has no lifting building (SC64_TERRAN_LATE_RUNTIME is off), so this is 0 there; a product that
+ * compiles the service with Terran flight gets the engine's own predicate. */
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#define SC64_PSC_AIRBORNE_BUILDING(slot) race_late_airborne(slot)
+#else
+#define SC64_PSC_AIRBORNE_BUILDING(slot) 0
+#endif
+
 /* Splash around runtime pixel (px,py) for a Scarab of `owner`. */
 static void race_paid_scarab_explode(int px, int py, int owner, int primary)
 {
@@ -326,6 +374,7 @@ static void race_paid_scarab_explode(int px, int py, int owner, int primary)
             raw = u[target].raw_type >= 0 ? u[target].raw_type : sc64_race_raw_unit(u[target].type);
             x = u[target].x; y = u[target].y; tgt_owner = u[target].owner;
         } else {
+            if (SC64_PSC_AIRBORNE_BUILDING(target - MAX_UNITS)) continue;
             raw = b[target - MAX_UNITS].raw_type >= 0 ? b[target - MAX_UNITS].raw_type :
                   sc64_race_raw_building(b[target - MAX_UNITS].type);
             x = b[target - MAX_UNITS].x; y = b[target - MAX_UNITS].y;
@@ -374,7 +423,7 @@ static int sc64_psc_target_ok(const Unit *q, int target)
     if (target < 0 || target >= MAX_UNITS + MAX_BUILDINGS || !target_alive(target)) return 0;
     if (target < MAX_UNITS)
         return owners_hostile(q->owner, u[target].owner) && !sc64_race_unit_flying(u[target].type);
-    return owners_hostile(q->owner, b[target - MAX_UNITS].owner);
+    return owners_hostile(q->owner, b[target - MAX_UNITS].owner) && !SC64_PSC_AIRBORNE_BUILDING(target - MAX_UNITS);
 }
 
 static void sc64_psc_flight_tick(int slot)
@@ -456,25 +505,6 @@ static void race_paid_scarab_clear_slot(int slot)
     }
 }
 
-/* A scripted removal can take a Reaver without the death hook: detach
- * what it launched. */
-/* The hangar count a mission's source map gives this placed Reaver, matched by mission, source
- * owner and position (a few pixels of slack: it may have taken a step). -1: a Reaver of a covered
- * mission that is not a placed row (reinforced, rescued, made by a trigger); it starts full later. */
-static int sc64_psc_placed_stock(const Unit *q)
-{
-    int best = -1, best_d = 0x7fffffff;
-    if (race_mode || (unsigned)race_selected_mission >= 32u) return 0;
-    if (!((SC64_PLACED_HANGAR_COVERED_MASK >> race_selected_mission) & 1u)) return 0; /* no source CHK here */
-    for (unsigned i = 0; i < SC64_PLACED_HANGAR_COUNT; ++i) {
-        const Sc64PlacedHangar *h = &sc64_placed_hangar[i];
-        int dx = q->x - (int)h->x_px, dy = q->y - (int)h->y_px, d = dx * dx + dy * dy;
-        if (h->mission != race_selected_mission || h->owner != q->raw_owner || d > 12 * 12 || d >= best_d) continue;
-        best = h->hangar; best_d = d;
-    }
-    return best;
-}
-
 static void race_paid_scarab_end_frame(void)
 {
     /* Reavers a mission places at its start hold their source hangar count (table above);
@@ -502,22 +532,19 @@ static int race_paid_scarab_candidate_valid(const Unit *actors, int count)
 {
     u8 claimed[MAX_UNITS];
     if (!actors || count != MAX_UNITS) return 0;
-    sc64_psc_hint = 1; /* conservative: a loaded world may hold a flight */
+    /* No side effects: the hint is set where a world is installed (SC64_PSC_WORLD_LOADED). */
     for (int i = 0; i < MAX_UNITS; ++i) claimed[i] = 0;
     for (int i = 0; i < count; ++i) {
         const Unit *q = &actors[i];
         Sc64PscState s;
         if ((q->type == U_SCARAB) != (q->raw_type == SC64_PSC_RAW)) return 0;
         if (q->type == U_REAVER) {
-            if (!q->alive) { if (q->carry || q->work_timer) return 0; continue; }
+            if (!q->alive) continue;   /* a dead row's state is never read; a reuse clears it */
             if (!sc64_psc_decode(q->carry, q->work_timer, sc64_psc_capacity(q->owner), &s)) return 0;
             continue;
         }
         if (q->type != U_SCARAB) continue;
-        if (!q->alive) {
-            if (q->build != -1 || q->carry || q->work_timer) return 0;
-            continue;
-        }
+        if (!q->alive) continue;
         if (q->work_timer < 1 || q->work_timer > SC64_PSC_LIFETIME || q->carry != 0 ||
             q->cd != 0 || q->selected || q->flags != 16 || q->order != ORDER_IDLE ||
             q->hp != 20 || q->shield < 0 || q->shield > 10 ||

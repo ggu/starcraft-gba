@@ -37,7 +37,7 @@ static int race_p5_saved_p7_recharge_valid(const RaceSave *candidate,
         actor->order != ORDER_P7_RECHARGE ||
         RACE_PROTOSS_RAW(actor) == 73 || RACE_PROTOSS_RAW(actor) == 85 ||
         RACE_PROTOSS_SLOT(actor) < 0 || RACE_PROTOSS_SLOT(actor) >= 8 ||
-        actor->work_timer != 0 ||
+        (actor->work_timer != 0 && !SC64_PSC_RECHARGE_WORK_OK(actor)) ||
         SC64_TRANSPORT_LOADED(actor)) return 0;
     rule=sc64_race_unit_rule(actor->type);
     if (!rule || rule->race != R_PROTOSS || !(rule->flags & SC_RACE_F_SHIELDS) ||

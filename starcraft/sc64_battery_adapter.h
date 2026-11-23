@@ -190,7 +190,7 @@ static void race_battery_clear_building_references(int slot)
 {
     if(!race_battery_active() || slot<0 || slot>=MAX_BUILDINGS) return;
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && race_battery_order_is_recharge(u[i].order) && u[i].target==slot) {
-        u[i].order=ORDER_IDLE;u[i].target=-1;u[i].work_timer=0;u[i].tx=u[i].x;u[i].ty=u[i].y;
+        u[i].order=ORDER_IDLE;u[i].target=-1;SC64_PSC_BATTERY_WORK(&u[i]);u[i].tx=u[i].x;u[i].ty=u[i].y;
         u[i].path_timer=0;u[i].path_retry=0;u[i].path_x=u[i].x;u[i].path_y=u[i].y;
     }
 }
@@ -208,7 +208,7 @@ static int __attribute__((noinline)) race_battery_tick_unit(int slot)
     b[battery].queue_progress=(int)energy;q->shield=(int)shield;q->shield_remainder=(int)rem;
     if(shield>=rule->shields || energy==0) goto cancel;
     return 1;
-cancel:q->order=ORDER_IDLE;q->target=-1;q->work_timer=0;return 1;
+cancel:q->order=ORDER_IDLE;q->target=-1;SC64_PSC_BATTERY_WORK(q);return 1;
 }
 static int race_battery_command_available(void)
 {
@@ -234,7 +234,7 @@ static int race_battery_issue_command(int battery,int x,int y)
     int count=0,unit=selection_target(),order=race_battery_recharge_order();
     if(!race_battery_command_available() || battery!=selected_building || order<0) return 0;
     if(unit>=0 && race_battery_unit_valid(unit,battery)){
-        u[unit].order=order;u[unit].target=battery;u[unit].work_timer=0;return 1;
+        u[unit].order=order;u[unit].target=battery;SC64_PSC_BATTERY_WORK(&u[unit]);return 1;
     }
     if(x<0 || y<0 || x>(INT_MAX-128)/2 || y>(INT_MAX-128)/2) return 0;
     int px=x*2,py=y*2;
@@ -242,7 +242,7 @@ static int race_battery_issue_command(int battery,int x,int y)
         int l,t,r,d,raw=sc64_battery_raw_unit(&u[i]);
         if(raw<0 || !sc64_battery_rect((unsigned)raw,u[i].x,u[i].y,0,&l,&t,&r,&d)) continue;
         if(r<=px-128 || l>=px+128 || d<=py-128 || t>=py+128) continue;
-        u[i].order=order;u[i].target=battery;u[i].work_timer=0;++count;
+        u[i].order=order;u[i].target=battery;SC64_PSC_BATTERY_WORK(&u[i]);++count;
     }
     return count;
 }

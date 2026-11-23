@@ -81,6 +81,8 @@ def main():
     print(f"{len(b)} samples: uninterrupted tape == tape with the save: {a == b}; fresh process == saving process: {b == c}")
     hits = re.findall(r"hits=(\d+)", (out / "run.out").read_text())
     print(f"Scarab hits at the last sample: {hits[-1] if hits else '?'}")
+    if not hits or int(hits[-1]) < 1:
+        sys.exit("the saved Scarab (or its fight) hit nothing: the check proves nothing about a Scarab in flight")
     sys.exit(0 if ok else 1)
 
 
