@@ -96,9 +96,25 @@ pause and fresh HOME cases pass. Six 12,000-update three-CPU
 matches across both maps agree on all 120 sampled cuts. Guest cycle
 totals decrease by 0.012–0.115% across these six matches.
 
+The full P9 route reaches victory at frame 272,857 after 281,447
+ordinary calls. All 93 checkpoints and 11 briefing entries match the
+pre-Bring control and the direct Bring build. The pause reload matches
+all 80 subsequent checkpoints. A third emulator process reloads the
+victory journal. The pause, victory and readback SRAM files each match
+byte for byte across all three builds.
+
+The cursor build takes 383,550,668,426 guest cycles across the full
+route, down 1.24% from 388,382,113,584 with direct Bring and 9.49% from
+423,749,329,236 before both changes. It averages 12.31 emulated
+updates per second, including UI and presentation time. This replay
+doesn't measure the frame rate on a GBA. The tested P10 ROM matches
+the default cursor release ROM byte for byte. Its SHA-256 is
+`562b93c371cf7a3734a361eddee88ac8c2e9394ff76684f0b1b186faca75c3c8`.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | P9 instruction windows | `fb9b4ec58c53a6d75053bfd1ed23b3045722b874c8460a698bc83b52e9bf9379` |
+| P9 full victory and save reload | `f759b2f0be24f5bdbde2fa1bdc663e680765cd4fd1bde44a750da1100e4136a1` |
 | P10 victory tail | `ccc6b12c7ac12a617b1282fd072ed92314f891f2e6d51304ce95ebd8f72177bc` |
 | P10 crowded double-tap | `67fbf75f93a5ae70ae3aadfe4c46da081b188ab873394c6f790ec6d96e0aba74` |
 | Custom Game timing matrix | `5ab87d5efa509ed543d217a703625dcf3758b545d58f722b2d9d18cf2b9ea3cd` |
