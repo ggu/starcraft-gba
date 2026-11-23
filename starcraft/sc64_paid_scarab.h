@@ -285,7 +285,10 @@ static int sc64_psc_parent_tick(int slot)
     if (s.queued && ++s.progress >= sc64_psc_build_ticks()) {
         ++s.stock; --s.queued; s.progress = 0;
     }
-    if (s.stock != was.stock || s.queued != was.queued || s.cooldown != was.cooldown || s.progress != was.progress)
+    /* A placed Reaver in a mission's first updates is established whatever it does (end_frame does the same):
+     * its source hangar count must be frozen before the window closes. */
+    if (s.stock != was.stock || s.queued != was.queued || s.cooldown != was.cooldown || s.progress != was.progress ||
+        (!(q->carry & SC64_PSC_INIT) && (unsigned)frame <= SC64_PSC_PLACED_FRAMES && sc64_psc_placed_stock(q) >= 0))
         sc64_psc_store(q, &s);
     return s.queued || s.cooldown || ai;
 }
