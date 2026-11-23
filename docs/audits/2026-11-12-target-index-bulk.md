@@ -201,13 +201,18 @@ The 30 ordinary campaign openings and 24 ordinary Custom Game save
 continuations agree with the cursor release. Six 12,000-update matches
 with three CPUs agree at all 120 sampled world, video, palette and route
 cuts. Total guest cycles fall by 0.13–0.21% in those matches. The full P9
-victory and result reload remain in progress.
+route wins at frame 272,857 after 281,447 ordinary calls. All 93
+checkpoints match the cursor build, including 80 after a fresh pause
+reload. The pause, victory and result-readback SRAM each match byte for
+byte. Total cost falls from 383,550,668,426 to 382,136,090,332 guest
+cycles (0.37%) and the mean reaches 12.36 emulated updates per second.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | P9 instruction windows | `ef320144e03b4a72d328aac003a910795969f3dda92ccb518020e22595a37aac` |
 | P10 victory tail | `c677652aa26566fe892e6435c392821437c807ce1f98f9f9b619a14a091c1b58` |
 | Six three-CPU matches | `fdcb7c5d949f968ff6da1438a61576307f1634d916bec88a28e14b87ed4929ba` |
+| Full P9 victory and SRAM readback | `90fac9b7bf721731c8343ad435d9b2173eb7a6a56608db5bc6f6bbb4c1bd9c25` |
 
 ## Strict reuse on the generated-bounds release
 
