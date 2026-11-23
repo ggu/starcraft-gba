@@ -25,7 +25,7 @@ int main(void) {
             if(p->actor_raw==124 && p->weapon_id==29 && p->mode==1 && p->variant==2) {
                 for(int dx=-111;dx<=111;dx++)for(int dy=-111;dy<=111;dy++) {
                     if(dx*dx+dy*dy>=112*112)continue;
-                    key.direction=(uint8_t)sc64_source_effect_direction(dx,dy);
+                    key.direction=(uint8_t)sc64_facing_direction(dx,dy);
                     assert(sc64_weapon_source_vfx_pack(key,&packed));
                     int d=sc64_trace_duration((int)packed,512,512,512+dx,512+dy);
                     if(d>legal_max)legal_max=d;

@@ -356,3 +356,51 @@ this approach. Retain the current exact crop on unknown art.
 | Normal Custom Game matrix | `f41775839cc5473724ee24893e220450c64197c83aeb706224e2213c14609e80` |
 | Preview Custom Game matrix | `780123b907f8bd2dc761cf2cd93f665cc4ec75191554ef08e9e8a4ee984585d5` |
 | Crop candidate population | `947f742a62c67c36cecd575abf49a89749e6ecad8cb6e441ef5cf3c3b36d1907` |
+
+## Generated bounds for offscreen animation checks
+
+The regular asset preparation commands now emit anchor radii alongside
+the facing, walking and full-attack frames. The shared actor viewport
+check combines the available body, turret, walk and attack bounds and
+adds one pixel for stride lift. A disjoint bound rejects a sprite
+without resolving its pose. When the bound intersects the viewport,
+the existing exact crop still decides admission. Uncertified art uses
+the exact crop. Rebuilding Protoss 10 with the older prepared banks
+reproduces the preceding release bytes.
+
+The three regenerated headers compare byte for byte with the retained
+inputs after removing the new metadata and normalizing the walk bank's
+facing hash. The paired bank check accepts the new hash. A compiled
+geometry check covers 55 facing families, 34 walk families and 32
+full-attack families. All 55,566 frame, mirror, packed geometry,
+heading and attack-lifetime cases fit their corresponding radius.
+The attack generator tests cover an odd canvas, both target modes,
+extreme headings and the exclusive right and bottom edges.
+
+The exact current Protoss replay matches all 32 sampled gameplay,
+route, palette and two-page framebuffer cuts. Profiled and unprofiled
+candidate runs also match all sampled guest clocks. The earlier window
+rises from 1,548,204 to 1,550,274 cycles (0.13%). The later window
+falls from 1,479,974 to 1,420,468 (4.02%). Over 9,489 updates to
+victory, the mean falls from 1,530,146 to 1,523,161 cycles (0.46%)
+with all 81 sampled cuts and the final SRAM matching. The dense mean
+corresponds to 11.01 emulated updates per second. In the later window,
+game update alone still uses 869,483 guest cycles, with 536,973 in
+orders. Reducing rendering work alone cannot meet the full pacing target.
+
+The normal Terran, Zerg, Protoss and Showcase images and their
+elimination previews keep their previous RAM endpoints. The prepared
+mining and Protoss frame tests pass with active bounds. The paired
+3,600-update Zerg Blood Bath replays match world, video, palette and
+route cuts and SRAM in both build groups. Mean cycles fall from
+576,330 to 575,708 in the normal match and from 571,196 to 570,952
+in the preview. All 54 Custom Game menu, save and fresh-load cases
+pass in each build group.
+
+| Local evidence | SHA-256 |
+| --- | --- |
+| Profiled and unprofiled candidate cuts | `01fc170178241508fad636c083e8c249de3c93bf4d4bab752856f8fab9c8f0d5` |
+| Instruction attribution | `ca0b84e5803487921283e9fb35409522ed072d0e4df3a26f26f75922408c002c` |
+| Protoss victory replay | `59ba529c0628706bdefdbf3fef50bee9cc1449a6c29294e17dae8167144e1440` |
+| Normal Custom Game matrix | `78789895f2b3a1e8c6217abd246fff7bdfa0a6ac5a851442d11583a642ccbec0` |
+| Preview Custom Game matrix | `2787f4c0286b2ab746419dcead758bf538e7badbf46b5222971b6738e5dc7fad` |

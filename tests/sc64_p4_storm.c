@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 #ifndef SC64_P4_STORM_ENABLED
 #error "Compile the P4 Storm fixture with SC64_P4_STORM_ENABLED"
@@ -32,7 +33,16 @@ static void launch_from_normal_menu(void)
     press(KEY_A);
     input(KEY_START);
     assert(screen == SCREEN_PLAY && race_p4_active());
-#ifdef SC64_P6_STORM_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_CUSTOM_CARRIER_PROBE)
+    u32 expected_save_version = 0x53435030u + 43u;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    expected_save_version |= 0x20000000u;
+#endif
+#ifdef SC64_WORKER_CARGO_KIND
+    expected_save_version ^= 0x01000000u;
+#endif
+    assert(SAVE_VERSION == expected_save_version);
+#elif defined(SC64_P6_STORM_ENABLED)
     /* Carried P4 uses the enclosing P6 product's save schema. */
     assert(SAVE_VERSION == 0x53435030u + 30u);
 #elif defined(SC64_P5_SHUTTLE_ENABLED)
@@ -133,6 +143,7 @@ static void select_caster_and_open_storm(int caster, int target_x, int target_y)
 static void test_inactive_runtime_and_save(void)
 {
     game_init();
+    init_state(); /* Initialize a valid non-P4 world before writing its journal. */
     prior_keys = 0;
     assert(!race_p4_active());
     assert(!race_p4_storm_menu_available());
@@ -269,7 +280,9 @@ static void test_menu_cast_damage_and_friendly_fire(void)
 
 static int encode_storm_test_unit(RaceSave *save, unsigned slot, const Unit *unit)
 {
-#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_unit_encode(&save->units[slot], unit, WORLD_W, WORLD_H);
+#elif defined(SC64_ZP_FULL_STORAGE)
     return sc64_zp_unit_save_encode(&save->units[slot], unit, WORLD_W, WORLD_H);
 #else
     return sc64_unit_save_encode(&save->units[slot], unit, WORLD_W, WORLD_H);
@@ -291,7 +304,8 @@ static void test_pause_and_save_validation(void)
     race_p4.source_paused = 0;
 
     assert(race_save_game());
-    RaceSave good = race_data;
+    RaceSave good;
+    fixture_capture_save(&good);
     race_p4.storm.storm[0].age_ticks = 0xffffu;
     assert(!race_save_game());
     race_p4 = good.p4;
@@ -302,20 +316,21 @@ static void test_pause_and_save_validation(void)
 
     RaceSave corrupt = good;
     corrupt.p4.storm.storm[0].age_ticks = 0xffffu;
-    save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
+    write_candidate_record(&corrupt);
     Unit before_units[MAX_UNITS];
     memcpy(before_units, u, sizeof(u));
     Sc64P4RuntimeState before_p4 = race_p4;
     assert(!race_load_game());
     assert(!memcmp(before_units, u, sizeof(u)));
     assert(!memcmp(&before_p4, &race_p4, sizeof(race_p4)));
+    fixture_finish_rejected_candidate();
 
     corrupt = good;
     Unit candidate;
     assert(race_save_decode_unit(&corrupt, (unsigned)caster, WORLD_W, WORLD_H, &candidate));
     candidate.carry = SC64_STORM_MAX_ENERGY * SC64_STORM_ENERGY_ONE + 1;
     assert(encode_storm_test_unit(&corrupt, (unsigned)caster, &candidate));
-    save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
+    write_candidate_record(&corrupt);
     assert(!race_load_game());
     assert(!memcmp(before_units, u, sizeof(u)));
     assert(!memcmp(&before_p4, &race_p4, sizeof(race_p4)));

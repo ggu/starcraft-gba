@@ -233,6 +233,14 @@ def render_frame(frame: dict[str, Any], palette: list[tuple[int, int, int, int]]
     return bytes(rgba)
 
 
+def sprite_anchor_radius(offset_x: int, offset_y: int, width: int, height: int,
+                         canvas_width: int, canvas_height: int) -> int:
+    """Bound a cropped frame around the anchor used by the sprite blitter."""
+    left = offset_x - canvas_width // 2
+    top = offset_y - canvas_height // 2
+    return max(-left, left + width, -top, top + height)
+
+
 def crop_frame(frame: dict[str, Any]) -> bytes:
     """Return the GRP frame rectangle, retaining zero for transparent pixels."""
     width, height = frame["width"], frame["height"]

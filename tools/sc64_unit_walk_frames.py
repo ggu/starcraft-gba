@@ -168,6 +168,7 @@ def generate(rom: Path, remap_path: Path, out: Path, facing_manifest: Path) -> d
     cycle_symbols: dict[int, str] = {}
     pixel_symbols: dict[tuple[int, int, bytes], str] = {}
     cases: list[tuple[int, str]] = []
+    radius_cases: list[tuple[int, int]] = []
     total = 0
     grps: dict[int, dict] = {}
     for name, raw in sorted(facing.unit_ids().items(), key=lambda item: item[1]):
@@ -202,6 +203,15 @@ def generate(rom: Path, remap_path: Path, out: Path, facing_manifest: Path) -> d
         for _tick, base in steps:
             if base % DIRECTIONS or base + DIRECTIONS > len(grp['frames']):
                 raise ValueError(f'{name}: walk frame {base} is not a directional pose in its GRP')
+        radius = 0
+        for _tick, pose_base in steps:
+            for d in range(DIRECTIONS):
+                frame = grp['frames'][pose_base + d]
+                for offset_x in (frame['x'], frame['width'] - frame['x'] - frame['frame_width']):
+                    radius = max(radius, sprites.sprite_anchor_radius(
+                        offset_x, frame['y'], frame['frame_width'], frame['frame_height'],
+                        frame['width'], frame['height']))
+        radius_cases.append((raw, radius))
         record.update({'cycle_ticks': cycle_ticks,
                        'steps': [{'tick': tick, 'pose': base // DIRECTIONS} for tick, base in steps]})
         if image_id in cycle_symbols:
@@ -254,6 +264,11 @@ def generate(rom: Path, remap_path: Path, out: Path, facing_manifest: Path) -> d
               'static inline const Sc64UnitWalkCycle *sc64_unit_walk_cycle(unsigned short raw_type) {',
               '    switch (raw_type) {',
               *(f'    case {raw}: return &{cycle};' for raw, cycle in cases),
+              '    default: return 0;', '    }', '}',
+              '#define SC64_UNIT_WALK_BOUNDS_METADATA 1',
+              'static inline unsigned short sc64_unit_walk_radius(unsigned short raw_type) {',
+              '    switch (raw_type) {',
+              *(f'    case {raw}: return {radius}u;' for raw, radius in radius_cases),
               '    default: return 0;', '    }', '}',
               f'#define SC64_UNIT_WALK_MAX_STEPS {MAX_CYCLE_STEPS}u',
               f'#define SC64_UNIT_WALK_HEADINGS {HEADINGS}u',

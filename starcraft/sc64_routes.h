@@ -1779,7 +1779,7 @@ sc64_route_fill_dense(u8 *field, int goal)
     u8 *dense = (u8 *)(void *)scratch;
     const u8 *walk = path_walkable;
     const int start = (goal & 63) + 4 + ((goal >> 6) + 1) * SC64_DENSE_STRIDE;
-    int head = 0, tail = 0;
+    u16 *read = bfs_queue, *write = bfs_queue;
 
     memset(dense, 15, SC64_DENSE_STRIDE);
     memset(dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE, 15, SC64_DENSE_STRIDE);
@@ -1798,21 +1798,22 @@ sc64_route_fill_dense(u8 *field, int goal)
     }
     if (dense[start] == 7u) {
         dense[start] = 0;
-        bfs_queue[tail++] = (u16)start;
+        *write++ = (u16)start;
     } else {
         for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
             int seed = start + dy * SC64_DENSE_STRIDE + dx;
             if (dense[seed] != 7u) continue;
             dense[seed] = 0;
-            bfs_queue[tail++] = (u16)seed;
+            *write++ = (u16)seed;
         }
     }
-    while (head < tail) {
-        int c = bfs_queue[head++];
+    while (read != write) {
+        int c = *read++;
+        u8 *cell = dense + c;
 #define SC64_DENSE_STEP(offset, direction) \
-        if (dense[c + (offset)] == 7u) { \
-            dense[c + (offset)] = direction; \
-            bfs_queue[tail++] = (u16)(c + (offset)); \
+        if (cell[(offset)] == 7u) { \
+            cell[(offset)] = direction; \
+            *write++ = (u16)(c + (offset)); \
         }
         SC64_DENSE_STEP(-1, 1)
         SC64_DENSE_STEP(1, 2)
@@ -1830,7 +1831,7 @@ sc64_route_fill_dense(u8 *field, int goal)
             *field++ = (u8)(pair >> 16);
         }
     }
-    return tail;
+    return (int)(write - bfs_queue);
 }
 #if defined(SC64_ROUTE_LINEAR_FLOOD_PROBE) || defined(SC64_ROUTE_FACILITY_FIFO_PROBE)
 enum { SC64_LINEAR_COLS = 96, SC64_LINEAR_WIDE_COLS = 128, SC64_LINEAR_MAX_ROWS = 128,
@@ -3471,6 +3472,94 @@ sc64_route_facility_discover(u8 *field, u8 *available, unsigned cell, int direct
     return tail;
 }
 
+#ifdef SC64_ROUTE_DENSE_FLOOD
+/* Compress four per-cell availability bits without carries between lanes. */
+static inline unsigned sc64_facility_available4(u32 lanes)
+{
+    u32 nonzero = (lanes ^ 0x07070707u) + 0x7f7f7f7fu;
+    u32 available = (~nonzero & 0x80808080u) >> 7;
+    return (available * 0x01020408u) >> 24;
+}
+
+static int __attribute__((noinline))
+sc64_route_expand_facility_dense(u8 *field, u8 *available, unsigned origin,
+                                 int *head_out, int tail)
+{
+    enum { stride = SC64_DENSE_STRIDE, side = SC64_DENSE_SIDE, first = stride + 4 };
+    uintptr_t scratch = ((uintptr_t)(void *)(bfs_queue + SC64_DENSE_CELLS) + 3u) &
+        ~(uintptr_t)3u;
+    u8 *dense = (u8 *)(void *)scratch;
+    const unsigned goal = origin < SC64_DENSE_CELLS
+        ? first + origin + (origin / side) * (stride - side) : 0;
+    int head = *head_out, old_tail = tail;
+
+    memset(dense, 15, stride);
+    memset(dense + (side + 1) * stride, 15, stride);
+    for (int y = 0; y < side; ++y) {
+        u8 *row = dense + (y + 1) * stride;
+        const u32 border = 0x0f0f0f0fu;
+        __builtin_memcpy(__builtin_assume_aligned(row, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(row + side + 4, 4), &border, 4);
+        for (int x = 0; x < side; x += 8) {
+            unsigned bits = available[y * (side / 8) + x / 8];
+            u8 *out = row + x + 4;
+#ifdef SC64_ROUTE_LINEAR_GRID_LUT8_PROBE
+            __builtin_memcpy(__builtin_assume_aligned(out, 4),
+                             sc64_dense_pairs[bits], 8);
+#else
+            __builtin_memcpy(__builtin_assume_aligned(out, 4),
+                             &sc64_dense_words[bits & 15u], 4);
+            __builtin_memcpy(__builtin_assume_aligned(out + 4, 4),
+                             &sc64_dense_words[bits >> 4], 4);
+#endif
+        }
+    }
+    while (head < tail && dense[goal] >= 7u) {
+        unsigned cell = bfs_queue[head++];
+        u8 *origin_byte = dense + first + cell + (cell / side) * (stride - side);
+#define SC64_FACILITY_DENSE_STEP(offset, delta, dir) do { \
+        if (origin_byte[offset] == 7u) { \
+            origin_byte[offset] = (dir); \
+            bfs_queue[tail++] = (u16)(cell + (delta)); \
+        } \
+    } while (0)
+        SC64_FACILITY_DENSE_STEP(-1, -1, 1);
+        SC64_FACILITY_DENSE_STEP(1, 1, 2);
+        SC64_FACILITY_DENSE_STEP(-stride, -side, 3);
+        SC64_FACILITY_DENSE_STEP(stride, side, 4);
+#undef SC64_FACILITY_DENSE_STEP
+    }
+    *head_out = head;
+    if (tail - old_tail < 512) {
+        for (int i = old_tail; i < tail; ++i) {
+            unsigned cell = bfs_queue[i];
+            int direction = dense[first + cell + (cell / side) * (stride - side)];
+            sc64_route_put_new_bits(field, (int)cell, direction);
+            SC64_GRID_SET(available, cell, 0);
+        }
+        return tail;
+    }
+    /* Old discoveries were initialized as 15. Both 15 and unused 7
+     * contribute 111 to the packed merge, leaving the prefix intact. */
+    for (int y = 0; y < side; ++y) {
+        const u8 *row = dense + (y + 1) * stride + 4;
+        for (int x = 0; x < side; x += 8) {
+            const u8 *p = row + x;
+            u32 a, b;
+            __builtin_memcpy(&a, __builtin_assume_aligned(p, 4), 4);
+            __builtin_memcpy(&b, __builtin_assume_aligned(p + 4, 4), 4);
+            u32 bits = sc64_dense_pack4(p) | (sc64_dense_pack4(p + 4) << 12);
+            *field++ &= (u8)bits;
+            *field++ &= (u8)(bits >> 8);
+            *field++ &= (u8)(bits >> 16);
+            *available++ = (u8)(sc64_facility_available4(a) |
+                                (sc64_facility_available4(b) << 4));
+        }
+    }
+    return tail;
+}
+#endif
+
 /* Use the parked frontier's exact packed field and visited grid. The
  * origin test precedes the next whole pop, including on resumed work. */
 static int __attribute__((noinline))
@@ -3479,7 +3568,21 @@ sc64_route_expand_facility_64(u8 *field, u8 *available, const u8 *origin_byte,
 {
     enum { side = SC64_FACILITY_FRONTIER_SIDE };
     int head = 0;
+#ifdef SC64_ROUTE_DENSE_FLOOD
+    /* A byte-grid transfer has a fixed setup cost. Save it for requests
+     * whose packed phase already needed a substantial number of pops. */
+    enum { prefix_pops = 768 };
+#endif
     while (head < tail && (*origin_byte & origin_mask) == origin_mask) {
+#ifdef SC64_ROUTE_DENSE_FLOOD
+        if (head == prefix_pops) {
+            unsigned origin = origin_mask
+                ? (unsigned)(origin_byte - available) * 8u + (unsigned)__builtin_ctz(origin_mask)
+                : SC64_DENSE_CELLS;
+            *head_out = head;
+            return sc64_route_expand_facility_dense(field, available, origin, head_out, tail);
+        }
+#endif
         unsigned cell = bfs_queue[head++];
         unsigned col = cell & (side - 1u);
         if (col != 0) tail = sc64_route_facility_discover(field, available, cell - 1, 1, tail);
@@ -3721,6 +3824,17 @@ facility_expand:
 #endif
 #ifdef SC64_ROUTE_FACILITY_64_FUSED
     if (frontier) {
+#ifdef SC64_ROUTE_DENSE_FLOOD
+        /* A fresh distant destination is likely to exhaust the packed
+         * prefix. Keep that prefix for nearby and previously parked work. */
+        int dx = (origin & 63) - (center_x >> 4);
+        int dy = (origin >> 6) - (center_y >> 4);
+        if (origin >= 0 && !previous_pops &&
+            (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy) >= 48) {
+            tail = sc64_route_expand_facility_dense(new_field, facility_walkable,
+                                                   (unsigned)origin, &head, tail);
+        } else
+#endif
         tail = sc64_route_expand_facility_64(new_field, facility_walkable,
                                             origin_byte, origin_mask, &head, tail);
         complete = head == tail;

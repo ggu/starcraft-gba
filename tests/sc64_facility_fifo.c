@@ -193,6 +193,23 @@ static void check_interleaved_frontiers(void)
         query(i, xy * 16 + 8, xy * 16 + 8, -1, 0, slots[i], 0);
         assert(sc64_route_valid[slots[i]] == 1);
     }
+#if defined(SC64_ROUTE_FACILITY_64_FUSED) && defined(SC64_ROUTE_DENSE_FLOOD)
+    /* Two long bounded searches park in the dense phase. Require the
+     * independent scalar oracle's packed result on each later expansion. */
+    sc64_routes_topology_changed();
+    int a = query(0, 8 * 16 + 8, 8 * 16 + 8, 37 * 65, 0, -1, 0);
+    int b = query(1, 56 * 16 + 8, 56 * 16 + 8, 23 * 65, 0, -1, 0);
+    unsigned long_frontiers = 0;
+    for (int i = 0; i < SC64_FACILITY_FRONTIER_COUNT; ++i) {
+        const Sc64FacilityFrontier *p = &sc64_facility_frontiers[i];
+        if (!p->count) continue;
+        assert(p->discovered > 768);
+        ++long_frontiers;
+    }
+    assert(long_frontiers == 2);
+    query(0, 8 * 16 + 8, 8 * 16 + 8, 55 * 65, 0, a, 0);
+    query(1, 56 * 16 + 8, 56 * 16 + 8, 7 * 65, 0, b, 0);
+#endif
     sc64_routes_topology_changed();
     for (int i = 0; i < 4; ++i) assert(!sc64_facility_frontiers[i].count);
     SC64_GRID_SET(path_walkable, 8 * 65 + 2, 0);

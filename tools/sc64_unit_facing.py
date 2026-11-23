@@ -114,7 +114,7 @@ def generate(rom: Path, remap_path: Path, out: Path) -> dict:
              'typedef struct { short offset_x, offset_y; unsigned short w, h, canvas_w, canvas_h; '
              'const unsigned char *pixels; } Sc64SpriteFrame;',
              '#endif', '#endif']
-    manifest, cases, word_cases, total = [], [], [], 0
+    manifest, cases, word_cases, radius_cases, total = [], [], [], [], 0
     for name, ref in sorted(refs.items(), key=lambda item: item[1]['unit_id']):
         grp_data = archive.read(entries[ref['bolt_path']])
         grp = base.parse_grp(grp_data)
@@ -129,9 +129,14 @@ def generate(rom: Path, remap_path: Path, out: Path) -> dict:
             continue
         symbol = f'sc64_unit_facing_{ref["unit_id"]}'
         frames = []
+        radius = 0
         for d in range(1 if static else DIRECTIONS):
             frame = grp['frames'][0 if static else d]
             data = frame_pixels(frame, remap)
+            for offset_x in (frame['x'], frame['width'] - frame['x'] - frame['frame_width']):
+                radius = max(radius, base.sprite_anchor_radius(
+                    offset_x, frame['y'], frame['frame_width'], frame['frame_height'],
+                    frame['width'], frame['height']))
             total += len(data)
             lines.append(f'static const unsigned char {symbol}_{d}_pixels[{len(data)}] = {{')
             for i in range(0, len(data), 16):
@@ -145,6 +150,7 @@ def generate(rom: Path, remap_path: Path, out: Path) -> dict:
         lines.extend(f'    {item},' for item in frames)
         lines.append('};')
         cases.append(f'    case {ref["unit_id"]}: return {symbol};')
+        radius_cases.append((ref['unit_id'], radius))
 
         # Store all 32 visual directions as pre-mirrored packed sidecars.
         # This is optional ROM data: canonical callers enable the existing
@@ -185,7 +191,12 @@ def generate(rom: Path, remap_path: Path, out: Path) -> dict:
     lines += ['/* The 17 source-authored directional frames for each unit. */',
               'static inline const Sc64SpriteFrame *sc64_unit_facing_frames(unsigned short raw_type) {',
               '    switch (raw_type) {', *cases, '    default: return 0;', '    }', '}',
-              f'#define SC64_UNIT_FACING_PIXEL_BYTES {total}u']
+              f'#define SC64_UNIT_FACING_PIXEL_BYTES {total}u',
+              '#define SC64_UNIT_FACING_BOUNDS_METADATA 1',
+              'static inline unsigned short sc64_unit_facing_radius(unsigned short raw_type) {',
+              '    switch (raw_type) {',
+              *(f'    case {raw}: return {radius}u;' for raw, radius in radius_cases),
+              '    default: return 0;', '    }', '}']
     lines += ['#ifdef SC64_UNIT_WORD_SPRITES',
               '#define SC64_UNIT_FACING_WORD_METADATA 1',
               'typedef struct { const GbaSpriteWordFrame *sprite; short offset_x, offset_y; '

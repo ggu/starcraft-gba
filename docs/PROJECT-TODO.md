@@ -31,16 +31,137 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 3.61% in the archived late Z7 16-update window and moves
   whole-run means by less than 0.1% in the measured replays. Record
   a fresh late Z7 paired run and keep profiling the steady draw and
-  order costs. The current P10 victory tail still averages 10.92
-  emulated updates per second.
+  order costs. The compaction trial at that revision averaged 10.92
+  emulated updates per second in the P10 victory tail.
   The [unit projection and facing trial](audits/2026-11-22-dense-release-attribution.md#unit-projection-and-facing-on-the-compacted-release)
   lowers the later P10 window by 1.79% and the 9,489-update mean by
-  0.39%. Animation lookup inside viewport checks remains expensive.
+  0.39%.
   Friendly Marines and Firebats account for 61.6 of the 75.7 outer-band
-  crops per update in the later window. Measure a reject-only bounds
-  table certified against facing, walking, mirrored, attack, turret
-  and fallback art. Keep the exact crop for uncertified metadata and
-  check foreground picks and both framebuffer pages.
+  crops per update in the later window. [Generated animation bounds](audits/2026-11-22-dense-release-attribution.md#generated-bounds-for-offscreen-animation-checks)
+  now reduce that window by another 4.02%. The exact crop stays active
+  for visible or uncertified art. With the bounds active, the later
+  orders pass alone still costs about 537,000 cycles. The [strict target
+  retention comparison](audits/2026-11-12-target-index-bulk.md#strict-reuse-on-the-generated-bounds-release)
+  preserves target order and the sampled dense matches. It fails the
+  Z10 IWRAM guard and raises the dense Blood Bath mean by 1.22% when
+  compared with matched ROM placement. Keep the current index.
+  The [steady target and cloak-cache audit](audits/2026-11-22-steady-order-cost.md)
+  finds empty cells at 93% of sampled indexed visits. Row bitmaps
+  make queries cheaper and still raise mean Blood Bath cost after
+  sparse clearing. Skipping redundant untracked Arbiter cache writes
+  cuts the P10 victory replay's mean 0.39% with matching cache
+  words, displays and saves. The replay averages 11.06 emulated
+  updates per second. Across all three race cartridges and both maps,
+  the [three-AI Custom Game opening measurements](audits/2026-11-22-steady-order-cost.md#three-ai-custom-game-opening-pace)
+  average 29.76–29.86 emulated updates per second with 28–29 live
+  units. All six miss the two-VBlank deadline at p95. The
+  [later three-AI battle windows](audits/2026-11-22-steady-order-cost.md#three-ai-custom-game-battle-pace)
+  drop to 13.24–18.47 emulated updates per second. In the sampled
+  no-new-route-build Protoss Outpost cut, targeting alone costs 139,078
+  cycles within orders and tracer passes cost 96,034 within rendering.
+  The [merged selection and detector query changes](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
+  saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
+  Custom Game replays with matching state and video. Profile repeated
+  eligibility and tracer drawing here, then validate in a player-driven
+  battle and on hardware. A strict target cell bound can exclude 44.8%
+  of live node visits in the short battle cut, then costs 0.60% on
+  the full P10 replay and exceeds the Z10 stack reserve. The animation
+  index cache saves 0.29% in 16 skirmish updates and 0.02% in the full
+  campaign run. Keep both trials local. In [visible Crossfire](audits/2026-11-22-steady-order-cost.md#visible-fights-in-protoss-crossfire),
+  uncompressed unit sprite blits take 130,161–148,318 guest cycles per
+  update. All 507 sampled calls draw attack poses. A private 85-frame
+  packed bank saves 1.02–1.24% across two short Crossfire windows.
+  The [generated sidecar](audits/2026-11-22-steady-order-cost.md#generated-attack-pose-sidecar)
+  raises the pooled saving to 1.53% with stable frame metadata and
+  about 292,000 added ROM bytes. Over 900 visible Crossfire updates,
+  the saving is 0.89%. The full Custom Game and P10 samples are nearly
+  flat, and Z1 saves 0.07%. All 48 ordinary Custom Game save and reload
+  cases pass. Keep the option explicit and use sustained battle
+  measurements to choose future actor banks. A
+  [shared byte-sprite trial](audits/2026-11-22-steady-order-cost.md#aligned-reads-in-the-shared-byte-sprite-compositor)
+  saves 1.53% over the sustained visible Crossfire run with matching
+  pixels and state. The three Outpost matches use 0.33–0.42% more
+  cycles and the P10 campaign tail is flat. Keep the trial out of the
+  regular builds while reducing the unaligned and mixed-opacity
+  cost. The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
+  saves 1.19% over the same visible fight and 0.16% on the P10
+  victory tail. Five long Custom Game pairs improve slightly and the
+  sixth stays within 0.003%. All 48 ordinary save/reload cases pass.
+  The [Mode 4 page census](audits/2026-11-22-steady-order-cost.md#mode-4-page-update-coverage)
+  finds changes in 8–36 of 105 battlefield tiles in fixed-camera
+  windows, with 55–81 tiles still carrying overlays over terrain.
+  Prioritize exact reuse of finished regions where the camera and
+  contributors are stable. Retain moving-camera cases, with 105
+  changed tiles on each pan update in one P10 window. Continue
+  profiling movement and route work toward the two-VBlank budget.
+  [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
+  saves 0.63% in Crossfire and slightly increases both measured
+  Custom Game means. Keep it local. Count transparent row edges in
+  an ordinary fight before trialing generated row bounds.
+  The [shared projectile heading lookup](audits/2026-11-22-steady-order-cost.md#shared-heading-for-projectiles-and-unit-facing)
+  preserves launch and impact direction through exact ties. It
+  cuts guest cycles slightly in six ordinary battles, the P10
+  victory replay and Crossfire. The busy-frame target still needs
+  larger movement and rendering gains.
+  The [shared weapon profile index](audits/2026-11-22-steady-order-cost.md#source-weapon-profile-index)
+  removes two Thumb division calls. It saves 0.87% across the full
+  Crossfire sample and slightly improves all six three-CPU means.
+  The [shared visibility lookup](audits/2026-11-22-steady-order-cost.md#visibility-coordinate-lookup)
+  cuts mean guest cycles 0.56–0.87% in the six three-CPU battles,
+  0.47% in Crossfire and 0.73% on the P10 victory tail. The measured
+  P10 pace rises to 11.25 emulated updates per second. Larger movement
+  and rendering costs still dominate the crowded scenes.
+  The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
+  attributes about 59,514 guest cycles per update to four mineral
+  blits and 9,750 to one geyser blit. Reusing the loaded word for
+  mixed pixels saves 0.47% in that cut and 0.21–0.53% across all
+  six long three-CPU matches. The P10 victory replay averages 11.26
+  emulated updates per second. Enabling aligned word loads in
+  Showcase slows each of the three sampled Crossfire windows.
+  The [shared opaque minimap copy](audits/2026-11-22-steady-order-cost.md#opaque-minimap-raster-copy)
+  then saves 0.37–0.56% across the six three-CPU matches and 0.47%
+  across 900 Showcase updates. The P10 victory replay rises to
+  11.30 emulated updates per second with matching frames and SRAM.
+  Use the [page census](audits/2026-11-22-steady-order-cost.md#mode-4-page-update-coverage)
+  to bound a stationary-camera band reuse trial. Measure the cost
+  of tracking changes before relying on it in crowded fights.
+  A point-route
+  predecessor skip has flat timing in the 3,600-update Blood Bath holdout
+  and exceeds Z10's IWRAM reserve without ROM placement. A uniform-radius
+  whole-bucket bound excludes
+  3.5% of visited contact nodes in a five-update P10 sample. Broader
+  movement and collision work remains the priority. Compare sustained
+  cost, normal-input outcomes and fresh title continuation.
+  The tighter [contact footprint trial](audits/2026-11-22-steady-order-cost.md#collision-bucket-footprints)
+  finds more removable visits. Maintaining the footprint exceeds the
+  P10 IWRAM guard, and moving its update helper to ROM raises late
+  Outpost mean cycles by 4.30%. Focus on reducing candidate loads
+  without adding work to each coordinate update.
+  The [current Blood Bath spike](audits/2026-11-12-target-index-bulk.md#the-next-dense-skirmish-bottleneck)
+  spends 1.09 million cycles on worker facility paths and 870,183
+  on movement point fills. One destroyed building invalidates 32
+  worker depot choices. The [depot expansion continuation](audits/2026-11-22-dense-depot-suffix.md)
+  switches long 64×64 floods to byte-grid scratch while preserving
+  the FIFO and its packed result. Busy Blood Bath's worst update is
+  3.01% faster with matching gameplay, video and saves. Its average
+  cost improves 0.12%. The longest depot query still consumes 529,000
+  cycles. The [fresh distant transfer](audits/2026-11-22-dense-depot-suffix.md#fresh-distant-requests-on-the-pacing-release)
+  reduces that call to 405,319 cycles and cuts the current match peak
+  3.50% and p95 0.74% with matching directions and continuation.
+  Every distinct depot-query origin in the stall had a positive
+  witness before the six-cell opening. A destruction-only proof cuts
+  the worst update a further 8.06%, while the mean and p95 rise 0.35%
+  and 2.13%. Keep that trial out of the cartridges. Prioritize reuse of
+  exact retained directions when an opening cannot affect the path.
+  Measure the next update and full replay to capture cache-warming cost.
+  Include closer newly reachable depots and save/load continuation.
+  The [64×64 point FIFO](audits/2026-11-22-dense-depot-suffix.md#dense-point-queue-on-the-current-release)
+  saves 3.29% on the current Blood Bath peak and 5.05% on the
+  next update. All seven fields have different goals. Their
+  requested origins are first discovered after 685–1,662 of
+  2,795 pops. The earlier partial-field trials often shifted the
+  cost to later reads. Measure how long fields remain usable
+  before materialization and look for savings in the full fill.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak
@@ -223,6 +344,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   coverage. The [native Custom Game lobby captures](audits/2026-11-22-native-custom-game-lobby.md)
   show the map and seat controls, race cycling, and no difficulty field
   in the sampled Challenger and Blood Bath settings.
+  The [matched Blood Bath Melee opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
+  observes the native opening credit beside elapsed times of 9 and
+  11 seconds. The GBA gives the same eight minerals at 2.470 guest
+  seconds, with both hall anchors matching at half scale. At the
+  sampled 19-to-28-second interval the native bank gains 24 minerals
+  and the GBA gains 72–80 within corresponding clock brackets.
+  The [shared Terran row trial](audits/2026-11-21-blood-bath-worker-opening.md#shared-terran-opening-trial)
+  moves the southwest first credit to 3.303 guest seconds using the same
+  four mineral targets and 45-update wait. All 16 SCVs deliver on HOST and
+  ARM restores both old and new openings. The rendered controller wins
+  on the regular ARM build at frame 42,658 with all 221 observations
+  matched. All 1,134 named and closed-seat launches, 30 campaign openings
+  and 24 regular fresh HOME continuations match the earlier trial. The matched
+  N64 workers take turns on one southwest patch. Qualify patch contention
+  and depot contact separately from the starting row.
   Use the active Blood Bath combat witness to qualify opaque
   overlaps and pool-ID reuse in new ordinary-input cuts.
   The [native Blood Bath production witness](audits/2026-11-21-native-blood-bath-lurker.md)
@@ -277,6 +413,25 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   save, with 21 paired continuation checkpoints and identical
   third-process victory readbacks. Preserve the older unaligned
   tape as historical evidence.
+  The [facility P7 proof](audits/2026-11-13-p7-carried-normal-home.md#november-22-facility-release)
+  recovers the ordinary opening through authored dialogue and wins
+  after a fresh HOME load. The exact controller target reproduces
+  all 4,929 physical input transitions. Extend that proof to other
+  campaign saves and the next combined runtime.
+  [Carried P8](audits/2026-11-22-steady-order-cost.md#carried-p8-replay-refresh)
+  now wins at frame 104,113 on the current Protoss cartridge and
+  matches all 40 named checks, including 27 after fresh HOME.
+  The host renders before the next input so the overlapping-unit
+  selection uses the painted camera. Add a separate fresh victory
+  journal readback and extend the check to the next combined runtime.
+  The [rendered Protoss controller matrix](audits/2026-11-13-p3-p4-home-preparation.md#rendered-protoss-controllers-on-the-visibility-release)
+  reproduces all ten victories in independent HOST replay processes
+  on the visibility release. The P8 and P9 fresh-process paths match
+  all 327 continuation checkpoints. The [ordinary P3 ARM replay](audits/2026-11-13-p3-p4-home-preparation.md#current-ordinary-p3-victory)
+  also wins at frame 47,661 on the regular Protoss cartridge after
+  restoring a frame-20,000 pause save in a fresh process. The victory
+  SRAM reloads into the result screen and re-exports byte-for-byte.
+  Reuse the unchanged P7 and P8 authored HOME tapes.
 
 - **Current three-cartridge playtest.** The
   [cross-layer and Command composition](audits/2026-11-22-two-flyer-picker.md#opaque-flyers-on-different-layers)
@@ -2325,6 +2480,35 @@ save/source-owner and timing evidence; do not advertise unwired components.
   every owner. The Terran CPU spends 50 on a queued SCV before any
   owner adds a building. Capture first purchases for Zerg and Protoss
   before comparing the later AI build order.
+- The [matched Wasteland selection run](audits/2026-11-22-steady-order-cost.md#wasteland-selection-and-terran-7-continuation)
+  confirms that five Marines remain selected after releasing R in both
+  the native N64 emulator and the current Terran GBA ROM. Both controls
+  keep selection empty. Terran 7 on the same GBA ROM wins after a fresh
+  HOME save load and passes victory journal readback.
+- [Wasteland camera comparison](audits/2026-11-22-steady-order-cost.md#wasteland-camera-and-fog)
+  confirms that panning alone leaves unexplored space dark. Native analog
+  scrolling places its indicator at the edge before the camera clamps.
+  The GBA D-pad centers the cursor over the interior. Account for this
+  difference in subsequent normal-input camera and fog comparisons.
+- The [facility-transfer campaign checks](audits/2026-11-22-dense-depot-suffix.md#fresh-distant-requests-on-the-pacing-release)
+  confirm all 30 starts and fresh SRAM victories in T10, Z1 and P10.
+  The Z1 replay reloads at frame 984 and uses an ordinary A press and
+  release to reselect the Hatchery during two neutral tape updates.
+  All 49 remaining checkpoints match, and a third process verifies its
+  victory journal. Continue qualifying other normal campaign save points.
+- The [ordinary Custom Game openings](audits/2026-11-22-steady-order-cost.md#automatic-gathering-in-two-custom-game-openings)
+  show automatic Terran gathering on native Challenger and GBA
+  Outpost. A follow-up launches Blood Bath Melee with one Zerg CPU
+  on both engines and confirms automatic gathering. Ordinary
+  pre-launch delays now reproduce the native southwest human start
+  with each possible Zerg corner on GBA. The first mineral credit is
+  at neutral update 74 in all three. Verify the native Zerg start and
+  gameplay clock before tuning the collection rate.
+- [Fresh P5 and P6 controls](audits/2026-11-22-steady-order-cost.md#protoss-campaign-continuation-and-replay-controls)
+  verify P5 and P6 victories after fresh SRAM load on the facility
+  release. The [merged P6 controller](https://github.com/ggu/starcraft-gba/pull/728)
+  verifies the intended unit after each contested click and matches
+  105 ARM checkpoints. Qualify later campaign save points.
 - The [native Wasteland group retarget](audits/2026-11-07-native-actor-differential/README.md#november-18-wasteland-group-movement)
   follows five selected Marines in ares. Two ordinary Move commands assign
   destinations on both axes, while the GBA's initial five destinations lie

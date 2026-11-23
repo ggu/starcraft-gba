@@ -119,7 +119,7 @@ class AttackPoseSourceTests(unittest.TestCase):
             path = Path(directory) / "generated.h"
             attack.write_header(path, compiled)
             source = path.read_text()
-        self.assertEqual(source.count("case 66u:"), 5)  # release, two durations, two samplers.
+        self.assertEqual(source.count("case 66u:"), 6)  # bounds, release, two durations, two samplers.
         self.assertIn("if (!!target_air == 0) return 2u;", source)
         self.assertIn("if (!!target_air == 1) return 4u;", source)
         self.assertIn("if (!!target_air == 0) return 1u;", source)
@@ -129,6 +129,101 @@ class AttackPoseSourceTests(unittest.TestCase):
         self.assertIn("sc64_unit_attack_source_full_frame", source)
         self.assertIn("return 3u;", source)  # compatibility fixture's full source span.
         self.assertIn("SC64_UNIT_ATTACK_POSE_PIXEL_BYTES 1u", source)
+
+    def test_bounds_cover_full_frames_for_both_modes_and_every_heading(self):
+        from tools import sc64_sprites as sprites
+
+        def frame(x, y, w, h, cw, ch):
+            return {"offset_x": x, "offset_y": y, "w": w, "h": h,
+                    "canvas_w": cw, "canvas_h": ch, "pixels": bytes([1] * (w * h))}
+
+        small = frame(3, 3, 1, 1, 7, 7)
+        wide = frame(-2, 1, 12, 2, 7, 7)
+        tall = frame(2, -5, 1, 10, 7, 7)
+        def step(tick, frames):
+            return {"tick": tick, "frames": frames}
+
+        ground = [step(0, [small] * 31 + [wide]), step(2, [small] * 32)]
+        air = [step(0, [small] * 32), step(1, [tall] + [small] * 31)]
+        compiled = {
+            (66, 0): {"release_tick": 0, "steps": [ground[1]], "full_steps": ground,
+                      "full_duration_source_ticks": 3},
+            (66, 1): {"release_tick": 0, "steps": [air[0]], "full_steps": air,
+                      "full_duration_source_ticks": 2},
+            (67, 0): {"release_tick": 0, "steps": [ground[0]], "full_steps": ground,
+                      "full_duration_source_ticks": 0},
+        }
+        expected = max(sprites.sprite_anchor_radius(f["offset_x"], f["offset_y"],
+                       f["w"], f["h"], f["canvas_w"], f["canvas_h"])
+                       for f in (small, wide, tall))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attack.write_header(root / "generated.h", compiled)
+            source = (root / "generated.h").read_text()
+            self.assertIn("#define SC64_UNIT_ATTACK_BOUNDS_METADATA 1", source)
+            self.assertIn(f"case 66u: return {max(1, expected)}u;", source)
+            compiler = shutil.which("clang") or shutil.which("cc")
+            self.assertIsNotNone(compiler)
+            (root / "oracle.c").write_text(
+                '#include "generated.h"\n#include <assert.h>\n'
+                'int main(void) {\n'
+                ' assert(sc64_unit_attack_radius(66) > 0);\n'
+                ' assert(sc64_unit_attack_radius(67) == 0);\n'
+                ' assert(sc64_unit_attack_radius(999) == 0);\n'
+                ' for (int a=0; a<2; ++a) for (int h=0; h<32; ++h)\n'
+                '  for (unsigned t=0; t<sc64_unit_attack_source_full_duration(66,a); ++t)\n'
+                '   { const Sc64SpriteFrame *f=sc64_unit_attack_source_full_frame(66,a,h,t);\n'
+                '     int r=sc64_unit_attack_radius(66), x=f->offset_x-f->canvas_w/2, y=f->offset_y-f->canvas_h/2;\n'
+                '     assert(x >= -r && y >= -r && x+(int)f->w <= r && y+(int)f->h <= r); }\n'
+                ' return 0;\n}\n', encoding="ascii")
+            subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                            "-I", str(root), str(root / "oracle.c"), "-o", str(root / "oracle")],
+                           check=True, capture_output=True, text=True)
+            subprocess.run([str(root / "oracle")], check=True)
+
+    def test_optional_word_sidecar_tracks_resolved_frames_and_falls_back(self):
+        def frame(value):
+            return {"offset_x": 0, "offset_y": 0, "w": 1, "h": 1,
+                    "canvas_w": 1, "canvas_h": 1, "pixels": bytes([value])}
+        a, b, c = (frame(i) for i in (1, 2, 3))
+        ground = [{"tick": 0, "frames": [a, b] * 16},
+                  {"tick": 2, "frames": [b, a] * 16}]
+        air = [{"tick": 0, "frames": [c] * 32}]
+        compiled = {(66, 0): {"release_tick": 0, "steps": ground, "full_steps": ground,
+                               "full_duration_source_ticks": 4},
+                    (66, 1): {"release_tick": 0, "steps": air, "full_steps": air,
+                               "full_duration_source_ticks": 2},
+                    (67, 0): {"release_tick": 0, "steps": air, "full_steps": air,
+                               "full_duration_source_ticks": 2}}
+        compiler = shutil.which("clang") or shutil.which("cc")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attack.write_header(root / "generated.h", compiled, root / "words.h", (66,))
+            (root / "oracle.c").write_text(
+                '#include <assert.h>\n'
+                'typedef unsigned int u32; typedef struct { unsigned short w,h; const u32 *phase[4]; } GbaSpriteWordFrame;\n'
+                '#include "generated.h"\n#include "words.h"\n'
+                'int main(void) {\n'
+                ' for(int air=0;air<2;air++) for(unsigned h=0;h<64;h++)\n'
+                '  for(unsigned t=0;t<sc64_unit_attack_source_full_duration(66,air);t++) {\n'
+                '   const Sc64SpriteFrame *f=sc64_unit_attack_source_full_frame(66,air,h,t);\n'
+                '   const GbaSpriteWordFrame *w=sc64_attack_words_lookup(66,air,h,t,f);\n'
+                '   assert(w && w->w==f->w && w->h==f->h);\n'
+                '   assert((w->phase[0][0]&255u)==f->pixels[0]);\n'
+                '   assert(!sc64_attack_words_lookup(66,air,h,t,0)); }\n'
+                ' assert(!sc64_attack_words_lookup(66,0,0,4,0));\n'
+                ' assert(!sc64_attack_words_lookup(66,1,0,2,0));\n'
+                ' assert(!sc64_attack_words_lookup(67,0,0,0,0)); return 0; }\n')
+            subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                            "-I", str(root), str(root / "oracle.c"), "-o", str(root / "oracle")],
+                           check=True, capture_output=True, text=True)
+            subprocess.run([str(root / "oracle")], check=True)
+            attack.write_header(root / "generated.h", {(67, 0): compiled[(67, 0)]})
+            stale = subprocess.run([compiler, "-std=c11", "-I", str(root), "-c",
+                                    str(root / "oracle.c"), "-o", str(root / "stale.o")],
+                                   capture_output=True, text=True)
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("sidecar does not match", stale.stderr)
 
     def test_full_timeline_holds_last_pose_until_terminal_wait_boundary(self):
         # A frame set at tick 0 followed by wait(5), end is visible at source

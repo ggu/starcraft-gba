@@ -364,10 +364,19 @@ sc64_weapon_source_profile_bank_index(const Sc64WeaponSourceAttackProfile *p)
     uintptr_t base = (uintptr_t)(const void *)sc64_weapon_source_profiles;
     uintptr_t addr = (uintptr_t)(const void *)p;
     if (addr < base) return -1;
-    addr -= base;
-    if (addr % sizeof(sc64_weapon_source_profiles[0])) return -1;
-    addr /= sizeof(sc64_weapon_source_profiles[0]);
-    return addr < SC64_WEAPON_SOURCE_PROFILE_COUNT ? (int)addr : -1;
+    uintptr_t offset = addr - base;
+    if (offset >= sizeof(sc64_weapon_source_profiles)) return -1;
+    const unsigned stride = sizeof(sc64_weapon_source_profiles[0]);
+    if (stride == 52 && sizeof(sc64_weapon_source_profiles) <= UINT32_MAX) {
+        if (offset & 3u) return -1;
+        /* 52 is 4 times 13. Multiplying by the inverse of 13 modulo 2^32
+         * maps aligned record offsets to indices and all other in-bank
+         * offsets outside the index range. This avoids Thumb division. */
+        uint32_t index = (uint32_t)(offset >> 2) * UINT32_C(0xc4ec4ec5);
+        return index < SC64_WEAPON_SOURCE_PROFILE_COUNT ? (int)index : -1;
+    }
+    uintptr_t index = offset / stride;
+    return index * stride == offset ? (int)index : -1;
 }
 
 /* Filled lazily, one profile at a time; 8 bytes per bank profile of RAM.

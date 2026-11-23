@@ -12,8 +12,32 @@ static void check_owner(int owner, int race)
     int workers=0, halls=0, extra=0, overlords=0;
     int worker=race==R_TER?U_SCV:race==R_ZERG?U_DRONE:U_PROBE;
     int hall=race==R_TER?B_COMMAND:race==R_ZERG?B_HATCHERY:B_NEXUS;
+#ifdef SC64_IMPORTED_SKIRMISH
+    int targets[4];
+#endif
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==owner) {
-        if(u[i].type==worker) { ++workers; assert(u[i].order==ORDER_MINE); }
+        if (u[i].type == worker) {
+            assert(u[i].order == ORDER_MINE);
+#ifdef SC64_IMPORTED_SKIRMISH
+            int patch = u[i].target;
+            assert(workers < 4 && patch >= 0 && patch < MAX_MINERALS && m[patch].amount > 0);
+            for (int prior = 0; prior < workers; ++prior) assert(targets[prior] != patch);
+            targets[workers] = patch;
+            if (race == R_TER && race_skirmish_map == SC64_MAP_BLOOD_BATH) {
+                int base = race_skirmish_owner_base(owner);
+                assert(base >= 0 && base < 4);
+                int x = race_base_x[base] + 12 * (workers - 2);
+                int y = race_base_y[base] + 28;
+                /* The button release can advance the first outbound step. */
+                assert(frame <= 1 && abs(u[i].x - x) <= 2 && abs(u[i].y - y) <= 2);
+                assert(!u[i].carry && !u[i].work_timer);
+                assert(is_traversable(x / 16, y / 16, -1));
+            } else {
+                assert(u[i].x == m[patch].x + 4 && u[i].y == m[patch].y + 4);
+            }
+#endif
+            ++workers;
+        }
         if(u[i].type==U_OVERLORD) ++overlords;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].owner==owner) {
@@ -136,12 +160,18 @@ static void mixed_opening_and_save(int map, int human_choice, int expected_human
     for (int step = 0; race_front.race != human_choice && step < 4; ++step) tap(KEY_RIGHT);
     assert(race_front.race == human_choice);
     sc64_frontend_draw();
-    while (race_front.row < SC_FRONT_BOT_FIRST_ROW) tap(KEY_DOWN);
-    for (int seat = 0; seat < 3; ++seat, tap(KEY_DOWN)) {
-        int choice = choices[seat];
-        for (int step = 0; race_front.bot_races[seat] != choice && step < 5; ++step) tap(KEY_RIGHT);
-        assert(race_front.bot_races[seat] == choice);
+    /* The lobby keeps at least one CPU open. Set occupied rows before
+     * closing the original row when moving the only CPU to another seat. */
+    for (int closing = 0; closing <= 1; ++closing) {
+        for (int seat = 0; seat < 3; ++seat) {
+            int choice = choices[seat], row = SC_FRONT_BOT_FIRST_ROW + seat;
+            if ((choice == SC_FRONT_BOT_CLOSED) != closing) continue;
+            while (race_front.row != row) tap(race_front.row < row ? KEY_DOWN : KEY_UP);
+            for (int step = 0; race_front.bot_races[seat] != choice && step < 5; ++step) tap(KEY_RIGHT);
+            assert(race_front.bot_races[seat] == choice);
+        }
     }
+    while (race_front.row < SC_FRONT_BOT_FIRST_ROW + 3) tap(KEY_DOWN);
 #ifdef SC64_NATIVE_MELEE_STARTS
     assert(race_front.row == SC_FRONT_SKIRMISH_MODE_ROW);
     if (melee) tap(KEY_RIGHT);
@@ -330,6 +360,39 @@ static void dense_blood_bath_start_and_save(unsigned seed, unsigned order)
     for (int i = 0; i < 4; ++i) check_seat(owners[i], order ? sc64_skirmish_start_base(order, i) : i);
 }
 
+static void check_terran_crew_deliveries(void)
+{
+    const int owners[] = {SIDE, ENEMY, RESCUABLE, 4};
+    int slots[16], states[16] = {0}, count = 0, delivered = 0;
+
+    option_map = SC64_MAP_BLOOD_BATH;
+    option_human = R_TER;
+    option_bots = 3;
+    for (int i = 0; i < option_bots; ++i) option_bot_races[i] = R_TER;
+    gba_init();
+    assert(launch_match());
+    for (int i = 0; i < 4; ++i) check_owner(owners[i], R_TER);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].type == U_SCV) {
+            assert(count < 16);
+            slots[count++] = i;
+        }
+    assert(count == 16);
+    for (int tick = 0; tick < 480 && delivered < count; ++tick) {
+        input(0);
+        for (int i = 0; i < count; ++i) {
+            Unit *worker = &u[slots[i]];
+            assert(worker->alive && worker->type == U_SCV);
+            if (!states[i] && worker->carry == 8) states[i] = 1;
+            else if (states[i] == 1 && !worker->carry) {
+                states[i] = 2;
+                ++delivered;
+            }
+        }
+    }
+    assert(delivered == count && minerals >= 82);
+}
+
 #endif
 
 int main(void)
@@ -362,6 +425,7 @@ int main(void)
         for (unsigned seats = 1; seats <= SC64_SKIRMISH_SEAT_MASK; ++seats)
             if (sc64_skirmish_sparse_valid(sc64_skirmish_seat_count(seats), seats))
                 sparse_opening_and_save(map, seats);
+    check_terran_crew_deliveries();
 #ifdef SC64_NATIVE_MELEE_STARTS
     dense_blood_bath_start_and_save(0xf3ae, SC64_SKIRMISH_BLOOD_BATH_DENSE_ORDER);
     dense_blood_bath_start_and_save(0xf6e0, 0x9cu);

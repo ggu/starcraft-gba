@@ -288,7 +288,8 @@ def image_mode_events(bank: SourceBank, image_id: int, air: int) -> dict[str, An
 
 
 def generate(rom_path: Path = ROM, remap_path: Path = REMAP,
-             out_dir: Path = OUT, header_path: Path = HEADER) -> dict[str, Any]:
+             out_dir: Path = OUT, header_path: Path = HEADER,
+             word_header: Path | None = None, word_actors: tuple[int, ...] = ()) -> dict[str, Any]:
     extractor = sprites.load_extractor(sprites.UPSTREAM)
     normalized = extractor.load_rom(str(rom_path))
     digest = hashlib.sha1(normalized).hexdigest()
@@ -438,7 +439,7 @@ def generate(rom_path: Path = ROM, remap_path: Path = REMAP,
         "source_reference": "authenticated StarCraft 64 USA ROM; OpenBW 4b046d5f65302b10cb0a745f0fecd37ec85b20a8 IScript opcode semantics",
         "scope": "full source composite body timeline from attack Init tick zero through bounded recovery; compatibility post-release sampler retained; projectile/damage omitted",
         "actors": actors_manifest}
-    write_header(header_path, compiled)
+    write_header(header_path, compiled, word_header, word_actors)
     header_hash = hashlib.sha256(header_path.read_bytes()).hexdigest()
     manifest["header_sha256"] = header_hash
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -446,13 +447,15 @@ def generate(rom_path: Path = ROM, remap_path: Path = REMAP,
     return manifest
 
 
-def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) -> None:
+def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]],
+                 word_header: Path | None = None, word_actors: tuple[int, ...] = ()) -> None:
     lines = [
         "/* Generated from the verified USA ROM; private local asset. */",
         "#ifndef SC64_UNIT_ATTACK_SOURCE_GENERATED_H",
         "#define SC64_UNIT_ATTACK_SOURCE_GENERATED_H",
         "#define SC64_UNIT_ATTACK_POSE_BANK_VERSION 1",
         "#define SC64_UNIT_ATTACK_POSE_METADATA 1",
+        "#define SC64_UNIT_ATTACK_BOUNDS_METADATA 1",
         "#ifndef SC64_SPRITES_GENERATED_H",
         "#ifndef SC64_RACE_SPRITES_GENERATED_H",
         "typedef struct { short offset_x, offset_y; unsigned short w, h, canvas_w, canvas_h; const unsigned char *pixels; } Sc64SpriteFrame;",
@@ -486,6 +489,8 @@ def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) ->
                 f"{frame['canvas_w']},{frame['canvas_h']},{psym}}};")
         return fsym
     rows_by_raw: dict[int, dict[int, tuple[int, int, str, int, int, int, str, int]]] = {}
+    radii_by_raw: dict[int, int] = {}
+    word_modes: dict[tuple[int, int], tuple[int, list]] = {}
     for (raw, air), entry in sorted(compiled.items()):
         step_symbol = f"sc64_unit_attack_raw{raw}_{'air' if air else 'ground'}_steps"
         step_frames = []
@@ -511,11 +516,27 @@ def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) ->
         lines.append("};")
         fallback_full_span = entry["release_tick"] + step_frames[-1][0] + 1
         full_duration = int(entry.get("full_duration_source_ticks", fallback_full_span))
+        if full_duration > 0:
+            radius = max(
+                sprites.sprite_anchor_radius(
+                    frame["offset_x"], frame["offset_y"], frame["w"], frame["h"],
+                    frame["canvas_w"], frame["canvas_h"])
+                for step in source_steps for frame in step["frames"]
+            )
+            radii_by_raw[raw] = max(radii_by_raw.get(raw, 0), 1, radius)
+        if raw in word_actors:
+            word_modes[(raw, air)] = (full_duration, full_step_frames)
         row = (entry["release_tick"], step_frames[-1][0], step_symbol, len(step_frames),
                full_duration, full_step_frames[-1][0], full_step_symbol,
                len(full_step_frames))
         rows_by_raw.setdefault(raw, {})[air] = row
     lines.extend([
+        "static inline unsigned short sc64_unit_attack_radius(unsigned short raw_type) {",
+        "    switch (raw_type) {",
+    ])
+    for raw, radius in sorted(radii_by_raw.items()):
+        lines.append(f"    case {raw}u: return {radius}u;")
+    lines.extend(["    default: return 0u;", "    }", "}",
         "static inline unsigned char sc64_unit_attack_source_release_tick(unsigned short raw_type, int target_air) {",
         "    switch (raw_type) {",
     ])
@@ -577,9 +598,67 @@ def write_header(path: Path, compiled: dict[tuple[int, int], dict[str, Any]]) ->
                 "                selected=i;", "            }",
                 "            return steps[selected].heading[dir];", "        }"])
         lines.extend(["        return 0;", "    }"])
-    lines.extend(["    default: return 0;", "    }", "}",
-                  f"#define SC64_UNIT_ATTACK_POSE_PIXEL_BYTES {payload_bytes}u",
+    bank_id = hashlib.sha256("\n".join(lines).encode("ascii")).hexdigest()
+    lines.extend(["    default: return 0;", "    }", "}"])
+    if word_header is not None:
+        lines.extend([f"#define SC64_UNIT_ATTACK_BANK_ID_A 0x{bank_id[:8]}u",
+                      f"#define SC64_UNIT_ATTACK_BANK_ID_B 0x{bank_id[8:16]}u"])
+    lines.extend([f"#define SC64_UNIT_ATTACK_POSE_PIXEL_BYTES {payload_bytes}u",
                   "#endif", ""])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="ascii")
+    if word_header is not None:
+        write_word_header(word_header, word_modes, pixels_seen, frames_seen, bank_id)
+
+
+def write_word_header(path: Path, modes: dict, pixels_seen: dict, frames_seen: dict, bank_id: str) -> None:
+    """Generate an optional bounded sidecar from the same resolved pose records.
+
+    The lookup uses source tick/heading, and validates frame identity so that a
+    mismatched bank cannot select the wrong art. Raster packing is confined here.
+    """
+    from tools.sc64_unit_facing import pack_word_phases
+    by_frame = {v: k for k, v in frames_seen.items()}
+    by_pixels = {v: k for k, v in pixels_seen.items()}
+    used = {frame for _, steps in modes.values() for _, row in steps for frame in row}
+    pixel_names = {by_frame[f][-1] for f in used}
+    lines = ["/* Generated optional word-packed attack poses; private local asset. */",
+             "#ifndef SC64_UNIT_ATTACK_WORDS_GENERATED_H",
+             "#define SC64_UNIT_ATTACK_WORDS_GENERATED_H",
+             "#define SC64_UNIT_ATTACK_WORDS_METADATA 1",
+             f"#if !defined(SC64_UNIT_ATTACK_BANK_ID_A) || !defined(SC64_UNIT_ATTACK_BANK_ID_B) || SC64_UNIT_ATTACK_BANK_ID_A != 0x{bank_id[:8]}u || SC64_UNIT_ATTACK_BANK_ID_B != 0x{bank_id[8:16]}u",
+             "#error \"Attack word sidecar does not match attack pose bank\"", "#endif"]
+    total = 0
+    for name in sorted(pixel_names):
+        w, h, pixels = by_pixels[name]
+        phases = pack_word_phases(w, h, pixels)
+        phase_names = []
+        for i, words in enumerate(phases):
+            sym = name + "_word_" + str(i)
+            phase_names.append(sym)
+            lines.append("static const u32 " + sym + "[] = {" +
+                         ",".join("0x%08xu" % word for word in words) + "};")
+            total += 4 * len(words)
+        lines.append("static const GbaSpriteWordFrame " + name + "_word = {" +
+                     str(w) + "," + str(h) + ",{ " + ",".join(phase_names) + " }};")
+    lines.append("typedef struct { const Sc64SpriteFrame *frame; const GbaSpriteWordFrame *word; } Sc64AttackWordEntry;")
+    for (raw, air), (duration, steps) in sorted(modes.items()):
+        if duration > MAX_FULL_ATTACK_TICKS or not steps or steps[0][0] != 0:
+            raise ValueError("invalid bounded full attack pose")
+        sym = f"sc64_attack_words_{raw}_{air}"
+        lines.append(f"static const Sc64AttackWordEntry {sym}[{duration}][32] = {{")
+        for tick in range(duration):
+            row = next(row for step_tick, row in reversed(steps) if step_tick <= tick)
+            lines.append("{" + ",".join("{&" + frame + ",&" + by_frame[frame][-1] + "_word}" for frame in row) + "},")
+        lines.append("};")
+    lines += ["static inline const GbaSpriteWordFrame *sc64_attack_words_lookup(unsigned short raw, int air, unsigned char heading, unsigned tick, const Sc64SpriteFrame *frame) {", "    const Sc64AttackWordEntry *entry = 0;", "    switch (raw) {"]
+    for raw in sorted({raw for raw, _ in modes}):
+        lines.append(f"    case {raw}u:")
+        for (r, air), (duration, _) in sorted(modes.items()):
+            if r == raw:
+                lines.append(f"        if (!!air == {air} && tick < {duration}u) entry = &sc64_attack_words_{raw}_{air}[tick][heading & 31u];")
+        lines.append("        break;")
+    lines += ["    default: break;", "    }", "    return entry && entry->frame == frame ? entry->word : 0;", "}", f"#define SC64_UNIT_ATTACK_WORD_PIXEL_BYTES {total}u", "#endif", ""]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="ascii")
 
@@ -590,8 +669,14 @@ def main() -> int:
     parser.add_argument("--remap", type=Path, default=REMAP)
     parser.add_argument("--out", type=Path, default=OUT)
     parser.add_argument("--header", type=Path, default=HEADER)
+    parser.add_argument("--word-header", type=Path, help="optional word-packed attack sidecar")
+    parser.add_argument("--word-actors", default="", help="comma-separated actor names for the sidecar")
     args = parser.parse_args()
-    manifest = generate(args.rom, args.remap, args.out, args.header)
+    names = tuple(filter(None, args.word_actors.split(",")))
+    if bool(args.word_header) != bool(names) or any(name not in ATTACK_UNITS for name in names):
+        parser.error("--word-header and known --word-actors must be supplied together")
+    manifest = generate(args.rom, args.remap, args.out, args.header, args.word_header,
+                        tuple(ATTACK_UNITS[name] for name in names))
     print(f"generated {args.header} ({len(manifest['actors'])} actors)")
     for actor in manifest["actors"]:
         print(f"  raw{actor['raw_unit']} {actor['name']}: " +

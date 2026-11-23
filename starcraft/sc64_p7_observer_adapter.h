@@ -1136,6 +1136,14 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             continue;
         }
         int tracked=aura[i] || sc64_p7_observer_is_cloaked((unsigned)RACE_PROTOSS_RAW(&u[i]));
+        if (!tracked) {
+            /* An untracked row retains its valid countdown for later cloak
+             * and clears its detector result. Skip an identical store. */
+            unsigned next=SC64_P7_ARBITER_VALID;
+            if (SC64_P7_ARBITER_CACHE_VALID(old)) next |= SC64_P7_ARBITER_COUNTDOWN(old) << 8;
+            if (next!=old) u[i].weapon=(u16)next;
+            continue;
+        }
         int was_tracked=SC64_P7_ARBITER_CACHE_VALID(old) &&
                         (old&SC64_P7_ARBITER_TRACKED)!=0;
         if (!SC64_P7_ARBITER_CACHE_VALID(old)) {
@@ -1144,52 +1152,46 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             old=(unsigned)u[i].weapon;
         }
         timer=SC64_P7_ARBITER_COUNTDOWN(old);
-        if (tracked) {
-            if (timer==0 || (tracked && !was_tracked)) {
-                /* Building and owner state are unchanged within this tick.
-                 * The snapshot's inputs are resolved once, on the first
-                 * refresh; its rows and Cannon power are built when a
-                 * refresh first needs them. */
-                if (!lists_ready) {
-                    sc64_p7_detector_lists_begin(&detector_lists);
-                    lists_ready=1;
-                }
+        if (timer==0 || !was_tracked) {
+            /* Building and owner state are unchanged within this tick.
+             * The snapshot's inputs are resolved once, on the first
+             * refresh; its rows and Cannon power are built when a
+             * refresh first needs them. */
+            if (!lists_ready) {
+                sc64_p7_detector_lists_begin(&detector_lists);
+                lists_ready=1;
+            }
 #ifdef SC64_DIAGNOSTIC_SETUP
-                u32 detect_start=gba_clock();
+            u32 detect_start=gba_clock();
 #endif
 #ifdef GBA_HOST
-                if (sc64_p7_detector_lists_test_scalar) {
-                    /* Reference route: the per-actor scalar mask with every
-                     * Cannon's power computed up front. */
-                    if (!powered_cannons_ready) {
-                        memset(powered_cannons,0,sizeof(powered_cannons));
-                        for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
-                            RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j)) {
-                            int source=sc64_p7_detector_current_slot(b[j].owner,RACE_PROTOSS_SLOT(&b[j]));
-                            if(source>=0 && source<8) {
-                                int live=race_protoss_source_owner((unsigned)source);
-                                if(live==b[j].owner)
-                                    powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,source,live);
-                            }
+            if (sc64_p7_detector_lists_test_scalar) {
+                /* Reference route: the per-actor scalar mask with every
+                 * Cannon's power computed up front. */
+                if (!powered_cannons_ready) {
+                    memset(powered_cannons,0,sizeof(powered_cannons));
+                    for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
+                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j)) {
+                        int source=sc64_p7_detector_current_slot(b[j].owner,RACE_PROTOSS_SLOT(&b[j]));
+                        if(source>=0 && source<8) {
+                            int live=race_protoss_source_owner((unsigned)source);
+                            if(live==b[j].owner)
+                                powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,source,live);
                         }
-                        powered_cannons_ready=1;
                     }
-                    mask=sc64_p7_arbiter_detected_mask_legacy((int)i,powered_cannons,0);
-                } else
+                    powered_cannons_ready=1;
+                }
+                mask=sc64_p7_arbiter_detected_mask_legacy((int)i,powered_cannons,0);
+            } else
 #endif
-                mask=sc64_p7_arbiter_detected_mask_lists((int)i,0,&detector_lists);
+            mask=sc64_p7_arbiter_detected_mask_lists((int)i,0,&detector_lists);
 #ifdef SC64_DIAGNOSTIC_SETUP
-                sc64_arbiter_detect_cycles+=gba_clock()-detect_start;
+            sc64_arbiter_detect_cycles+=gba_clock()-detect_start;
 #endif
-                timer=30;
-            } else {
-                mask=SC64_P7_ARBITER_DETECTED_MASK(old);
-                --timer;
-            }
+            timer=30;
         } else {
-            /* Native reset assigns a countdown even to currently uncloaked
-               visible units; retain it in case cloak begins before next reset. */
-            mask=0;
+            mask=SC64_P7_ARBITER_DETECTED_MASK(old);
+            --timer;
         }
         u[i].weapon=(u16)sc64_p7_arbiter_pack(mask,timer,(int)aura[i],tracked);
     }
@@ -1364,7 +1366,8 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int source_owner)
 {
     if (!SC64_CAN_ATTACK_FROM(attacker, target, live_owner)) return 0;
-#ifdef SC64_SOURCE_SIGHT_ALL_RACES
+/* The cache path resolves the detection slot in detector_sees. */
+#if defined(SC64_SOURCE_SIGHT_ALL_RACES) && !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
     source_owner = sc64_p7_detector_current_slot(live_owner,
         race_protoss_query_slot(source_owner,live_owner));
 #endif

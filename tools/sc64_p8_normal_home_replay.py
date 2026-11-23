@@ -68,7 +68,11 @@ def parse_plan(tape, hostlog):
     checks, edges, briefs = {}, {}, {}
     for line in tape.read_text().splitlines():
         row = json.loads(line)
-        if row["kind"] == "checkpoint":
+        if row["kind"] == "metadata":
+            recorded = row.get("recorded_dialogue", False)
+            require(type(recorded) is bool, "invalid recorded dialogue mode")
+            plan["recorded_dialogue"] = recorded
+        elif row["kind"] == "checkpoint":
             call = row["call_index"]
             require(
                 type(call) is int
@@ -181,6 +185,7 @@ def main():
     ):
         require(pins[str(path.resolve())] == sha, f"SHA-256 mismatch: {path}")
     plan, keys, checks, edges, briefchecks = parse_plan(tape, hostlog)
+    recorded_dialogue = plan["recorded_dialogue"]
     stop = plan["stop"] if args.stop is None else args.stop
     require(0 < stop <= plan["stop"], "stop outside tape")
     resume_values = (args.resume_save, args.resume_prefix, args.resume_prefix_sha256)
@@ -199,6 +204,8 @@ def main():
         require(input_pins[str(args.resume_prefix.resolve())] == args.resume_prefix_sha256,
                 "resume prefix SHA-256 mismatch")
         receipt = json.loads(args.resume_prefix.read_text())
+        require(receipt.get("recorded_dialogue", False) == recorded_dialogue,
+                "resume prefix has a different recorded dialogue mode")
         require(type(receipt["last_index"]) is int and receipt["last_index"] < plan["stop"] - 1,
                 "resume receipt must end at a prefix")
         rom_pins = {str(p.resolve()): pins[str(p.resolve())] for p in paths[:-1]}
@@ -261,6 +268,7 @@ def main():
                     checkpoints=len(checks),
                     briefings=briefchecks,
                     authenticated_p8_rows=auth,
+                    recorded_dialogue=recorded_dialogue,
                     fresh_save_cut=cut,
                     resume_from_prefix=resume,
                     sha256=pins,
@@ -279,11 +287,19 @@ def main():
     resource.setrlimit(resource.RLIMIT_FSIZE, (256 * 1024, 256 * 1024))
     us, uf = dwarf_struct_layout(elf, "Unit")
     save_path = args.resume_save if resume else out / "saved.sav" if cut is not None else None
-    g = PhysicalGame(runner, rom, elf, out / "guest",
-                     save_input=args.resume_save, save_output=None if resume else save_path)
+
+    def open_guest(folder, **save):
+        folder.mkdir()
+        # The emulator can log DMA every frame. Keep the output cap for
+        # receipts and SRAM without letting the DMA stream abort the guest.
+        (folder / "headless.log").symlink_to("/dev/null")
+        return PhysicalGame(runner, rom, elf, folder, **save)
+
+    g = open_guest(out / "guest", save_input=args.resume_save,
+                   save_output=None if resume else save_path)
     r = g.rsp
     obs, pages, brief = resume_history
-    prior_calls = cut + 2 * len(pages) if resume else 0
+    prior_calls = cut + (0 if recorded_dialogue else 2 * len(pages)) if resume else 0
     saved = None
     journal = resume_journal
     fresh_load_verified = False
@@ -334,6 +350,7 @@ def main():
                     journal=journal,
                     fresh_load_verified=fresh_load_verified,
                     resumed_from_prefix=resume,
+                    recorded_dialogue=recorded_dialogue,
                     sha256=pins,
                 ),
                 indent=2,
@@ -351,6 +368,23 @@ def main():
 
         def modal():
             return struct.unpack("<4H", r.read(0x06013FE0, 8))
+
+        def check_recorded_page(before, frame, previous, held):
+            count, page, armed, row = before
+            require(0 < count <= 13 and row < len(auth)
+                    and page < auth[row]["page_count"], "invalid recorded P8 dialogue page")
+            require(n("frame") == frame, "recorded P8 dialogue advanced gameplay")
+            after = modal()
+            if not armed:
+                key = 8 if previous & 1 else 1
+                require(held == previous | key and after == (count, page, key, row),
+                        "recorded P8 dialogue press did not arm its page")
+                return
+            require(armed in (1, 8) and held == previous & ~armed and not after[2]
+                    and (not after[0] or (after[1], after[3]) != (page, row)),
+                    "recorded P8 dialogue release did not advance its page")
+            pages.append(dict(index=i, page=page, row=row, frame=frame,
+                              physical=completed(), held=held, key=armed, **auth[row]))
 
         for i in range(cut if resume else 0, stop):
             if i % 500 == 0 and shutil.disk_usage(out).free < int(4.15 * 1024**3):
@@ -370,7 +404,12 @@ def main():
                             "fresh title L changed P8 trigger state")
                 fresh_load_verified = True
             else:
+                before = modal() if recorded_dialogue else None
+                if before and before[0]:
+                    frame, previous = n("frame"), r.held
                 step(held)
+                if before and before[0]:
+                    check_recorded_page(before, frame, previous, held)
             if i + 1 in briefchecks:
                 page, total = briefchecks[i + 1]
                 require(
@@ -389,6 +428,8 @@ def main():
             # The observer cannot stop a batched advance when a page or RESULT opens.
             # Read at each boundary so the next tape key never answers either by accident.
             for _ in range(48):
+                if recorded_dialogue:
+                    break
                 count, page, armed, row = modal()
                 if not count:
                     break
@@ -489,12 +530,12 @@ def main():
                 prior_calls = completed()
                 g.close()
                 g = None
-                g = PhysicalGame(runner, rom, elf, out / "fresh", save_input=save_path)
+                g = open_guest(out / "fresh", save_input=save_path)
                 r = g.rsp
                 require(n("screen") == n("frame") == f("page") == 0,
                         "fresh process did not start at HOME")
         require(
-            completed() == stop + 2 * len(pages),
+            completed() == stop + (0 if recorded_dialogue else 2 * len(pages)),
             "P8 replay lost a recorded or dialogue-only update",
         )
         if cut is not None:

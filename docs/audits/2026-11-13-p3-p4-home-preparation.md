@@ -196,3 +196,87 @@ frame 65,700. All 146 checkpoints, both heroes at extraction on frame
 | Current normal P10 ROM | `34859980af3065e5401e13b892adf204bea77fc6e65a1dc084f7cabef184baf5` |
 | Matching ELF | `2b92433c1dfc2201d1e8a383d8317f4bbeef50d285fe2b81e76364203414aeda` |
 | Current fresh-process victory receipt | `46ab9fb10974f026779bcc9c5c943c916124e250a259f54db4d71c5d5591f719` |
+
+## Rendered Protoss controllers on the visibility release
+
+The controller integration at `0695d287` uses the released game engine
+from `adbb22bf`. The Protoss HOST input producers now render between
+updates, as the replay and normal main loop do. The shared early-campaign
+controller enables that behavior for P1 and P2. The P7 and P8 ordinary
+HOME producers retain their authored dialogue handling.
+
+All ten ASan/UBSan HOST controller runs reach victory. Playing their
+recorded inputs in independent PX replay processes reproduces each win.
+
+| Mission | Replay victory frame | Fresh process checkpoints |
+| --- | ---: | ---: |
+| P1 | 15,305 | |
+| P2 | 33,698 | |
+| P3 | 49,729 | |
+| P4 | 86,150 | |
+| P5 | 5,056 | |
+| P6 | 92,986 | |
+| P7 | 55,892 | |
+| P8 | 106,409 | 77 |
+| P9 | 272,857 | 250 |
+| P10 | 48,593 | |
+
+The P8 and P9 replay prefixes each write a 32 KiB journal. A new
+process loads each journal with the title-screen L control. All 327
+continuation checkpoints and both terminal states match the uninterrupted
+paths. The separate ordinary HOME P7 and P8 authored tapes match their
+previous controller output byte for byte, as does the P8 pause journal.
+The ordinary HOME P3 producer also wins at frame 47,661 with both enemy
+building rosters empty and its route-state assertions passing. Replay
+that tape on the regular P10 ARM cartridge once the disk guard passes.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Ten-mission sanitized controller and replay matrix | `32b1bf563458a8863bf6b4b1dd831a339032c3ab6b4a50ab38d87614e240f03a` |
+| P7 and P8 ordinary HOME comparison | `28601acfc1c923fe0e9e810bb87caba42941db0e7e0c43950910d7e9492dcbe5` |
+| P3 ordinary HOME HOST tape | `ee03bc74391adc95bee8c381906a7a890fc31afbc380d55f9e7986a5dac031fb` |
+
+### P4 storm save fixture
+
+On `adbb22bf`, the carried fixture fails its first save from HOME,
+where the shared projectile pool has yet to be initialized. The
+fixture now starts a non-P4 world for its inactive-storm check. It
+uses the enclosing product's unit encoder and the existing save
+candidate helper to inject both malformed records with valid checksums.
+The loader rejects both records and preserves the live units and storm
+state. The original P4 and canonical P7 fixtures both pass under
+ASan/UBSan, including the pause, damage and framebuffer checks.
+## Current ordinary P3 victory
+
+On releases `2b95d534` and `43e91668` the regular Protoss cartridge
+starts at fresh HOME and completes P3 at frame 47,661 after 48,168
+controller calls.
+All 49 checkpoints, nine briefing pages and three in-game dialogue
+acknowledgements match the authored HOME tape. The terminal check
+confirms the primary objective and zero remaining hostile buildings.
+The same normal ROM also pauses at frame 20,000, on input call 20,395,
+and exports its 32 KiB SRAM. A new emulator process loads the pause
+through HOME/L. The restored world and named mission fields match at
+the pause. All 28 subsequent observations and the final victory
+match the uninterrupted run. A third fresh HOME/L loads the result
+at frame 47,661, preserves it for eight neutral updates and
+re-exports the victory SRAM byte for byte. The victory write
+preserves the original 16 KiB pause bank.
+
+The existing 256 KiB per-file cap stopped the verbose mGBA runner
+at call 500. DMA diagnostics account for most of its log. The
+bounded replay now retains a 1 GiB free-space reserve and budgets
+64 MiB for runner output and 256 KiB for its report. HOME and
+temporary output are under the same replay directory. The final
+receipt requires a clean runner exit and a final disk check. The
+current release uses 27,273,555 bytes of log and 40,192 bytes of report.
+
+| Local input or receipt | SHA-256 |
+| --- | --- |
+| Current regular Protoss ROM | `b1dbb61a3398e890201d5fa4ed9d4253d8f1f6f0813815c3a64393077d327765` |
+| Authored HOME tape | `ee03bc74391adc95bee8c381906a7a890fc31afbc380d55f9e7986a5dac031fb` |
+| Previous uninterrupted ordinary P3 victory | `f7355e77cae9a0074b65f0e0b462b7898f5e301eaaf20de72cf4eb2f410fc49a` |
+| Current uninterrupted ordinary P3 victory | `9e460a6d17706acac2b93d5f8ae9d1e6718102f82c414a7a3ffd7755e139d960` |
+| P3 pause and victory through separate HOME loads | `b2fe36dc4f8ebf9a61cd1118b41ecaf3f0d3d40f0b0db0c2abd5502fb4fdbba5` |
+| P3 pause SRAM | `16786e21f396875b2e942fd0e6ec6fd2615549a1ad88a702626ec19336651a4f` |
+| P3 victory SRAM and fresh readback | `a0ed4a552a52a2289c29ea3ebb4fd1395d346801416637cbf12e46056c7bcdc5` |

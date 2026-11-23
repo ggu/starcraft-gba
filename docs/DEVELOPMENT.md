@@ -214,6 +214,16 @@ the fully revealed showcase arenas, each row is drawn in one call; otherwise
 the renderers split rows at tile boundaries and skip hidden tiles. Both paths
 produce the same pixels.
 
+Compare packed attack-pose blits with `make showcase
+ATTACK_POSE_WORD_ACTORS=hydralisk`. The same option applies to the
+Terran, Zerg and Protoss ROM targets. It accepts comma-separated
+actor names from the attack-pose generator. The option uses the
+prepared USA ROM and palette input to derive a matching pose bank
+and packed metadata in `build/generated/attack-words`. Choose an
+empty value to return to the default build. In the measured single
+actor build the option adds about 286 KiB to linked ROM content.
+See the [timing and coverage](audits/2026-11-22-steady-order-cost.md#generated-attack-pose-sidecar).
+
 ## Tank firing effects and siege splash
 
 Canonical race builds and Showcase use source Tank muzzle and target-impact

@@ -178,8 +178,8 @@ field_ui_refresh(void)
     /* The hint only needs to know whether anything is selected and which
      * friendly worker would service it. Find both in slot order. */
     for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) ||
-            SC64_SCARAB_CHILD(&u[i]) || !u[i].selected) continue;
+        if (!u[i].selected || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) ||
+            SC64_SCARAB_CHILD(&u[i])) continue;
         selected = 1;
         if (u[i].owner == SIDE && IS_WORKER(u[i].type)) { worker = i; break; }
     }

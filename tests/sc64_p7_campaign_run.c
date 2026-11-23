@@ -112,7 +112,7 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     return 1;
 }
 
-static void input(u16 held)
+static void input_raw(u16 held)
 {
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
@@ -123,20 +123,34 @@ static void input(u16 held)
 #endif
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
-    if (screen!=SCREEN_RESULT && !won && !lost) {
-        game_update(held,pressed);
-        /* A pad replay paints every frame, and what the painter retains (facing, walk latch)
-         * decides which of two stacked actors a click picks. Paint here too, in every mode, so
-         * the controller selects what the replay and the hardware will. */
-        audio_update();
-        game_render();
-    }
+    /* Draw after every update like common/main.c and the PX replay: selection
+     * picks read the facing and stride state that drawing advances. */
+    if (screen!=SCREEN_RESULT && !won && !lost) { game_update(held,pressed); game_render(); }
     prior=held;
     ++host_tick;
     if(trace && changed) {
         fprintf(trace,"{\"kind\":\"input\",\"call_index\":%u,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
             call_index,frame_before,(unsigned)frame,(unsigned)held,(unsigned)pressed);
     }
+}
+
+static void input(u16 held)
+{
+#if defined(SC64_TEXT_BOXES) && defined(SC64_TEXT_BOX_HOST_MODAL)
+    /* The cartridge consumes input while an authored transmission is
+     * open. Acknowledge all its pages before sending the field command. */
+    for (unsigned pages = 0; sc64_text_box_count(); ++pages) {
+        if (pages == 100) {
+            fprintf(stderr, "P7 authored dialogue did not close\n");
+            exit(2);
+        }
+        u16 previous = prior;
+        u16 acknowledge = (previous & KEY_A) ? KEY_START : KEY_A;
+        input_raw(previous | acknowledge);
+        input_raw(previous);
+    }
+#endif
+    input_raw(held);
 }
 
 static int nexus(int owner)
