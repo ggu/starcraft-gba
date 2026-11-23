@@ -701,9 +701,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The normal Terran ROM still exposes Blood Bath as Free for All.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
-  Free for All loads or Melee rejections. Qualify Random seats,
-  busy matches, campaign saves and complete Melee results
-  before enabling it on the regular products.
+  Free for All loads or Melee rejections. Random seats and four
+  legacy campaign saves also pass. The last full three-CPU
+  Melee samples average 16–20 emulated updates per second.
+  Fresh-pause defeats match on all four products. Verify an active
+  win and qualify a normal-product build before enabling the
+  option by default.
   The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   already differs in first patch assignment. Check native formation and
   worker travel before using a longer service delay to fit the income.

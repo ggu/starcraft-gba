@@ -46,12 +46,27 @@ between the preview and the regular ROM. The four regular ROMs reject
 the preview's Melee saves from HOME. All 20 cross-version cases
 preserve the input SRAM when re-exported.
 
-This sample covers named human races and short save continuations.
-Keep the feature in the preview while qualifying the Random seat,
-busy matches, campaign saves and complete Melee results on the same
-source.
+Eight ordinary launches resolve a Random human and a Random CPU with
+one Closed seat. Each profile repeats its resolved races and start
+order under the same inputs. All 30 campaign openings match the
+regular reference after explicitly checking that the added Melee
+state is zero. Four saved campaign starts (T10, Z8, P9 and P10)
+load to the same state on both cartridges and preserve their SRAM.
+
+Each neutral three-CPU Melee replay reaches RESULT between game
+frames 11,523 and 11,704. Across the 11,400 fully sampled updates,
+the four profiles average 25.19–27.07 emulated updates per second.
+The final full 600-update windows average 16.08–19.70. A full
+active win remains a separate check. A pause at update 6,000 and
+load from a fresh HOME process produce the same defeat frame,
+world state, both video pages, palette and exported SRAM as resuming
+the pause in the original process, on all four profiles.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | 20 ordinary save continuations | `cdb2c3e16eb6310553329cacc14a57586a63ac0837a213019c82abfeb6f30f28` |
 | 20 cross-version load and rejection cases | `299e6290b0fe1d43bca291cbc14b93165e89f499fcfdf4cb66cd4b537d821dad` |
+| Random and mixed-seat launches | `de0473b6098fd650339c7e2f27faaea7b00b9b33f877ed8824451dc133e24247` |
+| Four legacy campaign save loads | `853448855dc39fdc1f62ad41950075d474dde4f99a6dba9ee7296b6cd7b7bd9e` |
+| Four three-CPU Melee runs | `4750d836940d7d906147bd0df5897ca6cf7a7b0c6c2538f989393c13d6041e35` |
+| Three-CPU defeats after fresh HOME load | `6838dd54bd2a5bdea0fbc087e3b08b45b8283534fa71aecba0cf71d8cc893340` |
