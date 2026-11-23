@@ -162,6 +162,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   2,795 pops. The earlier partial-field trials often shifted the
   cost to later reads. Measure how long fields remain usable
   before materialization and look for savings in the full fill.
+  In [the five failed donor reads](audits/2026-11-22-dense-depot-suffix.md#opening-distance-and-retained-point-directions),
+  four openings tie the retained route length. Even exact live-grid
+  distances would certify only one read. Prioritize the full-fill cost
+  and require canonical FIFO tie ordering for any donor reuse.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak
@@ -689,11 +693,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four-seat Blood Bath. Qualify a saved service policy, the remaining
   depot travel and unloading, and campaign and CPU economy before
   normal activation.
+  The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
+  already differs in first patch assignment. Check native formation and
+  worker travel before using a longer service delay to fit the income.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
 - **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
   writes a new journal at the actual victory. A fresh HOME load
   restores RESULT and re-exports the same 32 KiB SRAM. The other
   campaign result journals still need a common current-build gate.
+  On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
+  a regenerated P9 controller matches 93 ordinary-input checkpoints
+  through victory. Separate fresh HOME loads restore the in-progress
+  construction save and the victory journal. The longer route averages
+  11.14 emulated calls per second. Focus on steady crowded gameplay cost.
   [P6 on normal P10](audits/2026-11-20-current-p6-save.md)
   reloads from frame 64,800 and wins with Zeratul and Tassadar alive. All
   113 checkpoints match, including 40 after the reload. The same cartridge

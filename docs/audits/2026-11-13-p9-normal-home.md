@@ -126,3 +126,41 @@ exact cartridge used by the Interceptor-release replay. The 40 pinned
 inputs, header, linked payload and RAM endpoints pass again. The
 composition receipt SHA-256 is
 `b856004427cb59a0be966066e82da065472e32a62242a55632c7f0875da690a4`.
+
+## November 23 current cartridge victory and result reload
+
+The November 20 tape matches through frame 19,844 on `c84883de`.
+At frame 22,096, the regular cartridge has 1,924 minerals and the
+old tape has 1,870. The other named fields at that checkpoint agree.
+A fresh ASan/UBSan controller built with the current cartridge flags
+takes a longer ordinary-input route.
+
+The current tape wins at frame 272,857 after 281,447 controller calls.
+All 93 gameplay checkpoints and 11 briefing pages match the regular
+ARM cartridge, including 80 gameplay checkpoints after a fresh
+HOME load. Both heroes survive and both Cerebrate switches are set.
+The frame-32,071 pause SRAM matches the controller byte for byte
+and restores with one structure under construction.
+
+`--fresh-save --verify-result-save` checks the pause bank from an
+empty SRAM start, resumes in a second process, and verifies victory
+in the second bank with the pause bank intact. A third process
+restores RESULT using HOME L, checks the named world, controls and
+P9 runtime, advances eight neutral updates, and exports byte-identical
+SRAM. The observer checks runner shutdown before publishing its
+receipt. It monitors a 32 MiB output budget, enforces a 16 MiB per-file
+limit, and retains a 256 MiB free-space reserve.
+
+This route averages 11.14 controller calls per emulated second. Its
+different gameplay and length preclude a speedup comparison with
+the November 20 route. Crowded gameplay timing on GBA SP remains open.
+
+| Item | SHA-256 |
+| --- | --- |
+| Regular P10 ROM | `e44f7e1fa8dd07dfb9ae8c00d2651821fd80d862d2b0f723e946e9a947de01d3` |
+| Matching ELF | `118026540e3d178fae985fae925736c09156ae08b73ca4ea80a97701ba308775` |
+| Current controller tape | `9013de170b21ac59250698d922e4d62ddd15485a3a0eedd011e0418bcfe4d355` |
+| Current briefing witness | `34783cb55ec8aa46fa96c7bcf61f37f809911c6a5059f839ebf8b601e5e59922` |
+| Pause SRAM | `519c27ed6b72767e891208b68e113159a7b6d52b80b36d9ef86baeefa9153277` |
+| Victory and readback SRAM | `f77d58315d7cbfe62604d5fdb8f2df34fa6fc9705f6f09526164d13269a3dec9` |
+| Full replay receipt | `f326c5705e93d21928d16e0a8ab779867f00f9f0b54d09d1793c98d9509e1c19` |

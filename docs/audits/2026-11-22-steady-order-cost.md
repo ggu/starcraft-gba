@@ -669,6 +669,23 @@ gains are 24 minerals on native and 72–80 in the corresponding GBA
 clock brackets. The clocks were sampled independently. Separating
 formation, travel, patch contention and depot contact remains next.
 
+The retained native actor cuts show all four human SCVs targeting the
+same mineral patch at elapsed second 3. One SCV is mining and three
+are waiting. At second 9 one carries ore to the Command Center, one
+mines and two wait. By second 19 the workers have spread to three
+patches. This uses the human Command Center and owner from the
+matched-corner lobby to identify the four live workers.
+
+On the pinned GBA Terran Melee preview, the starting four SCVs are
+already in their first work cycle on four different patches after
+one update. No sampled update across elapsed seconds 0, 3, 9, 11,
+19 or 28 has two SCVs with an active timer for the same patch.
+That makes opening assignment and travel a separate difference from
+the service timer. Check formation and first target choice in a
+fresh native start before fitting a mining wait to the wallet.
+The scoped comparison receipt SHA-256 is
+`c5e68db3124a9f016ec2a2c1f0b801625c37818b3e5e6ac1bb4f48e3e8b851b2`.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Native input and binary pins | `548aa5ea47118533bf1fcdf7b680afe50aa127862e56dcf2e245cd9ed4328579` |
