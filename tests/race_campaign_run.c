@@ -647,6 +647,45 @@ static void controller_staff_gas(void)
     controller_normal_ui();
 }
 
+#ifdef SC64_PAID_SCARAB
+/* A human with Reavers keeps them stocked: select the Reaver, open the order list, take the
+ * BUILD SCARAB row and press A, one Scarab at a time, whenever it holds fewer than five (held plus
+ * ordered) and the bank has 15 minerals. The same ordinary controls the player uses. */
+static int controller_scarab_purchases;
+/* Minerals to keep for the Reavers' Scarabs: the full load of three Reavers before the P2 escorts
+ * arrive (they cross the map near the 900-second trigger), then what the Reavers still lack. */
+static int controller_scarab_reserve(void)
+{
+    int k, reavers = 0, lacking = 0;
+    for (k = 0; k < MAX_UNITS; ++k)
+        if (u[k].alive && u[k].owner == SIDE && u[k].type == U_REAVER) {
+            int have = race_paid_scarab_stock(k) + race_paid_scarab_queued(k);
+            ++reavers;
+            if (have < 5) lacking += 5 - have;
+        }
+    if (!reavers) return race_campaign.mission == SC64_RACE_MISSION_P2 && controller_ticks >= 20000 ? 225 : 0;
+    return 15 * lacking;
+}
+static void controller_buy_scarabs(void)
+{
+    int k, row = race_carrier_command_base();
+    for (k = 0; k < MAX_UNITS && controller_playing(); ++k) {
+        int guard;
+        if (!u[k].alive || u[k].owner != SIDE || u[k].type != U_REAVER) continue;
+        for (guard = 0; guard < 5 && controller_playing() && minerals >= 15 && u[k].alive &&
+                        race_paid_scarab_stock(k) + race_paid_scarab_queued(k) < 5; ++guard) {
+            int queued = race_paid_scarab_queued(k);
+            controller_normal_ui();
+            if (!controller_select_actor(k)) break;
+            if (!controller_open_menu_row(row) || strcmp(race_menu_label(row), "BUILD SCARAB")) break;
+            controller_press(KEY_A);
+            if (race_paid_scarab_queued(k) > queued) ++controller_scarab_purchases;
+        }
+        controller_normal_ui();
+    }
+}
+#endif
+
 static int controller_queue_unit(int building, int type)
 {
     static const int offsets[][2] = {{0,0},{-16,0},{16,0},{0,-16},{0,16}};
@@ -700,6 +739,9 @@ static void controller_protoss_economy(int max_gateways, int probe_goal)
     }
     /* Save for the Core rather than spending every 100 minerals on Zealots. */
     if (side_buildings_of(B_GATEWAY, 1) && !side_buildings_of(B_CYBERNETICS_CORE, 0)) reserve = 200;
+#ifdef SC64_PAID_SCARAB
+    reserve += controller_scarab_reserve();   /* a human with Reavers keeps money for their Scarabs */
+#endif
     for (i = 0; i < MAX_BUILDINGS && controller_playing(); ++i)
         if (b[i].alive && b[i].owner == SIDE && b[i].type == B_GATEWAY && building_complete(i) &&
             race_site_powered(SIDE, b[i].x, b[i].y) && b[i].queue_count < 2) {
@@ -934,6 +976,9 @@ static int controller_mission(int mission)
         while (controller_playing() && controller_ticks < 150000) {
             int fenix = race_campaign.rescue_unit;
             if (controller_ticks >= next_economy) {
+#ifdef SC64_PAID_SCARAB
+                controller_buy_scarabs();            /* the Reavers' Scarabs come before more units */
+#endif
                 controller_protoss_economy(4, 12);
                 next_economy = controller_ticks + 120;
             }

@@ -913,7 +913,12 @@ INTERCEPTOR = 73
 # The same for Reavers: the planner's Robotics Facility and Support Bay, a
 # Reaver paid like any unit, its Scarabs ordered through the human's command
 # and fired. The lobbies are those of the sweep in which an owner did.
-REAVER_LOBBIES = ((1, "p", "pt"), (0, "t", "pt"), (0, "z", "pz"), (1, "z", "pt"))
+# Excluded: (1, "p", "pt") and (1, "z", "pt"). Match ends at ~21k-24k updates on
+# base before Reaver gas; base planner behaviour, not paid Scarabs (the base's own
+# Protoss harness shows the same timeline there: owner 1 has at most 274 gas and the
+# match ends at 20,884 and 24,817 updates). Each replacement lobby trains a Reaver
+# (stock 0), buys Scarabs at 15 minerals each and fires a bought Scarab.
+REAVER_LOBBIES = ((1, "t", "pp"), (0, "t", "pt"), (0, "z", "pz"), (0, "z", "pt"))
 REAVER = 83
 SCARAB = 85
 # A lobby that ends with nothing left in the world that can act, by profile:

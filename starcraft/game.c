@@ -3255,7 +3255,13 @@ spawn_unit(int owner, int type, int x, int y)
     if (sc64_unit_bucket_active) {
         if (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H)
             sc64_unit_bucket_active = 0; /* use the full-world fallback */
-        else
+        else if (SC64_SCARAB_BIRTH(&u[i])) {
+            /* What sc64_unit_bucket_move() does for a Scarab row, kept out of that IWRAM loop. */
+#ifdef SC64_CONTACT_MEMO_ENABLED
+            SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+            sc64_unit_bucket_active = 0;
+        } else
             sc64_unit_bucket_move(&u[i]);
     }
 #endif
@@ -4016,7 +4022,7 @@ static int GBA_HOT
 unit_step_clear(const Unit *q, int nx, int ny)
 {
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
-    if (SC64_SCARAB_NONCOLLIDING(q)) return 1;
+    if (SC64_SCARAB_NONCOLLIDING_MOVER(q)) return 1;
 #ifdef SC64_RACES
     /* OpenBW bwgame.h unit_can_collide_with(): gathering workers pass
        through ordinary units; static terrain/building checks still apply. */

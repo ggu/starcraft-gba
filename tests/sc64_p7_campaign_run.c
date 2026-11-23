@@ -123,7 +123,14 @@ static void input(u16 held)
 #endif
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
-    if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);
+    if (screen!=SCREEN_RESULT && !won && !lost) {
+        game_update(held,pressed);
+        /* A pad replay paints every frame, and what the painter retains (facing, walk latch)
+         * decides which of two stacked actors a click picks. Paint here too, in every mode, so
+         * the controller selects what the replay and the hardware will. */
+        audio_update();
+        game_render();
+    }
     prior=held;
     ++host_tick;
     if(trace && changed) {
@@ -1013,7 +1020,10 @@ int main(int argc,char **argv)
                 int wave_on=p7_wave_on;
                 int combat=live_units(SIDE)-probe_count()-heroes_alive();
                 if(!use_threat){
-                    if(!wave_on&&combat>=(minerals<400?24:50))wave_on=1;
+                    /* Supply-capped: the units already alive are the largest army that can exist (they are
+                     * heavy: 44 combat units at 192/194 supply), so waiting for a head count of 50 never ends. */
+                    int supply_spent=race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=6;
+                    if(!wave_on&&(combat>=(minerals<400?24:50)||(supply_spent&&combat>=40)))wave_on=1;
                     if(wave_on&&combat<=12)wave_on=0;
                     if(wave_on&&!p7_wave_on)++p7_wave_no;
                     p7_wave_on=wave_on;
