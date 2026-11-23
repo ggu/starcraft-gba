@@ -237,7 +237,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   painter uses 342,000, including 247,000 drawing units and their
   attached images. Reusing the painter's enemy visibility query saves
   0.018% on a 2,071-call holdout. Keep that trial local and prioritize
-  larger movement, targeting or pixel composition costs. The [early Z7 sample](audits/2026-11-22-dense-release-attribution.md#early-z7-movement-and-target-indexing)
+  larger movement, targeting or pixel composition costs.
+  [Packed mixer saturation](audits/2026-11-22-native-custom-game-lobby.md#packed-saturation-in-the-shared-mixer)
+  saves 0.23% in the late three-CPU Melee window and raises the
+  earlier one by 0.10%. The [steering address census](audits/2026-11-22-native-custom-game-lobby.md#occupancy-checks-for-steering-rows)
+  finds only nine empty spans in 104 visits. [Coalescing visible effect
+  runs](audits/2026-11-22-native-custom-game-lobby.md#coalesced-visible-runs-in-the-effect-raster)
+  saves about 62 cycles in the 1.35-million-cycle late sample.
+  Keep these trials local. The [current sprite coverage census](audits/2026-11-22-native-custom-game-lobby.md#sprite-coverage-on-the-current-physical-pages)
+  finds 60 of 61 whole draws eligible for reuse in the quiet
+  window and 50 of 402 in the late one. Even at 8×16 granularity
+  only 24.42% of observed late sprite rectangle area falls
+  outside the changed regions. Trial a whole-page reuse path for
+  quiet play and keep reducing orders and paint costs for busy
+  fights. Include mapped effects, depth ties, camera movement and
+  menu overlays in the reuse checks.
+  The [early Z7 sample](audits/2026-11-22-dense-release-attribution.md#early-z7-movement-and-target-indexing)
   measures 39,280 cycles per target index rebuild and 23,701 within
   its cell-link operation. Preserve canonical chain order in any local
   builder trial. Count actual queued completions in the later Z7 battle.
@@ -805,8 +820,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   to frame 78,849. A separate [worker transfer](audits/2026-11-12-z8-normal-physical.md#observed-deposits-after-the-worker-transfer)
   yields 22 deposits from a stocked field. Kerrigan's later retreat
   condition finds no eligible rally, and the host run loses at
-  frame 69,355. Keep the verified mining route while testing a
-  repeatable retreat and attack before another full ARM attempt.
+  frame 69,355. The [recovered historical tape](audits/2026-11-12-z8-normal-physical.md#november-23-replay-of-the-historical-winning-tape)
+  first differs at a sampled bank check and then restarts from a
+  pause-menu shortcut. Resuming 25 unexpected pauses reaches
+  defeat at frame 21,782 when an enemy Dark Templar enters the
+  trigger area. Kerrigan is alive. Qualify an ordinary interception
+  before this point, then use the verified mining route to sustain
+  the attack. The earlier HOST retreat loses by frame 59,745.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
