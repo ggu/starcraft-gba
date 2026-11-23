@@ -846,6 +846,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   envelopes. Qualify a fresh-process resume from active and empty queues,
   protect older parallel saves, check the memory guards, and compare race
   economy and busy-match pacing before shared release activation.
+  The authored ARM queue pass uses about 16,000 cycles at eight miners
+  and 55,000 at 72. Attribute that work in a complete busy-match trace.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.

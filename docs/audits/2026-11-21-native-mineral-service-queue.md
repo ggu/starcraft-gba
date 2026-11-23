@@ -334,6 +334,21 @@ limits. ARM syntax checks exercise the opt-in in Terran, Z10, P10 and
 Showcase with retained profile flags. Product saves, loads and continuous
 play still need end-to-end testing before the release flags enable it.
 
+An authored ARM7TDMI fixture in mGBA timed a single service pass with
+four workers per patch. These are operation counts in guest cycles for
+the queue walk and service checks against a parallel timer loop.
+
+| Pre-enqueued miners | Parallel timer loop | FIFO pass |
+| ---: | ---: | ---: |
+| 8 | 730 | 15,956 |
+| 24 | 1,990 | 25,656 |
+| 72 | 5,770 | 54,756 |
+
+The fixture starts each head with 20 ticks remaining and advances only
+the heads under FIFO. It excludes travel, completed harvest, save/load,
+audio and rendering. Use a busy-match trace to attribute the queue
+work before promoting the feature.
+
 Reserve live and detached queues in EWRAM. The saved-plan representation
 is 768 bytes per queue at 240 units and 144 patches. Older guarded links
 at source `1f0ad66e` show 11,952–22,084 bytes of EWRAM reserve across the
@@ -347,6 +362,8 @@ queues, then measure continuous play and busy matches.
 | Authored ARM rank comparison fixture | `5d80f0eb6f5607c646b758ec93bb7d204233108e5faa2a5b6c03d258d6aa1fa7` |
 | Rank comparisons and cycle counts | `f430d447d9306dcf83cf871c7193fed1dffcc379026f9c96b3dddfed9b7bce2c` |
 | Standalone ARM continuation with the new builder | `eeebe595bd5b8b5db04aa732cc979f40796e97cc041732eba68089f48c5f1b57` |
+| Authored packed ARM runtime fixture | `dc6e2a7669e5ffd1f5672890335df91a2c53ba07285afb4a55a2acb13334064f` |
+| Packed ARM runtime cycle results | `bcc7aa05a18aceaf49ff362af9583be4cdcb0088cb27e6cf3a3c090927e4552f` |
 
 ## Evidence
 
