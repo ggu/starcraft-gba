@@ -846,8 +846,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   envelopes. Qualify a fresh-process resume from active and empty queues,
   protect older parallel saves, check the memory guards, and compare race
   economy and busy-match pacing before shared release activation.
-  The authored ARM queue pass uses about 16,000 cycles at eight miners
-  and 55,000 at 72. Attribute that work in a complete busy-match trace.
+  The [bounded patch scan](audits/2026-11-21-native-mineral-service-queue.md#bounded-patch-scan-and-fresh-process-continuation)
+  reduces the authored ARM pass from about 16,000 to 7,400 cycles at
+  eight clustered miners and from 55,000 to 47,400 at 72. Very dense
+  fixtures add up to about 3,000 cycles. Compact and typed authored saves
+  resume byte-identically for 100 updates in a fresh mGBA process.
+  Attribute queue costs and verify full product resume in busy matches.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.

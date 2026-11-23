@@ -10,8 +10,15 @@
 _Static_assert(MAX_UNITS > 0 && MAX_UNITS <= 255, "unit IDs must fit in a byte");
 _Static_assert(MAX_MINERALS > 0 && MAX_MINERALS <= 255, "patch IDs must fit in a byte");
 
+enum { SC64_MINERAL_FIFO_HEAD_WORDS = (MAX_MINERALS + 3u) / 4u };
+
 typedef struct {
-    uint8_t head[MAX_MINERALS];
+    /* Give the prune walk aligned loads without maintaining a second index.
+     * The rounded head array leaves zeroes beyond the last actual patch. */
+    union {
+        uint8_t head[4u * SC64_MINERAL_FIFO_HEAD_WORDS];
+        uint32_t head_words[SC64_MINERAL_FIFO_HEAD_WORDS];
+    };
     uint8_t tail[MAX_MINERALS];
     uint8_t next[MAX_UNITS];
     uint8_t patch[MAX_UNITS];

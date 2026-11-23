@@ -349,6 +349,44 @@ the heads under FIFO. It excludes travel, completed harvest, save/load,
 audio and rendering. Use a busy-match trace to attribute the queue
 work before promoting the feature.
 
+#### Bounded patch scan and fresh-process continuation
+
+On tables larger than 16 patches, the queue walk skips all-zero head
+words at both ends and visits the remaining span in ascending order. The
+aligned word view shares the existing head bytes and needs no active
+patch cache to rebuild on load. The last word is padded when the patch
+capacity is not a multiple of four.
+
+| Authored ARM service pass | Full patch walk | Bounded walk |
+| --- | ---: | ---: |
+| Empty | 11,045 | 2,411 |
+| 8 miners, 4 per patch | 15,962 | 7,424 |
+| 24 miners, 4 per patch | 25,662 | 17,429 |
+| 72 miners, 4 per patch | 54,762 | 47,444 |
+| 8 miners spread across the array | 16,544 | 16,019 |
+| 72 miners spread across the array | 60,000 | 61,736 |
+| 144 miners, 1 per patch | 108,888 | 111,905 |
+| 240 miners, 2 per patch | 162,432 | 163,235 |
+
+Queue and timer checksums match. Clusters at middle and upper patch
+indices also improve. A prune-only test with 72 clustered miners and
+half the orders stale falls from 35,867 to 28,873 cycles. With 240
+miners spread across the field it rises from 92,969 to 94,852.
+The bounded walk helps clustered workloads and adds up to 3,017
+cycles in the measured dense cases. These are service-pass timings
+in mGBA, with full match timing still pending.
+
+A separate authored ARM fixture ran the shared runtime and the real
+SRAM selector and row codecs with compact and P7 typed records. For
+both partially served and empty queues, the fixture wrote the same
+SRAM bytes with either walk. A fresh mGBA process and uninterrupted
+execution reproduced the same 100-update queue, timer and credit
+traces. The fixture supplies world geometry, orders and credit
+bookkeeping, so real product save envelopes and pacing still need
+the end-to-end checks. The short standalone table keeps its scalar
+walk. The ARM standalone orders fixture reports the same cycle count,
+same SRAM bytes and matching state after 50 fresh-process updates.
+
 Reserve live and detached queues in EWRAM. The saved-plan representation
 is 768 bytes per queue at 240 units and 144 patches. Older guarded links
 at source `1f0ad66e` show 11,952–22,084 bytes of EWRAM reserve across the
@@ -364,6 +402,9 @@ queues, then measure continuous play and busy matches.
 | Standalone ARM continuation with the new builder | `eeebe595bd5b8b5db04aa732cc979f40796e97cc041732eba68089f48c5f1b57` |
 | Authored packed ARM runtime fixture | `dc6e2a7669e5ffd1f5672890335df91a2c53ba07285afb4a55a2acb13334064f` |
 | Packed ARM runtime cycle results | `bcc7aa05a18aceaf49ff362af9583be4cdcb0088cb27e6cf3a3c090927e4552f` |
+| Full and bounded ARM service-pass results | `7a0ea67081f28528834e238026e8e9f783760f5de27159d227b3515840b77b85` / `a3391e86b6c939ded1586f872dc463e6eacf8918db68c3724a400fc45912db1a` |
+| Authored ARM fresh-process results, active and empty queues | `260018d92ba49abbd5fec5fd18dc408cac028f0f3ee73a8928dd88be935886f6` / `ec3683fead7a969d0cd6c3f230cd430dff228fc3a026d57f54c75eb15d1d55bd` |
+| Standalone ARM continuation with short tables | `a73a0d77015a747197ebed70602d6bbc06b37b83aaa437b958cd808933612e51` |
 
 ## Evidence
 
