@@ -720,8 +720,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [current Z8 comparison](audits/2026-11-12-z8-normal-physical.md#november-23-current-controller-comparison)
   matches the input tape and pause SRAM on the baseline and Bring
   builds. Both controllers lose after the first Nexus falls and mineral
-  income stalls. Refresh that controller's late economy and verify a
-  new ordinary ARM victory.
+  income stalls. The worker census finds stocked patches outside
+  visibility and the 360-pixel worker search radius. Scout and
+  transfer workers before depletion, then verify a new ordinary ARM
+  victory.
   Profile the cursor's hostile scan during the same held-button
   inputs. The earlier [distance-first query](audits/2026-11-13-p10-field-cursor-cost.md)
   improved P10. Update its oracle for the shared foreground picker.
