@@ -740,7 +740,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   work timer. Check first assignment and worker travel before tuning
   service time.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
-- **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
+- **Current cartridge campaign saves.** [T1 on the packaged Terran ROM](audits/2026-11-17-save-ui-product-matrix.md#november-23-packaged-terran-t1)
+  wins at frame 10,120, with the frame-6,214 pause and victory reloading
+  in fresh HOME processes. [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
   writes a new journal at the actual victory. A fresh HOME load
   restores RESULT and re-exports the same 32 KiB SRAM. The other
   campaign result journals still need a common current-build gate.
@@ -777,12 +779,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   state and pixels. The [full P9 victory and result save](audits/2026-11-13-p9-normal-home.md#full-victory-and-journal-with-direct-location-counts)
   match all 93 checkpoints and all three SRAM exports. The replay
   goes from 11.14 to 12.16 emulated calls per second. The specialized
-  location scan already ships in the shared bridge. A [warm validation
-  trial](audits/2026-11-13-p9-normal-home.md#inline-validation-for-cached-actor-types)
-  saves another 1.64–1.65% in two current P9 windows and 0.62% through
-  the current full P10 win, with matching pause and victory journals.
-  Complete the paired P9 result journals before promoting this change. Continue checking other campaign providers
-  independently.
+  location scan already ships in the shared bridge.
+  [Inline cached validation](audits/2026-11-13-p9-normal-home.md#inline-validation-for-cached-actor-types)
+  saves another 1.64–1.65% in two current P9 windows, 0.95% over
+  the full P9 victory and 0.62% through the full P10 victory.
+  Both full runs match their pause, result and readback journals.
+  Busy skirmish windows match their existing timing. Continue
+  checking other campaign providers and reducing steady shared costs.
   The [current Z8 comparison](audits/2026-11-12-z8-normal-physical.md#november-23-current-controller-comparison)
   matches the input tape and pause SRAM on the baseline and Bring
   builds. Both controllers lose after the first Nexus falls and mineral

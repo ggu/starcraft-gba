@@ -93,3 +93,22 @@ restored menu behavior.
 | Rebuilt physical observer | `724715d35416c4d202041fc0585fa4f1542f1b4d8ed6b53a6db373c9d8caa50d` |
 | Rebuilt regular T1 ARM receipt | `541641b89e18d70843c4286aa503104f7c346536fa6bbade3d84761787385220` |
 | Rebuilt opt-in T1 ARM receipt | `7aac3954f2f25adaf2b0f8ea00e3f650573c33f7168ede790a48210ff79a1dcc` |
+
+## November 23 packaged Terran T1
+
+The packaged Terran ROM repeats the retained ordinary Wasteland
+route from HOME. It matches all ten gameplay checkpoints and
+reaches victory at frame 10,120 after 10,144 gameplay calls.
+Raynor survives, with ten Marines and five SCVs at victory.
+
+A fresh process restores the frame-6,214 pause, including the
+selected actor and camera position. A separate HOME session
+loads the victory and exports the identical SRAM image. The run
+averages 29.39 emulated main-loop updates per second, including
+presentation waits.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Full packaged T1 replay | `2b24ba18c5fc8f67342d472d38bcce818deda417f99f7afa6a583e2d2df13bad` |
+| Pause journal | `66d8f528bcc1d5b17a07c63c7ac832220db023c879ec306273c0ea10db30632a` |
+| Victory and readback journal | `111f48fc4c566ade3dbc4d3bb5b2829827c55266e77027966cb64c08e8e5c381` |
