@@ -739,8 +739,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   live populations and confirm any gain in the late Zerg workload.
   A [fresh target-index counter trial](audits/2026-11-12-target-index-bulk.md#batch-the-fresh-dirty-cell-count)
   saves about 5,600 cycles per rebuild in the two P9 samples and
-  0.33% over the P10 victory tail. Match the full P9 victory and
-  current Custom Game checks before changing the defaults.
+  0.33% over the P10 victory tail. The six three-CPU games and 24
+  fresh loads agree. Finish the full P9 victory before changing
+  the defaults.
   A local P10 armed-type lookup on top of the shared cursor queries saves
   2.39% and 2.37% in the P9 windows and 1.28% in the P10 tail.
   The sampled state, display pages and final P10 SRAM match.
