@@ -108,6 +108,33 @@ remains open.
 | Fresh-load receipt | `3afbb7b70bf3a0197d13e5bf4b658c8d6c7da6d1994c60e1d8833af5f4cb6d20` |
 | World checkpoint comparison | `7806a0659f5e59f7593d0e2dc0b75d578c0fbd458ede3f42e9fe704ad833c2a8` |
 
+## November 23 current controller comparison
+
+The older physical-button tape no longer follows the prior victory
+route on the current regular Z10. The route-table build and direct
+Bring candidate agree on call indices, physical input counts, frames,
+screens and dialogue counts throughout their 36,496-call common prefix.
+The emulator's per-file log limit stopped both comparisons.
+
+The same current host controller was then compiled with the
+prepared Z10 feature and input vectors for both sources. It destroys
+the second Nexus and loses Kerrigan at frame 62,535. The two complete
+63,637-call input tapes and the pause SRAM agree byte for byte. Mineral
+reserves stay under 60 at the sampled checkpoints after frame 30,400.
+The shared controller tape SHA-256 is
+`c83249a72f856617df0fa50c5a1b69ab7a6daa7d94bd7a6e0553bbd8cf787a8e`.
+
+A read-only census reproduces the exact input tape. Across five
+samples from frame 28,000 through 32,588, 16 drones remain active,
+11–13 are idle, and none are mining. There are 37–38 stocked
+mineral patches with zero visible to the player. By frame 33,601
+one stocked patch is visible, about 1,359 pixels from the nearest
+unladen gas drone. The controller searches at most 360 pixels.
+Its ordinary economy route needs earlier scouting and worker
+transfer before the existing miners deplete their fields. The
+census receipt SHA-256 is
+`c0bd7ff7ceef5b94d7e99dc032a7532ca24096f1982a3b3dde89284b78a734b1`.
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

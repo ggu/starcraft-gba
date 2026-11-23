@@ -212,7 +212,36 @@ and 15.24 emulated updates per second. World, both indexed pages,
 palette and route counters match all 32 sampled cuts. A separate
 9,489-update P10 victory tail matches 81 cuts and final SRAM. Its
 mean rises 0.022%, compared with 0.233% in the first shared-scanner
-trial. The full P9 route and result journal are separate release
-checks. The P9 attribution and specialized P10 tail receipts are
+trial. The P9 attribution and specialized P10 tail receipts are
 `66bf6844678e551b79b85f61e4c768796573e4cce416747296a5d29334217921` and
 `839bc809a8c7d141f2f3f5a3de32c963695fde837be60985ab49828a7f6219ea`.
+
+### Full victory and journal with direct location counts
+
+The specialized candidate replays all 281,447 ordinary tape calls
+through victory at frame 272,857. The 93 named checkpoints, 11 briefing
+pages, and 80 checkpoints after a fresh pause reload agree. The pause,
+victory and independent HOME result readback images all match the
+baseline byte for byte. The third emulator advances eight neutral
+result updates before exporting its journal.
+
+The mean falls from 1,505,610 to 1,379,948 guest cycles per call,
+an 8.35% reduction. The same run rises from 11.14 to 12.16 emulated
+calls per second. The busy campaign still exceeds the 30 fps budget.
+The four standard links pass the existing RAM checks. Z10 and P10
+use eight additional EWRAM bytes with unchanged IWRAM endpoints.
+Terran and Showcase reproduce their control ROMs.
+
+All 30 ordinary campaign entries launch, 24 Custom Game fresh
+continuations pass, and six three-CPU starts match all 120 state
+and pixel cuts. Those six matches stay within 0.001% in total
+guest cycles. P10 and Z10 pass the sanitizer comparison of the
+original actor provider and the direct counts, with and without
+raw validation caching.
+
+| Item | SHA-256 |
+| --- | --- |
+| Complete specialized P9 replay | `a33d94d2bd3a4457d5a72ac44e59a6c1ec1048098117acfbbd3282939449c36c` |
+| Victory and fresh readback SRAM | `f77d58315d7cbfe62604d5fdb8f2df34fa6fc9705f6f09526164d13269a3dec9` |
+| Six three-CPU matches | `b3826e59900d6a91af7b0e0858d5c69468f741e35cf8138a9ac2ff88cc55ae48` |
+| Custom Game fresh continuation matrix | `d39e46b0081b6626e0e190feabb94c550487e5bc2563ff2bf8878d2c3f74056e` |
