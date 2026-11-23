@@ -390,6 +390,56 @@ Keep the trial local.
 The local attribution SHA-256 is
 `61438e1f78b36c7b72c503917ad4b0ca7ef5ef5cdeb8daf15c18eaff08b94aa2`.
 
+### Cycle ceiling for fusing blocked direct steps with steering
+
+On the pinned normal Protoss 10 build, breakpoints at the
+primary direct collision check's entry and return measure the
+calls immediately before the steering branch. All 16 ordinary
+three-CPU Melee updates at calls 11,385–11,400 match the earlier
+frame, world, route counters, both display pages and palette.
+
+The 465 checks that return blocked consume 433,535 inclusive
+guest cycles, or 27,096 per update. The observed per-update
+range is 21,388–54,021. The 922 clear checks consume 301,621
+cycles across the same updates. Interrupt time inside a check is
+included. The mean is therefore an upper bound on the cost
+that could disappear by avoiding the entire failed primary
+check. A shared traversal would still need to test the blocked
+direction and account for work on clear moves. Keep the current
+order and prioritize larger costs. A previous
+[fused traversal](2026-11-20-p7-recurring-orders.md)
+also slows late Blood Bath.
+
+The local census script SHA-256 is
+`c8fcced8866a301bb130786cfedbc22c2722fc56b84cd5a497c95aea2401c0c4`.
+
+### Visible sprite costs by source in late Melee
+
+A read-only source census on the same 16 cuts observes 640
+battlefield raster calls, split between 321 byte-sprite and 319
+packed-word calls. All cuts match the stock frame, world, route
+counters, both pages and palette. Byte sprites consume 119,084
+inclusive cycles per update and the packed calls consume 72,342.
+These cycle counts include interrupts that occur inside the
+calls and bound the drawing cost under observation.
+
+| Byte-sprite source | Calls across 16 cuts | Mean inclusive cycles per update |
+| --- | ---: | ---: |
+| Attack poses, 15 sources | 70 | 54,169 |
+| Weapon effects, 22 offsets | 155 | 38,419 |
+| Mineral sprite, one source | 80 | 24,078 |
+
+The most expensive individual byte-sprite source is an attack
+pose from raw actor 70, at 27,456 cycles per update. The next
+eight attack frames belong to raw actor 66. Use the observed
+coverage to target compositor changes and check the gains in
+longer skirmish and campaign replays. Even eliminating the
+entire 119,084-cycle byte-sprite portion would leave the
+1,350,466-cycle late update well above the two-VBlank budget.
+
+The local corrected census receipt SHA-256 is
+`7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970`.
+
 ### Reusing actor admission during the draw
 
 The trial passes the depth queue's body or charge-only admission

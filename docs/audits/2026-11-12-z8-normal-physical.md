@@ -356,6 +356,67 @@ mission and its victory sequence still need a winning replay.
 | Fresh HOME comparison | `8a1c216ee9f9b71f940bfe51ebe50138239993dab2f9018a4d9ac38f8677c02f` |
 | Interception save | `2bbf10edccb8b208a77e7fa54e77d52421d0e062baf033f8ac3734d18bf90fc6` |
 
+### Production and the southern approach after interception
+
+These runs start with the verified fresh HOME load at frame 23,101.
+Ordinary training input pays for three Hydralisks at each of two
+Hatcheries. By frame 25,173 both queues empty and the live
+Hydralisk count rises from 11 to 17. Inputs at four other selected
+Hatcheries do not produce paid orders in this run. Breakpoints
+confirm that the first refusal, at frame 23,479, fails the
+completed-building prerequisite. The player's Hydralisk Den
+at the northern base drops to 7 HP at frame 23,470 and is gone
+by frame 23,475.
+
+A Drone places a replacement Den near the northern workers
+through ordinary input. The Den reaches its full 850 HP and
+completes by frame 24,313. At frame 24,765 a Hatchery accepts
+another Hydralisk order, paying 75 minerals and 25 gas and
+consuming one larva.
+
+The direct attack trial selects two southern Hydralisks and sends
+them toward the second Nexus. Across the next 4,000 updates the
+Nexus stays at 750 HP and both units settle near their starting
+area. A shorter duplicate observes active waypoints and zero
+retry counters while the units alternate by one or two pixels
+without advancing toward those waypoints.
+
+A fresh trial first issues a westward move through an intermediate
+waypoint. Both units reach it and advance toward the Nexus on a
+second attack order. The last observed survivor has 42 of 80 HP
+at frame 26,105. Both units are absent by frame 26,305, and the
+Nexus remains at 750 HP through frame 27,705. The waypoint bypasses
+the observed stall.
+
+In a separate recovery, six Hatcheries accept three Hydralisk
+orders each after the replacement completes. The live count
+rises to 29. Rallying the entire combat group on a southern
+Move order loses the northern force en route. The later southern
+box selects 21 combat units, including Kerrigan. Attack Move
+advances into the defenders and Kerrigan dies at frame 31,443
+with both target Nexuses at 750 HP. Stage the northern reinforcements
+in shorter moves and keep Kerrigan out of the assault group on
+the next replay. The current cartridge still needs a full win.
+
+The north and south Nydus endpoints are still linked at HOME
+load. During a neutral continuation the northern endpoint falls
+from 198 HP at frame 23,102 to 5 HP at 23,302 and both endpoints
+are gone by 23,327. A transfer through that link remains
+unverified. Test a defense before this loss or use a different
+route for the later reinforcements.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paid training and live arrivals | `059c9080369ec1fb559c41649852769320bc07791555127640a6cc076ed65bce` |
+| Prerequisite check at the first refused producer | `06ff44699e24c36e513ef7d3a38f2a6054e6987ad1dd493c64f448abae47fcce` |
+| Original Den health and loss | `371789bb70f214f9798927c852430c81efa418579881b4a04551e9169364bf65` |
+| Replacement Den and resumed production | `f9f626289b3673e069ef12d3e590a20f59a5fbc2e4cd9b7fe48058c11179b812` |
+| Direct attack | `f2891fa2f0d897df3de3fc7f0a857743884b358b025276cc855f8b21c6566375` |
+| Direct attack waypoint and retry samples | `a8e03004e93b8487552329280a569bcfa0adb8b0ebe1e5990049f60f6ed8802a` |
+| Intermediate waypoint assault | `9998e2fb3d7687270a837992ed13c467293561af661df3282c9651f4b5fd8cfe` |
+| Six-Hatchery production and combined assault | `2c4a9170b5fcee73250217df0308368037ed48883f0baf37144dddf2ffbc9584` |
+| Nydus link and health after load | `e8869ad4815123817c5e73ed9d606b2419b9208d49a076526fcd71ebf59ad204` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
