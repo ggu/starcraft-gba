@@ -492,6 +492,33 @@ further production and a new grouped attack.
 | Southern Pool, Den and fresh HOME production check | `23a65a5f866fc75fcf26aee66618aa6dd67882888053b051bbfa37bc51bcc9c5` |
 | Southern production SRAM | `4fa2c92494136377ee12b555995df23d15b24a734a404c33b0beb3e975a5cca7` |
 
+### Second Dark Templar defeat after the southern attack
+
+Repeated production at the southern Hatchery grows the live
+Hydralisk count to 29 by frame 38,582. A two-waypoint rally
+joins 15 southern reinforcements with the seven forward
+Hydralisks. The resulting 22-unit Hydralisk group and
+full-health Kerrigan reload from a new pause save at frame
+40,823.
+
+The attack clears another Photon Cannon and Pylon. The eastern
+Nexus retains 750 HP. The mission loses at frame 42,745 while
+Kerrigan is still at 400 HP. The fresh-load repeat records the
+human outcome changing to defeat and trigger 15 becoming done.
+A hero Dark Templar observed on the eastern approach at load
+is at the northwest objective area at defeat. A neutral run
+from the same save remains in play through frame 45,123 with
+trigger 15 still pending. The two runs establish a second
+interception requirement for this attack route.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Southern training, rally and attack | `850b63e8572fc9e3f3572864a3882f542862d7b2ef0a47612c379b0ed8d0f5ea` |
+| Pre-attack pause SRAM | `a918f6facaad270e43abaf27d8d2462b632f490917adb8f1b206b10c197073a3` |
+| Fresh load of the 22-Hydralisk group | `60f5f72526947196642a538f7f787ccc0d8c71d0719d440b8cb484039c95f5c7` |
+| Attack and late defeat trigger | `0a5a0abd4d6cb92a0b39ed1e28b027316a15b2ca1086dc6b33c6f6629c830b8d` |
+| Neutral result control | `3e69866e5d75d2ca6836536f94fb2708b5f2453378e6d6db73e776a23024fbf2` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
