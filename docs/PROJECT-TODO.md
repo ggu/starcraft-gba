@@ -723,12 +723,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   income stalls. The worker census finds stocked patches outside
   visibility and the 360-pixel worker search radius. Scout and
   transfer workers before depletion, then verify a new ordinary ARM
-  victory.
+  victory. A 1,500-pixel search delays the host loss from frame
+  62,535 to 79,353. The separate attempt-order change reproduces
+  the stock failure. Measure scouting and actual cargo returns
+  before treating the wider worker search as a recovery.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
   updates per second. Foreground picks, the ordinary double-tap,
   six three-CPU matches and 24 fresh Custom Game loads agree.
+  Two post-reload P9 instruction windows still average about
+  1.10 million cycles each. The defense pass and target-index
+  rebuild each account for about 80,000 cycles per update. Use
+  the paired samples to measure these passes across changing
+  live populations and confirm any gain in the late Zerg workload.
   A local P10 armed-type lookup on top of the shared cursor queries saves
   2.39% and 2.37% in the P9 windows and 1.28% in the P10 tail.
   The sampled state, display pages and final P10 SRAM match.

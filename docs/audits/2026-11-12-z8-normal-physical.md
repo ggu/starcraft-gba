@@ -135,6 +135,29 @@ transfer before the existing miners deplete their fields. The
 census receipt SHA-256 is
 `c0bd7ff7ceef5b94d7e99dc032a7532ca24096f1982a3b3dde89284b78a734b1`.
 
+Three additional host trials change only the ordinary-input
+controller on `537d09f7`. A 1,500-pixel search still considers only
+visible, stocked fields. Counting attempts after the cursor reach
+check yields the same tape as stock. Increasing the radius alone
+yields the same tape as both changes together.
+
+| Controller policy | Calls | Loss frame | Drones | Army |
+| --- | ---: | ---: | ---: | ---: |
+| Stock or attempt-count change | 63,637 | 62,535 | 1 | 9 |
+| Wider radius, with or without the attempt-count change | 80,452 | 79,353 | 3 | 11 |
+
+The longer run ends with 7 minerals and 3,976 gas. It still loses
+Kerrigan before the remaining objective. The test changed reach for
+already visible fields. It did not establish reachability, sustained
+income, or a winning route. Next, make the controller observe a
+stocked field before local depletion and track actual mineral returns
+after issuing worker orders. Then qualify victory on the normal ARM
+cartridge from HOME with a fresh pause load.
+
+The wider-radius input tape SHA-256 is
+`2e97076792d32848adb3e258f19c124a18c4163914f8ef75792bf0c15194ccb3`.
+The stock and attempt-only tape hash is the same `c83249a7` hash above.
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

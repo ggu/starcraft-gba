@@ -111,6 +111,15 @@ doesn't measure the frame rate on a GBA. The tested P10 ROM matches
 the default cursor release ROM byte for byte. Its SHA-256 is
 `562b93c371cf7a3734a361eddee88ac8c2e9394ff76684f0b1b186faca75c3c8`.
 
+In the two 16-update windows after loading the P9 pause journal,
+the cursor build still averages 1.10 million cycles per update.
+The defense pass takes 82,271–83,002 cycles and the target-index
+rebuild takes 78,814–80,012 inside the order pass. The remaining
+location/count calls take 52,594–53,347 cycles and already use the
+direct Command and Bring paths. These timings identify remaining
+cost in this replay. Qualify any changes in different campaign and
+skirmish populations before activating them.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | P9 instruction windows | `fb9b4ec58c53a6d75053bfd1ed23b3045722b874c8460a698bc83b52e9bf9379` |
