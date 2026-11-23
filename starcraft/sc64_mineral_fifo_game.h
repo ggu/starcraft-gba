@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Mineral queue lifecycle and raw journal preparation. Included by game.c. */
+#include "sc64_mineral_fifo_rank.h"
 
 enum { MINERAL_CARGO_MAX = 8, MINERAL_SERVICE_TICKS = 45 };
 #define SC64_MINERAL_FIFO_SAVE_VERSION \
@@ -95,7 +96,7 @@ worker_mineral_fifo_encode(void)
 static int
 worker_mineral_fifo_decode(void)
 {
-    u8 queued[MAX_MINERALS] = {0};
+    int has_ranks = 0;
     for (int i = 0; i < MAX_UNITS; ++i) {
         const Unit *worker = &data.units[i];
         if (!IS_WORKER(worker->type)) continue;
@@ -111,27 +112,15 @@ worker_mineral_fifo_decode(void)
         int patch = worker->target, rank = worker->carry - MINERAL_CARGO_MAX;
         if ((unsigned)patch >= MAX_MINERALS ||
             !worker_mineral_fifo_at_patch(worker, &data.minerals_map[patch], patch) ||
-            worker->work_timer < 0 || worker->work_timer > MINERAL_SERVICE_TICKS ||
-            (rank != 1 && worker->work_timer)) return 0;
-        ++queued[patch];
+            !sc64_mineral_fifo_stage_rank(&prepared_mineral_fifo, (unsigned)i,
+                (unsigned)patch, (unsigned)rank, (unsigned)worker->work_timer,
+                MINERAL_SERVICE_TICKS)) return 0;
+        has_ranks = 1;
     }
-    for (int patch = 0; patch < MAX_MINERALS; ++patch) {
-        for (int rank = 1; rank <= queued[patch]; ++rank) {
-            int found = -1;
-            for (int i = 0; i < MAX_UNITS; ++i) {
-                const Unit *worker = &data.units[i];
-                if (!worker->alive || !IS_WORKER(worker->type) || worker->order != ORDER_MINE ||
-                    worker->target != patch || worker->carry != MINERAL_CARGO_MAX + rank)
-                    continue;
-                if (found >= 0) return 0;
-                found = i;
-            }
-            if (found < 0) return 0;
-            if (!sc64_mineral_fifo_append(&prepared_mineral_fifo, (unsigned)patch, (unsigned)found))
-                return 0;
-            data.units[found].carry = 0;
-        }
-    }
+    if (!has_ranks) return 1;
+    if (!sc64_mineral_fifo_finish_ranks(&prepared_mineral_fifo)) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (prepared_mineral_fifo.patch[i]) data.units[i].carry = 0;
     return 1;
 }
 
