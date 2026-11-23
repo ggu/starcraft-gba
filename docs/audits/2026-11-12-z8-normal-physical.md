@@ -218,6 +218,30 @@ before attempting a full normal-cartridge run.
 | Friendly rally retreat input tape | `7845f3b22bcfa33725f71b5931e176d494a908c3af915fff94916c1fd829dba9` |
 | Friendly rally retreat observer trace | `483bb5137ebc2738c85e3ea37b28224b21ea6e971ce7e90523255ff023d4b925` |
 
+### Observed deposits after the worker transfer
+
+A host controller trial on the same engine issues an ordinary gather
+order at frame 34,045. The Drone selects a visible stocked field
+with 678 minerals after the controller observes no active special raid
+and at most 1,000 visible minerals in the current search. The trace
+records 22 deposits of eight minerals by that Drone between frames
+34,684 and 52,600, with its cargo clearing at each credit. This
+verifies the transfer, pickup and actual return to the depot.
+
+Kerrigan has 400 HP at frame 62,541. The attack reaches her later and
+the friendly rally filter finds no eligible unit after she starts
+taking damage. The trial ends in defeat at frame 69,355, with 421
+minerals, one Drone, six army units and the surviving Nexus at
+1,500 HP. A guarded attempt to reuse the earlier rally point sent
+no retreat order and produced the same tape and result. The replay
+proves the replenishment route and leaves a repeatable retreat and
+a complete mission win open.
+
+| Local worker trial | SHA-256 |
+| --- | --- |
+| Ordinary worker transfer tape | `73cf0e274ffc3247c445675287d66f1439fc5edf685e52a9c5d6662997bf1883` |
+| Deposit and hero observer trace | `70a1f0d80265bcd8086eac9492e3e83c7baaf74d022841053cf40c4749d753da` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.

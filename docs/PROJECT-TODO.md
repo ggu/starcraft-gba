@@ -722,11 +722,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reusing unchanged contributors before trying sparse terrain
   transfers. Keep camera and scene transitions on the full-render
   path. The [contact census](audits/2026-11-22-native-custom-game-lobby.md#terrain-filtering-in-the-contact-scan)
-  finds at most two new early exits in 80 Terran queries. Late
-  orders still need work to reach the two-VBlank budget.
-  The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
-  already differs in first patch assignment. Check native formation and
-  worker travel before using a longer service delay to fit the income.
+  finds at most two new early exits in 80 Terran queries. The
+  [ARM decoder trial](audits/2026-11-22-native-custom-game-lobby.md#first-order-audio-on-arm)
+  increases late Protoss Melee cycles by 2.33%. Late orders
+  and drawing still need work to reach the two-VBlank budget.
+  The [packaged Terran matched opening](audits/2026-11-22-steady-order-cost.md#packaged-terran-melee-mineral-opening)
+  still gathers faster at the same Blood Bath corners. In the sampled
+  seconds, the GBA has at most one worker actively mining each targeted
+  patch, whereas the four native SCVs initially approach the same patch.
+  Check first assignment and worker travel before tuning service time.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
 - **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
   writes a new journal at the actual victory. A fresh HOME load
@@ -743,8 +747,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   journals. On the [Melee-enabled Protoss cartridge](audits/2026-11-13-normal-campaign-matrix.md#november-23-melee-enabled-cartridge),
   P8 matches all 40 checks, restores its pause and wins at frame
   104,113. A third HOME process restores the victory and exports
-  identical SRAM. Apply these result checks to the remaining
-  missions on the current builds.
+  identical SRAM. The same ROM also passes [P7 pause, victory and
+  result reload](audits/2026-11-13-p7-carried-normal-home.md#november-23-melee-enabled-cartridge).
+  All 12 snapshots match the archived field and display checks.
+  Apply these result checks to the remaining missions on the current builds.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints
   through victory. Separate fresh HOME loads restore the in-progress
@@ -774,9 +780,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Kerrigan still dies. In the [late survival trace](audits/2026-11-12-z8-normal-physical.md#late-hero-survival-on-the-melee-release),
   she takes sustained damage while idle. An ordinary move toward
   a nearby friendly unit reaches its destination and delays defeat
-  to frame 78,849. The run ends with no workers and the surviving
-  Nexus undamaged. Pair the retreat with a verified worker transfer
-  and renewed income before another full ARM attempt.
+  to frame 78,849. A separate [worker transfer](audits/2026-11-12-z8-normal-physical.md#observed-deposits-after-the-worker-transfer)
+  yields 22 deposits from a stocked field. Kerrigan's later retreat
+  condition finds no eligible rally, and the host run loses at
+  frame 69,355. Keep the verified mining route while testing a
+  repeatable retreat and attack before another full ARM attempt.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

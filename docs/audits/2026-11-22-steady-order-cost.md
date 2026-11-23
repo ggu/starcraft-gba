@@ -739,6 +739,49 @@ the amount of service time.
 | Native warm-window commands | `ff9b85523d8551992ca346f5a93c20955b39fc037853d9eb1bab0ae9b96cc3ad` |
 | GBA warm-window replay | `990cff94a1db57dc67d2dafdd15f4a42ffa18951cb23e50ad446c4d04d49e762` |
 
+### Packaged Terran Melee mineral opening
+
+The packaged `7f7eab41` Terran 10 cartridge repeats the matched
+Blood Bath start through ordinary Custom Game controls. The human
+Terran Command Center and the Zerg CPU Hatchery match the retained
+ares opening's corners, and both start with four human SCVs and
+50 minerals. Automatic orders and eight-mineral credits are present
+on both engines. At GBA elapsed seconds 0, 3, 9, 11, 19 and 28,
+every observed mineral patch has at most one human worker with
+an active timer and empty cargo. The retained native elapsed
+second-3 cut shows four workers on the same mineral target,
+with one mining and three waiting.
+
+| Elapsed second on each emulator | Native observed minerals | Packaged Terran minerals |
+| --- | ---: | ---: |
+| 9 | 50 | 98–106 |
+| 11 | 58 | 122 |
+| 19 | 66 | 170–178 |
+| 28 | 90 | 234–258 |
+
+The native values are HUD observations from the retained ares
+run. The GBA bounds sample every advancing update in each reported
+second of the GBA guest clock. The independent clocks and native
+callback timing limit the comparison to these opening brackets.
+First patch assignment, travel and service each need separate
+measurement before tuning the mineral clock. The packaged
+ROM, matching ELF, observer and prior native snapshots were
+pinned. The paired replay receipt SHA-256 is
+`21750770c960ece1f6287870369f32f6cedf7b86965f471b30af20361f36a7a1`.
+
+A fresh native ares run narrows first claim to observer steps
+5,944–5,949. At step 5,943, all four human workers have zero claims
+and zero work timers. At 5,949, one has a claim and its timer is
+still zero. At 5,955, the same worker's timer is 74 and the entire
+snapshot matches the earlier qualified cut byte for byte. The
+observer reached the requested RAM cuts with the pinned inputs.
+Its final check requires a copied display frame, so the read-only
+run exits nonzero. These cuts show that the claim can precede
+the positive timer. The observer steps still bracket the transition
+in a different clock from simulation updates. The compact receipt
+SHA-256 is
+`fd2efc7a7b45a6ec15f94e47d40e5921f6e1efe62aa2134aff12b7c840c35da6`.
+
 ## Protoss campaign continuation and replay controls
 
 The exact routing release wins P5 after an ordinary pause save at
