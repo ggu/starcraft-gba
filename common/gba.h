@@ -127,7 +127,7 @@ void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy
                                   u32 marker_offset,u32 marker_mask,u32 marker_value);
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
-#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN) || defined(SC64_WORKER_CARGO_KIND)
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_HP_REGEN) || defined(SC64_WORKER_CARGO_KIND) || defined(SC64_MINERAL_FIFO)
 #ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
 /* The combined P10 reader recognizes one new tag and five predecessors. */
 #define GBA_SAVE_MAX_ACCEPTED_TAGS 6u

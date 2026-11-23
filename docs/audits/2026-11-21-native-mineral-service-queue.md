@@ -170,6 +170,54 @@ only from a validated new-format record.
 The local sanitizer fixture SHA-256 is
 `42264e05567bbf0be489cc7c9be6d14b027c3cfb440abfc69849769a387448af`.
 
+### Standalone FIFO and journal
+
+The opt-in `SC64_MINERAL_FIFO` stage implements arrival-ordered mineral
+service on the asset-free standalone engine. A patch advances only the
+head worker's timer. Same-update arrivals enter in unit iteration order.
+The next eligible worker starts service on the update after pickup.
+Cancellation, movement away, depletion and slot reuse clear old queue
+membership. The queue pass walks each patch list once and removes stale
+entries as it passes them.
+
+New matches written by the stage have a distinct journal tag. The
+existing unit rows carry ranks only in scratch before writing. Load
+validates and reconstructs the queues before committing, then restores
+normal cargo values. An older save keeps its concurrent work timers
+and continues to write the older tag. This stage keeps the existing
+timer length, pickup amount, and deposit path.
+
+Run `make test-sc64-mineral-fifo` for the standalone and Frontier
+sanitizer cases. They cover arrival order, service handoff, cancellation,
+depletion, slot reuse and a 50-update continuation. The journal checks
+also cover fallback after a checksum-valid duplicate rank or a rank
+on a gas order, and atomic rejection when neither bank can be loaded.
+
+An authored ARM fixture writes a save with one active miner and two
+waiters. A fresh mGBA process loads the actual 32 KiB SRAM image through
+the engine loader, restores the order, and matches 50 uninterrupted
+updates. The compared state includes units, buildings, mineral fields,
+queue links, frame and wallets.
+
+In the same ARM fixture, 32 orders passes with eight miners on
+separate patches cost 129,707 cycles under the older policy and
+255,419 cycles under the FIFO. Unit and mineral states match.
+The added cost is about 3,929 cycles per update in that workload.
+An earlier queue implementation took 261,923 cycles. This measures
+the authored orders workload.
+
+Integrate the distinct mode and rank normalization into the packed
+race journals next. Validate the packed fallback and publication
+paths, gas and depot transitions, payout and depletion, and shared
+performance across the normal race and Showcase builds before
+activating the mode there.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored ARM fixture | `f23ef06bdbbf093760bb786868d402633b49e057c4c32ad4d1abb1a830d51159` |
+| ARM continuation and timing | `83c7e46bca413c4c131c82767b813bfe7d8beba5a3bb1cd4676cc228623abc48` |
+| Standalone SRAM image | `bf05ad30a2b9f4054f9008f371a37ddfb62b185d51c1dc70fc851ef955d4181d` |
+
 ## Evidence
 
 Only metadata and digests appear here. Native states and input observers
