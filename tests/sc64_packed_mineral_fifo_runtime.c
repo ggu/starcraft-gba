@@ -9,7 +9,7 @@
 #define SC64_P6_COMBAT_ENABLED 1
 #define SC64_T6_RUNTIME 1
 #define MAX_UNITS 8
-#define MAX_MINERALS 3
+#define MAX_MINERALS 21
 #define WORLD_W 256
 #define WORLD_H 256
 #define MINERAL_WORK_RANGE 12
@@ -93,7 +93,43 @@ static void test_eligibility_and_reset(void) {
     burrow_t[0]=1; worker_mineral_fifo_begin(); assert(!mineral_fifo.patch[0]);
     reset_scene(); assert(!mineral_fifo.head[0] && !mineral_fifo_serviced[0]);
 }
+
+static void test_prune_spans(void)
+{
+    const unsigned patches[MAX_UNITS] = {0, 3, 4, 6, 7, 15, 20, 20};
+    for (unsigned mask = 0; mask < (1u << MAX_UNITS); ++mask) {
+        reset_scene();
+        for (unsigned slot = 0; slot < MAX_UNITS; ++slot) {
+            if (!(mask & (1u << slot))) continue;
+            unsigned patch = patches[slot];
+            m[patch] = (Mineral){100, 100, 100};
+            u[slot].target = (int)patch;
+            u[slot].work_timer = 19;
+            assert(sc64_mineral_fifo_append(&mineral_fifo, patch, slot));
+        }
+        m[3].amount = 0;
+        u[3].target = 20;
+        u[6].alive = 0;
+        burrow_t[4] = 1;
+
+        Sc64MineralFifo scalar = mineral_fifo;
+        Unit scalar_units[MAX_UNITS];
+        memcpy(scalar_units, u, sizeof(u));
+        for (unsigned patch = 0; patch < MAX_MINERALS; ++patch)
+            worker_mineral_fifo_prune_patch(&scalar, scalar_units, m, patch,
+                                            scalar.head[patch]);
+
+        worker_mineral_fifo_begin();
+        assert(!memcmp(mineral_fifo.head, scalar.head, sizeof(scalar.head)));
+        assert(!memcmp(mineral_fifo.tail, scalar.tail, sizeof(scalar.tail)));
+        assert(!memcmp(mineral_fifo.next, scalar.next, sizeof(scalar.next)));
+        assert(!memcmp(mineral_fifo.patch, scalar.patch, sizeof(scalar.patch)));
+        assert(!memcmp(u, scalar_units, sizeof(u)));
+    }
+}
+
 int main(void) {
     test_fifo_and_foreign_cargo(); test_prune_and_retarget(); test_eligibility_and_reset();
+    test_prune_spans();
     puts("packed mineral FIFO runtime: ok"); return 0;
 }

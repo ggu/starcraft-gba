@@ -36,33 +36,53 @@ worker_mineral_fifo_live_slot_at_patch(unsigned slot, const Unit *worker,
     return worker_mineral_fifo_matches_patch(worker, patch, index, WORLD_W, WORLD_H);
 }
 
+static inline __attribute__((always_inline)) void
+worker_mineral_fifo_prune_patch(Sc64MineralFifo *fifo, Unit *units,
+                                const Mineral *patches, unsigned patch,
+                                unsigned link)
+{
+    unsigned previous = 0;
+    while (link) {
+        unsigned slot = link - 1u;
+        Unit *worker = &units[slot];
+        link = fifo->next[slot];
+        if (
+#ifndef SC64_PACKED_MINERAL_FIFO
+            !worker->carry &&
+#endif
+            worker_mineral_fifo_live_slot_at_patch(slot, worker, &patches[patch], (int)patch)) {
+            previous = slot + 1u;
+            continue;
+        }
+        if (worker->order == ORDER_MINE &&
+#ifdef SC64_PACKED_MINERAL_FIFO
+            IS_WORKER(worker->type)
+#else
+            worker->target == (int)patch
+#endif
+           ) worker->work_timer = 0;
+        sc64_mineral_fifo_unlink(fifo, patch, slot, previous);
+    }
+}
+
 static void
 worker_mineral_fifo_prune(Sc64MineralFifo *fifo, Unit *units, const Mineral *patches)
 {
-    for (int i = 0; i < MAX_MINERALS; ++i) {
-        unsigned link = fifo->head[i], previous = 0;
-        while (link) {
-            unsigned slot = link - 1u;
-            Unit *worker = &units[slot];
-            link = fifo->next[slot];
-            if (
-#ifndef SC64_PACKED_MINERAL_FIFO
-                !worker->carry &&
-#endif
-                worker_mineral_fifo_live_slot_at_patch(slot, worker, &patches[i], i)) {
-                previous = slot + 1u;
-                continue;
-            }
-            if (worker->order == ORDER_MINE &&
-#ifdef SC64_PACKED_MINERAL_FIFO
-                IS_WORKER(worker->type)
-#else
-                worker->target == i
-#endif
-               ) worker->work_timer = 0;
-            sc64_mineral_fifo_unlink(fifo, (unsigned)i, slot, previous);
+    unsigned start = 0, end = MAX_MINERALS;
+    /* Scan short standalone tables directly. For larger tables, find
+     * the occupied interval once before walking its patches. */
+    if (MAX_MINERALS > 16) {
+        unsigned first = 0;
+        while (!fifo->head_words[first]) {
+            if (++first == SC64_MINERAL_FIFO_HEAD_WORDS) return;
         }
+        unsigned after = SC64_MINERAL_FIFO_HEAD_WORDS;
+        while (!fifo->head_words[after - 1u]) --after;
+        start = first * 4u;
+        if (after * 4u < end) end = after * 4u;
     }
+    for (unsigned patch = start; patch < end; ++patch)
+        worker_mineral_fifo_prune_patch(fifo, units, patches, patch, fifo->head[patch]);
 }
 
 #ifdef SC64_PACKED_MINERAL_FIFO
