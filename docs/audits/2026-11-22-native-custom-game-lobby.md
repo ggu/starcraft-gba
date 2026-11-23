@@ -440,6 +440,79 @@ entire 119,084-cycle byte-sprite portion would leave the
 The local corrected census receipt SHA-256 is
 `7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970`.
 
+### Whole-call savings available to retained rendering
+
+The same normal Protoss replay records each visible raster
+call's ordered source, clipped footprint and inclusive cycles
+in one pass. It compares prior and current contributors on
+each physical page and adds regions whose indexed pixels
+change. Source arguments are sampled at the entry breakpoint
+before the callee changes the stack pointer. Non-ROM inputs
+always invalidate their regions. All 16 frame, world, route,
+palette and paired page checks match stock. The first two cuts
+initialize the stored pages.
+
+| Region size | Mean marked regions | Whole calls outside marked regions | Mean cycles in those calls |
+| --- | ---: | ---: | ---: |
+| 8×16 | 58.29 | 66 / 558 | 23,865 |
+| 16×16 | 35.29 | 66 / 558 | 23,865 |
+| 32×16 | 22.00 | 62 / 558 | 21,088 |
+
+The measured raster calls use 194,891 cycles per update across
+the scored cuts. Eliminating the entire whole-call portion
+would save 23,865 at either finer region size before the
+required contributor tracking and terrain restoration. This
+counts only whole draws. Partial redraws need additional
+measurement, including their restore cost and exact
+depth-ordered recomposition. The 1,350,466-cycle late profile
+is still 788,674 cycles above the two-VBlank budget. Prioritize
+larger shared changes alongside the quiet-page reuse trial.
+
+Local census receipt SHA-256
+`bde7943f1ebdbde3110290d0d87c824b3fcb5d355eddddb361efda945ee2a1ee`.
+
+### Reusing indexed target coordinates
+
+The trial passes the target coordinates already loaded inside
+the spatial query to its eligibility check. Existing callers
+retain their original checks. The sanitized target differential
+passes with occupancy enabled. The 600-update late Melee window
+matches all 20 state, frame, route, display and palette cuts with
+the same static RAM endpoints.
+
+The mean falls from 1,040,170 to 1,039,851 cycles per update
+and p95 rises from 1,350,192 to 1,353,144. Keep the existing
+target query. Local timing receipt SHA-256
+`76de729d4bf36224329140e0e34bce84abcefe2eb6c279312e819665f8962ffe`.
+
+### Skipping over-budget combat sound lookups
+
+A shared observer trial checks the frame's existing sound effect
+budget before doing screen and raw-actor lookups for attack,
+death and completed-building cues. The selection and order
+responses still take their ordinary paths and the observer
+records each actor's state for the next update.
+
+The sanitizer fixtures for audio hooks, codec and mixer pass.
+The default observer fixture matches the control's simulation
+hash, event totals and alert totals. The current ARM Protoss
+Melee trial holds the static RAM endpoints and matches the
+control frame, units, world, route counters, both pages and
+palette at all 42 cuts. Each timing window measures 600 updates.
+
+| Window | Mean cycles, stock → trial | p95, stock → trial |
+| --- | ---: | ---: |
+| 8,401–9,000 | 766,169 → 767,662 | 904,103 → 905,493 |
+| 10,801–11,400 | 1,040,170 → 1,041,909 | 1,350,192 → 1,354,181 |
+
+The earlier mean rises 0.20% and the later mean rises 0.17%.
+Keep the existing observer. The [earlier effect budget census](2026-11-22-steady-order-cost.md#bounding-the-other-steady-costs)
+also shows few rejected events in other campaign and skirmish
+samples.
+
+The local candidate timing receipt SHA-256 is
+`aacf6f5d8396b662fba91188da3690fe2524242bd6ffb5ecc3c3d98ee4fc892c`.
+
 ### Reusing actor admission during the draw
 
 The trial passes the depth queue's body or charge-only admission

@@ -417,6 +417,151 @@ route for the later reinforcements.
 | Six-Hatchery production and combined assault | `2c4a9170b5fcee73250217df0308368037ed48883f0baf37144dddf2ffbc9584` |
 | Nydus link and health after load | `e8869ad4815123817c5e73ed9d606b2419b9208d49a076526fcd71ebf59ad204` |
 
+### Earlier Nydus transfers and fresh HOME recovery
+
+An earlier diversion of the current Z10 controller run pays for
+Hydralisks at four northern Hatcheries and sends three of the
+new units and a Drone through the existing Nydus link. Each
+transit uses an individual ground-unit selection and an ordinary
+order on the northern entrance. At frame 23,040 the four units
+are at full health and beside the southern exit. Both canals
+have 250 HP and Kerrigan has 400 HP.
+
+The ordinary pause save at frame 23,291 captures the group
+and both endpoints. The north entrance is down to 5 HP. A
+fresh HOME load reaches frame 23,292 and retains all four
+transported units, both canals and Kerrigan. The outer replay
+reports an error on a redundant final export after the pause
+save. The separate fresh-process check verifies the earlier
+SRAM file. This qualifies the transit and recovery. Preserving
+the link beyond the subsequent attack remains open.
+
+A separate continuation from the new save sends two existing
+southern Hydralisks through the intermediate waypoint. They
+reduce an outer Photon Cannon from 100 to 25 HP before both
+die. Kerrigan remains at 400 HP and the mission is active at
+frame 25,881. The transported group stays at the southern
+exit during this trial.
+
+A larger ordinary box selects the three transported Hydralisks,
+four other Hydralisks, six Zerglings and a Drone. It leaves
+Kerrigan behind. After the same intermediate waypoint, the
+group destroys the outer Cannon by frame 24,924. At frame
+26,124 all seven Hydralisks and two Zerglings remain selected.
+Kerrigan has 400 HP and the eastern Nexus still has 750 HP.
+
+A pause save at that point loads in a fresh process at frame
+26,125 with the Cannon still absent, the seven Hydralisks
+selected and Kerrigan at full health. That group destroys
+the Pylon southeast of the Nexus by frame 27,801. The
+remaining attackers die on the follow-up order and the
+Nexus still has 750 HP. The post-Cannon save preserves a
+larger force for testing reinforcement and a sustained attack.
+Three later visits to the southern Hatchery fail to pay for
+Hydralisks while the Den is absent. Selecting the transported
+Drone works on a close box around its current position. The
+northern Spawning Pool has also fallen by then. Ten southern
+placement attempts leave the Den command armed. The Den requires
+a completed Pool, so replace or preserve the Pool before the
+next Den order.
+
+An ordinary recovery spends a Drone on a new Pool near the
+southern Hatchery and queues three workers there. The Pool
+is complete by frame 28,803. One of the new Drones starts a
+southern Den, which completes by frame 30,597. The Hatchery
+then accepts three paid Hydralisk orders for 225 minerals
+and 75 gas. All three are beside the Hatchery at frame
+32,222. A fresh HOME load at frame 32,223 recovers the new
+Pool, Den and Hydralisks with the outer Cannon still gone.
+All seven original forward Hydralisks are still at their
+holding positions and Kerrigan has 400 HP. This save supports
+further production and a new grouped attack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Northern production, transit and pause save events | `35e74543ffa7dfc36f12a38f1baf63ca34846df37bc8adc14ae665ebaa9757db` |
+| Post-transit pause SRAM | `0e40ad4650f9f7f2d971499380f0dc147a32482788230d9585caa4d0d13bf841` |
+| Fresh HOME load | `33fd47c8a8d285a2c75439c4863e234d48331e890c6b68e39562daa94873c30f` |
+| Southern Photon Cannon attack | `a79fff16864fdbfbf5b26267eeb5209d11cdf695a2056a02788d3341167ffc4b` |
+| Southern box selection and Cannon destruction | `31ab6e5a0bc9118d3138f1c96066d1a539d017ebe331e9ba7b6dcc69e3eae619` |
+| Post-Cannon pause SRAM | `b59a01a29530ec3d5c0a1cf3d0313ec66d892967b790133c7363162d2b0fc45c` |
+| Fresh HOME and the Pylon assault | `f479270ead8de41124adf7d311e9246daefc409f0c4e7396220eb741b7e92f66` |
+| Southern Hatchery after the Den is lost | `3b94e287ef17ab70e84c37cfba5ce2bf01361c12fc4de3ccc21897357f48f859` |
+| Southern replacement placement attempts | `658287cd015efec91376b57cf1fb30c197e92db6d6b5d63abb261bc0d9f21aec` |
+| Owned buildings at the armed Den command | `2682ec12cff549134d817a29123271d598cd54552e3a21b8995f1e6a6a1818b7` |
+| Southern Pool, Den and fresh HOME production check | `23a65a5f866fc75fcf26aee66618aa6dd67882888053b051bbfa37bc51bcc9c5` |
+| Southern production SRAM | `4fa2c92494136377ee12b555995df23d15b24a734a404c33b0beb3e975a5cca7` |
+
+### Second Dark Templar defeat after the southern attack
+
+Repeated production at the southern Hatchery grows the live
+Hydralisk count to 29 by frame 38,582. A two-waypoint rally
+joins 15 southern reinforcements with the seven forward
+Hydralisks. The resulting 22-unit Hydralisk group and
+full-health Kerrigan reload from a new pause save at frame
+40,823.
+
+The attack clears another Photon Cannon and Pylon. The eastern
+Nexus retains 750 HP. The mission loses at frame 42,745 while
+Kerrigan is still at 400 HP. The fresh-load repeat records the
+human outcome changing to defeat and trigger 15 becoming done.
+A hero Dark Templar observed on the eastern approach at load
+is at the northwest objective area at defeat. A neutral run
+from the same save remains in play through frame 45,123 with
+trigger 15 still pending. The two runs establish a second
+interception requirement for this attack route.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Southern training, rally and attack | `850b63e8572fc9e3f3572864a3882f542862d7b2ef0a47612c379b0ed8d0f5ea` |
+| Pre-attack pause SRAM | `a918f6facaad270e43abaf27d8d2462b632f490917adb8f1b206b10c197073a3` |
+| Fresh load of the 22-Hydralisk group | `60f5f72526947196642a538f7f787ccc0d8c71d0719d440b8cb484039c95f5c7` |
+| Attack and late defeat trigger | `0a5a0abd4d6cb92a0b39ed1e28b027316a15b2ca1086dc6b33c6f6629c830b8d` |
+| Neutral result control | `3e69866e5d75d2ca6836536f94fb2708b5f2453378e6d6db73e776a23024fbf2` |
+
+### Three Dark Templar interceptions and a fresh HOME save
+
+From the 22-Hydralisk save, a smaller box excludes Kerrigan
+and sends four Hydralisks and an Overlord on the Dark Templar
+already near the southwest force. A direct order kills that
+Templar by frame 41,220. The same guard moves toward the
+central approach. It kills the eastern Templar as it crosses
+toward the northwest objective after the main army advances.
+Both are absent at the fresh HOME load at frame 43,339.
+
+A separate east-first route uses an Overlord to reveal the
+Templar near the eastern base. The assault clears a Cannon and
+Pylon, and the Templar is absent by frame 43,296. That Overlord
+survives at 10 HP. The southwest force kills the other Templar
+after loading this save. Most forward Hydralisks die by frame
+43,959, when one is still near the eastern Nexus approach.
+
+In a western continuation from the first save, the guard
+destroys an outer Cannon and Pylon. The western Nexus stays at
+750 HP. The guard is lost and a new Dark Templar reaches the
+southern objective, triggering defeat at frame 46,620 with
+Kerrigan at 400 HP. A passive guard with detection also loses
+when the new attacker passes it.
+
+The verified third interception stages the guard farther
+forward and issues a direct attack while the new Templar is
+still approaching. It is absent by frame 46,515. A fresh HOME
+load at frame 46,916 verifies the mission is active, Kerrigan
+and the Overlord at full health, and all three guarding
+Hydralisks alive. The eastern Nexus still has 750 HP, with
+only one forward Hydralisk left from the attack. Keep the
+guard in place while training a new offense.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First two interceptions | `54f241e851dec682df7e6707625fc0a655b0b8f076c4a37efaae82c6302d9aac` |
+| Fresh HOME after the first two | `cbbbb6b322cb900b1f2f45db106e56118d68b968d396e24d1f7cbf1d634144b7` |
+| East-first interception | `3c2da6cb5c6237060203fc2ebde5449b6ad76732433ad5ae78520372fa4097c3` |
+| Western advance and third defeat | `3092ff695bdab4ddfb3cf237c2430ceffc36051111b24b2c4e49b89a7adfd663` |
+| Third interception | `d1f445cb2f28f442ab9948f6816b18742752c2551ff4a372042aa5b6ac30b9f8` |
+| Post-interception SRAM | `0f27355f431000a9a1f021996cda104b17f37a2920cc26e1054df3cff3ca2bed` |
+| Fresh HOME after the third | `8a2ab7c93ef79b3a49f502e3a8a56e9809890cfb7aa34f6d7bb5170bce15bdc4` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
