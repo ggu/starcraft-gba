@@ -149,8 +149,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Effect raster tile bands](audits/2026-11-22-steady-order-cost.md#partially-fogged-effect-raster)
   cut partial-fog fixture costs. All 105 sampled Outpost draws reject
   on viewport bounds and all 498 Crossfire draws are fully visible.
-  Keep the band trial local and measure effect preparation before the
-  viewport rejection.
+  Keep the band trial local. The Outpost calls that reach a rejected
+  draw spend about 63,971 guest cycles per update before their first
+  raster. Identify which preparation an earlier viewport bound can
+  eliminate while preserving painter order and trail picks.
   The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
   attributes about 59,514 guest cycles per update to four mineral
   blits and 9,750 to one geyser blit. Reusing the loaded word for
