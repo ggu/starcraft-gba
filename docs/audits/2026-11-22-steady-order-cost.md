@@ -803,6 +803,9 @@ cover that segment. Calls that collect trail picks still use the
 existing path to produce painter keys. The sanitizer fixture exercises
 every clip edge, a partially visible frame with an offscreen anchor,
 a segment crossing the viewport, combined parts and invalid geometry.
+An authored differential checks 65,536 trajectories over 18 sampled
+ages each. All 40,845 rejected trajectories produce zero blits,
+including the synthetic child offset case.
 
 Four authored ARM cases run 64 draws each with the actual Mode 4
 blitters. Both builds produce identical framebuffer hashes.
@@ -830,6 +833,7 @@ both camera positions before using these figures for FPS claims.
 | --- | --- |
 | Outpost trajectory and call-site replay | `a7b0ccfd5924d5532996fd2617fc5875e5e7114581b5bfca6c6e0b0b7346464f` |
 | Outpost expanded-bounds replay | `a153287f5b1bab6cd66816882bd871de952f0da0bdaad7605349661f958b7337` |
+| Authored sanitizer differential | `5df6921e9d8f33c890120803459214758eac60be24710d39e8acc3012836db98` |
 | Authored ARM fixture | `78a0d1de6a2f45becac0dc801429ae3b6f45f843ba693fda14eefc50538e2103` |
 | ARM timings and framebuffer checks | `9467874673ce94a1e895ee6342abe61e102386f7123241df5d812d000395f831` |
 | Authored mixed ARM fixture | `99d105fa7a9374df1346a7f47dc33b6fa1da5a34c18074f8e15b8681a53509c1` |
