@@ -183,6 +183,64 @@ static int nearest_by_route(int tx,int ty,const u8 *skip)
     return best;
 }
 
+/* Walkable cells in the 3x3 block around (x,y)'s cell. The engine routes to a
+ * goal only through a walkable cell in that block, so with none an
+ * attack-move there never starts: path_next_tile fails, path_retry is set to
+ * 12, and the unit stands until an enemy comes into its acquisition range. */
+static int goal_open_cells(int x,int y)
+{
+    int col=limit(x/16,0,MAP_COLS-1),row=limit(y/16,0,MAP_ROWS-1),n=0;
+    if(!path_grid_valid)return -1;
+    for(int r=-1;r<=1;r++)for(int c=-1;c<=1;c++){
+        int nc=col+c,nr=row+r;
+        if(nc>=0&&nr>=0&&nc<MAP_COLS&&nr<MAP_ROWS)n+=SC64_GRID_GET(path_walkable,nc+nr*MAP_COLS)!=0;
+    }
+    return n;
+}
+
+/* The army's acquisition radius: an attack-move in update_orders() engages
+ * the nearest target whose center is strictly closer than SC64_PR_FAR_RANGE
+ * (dist2 < range*range), which is 64 pixels for Marines and Firebats. */
+static int army_reach(int slot)
+{
+    /* Evaluate the engine's own macro on local copies; the game is untouched. */
+    Unit marine=u[slot],firebat=u[slot];
+    marine.type=U_MARINE;firebat.type=U_FIREBAT;
+    int r=SC64_PR_FAR_RANGE(&marine),f=SC64_PR_FAR_RANGE(&firebat);
+    return r<f?r:f;
+}
+
+/* The walkable cell nearest by walk from (sx,sy) whose center is within the
+ * acquisition radius of (tx,ty). The Overmind's center is deep inside its
+ * footprint, so an attack-move there has no route; units sent to this cell
+ * can walk to it and engage the Overmind by the time they arrive. */
+static int attack_cell(int sx,int sy,int tx,int ty,int reach,int *px,int *py)
+{
+    static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+    static u8 seen[MAP_CELLS];
+    static int queue[MAP_CELLS];
+    if(!path_grid_valid)return 0;
+    int start=limit(sx/16,0,MAP_COLS-1)+limit(sy/16,0,MAP_ROWS-1)*MAP_COLS;
+    int head=0,tail=0;
+    for(int i=0;i<MAP_COLS*MAP_ROWS;i++)seen[i]=0;
+    seen[start]=1;queue[tail++]=start;
+    while(head<tail){
+        int cell=queue[head++],col=cell%MAP_COLS,row=cell/MAP_COLS;
+        int x=col*16+8,y=row*16+8;
+        if(dist2(x,y,tx,ty)<reach*reach&&SC64_GRID_GET(path_walkable,cell)){
+            *px=x;*py=y;return 1;
+        }
+        for(int k=0;k<4;k++){
+            int nc=col+dx[k],nr=row+dy[k];
+            if(nc<0||nr<0||nc>=MAP_COLS||nr>=MAP_ROWS)continue;
+            int next=nc+nr*MAP_COLS;
+            if(seen[next]||!SC64_GRID_GET(path_walkable,next))continue;
+            seen[next]=1;queue[tail++]=next;
+        }
+    }
+    return 0;
+}
+
 static int hero(int raw)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==raw)return i;
@@ -962,11 +1020,32 @@ int main(int argc,char **argv)
                  * attack orders would otherwise stand. */
                 army_force=distance<0||distance<12;
                 if(distance>=0&&distance<12){
+                    /* Attack-move to the nearest walkable cell that has the
+                     * Overmind in acquisition range, not to its center. The
+                     * engine cannot route to the center, so groups ordered
+                     * there stood still unless an enemy was already in range:
+                     * a 122-unit army once waited 165,000 frames 200 pixels
+                     * west of it. The record lists every input of this choice. */
+                    unsigned decided=(unsigned)frame;
+                    int ax=b[cell].x,ay=b[cell].y,fx=u[front].x,fy=u[front].y,om_x=b[cell].x,om_y=b[cell].y,om_hp=b[cell].hp;
+                    int center_open=goal_open_cells(om_x,om_y);
+                    int reach=army_reach(front),routed=attack_cell(fx,fy,om_x,om_y,reach,&ax,&ay);
+                    /* No such cell: the front's own route end is still walkable. */
+                    if(!routed){ax=wx;ay=wy;}
+                    int point_open=goal_open_cells(ax,ay);
                     army_only=U_MARINE;
-                    (void)army_command(MENU_ATTACK,b[cell].x,b[cell].y);
+                    int marines=army_command(MENU_ATTACK,ax,ay);
                     army_only=U_FIREBAT;
-                    (void)army_command(MENU_ATTACK,arb>=0?u[arb].x:b[cell].x,arb>=0?u[arb].y:b[cell].y);
+                    int bx=arb>=0?u[arb].x:ax,by=arb>=0?u[arb].y:ay;
+                    int firebats=army_command(MENU_ATTACK,bx,by);
                     army_only=0;
+                    fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"route\":%d,\"close_below\":12,\"front\":%d,\"front_at\":[%d,%d],"
+                        "\"overmind\":[%d,%d],\"overmind_hp\":%d,\"center_open\":%d,\"reach\":%d,\"routed\":%d,\"point\":[%d,%d],\"point_open\":%d,"
+                        "\"arbiter\":%d,\"firebat_point\":[%d,%d],\"marines_ordered\":%d,\"firebats_ordered\":%d}\n",
+                        decided,distance,front,fx,fy,om_x,om_y,om_hp,
+                        center_open,reach,routed,ax,ay,point_open,arb,bx,by,marines,firebats);
+                    /* The order record below reports the Marines' destination. */
+                    wx=ax;wy=ay;
                 } else {
                     if(arb>=0){wx=u[arb].x;wy=u[arb].y;}
                     (void)army_command(MENU_ATTACK,wx,wy);

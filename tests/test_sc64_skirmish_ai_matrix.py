@@ -885,7 +885,7 @@ class CatalogAndCases(unittest.TestCase):
     def test_new_case_kinds_are_listed_once_per_profile(self):
         cases = ai.cases(36000)
         self.assertEqual(len(cases), len(set(cases)))
-        for kind, per_profile in (("catalog", 1), ("audit-control", 6), ("repower", 3), ("air-pin", 6), ("no-ore", 6)):
+        for kind, per_profile in (("catalog", 1), ("audit-control", 6), ("repower", 3), ("air-pin", 6), ("no-ore", 8)):
             self.assertEqual(sum(c[0] == kind for c in cases), per_profile * len(ai.PROFILES), kind)
         matches = [c for c in cases if c[0] == "match"]
         draws = [c for c in cases if c[0] == "match-draw"]

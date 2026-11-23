@@ -280,3 +280,39 @@ current release uses 27,273,555 bytes of log and 40,192 bytes of report.
 | P3 pause and victory through separate HOME loads | `b2fe36dc4f8ebf9a61cd1118b41ecaf3f0d3d40f0b0db0c2abd5502fb4fdbba5` |
 | P3 pause SRAM | `16786e21f396875b2e942fd0e6ec6fd2615549a1ad88a702626ec19336651a4f` |
 | P3 victory SRAM and fresh readback | `a0ed4a552a52a2289c29ea3ebb4fd1395d346801416637cbf12e46056c7bcdc5` |
+
+## P10 Overmind assault point
+
+Since #738 (`ea9a3878`), the P10 HOST controller draws after every update.
+On a `.local` whose `protoss-p7` sprite header predates the current
+`tools/sc64_race_sprites.py` output, the controller no longer won. It
+stopped at its 220,000-call cap with 122 army units and the Overmind
+at 5,000 HP. The parent of #738, `adbb22bf`, wins at frame 44,249 with
+the same header. At `c84883de`, removing only that draw restores 44,249
+under both sprite headers. With the draw, the outcome depends on sprite
+frame rectangles, because selection picks read painter state.
+
+The blocking decision was the controller's close-range branch. When the
+front's route was under 12 cells, it attack-moved the Marines, and the
+Firebats when no Arbiter was near, to the Overmind's center. That point has no walkable cell in its 3x3
+neighbourhood, so `path_next_tile()` fails from everywhere. Units without
+an enemy in their 64-pixel acquisition radius stand with
+`path_retry=12`. In the stalled run, the front arrived 200 pixels west of
+the center and waited 165,000 frames. The controller now orders the walk
+nearest walkable cell inside that radius, and its `assault` trace record
+lists every input of the choice. Group orders still spread units around
+that cell, so a Firebat in an outer slot can stop out of range; the
+next order cycle re-issues every group.
+
+Fast unsanitized sweeps of 32 start delays (0 to 217, step 7):
+
+| Controller | Sprite header | Wins | Stopped at cap |
+| --- | --- | ---: | ---: |
+| `c84883de` | stale | 20 | 12 |
+| this change | stale | 31 | 1 |
+| `c84883de` | current | 31 | 1 |
+| this change | current | 31 | 1 |
+
+The 217-update delay reaches the call cap in all four rows. With current
+inputs, the sanitized controller and the PX host replay both win at frame
+93,377 (call 94,786). The other nine PX tapes still win.

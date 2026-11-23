@@ -696,6 +696,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four-seat Blood Bath. Qualify a saved service policy, the remaining
   depot travel and unloading, and campaign and CPU economy before
   normal activation.
+  A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
+  brackets the first service claim at ares steps 5,941–5,955.
+  The normal Terran ROM still exposes Blood Bath as Free for All.
+  The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
+  passes 20 ordinary save continuations and 20 cross-version
+  Free for All loads or Melee rejections. Random seats and four
+  legacy campaign saves also pass. The last full three-CPU
+  Melee samples average 16–20 emulated updates per second.
+  Fresh-pause defeats match on all four products. Verify an active
+  win and qualify a normal-product build before enabling the
+  option by default.
   The [matched one-CPU opening](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   already differs in first patch assignment. Check native formation and
   worker travel before using a longer service delay to fit the income.
@@ -726,7 +737,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory. A 1,500-pixel search delays the host loss from frame
   62,535 to 79,353. The separate attempt-order change reproduces
   the stock failure. Measure scouting and actual cargo returns
-  before treating the wider worker search as a recovery.
+  before treating the wider worker search as a recovery. Two
+  [instrumented recovery trials](audits/2026-11-12-z8-normal-physical.md#observed-mineral-returns-in-the-recovery-trials)
+  fail earlier than stock. A scout move stalls near a Hatchery,
+  and changing worker priority increases early returns while
+  Kerrigan still dies. Verify movement and gather completion and
+  track the hero's retreat before another full ARM attempt.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -737,6 +753,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rebuild each account for about 80,000 cycles per update. Use
   the paired samples to measure these passes across changing
   live populations and confirm any gain in the late Zerg workload.
+  A [fresh target-index counter trial](audits/2026-11-12-target-index-bulk.md#batch-the-fresh-dirty-cell-count)
+  saves about 5,600 cycles per rebuild in the two P9 samples and
+  0.33% over the P10 victory tail. The six three-CPU games and 24
+  fresh loads agree. Full P9 victory uses 0.37% fewer cycles,
+  with all 93 checkpoints and all three SRAM exports matching.
+  Finish normal-product build qualification before activation.
   A local P10 armed-type lookup on top of the shared cursor queries saves
   2.39% and 2.37% in the P9 windows and 1.28% in the P10 tail.
   The sampled state, display pages and final P10 SRAM match.

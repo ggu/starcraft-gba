@@ -24,6 +24,13 @@
 #endif
 #define SC64_TARGET_ENTITY_COUNT (MAX_UNITS + MAX_BUILDINGS)
 #define SC64_TARGET_DIRTY_CAPACITY (MAX_UNITS * 2 + MAX_BUILDINGS)
+#ifdef SC64_TARGET_BATCH_DIRTY_PROBE
+#ifndef SC64_TARGET_BULK_REBUILD_PROBE
+#error "Batch dirty counting requires the validated owner-list rebuild"
+#endif
+_Static_assert(SC64_TARGET_ENTITY_COUNT <= SC64_TARGET_DIRTY_CAPACITY,
+               "One initial insertion per entity fits the dirty list");
+#endif
 
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 typedef u16 Sc64TargetIndex;
@@ -65,17 +72,23 @@ sc64_target_cell_for(int x, int y, int *cell)
 
 /* The caller has validated the owner and position and computed the cell. */
 static inline __attribute__((always_inline)) int
-sc64_target_link_cell(int entity, int owner, int cell, int x, int y)
+sc64_target_link_cell_counted(int entity, int owner, int cell, int x, int y,
+                              unsigned *batch_dirty_count)
 {
     Sc64TargetIndex old = sc64_target_head[owner][cell];
     if (old == SC64_TARGET_NONE) {
-        if (sc64_target_dirty_count >= SC64_TARGET_DIRTY_CAPACITY) {
-            sc64_target_dirty_overflowed = 1;
-            sc64_target_index_active = 0;
-            return 0;
+        if (batch_dirty_count) {
+            sc64_target_dirty[(*batch_dirty_count)++] =
+                (u16)(owner * SC64_TARGET_CELL_COUNT + cell);
+        } else {
+            if (sc64_target_dirty_count >= SC64_TARGET_DIRTY_CAPACITY) {
+                sc64_target_dirty_overflowed = 1;
+                sc64_target_index_active = 0;
+                return 0;
+            }
+            sc64_target_dirty[sc64_target_dirty_count++] =
+                (u16)(owner * SC64_TARGET_CELL_COUNT + cell);
         }
-        sc64_target_dirty[sc64_target_dirty_count++] =
-            (u16)(owner * SC64_TARGET_CELL_COUNT + cell);
     }
     sc64_target_next[entity] = old;
     sc64_target_prev[entity] = SC64_TARGET_NONE;
@@ -97,6 +110,12 @@ sc64_target_link_cell(int entity, int owner, int cell, int x, int y)
     (void)y;
 #endif
     return 1;
+}
+
+static inline __attribute__((always_inline)) int
+sc64_target_link_cell(int entity, int owner, int cell, int x, int y)
+{
+    return sc64_target_link_cell_counted(entity, owner, cell, x, y, 0);
 }
 
 static int GBA_HOT
@@ -158,12 +177,13 @@ sc64_target_index_begin(void)
 #ifdef SC64_TARGET_BULK_REBUILD_PROBE
 static inline __attribute__((always_inline)) int
 sc64_target_link_in_world(int entity, int owner, int x, int y,
-                         unsigned width, unsigned height)
+                          unsigned width, unsigned height,
+                          unsigned *batch_dirty_count)
 {
     if ((unsigned)x >= width || (unsigned)y >= height) return 0;
-    return sc64_target_link_cell(entity, owner,
-                                 (x >> 6) + (y >> 6) * SC64_TARGET_GRID_COLS,
-                                 x, y);
+    return sc64_target_link_cell_counted(entity, owner,
+                                         (x >> 6) + (y >> 6) * SC64_TARGET_GRID_COLS,
+                                         x, y, batch_dirty_count);
 }
 #endif
 
@@ -180,6 +200,12 @@ sc64_target_index_begin_owner_lists(void)
     sc64_target_index_clear();
 #ifdef SC64_TARGET_BULK_REBUILD_PROBE
     const int width = WORLD_W, height = WORLD_H;
+#ifdef SC64_TARGET_BATCH_DIRTY_PROBE
+    unsigned dirty_count = 0;
+    unsigned *const batch_dirty_count = &dirty_count;
+#else
+    unsigned *const batch_dirty_count = 0;
+#endif
     if (width <= 0 || height <= 0 ||
         width > SC64_TARGET_GRID_COLS * SC64_TARGET_CELL_SIZE ||
         height > SC64_TARGET_GRID_ROWS * SC64_TARGET_CELL_SIZE) {
@@ -196,19 +222,28 @@ sc64_target_index_begin_owner_lists(void)
         for (int i = target_unit_head[owner]; i >= 0; i = target_unit_next[i])
 #ifdef SC64_TARGET_BULK_REBUILD_PROBE
             if (!sc64_target_link_in_world(i, owner, u[i].x, u[i].y,
-                                          width, height)) return;
+                                          width, height, batch_dirty_count)) goto finish;
 #else
             if (!sc64_target_insert(i, owner, u[i].x, u[i].y)) return;
 #endif
         for (int i = target_building_head[owner]; i >= 0; i = target_building_next[i])
 #ifdef SC64_TARGET_BULK_REBUILD_PROBE
             if (!sc64_target_link_in_world(MAX_UNITS + i, owner, b[i].x, b[i].y,
-                                          width, height)) return;
+                                          width, height, batch_dirty_count)) goto finish;
 #else
             if (!sc64_target_insert(MAX_UNITS + i, owner, b[i].x, b[i].y)) return;
 #endif
     }
     sc64_target_index_active = 1;
+#ifdef SC64_TARGET_BULK_REBUILD_PROBE
+finish:
+    /* Failed geometry may still leave an ordered prefix to clear. */
+#ifdef SC64_TARGET_BATCH_DIRTY_PROBE
+    sc64_target_dirty_count = (u16)dirty_count;
+#else
+    return;
+#endif
+#endif
 }
 
 static void GBA_HOT

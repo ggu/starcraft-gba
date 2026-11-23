@@ -1970,9 +1970,17 @@ static int ready_no_ore(void)
     cheapest = train_state(first_bot(), 1, &affordable);
     /* A bank the owner can plausibly spend within the window: at least one
      * unit's worth and a few units short of what production can absorb.
-     * Zerg bank up whenever larvae are the limit, so they have no bound. */
+     * Zerg bank up whenever larvae are the limit, so they have no bound.
+     * The native Blood Bath Bunker and Battery openings keep two Barracks or
+     * two Gateways through their measured events, and at the engine's faster
+     * mining rate they bank above the bound before the unit share fills.
+     * They have no bound either. The validation is the same for every
+     * owner: within the window the bank falls below the cheapest army unit
+     * or live and queued units fill the share, with no worker queued and at
+     * least one army unit made. */
     return frame >= 5400 && cheapest > 0 && bank >= cheapest &&
-        (c.race == R_ZERG || bank < 800) && c.workers >= 8 && c.depots &&
+        (c.race == R_ZERG || bank < 800 || race_ai_blood_bath_ffa()) &&
+        c.workers >= 8 && c.depots &&
         c.units + c.queued_units < race_ai_unit_cap() - 8 && !c.pending_builders;
 }
 
