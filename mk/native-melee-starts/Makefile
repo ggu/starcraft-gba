@@ -1,8 +1,12 @@
-# Private opt-in cartridges with unique filenames and identities.
 NATIVE_MELEE_START_FLAGS := -DSC64_NATIVE_MELEE_STARTS
 NATIVE_ELIMINATION_FLAGS := -DSC64_NATIVE_SKIRMISH_ELIMINATION
 NATIVE_MELEE_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 
+# The Blood Bath lobby mode is shared by the four normal cartridges.
+$(CANONICAL_GAME_ELFS): CFLAGS += $(NATIVE_MELEE_START_FLAGS)
+$(CANONICAL_GAME_ELFS): mk/native-melee-starts/Makefile
+
+# Private comparison cartridges have unique filenames and identities.
 define NATIVE_MELEE_START_PROFILE
 build/starcraft-native-melee-$(1).elf: $$(COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(4) $$(SC64_AUDIO_BANK_CONFIG) common/gba.ld Makefile mk/native-melee-starts/Makefile | build
 	$$(CC) $$(CFLAGS) $$(NATIVE_MELEE_START_FLAGS) $(8) $(2) $$(COMMON) $$(STARCRAFT) $(4) $$(LDFLAGS) -Wl,-Map,build/starcraft-native-melee-$(1).map -lgcc -o $$@
