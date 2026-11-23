@@ -298,11 +298,19 @@ race_impact_save_write(const GbaSaveSelection *previous
 #ifdef SC64_NUKE_SILO_JOURNAL
                        , int nuke_silo_tag
 #endif
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+                       , const Sc64StageSaveAuth *guard_auth
+#endif
                       )
 #else
 race_impact_save_write(void)
 #endif
 {
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && defined(SC64_CARRIER_EGG_AUTH_EXPERIMENT)
+    /* No combined authenticated wire format exists yet. Do not emit either
+     * predecessor tag for a custom world using the staged Egg identity. */
+    if (race_mode) return 0;
+#endif
     /* Loading a completed journal returns to a frozen result screen.
      * Leave the live queue alone and omit damage that cannot run there. */
     const unsigned impact_count = (race_data.state[18] || race_data.state[19]) ?
@@ -315,7 +323,7 @@ race_impact_save_write(void)
         if (impact_count>RACE_IMPACT_ROWS || !race_p7_carrier_training_live_world_valid()) return 0;
         u8 *wire=SC64_ZC_SCRATCH, *packet=wire+SC64_ZC_PACKET_WORK;
         unsigned n=race_p7_projectile_encode(packet);
-        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
+        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H SC64_GCTX_ARG};
         if (!n || !sc64_compact_codec_validate(packet,n,SC64_POOL_CAPACITY,
                                              race_showcase_projectile_row,&view)) return 0;
         unsigned tail=impact_count ? sc64_impact_save_bytes(impact_count) : 0;
@@ -421,7 +429,7 @@ race_impact_save_write(void)
     if (race_mode) {
         if (!race_p7_carrier_training_live_world_valid()) return 0;
         unsigned packet=race_p7_projectile_encode(race_tc_packet);
-        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H};
+        Sc64ShowcaseProjectileCandidate view={&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H SC64_GCTX_ARG};
         if (!packet || !sc64_compact_codec_validate(race_tc_packet,packet,SC64_POOL_CAPACITY,
                                        race_showcase_projectile_row,&view)) return 0;
         unsigned wire=sc64_tc_pack((const u8 *)&race_impact_record,

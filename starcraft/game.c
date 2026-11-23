@@ -446,6 +446,11 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Custom Egg service requires authenticated custom transport without competing staged namespaces"
 #endif
 #endif
+#if defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && \
+    (defined(SC64_TERRAN_CARRIER_PROBE) || defined(SC64_ZERG_CARRIER_PROBE) || defined(SC64_SHOWCASE_CARRIER_PROBE)) && \
+    !defined(SC64_CARRIER_EGG_AUTH_EXPERIMENT)
+#error "Carrier and custom Egg candidate require the isolated authentication experiment"
+#endif
 #if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_RACES))
 #error "Shared Egg wire identity is HOST-only and requires race rules"
 #endif
@@ -2460,6 +2465,9 @@ static void race_impact_tick(void);
 static int race_impact_save_write(const GbaSaveSelection *previous
 #ifdef SC64_NUKE_SILO_JOURNAL
                                   , int nuke_silo_tag
+#endif
+#ifdef SC64_SHARED_EGG_CUSTOM_CANDIDATE
+                                  , const Sc64StageSaveAuth *guard_auth
 #endif
                                   );
 #else

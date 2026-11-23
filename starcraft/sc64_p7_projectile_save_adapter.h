@@ -51,14 +51,20 @@ static int race_p7_projectile_candidate_row(const RaceSave *candidate,
 typedef struct {
     const RaceSave *candidate;
     unsigned ww,wh;
+#if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const Sc64StageSaveAuth *guard_auth;
+#endif
 } Sc64ShowcaseProjectileCandidate;
 
 static int race_showcase_projectile_row(void *context,u8 ordinal,const Sc64ProjectileRow *row)
 {
     const Sc64ShowcaseProjectileCandidate *view=context;
+#if defined(SC64_COMPOUND_SCARAB_CONTEXT_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+    const Sc64StageSaveAuth *guard_auth=view->guard_auth;
+#endif
     (void)ordinal;
     return race_protoss_services_active() &&
-        race_p7_projectile_candidate_row(view->candidate,view->ww,view->wh,row);
+        race_p7_projectile_candidate_row(view->candidate,view->ww,view->wh,row SC64_GCTX_ARG);
 }
 
 #ifndef SC64_CUSTOM_CARRIER_PROBE
@@ -82,7 +88,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
             (!p7 || RACE_PROTOSS_SLOT(&actor)<0 || RACE_PROTOSS_SLOT(&actor)>=8 ||
              actor.owner!=race_protoss_source_owner(RACE_PROTOSS_SLOT(&actor)))) return 0;
     }
-    Sc64ShowcaseProjectileCandidate view={candidate,ww,wh};
+    Sc64ShowcaseProjectileCandidate view={candidate,ww,wh SC64_GCTX_ARG};
     return (p7 || size==2) && sc64_compact_codec_validate_target(&race_p7_projectiles,
         candidate->interceptor_projectiles,size,SC64_SHOWCASE_PROJECTILE_CAP,race_showcase_projectile_row,&view);
 }
