@@ -733,6 +733,50 @@ Measure the projectile-overlay branch and wider fights before proposing
 a tracer shortcut. The one-frame receipt SHA-256 is
 `17be680573df0bde2e69793ffbfa0372f25bea1765d31bf0bca2d4e209d03e24`.
 
+## Partially fogged effect raster
+
+The local tile-band trial queries each column once per 16-pixel world
+row and reuses the visibility mask for its scanlines. It clips to map
+bounds and preserves each row's blit order for flipped and mapped
+sprites. The sanitizer pixel oracle passes a 256-pixel raster that
+straddles 17 tiles, all 16 tile phases, and viewport and map edges.
+
+Twelve authored ARM batches use the shared Mode 4 blitters on ordinary,
+strength-mapped and destination-mapped pixels. Each batch draws 24
+effects. Both versions produce the same framebuffer digests.
+
+| Visibility case | Cycle change across the three batches |
+| --- | ---: |
+| Whole raster visible | 0.94–3.00% more |
+| Whole raster hidden | 65.03–91.96% fewer |
+| Mixed visible and hidden tiles | 27.84–39.05% fewer |
+| Map edge | 54.91–86.20% fewer |
+
+Separating the fallback into a function brings fully visible changes
+within about 2%, with stack use split across caller and callee. These
+are fixture measurements.
+
+In a read-only replay of the retained three-CPU Outpost battle,
+all 105 raster calls across frames 11,100–11,107 are rejected by the
+existing viewport bounds. In Crossfire, the 498 raster calls across
+frames 40–55 and 95–110 all pass the whole-raster visibility check.
+Both replays match the retained world, both framebuffer pages, palette
+and route samples. The 105 viewport rejections consume 25,565 guest
+cycles from raster entry to return, about 3,196 per update. That leaves
+little headroom inside the final check. Neither workload exercises
+partial fog. Keep the trial local. Measure time spent preparing effect
+draws before the viewport check, then pair any earlier rejection with
+a visible-fight holdout.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored ARM fixture | `1aba289823f13756238e8cdd9096c2d6732f4953123d044c8730a89da7a1b95a` |
+| ARM timing and framebuffer results | `457397a6ac76a5394611fc82d4b8c8512d9f66982e2ba36bafda50d503f6de1b` |
+| Separate fallback ARM results | `b61bede9e95f61e803d4ef659ff932b0992b8acf31f81683be1dbb2237638123` |
+| Outpost raster census | `d0d360dc2a3da44aabbf82823dc2cd967bc2df075cfad0b0a42a1d7cc30200db` |
+| Outpost raster entry-to-return timing | `8c42be687db0ef0b77890733bcc1da1ba4525bd5328717c123ad15528904056d` |
+| Crossfire raster census | `ba93b109c4b900c94c13aa64557dfb0148bce73091acc26e8d2926f827752e8b` |
+
 ## Outpost resource sprite costs
 
 The ordinary late Outpost repeat matches the retained world,

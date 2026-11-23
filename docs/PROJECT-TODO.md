@@ -146,6 +146,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   0.47% in Crossfire and 0.73% on the P10 victory tail. The measured
   P10 pace rises to 11.25 emulated updates per second. Larger movement
   and rendering costs still dominate the crowded scenes.
+  [Effect raster tile bands](audits/2026-11-22-steady-order-cost.md#partially-fogged-effect-raster)
+  cut partial-fog fixture costs. All 105 sampled Outpost draws reject
+  on viewport bounds and all 498 Crossfire draws are fully visible.
+  Keep the band trial local and measure effect preparation before the
+  viewport rejection.
   The [ordinary Outpost census](audits/2026-11-22-steady-order-cost.md#outpost-resource-sprite-costs)
   attributes about 59,514 guest cycles per update to four mineral
   blits and 9,750 to one geyser blit. Reusing the loaded word for
@@ -817,6 +822,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   after HOME. Keep that continuation valid while qualifying a
   saved service policy, depot travel and unloading, and campaign
   and CPU economy for new matches.
+  The [packed row feasibility check](audits/2026-11-21-native-mineral-service-queue.md#queue-order-in-existing-width-save-rows)
+  round-trips all 240 proposed waiter ranks through four codecs with
+  independent timers. Qualify the new save tag and transactional
+  queue reconstruction before enabling the policy.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.

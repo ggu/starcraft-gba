@@ -141,6 +141,35 @@ Use the predecessor save above to verify both legacy timers. Compare uninterrupt
 and fresh HOME continuations on every normal product before activation.
 Check the normal opening and AI economy timings separately.
 
+### Queue order in existing-width save rows
+
+Test a new-policy row discriminator before changing the save size.
+An eligible queued worker has zero live cargo. Under an authenticated
+new save tag, serialized values 9–248 can carry that worker's rank
+1–240 on its patch. Decode and validate the ranks in a private
+candidate, then restore the zero cargo value before the normal cargo
+and mission checks. The work timer remains independent, including
+when a worker has reached zero but still owns the service slot.
+
+An asset-free fixture with synthetic actor facts passes all 240
+values with timers 0, 1, 31, 44 and 45 in the compact, ZP,
+derived and P7 typed codecs. All 4,800 row round trips reproduce
+the codec inputs and normalization restores the original zero cargo.
+The fixture exercises individual row widths. It follows the derived
+codec's requirement for the omitted weapon field. It does not
+exercise worker classification or the complete journal.
+
+Qualify the membership rules for empty workers, including approaches,
+cancellation, job replacement and slot reuse. Reject mismatched
+targets, duplicate ranks, gaps and inconsistent head state before
+publishing the candidate. Give a malformed newer record the same
+older-bank fallback as other journal failures. Keep the recorded
+concurrent service when loading a legacy match. Derive the FIFO
+only from a validated new-format record.
+
+The local sanitizer fixture SHA-256 is
+`42264e05567bbf0be489cc7c9be6d14b027c3cfb440abfc69849769a387448af`.
+
 ## Evidence
 
 Only metadata and digests appear here. Native states and input observers
