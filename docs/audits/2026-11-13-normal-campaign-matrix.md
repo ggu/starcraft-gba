@@ -519,7 +519,9 @@ neutral updates. There are 81 sampled cuts. The stored world
 fingerprints differ from the historical target-index receipt, so
 the test proves the current seeded win and save round trip under
 these inputs. The route averages 11.50 emulated main-loop updates
-per second. A complete current start-to-victory route remains open.
+per second. The [regenerated full HOME route](2026-11-13-p10-normal-home.md#november-23-packaged-full-home-win)
+wins from a fresh start on the same cartridge, with its own pause
+and victory journals.
 
 | Local receipt | SHA-256 |
 | --- | --- |
