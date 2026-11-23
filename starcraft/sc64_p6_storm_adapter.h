@@ -243,6 +243,9 @@ static int race_p6_storm_tick(int user_paused)
 #endif
             if (q->hp<=0) {
                 race_p6_note_building_death(q); q->hp=0; q->alive=0;
+#if SC64_PSC_TARGET_HOOK
+                race_scarab_probe_target_invalidate(MAX_UNITS+i);
+#endif
                 invalidate_path_grid();
             }
         }

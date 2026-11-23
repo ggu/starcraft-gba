@@ -117,6 +117,7 @@ static void __attribute__((noinline)) race_bunker_kill_passenger(int unit,int ki
     if (race_z6_active()) race_z6_note_unit_death(q);
 #endif
     if (q->owner==SIDE) supply_used-=unit_slot_supply(q);
+    SC64_PSC_CLEAR_SLOT(unit);
     /* Keep the loaded order on the dead slot until reuse so death_vfx_scan
      * recognizes an off-map casualty and does not draw an infantry corpse. */
     q->hp=0;q->alive=q->selected=0;q->order=ORDER_TRANSPORTED;q->target=-1;q->build=-1;

@@ -186,7 +186,7 @@ sc64_unit_bucket_move(Unit *q)
     int slot = (int)(q - u), old_cell, new_cell;
     u8 before, after;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
-    if (SC64_SCARAB_NONCOLLIDING(q)) {
+    if (SC64_SCARAB_BUCKET_ROW(q)) {
 #if defined(SC64_CONTACT_MEMO_ENABLED) && defined(SC64_CONTACT_LOCAL_MEMO_PROBE)
         SC64_CONTACT_MEMO_INVALIDATE();
 #endif
@@ -271,7 +271,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             int i;
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
-                if (&u[i] != q && u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))) {
+                if (&u[i] != q && u[i].alive && !(SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING_IN_CHAIN(&u[i]))) {
 #ifdef SC64_P6_COMBAT_ENABLED
                     if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
@@ -455,7 +455,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i]) {
                 int candidate_radius, candidate_flying, candidate_collidable;
-                if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i]))
+                if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING_IN_CHAIN(&u[i]))
                     continue;
 #ifdef SC64_P6_COMBAT_ENABLED
                 if (race_p6_combat_unit_burrowed(i)) continue;

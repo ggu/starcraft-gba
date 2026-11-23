@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+include mk/paid-scarab/Makefile
 # Included from the top-level Makefile after the P9 candidate rules; it is not
 # a standalone makefile. Run these targets from the repository root.
 
@@ -11,11 +12,13 @@ P10_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p10_scenari
 # reachable depot. Rank candidates first to avoid filling unused routes.
 P10_CAMPAIGN_DEFINES := -DSC64_P10_DATA_ENABLED -DSC64_P10_RUNTIME -DSC64_P10_CAMPAIGN_ENTRY -DSC64_NEAREST_RESOURCE_DEPOT
 PROTOSS_P10_BASE_FLAGS = $(patsubst -I$(P9_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(PROTOSS_P9_FLAGS)) $(P10_CAMPAIGN_DEFINES) -DSC64_DEPOT_FIRST_NEAREST_PROBE
+# The product also carries the paid Scarab service (mk/paid-scarab/Makefile), which
+# has its own fact-table header; the staged fixtures keep the V2 one.
 # The packed coordinate scan can reject wide misses early in the IWRAM kernel.
-PROTOSS_P10_FLAGS = $(PROTOSS_P10_BASE_FLAGS) $(PROTOSS_RESEARCH_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS) \
+PROTOSS_P10_FLAGS = $(patsubst -I$(P10_FACT_V2_DIR),-I$(P10_SCARAB_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) $(PROTOSS_RESEARCH_FLAGS) $(PROTOSS_SCARAB_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS) \
 	$(if $(filter 1,$(CANONICAL_CONTACT_COINCIDENT)),-DSC64_CONTACT_EARLY_AXIS_IWRAM_PROBE) \
 	$(if $(filter -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED,$(CFLAGS) $(PROTOSS_P10_BASE_FLAGS)),-DSC64_P7_DETECTOR_RANGE_CULL_PROBE)
-PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCENARIO_HEADER)
+PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCARAB_FACT_HEADER) $(P10_PLACED_HANGAR_HEADER) $(P10_SCENARIO_HEADER)
 # The depth painter redraws completed buildings each frame. Each packed
 # frame can be built independently.
 P10_HATCHERY_WORDS ?= 1

@@ -220,6 +220,66 @@ path_grid_update(void)
 }
 #endif /* SC64_PATH_GRID_INCREMENTAL */
 
+/* Whether the full build blocks cell (col,row) for building slot i: the same tests, in the same order, as the
+ * per-building loop of path_grid_build_full, for one cell. Independent of SC64_PATH_GRID_INCREMENTAL (the
+ * incremental footprint record does not exist without it). Terrain and other buildings are not considered. */
+static int
+path_building_blocks_cell(int i, int col, int row)
+{
+    if (i < 0 || i >= MAX_BUILDINGS || !b[i].alive) return 0;
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_airborne(i)) return 0;
+#endif
+#ifdef SC64_RACES
+    if (b[i].type == B_ZERG_BEACON) return 0;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (!sc64_t4_building_collidable(i)) return 0;
+#ifdef SC64_T4_RUNTIME
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active() && sc64_race_t4_is_door(b[i].type)) {
+        int left, up, right, down;
+        if (!sc64_race_t4_building_bounds_source(b[i].type, &left, &up, &right, &down)) return 0;
+        return col >= limit((b[i].x * 2 - left) / 32, 0, MAP_COLS - 1) &&
+               col <= limit((b[i].x * 2 + right) / 32, 0, MAP_COLS - 1) &&
+               row >= limit((b[i].y * 2 - up) / 32, 0, MAP_ROWS - 1) &&
+               row <= limit((b[i].y * 2 + down) / 32, 0, MAP_ROWS - 1);
+    }
+#endif
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (race_z5_active() && race_z5_is_door_type(b[i].type)) {
+        int left, up, right, down;
+        if (!race_z5_building_collidable(i) ||
+            !sc64_game_building_bounds_source(b[i].type, &left, &up, &right, &down)) return 0;
+        return col >= limit((b[i].x * 2 - left) / 32, 0, MAP_COLS - 1) &&
+               col <= limit((b[i].x * 2 + right) / 32, 0, MAP_COLS - 1) &&
+               row >= limit((b[i].y * 2 - up) / 32, 0, MAP_ROWS - 1) &&
+               row <= limit((b[i].y * 2 + down) / 32, 0, MAP_ROWS - 1);
+    }
+#endif
+#endif
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    {
+        int left, up, right, down;
+        if (sc64_game_building_bounds_source(b[i].type, &left, &up, &right, &down)) {
+            int x0 = b[i].x * 2 - left, x1 = b[i].x * 2 + right;
+            int y0 = b[i].y * 2 - up, y1 = b[i].y * 2 + down;
+            int cell_x0 = col * 32, cell_y0 = row * 32;
+            return col >= limit(x0 / 32, 0, MAP_COLS - 1) && col <= limit(x1 / 32, 0, MAP_COLS - 1) &&
+                   row >= limit(y0 / 32, 0, MAP_ROWS - 1) && row <= limit(y1 / 32, 0, MAP_ROWS - 1) &&
+                   cell_x0 <= x1 && cell_x0 + 32 >= x0 && cell_y0 <= y1 && cell_y0 + 32 >= y0;
+        }
+    }
+#endif
+    {
+        int c = b[i].x / 16, r = b[i].y / 16;
+        return col >= limit(c - 2, 0, MAP_COLS - 1) && col <= limit(c + 2, 0, MAP_COLS - 1) &&
+               row >= limit(r - 2, 0, MAP_ROWS - 1) && row <= limit(r + 2, 0, MAP_ROWS - 1) &&
+               dist2(col * 16 + 8, row * 16 + 8, b[i].x, b[i].y) < 18 * 18;
+    }
+}
+
 #if (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 /* Rebuilds follow map/door changes. Keep the larger span visibility path in
  * IWRAM and this occasional full-grid rebuild in ROM within the same reserve. */

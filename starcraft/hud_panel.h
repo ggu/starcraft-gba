@@ -297,6 +297,9 @@ hud_unit_hangar(int slot)
     if (race_protoss_services_active() && sc64_p7_carrier_parent_type(u[slot].type))
         return (int)race_p7_carrier_training_child_count(slot);
 #endif
+#ifdef SC64_PAID_SCARAB
+    if (u[slot].type == U_REAVER) return race_paid_scarab_stock(slot);
+#endif
     (void)slot;
     return -1;
 }
@@ -691,7 +694,11 @@ hud_draw_unit(int slot)
     x += HUD_SLOT_PITCH;
     value = hud_unit_hangar(slot);
     if (value >= 0) {
+#ifdef SC64_PAID_SCARAB
+        hud_slot(card_portrait(u[slot].type == U_REAVER ? 85 : 73), x, HUD_SLOT_Y, card_green);
+#else
         hud_slot(card_portrait(73), x, HUD_SLOT_Y, card_green);
+#endif
         hud_slot_number(x, HUD_SLOT_Y, value, C_WHITE);
         x += HUD_SLOT_PITCH;
     }

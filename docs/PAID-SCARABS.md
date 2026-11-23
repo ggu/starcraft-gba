@@ -1,0 +1,152 @@
+# Paid Scarabs (Reaver ammunition)
+
+Status 2026-11-12: working in the **Protoss P10 product** (campaign missions P1 to
+P10 and custom games). Terran, Zerg Z9/Z10 and Showcase do not compile it; see
+[Other products](#other-products).
+
+Code: `starcraft/sc64_paid_scarab.h`, enabled by `-DSC64_PAID_SCARAB`
+(`mk/paid-scarab/Makefile`, part of `PROTOSS_P10_FLAGS` only). The staged
+`SC64_SCARAB_*` Flash-era probes are untouched and cannot be combined with it.
+
+## Rules
+
+| | |
+| --- | --- |
+| Price, build time | the `U_SCARAB` rule row: 15 minerals, 105 source ticks (131 updates) |
+| Capacity | 5 (`sc64_psc_capacity()`; no Reaver Capacity research exists in the product, so 10 is never reached; the saved fields already hold 10) |
+| Buying | one Scarab per command, paid from the owner's own bank when ordered; at most 5 on order; stock plus orders never exceed capacity; no cancel command (as for Interceptors), a dead Reaver's orders are lost |
+| Attack | a Reaver in reach of a ground target with a Scarab held, none of its own in flight and its 60-tick cooldown expired launches one; with none held it never fires (it still walks into reach) |
+| Flight | a `U_SCARAB` row: 3 ticks of launch delay, then 8 runtime pixels (16 source) per source tick toward the target, explodes within 10 source pixels of the target bounds; 90-tick life |
+| Splash | the Scarab weapon's 100 Normal damage to every hostile ground actor within 60 source pixels of its bounds: full inside 20, half inside 40, quarter inside 60; shields then armor; burrowed actors only inside 20; air, own and allied actors never |
+| Lost | target dead or its slot reused: the Scarab flies on and explodes at the last position; route blocked for the rest of its life: it expires with no damage; Reaver dead: the Scarab goes on, detached |
+| Starting stock | production hands over an empty Reaver. A Reaver a campaign mission places at its start (within 36 updates) starts with the hangar count of its source map UNIT record: `tools/sc64_placed_hangar_pack.py` reads the authenticated CHKs (read-only) and writes `build/generated/placed-hangar/sc64_placed_hangar_generated.h`; the service looks a Reaver up by mission, source owner and position (12 px of slack). 24 placed Reavers in P4 to P10 and Z4 to Z10: P7 source owner 0 holds 5, all others 0. P1 to P3 and Z1 to Z3 (no CHK here) place no Reaver in their imported unit tables; if one did it would start empty (not checked against source). A Reaver that appears later (reinforced, rescued, made by a trigger) and one from a save written before this service starts **full** the first time the service looks at it. The full-load case is a project rule, not a source fact. |
+| Campaign enemies | a computer-owned Reaver in a campaign mission starts a Scarab whenever it holds fewer than 5 and has none on order, one at a time on the 105-tick timer, and takes **no payment**: no mission was found in which the opponent has an engine bank for it (P7 owners 0 and 4 and the P8 to P10 enemy forces are scripted source banks). |
+| Custom opponents | a Protoss opponent builds a Robotics Facility and a Support Bay (the custom menu offers the Support Bay now), trains up to three Reavers (one per three Zealots/Dragoons) and buys their Scarabs through the human's command from its own bank |
+
+Approximations: straight-line homing at constant speed (no turn rate or
+acceleration), centre-distance reach, the integer combat path (no fractional HP),
+and a one-in-flight limit per Reaver. The starting stock of placed Reavers is read from
+the source map (see the table above); the full load of later Reavers is a project rule.
+
+## Checked against the N64
+
+Numbers from a private ares measurement (unit-table reads, source ticks); only
+numbers are recorded here.
+
+| Row | N64 | This build | Status |
+| --- | --- | --- | --- |
+| Build time | 105 steps | 105 source ticks | confirmed |
+| Capacity | 5 | 5 | confirmed |
+| Trained Reaver, stock | 0 | 0 | confirmed |
+| Top flight speed | 16 px per step | 16 source px per tick | confirmed |
+| Shot gap | 60 to 69 steps | 60-tick cooldown, one Scarab at a time | consistent |
+| Target dies in flight | flies on, explodes at the stored position | same | confirmed |
+| Quarter-zone hit | about 59 px, 25 damage, shields then armor | 25 at 41 to 60 px | consistent (one read) |
+| Placed Reaver, stock | 5, 5 for P7 owner 0 and 0, 0 for owner 4 (confirmed on a second fresh start); 0 for P8 owner 3, Z6/Z8/Z9/Z10 enemies | the source UNIT hangar count: 5 for P7 owner 0, 0 for every other placed Reaver (24 rows) | confirmed against the source maps (the table is asserted row by row in the product test) |
+| Campaign AI restock | enemy Reavers climb 0 to 5, one per 105 to 112 steps, the first order at once; owner 0 also trains new Reavers, which arrive at 0 | same timer, no payment | changed to match |
+| Campaign AI payment per Scarab | not established: the first Scarab of each Reaver coincided with a -15 on one candidate counter, later ones showed no charge; the per-owner resource cells could not be mapped. P7 AI banks start near 10,000 minerals per cell, gain about 8 per mining trip (mined, not scripted) and never ran short in the window; no enemy Reaver was held below 5 by money | timer only, which behaves like paying from a bank that never runs dry | not established; the switch to paid-by-owner is one predicate (`sc64_psc_campaign_ai`) and the restock line in `sc64_psc_parent_tick` |
+| Launch delay | about 4 to 5 steps (resolution 1 to 2) | 3 ticks | not established |
+| Flight steering | turns at a limited rate (8 px per step mid-turn) | straight-line homing | approximation |
+| Player Reaver (trained or placed), price read, full and half splash zones, own-side damage, several Scarabs in flight, terrain following, 90-tick life | not measured | as in the table above | not established |
+
+No parity is claimed beyond the confirmed rows.
+
+## Storage and saves
+
+Only existing actor-row and save fields are used (no new row field, no wider
+unit number, so nothing here depends on the open 16-bit unit-number work):
+
+| State | Field (existing P10 typed row width) | Used |
+| --- | --- | --- |
+| Reaver: held, on order, cooldown, established | `carry` (17-bit signed) | bits 0 to 13 |
+| Reaver: progress of the front order | `work_timer` (11 bits) | 0 to 105 |
+| Scarab: parent Reaver slot, or -1 when detached | `build` (existing range -2 to 239) | -1 to 239 |
+| Scarab: target (unit or building number) | `target` (-1 to 399) | -1 to 399 |
+| Scarab: last target position | `tx`, `ty` (11 bits each) | position |
+| Scarab: remaining life | `work_timer` | 1 to 90 |
+| Scarab: immune | `flags` (14 bits) | value 16 |
+
+`build` and `target` are read and validated at those widths:
+`race_paid_scarab_candidate_valid` (called from the Carrier candidate check, so
+every load path runs it) rejects a Scarab whose `build` is outside -1..239 or not
+a live Reaver, whose `target` is outside -1..399, a second Scarab for one Reaver,
+life outside 1..90, a selected, non-immune or hurt Scarab, and Reavers over
+capacity, over cooldown, with progress but nothing on order, or "not established"
+with a non-zero field. `RaceSave` stays 16,332 bytes (read from the ELF's DWARF,
+base and candidate). A save from the base ROM loads: its Reavers hold zero in both
+fields, which means "not established". The staged Flash plan is dropped.
+
+## Memory (P10, HOST-measured link, not hardware)
+
+Base 03b5db64 against this branch (`verify-protoss-p10` passes on both):
+
+| | base | branch |
+| --- | --- | --- |
+| `__iwram_end` (limit `0x03005000`) | `0x03004d78` | `0x03004e10` (+152 bytes, 496 left) |
+| `__bss_end` (limit `0x0203e000`) | `0x0203bedc` | `0x0203bed8` (-4) |
+| `sizeof(RaceSave)` | 16,332 | 16,332 |
+
+The IWRAM growth is seven hot functions that each gained one "is this a
+Scarab" test (`nearest_enemy_typed`, `sc64_update_exploration`,
+`sc64_unit_bucket_move`, `sc64_contact_blocked_mask_uncached`,
+`sc64_target_index_move`, `sc64_unit_buckets_begin`, `unit_step_clear`). A
+flying Scarab must be invisible to targeting, vision and collision, and those
+paths already run in IWRAM; no new function is in IWRAM. The Terran, Zerg Z9 and
+Showcase ROMs, and the default ROM, are byte-identical to the base (same SHA-256),
+and the retired Z6, Z7, Z8, P7, P8 and P9 targets still link and verify; none of
+their compile lines contains the flag.
+
+## PROJECT-TODO C2 defect list
+
+| Defect from the staged path | Status |
+| --- | --- |
+| Combat-owner wallet fallback outside the unit-production bank swap | Not applicable: the new service pays from the owner's own engine bank (`race_owner_minerals`, the human's `minerals` or the opponent's bank); computer-owned campaign Reavers take no payment |
+| 8-bit typed cooldown against 16-bit motion | Not applicable: no heading or velocity is stored; motion is integer homing from position and target |
+| Live-Scarab HP container; dead hidden/training rows | Not applicable: stock is a count, the Scarab has fixed HP 20 and is immune, there are no hidden children |
+| Typed writer, guarded decode, reverse bridges, fallback writer | Fixed by not adding any: the P10 typed row carries every field; base saves load |
+| AI stocking only as a disabled probe | Fixed on P10: custom opponents buy, campaign opponents restock |
+| Source hangar bytes for starting stock | Done: read from the source CHKs into a build-time table; P1 to P3 and Z1 to Z3 place no Reaver in their imported tables |
+| Capacity and damage research | Open / not applicable: neither exists in the product; capacity is 5 |
+| Terran, Zerg, Showcase | Open, see below |
+| Z10 enemy Reavers | Open: next stage |
+| Scarab aimed at a building whose slot dies or is reused | Fixed: every building death and spawn path, including the Psionic Storm kill, drops the target; tested with a new hostile building in the freed slot |
+| P7 controller with restocking enemy Reavers | Fixed in the controller, not in the rule, and the change is small. On the merged head it wins at frame 79,213 in one wave of 44 units (restock off: 83,397 in one wave of 42; base game code: 91,350 in one wave of 44). The controller paints every frame (the pad replay and the hardware do, and the painter's retained state decides which of two stacked identical actors a click picks), and it launches a wave when supply is spent (at least 40 combat units with 6 or less supply left): a heavy army can sit at 44 units at the supply cap and never reach the 50 a wave needed. Enemy Scarabs fired in the winning run: 56 with restock, 10 without. Hero spells are not available in P7 (Psionic Storm exists only for P4 and P6). |
+| Scarab tests in the IWRAM actor loops | Fixed: the paid-Scarab type pushed the P2 and P7 replay ROMs over the IWRAM limit. The collision-chain walks, the mover guards and the two insertion functions no longer test for a Scarab, because no chain holds one (`sc64_unit_buckets_begin` skips the row, `sc64_unit_bucket_move` never links it, `spawn_unit` turns the buckets off at its birth) and a Scarab never moves through a collision query (its flight moves it). Host builds trap on a violation of either (`sc64_scarab_presence.h`). Replay ROMs end IWRAM at `0x03004fc0` (64 bytes left) and the P10 ROM at `0x03004f50` (176 left); the nearest enemy search keeps +48 bytes from the new unit type in its switch |
+| Review fixes | Fixed and tested (`make test-sc64-paid-scarab`: `cold`, `retrain`, `recharge`, `shuttle`, `birth`). The service hint is reset at world start and set when a world is loaded, never by a candidate check; a placed Reaver's first read, from any path, gives the source hangar count; training a Reaver wakes the service; the stock and queue getters no longer write; a Shield Battery order keeps a Reaver's Scarab build progress and the recharge save checks accept it; a cargo Reaver killed with its Shuttle or Bunker sheds its state, and a dead row's state is ignored by the save check (a reuse clears it); a Scarab born into a freed slot switches the target index and owner lists off (outside IWRAM); one Carrier-class selection buys only Interceptors; an empty placed enemy Reaver reached first by a launch wakes the service when its row is established (`restock0`). Unit type ids: in the P10 product `U_SCARAB` is id 53, the first past the legacy ids, and no other id moves. A build that also compiles a staged appended identity (Cocoon, Egg, Ghost, nuke missile) numbers `U_SCARAB` after the last of them, so no staged id and no save of a staged build changes (research probe: Egg 53, Scarab 54; nuke strike probe: missile 53, Scarab 54). The Egg preview ROM is built without the service, on the base vector. A save written by stock P10 holds an in-flight Scarab as type 53, raw 85; the four unit codecs of a staged build translate exactly that pair to the build's `U_SCARAB` (`make test-sc64-paid-scarab-staged`; the nuke-probe reader needs the private prepared nuke inputs and is skipped without them), and any other raw type at that id keeps the staged identity's own checks. The reverse (a staged build's save loaded by stock P10) is unsupported: its Scarab id is past the legacy bound and is refused. Lifted Terran buildings (the Terran late-campaign flight, and the Battlecruiser Science Facility flight that the P10 product compiles) are skipped through the engine predicate, so a lifted facility is neither homed on nor splashed (`lift`). Fourth round: a launch also needs an actor slot that queued building products, scripted P7 Carrier creates, paid Interceptor orders and the active P4 or P5 mission's scripted creates have not claimed (`sc64_psc_slot_unreserved`, the commitments ordinary production honours; short of one, the Scarab stays in the Reaver, as with a full pool; `slots`); a computer opponent at its unit cap still refills its Reavers, with the same worker-floor reserve (`aicap`; Scarabs are not units); the service's tick only reads an idle Reaver, and writes a row only when it changes, so a load (which wakes the service) does not establish a human's reinforcement Reaver that has not fired (`idleload`); a building target opens only the cells the path grid blocks for it, decided by the grid's own per-cell footprint test (`path_building_blocks_cell` in `path_grid_build.h`, the same tests as the full grid build, so it holds with and without `SC64_PATH_GRID_INCREMENTAL`; a Pylon's blocked cells are the ones whose centres lie within 18 px, not its whole 5 x 5 window), no longer every blocked cell within 20 px of its bounds, so a Scarab does not cross a neighbouring building, wall or cliff to reach it (`ring`, `neighbour`). Remaining case: a cell the target's footprint blocks that terrain or a neighbouring footprint also blocks cannot be told from the target's own and is open (a building placed against a cliff or touching another footprint can be reached through those shared cells); there is no terrain-only plane at that layer to separate them |
+| ARM replay of a Scarab in flight | Done on the P10 ROM in mGBA with the Protoss campaign mission 2 pad tape (no fixture): see Checks. The custom-game ordinary tape still cannot be replayed on the ROM because its bank fixture needs a write |
+| Campaign save refused at some updates | Found, not changed: in mission 2, `save_game()` returns 0 at some updates (3 of 12 probed near the flight, with or without a Scarab alive; accepted in the other 9). The pause menu then writes nothing, which fails closed. The P2 check picks the first neutral call at which the writer accepts |
+
+## Other products (path, nothing implemented)
+
+Reavers cannot be trained in custom games on the Terran, Zerg Z9/Z10 or
+Showcase ROMs (their menus hide the Support Bay and admission rejects raw 83
+without the flag). What exists there is the Zerg late-campaign enemy Reaver
+(Z8 to Z10 towns), which still fires the generic hit. To extend:
+
+1. Compile the service: needs the Carrier hangar command (menu hook), the
+   siege-bounds table, and an appended `U_SCARAB` id (Terran uses 44 of 63
+   persistent ids, Zerg 42, Showcase 49).
+2. Saves: the state fits existing unit-row fields, but the Zerg packed row
+   (35 bytes) and the Terran packed row (38 bytes) must be checked field by
+   field for `carry` and `work_timer` width; `RaceSave` free bytes are Terran
+   512, Zerg Z9 72, Showcase 2,140 (P10 has 36).
+3. Money: Z8 and late-Zerg towns have distinct source banks (`race_zl_ai_minerals`);
+   restock must follow the same rule as P7/P8 (timer without payment) or pay a
+   town bank, plus capture and controller-transfer rules.
+4. Memory at the base (IWRAM end against `0x03005000`, BSS end against
+   `0x0203e000`): Terran `0x03004838` / `0x020399e8`, Zerg Z9 `0x03004c88` /
+   `0x02038938`, Showcase `0x03004f10` / `0x02039a14`; Showcase has only 240
+   IWRAM bytes, the seven compares above cost about 150.
+5. Requalify the campaign controllers of each product (Z10 has no winning
+   fast-path with Reavers today) and rerun the custom matrix.
+
+## Checks
+
+| Command | What it covers |
+| --- | --- |
+| `make test-sc64-paid-scarab` | sanitized HOST product test: economy, combat, splash tiers, placed-Reaver hangar counts (table against the N64 rows, P7 in the game, a late Reaver starts full), loss (target lost, expiry, walled-route detour, Reaver death, slot reuse), 21 malformed worlds, in-process and fresh-process saves, campaign restock and mid-restock save, and (with `PSC_BASE_TREE=<unchanged checkout>`) a base-written save |
+| `make test-sc64-paid-scarab-ordinary` | pad-only scenario from the title screen: build the chain, train two Reavers, buy Scarabs from the order list, attack, save through the pause menu with a Scarab in flight, fresh-process load, continue through impact |
+| `make test-sc64-paid-scarab-p2` | sanitized HOST check on Protoss mission 2 (the human has Reavers there): the P2 controller tape plus text-box acknowledgements, an ordinary pause-menu save inserted while a human Scarab is in flight, the uninterrupted tape against the tape with the save, and a fresh process loading the SRAM and continuing through impact (12 fixed-frame samples, 17 Scarab hits) |
+| `make check-sc64-paid-scarab-p2-arm PSC_ARM_RUNNER=<sc64-headless-replay>` | the same pad tape on the P10 ROM in mGBA (no-GDB, physical buttons only): SRAM exported at the save, a fresh mGBA process loads it from the title and continues; frame counter, minerals, gas, Reaver stock, Scarab position, unit count, total hit points and shields match HOST at all 12 samples (frames 29404 to 29548), and the fresh process matches the saving one |
+| `make test-sc64-protoss-px` | the ten Protoss mission controllers with their host pad replays. On the merged head nine win at their controller's frame; the P10 controller stops at frame 218,279 (`won=0`) on base c84883de too, so that is not this change |
+| `python3 tools/sc64_skirmish_ai_matrix.py --build build --output OUT --profiles protoss-p10` | Reaver cases with the spending audit (the default profiles keep their cases) |

@@ -1375,7 +1375,7 @@ static int race_battery_saved_recharge_valid(const RaceSave *candidate,
     Building battery;
     const Sc64RaceUnitRule *rule;
     if (!candidate || !actor || !actor->alive || actor->order!=ORDER_RECHARGE ||
-        actor->owner<0 || actor->owner>=5 || actor->work_timer!=0 ||
+        actor->owner<0 || actor->owner>=5 || (actor->work_timer!=0 && !SC64_PSC_RECHARGE_WORK_OK(actor)) ||
         actor->target<0 || actor->target>=MAX_BUILDINGS ||
         actor->raw_type==73 || actor->raw_type==85 ||
         actor->raw_owner < -1 || actor->raw_owner >= 8 ||
@@ -3571,7 +3571,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
             if (!race_protoss_services_active() ||
                 RACE_PROTOSS_RAW(&candidate_unit)==73 || RACE_PROTOSS_RAW(&candidate_unit)==85 ||
                 RACE_PROTOSS_SLOT(&candidate_unit)<0 || RACE_PROTOSS_SLOT(&candidate_unit)>=8 ||
-                candidate_unit.work_timer!=0 || !unit_rule ||
+                (candidate_unit.work_timer!=0 && !SC64_PSC_RECHARGE_WORK_OK(&candidate_unit)) || !unit_rule ||
                 unit_rule->race!=R_PROTOSS ||
                 !(unit_rule->flags&SC_RACE_F_SHIELDS) ||
                 candidate_unit.shield>unit_rule->shields ||
@@ -5347,6 +5347,7 @@ static int race_load_game(void) {
     memcpy(race_minerals,race_data.ore,sizeof(race_minerals));
     memcpy(race_gas,race_data.vespene,sizeof(race_gas));
     memcpy(geysers,race_data.geysers,sizeof(race_data.geysers));race_campaign=race_data.campaign;
+    SC64_PSC_WORLD_LOADED();   /* the actors are in place: a flight or a Scarab in the making may be among them */
 #ifdef SC64_UNIFIED
     backwater=race_data.backwater;
 #ifdef SC64_ZP_FULL_STORAGE

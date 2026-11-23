@@ -1219,6 +1219,7 @@ typedef struct {
 #endif
 #endif
 } Unit;
+#include "sc64_paid_scarab_decl.h"
 #ifdef SC64_RACES
 /* Legacy saves can retain raw 36 on an Overlord. Its stored identity must
  * remain distinct from a newly produced Egg when choosing visual assets. */
@@ -3083,7 +3084,7 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(i);
 #endif
-#ifdef SC64_SCARAB_WEAPON_PROBE
+#if SC64_PSC_TARGET_HOOK
     race_scarab_probe_target_invalidate(i);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -3261,9 +3262,22 @@ spawn_unit(int owner, int type, int x, int y)
     if (sc64_unit_bucket_active) {
         if (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H)
             sc64_unit_bucket_active = 0; /* use the full-world fallback */
-        else
+        else if (SC64_SCARAB_BIRTH(&u[i])) {
+            /* What sc64_unit_bucket_move() does for a Scarab row, kept out of that IWRAM loop. */
+#ifdef SC64_CONTACT_MEMO_ENABLED
+            SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+            sc64_unit_bucket_active = 0;
+        } else
             sc64_unit_bucket_move(&u[i]);
     }
+#ifdef SC64_PAID_SCARAB
+    if (SC64_SCARAB_BIRTH(&u[i])) {
+        /* The slot may be a dead unit's, still linked in the target index and the owner lists. */
+        sc64_target_index_end();
+        target_lists_valid = 0;
+    }
+#endif
 #endif
     if (owner == SIDE)
 	supply_used += unit_supply(type);
@@ -3305,7 +3319,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #ifdef SC64_RANGE_WORK
     sc64_range_route_forget_target(MAX_UNITS+i);
 #endif
-#ifdef SC64_SCARAB_WEAPON_PROBE
+#if SC64_PSC_TARGET_HOOK
     race_scarab_probe_target_invalidate(MAX_UNITS+i);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -4022,7 +4036,7 @@ static int GBA_HOT
 unit_step_clear(const Unit *q, int nx, int ny)
 {
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
-    if (SC64_SCARAB_NONCOLLIDING(q)) return 1;
+    if (SC64_SCARAB_NONCOLLIDING_MOVER(q)) return 1;
 #ifdef SC64_RACES
     /* OpenBW bwgame.h unit_can_collide_with(): gathering workers pass
        through ordinary units; static terrain/building checks still apply. */
@@ -5066,7 +5080,7 @@ destroy_building(int slot, int source_owner)
 #ifdef SC64_SHARED_TRANSPORT
     race_sk_transport_producer_destroyed(slot);
 #endif
-#ifdef SC64_SCARAB_WEAPON_PROBE
+#if SC64_PSC_TARGET_HOOK
     race_scarab_probe_target_invalidate(MAX_UNITS+slot);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -5272,7 +5286,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 	}
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
-#ifdef SC64_SCARAB_WEAPON_PROBE
+#if SC64_PSC_TARGET_HOOK
             race_scarab_probe_target_invalidate(target);
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -5787,6 +5801,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    SC64_PSC_WORLD_RESET();   /* a new world: nothing in flight, nothing restocking */
 #ifdef SC64_SHARED_NUKE_PROBE
     race_nuke_reset();
 #endif
@@ -6739,6 +6754,7 @@ stop_selected(void)
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
             if (sc64_race_raw_unit(u[i].type) != 83)
 #endif
+            SC64_PSC_KEEP_STATE(u[i])
 #ifdef SC64_Z5_CLOAK_ENABLED
             if (!race_z5_cloak_actor(&u[i]))
 #endif
@@ -7528,7 +7544,7 @@ static int field_menu_count(void)
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
+    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return PSC_LABEL();
 #endif
 #ifdef SC64_EGG_RUNTIME
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
@@ -7566,7 +7582,7 @@ static const char *race_menu_label(int i)
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_mode && i==race_carrier_command_base() && race_p7_carrier_training_menu_available())
-        return "BUILD INTERCEPTOR";
+        return PSC_LABEL();
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
     if (i == race_context_command_base(RACE_CONTEXT_SCARAB) &&
@@ -9108,6 +9124,7 @@ tick_combat(Unit * q, int target)
         if (dx*dx+dy*dy<minimum_range*minimum_range) return;
 #endif
 	if (!q->cd) {
+            SC64_PSC_FIRE(q,target)
 #ifdef SC64_IMPACT_EVENTS
             /* Decide before any launch side effect: a full queue leaves the
              * weapon ready for the next update instead of losing damage. */
@@ -9377,6 +9394,7 @@ target_lists_unavailable:
 #ifdef SC64_DIAGNOSTIC_ORDERS
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
 #endif
+    SC64_PSC_WORLD_TICK();
     for (i = 0; i < MAX_UNITS; i++) {
 	Unit *q = &u[i];
 	if (!q->alive)
@@ -11521,7 +11539,7 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
     (void)first;
     (void)next;
 #endif
-    if (SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q)) return;
+    if (SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_DRAW_HIDDEN(q)) return;
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
 #endif
@@ -13469,6 +13487,7 @@ static unsigned race_shared_trigger_obligations(void);
 #include "sc64_p7_projectile_adapter.h"
 #include "sc64_p7_carrier_training.h"
 #include "sc64_p7_interceptor_flight.h"
+#include "sc64_paid_scarab.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_colony_service.h"

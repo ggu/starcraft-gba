@@ -251,7 +251,7 @@ sc64_target_index_move(Unit *q)
 {
     int entity = (int)(q - u), cell;
     if (!sc64_target_index_active || entity < 0 || entity >= MAX_UNITS) return;
-    if (SC64_SCARAB_HIDDEN(q)) {
+    if (SC64_SCARAB_INDEX_ROW(q)) {
         sc64_target_index_active = 0; /* hidden rows were never linked */
         return;
     }

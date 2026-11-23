@@ -52,11 +52,13 @@ typedef struct {
     /* Carrier use: updates with an own Interceptor in flight, the most at
      * once, and updates with an own shot in the projectile pool. */
     int outside_updates, max_outside, fire_updates;
+    /* Reaver use: updates with an own Scarab in flight, the most at once. */
+    int scarab_updates, max_scarabs;
 } OwnerAudit;
 typedef struct { int alive, owner, type, x, y, hp, maxhp, progress, raw_type, constructing, head, count; } AuditBuilding;
 static struct { int on, ore_start; OwnerAudit o[5]; } ledger;
 static AuditBuilding audit_pre_b[MAX_BUILDINGS];
-static struct { int owner, carry, parent, orders, interceptor; } audit_pre_u[MAX_UNITS];
+static struct { int owner, carry, parent, orders, interceptor; int reaver_total, scarab_of; } audit_pre_u[MAX_UNITS];
 static int audit_pre_minerals[5], audit_pre_cap[5];
 
 static int audit_owners(int *ids)
@@ -115,6 +117,23 @@ static void audit_start(void)
     }
 }
 
+#ifdef SC64_PAID_SCARAB
+/* Scarabs a Reaver holds, has on order and has in flight, or -1 for a row
+ * that is no Reaver or whose state is not yet established (a placed Reaver's
+ * first full load is free and is no purchase). Every change of this total is
+ * a payment (+1) or a Scarab that ended in flight (-1). */
+static int audit_reaver_total(int slot)
+{
+    Sc64PscState st;
+    int flying = 0;
+    if (!race_paid_scarab_parent(&u[slot]) ||
+        !sc64_psc_decode(u[slot].carry, u[slot].work_timer, 10, &st) || !st.init) return -1;
+    for (int j = 0; j < MAX_UNITS; ++j)
+        flying += u[j].alive && u[j].type == U_SCARAB && u[j].build == slot;
+    return (int)(st.stock + st.queued) + flying;
+}
+#endif
+
 static void audit_before(void)
 {
     int ids[4], n = audit_owners(ids);
@@ -131,6 +150,10 @@ static void audit_before(void)
         audit_pre_u[i].parent = u[i].alive && sc64_p7_carrier_parent_type(u[i].type);
         audit_pre_u[i].orders = audit_pre_u[i].parent ? u[i].carry : 0;
         audit_pre_u[i].interceptor = u[i].alive && u[i].type == U_P7_INTERCEPTOR;
+#endif
+#ifdef SC64_PAID_SCARAB
+        audit_pre_u[i].reaver_total = audit_reaver_total(i);
+        audit_pre_u[i].scarab_of = u[i].alive && u[i].type == U_SCARAB ? u[i].build : -2;
 #endif
     }
     for (int k = 0; k < n; ++k) {
@@ -201,6 +224,38 @@ static void audit_after(void)
         now = u[i].alive && u[i].owner == audit_pre_u[i].owner ? audit_mineral_cargo(&u[i]) : 0;
         if (now < was && audit_pre_u[i].owner < 5) vanish[audit_pre_u[i].owner] += was - now;
     }
+#ifdef SC64_PAID_SCARAB
+    {
+        int orders[5] = {0}, flying[5] = {0};
+        const Sc64RaceUnitRule *sr = sc64_race_unit_rule(U_SCARAB);
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            const Unit *q = &u[i];
+            int post, ended = 0;
+            if (q->alive && q->type == U_SCARAB && q->owner < 5) ++flying[q->owner];
+            if (audit_pre_u[i].reaver_total < 0 || !q->alive || q->owner != audit_pre_u[i].owner ||
+                q->owner >= 5) continue;
+            post = audit_reaver_total(i);
+            if (post < 0) { ++ledger.o[q->owner].model_errors; continue; }
+            for (int j = 0; j < MAX_UNITS; ++j)
+                if (audit_pre_u[j].scarab_of == i && !(u[j].alive && u[j].type == U_SCARAB && u[j].build == i))
+                    ++ended;
+            if (post - audit_pre_u[i].reaver_total + ended < 0) { ++ledger.o[q->owner].model_errors; continue; }
+            orders[q->owner] += post - audit_pre_u[i].reaver_total + ended;
+        }
+        for (int k = 0; k < n; ++k) {
+            int o = ids[k];
+            if (orders[o] && !sr) { ++ledger.o[o].model_errors; continue; }
+            for (int j = 0; j < orders[o]; ++j) {
+                cost[o] += sr->minerals; cost_gas[o] += sr->gas;
+                audit_note(o, sc64_race_raw_unit(U_SCARAB));
+            }
+            if (flying[o]) {
+                ++ledger.o[o].scarab_updates;
+                if (flying[o] > ledger.o[o].max_scarabs) ledger.o[o].max_scarabs = flying[o];
+            }
+        }
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     {
         int orders[5] = {0}, outside[5] = {0};
@@ -543,6 +598,15 @@ static void print_audit(FILE *out)
         const OwnerAudit *a = &ledger.o[ids[k]];
         fprintf(out, "%s{\"owner\":%d,\"outside_updates\":%d,\"max_outside\":%d,\"fire_updates\":%d}",
                 k ? "," : "", ids[k], a->outside_updates, a->max_outside, a->fire_updates);
+    }
+    fprintf(out, "]");
+#endif
+#ifdef SC64_PAID_SCARAB
+    fprintf(out, ",\"reaver\":[");
+    for (int k = 0; k < n; ++k) {
+        const OwnerAudit *a = &ledger.o[ids[k]];
+        fprintf(out, "%s{\"owner\":%d,\"scarab_updates\":%d,\"max_scarabs\":%d}",
+                k ? "," : "", ids[k], a->scarab_updates, a->max_scarabs);
     }
     fprintf(out, "]");
 #endif

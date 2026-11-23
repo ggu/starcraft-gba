@@ -59,29 +59,38 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
             (unsigned)frame,n?"path-grid-invalid":"no-eligible-combat",tx,ty);
         return 0;
     }
-    int origin=candidates[(n-1)/4],origin_x=u[origin].x,origin_y=u[origin].y;
-    int sx=limit(origin_x/16,0,MAP_COLS-1),sy=limit(origin_y/16,0,MAP_ROWS-1);
-    int start=sx+sy*MAP_COLS,gx=limit(tx/16,0,MAP_COLS-1),gy=limit(ty/16,0,MAP_ROWS-1);
-    int head=0,tail=0,best=-1,bestd=0x7fffffff;
-    for(int i=0;i<cells;i++)prev[i]=-2;
-    prev[start]=-1;queue[tail++]=start;
-    while(head<tail){
-        int cell=queue[head++],col=cell%MAP_COLS,row=cell/MAP_COLS;
-        /* A Nexus occupies more than one route tile. The engine path API
-         * searches only the immediate 3x3 around a clicked point, which can
-         * be fully covered by its inflated collision footprint. Treat the
-         * visible Nexus neighborhood as the valid attack-move arrival zone. */
-        if(FAST_ABS(col-gx)<=4&&FAST_ABS(row-gy)<=4){
-            int d=(col-gx)*(col-gx)+(row-gy)*(row-gy);
-            if(d<bestd){best=cell;bestd=d;}
-            break;
-        }
-        for(int k=0;k<4;k++){
-            int nc=col+dx[k],nr=row+dy[k];
-            if(nc<0||nr<0||nc>=MAP_COLS||nr>=MAP_ROWS)continue;
-            int next=nc+nr*MAP_COLS;
-            if(prev[next]!=-2||(!SC64_GRID_GET(path_walkable,next)&&next!=start))continue;
-            prev[next]=cell;queue[tail++]=next;
+    /* The forward quartile is the origin of the route; if that unit has no route (it stands in a pocket of
+     * our own buildings), try the next unit nearer the target rather than giving up on every wave. */
+    int origin=-1,origin_x=0,origin_y=0,best=-1,bestd=0x7fffffff,rank0=(n-1)/4;
+    for(int attempt=0;attempt<16&&attempt<=rank0+16&&best<0;attempt++){
+        int rank=rank0-attempt;
+        if(rank<0)rank=rank0+(-rank);
+        if(rank>=n)break;
+        origin=candidates[rank];origin_x=u[origin].x;origin_y=u[origin].y;
+        int sx=limit(origin_x/16,0,MAP_COLS-1),sy=limit(origin_y/16,0,MAP_ROWS-1);
+        int start=sx+sy*MAP_COLS,gx=limit(tx/16,0,MAP_COLS-1),gy=limit(ty/16,0,MAP_ROWS-1);
+        int head=0,tail=0;
+        bestd=0x7fffffff;
+        for(int i=0;i<cells;i++)prev[i]=-2;
+        prev[start]=-1;queue[tail++]=start;
+        while(head<tail){
+            int cell=queue[head++],col=cell%MAP_COLS,row=cell/MAP_COLS;
+            /* A Nexus occupies more than one route tile. The engine path API
+             * searches only the immediate 3x3 around a clicked point, which can
+             * be fully covered by its inflated collision footprint. Treat the
+             * visible Nexus neighborhood as the valid attack-move arrival zone. */
+            if(FAST_ABS(col-gx)<=4&&FAST_ABS(row-gy)<=4){
+                int d=(col-gx)*(col-gx)+(row-gy)*(row-gy);
+                if(d<bestd){best=cell;bestd=d;}
+                break;
+            }
+            for(int k=0;k<4;k++){
+                int nc=col+dx[k],nr=row+dy[k];
+                if(nc<0||nr<0||nc>=MAP_COLS||nr>=MAP_ROWS)continue;
+                int next=nc+nr*MAP_COLS;
+                if(prev[next]!=-2||(!SC64_GRID_GET(path_walkable,next)&&next!=start))continue;
+                prev[next]=cell;queue[tail++]=next;
+            }
         }
     }
     if(best<0) {
@@ -333,12 +342,18 @@ static int nearest_hero_threat(int *out_x,int *out_y)
     return best<=300*300?found:-1;
 }
 
+static int attack_selected(int x,int y);
 static int issue_attack(int x,int y)
 {
     if(!normalize_field())return 0;
     if(!clear_selected_building())return 0;
     KEY_TAP(KEY_R); /* standard whole-army selection shortcut */
     if(selected_count()<=0)return 0;
+    return attack_selected(x,y);
+}
+
+static int attack_selected(int x,int y)
+{
     KEY_TAP(KEY_B);
     /* The field menu remembers the last command. Reach Attack using input
      * from the current row instead of assuming that B opens on Move. */
@@ -392,6 +407,7 @@ static int escort_observer(int waypoint_x,int waypoint_y)
     return 1;
 }
 
+static int p7_goal=-1,p7_hold=0,p7_wave_on=0,p7_wave_no=0;
 static int live_units(int owner)
 {
     int n=0;for(int i=0;i<MAX_UNITS;i++)n+=u[i].alive&&(owner<0||u[i].owner==owner);return n;
@@ -684,16 +700,37 @@ static int count_gateway(void)
     return n;
 }
 
-static int build_gateway(void)
+/* Keep the way out of the base open: no building within 96 px of the straight lines from the home Nexus
+ * towards each enemy Nexus (for their first 420 px). The units that a Gateway makes stand beside it, and
+ * a wall of our own buildings left the army with no route (the "no-reachable-route" rejects). */
+static int corridor_blocked(int x,int y)
+{
+    int home=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_NEXUS){home=i;break;}
+    if(home<0)return 0;
+    for(int t=0;t<MAX_BUILDINGS;t++)if(b[t].alive&&b[t].raw_type==154&&b[t].owner!=SIDE){
+        long dx=b[t].x-b[home].x,dy=b[t].y-b[home].y,len2=dx*dx+dy*dy,len=1;
+        if(len2<=0)continue;
+        while((len+1)*(len+1)<=len2)++len;
+        long px=x-b[home].x,py=y-b[home].y;
+        long along=(px*dx+py*dy)/len;               /* distance along the line */
+        long cross=(px*dy-py*dx)/len;                /* signed distance from the line */
+        if(cross<0)cross=-cross;
+        if(along>-96&&along<420&&cross<96)return 1;
+    }
+    return 0;
+}
+
+static int build_site(int btype,int row,int cost)
 {
     int home=-1,worker=-1,best=0x7fffffff,site_x=-1,site_y=-1;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
         b[i].type==B_NEXUS){home=i;break;}
-    if(home<0||minerals<150)return 0;
+    if(home<0||minerals<cost)return 0;
     for(int dy=-160;dy<=160;dy+=16)for(int dx=-160;dx<=160;dx+=16){
         int x=b[home].x+dx,y=b[home].y+dy,d=dx*dx+dy*dy;
         if(d<80*80||x<32||x>=WORLD_W-32||y<32||y>=WORLD_H-32||
-           d>=best||!race_can_site(SIDE,B_GATEWAY,x,y)||!can_place(B_GATEWAY,x,y))continue;
+           d>=best||corridor_blocked(x,y)||!race_can_site(SIDE,btype,x,y)||!can_place(btype,x,y))continue;
         best=d;site_x=x;site_y=y;
     }
     if(site_x<0)return 0;
@@ -705,12 +742,41 @@ static int build_gateway(void)
     if(!move_cursor(u[worker].x,u[worker].y))return 0;
     KEY_TAP(KEY_A);
     if(!u[worker].selected)return 0;
-    if(!choose_field_row(MENU_BARRACKS))return 0;
-    if(mode!=MODE_BUILD||menu!=B_GATEWAY)return 0;
+    if(!choose_field_row(row))return 0;
+    if(mode!=MODE_BUILD||menu!=btype)return 0;
     if(!move_cursor(site_x,site_y))return 0;
     KEY_TAP(KEY_A);
-    return u[worker].order==ORDER_BUILD_PENDING && u[worker].target==B_GATEWAY &&
+    return u[worker].order==ORDER_BUILD_PENDING && u[worker].target==btype &&
         u[worker].tx==site_x && u[worker].ty==site_y;
+}
+
+static int build_gateway(void){return build_site(B_GATEWAY,MENU_BARRACKS,150);}
+
+/* Forge: tech for weapon and armor upgrades. */
+static int build_forge(void){return build_site(B_FORGE,MENU_ENG_BAY,150);}
+
+/* Select the completed Forge with the ordinary cursor and buy the next upgrade (weapons, then armor). */
+static int research_upgrade(void)
+{
+    int forge=-1;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_FORGE&&building_complete(i)){forge=i;break;}
+    if(forge<0||minerals<100||gas<100)return 0;
+    if(!normalize_field()||!clear_selected_building()||!move_cursor(b[forge].x,b[forge].y))return 0;
+    KEY_TAP(KEY_A);
+    if(selected_building!=forge)return 0;
+    int rows[2]={MENU_WEAPONS,MENU_ARMOR};
+    for(int k=0;k<2;k++){
+        int before_m=minerals;
+        KEY_TAP(KEY_B);
+        for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=rows[k];n++)KEY_TAP(KEY_DOWN);
+        if(!menu_open||menu_cursor!=rows[k]){if(menu_open)KEY_TAP(KEY_B);continue;}
+        KEY_TAP(KEY_A);
+        if(minerals<before_m){
+            fprintf(trace,"{\"kind\":\"research\",\"frame\":%u,\"row\":%d,\"minerals\":%d,\"gas\":%d}\n",(unsigned)frame,rows[k],minerals,gas);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static int build_pylon(void)
@@ -721,7 +787,7 @@ static int build_pylon(void)
     for(int dy=-192;dy<=192;dy+=16)for(int dx=-192;dx<=192;dx+=16){
         int x=b[home].x+dx,y=b[home].y+dy,d=dx*dx+dy*dy;
         if(d<80*80||x<32||x>=WORLD_W-32||y<32||y>=WORLD_H-32||d>=best||
-           !race_can_site(SIDE,B_PYLON,x,y)||!can_place(B_PYLON,x,y))continue;
+           corridor_blocked(x,y)||!race_can_site(SIDE,B_PYLON,x,y)||!can_place(B_PYLON,x,y))continue;
         best=d;site_x=x;site_y=y;
     }
     if(site_x<0)return 0;
@@ -822,6 +888,7 @@ int main(int argc,char **argv)
 
     unsigned next_checkpoint=1000;
     int locked_target_owner=-1;
+    unsigned next_upgrade=14000;
     int last_order=-10000,next_probe=300,next_gas=5000,next_production=5500,next_build=7000,next_pylon=5000,next_mineral=600;
     while(host_tick<RUN_LIMIT&&screen==SCREEN_PLAY&&!won&&!lost){
         if(frame>=next_probe&&probe_count()<10){
@@ -847,15 +914,64 @@ int main(int argc,char **argv)
             next_pylon=frame+1500;
         }
         if(frame>=next_build){
-            if(frame>=7000&&probe_count()>=8&&count_gateway()<4&&build_gateway())
+            int gate_cap=minerals>=1500?8:4;
+            if(frame>=12000&&minerals>=300&&gas>=100){
+                int have_forge=0;for(int i=0;i<MAX_BUILDINGS;i++)have_forge|=b[i].alive&&b[i].owner==SIDE&&b[i].type==B_FORGE;
+                if(!have_forge)(void)build_forge();
+            }
+            if(frame>=7000&&probe_count()>=8&&count_gateway()<gate_cap&&build_gateway())
                 fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"building\":\"gateway\",\"count\":%d}\n",
                     (unsigned)frame,count_gateway());
             next_build=frame+1200;
         }
         if(frame>=next_production&&probe_count()>=8){
-            (void)queue_combat_unit();
+            for(int k=0;k<(minerals>=600?count_gateway():1);k++)if(!queue_combat_unit())break;
+            if(frame>=next_upgrade&&weapons_level+armor_level<4){(void)research_upgrade();next_upgrade=frame+700;}
             next_production=frame+180;
         }
+        /* Split the wave into three groups and send each to its own staging point around the locked Nexus,
+         * 420 px out and about 40 degrees apart (well over the 60 px splash radius), then close in on the
+         * Nexus together. Units are ordered one at a time with the ordinary cursor, A, B, Attack. */
+        if(p7_wave_on&&p7_goal>=0&&b[p7_goal].alive){
+            static int done_wave=-1;static unsigned release_at=0;
+            int fd_any=0x7fffffff;
+            for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==SIDE&&!IS_WORKER(u[j].type)&&route_combat_type_eligible(u[j].type)){
+                int d=dist2(u[j].x,u[j].y,b[p7_goal].x,b[p7_goal].y);if(d<fd_any)fd_any=d;
+            }
+            if(done_wave==p7_wave_no&&frame>=release_at)p7_hold=0;
+            if(done_wave!=p7_wave_no&&fd_any<=1500*1500){
+                int gx=b[p7_goal].x,gy=b[p7_goal].y,ax=0,ay=0;
+                (void)army_center(&ax,&ay);
+                long vx=ax-gx,vy=ay-gy,vl=1;
+                while((vl+1)*(vl+1)<=vx*vx+vy*vy)++vl;
+                static const int rot[3][2]={{1000,0},{766,643},{766,-643}};  /* cos, sin of 0, +40, -40 degrees */
+                int sx[3],sy[3];
+                for(int k=0;k<3;k++){
+                    long rx=(vx*rot[k][0]-vy*rot[k][1])/1000,ry=(vx*rot[k][1]+vy*rot[k][0])/1000;
+                    sx[k]=gx;sy[k]=gy;
+                    for(int radius=420;radius>=200;radius-=55){
+                        int x=(int)(gx+rx*radius/vl),y=(int)(gy+ry*radius/vl);
+                        if(x>=16&&y>=16&&x<WORLD_W-16&&y<WORLD_H-16&&SC64_GRID_GET(path_walkable,x/16+(y/16)*MAP_COLS)){sx[k]=x;sy[k]=y;break;}
+                    }
+                }
+                int sent=0,idx=0;
+                p7_hold=1;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type)&&
+                    route_combat_type_eligible(u[i].type)&&!SC64_SCARAB_CHILD(&u[i])&&
+                    u[i].raw_type!=75&&u[i].raw_type!=78&&u[i].raw_type!=79){
+                    int k=idx++%3;
+                    if(!normalize_field()||!clear_selected_building())continue;
+                    static const int off[4][2]={{0,0},{-4,-4},{4,4},{-6,2}};
+                    for(int q=0;q<4&&!u[i].selected;q++)
+                        if(move_cursor(u[i].x+off[q][0],u[i].y+off[q][1])&&selection_target()==i)KEY_TAP(KEY_A);
+                    if(selected_count()==1&&u[i].selected&&attack_selected(sx[k],sy[k]))++sent;
+                }
+                fprintf(trace,"{\"kind\":\"split\",\"frame\":%u,\"wave\":%d,\"sent\":%d,\"staging\":[[%d,%d],[%d,%d],[%d,%d]],\"goal\":[%d,%d]}\n",
+                    (unsigned)frame,p7_wave_no,sent,sx[0],sy[0],sx[1],sy[1],sx[2],sy[2],gx,gy);
+                done_wave=p7_wave_no;release_at=frame+1500;
+                last_order=frame;
+            }
+        } else p7_hold=0;   /* the locked Nexus died, or no wave is on: there is nothing to hold for */
         if(frame-last_order>=480){
             int ax=0,ay=0;army_center(&ax,&ay);
             int threat_x=-1,threat_y=-1,threat=nearest_hero_threat(&threat_x,&threat_y);
@@ -863,6 +979,7 @@ int main(int argc,char **argv)
             static int prior_goal=-1,prior_path=0x7fffffff,stalled_orders=0;
             int t=-1;
             int use_threat=threat>=0&&frame<10000;
+            if(p7_hold&&!use_threat){last_order=frame;continue;}
             int target_x=use_threat?threat_x:(t>=0?b[t].x:-1),
                 target_y=use_threat?threat_y:(t>=0?b[t].y:-1);
             int command_x=target_x,command_y=target_y,route_steps=-1,has_route=0;
@@ -874,24 +991,33 @@ int main(int argc,char **argv)
                         (unsigned)frame,locked_target_owner,target_path);
                 }
                 if(locked_target_owner>=0){
+                    /* Lock one Nexus until it dies or stops being reachable; never alternate
+                     * between Nexuses because the group is slow. */
+                    static int locked_slot=-1;
                     target_owner=locked_target_owner;
-                    t=routeable_nexus(target_owner,&command_x,&command_y,
-                                      &route_steps,&target_path,-1);
+                    if(locked_slot>=0&&!(b[locked_slot].alive&&b[locked_slot].raw_type==154&&
+                                         b[locked_slot].raw_owner==target_owner))locked_slot=-1;
+                    t=-1;
+                    if(locked_slot>=0){
+                        if(waypoint_to(b[locked_slot].x,b[locked_slot].y,&command_x,&command_y,
+                                       &route_steps,&target_path))t=locked_slot;
+                        else locked_slot=-1;
+                    }
+                    if(t<0){
+                        t=routeable_nexus(target_owner,&command_x,&command_y,
+                                          &route_steps,&target_path,-1);
+                        locked_slot=t;
+                    }
                 }
                 if(t>=0&&t==prior_goal){
                     if(target_path+2<prior_path)stalled_orders=0;
                     else ++stalled_orders;
                 }else stalled_orders=0;
-                if(t>=0&&stalled_orders>=2){
-                    int alternate_path=-1;
-                    int alternate=routeable_nexus(target_owner,
-                        &command_x,&command_y,&route_steps,&alternate_path,t);
-                    if(alternate>=0){
-                        t=alternate;target_path=alternate_path;stalled_orders=0;
-                    }
-                }
-                if(t>=0){prior_goal=t;prior_path=target_path;}
-                if(t>=0){target_x=b[t].x;target_y=b[t].y;has_route=1;}
+                if(t>=0){prior_goal=t;prior_path=target_path;p7_goal=t;}
+                if(t>=0){target_x=b[t].x;target_y=b[t].y;has_route=1;
+                    /* The last 25 route steps: no more waypoint holds under the Reavers' fire; attack-move
+                     * onto the Nexus itself and let the army close until it sees and engages them. */
+                    if(target_path<=25){command_x=target_x;command_y=target_y;route_steps=0;}}
                 else {
                     int raw=nexus_source(0)>=0?0:4;
                     fprintf(trace,"{\"kind\":\"route\",\"frame\":%u,\"source_force\":%d,\"army_center\":[%d,%d],\"grid_valid\":1,\"reachable\":0,\"targets\":[",
@@ -902,6 +1028,20 @@ int main(int argc,char **argv)
                     }
                     fputs("]}\n",trace);
                     target_x=target_y=-1;
+                }
+            }
+            {   /* Attack in one massed wave: no trickling reinforcements into the defence. */
+                int wave_on=p7_wave_on;
+                int combat=live_units(SIDE)-probe_count()-heroes_alive();
+                if(!use_threat){
+                    /* Supply-capped: the units already alive are the largest army that can exist (they are
+                     * heavy: 44 combat units at 192/194 supply), so waiting for a head count of 50 never ends. */
+                    int supply_spent=race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=6;
+                    if(!wave_on&&(combat>=(minerals<400?24:50)||(supply_spent&&combat>=40)))wave_on=1;
+                    if(wave_on&&combat<=12)wave_on=0;
+                    if(wave_on&&!p7_wave_on)++p7_wave_no;
+                    p7_wave_on=wave_on;
+                    if(!wave_on)target_x=-1;
                 }
             }
             if(target_x>=0){

@@ -272,6 +272,9 @@ static int race_p7_carrier_training_candidate_valid(const Unit *actors,
     unsigned char rank_bits[MAX_UNITS];
     if (!actors || count < 0 || count > MAX_UNITS) return 0;
     for (int i = 0; i < MAX_UNITS; ++i) rank_bits[i] = 0;
+#ifdef SC64_PAID_SCARAB
+    if (!race_paid_scarab_candidate_valid(actors, count)) return 0;
+#endif
     for (int i = 0; i < count; ++i) {
         const Unit *q = &actors[i];
         unsigned state;
@@ -391,7 +394,12 @@ static int race_p7_carrier_training_can_queue(int carrier)
 
 static int race_p7_carrier_training_menu_available(void)
 {
+#ifdef SC64_PAID_SCARAB
+    /* The same contextual command buys a Scarab for a selected Reaver. */
+    return race_p7_carrier_training_selected() || race_paid_scarab_menu_available();
+#else
     return race_p7_carrier_training_selected();
+#endif
 }
 
 /* The user's command handler should call this only for a selected SIDE
@@ -419,6 +427,11 @@ static int race_p7_carrier_training_queue(int carrier)
 static int race_p7_carrier_training_queue_selected(void)
 {
     int queued = 0;
+#ifdef SC64_PAID_SCARAB
+    /* The row reads BUILD INTERCEPTOR when a Carrier-class actor is selected, BUILD SCARAB otherwise:
+     * buy only what it names. */
+    if (!race_p7_carrier_training_selected()) return race_paid_scarab_queue_selected();
+#endif
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && race_p7_carrier_training_queue(i)) ++queued;
     return queued;
@@ -542,6 +555,12 @@ static void sc64_p7_carrier_child_remove(int child_slot,
 static void race_p7_carrier_training_clear_slot(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS) return;
+#ifdef SC64_PAID_SCARAB
+    /* A dying or reused unit slot: a Reaver sheds its state, Scarabs aimed at
+     * it lose the target. */
+    race_paid_scarab_clear_slot(slot);
+    race_scarab_probe_target_invalidate(slot);
+#endif
     if (sc64_p7_carrier_parent_type(u[slot].type) &&
         sc64_p7_carrier_parent_row_consistent(&u[slot])) {
         race_p7_carrier_training_parent_died(
@@ -727,6 +746,9 @@ static void race_p7_carrier_training_parent_died(
  * completed-update boundary so its hidden children cannot remain orphaned. */
 static void race_p7_carrier_training_end_frame(void)
 {
+#ifdef SC64_PAID_SCARAB
+    race_paid_scarab_end_frame();
+#endif
     if (!race_protoss_services_active()) return;
 #if SC64_CARRIER_FRAME_ROSTER
     /* frame_tick has finished; none of its roster consumers are active. */
