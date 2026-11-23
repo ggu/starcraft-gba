@@ -192,7 +192,7 @@ sc64_command_validated_type(u8 *cache, int owner, int raw, int x, int y, int bui
 /* Command and Bring both validate every live row before filtering. Bring
  * additionally tests cargo and geometry only for matching candidates.
  * Rescan the live pools on every call so prior trigger actions are visible. */
-static int
+static inline __attribute__((always_inline)) int
 sc64_z8_game_direct_count(const Sc64Z8WorldView *world, const Sc64Z8Condition *c,
                           unsigned trigger_owner, const Sc64Z8Rect *rect, u32 *out)
 {

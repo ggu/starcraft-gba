@@ -39,9 +39,10 @@ static int compare(const Sc64Z8WorldView *world, unsigned player, unsigned raw,
 static int custom_actor(void *context, unsigned index, Sc64Z8ActorView *out)
 {
     (void)context;
-    assert(index == 0);
-    *out = (Sc64Z8ActorView){.alive = 1, .type_known = 1, .completed = 1,
-                             .source_owner = 0, .raw_type = 42, .men = 1};
+    *out = (Sc64Z8ActorView){0};
+    if (index == 0)
+        *out = (Sc64Z8ActorView){.alive = 1, .type_known = 1, .completed = 1,
+                                .source_owner = 0, .raw_type = 42, .men = 1};
     return 1;
 }
 
@@ -77,17 +78,16 @@ int main(void)
 
     Sc64Z8WorldView world = CENSUS_WORLD;
     const unsigned selectors[] = {0, 1, 2, 7, 8, 12, 13, 17, 18, 19, 20, 21};
+    const Sc64Z8Rect rects[] = {{0, 0, 4095, 4095},
+        {0, 0, 1, 1}, {200, 300, 220, 320}};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
         for (unsigned raw = 0; raw <= 231; ++raw)
             for (unsigned cmp = 0; cmp < 3; ++cmp)
-                for (unsigned runner = 0; runner < 8; ++runner)
-                    {
-                        const Sc64Z8Rect rects[] = {{0, 0, 4095, 4095},
-                            {0, 0, 1, 1}, {200, 300, 220, 320}};
-                        compare(&world, selectors[i], raw, cmp, runner, 2, 0, 0);
-                        for (unsigned r = 0; r < sizeof rects / sizeof *rects; ++r)
-                            compare(&world, selectors[i], raw, cmp, runner, 3, &rects[r], 0);
-                    }
+                for (unsigned runner = 0; runner < 8; ++runner) {
+                    compare(&world, selectors[i], raw, cmp, runner, 2, 0, 0);
+                    for (unsigned r = 0; r < sizeof rects / sizeof *rects; ++r)
+                        compare(&world, selectors[i], raw, cmp, runner, 3, &rects[r], 0);
+                }
 
     unsigned slot = MAX_UNITS - 1u, building = MAX_BUILDINGS - 1u;
     memset(u, 0, sizeof u);
@@ -207,11 +207,21 @@ int main(void)
     assert(compare(&world, 0, 64, 0, 0, 3, &area, 0) == -1);
     u[slot].alive = 0;
     assert(compare(&world, 1, 0, 0, 0, 3, &area, &count) == 1 && count == 0);
+    assert(compare(&world, 1, 0, 0, 0, 3, 0, 0) == -1);
+    u[slot] = (Unit){.alive = 1, .raw_owner = 0, .raw_type = 0,
+                     .type = U_MARINE, .x = 32767, .y = 32767};
+    assert(compare(&world, 0, 0, 0, 0, 3, &all, &count) == 1 && count == 0);
+    u[slot].x = u[slot].y = 42;
+    assert(compare(&world, 0, 0, 0, 0, 3, &area, &count) == 1 && count == 1);
+    assert(compare(&world, 1, 0, 0, 0, 3, &area, &count) == 1 && count == 0);
 
     world.actor_at = custom_actor;
-    world.actor_count = 1;
-    assert(compare(&world, 0, 42, 0, 0, 2, 0, &count) == 1 && count == 1);
     const Sc64Z8Rect rect = {0, 0, 1, 1};
-    assert(compare(&world, 0, 42, 0, 0, 3, &rect, &count) == 1 && count == 1);
+    const unsigned capacities[] = {1, MAX_UNITS + MAX_BUILDINGS};
+    for (unsigned i = 0; i < sizeof capacities / sizeof *capacities; ++i) {
+        world.actor_count = capacities[i];
+        assert(compare(&world, 0, 42, 0, 0, 2, 0, &count) == 1 && count == 1);
+        assert(compare(&world, 0, 42, 0, 0, 3, &rect, &count) == 1 && count == 1);
+    }
     puts("Shared direct Command and Bring censuses match the original actor provider");
 }
