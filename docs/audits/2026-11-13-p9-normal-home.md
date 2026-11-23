@@ -266,7 +266,10 @@ indexed pages, palette and route counters match at all 32 cuts.
 Whole-loop cost falls by 1.65% and 1.64%.
 The 9,489-update P10 seeded victory tail saves 0.54%. All 81 recorded
 cuts, the victory journal and fresh result re-export match the packaged
-control. These are emulator measurements.
+control. The regenerated P10 full HOME run saves 0.62% over all 94,852
+calls. All 37 checkpoints, briefing and dialogue observations, pause
+journal, victory journal and fresh result re-export match. These are
+emulator measurements.
 
 All four prepared links pass their original RAM guards with identical
 EWRAM and IWRAM endpoints. Terran and Showcase ROMs are byte-identical
@@ -281,3 +284,4 @@ The full paired P9 victory and result-journal runs are in progress.
 | Packaged P9 attribution | `9242fc4c4699bd5a256747c66620760629828be9d0e294b601522f97f555dc2e` |
 | Inline validation P9 attribution | `b37cae335a6a2632f50162509676b18617d5d05288abb58f1939153b32988192` |
 | Inline validation P10 seeded win | `d14bdae7ef35ff7f4584b51a24feee2e6d8739f5c8b367d3762fd96f79d5f306` |
+| Inline validation P10 full HOME win | `a018c1ee1cc0fd42631ae5a91101db087adf0466f680ea532e0115ce556d0605` |

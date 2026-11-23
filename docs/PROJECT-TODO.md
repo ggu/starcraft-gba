@@ -779,9 +779,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   goes from 11.14 to 12.16 emulated calls per second. The specialized
   location scan already ships in the shared bridge. A [warm validation
   trial](audits/2026-11-13-p9-normal-home.md#inline-validation-for-cached-actor-types)
-  saves another 1.64–1.65% in the two current P9 windows and 0.54% in
-  the seeded P10 win. Complete the paired P9 result journals before
-  promoting this change. Continue checking other campaign providers
+  saves another 1.64–1.65% in two current P9 windows and 0.62% through
+  the current full P10 win, with matching pause and victory journals.
+  Complete the paired P9 result journals before promoting this change. Continue checking other campaign providers
   independently.
   The [current Z8 comparison](audits/2026-11-12-z8-normal-physical.md#november-23-current-controller-comparison)
   matches the input tape and pause SRAM on the baseline and Bring
