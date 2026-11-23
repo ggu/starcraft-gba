@@ -185,3 +185,29 @@ cadence unresolved.
 | Native update 19,444 seed state | `4db6e4cf342abd2af5b3409d6ad3b9f9298b1a12e529d5484bde09eed7eab7be` |
 | Native update 19,868 snapshot | `f1ad28386562bc1da1ff518d88ef4fa4571dce872e2b5ca462443ad1a8ba1805` |
 | Native update 21,089 snapshot | `64064866a7220e78d743fe3c034fd0f87d74a302f2bdca892dc7ccc4ea656d25` |
+
+### Mineral pickup and claim release
+
+Eighteen further neutral snapshots from the same seed,
+spaced five to seven native updates apart, observe the
+owner-2 mineral cycle at patch 16. At update 19,492,
+SCV 67 has a live claim, no cargo, order 87 and phase 5.
+The patch reserve is 388. At 19,497, it has eight cargo,
+targets its completed Command Center in order 90, phase 1,
+and has relinquished its claim. The patch reserve is 380
+and its active flag is clear. That brackets the pickup,
+debit and claim release within five updates.
+
+SCV 66 targets the same patch without a claim at update
+19,517, then holds the claim in order 87, phase 5 by 19,523.
+SCV 67's eight cargo clears between updates 19,542 and
+19,548. The resource bank is unattributed, so this bounds
+cargo clear without resolving the exact bank credit.
+The local observation log stores a hash for each snapshot.
+The emulator overwrote the intermediate snapshots and
+retained the final state.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Eighteen observations | `3a82517571f5c3b18cb9df36e64ec79bdbae84799d69ee25a29f316e7280b9ae` |
+| Final native state | `3afd037e2b66a3b893cb558b3f00eba73f6e794f911915ba7c3374fd2fc492f0` |

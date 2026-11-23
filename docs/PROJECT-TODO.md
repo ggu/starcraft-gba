@@ -64,6 +64,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   occupied row. Authored ARM batches save 0.7–7.8% across the
   speed- and size-optimized query builds. Measure the change during
   a full busy battle before attributing a frame-rate gain.
+  The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
+  uses the existing walk grid and visits the same cells in order.
+  All 95 direct-path calls in the retained Outpost battle have
+  in-bounds endpoints. The separate authored ARM cases show lower
+  in-bounds query costs. The blocked movement scan is the larger
+  measured cost and still needs a broader reduction.
   The [merged selection and detector query changes](audits/2026-11-22-steady-order-cost.md#selection-and-detector-query-candidate)
   saves 0.72% on the P10 victory replay and 0.17–0.25% across the six
   Custom Game replays with matching state and video. Profile repeated
@@ -443,8 +449,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   verifies the Command Center, worker and mineral sprite keys in
   live render rows. A [later Blood Bath observation](audits/2026-11-21-native-headless-replay.md#later-blood-bath-worker-orders)
   records a neutral SCV alternating between a mineral and its Command
-  Center over 1,645 native updates. Resolve the native resource bank
-  and per-update service transitions to compare later mineral income.
+  Center over 1,645 native updates. The [closer native observations](audits/2026-11-21-native-headless-replay.md#mineral-pickup-and-claim-release)
+  bracket an eight-mineral pickup, matching patch debit and claim
+  release in five updates. Resolve the bank credit and per-update
+  service transitions to compare later mineral income.
   Extend campaign opening
   and event timing coverage. The [native Custom Game lobby captures](audits/2026-11-22-native-custom-game-lobby.md)
   show the map and seat controls, race cycling, and no difficulty field
@@ -975,8 +983,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Overlord reaches the northwest guard at frame 40,031.
   [Reinforcing the north first](audits/2026-11-12-z8-normal-physical.md#reinforce-the-north-through-the-nydus)
   defeats the next wave and preserves eight Drones, 357 gas
-  and Kerrigan at fresh HOME frame 39,680. Protect the northern
-  workers while getting a replacement detector to the northwest guard.
+  and Kerrigan at fresh HOME frame 39,680. An [earlier northern hold](audits/2026-11-12-z8-normal-physical.md#hold-the-northern-approach-and-evacuate-workers)
+  stops the next approach wave. Another southern Templar interception
+  preserves active gas and all eight buildings at fresh HOME frame
+  46,924. The alternate frame-48,594 save preserves all eight
+  evacuated Drones. The [southern production recovery](audits/2026-11-12-z8-normal-physical.md#southern-objective-probe-and-production-recovery)
+  establishes a Pool and Den, intercepts the northwest Templar
+  before the frame-56,579 loss boundary, and trains six more
+  Hydralisks. Fresh HOME at frame 58,760 retains the reserve
+  and Kerrigan. Restore southern detection and supply before
+  reattempting the Cannon and Nexus approach.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

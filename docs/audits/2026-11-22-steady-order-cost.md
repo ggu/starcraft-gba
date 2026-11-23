@@ -144,6 +144,69 @@ measurements are still open.
 | Size-optimized ARM timing output | `6bcfabd71d31135cb3fca7f5714d8eba990190f9c1e67877aac796af9222c3f6` |
 | Authored host differential runner | `ae763c1c6b53f62c2fe31bede694e7df354cfa67b50fb2e7a12f9ba9d1e1af56` |
 
+### Walk direct corridors by grid cell
+
+The direct path follows both axes until one reaches its
+endpoint, then finishes on the other axis. Advance the
+walk-grid index at each crossed boundary, including one
+diagonal index advance for a simultaneous X and Y crossing.
+With in-bounds endpoints this uses the existing walk grid
+without a bounds check, coordinate division and grid-validity
+check at each tile. Starting and finishing in one cell
+still causes no grid rebuild or cell read. Out-of-bounds
+coordinates use the existing checked path.
+
+The ASan/UBSan comparison matches the full cell-read
+sequence, the decision, and the grid rebuild count on
+120,000 authored paths. It includes clear and blocked
+terrain, four map sizes, horizontal, vertical and diagonal
+trips, endpoints in the same cell and negative coordinates.
+An ARM fixture with runtime map dimensions compares eight
+batches of 256 paths, with matching answer digests.
+
+| Authored batch | Existing cycles | Grid-cell walk cycles |
+| --- | ---: | ---: |
+| Horizontal clear | 2,006,216 | 793,903 |
+| Vertical clear | 1,616,912 | 733,184 |
+| Short clear | 1,225,685 | 1,122,233 |
+| Mixed long clear | 3,133,377 | 1,067,770 |
+| Mixed blocked terrain | 824,380 | 632,812 |
+| Starts west of the map | 3,302,890 | 5,074,872 |
+| Identical endpoints | 551,913 | 551,913 |
+| One pixel within the same cell | 575,274 | 568,553 |
+
+The authored and default-build IWRAM sections are each
+32 bytes smaller. The out-of-map reference takes longer
+from ROM. A read-only sample of the retained Outpost battle matches all
+16 world, route, palette and two-page cuts. It contains
+95 direct paths, all in bounds. Of those, 79 cross tiles
+with both axes moving, 12 are axis-aligned and cross a tile,
+and 4 begin and end in the same tile. The original direct
+path scope averages 2,146 guest cycles per update in this
+window. The uncached steering mask averages 54,591. The
+table above measures the query, with full-frame and hardware
+timing still open.
+
+A second read-only run observes 80 updates from the
+frame-46,924 Z8 HOME checkpoint. All 18 direct-path calls
+are in bounds, and every sampled world, route, palette and
+two-page result matches its uninstrumented continuation.
+
+The asset-free default ROM starts through ordinary A input
+in both builds and runs 1,200 updates. All 20 sampled actor,
+economy, RNG, palette and two-page hashes match. Total
+guest cycles are 673,806,915 and 673,807,340 respectively.
+This run includes presentation pacing and provides
+integration evidence for the default ROM.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored fixture | `dbd944ea45a12af8bf955e00b17d7c4cbbc1219c168c8a759aa0a69b2b20c595` |
+| ARM timing output | `9e96d978b769074b9988a43daa5cb944b0c702142ab305798e75262a69d78a83` |
+| Retained Outpost direct-path census | `a0646920b36b128fa27727a0f9cadc7cadcf5188507f240b9644678d785be0e5` |
+| Z8 fresh HOME direct-path census | `9cec10842ae59e3e43eb7fb8f9992fd8690360c535325d7187e8ce7e9f547a57` |
+| Asset-free default ARM pair | `4bda4c6d63c6ecaf9edfb9bbc9904b9fcc3114ee5e96cd43059577ef4eb12387` |
+
 ## Visible fights in Protoss Crossfire
 
 The merged #724 Showcase build enters Crossfire through the normal
