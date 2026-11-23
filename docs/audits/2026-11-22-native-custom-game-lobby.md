@@ -313,6 +313,48 @@ orders and actor composition costs.
 The local trial attribution SHA-256 is
 `a7bec653dfdcdf0e1053c92b4e04680803b33d2363a34ee45c7f1505fbbbd49f`.
 
+### Shorter cloak-cache scans
+
+The trial cloak tick checks the few relevant runtime types
+directly when an actor lacks an explicit source type. Its type
+predicates and general type-to-source mapping use the same rows.
+Explicit source IDs still take precedence. The GBA Thumb path also
+checks unused unit rows with grouped word loads. Every byte,
+including padding and the trailing words, still participates.
+
+An isolated ARM fixture sets each bit separately across 48-, 52-,
+56- and 60-byte rows, and checks fully zero rows at each slot.
+All 13,856 checks pass. The host cloak differential matches its
+scalar reference across 24 worlds and 8,640 updates. All four
+normal cartridges retain their static RAM endpoints. The Terran
+and Zerg ROM hashes match the prior package.
+
+| Three-CPU Melee window | Mean guest cycles, stock → shared scan | p95, stock → shared scan |
+| --- | ---: | ---: |
+| Protoss 10, 8,401–9,000 | 766,169 → 760,863 | 904,103 → 899,148 |
+| Protoss 10, 10,801–11,400 | 1,040,170 → 1,034,282 | 1,350,192 → 1,355,686 |
+| Showcase, 8,401–9,000 | 756,315 → 751,544 | 891,401 → 890,774 |
+| Showcase, 10,801–11,400 | 913,889 → 909,270 | 1,145,718 → 1,143,908 |
+
+The paired replays match complete unit banks, world summaries,
+route counters, both display pages and palette at 84 checkpoints.
+The late Protoss mean improves 0.57% and its p95 rises 0.41%.
+The late Showcase mean improves 0.51% and its p95 falls 0.16%.
+These windows still miss the two-VBlank budget. All 20 ordinary
+skirmish save continuations and 30 campaign openings pass.
+Four historical campaign saves load and re-export with the same
+SRAM bytes. The full ordinary Protoss 10 HOME replay wins at
+frame 93,377 with all 37 checkpoints and three SRAM exports
+matching. Across all 94,852 calls the mean rises from 1,095,036
+to 1,098,010 guest cycles, a 0.27% increase. Keep the trial local
+and retain the larger orders and renderer work as priorities.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Protoss 10 sustained candidate | `19b61e33dc75ee2177b18d01d7dd0e8c878392ce7e865d562f593946f4ad3be7` |
+| Showcase sustained candidate | `5311f302d2d1f715278e113f374f901ad21a7aba121592b2c6962f08c1daa11b` |
+| Protoss 10 full victory and fresh readback | `e8a2fbb49fc04657b3ed237f04cc1dada5495b63f9384c173b2572ab440bce72` |
+
 ### Occupancy checks for steering rows
 
 The address census at the actual steering bucket-head load covers
