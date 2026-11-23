@@ -172,8 +172,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [64×64 facility flood trial](audits/2026-11-21-facility-thumb-current.md)
   cuts the sampled Outpost peaks by 7–15% across the race ROMs on the
   preceding release. On top of the Carrier roster the Blood Bath peak
-  falls another 5.09%, while p95 rises 0.32%. Keep it opt-in pending
-  broader combined replays and the Showcase runtime stack watermark.
+  falls another 5.09%, while p95 rises 0.32%. On the current combined
+  source the isolated placement of the facility kernel exceeds the
+  Z10 IWRAM reserve. The broader placement preview still needs new
+  combined replay and runtime stack measurements. The nearby-root
+  reserve itself already ships in the shared composed route defaults.
   The [shared changed-row sight path](audits/2026-11-22-shared-sparse-sight.md)
   cuts the Protoss 10 campaign tail by 7.87% and the tested Terran
   Outpost battle window by 0.48%. An isolated generated-header path
@@ -724,13 +727,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   path. The [contact census](audits/2026-11-22-native-custom-game-lobby.md#terrain-filtering-in-the-contact-scan)
   finds at most two new early exits in 80 Terran queries. The
   [ARM decoder trial](audits/2026-11-22-native-custom-game-lobby.md#first-order-audio-on-arm)
-  increases late Protoss Melee cycles by 2.33%. Late orders
-  and drawing still need work to reach the two-VBlank budget.
+  increases late Protoss Melee cycles by 2.33%. Reusing
+  [unit admission checks](audits/2026-11-22-native-custom-game-lobby.md#reusing-actor-admission-during-the-draw)
+  reduces the late 600-update mean by 0.20%, while p95 rises
+  0.46%. Late orders and drawing still need work to reach the
+  two-VBlank budget.
   The [packaged Terran matched opening](audits/2026-11-22-steady-order-cost.md#packaged-terran-melee-mineral-opening)
   still gathers faster at the same Blood Bath corners. In the sampled
   seconds, the GBA has at most one worker actively mining each targeted
   patch, whereas the four native SCVs initially approach the same patch.
-  Check first assignment and worker travel before tuning service time.
+  The qualified native rerun confirms the claim precedes its positive
+  work timer. Check first assignment and worker travel before tuning
+  service time.
   [Mining-timing probe](https://github.com/ggu/starcraft-gba/pull/643)
 - **Current cartridge campaign saves.** [Shadow Hunters on normal P10](audits/2026-11-13-p9-normal-home.md#scripted-destruction-and-result-autosave)
   writes a new journal at the actual victory. A fresh HOME load
@@ -750,6 +758,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   identical SRAM. The same ROM also passes [P7 pause, victory and
   result reload](audits/2026-11-13-p7-carried-normal-home.md#november-23-melee-enabled-cartridge).
   All 12 snapshots match the archived field and display checks.
+  [P10 on the same cartridge](audits/2026-11-13-normal-campaign-matrix.md#p10-on-the-packaged-protoss-cartridge)
+  wins from the retained frame-36,761 pause and re-exports its result.
+  The historical full HOME route first differs in gas at frame
+  17,263 and diverges before victory. Regenerate the opening from
+  the current controls and verify a fresh start through the win.
   Apply these result checks to the remaining missions on the current builds.
   On [the November 23 normal cartridge](audits/2026-11-13-p9-normal-home.md#november-23-current-cartridge-victory-and-result-reload),
   a regenerated P9 controller matches 93 ordinary-input checkpoints

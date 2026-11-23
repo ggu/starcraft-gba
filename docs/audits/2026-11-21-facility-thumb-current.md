@@ -90,3 +90,16 @@ samples, route counters and exported pause bytes match. The comparison
 receipt SHA-256 is
 `c24d256cbfec20f1f342317b0629be1717cc961c6cc3bafe8f372c7e510165fe`.
 This paired trial covers the Z10 busy match.
+
+## Isolated placement on the later combined source
+
+A local trial on `14e32cbb` moves only the current 64×64 facility
+expansion function to IWRAM. It uses the pinned Z10 build vector
+with Melee and the batched target index. The linker rejects the
+trial at the existing 11 KiB stack reserve. The older preview also
+split the dense point flood and placed its setup and packing in
+ROM. That composition needs a fresh test against the current
+dense route code. The isolated trial produced no new timing result.
+
+The isolated link log SHA-256 is
+`9373a3bbf329e4f98a4712272c13ab0fbd6e01df2bbdac3c1a0a4e62ce446851`.

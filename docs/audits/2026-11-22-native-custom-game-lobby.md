@@ -214,6 +214,39 @@ interrupts active. Keep Thumb decoding in the shared builds.
 | Packaged Thumb control | `45a99a47d032f7004a61d8af6a9b44d0d6dc84de7bb70b967d778d775786b302` |
 | First-order ARM trial | `c87a93d27a4b4888b61a6295a79d168fa5747cbf3854569cdc801023d1526084` |
 
+### Reusing actor admission during the draw
+
+The trial passes the depth queue's body or charge-only admission
+to the unit draw. The ordinary draw entry points still compute
+their own admission. The depth keys, attack-image order and
+mining-effect order use the existing code. The trial fits the same
+Protoss 10 static RAM endpoints. The sanitizer unit-edge fixture
+passes on both physical pages, all four battlefield edges and
+the hidden-enemy cut.
+
+The control and candidate match frames, world state, route
+counters, both video pages and palettes at all 42 cuts in two
+600-update neutral Melee windows. All 32 separate attribution
+samples also match. At updates 11,385–11,400, the average
+body-crop calls fall from 4.31 to 2.31 and the depth painter's
+mean cost falls from 389,870 to 384,575 guest cycles.
+
+| Window | Mean guest cycles, control → trial | p95, control → trial |
+| --- | ---: | ---: |
+| 8,401–9,000 | 766,169 → 766,521 | 904,103 → 903,218 |
+| 10,801–11,400 | 1,040,170 → 1,038,072 | 1,350,192 → 1,356,396 |
+
+The late mean falls by 0.20%, and the late p95 rises by 0.46%.
+There is little gain at the full-loop level. Keep admission reuse
+as a local trial. The 30 fps target still requires savings in
+larger shared costs.
+
+| Local timing receipt | SHA-256 |
+| --- | --- |
+| 1,200-update control | `c26cc62fc6375f3de65fe4afa1bd26ba84a2f7f1a15dfeeb32bc6d156e9cf5c0` |
+| 1,200-update admission trial | `443bcd3b5ef715b1d481c7b8a5d42b002ad8b725029ddb5f149264c8569ee30e` |
+| Admission-trial attribution | `5c6ec19df684bd7e884bcedd263382ecadfed56d5f8f5803680b16af2fc123e0` |
+
 ## Normal cartridge integration candidate
 
 The four normal build recipes enable the same existing lobby mode

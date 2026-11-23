@@ -775,12 +775,17 @@ and zero work timers. At 5,949, one has a claim and its timer is
 still zero. At 5,955, the same worker's timer is 74 and the entire
 snapshot matches the earlier qualified cut byte for byte. The
 observer reached the requested RAM cuts with the pinned inputs.
-Its final check requires a copied display frame, so the read-only
-run exits nonzero. These cuts show that the claim can precede
-the positive timer. The observer steps still bracket the transition
-in a different clock from simulation updates. The compact receipt
-SHA-256 is
-`fd2efc7a7b45a6ec15f94e47d40e5921f6e1efe62aa2134aff12b7c840c35da6`.
+Its final check requires a copied display frame, so the initial run
+exits nonzero. A second fresh run copies one frame in scratch and
+passes the observer's exit checks. All three RAM cuts match the
+initial run byte for byte. These cuts show that the claim can
+precede the positive timer. The observer steps bracket the transition
+on a different clock from simulation updates.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First three RAM cuts | `fd2efc7a7b45a6ec15f94e47d40e5921f6e1efe62aa2134aff12b7c840c35da6` |
+| Qualified repeat ares run | `db375866fed03099398018aa1f05f3982691232f484c71f76b1d81e1c345667d` |
 
 ## Protoss campaign continuation and replay controls
 
