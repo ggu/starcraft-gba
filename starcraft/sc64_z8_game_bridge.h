@@ -175,18 +175,26 @@ _Static_assert(sizeof(((Unit *)0)->x) <= 2 && sizeof(((Unit *)0)->y) <= 2 &&
                "command raw validation requires compact coordinates");
 _Static_assert(SC_RU_COUNT < 254 && SC_RB_COUNT < 254,
                "command raw validation stores mapped type in a byte");
-static int
-sc64_command_validated_type(u8 *cache, int owner, int raw, int x, int y, int building)
+static int __attribute__((noinline))
+sc64_command_validate_uncached(u8 *cache, int owner, int raw, int x, int y, int building)
 {
-    int l, t, r, b, type;
-    if (owner < 0 || owner >= SC64_Z8_SOURCE_OWNER_LIMIT || x < 0 || y < 0) return -1;
+    int l, t, r, b;
     if ((unsigned)raw >= SC64_Z8_RAW_UNIT_LIMIT)
         return sc64_z8_game_actor_validate(owner, raw, x, y, building, &l, &t, &r, &b);
-    if (!cache[raw]) {
-        type = sc64_z8_game_actor_validate(owner, raw, 0, 0, building, &l, &t, &r, &b);
-        cache[raw] = (u8)(type < 0 ? 1 : type + 2);
-    }
+    int type = sc64_z8_game_actor_validate(owner, raw, 0, 0, building, &l, &t, &r, &b);
+    cache[raw] = (u8)(type < 0 ? 1 : type + 2);
     return (int)cache[raw] - 2;
+}
+
+static inline __attribute__((always_inline)) int
+sc64_command_validated_type(u8 *cache, int owner, int raw, int x, int y, int building)
+{
+    if ((unsigned)owner >= SC64_Z8_SOURCE_OWNER_LIMIT || (x | y) < 0) return -1;
+    if ((unsigned)raw < SC64_Z8_RAW_UNIT_LIMIT) {
+        unsigned encoded = cache[raw];
+        if (encoded) return (int)encoded - 2;
+    }
+    return sc64_command_validate_uncached(cache, owner, raw, x, y, building);
 }
 #endif
 /* Command and Bring both validate every live row before filtering. Bring

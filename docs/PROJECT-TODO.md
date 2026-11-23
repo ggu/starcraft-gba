@@ -775,8 +775,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   lowers total cycles by 15.59–16.12% with matching sampled
   state and pixels. The [full P9 victory and result save](audits/2026-11-13-p9-normal-home.md#full-victory-and-journal-with-direct-location-counts)
   match all 93 checkpoints and all three SRAM exports. The replay
-  goes from 11.14 to 12.16 emulated calls per second. Continue
-  checking location conditions with the other campaign providers.
+  goes from 11.14 to 12.16 emulated calls per second. The specialized
+  location scan already ships in the shared bridge. A [warm validation
+  trial](audits/2026-11-13-p9-normal-home.md#inline-validation-for-cached-actor-types)
+  saves another 1.64–1.65% in the two current P9 windows and 0.54% in
+  the seeded P10 win. Complete the paired P9 result journals before
+  promoting this change. Continue checking other campaign providers
+  independently.
   The [current Z8 comparison](audits/2026-11-12-z8-normal-physical.md#november-23-current-controller-comparison)
   matches the input tape and pause SRAM on the baseline and Bring
   builds. Both controllers lose after the first Nexus falls and mineral

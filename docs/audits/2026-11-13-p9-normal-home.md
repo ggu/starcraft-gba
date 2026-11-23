@@ -245,3 +245,39 @@ raw validation caching.
 | Victory and fresh readback SRAM | `f77d58315d7cbfe62604d5fdb8f2df34fa6fc9705f6f09526164d13269a3dec9` |
 | Six three-CPU matches | `b3826e59900d6a91af7b0e0858d5c69468f741e35cf8138a9ac2ff88cc55ae48` |
 | Custom Game fresh continuation matrix | `d39e46b0081b6626e0e190feabb94c550487e5bc2563ff2bf8878d2c3f74056e` |
+
+### Inline validation for cached actor types
+
+The normal Protoss and Zerg products already use the specialized
+location scan through PR #747. This trial inlines the common memo hit
+for a validated raw type in both shared scanners. Each live row still
+checks its owner and current coordinates. An unresolved or out-of-range
+type goes through the existing validator. Bring still checks current
+completion, cargo and location using the existing actor geometry.
+
+| Mean cycles per sampled update | First window, control → trial | Second window, control → trial |
+| --- | ---: | ---: |
+| Command and Bring scanners | 52,393 → 34,844 | 53,149 → 35,314 |
+| Whole loop | 1,089,720 → 1,071,698 | 1,090,299 → 1,072,435 |
+
+The two 16-update windows start at input calls 33,134 and 34,934
+after the retained ordinary P9 pause loads. Frames, world, both
+indexed pages, palette and route counters match at all 32 cuts.
+Whole-loop cost falls by 1.65% and 1.64%.
+The 9,489-update P10 seeded victory tail saves 0.54%. All 81 recorded
+cuts, the victory journal and fresh result re-export match the packaged
+control. These are emulator measurements.
+
+All four prepared links pass their original RAM guards with identical
+EWRAM and IWRAM endpoints. Terran and Showcase ROMs are byte-identical
+to their controls. The 30 campaign openings, four predecessor campaign
+save loads, 20 Custom Game continuations and 20 cross-version cases
+repeat the packaged receipts. The Protoss and Zerg sanitizer fixtures
+also match the shared slow provider across the actor and geometry cases.
+The full paired P9 victory and result-journal runs are in progress.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Packaged P9 attribution | `9242fc4c4699bd5a256747c66620760629828be9d0e294b601522f97f555dc2e` |
+| Inline validation P9 attribution | `b37cae335a6a2632f50162509676b18617d5d05288abb58f1939153b32988192` |
+| Inline validation P10 seeded win | `d14bdae7ef35ff7f4584b51a24feee2e6d8739f5c8b367d3762fd96f79d5f306` |
