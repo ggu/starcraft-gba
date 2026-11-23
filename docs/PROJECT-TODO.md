@@ -838,9 +838,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cuts the authored 240-worker load preparation from 6.97 million
   cycles to about 208,000 with matching state. All four packed row
   codecs feed the shared builder and preserve a worker's cargo.
-  Integrate it into the
-  [normal journal envelopes](audits/2026-11-21-native-mineral-service-queue.md#packed-journal-integration)
-  and measure race economy and pacing before shared activation.
+  [Authored packed journal candidates](audits/2026-11-21-native-mineral-service-queue.md#authored-packed-journal-candidates)
+  now exercise all four codecs through the SRAM selector, including
+  rejected newer candidates and half-range fallback. Next compose the
+  production [journal envelopes](audits/2026-11-21-native-mineral-service-queue.md#packed-journal-integration)
+  with the world-specific service checks, then measure resume,
+  memory headroom, race economy and pacing before shared activation.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.

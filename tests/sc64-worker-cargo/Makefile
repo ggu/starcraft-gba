@@ -34,8 +34,21 @@ build/test-sc64-mineral-fifo-frontier: $(MINERAL_FIFO_DEPS) | build
 	$(CLANG) $(MINERAL_FIFO_FLAGS) -DSC64_SKIRMISH -DSC_ORIGINAL_SKIRMISH -DSC_FRONTIER_ROUTE_CACHE $< $(MINERAL_FIFO_TEST_SRAM) -o $@
 build/test-sc64-mineral-fifo-packed: tests/sc64_mineral_fifo_packed.c $(wildcard starcraft/*.h) tests/sc64-worker-cargo/Makefile | build
 	$(CLANG) $(MINERAL_FIFO_FLAGS) $< -o $@
+# Exercise the real journal and each packed unit codec without game assets.
+define SC64_PACKED_FIFO_JOURNAL
+build/test-sc64-packed-fifo-journal-$(1): tests/sc64_packed_mineral_fifo_journal.c tests/sc64_mineral_fifo_packed.c tests/sc64_guardian_journal_shim.c $$(wildcard starcraft/*.h) common/gba.c common/gba.h tests/sc64-worker-cargo/Makefile | build
+	$$(CLANG) $$(MINERAL_FIFO_FLAGS) $(2) $$< tests/sc64_guardian_journal_shim.c -o $$@
+endef
+$(eval $(call SC64_PACKED_FIFO_JOURNAL,compact,-DSC64_LATE_TERRAN_STORAGE))
+$(eval $(call SC64_PACKED_FIFO_JOURNAL,zp,-DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ZP_FULL_STORAGE))
+$(eval $(call SC64_PACKED_FIFO_JOURNAL,derived,-DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ZP_FULL_STORAGE -DSC64_Z7_DERIVED_SAVE))
+$(eval $(call SC64_PACKED_FIFO_JOURNAL,typed,-DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ZP_FULL_STORAGE -DSC64_P7_TYPED_COMPACT_ENABLED))
+.PHONY: test-sc64-packed-fifo-journal
+test-sc64-packed-fifo-journal: $(addprefix build/test-sc64-packed-fifo-journal-,compact zp derived typed)
+	@for test in $^; do ./$$test || exit $$?; done
+
 .PHONY: test-sc64-mineral-fifo
-test-sc64-mineral-fifo: build/test-sc64-mineral-fifo-default build/test-sc64-mineral-fifo-frontier build/test-sc64-mineral-fifo-packed
+test-sc64-mineral-fifo: build/test-sc64-mineral-fifo-default build/test-sc64-mineral-fifo-frontier build/test-sc64-mineral-fifo-packed test-sc64-packed-fifo-journal
 	./build/test-sc64-mineral-fifo-default
 	./build/test-sc64-mineral-fifo-frontier
 	./build/test-sc64-mineral-fifo-packed

@@ -284,12 +284,45 @@ the amount and preserve the cargo flags before running the existing
 worker validators. The standalone tag continues to use its original
 rank encoding.
 
+#### Authored packed journal candidates
+
+`make test-sc64-mineral-fifo` exercises the real SRAM selector with
+authored payloads using the compact, ZP, derived and P7 typed row
+codecs. The prepared reader binds the FIFO feature to the selected
+payload address and exact outer/inner pair. It restores ordinary cargo
+before checking service eligibility and writes only ranked worker rows
+back to scratch. It uses the same packed row encoder as the cargo and
+shield migrations. Repair carry and nonworker carry are left verbatim.
+The selected token still refers to the checksummed bytes in SRAM.
+
+The journal fixtures check a newer, checksummed candidate with duplicate
+ranks and the half-range case that forces the selector to rebuild the
+winning candidate after inspecting both banks. Both restore the older
+queue and its normalized cargo. A separate legacy predecessor retains
+both of its parallel work timers and an empty queue. An invalid pair or
+a tag without the FIFO feature cannot authorize rank decoding. A failed
+selection leaves SRAM and the caller's selection token byte-identical.
+
+The feature pairs in these fixtures belong to their authored envelopes.
+Production activation still needs explicit pairs for each released
+transport layout, the world-specific eligibility check, and publication
+of the queue after the actual load. Keep the original selection token
+when passing the transport decoder its expected layout tag. The writer
+must protect the same set of accepted predecessor tags as the reader.
+
 The raw stage uses namespace `0x4f`. With separate FIFO tags for
 base and custom envelopes, Terran and Z10 would need five accepted
 tags each and P10 would need six. The ordinary selector currently
 allows five. The separate P10 research-and-Egg preview already uses
 six tags under its own capacity guard. Qualify those preview
 combinations separately from the normal products.
+
+Reserve live and detached queues in EWRAM. The saved-plan representation
+is 768 bytes per queue at 240 units and 144 patches. Older guarded links
+at source `1f0ad66e` show 11,952–22,084 bytes of EWRAM reserve across the
+four products and as little as 32 bytes of IWRAM reserve. These links
+predate this candidate work. Recheck all four products at the integrated
+head, with the final detached plan and runtime allocations.
 
 | Local receipt | SHA-256 |
 | --- | --- |
