@@ -457,16 +457,25 @@ build. Empty images use their original frame.
 
 The two offset loads and additions cost 30 cycles in the
 dense controls. IWRAM section size remains 5,680 bytes in
-both fixtures. Next, count profitable crops on a mixed
-visible scene. Keep the original frame identity, apply
-crop offsets after mirroring and drawing placement, and
-keep culling geometry aligned with the rendered pixels.
-The measured gains cover authored draws only.
+both fixtures. The measured gains cover authored draws only.
+
+The read-only census of all 16 retained late P10 Melee cuts
+(11,385–11,400) checks the widest and tallest opaque extent
+in each recorded call. All 319 packed draws use tight
+rectangles already, for zero removable groups across
+182,468 groups counted against all four phases. One of 321
+byte draws has five removable pixel slots out of 160,965
+in the sample. Keep the crop prototype local. If a future
+bank has measurable whole-frame margins, preserve frame
+identity, apply offsets after mirroring and drawing
+placement, and align culling with the rendered pixels.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | Crop fixture with runtime offset loads | `2cc7dad7146efea171ffb67fd5722f4c55254e1fcea3b20cfa68e411104ebb67` |
 | ARM timing results | `5f9e32c37499c07a60ab8fe2343f1217eca70542efc9c2e9e5aed581edcb2eea` |
+| Retained P10 Melee source-call evidence | `7807d46bc665b7073f7736994622eacb71c5cb0228a9f170a37701b7fc1c6970` |
+| Crop census | `760de111b9dfc950b6c5c662ab6e9bde00a15c0b8aaa4296a7621ec322bdc222` |
 
 ## Shared heading for projectiles and unit facing
 

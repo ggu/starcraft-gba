@@ -107,8 +107,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   20% on dense art and require another 608 bytes of IWRAM.
   Keep the trial local. [Whole-frame cropping](audits/2026-11-22-steady-order-cost.md#whole-frame-transparent-crop)
   saves 15–50% on authored padded ARM cases when offsets
-  are read at runtime. Measure frame edges and full-frame
-  timing on a mixed visible scene before enabling it.
+  are read at runtime. Across 16 retained P10 Melee cuts,
+  all 319 packed draws already use tight rectangles, and
+  only one of 321 byte draws can shed a five-pixel margin.
+  Keep whole-frame cropping local and prioritize larger
+  costs in the dense workload.
   The [shared projectile heading lookup](audits/2026-11-22-steady-order-cost.md#shared-heading-for-projectiles-and-unit-facing)
   preserves launch and impact direction through exact ties. It
   cuts guest cycles slightly in six ordinary battles, the P10
