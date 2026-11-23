@@ -163,3 +163,29 @@ result with an empty queue. Its exported SRAM matches the earlier
 | Victory SRAM and fresh readback | `4fbb2dc29e8496e3e105a38f4eecc3d02074692259baa224b3ca34040672365b` |
 | Full replay and both journal checks | `7086611cfd7735ebee71a08c44251c7f6899074749dbe9baef715787e0c40294` |
 | Pending-impact custom stress receipt | `ef48de518604ddbe33593edbd02923998994754acd8f3dabbb48b543502358e1` |
+
+## November 23 packaged full HOME win
+
+A regenerated ordinary controller route starts from HOME on the
+packaged `7f7eab41` Protoss 10 ROM. The strict ARM observer matches
+all 37 checkpoints, 10 briefing pages and 14 dialogue pages through
+victory at frame 93,377 on call 94,852. It records zero trigger faults
+and marks the mission complete.
+
+The run saves at call 31,605, frame 30,847. A fresh HOME session
+restores the sampled world, control and mission state and matches
+the 25 post-load checkpoints. Victory writes a sequence-2 journal.
+Another fresh HOME session reloads the result and re-exports the
+same 32 KiB image after eight neutral updates.
+
+The full route averages 15.23 emulated main-loop calls per second.
+This measure includes presentation and dialogue time. The seeded
+victory tail in the [campaign matrix](2026-11-13-normal-campaign-matrix.md#p10-on-the-packaged-protoss-cartridge)
+uses a different route and pause.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Regenerated HOME controller tape | `b64517e3c302cd9f19aea751eb387ea41415f0b7f9cdf0a77532dd58c10d30a6` |
+| Full ARM victory and fresh loads | `c340aa1e9ba1e15e5680fe4ce75eabab1695ac291df7b5fb1ac5ef714d9d52a0` |
+| Pause journal | `8d788f5b5f8bc8af4cca6ab5fb4e81f05e2cb3c51393f6562c3d894c2382a2cc` |
+| Victory and readback journal | `8a027508740fb2e755825d070948b07d2a071126b436d3638c0b00442b8e4e55` |
