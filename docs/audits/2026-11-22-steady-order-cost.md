@@ -717,6 +717,31 @@ elapsed-seconds field reads 2 at all three cuts. Runner steps include
 presentation cadence, so they are insufficient to derive an exact
 simulation update or mining delay.
 
+### Mineral targets spread between native seconds 12 and 15
+
+A new bounded ares run continues the authenticated one-Zerg
+Blood Bath opening without in-map input. At runner step 6,500
+the native clock reads 12 seconds. Three workers still target
+patch 49 and the fourth is carrying eight minerals back. At
+step 6,650, second 15, SCV 69 claims patch 56. SCV 71 claims
+patch 49 and another two workers still target it. At step
+6,800, second 18, SCV 69 still holds patch 56 while SCV 72
+holds patch 49 and SCV 71 carries eight minerals back.
+
+This brackets the first observed change from patch 49 to 56
+between steps 6,500 and 6,650. The player hall and initial
+worker identities match the original comparison. The three
+RAM and two video captures fit the observer's 64 MiB cap.
+Input pins match before and after the run. The exact retarget
+update and the condition that initiates it remain open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Controller and observer tape | `dcbe9bc3e4f27a424c63054e7e1b0abe3e41b32f36a8d301f102670b44194271` |
+| Step 6,500 | `4536053a302175e447877cc9c2e040e403e742cd7bd2f0ee094c5fbb0f996092` |
+| Step 6,650 | `2722ffdf670313889b5df31d1b98ace167e70be2022fdb2d8f764d3a9c736457` |
+| Step 6,800 | `81544fa4a0ae73f7f067bd5376d0356aad9389e8652c014172c2ef8cf0395a9b` |
+
 The normal Terran ROM at `e09a574b` reaches the Custom Game setup
 but has no Blood Bath Melee option. The earlier matched GBA opening
 used the separately configured Melee preview. Qualify that mode on

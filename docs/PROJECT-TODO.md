@@ -287,6 +287,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   measures 39,280 cycles per target index rebuild and 23,701 within
   its cell-link operation. Preserve canonical chain order in any local
   builder trial. Count actual queued completions in the later Z7 battle.
+  The [P10 point-route trace](audits/2026-11-22-dense-release-attribution.md#point-route-reuse-in-a-current-protoss-campaign-window)
+  observes one fill and two requests at the same goal and origin.
+  Verify the stored field and later hits before attempting to park
+  shorter FIFO frontiers. The [native mining trace](audits/2026-11-22-steady-order-cost.md#mineral-targets-spread-between-native-seconds-12-and-15)
+  brackets the first observed patch reassignment between seconds
+  12 and 15 in Blood Bath. Match opening assignment separately
+  from measured worker service duration.
   The [shared steering change](audits/2026-11-22-open-steering-directions.md)
   skips distance and terrain checks for actor-blocked directions. The
   P10 victory tail improves 0.93% in mean cycles and the matched Blood
@@ -893,6 +900,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   attacker beats passive detection and falls to an earlier
   explicit attack. Preserve the guard, train replacements
   for the eastern assault and keep detecting later attackers.
+  The [late gas recovery](audits/2026-11-12-z8-normal-physical.md#late-gas-supply-and-the-northwest-defeat-trigger)
+  qualifies an Extractor and a closer Hatchery, cutting observed
+  eight-gas credit intervals from about 870 to 182 game updates.
+  Two economy-only branches and the renewed assault all lose
+  at frame 56,579. The fourth Dark Templar takes the northwest
+  route. Use the earlier post-Cannon save while the three
+  northwest Hydralisks are still alive.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated

@@ -562,6 +562,86 @@ guard in place while training a new offense.
 | Post-interception SRAM | `0f27355f431000a9a1f021996cda104b17f37a2920cc26e1054df3cff3ca2bed` |
 | Fresh HOME after the third | `8a2ab7c93ef79b3a49f502e3a8a56e9809890cfb7aa34f6d7bb5170bce15bdc4` |
 
+### Late gas supply and the northwest defeat trigger
+
+From the third-interception save, an ordinary Drone order
+places an Extractor at the cleared southern approach. It is
+complete by frame 48,128. A Drone assigned to it carries
+eight gas per trip. The far Hatchery works as the depot and
+the wallet grows from 185 to 225 by frame 52,418.
+
+A second Drone starts a Hatchery nearer the Extractor. The
+Hatchery completes by frame 54,991. After reissuing the gas
+order, the same worker deposits at frames 55,437, 55,619,
+55,800 and 55,983. A fresh HOME load recovers the completed
+Hatchery, the worker order and the 281 gas balance. Three
+further credits before frame 56,531 confirm that the route
+survives the new process.
+
+| Depot | Consecutive credit intervals in game updates |
+| --- | --- |
+| Original southern Hatchery, neutral control | 869, 870, 871 |
+| Closer Hatchery, before and after fresh HOME | 182, 181, 183, 182, 183, 182 |
+
+Both resource-only branches lose at frame 56,579. In a
+separate replay a new hero Dark Templar appears on the
+western approach and reaches the northwest objective at
+that frame. Scheduler trigger 15 changes from pending to
+done, and the human outcome becomes defeat while Kerrigan
+still has 400 HP. The attacker's slot differs across branches.
+
+An independent reinforcing branch uses the original 185
+gas to place seven paid Hydralisk orders and adds
+mineral-only Zerglings. Fresh HOME at frame 55,421 recovers
+nine Hydralisks and ten Zerglings staged on the eastern
+approach, plus the separate detector guard. The main army
+reaches a forward waypoint intact. It takes heavy losses
+approaching the next defenses and leaves the eastern
+Nexus undamaged. Intercept the fourth attacker before a
+renewed assault.
+
+Sending new northern Hydralisks and the western Overlord
+toward a rendezvous loses both groups before they reach the
+intercept lane. Fresh HOME at frame 26,125 still has three
+full-health Hydralisks and an Overlord already in the
+northwest. By the later southern-production save, only
+the Overlord remains there. Stage that early guard before
+the subsequent southern work.
+
+The post-Cannon replay moves the four original northwest
+defenders to a safer holding position. All four remain at
+full health when the pause save is written at frame 32,900.
+From a fresh HOME load, a Templar approaches that guard
+earlier than in the later gas and reinforcement branches.
+A direct order takes it to 31 HP, but it reaches the
+northwest trigger at frame 47,628. The early guard solves
+the reinforcement route. It still needs earlier contact
+with the attacker.
+
+Moving the guard farther forward and giving the direct
+order at frame 47,374 improves net damage to 19 HP. The
+Templar reaches the trigger at the same frame with 21 HP.
+All four guard units are still healthy. The original
+guard can reach the lane in time. Additional damage or
+longer detector coverage remains necessary.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Extractor placement and completion | `f1c5143fbb306e21b4aa5bc0fb4e8df00aebcb6c79da3dcae9daebf3b4c5dbee` |
+| Far-depot gas cycles | `33fb9e79636fa3c4f15572ebc9ce8986e5e83bd857bfef33c3bdffa28fb3ecaf` |
+| Closer Hatchery and gas cycles | `e5eed74c8375f6df2602fbd63aad8a1a1dcb915240864ca9072163f31f7f0139` |
+| Closer depot pause SRAM | `de3e1b043e1279c0127591ac9427263de42f3ffc0ffbab368481763a151acdd8` |
+| Far-depot neutral control | `ec1a25cadbee105b00a5295509c5191713b0b1d5f744a53eb382099ab179e1b7` |
+| Closer depot fresh HOME control | `d6d7134ce0fbf9196fc6adf3c2015eca1ce0c2fc489385b3f1d5918cbe177411` |
+| Pre-assault 19-unit pause SRAM | `e603cebaab7bd8640b3db8c79296cb5815b48a1e0920c292a4068d4c3af10641` |
+| Fresh HOME with the staged force | `dd419dc8c55985d24ad483671952d6bfc94537679e521b269a8bd4f5133a835e` |
+| Fourth attacker and scheduler outcome | `12d7abb8f33ac1570ff4de0fe1f0ef6ff30474f21ea306e3b44c1eae122206b0` |
+| Late northern reinforcement and Overlord route | `f04aa0963c3412d08ea47c8798e55a48263a2ca86040890e0ff5fc4b52e3c297` |
+| Northwest guard across six fresh HOME loads | `f2cc53b38f1e745ed0cf0355bd752cddf1c0f573ca37cc387738abdda9f72351` |
+| Staged northwest guard | `1539d61dce21f85caf9dc5300d79385475fa300112c76cae1e40784537697c1c` |
+| Early guard pause SRAM | `c4bc47dd795f7886058289079a06258c446ffaabe65e7b461a54c5e509ee2529` |
+| Earlier attack on the northwest approach | `df867c2c2fbe41c4acbc874a2b472362beeb5e19629aa80cacdec5bca8a91c73` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
