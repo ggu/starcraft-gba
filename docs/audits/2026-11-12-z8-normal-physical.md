@@ -293,6 +293,40 @@ winning controller until there is a repeatable survival route.
 | Bounded defeat observer | `e7eca9d9cbbae7c22e7e8ae896d45995bb1d2df38dbc2231d7de8ab450825c3b` |
 | Earlier-retreat observer | `2955f45d383a350c277b7a60038833de1aced9842337a7963c475a10b6759379` |
 
+### Interception trials on the normal Z10 cartridge
+
+The observed attacker passes within the stationary Overlord's
+144-pixel detection radius by frame 21,658, 124 updates before
+defeat. The old route has three Hydralisks near the threatened
+area at frame 18,483 and none within 500 pixels by frame 19,454.
+The remaining army is too far away for a last-minute interception.
+
+Three fresh HOME runs detach from the old input tape at the
+earlier position. Each selects the three Hydralisks and moves
+them with ordinary buttons. The first holds near the objective.
+The second holds farther up the approach. The third gives an
+explicit attack order once the attacker is detectable. All three
+Hydralisks pursue in the last trial.
+
+| Trial | Attacker HP at arrival | Result frame |
+| --- | ---: | ---: |
+| Hold near the objective | 35 of 40 | Defeat at 21,782 |
+| Hold on the approach | 21 of 40 | Defeat at 21,782 |
+| Attack on the approach | 21 of 40 | Defeat at 21,782 |
+
+The approach trials both observe 40 HP at frame 21,680, 36 at
+21,700 and 21 at 21,720. The selected force survives. These samples
+give net damage and cannot establish exact shot or regeneration
+timing. Test earlier detection or a larger defending group on the
+approach before returning to the attack and mining route.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Attacker and detector paths | `17805bfe1483e00da5d673c64a5af75e95c86ca12179cb2327c40e794527c01e` |
+| Hold near the objective | `6ab7f1ce0a0242fc5356ff26928f8a6c115743f15ae2e9fe15790867d2162b2b` |
+| Hold on the approach | `d3345840c3c6a20f733fd894f422cf441dde92739560d3adceeafb2eed56f4c9` |
+| Explicit attack on the approach | `40d5511b700c6e00969cbd474b3a32e42120089c34731a4d5c56121085c4d1f8` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
