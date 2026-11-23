@@ -152,6 +152,30 @@ fully transparent groups and copies fully opaque groups directly.
 Profile mixed-word and byte-sprite coverage before revisiting span
 skipping.
 
+### Point-route reuse in a current Protoss campaign window
+
+The pinned normal Protoss ROM loads a byte-identical retained
+pause save and advances the ordinary campaign tape through
+calls 44,906–45,025. Five sampled world, frame, route,
+framebuffer and palette cuts match the uninstrumented replay.
+The observed point-prefix producer runs once, at call 44,963.
+The query sees the same goal and origin at calls 44,987 and
+45,011. No breakpoint at the prefix resume or completion
+entry is hit in the sampled window.
+
+A focused trace from 44,961 to 44,989 observes 45 facility
+slot lookups. None enters the named out-of-line facility
+expansion or flood functions. The trace covers those
+entry points. The published field kind, exact lookup hit
+and other scratch writers remain unmeasured. Capture them
+before building an origin-specific retention path. This
+Protoss window leaves the late Z7 queue lifetime open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| 120-call repeat and point consumers | `f26e685ee98285b741e4c11263a9bb7f673ccbee6d26350659de60cfdc0b0e49` |
+| Focused facility and flood call sites | `6522697302bbd5c40fd66fc5e69a20bf567b779ee901060d81c6512c7cb30a9a` |
+
 ## Full FIFO completions
 
 On the same late Z7 replay, all six baseline point fills exhaust the
