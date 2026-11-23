@@ -519,6 +519,49 @@ interception requirement for this attack route.
 | Attack and late defeat trigger | `0a5a0abd4d6cb92a0b39ed1e28b027316a15b2ca1086dc6b33c6f6629c830b8d` |
 | Neutral result control | `3e69866e5d75d2ca6836536f94fb2708b5f2453378e6d6db73e776a23024fbf2` |
 
+### Three Dark Templar interceptions and a fresh HOME save
+
+From the 22-Hydralisk save, a smaller box excludes Kerrigan
+and sends four Hydralisks and an Overlord on the Dark Templar
+already near the southwest force. A direct order kills that
+Templar by frame 41,220. The same guard moves toward the
+central approach. It kills the eastern Templar as it crosses
+toward the northwest objective after the main army advances.
+Both are absent at the fresh HOME load at frame 43,339.
+
+A separate east-first route uses an Overlord to reveal the
+Templar near the eastern base. The assault clears a Cannon and
+Pylon, and the Templar is absent by frame 43,296. That Overlord
+survives at 10 HP. The southwest force kills the other Templar
+after loading this save. Most forward Hydralisks die by frame
+43,959, when one is still near the eastern Nexus approach.
+
+In a western continuation from the first save, the guard
+destroys an outer Cannon and Pylon. The western Nexus stays at
+750 HP. The guard is lost and a new Dark Templar reaches the
+southern objective, triggering defeat at frame 46,620 with
+Kerrigan at 400 HP. A passive guard with detection also loses
+when the new attacker passes it.
+
+The verified third interception stages the guard farther
+forward and issues a direct attack while the new Templar is
+still approaching. It is absent by frame 46,515. A fresh HOME
+load at frame 46,916 verifies the mission is active, Kerrigan
+and the Overlord at full health, and all three guarding
+Hydralisks alive. The eastern Nexus still has 750 HP, with
+only one forward Hydralisk left from the attack. Keep the
+guard in place while training a new offense.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First two interceptions | `54f241e851dec682df7e6707625fc0a655b0b8f076c4a37efaae82c6302d9aac` |
+| Fresh HOME after the first two | `cbbbb6b322cb900b1f2f45db106e56118d68b968d396e24d1f7cbf1d634144b7` |
+| East-first interception | `3c2da6cb5c6237060203fc2ebde5449b6ad76732433ad5ae78520372fa4097c3` |
+| Western advance and third defeat | `3092ff695bdab4ddfb3cf237c2430ceffc36051111b24b2c4e49b89a7adfd663` |
+| Third interception | `d1f445cb2f28f442ab9948f6816b18742752c2551ff4a372042aa5b6ac30b9f8` |
+| Post-interception SRAM | `0f27355f431000a9a1f021996cda104b17f37a2920cc26e1054df3cff3ca2bed` |
+| Fresh HOME after the third | `8a2ab7c93ef79b3a49f502e3a8a56e9809890cfb7aa34f6d7bb5170bce15bdc4` |
+
 ## Attack-pose lookup timing
 
 An ARM trial indexed the live tracer slots by shooter once per draw.
