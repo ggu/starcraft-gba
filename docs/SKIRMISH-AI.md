@@ -329,15 +329,15 @@ a passive human, then:
 - `--air-pin S`: an armed flyer hovers over the base of an opponent that is
   all in with three units. With no unit that can shoot air (0) the army must
   still leave and attack; with one (1) it must answer the flyer.
-- `--no-ore S`: every mineral field runs dry. The opponent must queue no more
+- `--no-ore S`: every mineral field runs dry. The opponent must finish no more
   workers and spend its bank on army units. The fixture waits from update
   5,400 for a bank of at least one army unit. Terran and Protoss also need
   less than 800 minerals, except in Blood Bath Free for All. There the
   native-count Bunker and Battery openings already hold well over 1,000
   minerals at the engine's mining rate. Zerg have no upper bound. Within
   5,400 updates the bank must fall below the cheapest army unit, or live
-  and queued units must fill the share. No worker may be queued and at
-  least one army unit must be made. The matrix also runs Terran on
+  and queued units must fill the share. The production ledger must record
+  zero additional workers and at least one army unit. The matrix also runs Terran on
   Outpost, which starts with a bank under 300, so a low-bank Terran start
   stays covered.
 - `--first-wave`: with one opponent and a passive human, the update on which
