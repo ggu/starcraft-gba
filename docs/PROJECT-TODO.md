@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-24. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-25. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -1845,8 +1845,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   retains the earlier crossing. The next native save fresh-loads
   a 60-health SCV moved to the rocky pass. A subsequent run
   reselects it and moves it farther south. The cursor over a
-  mineral patch shows B Harvest. Verify delivery and a fresh save,
-  then a Barracks, Marine production, the native win and mission unlock.
+  mineral patch shows B Harvest. The [harvest comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-mineral-collection)
+  confirms native deposits from 40 to 72. A fresh first-slot
+  load from a separate save continues mining with no new order
+  and identical FlashRAM. The GBA SCV collects eight minerals
+  after contextual A and dies before delivery. Verify an escorted
+  GBA deposit, then a native Barracks, Marine production, victory
+  and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
