@@ -1742,8 +1742,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cap, but the Den falls before it hatches. Protect the Den through
   supply recovery. The [earlier defense branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-defended-opening-and-economy)
   hatches a paid Hydralisk and reaches a freshly reloaded save with
-  four Hydralisks, three mining Drones and a living Den. Rebuild
-  gas income and qualify the mission result from this branch.
+  four Hydralisks, three mining Drones and a living Den. The
+  [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
+  keeps the Extractor alive through frame 15,348, restores gas
+  delivery and reaches five Hydralisks. Use that verified save and
+  protect the damaged Extractor while building toward the result.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
