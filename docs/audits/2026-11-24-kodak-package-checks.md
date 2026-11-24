@@ -411,6 +411,23 @@ and the intact Chrysalis and tech buildings. Independent replays
 match the three saved field states and journals. The air-tech
 branch has 26 hostile buildings remaining.
 
+The frame-31,682 save also continues through a third gas worker
+and seven more Mutalisks. At frame 44,345 the force has 19
+Hydralisks and 12 Mutalisks. An ordinary Move order concentrates
+both groups before the attacks. The two turret strikes remove
+two hostile buildings while all 31 combat units survive.
+The last save at frame 48,118 retains the full-health Chrysalis,
+key tech buildings, and six Drones split evenly between minerals
+and gas. There are 33 hostile units and 24 hostile buildings.
+
+An independent replay matches the six stage fingerprints and
+SRAM outputs byte for byte. A fresh HOME process restores frame
+48,118 and the same army. One Hydralisk dies after another 120
+neutral updates, so the next attack needs an immediate ground
+order before sending the Mutalisks ahead. A separate attempt
+shows the line ahead has siege tanks and costs nine Hydralisks
+on a direct advance.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -963,6 +980,7 @@ quality on the GBA SP.
 | Zerg chapter 3 larger staging army and paired assault journals | `add479597eb38b1346b659a915453c0ff18e6780dd44698be74bf382d438594e` |
 | Zerg chapter 3 paid Lair, Spire, Mutalisk and fresh load | `19b35e7e434fb4a1e2ffe1f23ce38e49ab41459e21fc3915f907f83d17f7010b` |
 | Zerg chapter 3 two gas workers, replacement Drone, second paid Mutalisk and fresh load | `c03824f923eeccb8a403b2b300575e049ac4084477f558acc9bc9d23351667fa` |
+| Zerg chapter 3 concentrated force, two turrets destroyed and fresh load | `7ab53d373dce59910590b59f49578a5321981a5606444fcd64fc5b2a7781ca1b` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |

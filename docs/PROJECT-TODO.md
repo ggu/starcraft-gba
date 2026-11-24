@@ -1774,8 +1774,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   25 hostile buildings left. A separate staging branch reaches
   a completed Lair and Spire, two Drones on gas, 20 Hydralisks
   and five Mutalisks by frame 31,682. Its fresh load restores
-  the full staging force and intact Chrysalis. Build a stronger
-  air force from that checkpoint, then verify victory on the exact ROM.
+  the full staging force and intact Chrysalis. Three gas Drones
+  bring the force to 12 Mutalisks. A concentrated push removes
+  two turrets with all 19 Hydralisks and 12 Mutalisks still alive
+  at the fresh frame-48,118 checkpoint. Move the ground force
+  clear of the siege line before sending the air group ahead.
+  Verify the remaining objectives and victory on the exact ROM.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
