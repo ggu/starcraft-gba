@@ -1,4 +1,4 @@
-# Shared rectangle borders and authored crowd timing
+# Shared Mode 4 drawing and authored crowd timing
 
 The shared rectangle outline now clips its side columns together. Each
 visible side still uses a halfword read, mask and write to preserve the
@@ -56,6 +56,46 @@ with each of the Terran, Z10, P10 and Showcase flags leaves its
 IWRAM section unchanged. The two rectangle-outline functions add
 244 bytes of instruction text before linking. Race-cartridge and
 physical frame-pacing qualification remain open.
+
+## Full-width fills and glyph rows
+
+Read-only ARM probes match the panned baseline's draw time and both
+display pages at eight updates. The probes attribute an average of
+99,145 cycles to rectangle fills and 42,866 to text. A fully
+visible HUD fill costs 3,696 cycles for 12 rows or 11,769 for
+39 rows. Clipped full-width terrain also accounts for recurring
+fills in the authored workload.
+
+The full-width row API transfers aligned Mode 4 bands with synchronous
+DMA3. It uses the shared rectangle painter for host and tile-buffer
+draws. The common rectangle path keeps its original code and IWRAM
+footprint. The ARM pixel oracle covers 400 whole-frame comparisons
+across both pages, including zero-height, empty clip, negative origin,
+clipped height and bottom-edge fills.
+
+An in-bounds 5-by-7 glyph establishes its clip and halfword alignment
+once and draws two pixel pairs per row. Space advances without writing
+pixels. Partial glyphs keep the existing row painter in ROM. The
+sanitizer clipping test and a host pixel comparison cover both pages,
+glyph parity, ASCII, clipped positions and multiline strings.
+
+| Combined workload | Baseline → candidate mean draw cycles | Baseline → candidate mean frame cycles | Frames above two VBlanks |
+| --- | ---: | ---: | ---: |
+| Fixed camera, 120 updates | 455,539 → 427,229 | 886,775 → 849,332 | 120 → 119 |
+| Battle in view with pan and scene clip, 600 updates | 476,353 → 438,942 | 672,914 → 660,677 | 196 → 163 |
+
+Both comparisons match simulation digests, cameras, palette, display
+control and both video pages at every update. End-to-end mean falls
+4.22% and 1.82% respectively. The visible pair retains its broad p95
+at 1,123,172 cycles and increases the peak by 729 cycles. Its drawing
+p95 falls from 597,906 to 560,441 cycles. The isolated row and glyph
+changes each reduce mean draw cost before combination.
+
+The recorded Terran, Z10, P10 and Showcase flags pass ARM syntax
+with their prepared inputs. Their graphics objects each use 76
+fewer IWRAM bytes than the source baseline. This checks the shared
+code placement at object scope. Full cartridge links, release
+gameplay and real-device pacing remain open.
 
 ## Reproduce the comparison
 

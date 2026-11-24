@@ -17,13 +17,13 @@ static void front_right_text(int right, int y, const char *text, u8 color)
 /* The menus use the common framebuffer palette and authored GBA glyphs. */
 static void front_shell(const char *title, const char *section)
 {
-    gfx_rect(0, 0, 240, 23, C_PANEL);
-    gfx_rect(0, 22, 240, 1, C_EDGE);
+    gfx_fill_rows(0, 23, C_PANEL);
+    gfx_fill_rows(22, 1, C_EDGE);
     gfx_rect(0, 22, 52, 1, C_CYAN);
     for (int x = 8; x < 240; x += 16)
         gfx_rect(x, 23, 1, 113, C_PANEL);
     for (int y = 32; y < 136; y += 16)
-        gfx_rect(0, y, 240, 1, C_PANEL);
+        gfx_fill_rows(y, 1, C_PANEL);
     gfx_text(12, 8, title, C_WHITE);
     front_right_text(230, 8, section, C_CYAN);
 }
@@ -59,8 +59,8 @@ static void front_row(int x, int y, int width, int height,
 
 static void front_footer(const char *first, const char *second)
 {
-    gfx_rect(0, 136, 240, 24, C_PANEL);
-    gfx_rect(0, 136, 240, 1, C_EDGE);
+    gfx_fill_rows(136, 24, C_PANEL);
+    gfx_fill_rows(136, 1, C_EDGE);
     gfx_text(12, 140, first, C_WHITE);
     gfx_text(12, 150, second, C_SILVER);
 }
