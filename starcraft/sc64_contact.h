@@ -752,8 +752,13 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (speed != 0 && ox == 0 && oy == 0) continue;
                 /* No offset moves the mover closer than |o| - speed. */
                 limit_axis = radius + speed;
-                if (ox <= -limit_axis || ox >= limit_axis ||
-                    oy <= -limit_axis || oy >= limit_axis) continue;
+                if (limit_axis <= 0) continue;
+                /* Bias the open interval (-limit_axis, limit_axis) to start at zero.
+                 * Unsigned wrap rejects offsets below its lower end. */
+                unsigned axis_bias = (unsigned)limit_axis - 1u;
+                unsigned axis_span = 2u * axis_bias + 1u;
+                if ((unsigned)ox + axis_bias >= axis_span ||
+                    (unsigned)oy + axis_bias >= axis_span) continue;
 #ifdef SC64_CONTACT_MASK_TABLE
                 mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
 #else
