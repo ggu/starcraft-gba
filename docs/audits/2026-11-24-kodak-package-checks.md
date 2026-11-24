@@ -375,7 +375,19 @@ and 90 gas. The 250-health Chrysalis survives along with the
 Hatchery, Pool, Den and completed Extractor. An independent replay
 matches all four journals. A fresh HOME process restores the
 latest journal byte for byte and advances another 120 updates
-with both workers still assigned. Victory remains open.
+with both workers still assigned.
+
+Continuing from that save with ordinary input raises ten
+Hydralisks and four Mutalisks by frame 11,342. Five Drones
+continue mining or gathering gas. By frame 12,156 the first
+hostile turret is down, leaving 45 hostile units and 25 hostile
+buildings. Nine Hydralisks and three Mutalisks survive.
+The Hatchery, Pool, Den, Extractor and 250-health Chrysalis
+remain intact. An independent replay matches both new saves
+byte for byte. A fresh HOME load restores the latter save
+and the same field state. A 120-update neutral continuation
+loses one more Hydralisk, so the next attempt needs immediate
+movement or reinforcement. Victory remains open.
 
 ### Wasteland opening on N64 and KODAK
 
@@ -429,6 +441,15 @@ new survival objective. This supplies a native counterpart to the
 The first slot now stores `Terr01 03:47`. A fresh process reloads
 the field after the encounter with byte-identical FlashRAM and
 still lists the earlier second slot. A native mission win remains open.
+
+From that encounter, ordinary movement takes Raynor south to
+the Command Center, Supply Depot and mineral field. Raynor
+survives an enemy engagement with 270 HP. The first slot saves
+this position and a fresh process restores it with byte-identical
+128 KiB FlashRAM. The native Goals screen lists a Barracks,
+additional Marines and Raynor's survival. The bank still has
+40 minerals and five SCVs remain near the northwest start.
+Mining and production are the next verified-play checkpoints.
 
 ### Terran chapter 5 input divergence
 
@@ -916,6 +937,7 @@ quality on the GBA SP.
 | Zerg chapter 1 composed ordinary input from frame 984 to victory, with fresh load | `1972dd567660b95aedef54d66cc1425f1966cfc20f218861101f955bb85147ed` |
 | Zerg chapter 1 victory load and Zerg chapter 2 briefing | `e9b826443cda4a4dd44290896cf841577909b3eeba297e81fc5b9081d0266e4e` |
 | Zerg chapter 3 blank HOME deployment, paid economy and fresh pause continuation | `f00dfa77e6a95579fee276f2466d9b1f51215bd51b8dbf887f4f105e01201b7b` |
+| Zerg chapter 3 paid army, first turret destroyed and fresh reload | `465c036febfef23eebbd9028718ddde9fbcc2a5260290a38b4946ff3f6f39bf2` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
@@ -925,6 +947,7 @@ quality on the GBA SP.
 | N64 Wasteland eastern-shore movement manifest | `42afda84d1d1eb620e709d738be1e1f9cbc3f641077041b0b1e03a5ea9783a2a` |
 | N64 Wasteland Raynor survival objective manifest | `ab665a6572572da554ecc7da81a67ad8a02f21306149d2b22009a5b54190cdbd` |
 | N64 Wasteland post-encounter save and fresh title-load manifests | `e3ace99f57f04f37b5c743e92b8c38f516e4d6af4b4078890b16de5817e71d43` / `0bcebe5d9b9519e578797c3b2a33bcedcd6522c3d9b1243411b46ae9a0ee249a` |
+| N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
