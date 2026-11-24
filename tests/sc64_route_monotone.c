@@ -21,7 +21,9 @@ typedef int8_t s8;
 #define SC64_ROUTE_VISIT_GRID
 #define SC64_ROUTE_FLOOD_SPLIT
 #define SC64_ROUTE_DECAY_FREQ
+#ifndef TEST_CLEAR_PREFIX
 #define SC64_ROUTE_L_FAST_PATH
+#endif
 static int race_cols = 64, race_rows = 64;
 #define MAP_COLS race_cols
 #define MAP_ROWS race_rows
@@ -36,7 +38,11 @@ static int race_cols = 64, race_rows = 64;
 enum { MAP_COLS = 32, MAP_ROWS = 24, MAP_CELLS = MAP_COLS * MAP_ROWS };
 #endif
 
+#ifdef TEST_CLEAR_PREFIX
+#define SC64_ROUTE_MONOTONE_CLEAR_PREFIX
+#else
 #define SC64_ROUTE_MONOTONE_DIAGNOSTICS
+#endif
 #define GBA_HOST
 static u32 frame;
 static u16 bfs_queue[MAP_CELLS];
@@ -420,6 +426,46 @@ static void test_active_geometry(void)
 #endif
 }
 
+#ifdef TEST_CLEAR_PREFIX
+static void test_clear_prefix_bounds(void)
+{
+    const int width = 128, height = 128;
+    const int distance = width + height - 2;
+    const unsigned scratch_size = (width * height) / 8 + (distance + 1) * sizeof(u16);
+    const int goal = width * height - 1;
+    sc64_route_probe_stats stats;
+    int predecessor = -12345;
+    race_cols = width;
+    race_rows = height;
+    reset_world();
+    grid_fill(1);
+    bfs_queue[0] = 0xa55a;
+    assert(sc64_route_monotone_probe(path_walkable, width, height,
+        MAP_CELLS, bfs_queue, scratch_size - 1,
+        0, goal, (unsigned)distance, &predecessor, &stats) == SC64_ROUTE_PROBE_UNSUPPORTED);
+    assert(predecessor == -12345 && bfs_queue[0] == 0xa55a);
+    assert(sc64_route_monotone_probe(path_walkable, width, height,
+        MAP_CELLS, bfs_queue, scratch_size,
+        0, goal, (unsigned)distance - 1, &predecessor, &stats) == SC64_ROUTE_PROBE_BUDGET);
+    assert(predecessor == -12345);
+    bfs_queue[0] = 0xa55a;
+    assert(sc64_route_monotone_probe(path_walkable, width, height,
+        MAP_CELLS, bfs_queue, scratch_size,
+        0, goal, (unsigned)distance, &predecessor, &stats) == 1);
+    assert(predecessor == width && bfs_queue[0] == 0xa55a);
+
+    /* With the first vertical step blocked, the exact oracle takes the
+       available horizontal exit and exercises the bounded fallback. */
+    grid_set(0, 1, 0);
+    assert(sc64_route_monotone_probe(path_walkable, width, height,
+        MAP_CELLS, bfs_queue, sizeof(bfs_queue),
+        0, goal, 512, &predecessor, &stats) == 1);
+    assert(predecessor == 1 && bfs_queue[0] != 0xa55a);
+    race_cols = race_rows = 64;
+    sc64_routes_reset();
+}
+#endif
+
 int main(void)
 {
 #ifdef TEST_PARTIAL
@@ -434,6 +480,9 @@ int main(void)
     test_budget_and_canaries();
 #endif
     test_active_geometry();
+#ifdef TEST_CLEAR_PREFIX
+    test_clear_prefix_bounds();
+#endif
     printf("route monotone dispatch OK active=%d builds=%u hits=%u\n",
            SC64_ROUTE_ACTIVE_SLOTS, (unsigned)sc64_route_builds,
            (unsigned)sc64_route_hits);

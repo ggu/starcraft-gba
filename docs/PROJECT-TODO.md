@@ -126,7 +126,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   in [merged PR #802](https://github.com/ggu/starcraft-gba/pull/802) also
   matches 460,800 host comparisons and uses 24.62% fewer fixture
   cycles at `-O2` for the observed calls. Qualify the full race
-  runtime and its memory on both maps. The eight-entry exact
+  runtime and its memory on both maps.
+  The [clear-prefix dispatcher experiment](audits/2026-11-24-monotone-clear-prefix.md)
+  resumes the same search after the clear cells. It saves 3.38%
+  across the captured late Terran route calls and reduces frame
+  budget misses from 18 to 13 in the authored 280-update test.
+  Keep it opt-in until the intended race profiles pass busy
+  frame, save and memory checks.
+  The eight-entry exact
   endpoint cache simulation covers at most 0.20% of loop cycles in
   the expanded Terran Blood Bath window, before cache overhead.
   The opt-in [16-path continuation table](https://github.com/ggu/starcraft-gba/pull/805)
