@@ -100,6 +100,9 @@ The final SRAM readback matches the victory save byte for byte.
 The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
 
+Victories with fresh SRAM readback on the installed package now cover
+23 of 30 chapters: nine Terran, all ten Protoss, and Zerg 1 through 4.
+
 ### Protoss and Zerg victories
 
 P1 and P2 win from HOME on the exact installed Protoss image. P1
@@ -475,6 +478,27 @@ the victory and the 32 KiB autosave byte for byte. Fresh HOME
 load restores the same result. Ordinary menu input then opens
 the Z4 briefing and deploys the next mission.
 
+### Zerg 4 victory and Zerg 5 deployment
+
+Ordinary input from the Z3 victory opens and deploys Z4 on the exact
+installed Z10 image. Drones build the Pool, gather minerals and gas,
+and complete the Lair and Spire. The Chrysalis hatches at frame 18,111.
+Kerrigan has 400 HP and the mission reports no unsupported actions.
+
+The frame-43,789 pause save restores 20 paid Mutalisks, five Drones,
+and the Lair, Pool, Spire and Extractor in a fresh HOME process. A
+direct advance loses most of the air force. The east-edge flank takes
+18 Mutalisks to the Command Center. Ordinary attack orders destroy it,
+and the objective sequence reaches victory at frame 47,951 with
+Kerrigan still at 400 HP.
+
+An independent replay repeats all ten ordinary-input segments from
+the Z3 victory, matching each world fingerprint and SRAM export.
+Fresh HOME Load restores the frozen victory with completion mask
+`0xc000` and re-exports the same 32 KiB. Returning to HOME and pressing
+A, Right, A and Start with releases opens the Z5 briefing and deploys
+the first field frame. Z5's victory remains open on this package.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -549,10 +573,11 @@ order at the base followed by a verified increase in minerals.
 A fresh continuation reselects the same SCV and issues another
 C-Right Move to the south. The original field HUD shows Build,
 Repair, Move and the ground-context B Attack label. The bank
-still has 40 minerals. A prepared follow-up aims the selected
-SCV at the mineral field. The wrapper stops that new launch
-before emulation when the disk falls below its 5 GiB reserve.
-The contextual gathering input remains to be observed.
+still has 40 minerals. The next guarded replay positions the cursor
+over a mineral patch while the SCV is selected. The native prompt
+switches to **B Harvest**. Pressing A selects the patch. The bank
+still reads 40 after that input. Qualify a B press at that cursor
+position, delivery, and fresh FlashRAM readback.
 
 ### Terran chapter 5 input divergence
 
@@ -1052,6 +1077,9 @@ quality on the GBA SP.
 | Zerg chapter 3 rejected pause save with 12 pending impacts | `dda019fe449f93ef34b3c922cd683d6a6305b536a574d06ad428d53e4cf35f51` |
 | Zerg chapter 3 coordinated ground and air checkpoint | `ba1377b8ac2fdb5bce7f7513206820f03a1848c1fa0bf38eb4cfe1c3a522765a` |
 | Zerg chapter 3 victory, exact autosave reload and Zerg chapter 4 deployment | `4fdf64e727696beabe40bf58d4c61fb2df92e78d75a9400a3937a27e14a087c6` |
+| Zerg chapter 4 fresh air-production save | `d1fe57cc5a21e1d44ff004d583b5ac4e71eaf6ebcafc72345542a31c766d4e0e` |
+| Zerg chapter 4 independent ten-stage victory replay | `5870e567b34e5d044deb4313cbb84229347a6a987c8f1975a2ed719ccb5a29a8` |
+| Zerg chapter 4 victory readback and Zerg chapter 5 deployment | `43529b8ca8065c56258378257bd92bca46f119e2728293a8b0e829406cff7232` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
@@ -1064,6 +1092,7 @@ quality on the GBA SP.
 | N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
 | N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
 | N64 Wasteland SCV reselection and southward move | `d634dc26e7a39a6cb21b1939c929db6de2612e9d0c4a79ea251a08f032fe899e` |
+| N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |

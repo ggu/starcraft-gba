@@ -1800,6 +1800,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   64,486 as a 12-impact volley against the eight-impact journal
   limit. Qualify combat saves beyond that limit without losing
   pending projectile outcomes or older journals.
+  [Z4's installed-ROM replay](audits/2026-11-24-kodak-package-checks.md#zerg-4-victory-and-zerg-5-deployment)
+  hatches the Chrysalis, completes paid air production and wins at
+  frame 47,951 with Kerrigan alive. The victory loads byte for byte
+  and Z5 deploys from HOME. The package now has 23 of 30 verified
+  victories. Continue with Z5 and the remaining T5 replay.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
@@ -1807,9 +1812,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The first FlashRAM slot reloads at the base, and the second
   retains the earlier crossing. The next native save fresh-loads
   a 60-health SCV moved to the rocky pass. A subsequent run
-  reselects it and moves it farther south. Reach the mineral
-  field with it, verify mining, a Barracks and Marine production,
-  and qualify the native win and mission unlock.
+  reselects it and moves it farther south. The cursor over a
+  mineral patch shows B Harvest. Verify delivery and a fresh save,
+  then a Barracks, Marine production, the native win and mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
