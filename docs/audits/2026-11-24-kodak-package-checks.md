@@ -182,6 +182,32 @@ exceeds the two-VBlank budget. Even the openings have 123–170
 overruns of that budget per 600 updates. The 30 fps target remains
 open for busy play on these cartridges.
 
+### Pacing with one or two CPUs
+
+The same three race cartridges also run both maps with a Terran CPU
+in the first row, then with a Zerg CPU added in the second row in a
+separate reset. Both maps keep the same game type as above, and the
+human uses the cartridge's race and issues no orders. Each launch
+checks its requested CPU mask, factions and distinct start locations.
+The table compares the final window beginning after 11,000 updates.
+
+| Cartridge and map | One CPU | Two CPUs | Three CPUs |
+| --- | ---: | ---: | ---: |
+| Terran 10 Outpost | 28.25 | 19.75 | 16.30 |
+| Terran 10 Blood Bath | 29.89 | 24.69 | 17.90 |
+| Zerg 10 Outpost | 26.19 | 18.43 | 14.98 |
+| Zerg 10 Blood Bath | 29.86 | 24.36 | 15.45 |
+| Protoss 10 Outpost | 26.13 | 19.47 | 14.14 |
+| Protoss 10 Blood Bath | 29.45 | 23.65 | 14.20 |
+
+All 12 new cases start at 29.85–29.93 emulated updates/s. In the
+late two-CPU cases, every update exceeds the two-VBlank budget.
+Late one-CPU Outpost overruns range from 510 to 600 of 600 updates.
+The one-CPU Blood Bath range is 140 to 411 overruns of 600 despite
+its higher mean rate. Blood Bath resolves different start locations
+across lineups, so these are full-match observations for the stated
+configurations. They measure guest cycles in mGBA.
+
 ### Protoss 10 late battle attribution
 
 On the same Protoss 10 Blood Bath Melee lineup, a read-only ARM
@@ -212,6 +238,8 @@ workload sizes for synthetic renderer and collision tests.
 | Check | SHA-256 |
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
+| One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
+| One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
 | Terran chapter 1 full run and fresh loads | `8c3642922e2358bcfe2d0264918d1cf381bf254e95c7b993a55ab55f8046cc94` |
 | Terran chapter 2 full run and fresh loads | `e51366eeaa6c55309aa3630a5c9e2da47ad51608be0b25f85f33d60fd20902b2` |

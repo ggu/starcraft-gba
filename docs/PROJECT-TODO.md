@@ -26,6 +26,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. Prioritize those paths for
   the race cartridges.
+  [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
+  put late one-CPU Blood Bath near 30 emulated updates/s. Late
+  one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
+  update exceeds two VBlanks. Preserve the one-CPU
+  pacing while tracking both maps at two and three CPUs.
   The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
