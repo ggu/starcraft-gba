@@ -11633,7 +11633,8 @@ draw_minimap(void)
 {
 #if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
     int x, y, i;
-    const int map_x = 197, map_y = 129, map_size = 24;
+    enum { map_size = 24 };
+    const int map_x = 197, map_y = 129;
 #else
     int row, col, x, y, i;
 #endif
@@ -11665,10 +11666,14 @@ draw_minimap(void)
 #elif defined(SC_FRONTIER_FACTION)
     frontier_minimap_draw_terrain(map_x, map_y);
 #elif defined(SC_ORIGINAL_SKIRMISH)
+    /* Column samples are independent of the row; compute each only once. */
+    int sample_col[map_size];
+    for (int col = 0; col < map_size; col++)
+        sample_col[col] = (2 * col + 1) * MAP_COLS / (2 * map_size);
     for (int row = 0; row < map_size; row++) {
         int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);
         for (int col = 0; col < map_size; col++) {
-            int cell = grid_row * MAP_COLS + (2 * col + 1) * MAP_COLS / (2 * map_size);
+            int cell = grid_row * MAP_COLS + sample_col[col];
             if (SC64_GRID_GET(visible, cell))
                 gfx_pixel(map_x + col, map_y + row, C_GRASS);
             else if (SC64_GRID_GET(explored, cell))
@@ -12321,7 +12326,7 @@ draw_title(void)
     frontier_title_draw();
     return;
 #elif defined(SC_ORIGINAL_SKIRMISH)
-    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_fill_rows(0, 160, C_BLACK);
     gfx_rect(16, 16, 208, 128, C_PANEL);
     gfx_frame(16, 16, 208, 128, C_CYAN);
     gfx_text(38, 28, "FRONTIER SKIRMISH", C_GOLD);
@@ -12341,7 +12346,7 @@ draw_title(void)
     field_ui_draw_title();
     return;
 #endif
-    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_fill_rows(0, 160, C_BLACK);
     gfx_rect(15, 18, 210, 124, C_PANEL);
     gfx_frame(15, 18, 210, 124, C_CYAN);
     gfx_text(45, 32, "STARCRAFT", C_GOLD);
@@ -12534,7 +12539,7 @@ draw_hud_resources(void)
     int used = supply_used / 2;
     int cap = sc64_supply_limit(supply_cap) / 2;
 #endif
-    gfx_rect(0, 0, 240, 12, C_PANEL);
+    gfx_fill_rows(0, 12, C_PANEL);
 #ifdef SC64_HUD_ICONS
     card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
     gfx_num(16, 3, minerals, C_WHITE);
@@ -12584,7 +12589,7 @@ static void
 draw_hud_commands_body(void)
 {
     int i, n = selected_count();
-    gfx_rect(0, 121, 240, 39, C_PANEL);
+    gfx_fill_rows(121, 39, C_PANEL);
     gfx_line(0, 120, 240, 120, C_EDGE);
 #ifdef SC_COMMAND_RING
     if (command_ring_draw_hud()) return;
