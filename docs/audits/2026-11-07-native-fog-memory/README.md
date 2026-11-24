@@ -78,6 +78,12 @@ coverage. Legacy saves require a conservative initialization because
 they carry exploration and current mineral amounts without the last
 observation.
 
+The standalone packed Protoss 6 save illustrates the storage constraint.
+Its 16,348-byte `RaceSave` and four-byte packed-impact marker leave
+16 bytes under the 16,368-byte record payload limit. A 144-slot bitmap
+needs 18 bytes. Qualify a representation that fits the existing
+profiles and keeps the observation and world in the same save record.
+
 The pinned native bridge completed in 70.335 seconds with 17
 local frames and verified its checked inputs after the run.
 

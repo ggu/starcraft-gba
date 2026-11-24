@@ -78,8 +78,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with the same chosen targets. Rebuild timings match. Measure
   the same query cost in a current dense three-CPU replay.
   [One visibility check per queued resource](audits/2026-11-24-resource-depth-admission.md)
-  saves about 419 guest cycles for five resources in an authored
-  ARM painter batch. Measure alongside the full depth sort.
+  saves 552 guest cycles for five minerals and two geysers in an
+  authored ARM batch with the production heap. Measure the same
+  change with imported sprites and the full actor roster.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have

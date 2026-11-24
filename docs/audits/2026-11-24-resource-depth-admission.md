@@ -23,5 +23,19 @@ It also compares each extracted path with its direct resource draws.
 All three framebuffer hashes agree. The Thumb fixture function
 shrinks from 420 to 372 bytes. It uses the production graphics
 primitives with authored diamond art and a simple append queue.
-Full depth sorting, source sprite costs and cartridge frame pacing
-need separate measurements.
+
+A second ARM fixture uses the production depth keys and heap push
+and pop, with two visible geysers in each scene. It draws each scene
+128 times and matches all 115,200 captured framebuffer bytes. The
+fixture function shrinks from 700 to 640 bytes.
+
+| Resource-only heap fixture | Baseline cycles per draw | Candidate cycles per draw | Reduction |
+| --- | ---: | ---: | ---: |
+| Five visible minerals and two geysers | 15,433.45 | 14,881.45 | 3.58% |
+| Thirty-two visible minerals and two geysers | 76,035.45 | 73,497.45 | 3.34% |
+| Thirty-two mixed minerals and two geysers | 40,329.45 | 38,975.45 | 3.36% |
+
+The heap fixture uses asset-free diamond art. Sprites, other actors
+and cartridge frame pacing need separate measurements. The framebuffer
+receipt SHA-256 is
+`8695147c261d89b444d49e9c763ef3918145c9a014292cd0a192314a9170ad84`.
