@@ -823,6 +823,13 @@ from 56 to 6 and raising supply to 12/18. The new Marine finishes
 with the counter at seven of ten. The FlashRAM export matches the
 six-Marine input image byte for byte for this unsaved continuation.
 
+The seven-Marine position is saved to the first slot and loaded
+in a fresh process. The export stays byte-identical. Mining
+raises the bank to 54. A third 50-mineral order leaves four
+minerals and queues at 13/18 supply. The resulting field capture
+shows eight of ten Marines. This continuation ends before a
+new save.
+
 A read-only replay of the full GBA Wasteland input tape observes
 the matching 150-mineral charge, from 463 to 313, when the
 Barracks first appears at frame 6,367. It completes with 1,000 HP
@@ -1627,6 +1634,7 @@ quality on the GBA SP.
 | N64 Wasteland mining resumes after the Barracks completes | `f0e9024b73022e629dd8e05dfd80f00c2276bb6ff69daa869b8c00927d51917f` |
 | N64 Wasteland first paid Marine and six-of-ten count | `c31ad1788d22f742d33233fcca8de0fa39e64843b3d6b0057d8d65deb9757c72` |
 | N64 Wasteland fresh six-Marine load and second paid Marine | `203a609a90089d60376da24517dd40cadfdb5679efb443ff0fc3af511c8be8c4` |
+| N64 Wasteland fresh seven-Marine load and third paid Marine | `f2785703c13676c42af8dbf3afad3cce84de4256b30085723b283617c039f309` |
 | Exact KODAK Wasteland Barracks payment, completion and Marine queue | `a4ea776e6036165fa886abc96e0be45dff38b78a70dba3a0e845010f31af90b4` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |

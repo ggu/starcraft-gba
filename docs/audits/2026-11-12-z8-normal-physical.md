@@ -1163,6 +1163,15 @@ Pool and workers. Fresh HOME restores the surviving buildings
 and the exact SRAM. Worker recovery is the next test on this
 branch.
 
+Two paid Drones hatch by frame 75,130. One starts a replacement
+Pool at (1792,1800), and the other resumes mining. Fresh HOME
+at frame 75,299 restores the unfinished Pool, the remaining
+40-HP Drone, a queued Drone and Kerrigan at 400 HP. SRAM is
+byte-identical. A later passive continuation loses the workers
+and leaves Kerrigan at 204 HP with the Pool still unfinished.
+The saved recovery still needs active defense before it can
+sustain production.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent production, staging and eastern attack replay | `f93f73071a2371c917d3c986cbedf905b5105999c632fcd8d54b3355ac89cb58` |
@@ -1171,6 +1180,7 @@ branch.
 | Separate southern defense, independent replay and fresh HOME | `e9ddfb4fbe70ad677701c4302ce2ae00f5ed99bc932b8d6d9ce7cae107bbdb66` |
 | Paid replacement Den and fresh HOME | `0795ee44ac206154e8f8c66199d083c2d225f1bef32a33d980a19a98178adfb1` / `c0bdc284519aa4258c8e605dd0662f8106de6fbe78e366a1b2224c0a5277af5b` |
 | Second Reaver wave and fresh HOME | `ab2620100cf6b32887b4374f00297f1195c59ce97321f43d22618faf18b934e3` / `f9fb9a51dc12e56c744be87fe1d45adabbcbc344086e8e89abb48a2e1dabd492` |
+| Worker recovery and replacement Pool fresh HOME | `756e85581be9f42c917bc51b2739e60bee9845e7c98b0bdf97ba0ff6d5b30967` / `e9435467f708ae3521ab362d2cc4d90cbad0c14b599f9dbefe4761b7e4fad8e0` |
 
 ### Native Overlord research permission
 

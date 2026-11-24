@@ -1190,8 +1190,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A separate defensive branch removes three attackers and
   fresh-loads the southern Hatchery, Pool and both Dens. Its
   second defense keeps the new Den and Kerrigan, with the Hatchery
-  at 359 HP and all workers lost. Recover the economy, combine base
-  defense with the eastern assault and defeat the western Nexus.
+  at 359 HP. A paid worker recovery restores a miner, a queued
+  Drone and a replacement Pool under construction at frame
+  75,299. Defend that economy, combine base defense with the
+  eastern assault and defeat the western Nexus.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -1907,8 +1909,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   activates the five-of-ten Marine counter. A new B Harvest
   order raises the native bank from 10 to 34. A later native
   run trains a Marine for the displayed price of 50. After fresh
-  load, a second paid Marine completes and the objective reaches
-  seven of ten. GBA trains five at that price and wins. Verify
+  load, a second paid Marine completes. A fresh seven-Marine
+  load then adds a third paid Marine and the objective reaches
+  eight of ten. GBA trains five at that price and wins. Verify
   native victory and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
