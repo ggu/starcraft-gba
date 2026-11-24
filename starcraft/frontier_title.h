@@ -40,7 +40,7 @@ frontier_title_draw(void)
     int format_row = FRONTIER_SETUP_CPU_FIRST + skirmish_bots;
     int format_selected = frontier_setup_row == format_row;
     int format_color = format_selected ? C_HIGHLIGHT : C_WHITE;
-    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_fill_rows(0, 160, C_BLACK);
     gfx_rect(12, 8, 216, 144, C_PANEL);
     gfx_frame(12, 8, 216, 144, C_CYAN);
     gfx_text(25, 17, "FRONTIER SKIRMISH", C_GOLD);

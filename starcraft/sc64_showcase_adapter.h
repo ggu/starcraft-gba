@@ -142,7 +142,7 @@ static void sc64_showcase_leave(u16 held)
 
 static void sc64_showcase_draw_label(void)
 {
-    gfx_rect(0,147,240,13,C_PANEL);
+    gfx_fill_rows(147, 13, C_PANEL);
     gfx_text(4,149,sc64_front_showcase_name(sc64_showcase_scene),C_CYAN);
     if(sc64_showcase_scene>=2&&sc64_showcase_scene<=4) {
         gfx_text(155,149,"STAGED",C_DIM);

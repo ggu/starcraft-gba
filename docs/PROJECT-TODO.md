@@ -195,6 +195,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   original-art crowd with matching pixels and world state. Two exact
   ratios cost more in the IWRAM microbench. Measure fallback shape
   frequency and combined pacing on the race cartridges.
+  [Shared outlines, full-width fills and glyph drawing](audits/2026-11-24-shared-frame-borders.md)
+  cut mean emulated frame cycles by 5.74% in a fixed-camera 76-unit
+  authored skirmish and 0.92% with the battle in view and camera
+  panning, after pairing against the packed-sprite release. The
+  600-update visible pair matches state and both pages and reduces
+  two-VBlank overruns from 115 to 101. The earlier visible battle
+  changes about 14 of 105 tiles on average between uses of the same
+  page at a fixed camera. The first exact band-command trial
+  reuses 3,341 of 4,200 bands and raises whole-frame mean by 10.6%.
+  Its forced fallback also disagrees on 13 frames. Prioritize
+  cheaper contributor tracking and validate fallback before
+  offering finished-pixel reuse. Replay the race cartridges and
+  keep reducing the larger movement and painter costs.
   [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in
