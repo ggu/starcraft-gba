@@ -9,3 +9,46 @@ A single further fresh run used the extended frontend and the same setup. The ca
 A subsequent fresh session replayed the known setup and base-edge selection, then used a preplanned 8,207-step input sequence to move the selected group farther right twice and pan back across the area. The prepared command file SHA-256 was `0c1354c48a5e82de877ebea76287184d9b8b73a646fc873d761ee1e1d76905a5`. At observed steps 7017 and 8067 the selected group appeared beside rocky coastal terrain; on the return pan, step 8137 showed darkened terrain with visible texture and step 8172 showed the Nexus and starting mineral line. These samples do not uniquely establish that an identifiable previously seen cell was outside all Probe and Nexus sight, and no remote mineral cluster was observed. They therefore do not establish remembered terrain or resource behavior.
 
 The same C-button frontend binary SHA-256 `45c0110d1a1427d5844e961de564f052136b9f2533854c5b3f1bc8fdae64d1e4` returned 0 in 77.392 seconds with seven copied frames totaling 4,300,800 bytes and checked inputs unchanged. Selected group/coast frames at 7017 and 8067 have SHA-256 `ad5d6886c70d34a46b7544c0c6a2f57deb585aa92fc5647f342c009378e3849f` and `c8d16b4aa19c2cfc258521f3faf898c18978736cff8333e41a6915746e4a20de`; the return-pan frame at 8137 is `478658b2467f047ce43396dcabdad67ae407ee6f85d288e4017d32364cf591c2`. The actual command, input and callback records hash to `ca2a01134ddd4b2cd83058621b03dbf4f276386d01aae8df8dee30928f789326`, `5dd71502affab304fc8d91db8bd357f4ebe2d5a7a58364d1146a1bde0cd137cc`, and `85f185d720c8d6d0c38b1712a47a4dbd2b9db4545388dd0a56341bfd70a84c64`. The ROM, source and library checks matched the preceding run. Frame and controller records, images, fresh save and copied ROM remain private; no audio was retained, and callback steps are not game frames.
+
+## Scout and return
+
+A fresh Protoss Custom Game reached the starting Nexus. R selected all
+four Probes. A rightward camera pan showed a dark purple viewport, with
+the four Probes near the base on the minimap. C-Right sent the group
+toward the right-hand viewport. The Probes reached a shoreline with
+a visible line of cliffs and blue water. A leftward pan and a second
+C-Right command returned the group to the base area. The next rightward
+pan showed the same coastline as dim textured land and water, with
+the group away from it on the minimap.
+
+| Callback step | Observation | Land patch median intensity |
+| ---: | --- | ---: |
+| 5,945 | Remote viewport before scouting | 4.85 |
+| 7,155 | Shoreline with the four Probes nearby | 41.29 |
+| 8,765 | Coastline after the Probes returned toward the base | 22.74 |
+
+The last column uses the median of `(54R + 183G + 19B) / 256` for
+pixels `x=60..151`, `y=85..129` in the 640×240 callback buffers.
+It describes displayed pixel intensity. The three frames establish
+retained terrain in this sampled area. Exact visibility boundaries,
+remote mineral and geyser memory, and correspondence to the GBA
+rendering remain open.
+
+The rebuilt callback frontend uses the pinned ares source
+`0aafd85789215e84e1e43415c07d4c88461b7899` and the installed
+MoltenVK from the earlier audits. The run returned 0 in 60.336
+seconds with ten local captures. The wrapper verified the ROM,
+library, binary and checked source inputs after execution. Clients
+reading the interactive bridge can encounter emulator diagnostics on
+stdout, including a Flash status line during startup. Wait for the
+protocol response before sending the next command. Images and input
+records are retained only in the ignored local run output.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Interactive frontend | `f20a98e70f2a7899216793cdba71d5942b77b70e7405cf762cc60f4dde22d44e` |
+| Run manifest | `8baa3d8142aad56387b2ecf7718c68a7f7012ae39c6329f03eea15e23b506b59` |
+| Controller commands | `ffdbe11dd284d5824d8661f8181e2aad1c3d5e9c3b66f30b328147b6504d12e2` |
+| Viewport before scout | `8c4923a905d7f9abd06189d19cf8b6ed2ca10e95f3e40cbf49308e154aae1fc4` |
+| Lit shoreline | `2c7fd74ed9466ba6e103e9f02c11c5e69f53b89b9bd57367cc3a4bc01c8994a1` |
+| Dim shoreline | `b4a44539f6b57d32a95f84926bd6e5f7d43655092afb39a6bc49da0d3b33efe6` |
