@@ -1236,6 +1236,30 @@ An independent replay of both recorded controller sequences
 matches the two saved states and their SRAM byte for byte.
 Recover workers and prepare a second defense from this checkpoint.
 
+#### Pool completion under the next attack
+
+Starting from the post-Reaver save, move Kerrigan west before
+ordering the first Pool. At frame 78,803 she retains 204 HP
+at (1405,1600). The Hatchery has 1,085 HP and the completed
+Pool has 636 HP. Fresh HOME re-exports identical SRAM and
+confirms that the western Nexus still stands. The eastern
+Nexus remains absent.
+
+An ordinary queue order adds three Zerglings. Before any
+hatch, the attackers reduce Kerrigan to 141 HP, the Hatchery
+to 714 and the Pool to 370. Retain the post-Reaver checkpoint
+as the starting point to move in existing Hydralisks before
+spending time on production.
+
+One test moves the five reserve Hydralisks from the northwest.
+The read-only walk grid gives a 184-cell connected route to
+the previously verified Kerrigan corridor. All five arrive
+near the first order at (392,500), and three lose 20 HP during
+that first leg. Fresh HOME at frame 77,713 retains all five,
+Kerrigan at 204 HP and the Hatchery at 1,250 HP. Hostile units
+hold the approach ahead, so a route through the terrain needs
+separate combat coverage.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent post-Nexus evacuation and Hatchery | `050ed6fa7278eb19a8b89709da4181999011c2bcc4e504658bf48852b33559b5` |
@@ -1248,6 +1272,11 @@ Recover workers and prepare a second defense from this checkpoint.
 | Fresh HOME after the interception | `3bcce9106cdc40b817a93ec9c47afc23b3f7f67e86b73f4d96a81723656e2a5a` |
 | Independent replay of both controller sequences | `fef400e34cae62e698496d4d7ff1a598c936c034c718b01c4a9bd8581df15e0c` |
 | Post-Reaver SRAM | `4c8f492030fb634fbee9a244924fbc0a896e6c478b95daa7d748eca6cedff9a8` |
+| Follow-up Pool construction | `25c8563db1ae473b6f9a7c558d3dd0779a3364c6c4fab44478bb1014ea67b88a` |
+| Byte-identical fresh HOME for the new Pool | `5a8703885bc9e356a4099ee7073ca50eea9e037fc7580c4a4b5538d318a41ec3` |
+| Zergling queue during the following attack | `c74a00c5a14f396e4c7a210d5fddf24d9421818f492e9f95506ce5de628c0664` |
+| Hydralisk movement and first damage checkpoint | `70e8152c86bc073afc922148e4536eb44150685a87f273f4bc3ecfe88209679e` |
+| Fresh HOME for the Hydralisk waypoint | `b7e07a0cb5d3f400cf687afceac85a85884c66725bd1b8b54dca689e94282464` |
 
 ### Native Overlord research permission
 
