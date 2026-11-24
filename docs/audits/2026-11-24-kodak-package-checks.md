@@ -60,6 +60,7 @@ The final SRAM readback matches the victory save byte for byte.
 | 4 | 4,968 | 8,911 | 10 | 24.02 |
 | 6 | 19,466 | 23,536 | 42 | 16.34 |
 | 7 | 2,289 | 3,931 | 12 | 22.09 |
+| 8 | 2,568 | 139,216 | 268 | 21.75 |
 | 9 | 35,363 | 47,266 | 51 | 17.12 |
 | 10 | 2,276 | 3,361 | 6 | 17.83 |
 
@@ -156,9 +157,9 @@ identify the expensive paths in the measured windows.
 The same 16 cuts contain 450 uncached ground contact queries
 with speeds one through three. Of 2,406 observed bucket visits,
 1,622 are nonempty. Each mover, position and speed combination
-occurs at most once within a sampled update. The late cut also draws 164 packed
-sprites across 3,251 rows. These counts provide workload sizes
-for synthetic renderer and collision tests.
+occurs at most once within a sampled update. The late cut also
+draws 164 packed sprites across 3,251 rows. These counts provide
+workload sizes for synthetic renderer and collision tests.
 
 ## Local receipts
 
@@ -175,6 +176,7 @@ for synthetic renderer and collision tests.
 | Terran chapter 5 pause-corrected defeat | `5045cef4db7af2cd8c214745ef1761e011972a1266df7490112d6e5fe6606aea` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
+| Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
 | Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
 | Protoss chapter 9 full comparison | `93151835a97657694c868c183a81ec82aac9f41c9ff1ee49af472e299761f48c` |

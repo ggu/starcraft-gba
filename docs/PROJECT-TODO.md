@@ -1671,9 +1671,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   maps, every player race and every explicit one-to-three CPU
   lineup. All 30 campaign entries and eight Showcase scenes start.
   Thirty-six Custom Game fresh saves load and match continuation.
-  T1–T4, T6, T7, T9 and T10 win through ordinary inputs on the
-  exact Terran image, including fresh mid-mission and victory
-  loads. The pinned Protoss image has P9 and P10 full wins and
+  T1–T4 and T6–T10 win through ordinary inputs on the exact
+  Terran image, including fresh mid-mission and victory loads.
+  The pinned Protoss image has P9 and P10 full wins and
   fresh loads. Update the T5 ordinary-input route to protect Raynor
   through the observed frame-56,506 defeat.
   The same audit records fresh N64 reset replays of the two-slot
