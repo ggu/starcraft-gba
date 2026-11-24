@@ -1740,7 +1740,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   collects gas and builds a Hydralisk Den. Its completed-Den save
   reloads in a fresh process. A paid Overlord restores the supply
   cap, but the Den falls before it hatches. Protect the Den through
-  supply recovery, then verify Hydralisk production and the result.
+  supply recovery. The [earlier defense branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-defended-opening-and-economy)
+  hatches a paid Hydralisk and reaches a freshly reloaded save with
+  four Hydralisks, three mining Drones and a living Den. Rebuild
+  gas income and qualify the mission result from this branch.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

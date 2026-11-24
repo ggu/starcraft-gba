@@ -202,6 +202,38 @@ then, and the next Hydralisk request is refused for a missing
 prerequisite. The validated opening needs the Den defended through
 supply recovery to advance to Hydralisk production.
 
+### Zerg 1 defended opening and economy
+
+An earlier Overlord purchase at frame 3,560 keeps supply available
+for the first Hydralisk. One branch queues that Hydralisk at frame
+6,112 for 75 minerals and 25 gas. It hatches by frame 6,712 while
+the Den is still standing. The player then loses both the unit and
+the Den in an unsupported first attack.
+
+A separate branch selects all twelve Zerglings and issues Attack
+Move at frame 5,977, shortly after the Den completes. Ten Zerglings
+hold near the approach. A paid Hydralisk hatches by frame 7,160 with
+the Hatchery at 1,250 health and the Den at 814. An independent
+6,521-update replay reaches the same world and living Chrysalis.
+Saving from pause exports the same journal bytes, and a fresh HOME
+load restores the world and re-exports those bytes.
+
+The next branch reaches four Hydralisks by frame 11,491, after all
+ten defending Zerglings have died. An ordinary attack order clears
+the immediate pressure on the Den. The gas Drone dies in that fight.
+The Hatchery buys two replacement Drones, both assigned to minerals.
+The save at frame 13,270 has three mining Drones, four Hydralisks,
+176 minerals and 90 gas. Hatchery and Den health are 1,250 and 142.
+A fresh fixed-input replay from the frame-12,180 journal produces
+byte-identical SRAM. Loading it from another fresh HOME restores
+the same world and living Chrysalis. The following 120 neutral
+updates retain all four Hydralisks and three miners. Minerals rise
+to 200 while Den health and the gas bank hold steady.
+
+The mission is still active with 42 enemy units and 14 enemy
+buildings at the saved checkpoint. The damaged Den and interrupted
+gas income remain the next constraints on an assault.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -643,6 +675,9 @@ quality on the GBA SP.
 | Zerg chapter 1 paid Hydralisk Den from the earlier pause | `58d5cd1704e6badfa09cde17168fc1abd9b098bbd8bf191c4ab27900d1724cce` |
 | Zerg chapter 1 completed Den, new pause journal and fresh load | `7955f55008dff0fb8df79d35c6d26ad91c9205155ffbd1474c02fff25f54f5c3` |
 | Zerg chapter 1 Overlord hatching and Den loss | `b61993ff8441be3c34eaa209b4343522941ca4c30ff3a27745148ab4eb3ce7e3` |
+| Zerg chapter 1 earlier Overlord and first paid Hydralisk | `61157044ccd65d5b3c373cd0a3d6358597ed0694f254f731396053776e91373a` |
+| Zerg chapter 1 defended opening, independent replay and fresh load | `c07133279a15e890fc3f28192096dc7ccc2b85fbf5853ea319d8ecf15671bb6d` |
+| Zerg chapter 1 replacement workers, save and fresh load | `3fd25cfa02801e85481074f0d8a37b93601e3b8db07fd4afe5123f800f621a41` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
