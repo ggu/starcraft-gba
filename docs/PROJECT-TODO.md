@@ -121,6 +121,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   open grids and exhausted-budget cases. Qualify the race-cartridge
   memory limits and repeat the paired Terran Blood Bath and Protoss
   route windows.
+  The [retained-prefix experiment](audits/2026-10-29-monotone-route-step/README.md#retaining-successful-path-prefixes)
+  now saves 67.84–70.08% of authored ARM route cycles when requests
+  advance along interleaved paths. Distinct goals cost 0.33–0.35%
+  more. Verify production replay equivalence and RAM margins before
+  using the opt-in flag on race cartridges.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have

@@ -179,3 +179,70 @@ race-cartridge RAM and timing qualification remain open.
 | --- | --- |
 | Production wait states | `096a6ced99d4361f90681cdebdccf50367c272e924998db7524f7171d06778a7` |
 | Reset wait states | `f81e50522bafd76ce187c81767314668376e3d7fba0751e0d894ce19e7f57878` |
+
+## Retaining successful path prefixes
+
+`SC64_ROUTE_MONOTONE_WITNESS` is an opt-in experiment for profiles
+using the monotone point-route shortcut. After two qualifying
+successful searches for a goal, it retains the latest path with
+one bit per edge. Each of the eight entries can serve the same
+tile again or follow the next tile toward the same goal. Qualifying
+searches visit at least 32 nodes and take at least two steps. The
+caller packs the path before returning the borrowed search stack.
+
+The existing L-shaped fast path and cached route fields keep their
+priority. A retained hit ages the route request at the original
+point and still uses the current raw target pixel at the endpoint.
+Grid rebuilds, route resets and shape changes clear the retained
+paths and recent goals. The flag is inactive with partial-flood
+routes or host monotone diagnostics. Diagnostic counters therefore
+continue to describe actual probe work.
+
+The sanitizer checks run the public dispatch and FIFO oracle,
+including the opt-in byte and packed grids. The retained-path cases
+follow all four directions and a blocked goal, reuse scratch between
+calls, exercise a blocked L-shaped path, confirm cached-field
+priority and check route aging. Reopening a tile changes the chosen
+predecessor after rebuilding the grid. Shape rebinding clears the
+witness as well.
+
+An authored 64×64 ARM7 fixture uses `-O2` and the production wait
+states. Four or eight interleaved streams take the returned step
+toward their own goals around a barrier, with short requests mixed
+in. The cold batch asks for 96 distinct goals once each. All 1,196
+returned steps match with the flag on or off, both with and without
+the L-shaped fast path.
+
+| Workload | Baseline cycles | Retained-path cycles | Change |
+| --- | ---: | ---: | ---: |
+| Four streams | 4,068,922 | 1,308,556 | −67.84% |
+| Eight streams | 7,889,384 | 2,384,966 | −69.77% |
+| Distinct goals | 2,357,504 | 2,365,760 | +0.35% |
+| Four streams with L fast path | 3,367,390 | 1,007,537 | −70.08% |
+| Eight streams with L fast path | 6,436,402 | 1,964,303 | −69.48% |
+| Distinct goals with L fast path | 2,469,104 | 2,477,360 | +0.33% |
+
+Admitting every qualifying path gives a larger warm improvement
+and makes the distinct-goal batch 12.93–13.55% slower. The two-query
+admission keeps that miss cost below 0.4% in the fixture. The selected
+configuration adds 360 bytes of linked BSS, 640 bytes of ROM text
+and 40 static stack bytes in `sc64_route_monotone_next_step`. The
+fixture's IWRAM code size is unchanged. Race-cartridge RAM reserves,
+replay equivalence and whole-match effects still need qualification.
+
+The same admission and replacement rules were also simulated from an
+empty cache on 277 observed calls from the installed Terran Blood Bath
+cartridge. The 96-update run matches the retained plain replay on
+world, display and guest cycles. The eight-entry simulation covers
+34 calls and 2.82% of full loop cycles. Twelve entries cover 86 calls
+and 6.96%. These are observed costs of calls that could be reused,
+before lookup, admission, or path packing costs. The run has one
+observed walkability fingerprint. A larger count needs a separate
+memory check.
+
+| Local ARM receipt | SHA-256 |
+| --- | --- |
+| Admission on the second qualifying query | `0c5e5543490c32b6ede7c60ab1602bba081af7a5f283cb52f9b740398534d550` |
+| Immediate admission trial | `f25e979eeeb63f5de940498115b6f9241cdc11e7ffbd3c6431856cd6141aad8e` |
+| Exact Terran call identities and costs | `9acd03c2d3998302dff7e8f0d3c710121e8546153cf5d1ba5e19cd5f8b584ac5` |
+| Offline admission and capacity comparison | `4bd2748c01f9afe2f2a4380108f52e33e15e6655f69c80a349bb289d75f8c24f` |

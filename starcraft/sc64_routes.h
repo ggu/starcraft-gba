@@ -30,13 +30,43 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
     !defined(SC64_ROUTE_PARTIAL_FLOOD)
 #define SC64_ROUTE_MONOTONE_ENABLED 1
 #endif
+#if defined(GBA_HOST) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
+    defined(SC64_ROUTE_MONOTONE_DIAGNOSTICS)
+#define SC64_ROUTE_MONOTONE_DIAG_ENABLED 1
+#endif
+#if defined(SC64_ROUTE_MONOTONE_WITNESS) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
+    !defined(SC64_ROUTE_MONOTONE_DIAG_ENABLED)
+#define SC64_ROUTE_MONOTONE_WITNESS_ENABLED 1
+#endif
 /* Cached range reads can reuse the oracle without changing point movement. */
 #if defined(SC64_ROUTE_MONOTONE_ENABLED) || defined(SC64_ROUTE_POINT_FAR_READ)
 #include "sc64_route_monotone_probe.h"
 #endif
-#if defined(GBA_HOST) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
-    defined(SC64_ROUTE_MONOTONE_DIAGNOSTICS)
-#define SC64_ROUTE_MONOTONE_DIAG_ENABLED 1
+
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+enum { SC64_ROUTE_WITNESS_COUNT = 8, SC64_ROUTE_WITNESS_MIN_NODES = 32 };
+typedef struct {
+    u16 cell, goal;
+    u8 cols, rows, steps;
+    signed char x_step, y_sign;
+    u8 vertical[32]; /* At most 254 cardinal edges. */
+} Sc64RouteWitness;
+static Sc64RouteWitness sc64_route_witness[SC64_ROUTE_WITNESS_COUNT];
+static u8 sc64_route_witness_count, sc64_route_witness_next;
+static u16 sc64_route_witness_recent_goals[SC64_ROUTE_WITNESS_COUNT];
+static u8 sc64_route_witness_recent_count, sc64_route_witness_recent_next;
+#endif
+
+#ifdef SC64_ROUTE_MONOTONE_WITNESS
+static inline void sc64_route_witness_reset(void)
+{
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+    sc64_route_witness_count = sc64_route_witness_next = 0;
+    sc64_route_witness_recent_count = sc64_route_witness_recent_next = 0;
+#endif
+}
+#else
+#define sc64_route_witness_reset() ((void)0)
 #endif
 
 #if defined(SC64_DEPOT_BOUNDED) && !defined(SC64_RACES)
@@ -475,6 +505,7 @@ static int sc64_route_configure(void)
         (unsigned)cols > (unsigned)MAP_CELLS / (unsigned)rows) {
         if (sc64_route_config_cols != cols || sc64_route_config_rows != rows ||
             sc64_route_active_slots != 0) {
+            sc64_route_witness_reset();
 #ifdef SC64_RANGE_WORK
             sc64_range_route_reset();
 #endif
@@ -502,6 +533,7 @@ static int sc64_route_configure(void)
         return 0;
     if (sc64_route_config_cols == cols && sc64_route_config_rows == rows &&
         sc64_route_active_bytes == bytes && sc64_route_active_slots != 0) return 1;
+    sc64_route_witness_reset();
 #ifdef SC64_RANGE_WORK
     sc64_range_route_reset();
 #endif
@@ -677,6 +709,7 @@ sc64_routes_reset(void)
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
     (void)sc64_route_configure();
 #endif
+    sc64_route_witness_reset();
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
     SC64_POINT_PREFIX_RESET();
     sc64_facility_frontiers_reset();
@@ -3135,6 +3168,75 @@ sc64_route_preferred_l_clear(int start_col, int start_row,
 }
 #endif
 
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+/* Admit a long route only after seeing the same goal twice. */
+static int sc64_route_witness_admit(int goal)
+{
+    for (unsigned i = 0; i < sc64_route_witness_recent_count; ++i)
+        if (sc64_route_witness_recent_goals[i] == goal) return 1;
+    sc64_route_witness_recent_goals[sc64_route_witness_recent_next] = (u16)goal;
+    if (sc64_route_witness_recent_count < SC64_ROUTE_WITNESS_COUNT)
+        ++sc64_route_witness_recent_count;
+    if (++sc64_route_witness_recent_next == SC64_ROUTE_WITNESS_COUNT)
+        sc64_route_witness_recent_next = 0;
+    return 0;
+}
+
+static void sc64_route_witness_store(int cell, int goal, int cols, int rows,
+                                     const sc64_route_probe_stats *stats)
+{
+    Sc64RouteWitness *path = &sc64_route_witness[sc64_route_witness_next];
+    const unsigned steps = stats->path_steps;
+    path->cell = (u16)cell;
+    path->goal = (u16)goal;
+    path->cols = (u8)cols;
+    path->rows = (u8)rows;
+    path->steps = (u8)steps;
+    path->x_step = stats->x_step;
+    path->y_sign = stats->y_sign;
+    memset(path->vertical, 0, (steps + 7u) >> 3);
+    for (unsigned i = 0; i + 1u < steps; ++i)
+        if (stats->path_stack[i] == SC64_PROBE_FINISHED)
+            path->vertical[i >> 3] |= (u8)(1u << (i & 7u));
+    if (stats->last_vertical) {
+        unsigned last = steps - 1u;
+        path->vertical[last >> 3] |= (u8)(1u << (last & 7u));
+    }
+    if (sc64_route_witness_count < SC64_ROUTE_WITNESS_COUNT) ++sc64_route_witness_count;
+    if (++sc64_route_witness_next == SC64_ROUTE_WITNESS_COUNT) sc64_route_witness_next = 0;
+}
+
+static int sc64_route_witness_predecessor(const Sc64RouteWitness *path)
+{
+    if (!path->steps) return path->cell;
+    unsigned last = path->steps - 1u;
+    int delta = path->vertical[last >> 3] & (1u << (last & 7u)) ?
+                path->y_sign * path->cols : path->x_step;
+    return (int)path->cell - delta;
+}
+
+/* Successive requests use the same reverse-BFS prefix on an unchanged grid.
+ * Retain the current cell for repeated requests before a unit crosses a tile. */
+static int sc64_route_witness_lookup(int origin, int goal, int cols, int rows,
+                                      int *predecessor)
+{
+    for (unsigned i = 0; i < sc64_route_witness_count; ++i) {
+        Sc64RouteWitness *path = &sc64_route_witness[i];
+        if (path->goal != goal || path->cols != cols || path->rows != rows) continue;
+        int step = sc64_route_witness_predecessor(path);
+        if (origin != path->cell) {
+            if (origin != step) continue;
+            path->cell = (u16)origin;
+            --path->steps;
+            step = sc64_route_witness_predecessor(path);
+        }
+        *predecessor = step;
+        return 1;
+    }
+    return 0;
+}
+#endif
+
 #ifdef SC64_ROUTE_MONOTONE_ENABLED
 static int __attribute__((noinline))
 sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
@@ -3159,13 +3261,24 @@ sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
     _Static_assert(sizeof(bfs_queue) - SC64_ROUTE_POINT_BYTES >= 2048 + 255 * sizeof(u16),
                    "monotone probe and route tail need disjoint scratch");
 #endif
-    status = sc64_route_monotone_probe(path_walkable, cols, rows, active_cells,
-                                       bfs_queue, sizeof(bfs_queue)
-#ifdef SC64_ROUTE_POINT_TAIL_PROBE
-                                       - SC64_ROUTE_POINT_BYTES
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+    if (sc64_route_witness_lookup(origin, goal, cols, rows, &predecessor)) status = 1;
+    else
 #endif
-                                       , origin, goal,
-                                       512u, &predecessor, &stats);
+    {
+        status = sc64_route_monotone_probe(path_walkable, cols, rows, active_cells,
+                                           bfs_queue, sizeof(bfs_queue)
+#ifdef SC64_ROUTE_POINT_TAIL_PROBE
+                                           - SC64_ROUTE_POINT_BYTES
+#endif
+                                           , origin, goal,
+                                           512u, &predecessor, &stats);
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+        if (status == 1 && stats.nodes >= SC64_ROUTE_WITNESS_MIN_NODES && stats.path_steps > 1 &&
+            sc64_route_witness_admit(goal))
+            sc64_route_witness_store(origin, goal, cols, rows, &stats);
+#endif
+    }
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     sc64_route_probe_diag.attempts++;
     sc64_route_probe_diag.nodes += stats.nodes;

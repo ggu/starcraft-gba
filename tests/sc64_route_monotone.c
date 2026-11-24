@@ -36,7 +36,12 @@ static int race_cols = 64, race_rows = 64;
 enum { MAP_COLS = 32, MAP_ROWS = 24, MAP_CELLS = MAP_COLS * MAP_ROWS };
 #endif
 
+#ifdef TEST_WITNESS
+#define SC64_ROUTE_MONOTONE_WITNESS
+static inline void sc64_route_witness_reset(void);
+#else
 #define SC64_ROUTE_MONOTONE_DIAGNOSTICS
+#endif
 #define GBA_HOST
 static u32 frame;
 static u16 bfs_queue[MAP_CELLS];
@@ -62,7 +67,13 @@ static u8 path_walkable[MAP_CELLS];
 
 static int sc64_cell_row(unsigned cell) { return (int)(cell / (unsigned)MAP_COLS); }
 static int sc64_cell_col(unsigned cell) { return (int)(cell % (unsigned)MAP_COLS); }
-static void build_path_grid(void) { path_grid_valid = 1; }
+static void build_path_grid(void)
+{
+#ifdef TEST_WITNESS
+    sc64_route_witness_reset();
+#endif
+    path_grid_valid = 1;
+}
 
 #include "starcraft/sc64_routes.h"
 
@@ -235,7 +246,7 @@ static void test_dispatch_oracle(void)
     grid_fill(1);
     u32 before = sc64_route_builds;
     check_dispatch(2 * 16 + 8, 2 * 16 + 8, 18 * 16 + 8, 13 * 16 + 8);
-#if defined(SC64_ROUTE_MONOTONE_ENABLED) && !defined(SC64_ROUTE_L_FAST_PATH)
+#ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
     assert(sc64_route_probe_diag.attempts == 1);
     assert(sc64_route_probe_diag.hits == 1);
     assert(sc64_route_builds == before);
@@ -420,6 +431,93 @@ static void test_active_geometry(void)
 #endif
 }
 
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+static void test_retained_witness(void)
+{
+    for (unsigned direction = 0; direction < 4; ++direction) {
+        int sx = direction & 1u ? MAP_COLS - 2 : 1;
+        int sy = direction & 2u ? MAP_ROWS - 2 : 1;
+        int gx = MAP_COLS - sx - 1, gy = MAP_ROWS - sy - 1;
+        int goal = gx + gy * MAP_COLS, origin = sx + sy * MAP_COLS;
+        int nx, ny, expected;
+        /* Exercise a blocked goal as well as all four direction pairs. */
+        reset_world();
+        grid_fill(1);
+        if (direction == 3) grid_set(gx, gy, 0);
+        assert(sc64_route_monotone_next_step(origin, goal, gx * 16 + 3, gy * 16 + 12, &nx, &ny));
+        assert(sc64_route_witness_count == 0 && sc64_route_witness_recent_count == 1);
+        unsigned clock_before = sc64_route_clock;
+        for (unsigned call = 0; ; ++call) {
+            assert(call < 256);
+            assert(reference_step(origin % MAP_COLS, origin / MAP_COLS, gx, gy, &expected));
+            /* The FIFO oracle overwrites the scratch holding the first path. */
+            bfs_queue[0] = 0xa55a;
+            assert(sc64_route_monotone_next_step(origin, goal, gx * 16 + 3, gy * 16 + 12, &nx, &ny));
+            if (call) assert(bfs_queue[0] == 0xa55a);
+            assert(sc64_route_witness_count == 1 && sc64_route_witness_next == 1);
+#ifdef SC64_ROUTE_DECAY_FREQ
+            assert(sc64_route_clock == clock_before + call + 1u);
+#endif
+            assert(sc64_route_witness[0].cell == origin);
+            if (expected == origin || (expected == goal && !grid_get(gx, gy))) {
+                assert(nx == gx * 16 + 3 && ny == gy * 16 + 12);
+                assert(sc64_route_monotone_next_step(origin, goal, gx * 16 + 11, gy * 16 + 4, &nx, &ny));
+                assert(nx == gx * 16 + 11 && ny == gy * 16 + 4);
+                break;
+            }
+            assert(nx / 16 + ny / 16 * MAP_COLS == expected);
+            origin = expected;
+        }
+    }
+    reset_world();
+    grid_fill(1);
+    int origin = MAP_COLS + 1, goal = MAP_COLS * (MAP_ROWS - 2) + MAP_COLS - 2;
+    int nx, ny, tx = (MAP_COLS - 2) * 16 + 8, ty = (MAP_ROWS - 2) * 16 + 8;
+    /* Block the preferred L path and exercise the public dispatch. */
+    grid_set(1, 2, 0);
+    check_dispatch(24, 24, tx, ty);
+    assert(sc64_route_witness_count == 0);
+    check_dispatch(24, 24, tx, ty);
+    assert(sc64_route_witness_count == 1);
+    bfs_queue[0] = 0xa55a;
+    unsigned clock_before = sc64_route_clock;
+    assert(sc64_route_next(24, 24, tx, ty, &nx, &ny));
+    assert(bfs_queue[0] == 0xa55a && nx == 40 && ny == 24);
+#ifdef SC64_ROUTE_DECAY_FREQ
+    assert(sc64_route_clock == clock_before + 1u);
+#endif
+    assert(SC64_ROUTE_SLOT_Q(goal) >= 0);
+    unsigned hits = sc64_route_hits;
+    check_dispatch(24, 24, tx, ty);
+    assert(sc64_route_hits == hits + 1u);
+    assert(!sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
+    sc64_routes_reset();
+    check_dispatch(24, 24, tx, ty);
+    check_dispatch(24, 24, tx, ty);
+    assert(sc64_route_witness_count == 1);
+    path_grid_valid = 0;
+    grid_set(1, 2, 1);
+    build_path_grid();
+    assert(sc64_route_witness_count == 0);
+    assert(sc64_route_witness_recent_count == 0);
+    assert(sc64_route_next(24, 24, tx, ty, &nx, &ny));
+    assert(nx == 24 && ny == 40);
+#ifdef TEST_ACTIVE
+    /* Shape rebinding discards even a valid packed witness. */
+    sc64_routes_reset();
+    grid_fill(1);
+    assert(sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
+    assert(sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
+    assert(sc64_route_witness_count == 1);
+    race_cols = 96;
+    assert(sc64_route_configure());
+    assert(sc64_route_witness_count == 0);
+    race_cols = 64;
+    sc64_routes_reset();
+#endif
+}
+#endif
+
 int main(void)
 {
 #ifdef TEST_PARTIAL
@@ -434,6 +532,9 @@ int main(void)
     test_budget_and_canaries();
 #endif
     test_active_geometry();
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+    test_retained_witness();
+#endif
     printf("route monotone dispatch OK active=%d builds=%u hits=%u\n",
            SC64_ROUTE_ACTIVE_SLOTS, (unsigned)sc64_route_builds,
            (unsigned)sc64_route_hits);

@@ -11,9 +11,30 @@
 
 typedef struct {
     unsigned nodes, candidates, memo_checks, memo_clear_bytes, seeds_tried;
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+    const u16 *path_stack;
+    u8 path_steps, last_vertical;
+    signed char x_step, y_sign;
+#endif
 } sc64_route_probe_stats;
 
 enum { SC64_ROUTE_PROBE_BUDGET = -1, SC64_ROUTE_PROBE_UNSUPPORTED = -2 };
+enum { SC64_PROBE_TRY_BOTH, SC64_PROBE_TRY_VERTICAL, SC64_PROBE_FINISHED };
+
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+/* The caller copies the successful path before reusing the shared scratch. */
+static inline void sc64_probe_record_path(sc64_route_probe_stats *stats,
+    const u16 *stack, unsigned depth, int x_step, int y_step, unsigned vertical)
+{
+    stats->path_stack = stack;
+    stats->path_steps = (u8)depth;
+    stats->x_step = (signed char)x_step;
+    stats->y_sign = y_step > 0 ? 1 : -1;
+    stats->last_vertical = (u8)vertical;
+}
+#else
+#define sc64_probe_record_path(stats, stack, depth, x_step, y_step, vertical) ((void)0)
+#endif
 
 static inline unsigned sc64_route_probe_row(unsigned cell, unsigned cols)
 {
@@ -40,6 +61,9 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
     if (!stats) return SC64_ROUTE_PROBE_UNSUPPORTED;
     stats->nodes = stats->candidates = stats->memo_checks = 0;
     stats->memo_clear_bytes = stats->seeds_tried = 0;
+#ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+    stats->path_steps = 0;
+#endif
     if (!walkable || !scratch || !predecessor || cols <= 0 || rows <= 0 ||
         cells <= 0 || cells > 16384 || cols > 128 || rows > 128 ||
         cols * rows != cells || origin < 0 || origin >= cells || goal < 0 || goal >= cells ||
@@ -66,7 +90,6 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
 
     failed = (u8 *)(void *)scratch;
     for (root_i = 0; root_i < root_count; ++root_i) {
-        enum { TRY_BOTH, TRY_VERTICAL, FINISHED };
         unsigned depth = 1;
         int root = roots[root_i];
         int root_row = (int)sc64_route_probe_row((unsigned)root, (unsigned)cols);
@@ -98,20 +121,24 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
         }
         /* Bitmap coordinates count steps remaining toward the origin.
          * The parent's phase identifies the edge to undo on backtracking. */
-        stack[0] = TRY_BOTH;
+        stack[0] = SC64_PROBE_TRY_BOTH;
         while (depth) {
             unsigned top = depth - 1u;
             unsigned phase = stack[top];
             if (stats->nodes >= budget) return SC64_ROUTE_PROBE_BUDGET;
             stats->nodes++;
             /* Horizontal before vertical matches FIFO L/R/U/D root expansion. */
-            if (phase == TRY_BOTH) {
-                stack[top] = TRY_VERTICAL;
+            if (phase == SC64_PROBE_TRY_BOTH) {
+                stack[top] = SC64_PROBE_TRY_VERTICAL;
                 if (horizontal) {
                     int next = cell + x_step;
                     unsigned next_local = local - 1u;
                     stats->candidates++;
-                    if (next == origin) { *predecessor = cell; return 1; }
+                    if (next == origin) {
+                        *predecessor = cell;
+                        sc64_probe_record_path(stats, stack, depth, x_step, y_step, 0);
+                        return 1;
+                    }
                     stats->memo_checks++;
                     if (SC64_GRID_GET(walkable, next) &&
                         !((failed[next_local >> 3] >> (next_local & 7u)) & 1u)) {
@@ -119,18 +146,22 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
                         cell = next;
                         local = next_local;
                         horizontal--;
-                        stack[depth++] = TRY_BOTH;
+                        stack[depth++] = SC64_PROBE_TRY_BOTH;
                         continue;
                     }
                 }
             }
-            if (phase != FINISHED) {
-                stack[top] = FINISHED;
+            if (phase != SC64_PROBE_FINISHED) {
+                stack[top] = SC64_PROBE_FINISHED;
                 if (vertical) {
                     int next = cell + y_step;
                     unsigned next_local = local - width;
                     stats->candidates++;
-                    if (next == origin) { *predecessor = cell; return 1; }
+                    if (next == origin) {
+                        *predecessor = cell;
+                        sc64_probe_record_path(stats, stack, depth, x_step, y_step, 1);
+                        return 1;
+                    }
                     stats->memo_checks++;
                     if (SC64_GRID_GET(walkable, next) &&
                         !((failed[next_local >> 3] >> (next_local & 7u)) & 1u)) {
@@ -138,14 +169,14 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
                         cell = next;
                         local = next_local;
                         vertical--;
-                        stack[depth++] = TRY_BOTH;
+                        stack[depth++] = SC64_PROBE_TRY_BOTH;
                         continue;
                     }
                 }
             }
             failed[local >> 3] |= (u8)(1u << (local & 7u));
             if (--depth == 0) break;
-            if (stack[depth - 1u] == FINISHED) {
+            if (stack[depth - 1u] == SC64_PROBE_FINISHED) {
                 cell -= y_step;
                 local += width;
                 vertical++;
@@ -158,5 +189,9 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
     }
     return 0;
 }
+
+#ifndef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
+#undef sc64_probe_record_path
+#endif
 
 #endif
