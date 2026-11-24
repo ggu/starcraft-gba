@@ -853,6 +853,32 @@ each. The first completes at frame 8,319 and the fifth at 10,119.
 The replay still wins at frame 10,120. These checkpoints follow
 each platform's ordinary controls and use separate clock units.
 
+### Backwater Station opening
+
+The N64 replay opens Backwater Station through the campaign menu
+after Wasteland victory. The playable field shows 200 minerals,
+200 gas and 5/26 supply. The opening roster visible at the base
+is four Marines, Raynor's Vulture and an SCV, with a Command
+Center, a Barracks and two Supply Depots. The SCV gathers without
+a new order from the player. Minerals rise to 216, then 232.
+The ordinary Save Screen writes a first-slot checkpoint. A fresh
+process loads that slot and resumes play with 248 minerals, 200
+gas and 5/26 supply. Its FlashRAM export is byte-identical.
+
+On the installed Terran ROM, ordinary controller inputs open
+the same mission and the read-only observer sees those six units
+and four buildings, 200 minerals, 200 gas and 6/26 supply. The
+human units report idle orders. After 60 neutral updates the SCV
+is still idle and the bank is still 200/200. The N64 supply
+exclusion still needs an isolated test.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |
+| N64 first-slot save | `bbb280c07d827e96135ee6ee17b3268bec83d20a20681e18662a4e40b08306f6` |
+| N64 fresh-process reload | `2c9d3141c995bf315e72a9e500aa91601b60c507af72631d02d2f6c6b07ebab4` |
+| GBA opening and neutral updates | `c23236098c12c013370634bb91fda62357c34a4273d9420be5d62243e3904cd6` |
+
 ### Terran chapter 5 input divergence
 
 The old paid-air route matches all checked observations through
@@ -1020,6 +1046,24 @@ destroys the eastern Refinery at (1376,1296). At frame 57,882
 all seven Wraiths and both heroes survive. An independent fresh
 HOME process verifies both eastern structures are gone, the
 21 remaining hostile buildings, and byte-identical SRAM.
+
+A western staging run pays for two more Wraiths and reaches
+84/84 supply. A nine-Wraith attack removes the northern Missile
+Turret at (528,1344). Fresh HOME at frame 64,503 restores all
+nine aircraft, both heroes and byte-identical SRAM. The hostile
+census contains seven turrets, eight depots and five other
+buildings. Six of the seven remaining enemy Wraiths are clustered
+by the western Starport. They engage the force after reload.
+A second turret attack from that position loses five Wraiths
+without damaging the target. Use the earlier staging save for a
+new approach that separates enemy aircraft from the turret line.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Earlier staging SRAM | `3049d226fa3b9f60c32d70b15ed0376a08a763edb2ccc68c96b4ced097d85cf0` |
+| Western Missile Turret attack | `0587019f430cec3382e80b5ee6030bd763ad3c8274c3bbb3d076218c4656f89d` |
+| Western Missile Turret fresh HOME | `94ef81c771f372d71a38eea6d6857fefc2e57b0f0292a070b1ca21e89cd41596` |
+| Second turret attack | `f784de0e78d93711283e484fe308de0f9da740755ca9039450512897b2213a1f` |
 
 ## Custom Game saves
 
