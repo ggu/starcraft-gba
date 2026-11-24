@@ -670,8 +670,10 @@ still reads 40 after that input.
 #### Wasteland mineral collection
 
 An isolated ares v148 replay uses the same starting FlashRAM.
-The bridge exposes the ordinary B button alongside the existing
-mapped controls. With the SCV selected and the cursor on the
+The scratch bridge exposes the ordinary B button alongside the
+existing mapped controls. The receipts pin the compiled binary
+and its actual source separately from the wrapper's tracked
+source entries. With the SCV selected and the cursor on the
 patch, the HUD shows **B Harvest** and 40 minerals at step 9,890.
 A B press and neutral updates raise the bank to 48 by step 10,900,
 64 by 11,900 and 72 by 12,900. These three HUD captures precede
@@ -1277,6 +1279,8 @@ quality on the GBA SP.
 | N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
 | N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
 | N64 Wasteland SCV reselection and southward move | `d634dc26e7a39a6cb21b1939c929db6de2612e9d0c4a79ea251a08f032fe899e` |
+| N64 Wasteland B-enabled scratch bridge source | `2bcb6ce41b28950fdbc5abb891e263a8a28ff74c255ea3093905d189ea2ff0b6` |
+| N64 Wasteland B-enabled scratch bridge binary | `52ca094d2fbc0d723305546b0e6cef7f0b0a19a7a436de09dfab30950b05a3da` |
 | N64 Wasteland B Harvest deliveries before the observer failure | `cd7844c9cb1cf4acc307d3c40a158d7c7011a084d07374b291375535f00137e2` |
 | N64 Wasteland first mineral delivery and ordinary FlashRAM save | `6625cd459e1e46a7cf95d6259e6e462db23cdc90a752d0224952608d354cb577` |
 | N64 Wasteland first slot fresh reload, continued mining and FlashRAM readback | `7106dfa869740ea0d859dfb9882b815e61655b470bcec19e93ee19e6bac61299` |
