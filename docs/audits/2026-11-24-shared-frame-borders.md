@@ -97,6 +97,43 @@ fewer IWRAM bytes than the source baseline. This checks the shared
 code placement at object scope. Full cartridge links, release
 gameplay and real-device pacing remain open.
 
+## Finished-band reuse trial
+
+The authored trial captures ordered drawing commands and keeps a
+separate history for each physical page. It compares the commands
+affecting each of seven full-width battlefield bands. A changed band
+is cleared and redrawn in original order. The comparison considers
+both histories, so a disappearing command dirties its old band.
+
+The 600-update visible panned pair matches both video pages, palette
+and sampled state. The trial reuses 3,341 of 4,200 bands and records
+up to 345 commands per update. Mean whole-frame time rises from
+659,276 to 729,159 cycles, with p95 rising from 1,123,171 to 1,389,351.
+Command capture alone averages 55,981 cycles outside the candidate's
+draw counter. A forced post-capture fallback disagrees on 13 displayed
+updates despite matching state and palette. The trial stays out of
+the shared renderer. A later attempt needs a cheaper way to identify
+changed contributors and a verified fallback.
+
+## Clipped terrain rows and solid lines
+
+An authored ARM fixture covering all horizontal phases shows that
+aligned sources at phase 2 can draw 100 clipped five-row cells in
+67,520 cycles versus 211,920. The retained `1f0ad66e` P10 cartridge
+has no clipped-row calls in the two fixed-camera samples. Holding
+Right for the same two 12-update windows produces 12 clipped-row
+calls. Eight are clipped horizontally and the other four have phase
+0. The camera advances four pixels at a time from phase 0 in the
+measured runs. The stage census identifies no effective branch hits
+for phase 2 there.
+
+Direct halfword writes for a wholly visible solid line match the
+reference on both pages across the authored 600-update panned pair.
+They save 347 mean draw cycles per update. Mean whole-frame time
+stays at 660,677 cycles with 163 updates above two VBlanks. Keep
+both trials local and prioritize the larger movement and painting
+work. Additional camera positions may exercise other row phases.
+
 ## Reproduce the comparison
 
 Use a headless mGBA runner built from the current

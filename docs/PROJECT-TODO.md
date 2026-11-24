@@ -143,9 +143,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   panning. The 600-update visible pair matches state and both pages
   and reduces two-VBlank overruns from 196 to 163. That battle
   changes about 14 of 105 tiles on average between uses of the same
-  page at a fixed camera. Test safe finished-pixel reuse across
-  movement and overlays. Replay the race cartridges and keep
-  reducing the larger movement and painter costs.
+  page at a fixed camera. The first exact band-command trial
+  reuses 3,341 of 4,200 bands and raises whole-frame mean by 10.6%.
+  Its forced fallback also disagrees on 13 frames. Prioritize
+  cheaper contributor tracking and validate fallback before
+  offering finished-pixel reuse. Replay the race cartridges and
+  keep reducing the larger movement and painter costs.
   [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in
