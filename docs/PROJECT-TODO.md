@@ -73,6 +73,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   slows compact crowds and every 32-query rebuild batch. Keep the
   shared masks and measure the real query count and actor spread
   before revisiting this design.
+  [Clipped targeting bounds and a squared radius](audits/2026-11-24-target-query-radius.md)
+  save 0.55–4.69% of query cycles across authored ARM layouts
+  with the same chosen targets. Rebuild timings match. Measure
+  the same query cost in a current dense three-CPU replay.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
