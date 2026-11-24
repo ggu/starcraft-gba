@@ -1123,6 +1123,55 @@ attack.
 | Staged Nexus attack | `c5cd2592000ad471e1e022d5983120466ca1cf17e4374ec1962067b5396d7eee` |
 | Assault fresh HOME | `6cffd5bbf2b6659436836d8c9a1968a2dc72f04125be17c352e1d3bde5c2e94e` |
 
+### Reinforce and destroy the eastern Nexus
+
+Five paid Hydralisks from the southern Hatchery join the eleven
+at the eastern staging point. The completed sixteen-unit group
+and two Overlords fresh-load at frame 69,098. The bank is 8,617
+minerals and 259 gas.
+
+An ordinary Attack Move order takes down the Pylon and then the
+eastern Nexus. At frame 70,971 the eastern Nexus is gone, two of the
+attacking Hydralisks survive and Kerrigan retains 400 HP. Independent
+replays of the production, staging and assault each match the sampled
+world and SRAM. Fresh HOME confirms the result. The western Nexus at
+(400,1704) retains 750 HP and 750 shields, and the mission is active.
+At this save the southern Hatchery is also under attack and the Den
+is gone. Preserve the base and rebuild production for the western
+attack.
+
+A separate branch at the reinforcement checkpoint keeps the
+original eastern force in place. The five paid Hydralisks
+intercept a Reaver and two Dragoons approaching the southern
+base. All three attackers are gone at frame 69,399, with the
+Hatchery at 1,250 HP, the Pool at 750 HP, the Den at 356 HP and
+Kerrigan at 400 HP. The independent replay and fresh HOME
+match SRAM exactly. The eastern Nexus remains on this branch.
+Protect production and Kerrigan through the next wave before
+combining defense with the objective attack.
+
+The defensive branch moves Kerrigan to (1216,1984) and pays
+for a second Den at (1856,1904). Both Dens remain on the
+fresh frame-71,099 save, with the new Den at 850 HP and the
+Hatchery and Kerrigan at full health. The eleven eastern
+Hydralisks remain staged. Both Nexuses persist on this branch.
+
+Six more paid Hydralisks stop the second Reaver wave by frame
+74,254. The replacement Den stays at 850 HP and Kerrigan at
+400 HP. The Hatchery falls to 359 HP and the branch loses its
+Pool and workers. Fresh HOME restores the surviving buildings
+and the exact SRAM. Worker recovery is the next test on this
+branch.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent production, staging and eastern attack replay | `f93f73071a2371c917d3c986cbedf905b5105999c632fcd8d54b3355ac89cb58` |
+| Eastern Nexus destruction SRAM | `fe7f4dd2fc1a9b8901dec10aa30640c4369dd0b7d151d9b0495b0d464bf921ed` |
+| Eastern Nexus destruction fresh HOME | `a3d1a7ee3432e632862a8303f02871dfb511bd7b5412bd8938b72521c88b4215` |
+| Separate southern defense, independent replay and fresh HOME | `e9ddfb4fbe70ad677701c4302ce2ae00f5ed99bc932b8d6d9ce7cae107bbdb66` |
+| Paid replacement Den and fresh HOME | `0795ee44ac206154e8f8c66199d083c2d225f1bef32a33d980a19a98178adfb1` / `c0bdc284519aa4258c8e605dd0662f8106de6fbe78e366a1b2224c0a5277af5b` |
+| Second Reaver wave and fresh HOME | `ab2620100cf6b32887b4374f00297f1195c59ce97321f43d22618faf18b934e3` / `f9fb9a51dc12e56c744be87fe1d45adabbcbc344086e8e89abb48a2e1dabd492` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

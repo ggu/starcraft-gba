@@ -805,7 +805,23 @@ Marines with 10 minerals. A fresh attempt reselects the same
 60-HP SCV near the completed Barracks and moves the cursor onto
 the minerals. The field shows B Harvest. Pressing B at emulator
 step 9,680 raises the bank from 10 to 26 by step 10,680 and to
-34 by step 11,680. The Marine queue and completion remain open.
+34 by step 11,680.
+
+A later native run opens the completed Barracks menu with 66
+minerals. The Marine option shows a price of 50. A starts
+production, and the next capture shows the active progress bar
+and 11/18 supply. Mining continues through the payment, with
+24 minerals at the first post-order capture. By emulator step
+9,035 in this run, the objective counter reads six of ten
+Marines. Full native victory and the next mission unlock
+remain open.
+
+A fresh process loads the first slot at six Marines. Mining
+continues to 56 minerals. The ordinary Barracks menu again shows
+50 for a Marine. A queues the second paid Marine, dropping the bank
+from 56 to 6 and raising supply to 12/18. The new Marine finishes
+with the counter at seven of ten. The FlashRAM export matches the
+six-Marine input image byte for byte for this unsaved continuation.
 
 A read-only replay of the full GBA Wasteland input tape observes
 the matching 150-mineral charge, from 463 to 313, when the
@@ -829,60 +845,58 @@ at call 57,747, game frame 56,506, with Raynor dead and Kerrigan
 alive. The runtime records defeat and zero trigger faults.
 The current cartridge still needs a winning route.
 
-An ordinary move order after input call 22,000 takes Raynor to the
-northeast edge. He reaches it by game frame 24,775 and stays at
+An ordinary move order after input call 22,000 takes Kerrigan to the
+northeast edge. She reaches it by game frame 24,775 and stays at
 full health through frame 129,658 in the neutral continuation.
 The mission is still active with all 21 hostile buildings and
 four friendly buildings remaining.
 
-Applying the old suffix after that retreat recalls Raynor through
+Applying the old suffix after that retreat recalls Kerrigan through
 the global combat-group selection and later orders. That variant
 loses at frame 108,946 with all 21 hostile buildings still standing.
 
 A fresh retreat test uses an ordinary L-drag box to select two
 nearby Marines. A ground order moves both with formation
-offsets. Kerrigan retains her idle target, and Raynor retains
-his retreat target and idles on arrival. This verifies local
+offsets. Raynor retains his idle target, and Kerrigan retains
+her retreat target and idles on arrival. This verifies local
 command of an assault group with both heroes excluded.
 
-The explicit Move test selects Kerrigan and uses B, Up and A to
+The explicit Move test selects Raynor and uses B, Up and A to
 choose Move from the command menu. Placing the cursor at (1379,203)
-sets her movement order and destination. She remains around
-(1319,203–205) at 45 HP for 2,000 updates. Raynor reaches (1528,7)
+sets his movement order and destination. He remains around
+(1319,203–205) at 45 HP for 2,000 updates. Kerrigan reaches (1528,7)
 at 250 HP. This establishes command acceptance and isolates the
 remaining route problem to reaching that waypoint. A previous
 contextual A click on nearby ground selected another actor.
 
-The retained route puts Kerrigan at the stalled location by input
-call 20,000. A new branch at call 18,000 verifies selection of her
-slot and issues Move toward (1448,398). She moves from (1352,290)
+The retained route puts Raynor at the stalled location by input
+call 20,000. A new branch at call 18,000 verifies selection of his
+slot and issues Move toward (1448,398). He moves from (1352,290)
 to (1456,383) by 200 updates and stays there through update 500.
-She keeps 45 HP and Raynor keeps 250 HP. The test establishes an
+He keeps 45 HP and Kerrigan keeps 250 HP. The test establishes an
 earlier route that clears the original position. This waypoint is
 short of its target, and the mission outcome is still open.
 
-An earlier branch at call 12,000 redirects Kerrigan from (945,397)
-to a staging area near (856,398). She reaches it within 100 updates
-of the Move order and keeps 294 HP through game frame 19,160. Raynor
-follows his prior order and falls to 23 HP. A later attempt selects
-his verified slot at frame 13,229 while he still has 250 HP. That
+An earlier branch at call 12,000 redirects Raynor from (945,397)
+to a staging area near (856,398). He reaches it within 100 updates
+of the Move order and keeps 294 HP through game frame 19,160. Kerrigan
+follows her prior order and falls to 23 HP. A later attempt selects
+her verified slot at frame 13,229 while she still has 250 HP. That
 attempt ends before issuing an order because the menu sequence does
 not enter Move mode.
 
-A second early branch selects Raynor at frame 13,229 and uses an
-ordinary A click on empty ground at (702,538). This replaces his
-old attack order with Move. At frame 19,288 Kerrigan remains at
-(856,398) with 294 HP and Raynor is at (702,527) with 250 HP. They
+A second early branch selects Kerrigan at frame 13,229 and uses an
+ordinary A click on empty ground at (702,538). This replaces her
+old attack order with Move. At frame 19,288 Raynor remains at
+(856,398) with 294 HP and Kerrigan is at (702,527) with 250 HP. They
 are the two remaining player units. The mission is still active
 and this branch has yet to produce a victory.
 
-The direct recruitment attempt moves the rescued Kerrigan alone
-toward the rebel base. At frame 12,814 her position is (1348,257),
-inside the base-entry rectangle, and she has 118 of her earlier
-294 HP. She dies by frame 13,306 and the mission is lost before
-any observed recruitment. The existing fixture allows up to 2,400
-updates for its delayed sequence. This attempt did not establish
-a safe approach or dwell window for it.
+One direct approach moves Raynor alone toward the rebel base.
+At frame 12,814 his position is (1348,257), inside the base-entry
+rectangle, and he has 118 of his earlier 294 HP. He dies by
+frame 13,306. The mission's recruitment trigger checks for
+Kerrigan's raw identity, so this branch only tests the approach.
 
 An earlier branch at input call 8,000 preserves seven Marines and both
 heroes at full health at frame 10,093. A long group order to (200,700)
@@ -890,7 +904,7 @@ stalls through 1,000 updates. Ordinary L-box selection and three shorter
 ground orders to (110,590), (180,540) and (260,500) advance the escort.
 At frame 13,603 six Marines and both heroes are between (229,496)
 and (255,516). One Marine stalls at (190,534). All seven Marines
-retain 40 HP, Kerrigan 300 HP and Raynor 250 HP. The bank stays
+retain 40 HP, Raynor 300 HP and Kerrigan 250 HP. The bank stays
 at 300 minerals and 300 gas. Independent HOME reload restores the
 frame, every observed friendly actor field and the exact SRAM bytes.
 Recruitment and victory are open.
@@ -898,14 +912,14 @@ Recruitment and victory are open.
 Another branch from frame 13,603 sends the selected eight-unit
 escort north to (250,450). The independent frame-14,692 HOME
 reload restores their positions around the waypoint, all seven
-Marines at 40 HP, Kerrigan at 300 HP and Raynor at 250 HP. One
+Marines at 40 HP, Raynor at 300 HP and Kerrigan at 250 HP. One
 Marine remains at (190,534). The bank retains 300 minerals and
 300 gas, and the SRAM export is byte-identical. Two alternative
 longer moves stall or expose units to a hostile detour. The
 northern waypoint is the start of a five-order continuation through
 (215,400), (185,330), (230,280), (280,232) and (344,200). At frame
-16,671 six Marines have reached the final position with Kerrigan
-at 300 HP and Raynor at 250 HP. The seventh Marine stays at
+16,671 six Marines have reached the final position with Raynor
+at 300 HP and Kerrigan at 250 HP. The seventh Marine stays at
 (190,534), and all seven retain 40 HP. A separate HOME process
 restores the observed friendly roster, positions, health and
 300/300 bank with byte-identical SRAM.
@@ -923,6 +937,47 @@ nearby Vulture and loses the same Marine. At frame 22,304 Kerrigan,
 Raynor and the six surviving Marines are at full health. Fresh HOME
 restores their positions, the 300/300 bank and byte-identical SRAM.
 The Vulture is absent after reload. Recruitment and victory remain open.
+
+Short ordinary orders continue past the Wraith area and along the
+southern approach. A fresh HOME process restores frame 27,001
+around (1070,440) with both heroes at full health. All six
+remaining Marines survive, four wounded. The bank remains 300/300,
+and the SRAM export matches exactly. A farther branch reaches
+the (1289,434) area at frame 28,190 but loses two Marines and
+leaves Raynor at 134 HP. Recruitment is unobserved in that
+branch. The full-escort journal remains available.
+
+Focused attack orders clear two bunkers on a separate branch.
+The first falls at (1160,400) with all six Marines and both
+heroes alive. The independent replay matches the full result
+and exact SRAM at frame 27,325. A second engagement clears
+the bunker at (1272,384) and costs one wounded Marine.
+At frame 27,771, Kerrigan and Raynor retain full health, with
+five surviving Marines. Fresh HOME restores the observed
+positions and health and the exact SRAM. A third bunker and
+hostile units remain near the east corridor into the base.
+
+Raynor takes the east corridor into the base-entry rectangle and
+survives there. A fresh replay of the follow-up identifies Kerrigan
+by raw identity 16 and uses the explicit Move command to send her
+to (1376,240). At frame 30,681 the player roster grows from four to
+27 units and from zero to 19 buildings. The neutral unit count drops
+from 20 to zero. Kerrigan has 250 HP and Raynor 269 HP. Fresh HOME
+restores both heroes and the recruited roster with identical SRAM.
+An independent replay from the post-bunker save reproduces each
+of the four checkpoints and its SRAM.
+
+The recruited Factory accepts a paid Vulture order for 75
+minerals. The bank falls from 300 to 225. The unit finishes by
+frame 31,349 at 80 HP. Fresh HOME at frame 31,549 restores the
+unit, both heroes and the bank with byte-identical SRAM.
+
+The captured Starport at (1184,72) then queues a Wraith for
+150 minerals and 100 gas. The bank moves from 225/300 to 75/200.
+The new Wraith finishes with 120 HP by frame 32,826. The
+original recruited Wraith is still present. Fresh HOME
+restores both Wraiths, both heroes and the exact SRAM.
+The mission still needs a winning attack on the hostile base.
 
 ## Custom Game saves
 
@@ -1452,14 +1507,14 @@ quality on the GBA SP.
 | Terran chapter 5 screen transitions | `91317b3116e15d7d9b92626a37fd52af05cc6009a30a697319c490c9b30e2e17` |
 | Terran chapter 5 pause-corrected divergence | `19133241bc024bc6096a698611de030155e3c341679fb26105ea012e843835ab` |
 | Terran chapter 5 pause-corrected defeat | `5045cef4db7af2cd8c214745ef1761e011972a1266df7490112d6e5fe6606aea` |
-| Terran chapter 5 Raynor retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
+| Terran chapter 5 Kerrigan retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
 | Terran chapter 5 retreat with the older suffix | `99ecca6a4f17266c65ccafbf47d41b93cd5e6830adaa7ce71aaf1325b2ed3cad` |
 | Terran chapter 5 hero-safe local selection and order | `1848f80e7fe00f9d303bb853b661dd32add344459f56f878facaf4474a833698` |
 | Terran chapter 5 explicit Move with stalled hero waypoint | `b0a318d3447b14132d09f800c2602ff5ba28b7682100c973dc89a8f2fee06fb0` |
-| Terran chapter 5 earlier Kerrigan route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
-| Terran chapter 5 Kerrigan staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
+| Terran chapter 5 earlier Raynor route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
+| Terran chapter 5 Raynor staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
 | Terran chapter 5 both heroes healthy at frame 19,288 | `abd770a652624759162b89b7f73a5f5b07fd1723991baa5a8f7e5dda366dfee5` |
-| Terran chapter 5 direct recruitment approach | `c3dc75496ad1a132b8167009000f52b0a81e11f7306ba9c4921b2a66d24862bb` |
+| Terran chapter 5 Raynor entry-area approach | `c3dc75496ad1a132b8167009000f52b0a81e11f7306ba9c4921b2a66d24862bb` |
 | Terran chapter 5 seven-Marine early checkpoint | `11bb068c5d26f5dd67c45b311099e5bdf8a27b2601c68ddb6d03bfaab4c8786c` |
 | Terran chapter 5 short escort waypoints, frame 13,603 | `ecdfc1cbd05edfd866f9206329846f730980b5556da8cc62136c32b6ffe078e4` |
 | Terran chapter 5 escort fresh HOME reload and SRAM readback | `c4c78410820830d55d0de4e9d35dbeef53a41246f471612e8cbcd8fd8cad2336` |
@@ -1467,6 +1522,13 @@ quality on the GBA SP.
 | Terran chapter 5 five-order escort continuation and fresh HOME | `9a2a67c8895b07b99c6a8f3836675564fcf35ca1c050d7a82de246dee858fc6a` / `1bb601fef43f7b7cc99b1a4a5f7560f6b5ab03ca1cb3d7a441c636439adf2693` |
 | Terran chapter 5 south corridor continuation and fresh HOME | `dc814b7a03aa182c456fd1a53fda79271db261317b0a224c6164e0a20bc76a6a` / `5acc65e12322e807a3db8ef4742c2dbabb8615b52592db4ffa3761a8e7544d1e` |
 | Terran chapter 5 Vulture engagement and independent fresh HOME check | `cf09d3654cd0dc8991838856dc9370fa61ac8cfdebbabde9b14066de32663bfc` / `4c89607b5dca55c9d371970eb6ea03664784b9df0c791bdc460524e8943643c3` |
+| Terran chapter 5 south approach at frame 27,001 and fresh HOME | `eb7aef2e8afd2f9b36b4d0c741f0cf6003cce7ff19d13f833655e45d07765c69` / `b4e25c4f7ae7cd7993f1f635bc68e4ac594a836eecb08a42618ff8c6345c2998` |
+| Terran chapter 5 first bunker removal and fresh HOME | `8fa035f4d3b9eebe6c0c19099bc04a05f3caebab347dcfe97115fcbe37af255b` / `7a7fc9af1e06d8cb12f87d56ba552846a48b716be59b1cc702a4f593d76c2b61` |
+| Terran chapter 5 second bunker removal and fresh HOME | `f93a0deae5f9008a92097b6a32ac1b8581979df58b4ca56a2c120d7a8ee4ac1a` / `e254169bc8482e3aadce0e6f1a1022bcc7ae4cc0fe300979f50b526f4535fe21` |
+| Terran chapter 5 recruitment and fresh HOME actor and building checks | `6a23eddb9a52ff2c035670638a2aa669e4bffc16b6941c3e177a7abf3593ecd8` / `a3d5c5ff57357af597720ea42ffad5a80660f5460a3f91d5bb5efb537b7c88d6` |
+| Terran chapter 5 independent four-stage recruitment and fresh HOME | `31968bfc272f8faa187e28eddf086873bfd249ff5cdc22744bf8d362cb296b72` |
+| Terran chapter 5 paid Vulture and fresh HOME | `1da0fa927fc9f7f556b7a93ab54de12f3a8d5db7e51555e9cc585a37b8c44cbb` / `a2d875fc61f9563eab413c6988deeb93e888dfa3d6743f1c09784e1f1f9a08f8` |
+| Terran chapter 5 paid Wraith and fresh HOME | `98aa3f1d508177d0f03482756e63c36da1900df782dd1c5cc06253d7fd6aee4b` / `48a6f3878187a272f89e640c0471ca6ae554aa235b94ec1f6f42516d88ee4b30` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -1563,6 +1625,8 @@ quality on the GBA SP.
 | N64 Wasteland advisor activates five-of-ten Marine counter | `8f320c0688a82e90b457a56f4e991e43b3d85d919f5fea46abb27841c8367f76` |
 | N64 Wasteland reselects SCV after the Barracks completes | `0c3b4daaf35c04fad8835cc94115ae5b1d8665fe2ec92cbda115ed7b565bce99` |
 | N64 Wasteland mining resumes after the Barracks completes | `f0e9024b73022e629dd8e05dfd80f00c2276bb6ff69daa869b8c00927d51917f` |
+| N64 Wasteland first paid Marine and six-of-ten count | `c31ad1788d22f742d33233fcca8de0fa39e64843b3d6b0057d8d65deb9757c72` |
+| N64 Wasteland fresh six-Marine load and second paid Marine | `203a609a90089d60376da24517dd40cadfdb5679efb443ff0fc3af511c8be8c4` |
 | Exact KODAK Wasteland Barracks payment, completion and Marine queue | `a4ea776e6036165fa886abc96e0be45dff38b78a70dba3a0e845010f31af90b4` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
