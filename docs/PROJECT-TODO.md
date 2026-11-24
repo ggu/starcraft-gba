@@ -1816,10 +1816,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   completes, Kerrigan boards an Overlord, and fresh HOME restores
   the cargo. The [Z6 ferry and assault replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-ferry-and-mainland-assault)
   unloads her on the island at full health. A later fresh save
-  retains 25 Hydralisks near region 4. The subsequent strike leaves
-  one Photon Cannon there and Kerrigan at full health. Finish that
-  clearance, defeat the Force 2 defenders in region 5 and verify
-  victory. The T5 completion replay also remains open.
+  retains 25 Hydralisks near region 4. Reinforced attacks clear
+  the region by frame 63,540 with Kerrigan at full health. Defeat
+  the Force 2 defenders in region 5 and verify victory. The T5
+  completion replay also remains open.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)

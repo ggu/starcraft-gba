@@ -545,13 +545,20 @@ the boarded save match every world fingerprint and SRAM export.
 Another continuation from frame 34,450 sends 12 paid reinforcements
 to the existing force. The fresh frame-55,229 checkpoint retains 25
 Hydralisks near region 4 and Kerrigan at full health. Eight Force 2
-structures remain in region 4 at that checkpoint. Both regions and
-the victory journal remain open on the installed image. The next
+structures remain in region 4 at that checkpoint. The next
 concentrated attack brings region 4 down to one Photon Cannon and
 no Force 2 units. Fresh HOME restores that frame-57,403 checkpoint
 with two surviving Hydralisks, Kerrigan at 400 HP and identical SRAM.
 Region 5 retains 67 Force 2 units and 19 structures. All three
 reinforcement stages independently match their world and journal.
+
+Four more paid Hydralisks join the surviving air units and destroy
+the final Photon Cannon. The fresh frame-63,540 save has zero Force 2
+units or buildings in region 4, and Kerrigan still has 400 HP. The
+region 5 census remains at 67 Force 2 units and 19 buildings. Its
+clearance and the victory journal remain open.
+An independent replay matches both final controller segments and their
+SRAM journals.
 
 ### Wasteland opening on N64 and KODAK
 
@@ -1147,6 +1154,8 @@ quality on the GBA SP.
 | Zerg chapter 6 fresh region 4 and 5 census | `45d96017ef85d4803d30b3aa107f0ed4b5d884f7c0229dbd43bae00abf659ca6` |
 | Zerg chapter 6 reinforced attack and fresh one-cannon census | `d35d5dcba88744bb1a867d765e63a3418187bf32d370483268ef08345c1b4c75` |
 | Zerg chapter 6 independent three-stage reinforcement replay | `1a24cf08c260312e0b6b32ae3005ea3ce1cc0bbbe291dac3e901442ad463b9e4` |
+| Zerg chapter 6 complete region 4 clearance and fresh readback | `20fb9761e797f750a54099086ea1f8b8be9fa4438bd10fcbf3418b292023dba0` |
+| Zerg chapter 6 independent region 4 clearance replay | `e14fa4d1f5b0352e5601cd7fe7b3f28474192a6bfc17c59ffc99c12f651d502e` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
