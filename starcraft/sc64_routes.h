@@ -3196,19 +3196,27 @@ static void sc64_route_witness_store(int cell, int goal,
                            stats->path_steps : SC64_ROUTE_WITNESS_MAX_STEPS;
     /* The search stack runs from the root to the origin. Keep the edges
      * closest to the origin so the next request can use this witness. */
-    const u16 *near_origin = stats->path_stack + (stats->path_steps - steps);
+    const unsigned skipped_steps = stats->path_steps - steps;
     path->cell = (u16)cell;
     path->goal_and_signs = (u16)((unsigned)goal |
         (stats->x_step < 0 ? SC64_ROUTE_WITNESS_X_NEGATIVE : 0u) |
         (stats->y_sign < 0 ? SC64_ROUTE_WITNESS_Y_NEGATIVE : 0u));
     path->steps = (u8)steps;
     memset(path->vertical, 0, (steps + 7u) >> 3);
-    for (unsigned i = 0; i + 1u < steps; ++i)
-        if (near_origin[i] == SC64_PROBE_FINISHED)
+    if (stats->path_stack) {
+        const u16 *near_origin = stats->path_stack + skipped_steps;
+        for (unsigned i = 0; i + 1u < steps; ++i)
+            if (near_origin[i] == SC64_PROBE_FINISHED)
+                path->vertical[i >> 3] |= (u8)(1u << (i & 7u));
+        if (stats->last_vertical) {
+            unsigned last = steps - 1u;
+            path->vertical[last >> 3] |= (u8)(1u << (last & 7u));
+        }
+    } else {
+        unsigned first_vertical = stats->clear_horizontal > skipped_steps ?
+                                  stats->clear_horizontal - skipped_steps : 0;
+        for (unsigned i = first_vertical; i < steps; ++i)
             path->vertical[i >> 3] |= (u8)(1u << (i & 7u));
-    if (stats->last_vertical) {
-        unsigned last = steps - 1u;
-        path->vertical[last >> 3] |= (u8)(1u << (last & 7u));
     }
     if (sc64_route_witness.count < SC64_ROUTE_WITNESS_COUNT) ++sc64_route_witness.count;
     sc64_route_witness.next = (sc64_route_witness.next + 1u) % SC64_ROUTE_WITNESS_COUNT;

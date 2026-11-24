@@ -13,11 +13,14 @@ build/test-sc64-route-witness: $(ROUTE_MONOTONE_TEST_INPUTS) | build
 	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_WITNESS $< -o $@
 build/test-sc64-route-witness-active: $(ROUTE_MONOTONE_TEST_INPUTS) | build
 	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_WITNESS -DTEST_ACTIVE $< -o $@
+build/test-sc64-route-witness-clear-prefix: $(ROUTE_MONOTONE_TEST_INPUTS) | build
+	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_WITNESS -DTEST_ACTIVE -DTEST_CLEAR_PREFIX $< -o $@
 .PHONY: test-sc64-route-monotone
-test-sc64-route-monotone: build/test-sc64-route-monotone build/test-sc64-route-monotone-active build/test-sc64-route-monotone-partial build/test-sc64-route-witness build/test-sc64-route-witness-active
+test-sc64-route-monotone: build/test-sc64-route-monotone build/test-sc64-route-monotone-active build/test-sc64-route-monotone-partial build/test-sc64-route-witness build/test-sc64-route-witness-active build/test-sc64-route-witness-clear-prefix
 	./build/test-sc64-route-monotone
 	./build/test-sc64-route-monotone-active
 	./build/test-sc64-route-monotone-partial
 	./build/test-sc64-route-witness
 	./build/test-sc64-route-witness-active
+	./build/test-sc64-route-witness-clear-prefix
 test: test-sc64-route-monotone

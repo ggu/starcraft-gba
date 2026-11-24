@@ -126,7 +126,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   in [merged PR #802](https://github.com/ggu/starcraft-gba/pull/802) also
   matches 460,800 host comparisons and uses 24.62% fewer fixture
   cycles at `-O2` for the observed calls. Qualify the full race
-  runtime and its memory on both maps. The eight-entry exact
+  runtime and its memory on both maps.
+  The [clear-prefix dispatcher experiment](audits/2026-11-24-monotone-clear-prefix.md)
+  resumes the same search after the clear cells. It saves 3.38%
+  across the captured late Terran route calls and reduces frame
+  budget misses from 18 to 13 in the authored 280-update test.
+  Keep it opt-in until the intended race profiles pass busy
+  frame, save and memory checks.
+  The eight-entry exact
   endpoint cache simulation covers at most 0.20% of loop cycles in
   the expanded Terran Blood Bath window, before cache overhead.
   The opt-in [16-path continuation table](https://github.com/ggu/starcraft-gba/pull/805)
@@ -145,11 +152,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   save boundaries before enabling the cache. The preferred-L
   shortcut after slot and age checks reduces misses from 18
   to 13 with matching route counters on the authored aging
-  workload. Prioritize a separate live-slot, recency and
-  fallback test with the shortcut before considering activation.
-  The 99 new endpoints that continue an earlier path account for
-  7.07% of loop cycles. Verify reuse with the existing route-slot
-  precedence, aging, and grid invalidation before activation.
+  workload. The [combined dispatcher test](audits/2026-10-29-monotone-route-step/README.md#clear-prefix-and-retained-path-comparison)
+  verifies real retained-path hits, exact and nearby point fields,
+  depot hits, recency rollover and grid invalidation. Both flags
+  also match the authored ARM frame trace. The clear prefix alone
+  achieves the same 13 budget misses and adds no working RAM in
+  that scene. Qualify it first on the busy race cartridges, then
+  measure whether a 360-byte table warrants the added state there.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
@@ -1758,8 +1767,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
   Z2 and all ten Protoss chapters also win on the exact images.
-  Z1 adds a verified continuation from an earlier-release pause,
-  bringing the exact-package victory count to 21 of 30. P4 also
+  Z1 adds a verified continuation from an earlier-release pause.
+  Z3 wins after a paid economy and independently replayed assaults,
+  bringing the exact-package victory count to 22 of 30. P4 also
   passes fresh field and victory save reloads.
   An ordinary T5 retreat keeps Raynor at full health through
   frame 129,658. Local box
@@ -1788,16 +1798,39 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   25 hostile buildings left. A separate staging branch reaches
   a completed Lair and Spire, two Drones on gas, 20 Hydralisks
   and five Mutalisks by frame 31,682. Its fresh load restores
-  the full staging force and intact Chrysalis. Build a stronger
-  air force from that checkpoint, then verify victory on the exact ROM.
+  the full staging force and intact Chrysalis. Three gas Drones
+  bring the force to 12 Mutalisks. A concentrated push removes
+  two turrets with all 19 Hydralisks and 12 Mutalisks still alive
+  at the fresh frame-48,118 checkpoint. A branch that keeps the
+  ground force near the base clears three buildings and an
+  exposed tank with 18 Mutalisks. The fresh frame-55,138 save
+  retains all 18 Hydralisks, 18 Mutalisks and the intact Chrysalis.
+  The next seven replayed segments reduce the hostile buildings
+  from 23 to nine. A Hydralisk intercepts a Marine at the base
+  with the Chrysalis at 170 HP. The recovered frame-64,819
+  save reloads with three hostile buildings still standing.
+  Combined ground and air orders win at frame 68,639 with the
+  Chrysalis alive at 170 HP. Fresh HOME restores the result and
+  the Z4 briefing deploys through ordinary input. A read-only trace
+  identifies the intervening pause-save rejection at frame
+  64,486 as a 12-impact volley against the eight-impact journal
+  limit. Qualify combat saves beyond that limit without losing
+  pending projectile outcomes or older journals.
+  [Z4's installed-ROM replay](audits/2026-11-24-kodak-package-checks.md#zerg-4-victory-and-zerg-5-deployment)
+  hatches the Chrysalis, completes paid air production and wins at
+  frame 47,951 with Kerrigan alive. The victory loads byte for byte
+  and Z5 deploys from HOME. The package now has 23 of 30 verified
+  victories. Continue with Z5 and the remaining T5 replay.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
-  retains the earlier crossing. Bring the five SCVs to the
-  mineral field, verify a Barracks and Marine production, and
-  qualify the native win and mission unlock.
+  retains the earlier crossing. The next native save fresh-loads
+  a 60-health SCV moved to the rocky pass. A subsequent run
+  reselects it and moves it farther south. The cursor over a
+  mineral patch shows B Harvest. Verify delivery and a fresh save,
+  then a Barracks, Marine production, the native win and mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

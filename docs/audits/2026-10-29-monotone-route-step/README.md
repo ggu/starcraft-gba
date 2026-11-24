@@ -445,3 +445,37 @@ resident route-field builds or hits.
 | Paired game loop with route request aging | `3d63b6770ea06c81b4e0fc7e7be26b574a4bf9325f7dd7cc8cdce35aa5565f9b` |
 | Preferred-L experiment with zero prefix admissions | `a82cfc684980ccc1d5a9ccf24d3db2d53fa77fadcf4865f7ea005e39edaacdb6` |
 | Preferred-L experiment after slot and clock checks | `266a3c1bf98a99c9e0b589eb05f388b3c9bd39881bf083dffceef300217cf12a` |
+
+### Clear-prefix and retained-path comparison
+
+The clear-prefix probe and retained-path table can be enabled independently
+or together. When a clear L succeeds, the combined path records the length
+of its horizontal run. The table copies that run and the following vertical
+run only when admitting a path. Obstructed searches retain the ordinary
+DFS stack. Both encodings preserve edge order when the retained path is cut
+to its last 112 steps toward the origin.
+
+The combined sanitizer fixture drives the public dispatcher with a retained
+path, a depot hit, a nearby point field and an exact field. The normal field
+builds on recency rollover. A world reset empties the table, and closing and
+reopening a cell on the path each invalidate witnesses before the next
+dispatch. The topology checks use a synthetic grid rebuild callback.
+
+An ARM replay compares four variants of the authored 280-update race scene
+with route aging and two actual building placements. Every variant matches
+actor state, walkability, route clock and counters, both display pages and
+palette in every sample. Point and depot slot validity, roots and ages also
+match. Both table variants fill all 16 entries and have byte-identical
+retained-path state across all samples.
+
+| Opt-in features | Mean simulation cycles | Frame p95 cycles | Frames above two VBlanks | BSS change |
+| --- | ---: | ---: | ---: | ---: |
+| Neither | 240,905 | 581,253 | 18 | 0 B |
+| Clear prefix | 229,195 | 561,393 | 13 | 0 B |
+| Retained paths | 237,586 | 582,461 | 18 | +360 B |
+| Both | 229,023 | 561,393 | 13 | +360 B |
+
+The clear prefix covers most of the improvement in this scene. Qualify it
+first on the busy Terran, Zerg and Protoss windows. The combined option
+still needs exact-product timing, memory and fresh SRAM replays. Local ARM
+receipt SHA-256 `16aa76820fcfaf17aa8af99c1209a62b7c5ac9a3811f3063825f8485fe73e37a`.
