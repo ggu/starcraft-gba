@@ -19,7 +19,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Busy match pacing.** The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
+- **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
+  start at 29.85–29.92 emulated updates/s across six three-CPU cases
+  and fall to 14.14–17.90 in the last measured window. Every sampled
+  busy update exceeds two VBlanks. The exact Protoss 10 late sample
+  spends 396,340 guest cycles per update on depth-ordered actor
+  drawing and 152,204 on movement orders. Prioritize those paths for
+  the race cartridges.
+  [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
+  put late one-CPU Blood Bath near 30 emulated updates/s. Late
+  one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
+  update exceeds two VBlanks. Preserve the one-CPU
+  pacing while tracking both maps at two and three CPUs.
+  [Late moving-camera pairs](audits/2026-11-24-kodak-package-checks.md#late-camera-movement)
+  cover all six three-CPU configurations. Mean cycle changes span
+  −3.75% to +4.92% with matching sampled world state. Every fixed
+  and moving update still exceeds two VBlanks, so keep busy field
+  and simulation costs ahead of camera-specific changes.
+  The [shared contact scan draft](https://github.com/ggu/starcraft-gba/pull/799)
+  saves 1.80% in a synthetic ARM7 traversal while matching all returned
+  masks. Qualify full race and Showcase frame timing before integration.
+  The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
   peak rises 0.30%. The [shared Custom Game defense pass](audits/2026-11-21-custom-defense-cells.md)
@@ -1656,6 +1676,46 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   builds, and qualify full pools, older journals and hardware before
   activation. Keep roster and saved IDs stable.
 
+- **KODAK delivery (2026-11-24):** the four verified `1f0ad66e`
+  race and Showcase ROMs are on the card under
+  `Games/Development/StarCraft-2026-11-24`. The
+  [exact-package checks](audits/2026-11-24-kodak-package-checks.md)
+  verify 1,134 normal-button Custom Game launches spanning both
+  maps, every player race and every explicit one-to-three CPU
+  lineup. All 30 campaign entries and eight Showcase scenes start.
+  Thirty-six early Custom Game fresh saves load and match
+  continuation. Six late three-CPU saves on both maps and all
+  race cartridges also match uninterrupted play for 180 updates.
+  Twenty-seven cases with Random seats preserve resolved races,
+  rows and starts through fresh HOME load and pause restart.
+  T1–T4 and T6–T10 win through ordinary inputs on the exact
+  Terran image, including fresh mid-mission and victory loads.
+  Z2 and all ten Protoss chapters also win on the exact images,
+  for 20 of 30 missions overall. P4 also passes fresh field and
+  victory save reloads.
+  An ordinary T5 retreat keeps Raynor at full health through
+  frame 129,658. Local box
+  selection moves Marines with both heroes excluded. An explicit
+  Move near input call 22,000 stalls. Redirecting Kerrigan around
+  call 12,000 takes her to (856,398). A separate empty-ground order
+  moves Raynor away from his previous target. Both retain 294 and 250 HP
+  respectively through frame 19,288. The branch has only the two
+  heroes and still needs a full win. A direct approach also enters
+  the recruitment zone, where Kerrigan dies before reinforcement.
+  Preserve enough of the allied force for a protected approach.
+  The same audit records fresh N64 reset replays of the two-slot
+  Challenger and four-slot Blood Bath Melee lobbies, plus the
+  Wasteland opening bank and five-Marine R selection on both systems.
+  [The last open CPU edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
+  matches in both Blood Bath modes on N64 and all three race ROMs.
+  Wider campaign wins, deeper load checkpoints and GBA SP timing
+  remain open for this package.
+  [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
+  leaves 1.96–2.81 MiB per race cartridge for all future content.
+  The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
+  2.09 MiB for the opening animation, palettes and music. Short
+  full-motion playback needs a benchmark on GBA SP.
+
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to
   `Games/Development/StarCraft-2026-11-13`. All four 32 MiB files were
@@ -1759,6 +1819,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   separate qualification. The [ordinary-profile Blood Bath preview](audits/2026-11-12-skirmish-seat-options.md#ordinary-four-profile-blood-bath-preview)
   matches the last-open CPU edit and passes 24 physical same-build checks
   and 20 cross-build checks. The old ROMs reject Melee saves as intended.
+  The [November 24 delivery rechecks the last-row edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
+  through ordinary inputs in both Blood Bath modes on both systems.
   The [November 18 Terran terminal pair](audits/2026-11-12-skirmish-seat-options.md#current-terran-arm-terminal-and-save-checks)
   reaches identical defeats from HOME and fresh SRAM within each mode. Two
   human survivors keep their owner on GBA. Keep the flag off while active
@@ -3217,7 +3279,7 @@ AI wallets and full-match behavior remain unverified.
 | [#146](https://github.com/ggu/starcraft-gba/pull/146), fog | Finished as [#381](https://github.com/ggu/starcraft-gba/pull/381) (merged with the current base, memory/VRAM ownership re-derived, ARM cost cut from about +33% to about +3.2%, pixel and simulation-identity checks). Open: the 1% cost aim, native preview, hardware check. |
 | [#315](https://github.com/ggu/starcraft-gba/pull/315), late-Zerg packed grid | Merged as `738223a4`; scoped tests and emulator timing are recorded above. The later #323 package retains this capability, with a different binary; its speed has not been remeasured. Strict current Z7 winning validation, broader campaign/skirmish and hardware qualification remain open. |
 | [#318](https://github.com/ggu/starcraft-gba/pull/318), research journal groundwork | Merged as `f34004af`, default-off. Full default suite and current flag-off composition passed; feature-on current-base and functional research qualification remain open. The default-off groundwork alone did not change package bytes; #323 is included in the newer normal package. |
-| SD delivery | The November 13 KODAK folder holds verified T10, Z10, P10 and Showcase builds from runtime `cbba1c5`. Their card files match the local SHA-256 values; older ROMs and saves remain available under their original filenames. |
+| SD delivery | The November 24 KODAK folder holds verified T10, Z10, P10 and Showcase builds from runtime `1f0ad66e`. The [exact-package checks](audits/2026-11-24-kodak-package-checks.md) cover campaign and Showcase starts, custom lineups and early custom fresh saves. |
 
 ## Verification and maintenance
 
