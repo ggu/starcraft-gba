@@ -25,6 +25,11 @@ static inline unsigned sc64_route_probe_col(unsigned cell, unsigned cols, unsign
     return cell - row * cols;
 }
 
+#if defined(SC64_ROUTE_MONOTONE_CLEAR_PREFIX) && !defined(SC64_ROUTE_MONOTONE_WITNESS_ENABLED) && \
+    !defined(SC64_ROUTE_MONOTONE_DIAGNOSTICS)
+#define SC64_ROUTE_MONOTONE_CLEAR_PREFIX_ENABLED 1
+#endif
+
 static int __attribute__((noinline))
 sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
                           int cells, u16 *scratch, unsigned scratch_bytes,
@@ -86,6 +91,30 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
         if (stack_offset > scratch_bytes) return SC64_ROUTE_PROBE_UNSUPPORTED;
         stack_capacity = (scratch_bytes - stack_offset) / sizeof(u16);
         if (stack_capacity < (unsigned)min_distance + 1u) return SC64_ROUTE_PROBE_UNSUPPORTED;
+#ifdef SC64_ROUTE_MONOTONE_CLEAR_PREFIX_ENABLED
+        unsigned prefix_x = 0, prefix_y = 0;
+        if (distance > 0 && stats->nodes <= budget &&
+            (unsigned)distance <= budget - stats->nodes) {
+            while (prefix_x < horizontal && SC64_GRID_GET(walkable, cell + x_step)) {
+                cell += x_step;
+                ++prefix_x;
+            }
+            if (prefix_x == horizontal) {
+                while (prefix_y < vertical && SC64_GRID_GET(walkable, cell + y_step)) {
+                    cell += y_step;
+                    ++prefix_y;
+                }
+                if (prefix_y == vertical) {
+                    *predecessor = origin - (vertical ? y_step : x_step);
+                    stats->nodes += (unsigned)distance;
+                    stats->candidates += (unsigned)distance;
+                    stats->memo_checks += (unsigned)distance - 1u;
+                    ++stats->seeds_tried;
+                    return 1;
+                }
+            }
+        }
+#endif
         stack = (u16 *)(void *)((u8 *)(void *)scratch + stack_offset);
         memset(failed, 0, bit_bytes);
         stats->memo_clear_bytes += bit_bytes;
@@ -98,7 +127,21 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
         }
         /* Bitmap coordinates count steps remaining toward the origin.
          * The parent's phase identifies the edge to undo on backtracking. */
-        stack[0] = TRY_BOTH;
+#ifdef SC64_ROUTE_MONOTONE_CLEAR_PREFIX_ENABLED
+        /* Resume the exact DFS at the obstruction with the same ancestor
+         * phases. The clear prefix has not read or written the memo. */
+        for (unsigned i = 0; i < prefix_x; ++i) stack[i] = TRY_VERTICAL;
+        unsigned prefix = prefix_x + prefix_y;
+        for (unsigned i = prefix_x; i < prefix; ++i) stack[i] = FINISHED;
+        depth += prefix;
+        horizontal -= prefix_x;
+        vertical -= prefix_y;
+        local -= prefix_x + prefix_y * width;
+        stats->nodes += prefix;
+        stats->candidates += prefix;
+        stats->memo_checks += prefix;
+#endif
+        stack[depth - 1] = TRY_BOTH;
         while (depth) {
             unsigned top = depth - 1u;
             unsigned phase = stack[top];
