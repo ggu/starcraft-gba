@@ -84,48 +84,70 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         for (int tx = wx0 >> 4; whole && tx <= wx1 >> 4; ++tx)
             whole = currently_visible(tx * 16, ty * 16);
 
-    if (whole && !reverse) {
-        const uint8_t *rect_src = frame_pixels +
-            (unsigned)(sy0 - top) * r->width;
-        sc64_weapon_source_vfx_blit_rect(r, left, sy0, r->width,
-                                         sy1 - sy0, rect_src);
+    if (whole) {
+        if (!reverse) {
+            const uint8_t *rect_src = frame_pixels +
+                (unsigned)(sy0 - top) * r->width;
+            sc64_weapon_source_vfx_blit_rect(r, left, sy0, r->width,
+                                             sy1 - sy0, rect_src);
+        } else {
+            for (int sy = sy0; sy < sy1; ++sy) {
+                const uint8_t *row_src = sc64_weapon_source_vfx_row(
+                    frame_pixels, r->width, sy - top, 1, reversed);
+                sc64_weapon_source_vfx_blit_rect(r, left, sy, r->width, 1, row_src);
+            }
+        }
         return;
     }
 
-    for (int sy = sy0; sy < sy1; ++sy) {
-        const uint8_t *row_src = sc64_weapon_source_vfx_row(
-            frame_pixels, r->width, sy - top, reverse, reversed);
-        int col = 0;
-        if (whole) {
-            sc64_weapon_source_vfx_blit_rect(r, left, sy, r->width, 1, row_src);
-            col = r->width;
-        }
-        while (col < r->width) {
-            int wx = left + col + camx;
-            int wy = sy + camy - 12;
-            if (wx < 0 || wx >= MAP_COLS * 16 || wy < 0 ||
-                wy >= MAP_ROWS * 16) {
-                ++col;
-                continue;
+    int first = wx0 < 0 ? -wx0 : 0;
+    int last = (int)r->width;
+    if (left + first < 0) first = -left;
+    if (left + last > 240) last = 240 - left;
+    if (wx0 + last > MAP_COLS * 16) last = MAP_COLS * 16 - wx0;
+    if (first >= last) return;
+
+    /* A width of at most 256 can cross 17 tiles, giving at most nine
+     * separate visible runs. Visibility is shared by a whole tile row. */
+    struct { uint16_t first, last; } runs[9];
+    for (int sy = sy0; sy < sy1;) {
+        int wy = sy + camy - 12;
+        int end = sy + 16 - (wy & 15);
+        if (end > sy1) end = sy1;
+        unsigned count = 0;
+        int previous_visible = 0;
+        if ((unsigned)wy < (unsigned)MAP_ROWS * 16u) {
+            for (int col = first; col < last;) {
+                int wx = wx0 + col;
+                int next = col + 16 - (wx & 15);
+                if (next > last) next = last;
+                int visible = currently_visible(wx, wy);
+                if (visible) {
+                    if (!previous_visible) runs[count++].first = (uint16_t)col;
+                    runs[count - 1].last = (uint16_t)next;
+                }
+                previous_visible = visible;
+                col = next;
             }
-            if (!currently_visible(wx, wy)) {
-                /* Visibility is tile-wide. Skip the remaining pixels in this
-                 * hidden tile, while keeping the source column aligned. */
-                int hidden = 16 - (wx & 15);
-                if (hidden > (int)r->width - col)
-                    hidden = (int)r->width - col;
-                col += hidden;
-                continue;
-            }
-            /* Bound each blit to one tile so unseen neighboring tiles never
-             * leak through a partially visible projectile or impact. The
-             * starting coordinate was checked above; visibility is tile-wide. */
-            int run = 16 - (wx & 15);
-            if (run > (int)r->width - col) run = (int)r->width - col;
-            sc64_weapon_source_vfx_blit_rect(r, left + col, sy, run, 1,
-                                             row_src + col);
-            col += run;
         }
+        if (count == 1 && !reverse && runs[0].first == 0 &&
+            runs[0].last == r->width) {
+            const uint8_t *rect_src = frame_pixels +
+                (unsigned)(sy - top) * r->width;
+            sc64_weapon_source_vfx_blit_rect(r, left, sy, r->width,
+                                             end - sy, rect_src);
+        } else if (count) {
+            for (int row = sy; row < end; ++row) {
+                const uint8_t *row_src = sc64_weapon_source_vfx_row(
+                    frame_pixels, r->width, row - top, reverse, reversed);
+                for (unsigned i = 0; i < count; ++i) {
+                    int col = runs[i].first;
+                    sc64_weapon_source_vfx_blit_rect(r, left + col, row,
+                        runs[i].last - col, 1, row_src + col);
+                }
+            }
+        }
+        sy = end;
     }
 }
 
