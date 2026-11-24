@@ -11633,7 +11633,8 @@ draw_minimap(void)
 {
 #if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
     int x, y, i;
-    const int map_x = 197, map_y = 129, map_size = 24;
+    enum { map_size = 24 };
+    const int map_x = 197, map_y = 129;
 #else
     int row, col, x, y, i;
 #endif
@@ -11665,10 +11666,14 @@ draw_minimap(void)
 #elif defined(SC_FRONTIER_FACTION)
     frontier_minimap_draw_terrain(map_x, map_y);
 #elif defined(SC_ORIGINAL_SKIRMISH)
+    /* Column samples are independent of the row; compute each only once. */
+    int sample_col[map_size];
+    for (int col = 0; col < map_size; col++)
+        sample_col[col] = (2 * col + 1) * MAP_COLS / (2 * map_size);
     for (int row = 0; row < map_size; row++) {
         int grid_row = (2 * row + 1) * MAP_ROWS / (2 * map_size);
         for (int col = 0; col < map_size; col++) {
-            int cell = grid_row * MAP_COLS + (2 * col + 1) * MAP_COLS / (2 * map_size);
+            int cell = grid_row * MAP_COLS + sample_col[col];
             if (SC64_GRID_GET(visible, cell))
                 gfx_pixel(map_x + col, map_y + row, C_GRASS);
             else if (SC64_GRID_GET(explored, cell))

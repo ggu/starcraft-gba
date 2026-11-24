@@ -101,6 +101,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 552 guest cycles for five minerals and two geysers in an
   authored ARM batch with the production heap. Measure the same
   change with imported sprites and the full actor roster.
+  [Authored minimap sampling and target ranking](audits/2026-11-24-authored-minimap-target.md)
+  save 8.17–9.48% mean frame cycles in two 600-update ARM replays.
+  The race engine uses its own minimap raster and indexed target
+  queries. The exact KODAK Protoss 10 sample takes 152 indexed
+  queries and zero fallback scans in four late three-CPU updates.
+  Prioritize draw and movement costs measured on the race path.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
