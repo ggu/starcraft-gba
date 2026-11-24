@@ -179,3 +179,23 @@ race-cartridge RAM and timing qualification remain open.
 | --- | --- |
 | Production wait states | `096a6ced99d4361f90681cdebdccf50367c272e924998db7524f7171d06778a7` |
 | Reset wait states | `f81e50522bafd76ce187c81767314668376e3d7fba0751e0d894ce19e7f57878` |
+
+### Shared dispatcher comparison
+
+On source release `369b6008`, the original and incremental probes
+run behind the same shared dispatch with sanitizers. Two packed-grid
+configurations exercise active stride with and without retaining
+fields across topology changes. Each runs 321,445 queries on
+authored maps with blocked cells, edited terrain, rotating goals
+and cache eviction. Both builds pass the independent FIFO oracle.
+Each pair produces byte-identical semantic cache-state traces and
+identical rebuild counts. The archived comparison covers 642,890
+dispatch samples and has SHA-256
+`512730c1ddefbc8cf249467563d37a1e64dbcfac9e33a9e913d79ed78570e49f`.
+
+The [paired observed-query replay](../2026-11-24-kodak-package-checks.md#paired-arm-replay-of-observed-route-queries)
+matches the original cartridge response on all 277 inputs and
+saves 24.62% of ARM fixture cycles at `-O2`. The changed function
+adds no persistent state. Together the dispatch and ARM checks
+qualify the source change. Full race-cartridge RAM and pacing,
+including timing on GBA SP, still need a paired release test.
