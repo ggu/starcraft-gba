@@ -30,8 +30,7 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
     !defined(SC64_ROUTE_PARTIAL_FLOOD)
 #define SC64_ROUTE_MONOTONE_ENABLED 1
 #endif
-/* Cached range reads can reuse the oracle without changing point movement. */
-#if defined(SC64_ROUTE_MONOTONE_ENABLED) || defined(SC64_ROUTE_POINT_FAR_READ)
+#ifdef SC64_ROUTE_MONOTONE_ENABLED
 #include "sc64_route_monotone_probe.h"
 #endif
 #if defined(GBA_HOST) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
@@ -125,9 +124,8 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #if defined(SC64_ROUTE_POINT_WARM_BLOCKED_GAP_PROBE) && !defined(SC64_ROUTE_POINT_COLD_CERTIFICATE)
 #error "the blocked-goal retry requires deferred point certificates"
 #endif
-#if defined(SC64_ROUTE_POINT_FAR_READ) && (!defined(SC64_ROUTE_POINT_COLD_CERTIFICATE) || \
-    !defined(SC64_RANGE_WORK))
-#error "far point reads require deferred point fields and range work"
+#ifdef SC64_ROUTE_POINT_FAR_READ
+#error "SC64_ROUTE_POINT_FAR_READ was removed: weapon-range movement no longer reads cached fields"
 #endif
 #if defined(SC64_ROUTE_POINT_COMPONENT_PROBE) && !defined(SC64_ROUTE_POINT_PREFIX_PROBE)
 #error "point component witnesses require resumable point prefixes"
@@ -164,7 +162,14 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #endif
 #ifdef SC64_RACES
 /* Fields the bank holds when each one is sized for the largest map. */
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_ROUTE_FIXED_SLOTS)
+/* A build may set the field count; it changes speed and memory, not play.
+ * Range work borrows two planes and pins a copy and a snapshot, so ordinary
+ * routing keeps at least two fields of its own. */
+#if SC64_ROUTE_FIXED_SLOTS < 6 || SC64_ROUTE_FIXED_SLOTS > 56
+#error "SC64_ROUTE_FIXED_SLOTS must be between 6 and 56"
+#endif
+#elif defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_ROUTE_FIXED_SLOTS 14
 #elif defined(SC64_LARGE_MAPS)
 #ifdef SC64_ROUTE_PACK3
@@ -2593,7 +2598,11 @@ sc64_route_slot(int goal)
     active_slots = SC64_ROUTE_ACTIVE_SLOTS;
     for (i = 0; i < active_slots; i++) {
 #ifdef SC64_RANGE_WORK
-        if (i == sc64_range_route_copy_slot) continue;
+        /* The completed range snapshot is pinned like the copy in progress:
+         * if ordinary requests could evict it, its lifetime and so range
+         * movement would follow the cache size. */
+        if (i == sc64_range_route_copy_slot ||
+            i == sc64_range_route_snapshot_slot) continue;
         if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
             sc64_route_goal[i] == goal) {
 #else
@@ -3049,67 +3058,6 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
     }
     if(best<0)return 0;
     *out_col=col+dx[best];*out_row=row+dy[best];
-    return 1;
-}
-#endif
-
-#if defined(SC64_RANGE_WORK) && defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
-#ifdef SC64_ROUTE_POINT_FAR_READ
-#include "sc64_route_point_far_read.h"
-#endif
-/* Read an existing point slot without touching its recency. A stale or
- * deferred field can require exact materialization. */
-static int __attribute__((noinline))
-sc64_range_cached_point_step(int x, int y, int tx, int ty, int *nx, int *ny)
-{
-    int col, row, goal, cell, slot = -1, direction;
-    if (!path_grid_valid || x < 0 || y < 0 || tx < 0 || ty < 0 ||
-        x >= MAP_COLS * 16 || y >= MAP_ROWS * 16 ||
-        tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16) return 0;
-#ifdef SC64_ROUTE_ACTIVE_STRIDE
-    if (!sc64_route_configure()) return 0;
-#endif
-    col = x / 16; row = y / 16; cell = col + row * MAP_COLS;
-    goal = tx / 16 + (ty / 16) * MAP_COLS;
-    for (int i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i) {
-        if ((sc64_route_valid[i] != 1 && sc64_route_valid[i] != 2) ||
-            sc64_route_goal[i] != (u16)goal) continue;
-#ifdef SC64_ROUTE_PARTIAL_FLOOD
-        if (sc64_route_valid[i] == 2 &&
-            !sc64_route_origin_ready(i, cell, SC64_GRID_GET(path_walkable, cell)))
-            continue;
-#endif
-        slot = i; break;
-    }
-    if (slot < 0) return 0;
-#ifdef SC64_ROUTE_POINT_FAR_READ
-    if (!SC64_ROUTE_LAZY(slot) && sc64_point_prefix_find(slot) &&
-        sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
-        sc64_point_far_read(cell, goal, &direction)) goto point_direction;
-#endif
-#ifdef SC64_ROUTE_POINT_PREFIX_PROBE
-    sc64_point_prefix_require(slot, cell);
-#endif
-#ifdef SC64_ROUTE_KEEP_FIELDS
-    if (SC64_ROUTE_LAZY(slot) &&
-        (!SC64_GRID_GET(path_walkable, cell) || !sc64_route_gate(slot, cell, goal)))
-        sc64_route_exact(slot);
-#endif
-    direction = sc64_route_get(slot, cell);
-#ifdef SC64_ROUTE_POINT_FAR_READ
-point_direction:
-#endif
-    if (direction == SC64_ROUTE_UNREACHABLE && !SC64_GRID_GET(path_walkable, cell)) {
-        if (!sc64_route_blocked_start(slot, col, row, goal, &col, &row)) return 0;
-    } else if (direction == SC64_ROUTE_UNREACHABLE) return 0;
-    else if (direction == 0) { *nx = tx; *ny = ty; return 1; }
-    else if (direction == 1) ++col;
-    else if (direction == 2) --col;
-    else if (direction == 3) ++row;
-    else if (direction == 4) --row;
-    else return 0;
-    if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) return 0;
-    *nx = col * 16 + 8; *ny = row * 16 + 8;
     return 1;
 }
 #endif
@@ -3713,7 +3661,8 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     active_slots = SC64_ROUTE_ACTIVE_SLOTS;
     for (i = 0; i < active_slots; ++i) {
 #ifdef SC64_RANGE_WORK
-        if (i == sc64_range_route_copy_slot) continue;
+        if (i == sc64_range_route_copy_slot ||
+            i == sc64_range_route_snapshot_slot) continue;
         if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
             sc64_route_goal[i] == key) {
 #else

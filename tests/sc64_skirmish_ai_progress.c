@@ -15,6 +15,13 @@
 #endif
 
 static u16 previous;
+/* TRACE_OUT=FILE: after every update that starts in PLAY (including the one
+ * that ends the match), append the world digest and every live unit's
+ * movement plan, so two builds can be compared update by update. */
+static FILE *trace_out;
+static int trace_failed;
+static uint32_t world_hash(void);
+static void trace_update(void);
 /* --mirror: a HOST fixture, not ordinary play. The human owner is planned by
  * the same planner as the opponents, on an update no opponent uses, so a
  * match runs to the engine's own victory or defeat with every owner paying
@@ -386,8 +393,10 @@ static void input(u16 held)
         mirror_resume_cargo();
         race_ai_plan(SIDE);
     }
+    int traced = trace_out && screen == SCREEN_PLAY;
     game_update(held, held & (u16)~previous);
     previous = held;
+    if (traced) trace_update();
     if (audit_control >= 0 && ledger.on && frame == AUDIT_CONTROL_FRAME) audit_control_inject();
     if (ledger.on) audit_after();
 }
@@ -657,6 +666,17 @@ static uint32_t world_hash(void)
     return h;
 }
 
+static void trace_update(void)
+{
+    uint32_t h = world_hash();
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        const Unit *q = &u[i];
+        if (!q->alive) continue;
+        h = hash_word(h, (uint32_t)q->path_x); h = hash_word(h, (uint32_t)q->path_y);
+        h = hash_word(h, (uint32_t)q->path_timer); h = hash_word(h, (uint32_t)q->path_retry);
+    }
+    if (fwrite(&h, sizeof(h), 1, trace_out) != 1) trace_failed = 1;
+}
 static void run_ticks(int ticks, int every, FILE *out)
 {
     for (int t = 0; t < ticks && screen == SCREEN_PLAY && !won && !lost; ++t) {
@@ -2129,6 +2149,7 @@ int main(int argc, char **argv)
         else { fprintf(stderr, "unknown argument %s\n", argv[i]); return 2; }
     }
     if (audit_control < -1 || audit_control > 1) return 2;
+    if (getenv("TRACE_OUT") && !(trace_out = fopen(getenv("TRACE_OUT"), "wb"))) return 2;
     launch(map, human, bots, races);
     if (recover >= 0) return recovery(recover) ? 0 : 7;
     if (morph >= 0) return morph_hp(morph) ? 0 : 8;
@@ -2153,6 +2174,7 @@ int main(int argc, char **argv)
         audit_start();
         run_ticks(ticks, every, stdout);
         snapshot(stdout, "final");
+        if (trace_out && (fclose(trace_out) != 0 || trace_failed)) return 2;
         if (getenv("AI_DEBUG")) {
             for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive)
                 fprintf(stderr, "B%d o%d raw%d %d,%d hp%d uc%d\n", i, b[i].owner, sc64_race_raw_building(b[i].type), b[i].x, b[i].y, b[i].hp, b[i].under_construction);
