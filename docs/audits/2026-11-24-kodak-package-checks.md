@@ -619,6 +619,30 @@ Ordinary buttons reach the Zerg 7 briefing and deploy mission 18
 at frame 1 with zero unsupported-mission faults. This brings the
 installed package to 25 of 30 verified wins.
 
+### Zerg 7 guarded opening and production
+
+Starting with the independently verified Z6 victory journal, ordinary
+HOME inputs deploy Z7 and save at frame 11. In one branch, a paid
+Hatchery at (1120,1680) finishes with 161 HP under attack. A separate
+branch places the same Hatchery, then selects the opening 12 fighters
+with R and orders them to defend near (1080,1688). The Hatchery
+finishes at 1,250 HP by frame 2,696.
+
+Training more Drones raises the live worker count to six by frame
+4,405. The full-health Hatchery and its eight Hydralisks and four
+Mutalisks survive. One Drone collects minerals and the bank reads
+372 minerals and 200 gas. Three independent ordinary-input stages
+match the world fingerprint and SRAM. Fresh HOME restores the
+worker roster and bank with byte-identical SRAM.
+
+The next paid construction and morph sequence completes a Spawning
+Pool, Lair and Hydralisk Den. The fresh frame-9,640 checkpoint
+retains eight Hydralisks, four Mutalisks and five Drones. The Lair
+has 1,800 HP, the Den 850 and the Pool 750. The bank is 242 minerals
+and 50 gas. All three technology stages also match their world and
+SRAM in an independent replay. A nearby gas supply is the next
+milestone for sustained production and the approach to the objective.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -741,6 +765,31 @@ pause save at frame 6,274 loads through HOME with the same frame,
 bank and five worker records. The fresh export is byte-identical.
 The bank rises to 463 after 60 more neutral updates.
 
+#### Wasteland Barracks construction
+
+The N64 SCV opens a three-by-three Build grid with C-Left. A left
+stick input highlights the Barracks at 150 minerals. The selected
+SCV can place a green footprint near the mineral line. After A
+confirms the site, the bank drops from 160 to 10 and a foundation
+appears by emulator step 8,535. The frame at 11,035 shows additional
+building sections and an active progress bar. The run exits with
+the original FlashRAM intact. A second ordinary run saves the
+active construction into the first slot and exits successfully with
+a changed FlashRAM export. The final frame still shows the foundation
+and its SCV at 10 minerals. A fresh first-slot load restores that
+construction and advances with neutral inputs. By step 9,120,
+the Barracks is complete and the advisor prompts the player to
+train infantry. The fresh FlashRAM export matches the construction
+checkpoint byte for byte.
+
+A read-only replay of the full GBA Wasteland input tape observes
+the matching 150-mineral charge, from 463 to 313, when the
+Barracks first appears at frame 6,367. It completes with 1,000 HP
+by frame 7,866. Five ordinary orders queue Marines at 50 minerals
+each. The first completes at frame 8,319 and the fifth at 10,119.
+The replay still wins at frame 10,120. These checkpoints follow
+each platform's ordinary controls and use separate clock units.
+
 ### Terran chapter 5 input divergence
 
 The old paid-air route matches all checked observations through
@@ -820,6 +869,15 @@ retain 40 HP, Kerrigan 300 HP and Raynor 250 HP. The bank stays
 at 300 minerals and 300 gas. Independent HOME reload restores the
 frame, every observed friendly actor field and the exact SRAM bytes.
 Recruitment and victory are open.
+
+Another branch from frame 13,603 sends the selected eight-unit
+escort north to (250,450). The independent frame-14,692 HOME
+reload restores their positions around the waypoint, all seven
+Marines at 40 HP, Kerrigan at 300 HP and Raynor at 250 HP. One
+Marine remains at (190,534). The bank retains 300 minerals and
+300 gas, and the SRAM export is byte-identical. Two alternative
+longer moves stall or expose units to a hostile detour. The
+northern waypoint is the current safest verified continuation.
 
 ## Custom Game saves
 
@@ -1167,6 +1225,37 @@ P10 pair. Qualify the current combined source against the other
 cartridges, campaign and Showcase, including save continuation,
 before promoting the renderer to the release builds.
 
+#### Blood Bath holdout and late skirmish journals
+
+The same P10 pair completes 120 Blood Bath Melee updates in each
+of two camera positions from frame 11,385. Each pair matches world
+state, route counters, both framebuffer pages, palette and the
+selected scanout. In one panned frame, 11,386, the display registers
+differ by the single Mode 4 page bit. The raw bytes prove the two
+pages are identical within and across builds at that boundary.
+All remaining display register readings match exactly.
+
+| Blood Bath camera | Mean loop cycles, original → trial | Mean draw cycles, original → trial |
+| --- | ---: | ---: |
+| (24,850) | 1,394,509 → 1,394,508 | 677,980 → 678,255 |
+| (512,594) | 955,730 → 955,579 | 279,836 → 279,581 |
+
+The effect on mean frame time in this holdout is under 0.02% at
+both views. Every measured update still misses the two-VBlank
+deadline.
+
+Two separate P10 runs save the mixed three-CPU matches at frame
+11,001 on Outpost and Blood Bath. Ordinary fresh HOME loads each
+saved lobby and continues 180 updates. Both saves and both exports
+match the original byte for byte. Lobby settings, resolved seats,
+starting positions, world and continuation checks also match.
+
+The current source also passes a 5,000-case asset-free Mode 0
+differential under ASan and UBSan. The baseline and candidate
+digest the same tile pixels, dirty, drawn and art masks, and
+HUD flags. This is host renderer evidence. The current combined
+race and Showcase cartridge matrix remains open.
+
 ### Paired ARM replay of observed route queries
 
 A repeat of the 96-update Terran Blood Bath cut records the ordered
@@ -1279,6 +1368,9 @@ quality on the GBA SP.
 | Protoss 7 late exact crop calls and victory | `1a716f7f8c938d9b8a1945c068c94a9d8c0bcaeeb059cd294028ca07a9d9e18f` |
 | Late three-race tracer draw calls and timings | `e3ec7ca92ca312e0417034da49f19079826ce2faa992b3e0581621601b275ad6` |
 | Late three-race Outpost pan and nested tracer/raster attribution | `367528075a2cffa35f0c45de9fc89215731a243305e3f3e310dfdfb361c2a50e` |
+| P10 Blood Bath tile-row holdout and selected scanout proof | `f706a49a4dab2d4d429c10ab392cb93c29d3e2eb5b63dab0e0604fa852f03ec0` |
+| P10 tile-row late mixed-lobby saves, both maps | `89348bccc7c827a9adc51218f835b076ed49a8e5125c3f3b4b4efc8455ba15a4` |
+| Authored Mode 0 fog raster differential fixture | `1f6cf26092f226fea8e3b360140e298876f9f9dfda25d5f1a1a89601494e20bd` |
 | P10 paired fixed and panned tile-row effect bench | `7e8d95ce4175b2befa682238ef2c02551265cecf25489522540a43c4011cf843` |
 | Current-source asset-free Mode 4 ARM differential | `66b15e3234ecf39ebe02a087b5ba8d8d7c7fda447fa602f468c2598131fd2d34` |
 | Late three-race tracer depth readback | `90963fb5bb184ef515bf078de40366c193d459e6fdf1437dff11754a4d67f9eb` |
@@ -1309,6 +1401,7 @@ quality on the GBA SP.
 | Terran chapter 5 seven-Marine early checkpoint | `11bb068c5d26f5dd67c45b311099e5bdf8a27b2601c68ddb6d03bfaab4c8786c` |
 | Terran chapter 5 short escort waypoints, frame 13,603 | `ecdfc1cbd05edfd866f9206329846f730980b5556da8cc62136c32b6ffe078e4` |
 | Terran chapter 5 escort fresh HOME reload and SRAM readback | `c4c78410820830d55d0de4e9d35dbeef53a41246f471612e8cbcd8fd8cad2336` |
+| Terran chapter 5 northern escort waypoint and fresh HOME reload | `c5899c4509f6ae8620bda41c2f3f33ad51b5130813d34c230cda11a69a26c3c2` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -1356,6 +1449,9 @@ quality on the GBA SP.
 | Zerg chapter 6 second ferry, further Storms and safe return, six-stage independent replay | `14923c08c5e52518cbfa7c33cf2e49eef3f2953bdd1424b9f74d05cf93cba298` |
 | Zerg chapter 6 final sorties and structure clearance, ten-stage replay | `e49ba9d8bff12a103c3a3e53d607c1e400b4a80673d0ef4517081159838769d6` |
 | Zerg chapter 6 final defenders, victory and Zerg 7, independent replay | `edfd65ace98a422cec802aea684fee66ee1c82372251c031c46c9f924aa572f5` |
+| Zerg chapter 7 independent opening, Hatchery defense and economy replay | `a70f9adddee6d48ba68ef13285deb01d10dda0103287b35d92f68c749b634613` |
+| Zerg chapter 7 three-stage independent Pool, Lair and Den replay | `570877a52262e4ac222e19f62e44121c33dd5e0496c3b9e11963bcc366038e81` |
+| Zerg chapter 7 fresh completed Pool, Lair and Den census | `f19e2d5b56cedf317753eb739ed7c21c94b3ae913a8d30aef59f8d55a6a1d636` |
 | Zerg chapter 6 fresh victory load and Zerg 7 deployment | `13d4cb35f525874774cb9bb5ae808f134483d31e0577432d6e0b1ca3731f01a3` |
 | Zerg chapter 6 seven-stage third-sortie replay, safe evacuation and fresh load | `a24ec13fcb7a82d06b2d11236a51f0194c9772986aa145386499198b4b350b06` |
 | Zerg chapter 6 frame-147,057 fresh force and hero census | `032ffeb493f4c87d1a072c4851f935c530711bc322f772a5c0ccbc74433cf5cf` |
@@ -1394,6 +1490,10 @@ quality on the GBA SP.
 | Exact KODAK Wasteland fresh start, matching pause journal and victory | `46368011e850ec911ce585edb1c8a64747a7fe14a2a08ba9d6a676e0adbd7b1f` |
 | Exact KODAK Wasteland two SCV deposits and independent fresh HOME continuation | `568c075b6d633c88b85975fa2979ce3910c0dc163efd22c88dfddd02353616e0` |
 | KODAK Wasteland contextual Mine, eight-mineral cargo and return-path loss | `ac949cbde3012f37ff65a20296c9cfc0b4ba5fc8327856bb73c96df18c7dab21` |
+| N64 Wasteland Barracks placement, payment and construction | `45ba6eb34972427f2dabf51588937f2c81ef48319ef84bd131c72eeb96453b1d` |
+| N64 Wasteland first-slot save during paid Barracks construction | `521410b9a16e3f610efdc9ac41e2db268dfc15fea88f04f18be80d62b3365ec8` |
+| N64 Wasteland fresh Barracks load and construction completion | `b7eaee824b6d675614eec4f3ab08c5f74f35688b348a7a6b1854793d14dc99ed` |
+| Exact KODAK Wasteland Barracks payment, completion and Marine queue | `a4ea776e6036165fa886abc96e0be45dff38b78a70dba3a0e845010f31af90b4` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
