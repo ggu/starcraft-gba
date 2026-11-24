@@ -974,6 +974,12 @@ queue time. These GBA observations read actual used supply.
 | N64 field cursor snap and selection attempt | `7fe3baa1973ccc388c2970e53c80bec68c7d10ede87f3cff671001fde6af3a8a` |
 | Exact-KODAK Backwater Marine payment, queue and completion | `29fe8339b66cf3f39d56ec0f0b399ca6213a26b5ad4d44a420bc38095f8b513a` |
 
+A further native controller attempt from the first-slot save
+leaves the Marines stationary after A and the attempted move.
+No unit panel appears. This run completes with unchanged
+FlashRAM and does not establish hero acquisition. Its manifest
+has SHA-256 `45c854ba51cc6c54a74eaa4c6a55ff4327a1d13b8167d658b48985f15d21a670`.
+
 ### Terran chapter 5 input divergence
 
 The old paid-air route matches all checked observations through
@@ -1799,6 +1805,63 @@ continuation table. The request clock is pinned to an eligible
 value. Qualification with the full dispatcher must cover existing
 route hits, age boundaries, earlier cache history and topology
 changes. The fixture adds 360 bytes of linked BSS.
+
+### Projectile fog spans on current Terran and Showcase
+
+[PR #823](https://github.com/ggu/starcraft-gba/pull/823) was
+linked with prepared inputs on the source release at `ba2541bd`.
+The tested merge tree is `048c4022`. The paired Terran runs
+load the same late skirmish journals. Eight 120-update
+windows cover two and three CPU opponents, both maps and
+fixed and panned views. Worlds, camera, palette, both
+framebuffer pages and every save continuation agree. The
+six two-CPU and Outpost cases match all cycle samples. The
+three-CPU Blood Bath means improve by less than 0.01%.
+
+Five Showcase scenes start through the ordinary menu and
+compare 120 updates per scene. Worlds, palette and both
+pages agree. Carrier Approach and Protoss Crossfire mean
+frame costs fall 0.37% and 0.29%. The other three means
+change by less than 0.03%. Both product pairs have identical
+linked working RAM and IWRAM endpoints.
+
+The selected page differs at one Terran and one Showcase
+stop. At both stops, the candidate has already completed one
+more VBlank flip and has no pending page. The control still
+has a queued page. Cumulative flip counts and selected
+page agree again at the next input boundary, with both pages
+matching throughout. This comparison does not measure
+physical display duration. The current samples show modest
+or flat timing, and the earlier stronger panned Protoss
+result still needs a current-source product comparison.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Late Terran pair summaries and per-window hashes | `bcbf5aca52f33fb33b051c2c7958f0edb65fb4470fd15eca12740b9ed87e5a5e` |
+| Five paired Showcase scenes | `ebb6721eb8869ffffb11a0eea85d65afe787d2f6fc14a8b2b1e19b835431f2f0` |
+| Selected page, pending flip and cumulative flip checks | `5314da82da885fedd5fd7ebaf70f2a8432fdd2e45c7c56d83f24fa448df18b5f` |
+
+### Monotone route witnesses on two current Terran saves
+
+The [witness trial](https://github.com/ggu/starcraft-gba/pull/805)
+uses merged tree `b79233fd`. Both links enable the existing
+clear-prefix path. Only the candidate enables the witness
+table. Each pair loads the same late Terran journal and
+compares 120 fixed-camera updates. Two-CPU Outpost mean
+cost is flat at about 868,840 cycles. Three-CPU Blood Bath
+falls from 849,265 to 836,050 mean frame cycles, a 1.56%
+reduction. Every measured frame remains over budget.
+
+Worlds, palette, camera, both framebuffer pages and saves
+agree. One Blood Bath input boundary selects a different page.
+The trial does not observe live witness-hit counts. Extend
+the pair to active orders and profile the cache before
+changing the default.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Outpost stock / witness | `835e54c19a185059dbc188f28308e340b57e6cc7cb3b8e38a86c05cbb9b80bb4` / `1ddef2d373f6e25e4dbff3137add25478c81494c2f90369cd8c6dd2cac259db6` |
+| Blood Bath stock / witness | `c4f3e288b41471ef0ffba990bdb9da632da13295d2ac786a01d1a385aa46e716` / `ddc65b9d89773734f09343c63d6d04708e767137edd040effd244d85791f2ca8` |
 
 ## ROM space available for cutscenes
 

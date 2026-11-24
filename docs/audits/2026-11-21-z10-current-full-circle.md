@@ -151,3 +151,31 @@ continuation with workers available to rebuild.
 | Four-Sunken HOME verification | `dcda4c3e1182f3b3407de0d200765b1757dc91769b9dde1c96b536c8e8f93ce5` |
 | Continuation through the first raid | `70cd9ffc1b5890806f011f952b0e64328001fa65a19b14288d671b3219afca44` |
 | Focused Reaver continuation | `efb10364be2a9ca47938a3c9f66488449ed2e595065f957e94a06bd8ad91e4a1` |
+
+### Rebuild after the first raid
+
+Fresh HOME restores the focused branch at frame 8,850.
+Starting construction immediately loses the Hatchery and
+miners. In the successful defense branch the nearby
+enemy is gone by frame 9,220 after an immediate attack
+order. The Hatchery survives with 6 HP, along with the
+Pool, eastern Sunken and both miners.
+
+The replacement Den finishes at full health and paid
+Drones restore four mining workers. Fresh HOME at frame
+14,345 restores the Den, Hatchery, Pool, Sunken, and the
+1,806/800 bank. No nearby attacker is present in that
+observation. Another ordinary build order starts a
+second Hatchery at (560, 1776). Fresh HOME at frame
+15,812 retains construction at 714 HP, three miners,
+six Hydralisks, one Hydralisk queued and the 1,601/725
+bank. A later passive replay sees attackers arrive
+from both sides around frame 16,112. Protect the new
+Hatchery while the fighters are still together.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Recovered Den and mining SRAM | `99bd54a6b93d92d6a713cdbc3286d5c908050827d17acdafe3e427a2d4b79454` |
+| Recovered position fresh HOME | `216951752de3ccc56d9100e2eff5730c455316f54680529e51fc0896054afd61` |
+| Second Hatchery construction SRAM | `c4e65f00fbee815d7cba49c44320fcc1298e417aaca6dd0069b2cd345f95c77d` |
+| Second Hatchery fresh HOME | `ad1960a0dae859808476ab0b8be5f4dbb6a150776840903cf48928e2a6edc2ac` |

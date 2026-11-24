@@ -1310,6 +1310,43 @@ or a second production base.
 | Evacuation checkpoint SRAM and readback | `71888030a6470bd692bf626be7edd148c1792bb9f82b8736dc68d38a50d33619` |
 | Evacuation fresh HOME verification | `22db8614a82d6a89173455dc23bfae950e2637dd737724a67ec055389614e161` |
 
+#### Found a replacement base without moving the whole refuge
+
+Moving the five workers north lets one start a Hatchery
+and puts the rest in range of a second hostile actor.
+All workers are lost before the new hall completes.
+Moving one Drone instead preserves the group. A pending
+order at (1952, 1760) stalls without payment. The closest
+reachable cell center in the observed walk grid is about
+61 pixels from the target, outside the 36-pixel build
+commit radius.
+
+A closer footprint at (2016, 1696) commits. Fresh HOME
+at frame 75,235 restores a completed 1,250-HP Hatchery,
+Kerrigan at 400 HP and the four other Drones. The previous
+Hatchery and Den have fallen. The new base and workers
+provide a path to restore production.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Completed base and remaining workers | `88e4cddea129617a8bf6a2b24a8e1a25a27e6220cdbad4898b77f53ba242c20e` |
+| Fresh HOME and completed base | `38f811960df62dac91e547df23e8281d83d8cdefb0ae05f73b79f4d552e29825` |
+| Replacement Hatchery SRAM and fresh readback | `bc1c53c5c5ee53dc9dc3039e1973b1b4964a27a0f358d76ebb09dbed4f563fb5` |
+
+The new Hatchery trains a Drone that brings in 72 minerals
+over 1,200 observed updates. Fresh HOME at frame 76,885
+preserves five Drones, the full-health Hatchery and Kerrigan
+at 400 HP. Both objective Nexuses are still at 750 HP and
+750 shields. A follow-up Pool starts, but the miner disappears
+within 100 updates of construction. Retain the verified mining
+position to stage another defense before spending a worker.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paid Drone and mineral deliveries | `779a5c925bf49e0811624749a9ca45d0b6cf8f94e5bb35aa0459e5865bb5cf28` |
+| Mining and both Nexus observations after fresh HOME | `867aad7c999f458d6d939e72caaf14bcea0a3383405762032b7fadedd0462811` |
+| Mining SRAM and fresh readback | `9616b9168521570c1a8b7c2cee389f571272c98d9eccd1348b08b8fa6367ce38` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source
