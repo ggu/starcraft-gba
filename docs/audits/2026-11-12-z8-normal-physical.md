@@ -1206,11 +1206,21 @@ before the nearest Hydralisks can reinforce it. Two miners die
 before the Den finishes. Preserve the frame-77,041 save and
 prepare a defense before extending the base.
 
+A separate trial from frame 74,303 sends Kerrigan from
+(1205,2000) toward (1860,1700) using the ordinary Move command.
+At frame 77,160 she remains at the starting position, at 400 HP,
+with the order and destination retained. The Reaver reaches
+(1808,1640) and reduces the Hatchery from 1,250 to 953 HP.
+This establishes that giving the direct order earlier does not
+protect the Hatchery. Check intermediate waypoints or stage the
+defenders on the eastern side before the evacuation.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent post-Nexus evacuation and Hatchery | `050ed6fa7278eb19a8b89709da4181999011c2bcc4e504658bf48852b33559b5` |
 | Independent paid Drones, Pool construction and fresh HOME | `ebe2ed0edb5bd9745e7aa4f9c45494509df26bc6d385cf4a5387bffc32fe24fe` |
 | Recovered base SRAM | `7d4644978c21f581b8f026931ba79dcaa61297647142d3cbb246466e46dd46c9` |
+| Earlier Kerrigan move order and Reaver arrival | `6919601987baf63e20bf4dbfe1141ba0b3bab9523a0baf31eefb5207ac5f3d74` |
 
 ### Native Overlord research permission
 

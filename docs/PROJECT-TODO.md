@@ -1195,8 +1195,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   75,299. A [separate same-chain recovery](audits/2026-11-12-z8-normal-physical.md#rebuild-after-the-eastern-nexus-falls)
   continues directly after destroying the eastern Nexus and
   fresh-loads a full-health Hatchery and Pool at frame 77,041.
-  Intercept the next Reaver before extending the base and
-  advance on the western Nexus.
+  An earlier direct Move to the Reaver's approach leaves
+  Kerrigan at her starting position. Test intermediate
+  waypoints or pre-position defenders on the eastern side,
+  then advance on the western Nexus.
   [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
   fresh-loads an Extractor, Lair, Den, Spire and three full-health
   paid Mutalisks at frame 8,925. Preserve the wounded gas worker
@@ -1902,8 +1904,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The captured Factory and Starport complete paid Vulture and
   Wraith orders. Two miners establish minerals and gas. The air
   force destroys the eastern Command Center and Refinery.
-  Frame 57,882 fresh-loads seven Wraiths and both heroes. Clear
-  the 21 remaining enemy buildings.
+  Frame 57,882 fresh-loads seven Wraiths and both heroes. The
+  next western attack removes a Missile Turret. Fresh HOME at
+  frame 64,503 retains nine Wraiths, both heroes and 20 enemy
+  buildings. Seven hostile Wraiths remain. From the earlier
+  staging save, draw them away from the turrets before the
+  next attack.
   Finish T5 and Z7–Z10 on this package,
   and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
@@ -1929,7 +1935,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   carry mining and paid infantry through ten of ten and victory.
   Accepting the result opens Backwater Station. A fresh process
   retains the unlock, opens its briefing and deploys to the playable
-  map at Raynor's first dialogue. Continue field parity in Backwater.
+  map at Raynor's first dialogue. The [Backwater comparison](audits/2026-11-24-kodak-package-checks.md#backwater-station-opening)
+  matches the starting bank and roster. N64 shows 5/26 and
+  starts the SCV gathering, while GBA shows 6/26 and the worker
+  starts idle. The native checkpoint fresh-loads and resumes
+  mining. Isolate the native supply exclusion and starting
+  worker order before changing the GBA initialization.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
