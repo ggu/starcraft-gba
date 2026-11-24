@@ -27,6 +27,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Outpost Run windows. Pursue route stalls and the large shared draw
   passes against the current combined build.
   Qualify physical frame pacing on all three race cartridges.
+  [Word stores for padded route borders](audits/2026-11-24-route-grid-borders.md)
+  save about 1,700–3,400 guest cycles per authored point fill across
+  64-, 96- and 128-cell widths. The FIFO still dominates dense fills.
+  Measure how often the shared border setup runs in a current busy
+  match before attributing any frame-rate gain.
   [Compacting the pending point queue](audits/2026-11-22-dense-release-attribution.md#compact-the-pending-point-queue)
   saves 3.61% in the archived late Z7 16-update window and moves
   whole-run means by less than 0.1% in the measured replays. Record

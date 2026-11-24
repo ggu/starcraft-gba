@@ -1774,6 +1774,17 @@ static inline u32 sc64_dense_pack4(const u8 *p)
     return (v | (v >> 10)) & 0xfffu;
 }
 
+/* The padded rows begin on word boundaries and their stride is a multiple
+ * of four. Leave the interior rows to the walkability unpacker. */
+static inline void sc64_route_fill_borders(u8 *top, u8 *bottom, int stride)
+{
+    const u32 border = 0x0f0f0f0fu;
+    for (int x = 0; x < stride; x += 4) {
+        __builtin_memcpy(__builtin_assume_aligned(top + x, 4), &border, 4);
+        __builtin_memcpy(__builtin_assume_aligned(bottom + x, 4), &border, 4);
+    }
+}
+
 static int GBA_HOT __attribute__((noinline))
 sc64_route_fill_dense(u8 *field, int goal)
 {
@@ -1784,8 +1795,8 @@ sc64_route_fill_dense(u8 *field, int goal)
     const int start = (goal & 63) + 4 + ((goal >> 6) + 1) * SC64_DENSE_STRIDE;
     u16 *read = bfs_queue, *write = bfs_queue;
 
-    memset(dense, 15, SC64_DENSE_STRIDE);
-    memset(dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE, 15, SC64_DENSE_STRIDE);
+    sc64_route_fill_borders(dense, dense + (SC64_DENSE_SIDE + 1) * SC64_DENSE_STRIDE,
+                            SC64_DENSE_STRIDE);
     for (int y = 1; y <= SC64_DENSE_SIDE; ++y) {
         u8 *row = dense + y * SC64_DENSE_STRIDE;
         const u32 border = 0x0f0f0f0fu;
@@ -1890,16 +1901,14 @@ static inline u8 *sc64_route_linear_grid(int cols, int rows, int stride, int cap
 #ifdef SC64_ROUTE_SMALL_COMPONENT_PROBE
     const u8 *walk = path_walkable + (first - 1) * (cols / 8);
 
-    if (borders) {
-        memset(dense + (first - 1) * stride, 15, (size_t)stride);
-        memset(dense + (last + 1) * stride, 15, (size_t)stride);
-    }
+    if (borders)
+        sc64_route_fill_borders(dense + (first - 1) * stride, dense + (last + 1) * stride,
+                                stride);
     for (int y = first; y <= last; ++y) {
 #else
     const u8 *walk = path_walkable;
 
-    memset(dense, 15, (size_t)stride);
-    memset(dense + (rows + 1) * stride, 15, (size_t)stride);
+    sc64_route_fill_borders(dense, dense + (rows + 1) * stride, stride);
     for (int y = 1; y <= rows; ++y) {
 #endif
         u8 *out = dense + y * stride;
@@ -2198,8 +2207,7 @@ sc64_route_try_small_component_internal(u8 *field, int goal, int cols, int rows,
         sc64_small_route_first = 0;
         if (first > 1) sc64_route_linear_grid_rows(cols, stride, cap, 1, first - 1, 0);
         if (last < rows) sc64_route_linear_grid_rows(cols, stride, cap, last + 1, rows, 0);
-        memset(dense, 15, (size_t)stride);
-        memset(dense + (rows + 1) * stride, 15, (size_t)stride);
+        sc64_route_fill_borders(dense, dense + (rows + 1) * stride, stride);
         return -1;
     }
 #else
@@ -3546,8 +3554,7 @@ sc64_route_expand_facility_dense(u8 *field, u8 *available, unsigned origin,
         ? first + origin + (origin / side) * (stride - side) : 0;
     int head = *head_out, old_tail = tail;
 
-    memset(dense, 15, stride);
-    memset(dense + (side + 1) * stride, 15, stride);
+    sc64_route_fill_borders(dense, dense + (side + 1) * stride, stride);
     for (int y = 0; y < side; ++y) {
         u8 *row = dense + (y + 1) * stride;
         const u32 border = 0x0f0f0f0fu;
