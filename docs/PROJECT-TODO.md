@@ -1758,16 +1758,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   four Hydralisks, three mining Drones and a living Den. The
   [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
   sustains gas delivery and reaches a frame-37,754 save with 16
-  Hydralisks and three enemy buildings destroyed. It reloads byte
-  for byte. The next raid defeats a passive defense and an early
-  regroup. Intercept that raid while protecting the gas worker,
-  then verify an ordinary victory.
+  Hydralisks and three enemy buildings destroyed. The [later assault](audits/2026-11-24-kodak-package-checks.md#zerg-1-victory-requirements)
+  clears every enemy building but loses the Pool and the builders.
+  The original N64 victory trigger also requires a Pool and Den at
+  the moment of victory. Continue from the five-building branch
+  with three full-health Drones and rebuild the Pool under cover.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
-  now has an ordinary-input FlashRAM save that reloads on a fresh
-  ares process. Continue from that checkpoint to qualify native
-  mission progression and unlocks.
+  has two ordinary-input FlashRAM slots. The second reloads at the
+  water crossing in a fresh ares process. Continue from that
+  checkpoint to qualify native mission progression and unlocks.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
