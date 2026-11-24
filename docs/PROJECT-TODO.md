@@ -1723,7 +1723,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [The last open CPU edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
   matches in both directions and both Blood Bath modes on N64 and
   all three race ROMs. Recover or replace the missing Z1 input tape
-  for an exact-package win and fresh-save replay.
+  for an exact-package win. The earlier Z1 pause and victory journals
+  both load on the installed Z10 through HOME and export identical SRAM.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

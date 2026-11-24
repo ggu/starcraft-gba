@@ -163,6 +163,15 @@ the retained local path, and the current host trace recipe depends
 on generated inputs absent from the checkout. The installed Z10
 still needs its own victory replay.
 
+The installed Z10 loads both earlier Z1 journals when pressing
+L from fresh HOME. The paused journal restores frame 984 with a
+matching world fingerprint, 55 units and 18 buildings, then advances
+to frame 992 after release. The victory journal restores the frozen
+frame 50,669, the completion bit and matching objective flags, army,
+resources and living Chrysalis. Both export SRAM byte for byte.
+This qualifies loading the earlier save and result on the exact
+current image. A full win replay on that image remains open.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -534,6 +543,7 @@ quality on the GBA SP.
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
 | Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
+| Zerg chapter 1 previous-version pause and victory journal loads | `855aac8e466c4b7fa0266a0150dff9ba86420ae3dd746836cc6246881587a3c5` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
