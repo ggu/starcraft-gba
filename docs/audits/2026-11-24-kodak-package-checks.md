@@ -309,6 +309,38 @@ and their SRAM bytes. A fresh load advances 120 updates with all
 idling loses the Extractor and a preemptive regroup loses nine
 Hydralisks. The next raid and the mission victory remain open.
 
+### Zerg 1 victory requirements
+
+Targeting the incoming Marine's actual path preserves the army.
+In the subsequent assault, Hydralisks reduce 11 enemy buildings to
+five by frame 42,816 and to zero by frame 45,652. Thirteen Hydralisks
+and the Chrysalis survive. The Pool, Den and all Drones are gone.
+An independent replay matches the pause journal. A fresh load
+advances another 1,200 updates with zero enemy buildings and the
+mission still active.
+
+A separate branch returns to the base and rebuilds the Pool. The
+Den and two Drones survive, while all Hydralisks are lost. An
+Overlord hatches after being queued at 4/2 supply, allowing paid
+Hydralisk production. The following raid destroys the new Pool.
+The southwest evacuation reaches frame 43,412 with a living Den,
+ten Hydralisks and three full-health Drones. Five hostile buildings
+remain and the Pool needs rebuilding. The later push from this
+checkpoint clears every hostile building by frame 46,554. The Den
+survives and a raid kills the Drones before the Pool is rebuilt,
+leaving the mission active. Both southwest journals reload with
+identical SRAM in a fresh process and advance ordinary play.
+
+In-memory inspection of the owned USA N64 ROM's Zerg 1 victory
+trigger finds three simultaneous command-count conditions. Player 6
+has zero buildings, and the current player has at least one
+Spawning Pool and at least one Hydralisk Den. The victory row uses
+current counts. Initial building records in the standard building
+ID range belong to Player 4 and Player 6, with two and fourteen,
+respectively. This verifies the numerical conditions in the ROM.
+Native engine execution, ownership changes and trigger polling
+timing remain open.
+
 The retained N64 Z1 evidence covers the title and
 briefing after a progress edit. A native combat comparison still
 needs an ordinary mission unlock and capture.
@@ -351,6 +383,15 @@ the slot and the field restores with the Marines by the trees,
 40 minerals and 10/18 supply. The original flash and the new run's
 export match byte for byte. The replay uses ordinary controller
 input and cartridge FlashRAM.
+
+From the first slot, two ordinary C-Right moves advance the
+Marines southeast across the road toward a water crossing. The
+pause menu saves the position to the second slot. A fresh process
+selects `Terr01 02:41` and restores the crossing with 40 minerals
+and 10/18 supply. The 128 KiB FlashRAM round trip matches byte for
+byte and the first slot is still listed. A later ordinary run
+moves the five Marines along the eastern shore to its southern
+edge. An engagement and native mission progression remain open.
 
 ### Terran chapter 5 input divergence
 
@@ -833,10 +874,15 @@ quality on the GBA SP.
 | Zerg chapter 1 sustained gas delivery, sixth Hydralisk and fresh load | `8788f3c9c8d7b24cc1f2a0e0463409dde1bddc18fa0585829f4a0d7e15968b02` |
 | Zerg chapter 1 three assault checkpoints and fresh load | `9ae9c0dbcd4d146678eac97d235f6e52632afb3ab9f47c16587f4de3565b00cc` |
 | Zerg chapter 1 five raid and reinforcement checkpoints, with fresh load | `0aa1c8b34e4f9d8a18b0f6ec89be486c1c31c0b8ac9ce8a913afdd318487e4e6` |
+| Zerg chapter 1 assault, Pool recovery and three fresh loads | `fe4c144210505c8a6921fd9f6701d4cf9c8fb67b778ffc0e5681903e3e0331ec` |
+| Zerg chapter 1 southwest evacuation and final assault, with two fresh loads | `c8e7af793d05a7252a2e5cfa8abce99e8ccc6b48006b32b4dda44e1f57abd835` |
+| N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
 | N64 Wasteland ordinary save with persistent media enabled | `c864ce55ae39739209c890552f956d783d8a34e9bbe156d20ab457d133aec9b5` |
 | N64 Wasteland ordinary fresh title load manifest | `16a8056ac4ac05cf2bd7e7e08ee89d75a8d86f6e0672322c5de251a89b41bf2b` |
+| N64 Wasteland second-slot save and fresh load manifests | `911d224bd8d631db1f0c00dc91dc3038f642e293c1883ba628b091c9ae875953` / `073a5f77a61d7703a8668e4ec9304d75fd926775fe6d2ec8a6497ac577b60cbc` |
+| N64 Wasteland eastern-shore movement manifest | `42afda84d1d1eb620e709d738be1e1f9cbc3f641077041b0b1e03a5ea9783a2a` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
