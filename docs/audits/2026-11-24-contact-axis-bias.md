@@ -112,7 +112,8 @@ matching cycles. Its receipt has SHA-256
 ### Whole-frame Terran arithmetic comparison
 
 Two local Terran links from `4e24202f` use the same prepared
-inputs, including audio, and differ only in the early-axis
+inputs, including audio, with the unpacked shared sight
+path. They differ only in the early-axis
 compile definition. After adding the option to the arithmetic
 path, a second link for each setting matches its measured
 ROM byte for byte. Both links meet the existing static RAM
@@ -143,8 +144,7 @@ again after 60 resumed updates. The three-CPU Blood Bath
 peak rises from 1,215,014 to 1,225,063 cycles, despite the
 lower mean and p95. The 1-CPU Outpost mean reaches 29.66
 emulated updates per second. Busy matches still exceed
-the budget. The product option stays off pending broader
-campaign, stack and device checks, and a Z10 frame pair.
+the budget.
 
 The paired receipt has SHA-256
 `e76e2b17291ff5de075e7638fd750240d6dd983482a689d673b9c34ece9fb228`.
@@ -156,3 +156,40 @@ ordinary save, fresh HOME, and 60 neutral continuation
 updates agree again. Mean cost changes from 734,317 to
 734,299 cycles in that window. The campaign receipt has
 SHA-256 `a8973a1a9a057011f09611fd0a755ba7e3e65892b591a459e071e32724f7c7a0`.
+
+### Canonical Terran and Z10 whole-frame pairs
+
+The release builds include persistent collision buckets and
+native Melee starts. Terran also uses the canonical packed
+and sparse sight tables. Late pairs measure 120 updates each
+after 11,000 updates of ordinary skirmish play. The sampled
+worlds, both framebuffer pages, save journals and fresh HOME
+continuations match on all ten pairs.
+
+| Product and map | CPUs | Mean cycles, off → on | Reduction |
+| --- | ---: | ---: | ---: |
+| Terran Outpost | 1 | 573,831 → 561,151 | 2.21% |
+| Terran Outpost | 2 | 818,078 → 792,180 | 3.17% |
+| Terran Outpost | 3 | 1,012,069 → 1,000,027 | 1.19% |
+| Terran Blood Bath | 1 | 561,368 → 561,368 | 0.00% |
+| Terran Blood Bath | 2 | 620,192 → 607,469 | 2.05% |
+| Terran Blood Bath | 3 | 898,966 → 887,885 | 1.23% |
+| Z10 Outpost | 2 | 843,126 → 802,554 | 4.81% |
+| Z10 Outpost | 3 | 1,174,639 → 1,156,382 | 1.55% |
+| Z10 Blood Bath | 2 | 691,169 → 670,949 | 2.93% |
+| Z10 Blood Bath | 3 | 816,476 → 790,240 | 3.21% |
+
+The canonical Terran one-CPU Outpost average reaches the
+561,792-cycle budget with 52 of 120 updates still over it.
+All Z10 samples remain over the budget. Z10 adds 88 linked
+text bytes and preserves its data and BSS section sizes.
+Protoss P10 and Showcase links are byte-identical with the
+ROM option on or off because their contact kernels run in
+IWRAM. The option remains off by default. These comparisons
+measure emulated cycles rather than GBA SP frame delivery.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Canonical Terran skirmish pairs | `f815ac0165f94bf524f2a087a18a906c7a61c79b4a3b2b8eb372b23666ec457c` |
+| Canonical Z10 skirmish pairs | `4a99b3085809b11f2f2aecb32ef1a7ce846bba1fd5c41fc8c1c2a28f495276a3` |
+| Byte-identical P10 and Showcase links | `faa1ca7b9588c287f57ec72abdbda5f4734d47231509d4f888b205124c5c7fc6` |
