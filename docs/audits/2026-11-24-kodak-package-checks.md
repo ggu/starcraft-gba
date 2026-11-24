@@ -802,8 +802,10 @@ checkpoint byte for byte.
 Continuing the native advisor sequence with A activates the
 Marine counter. The next field capture shows five of ten
 Marines with 10 minerals. A fresh attempt reselects the same
-60-HP SCV near the completed Barracks. The native Marine queue
-and completion still need a funded attempt.
+60-HP SCV near the completed Barracks and moves the cursor onto
+the minerals. The field shows B Harvest. Pressing B at emulator
+step 9,680 raises the bank from 10 to 26 by step 10,680 and to
+34 by step 11,680. The Marine queue and completion remain open.
 
 A read-only replay of the full GBA Wasteland input tape observes
 the matching 150-mineral charge, from 463 to 313, when the
@@ -1560,6 +1562,7 @@ quality on the GBA SP.
 | N64 Wasteland fresh Barracks load and construction completion | `b7eaee824b6d675614eec4f3ab08c5f74f35688b348a7a6b1854793d14dc99ed` |
 | N64 Wasteland advisor activates five-of-ten Marine counter | `8f320c0688a82e90b457a56f4e991e43b3d85d919f5fea46abb27841c8367f76` |
 | N64 Wasteland reselects SCV after the Barracks completes | `0c3b4daaf35c04fad8835cc94115ae5b1d8665fe2ec92cbda115ed7b565bce99` |
+| N64 Wasteland mining resumes after the Barracks completes | `f0e9024b73022e629dd8e05dfd80f00c2276bb6ff69daa869b8c00927d51917f` |
 | Exact KODAK Wasteland Barracks payment, completion and Marine queue | `a4ea776e6036165fa886abc96e0be45dff38b78a70dba3a0e845010f31af90b4` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
