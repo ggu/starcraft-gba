@@ -114,9 +114,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   both maps. Orders consume 45–56% of total cycles. Profile movement
   and depot/route work across the three cartridges first. The eight
   instruction-attributed updates per case put 51–129k cycles in
-  uncached contact masks. Terran Blood Bath also spends about 81k
-  direct cycles in the monotone route probe. Pair those workloads
-  separately and keep both maps in the actor and effect draw tests.
+  uncached contact masks. [Reusing the query origin and dimensions](https://github.com/ggu/starcraft-gba/pull/828)
+  matches 450 observed masks and saves 5.96–6.06% in the paired
+  IWRAM kernel fixture. Qualify full frames and saves across the
+  current production cartridges before adopting it. Terran Blood
+  Bath also spends about 81k direct cycles in the monotone route
+  probe. Pair those workloads separately and keep both maps in
+  the actor and effect draw tests.
   The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
   finds only seven redundant crops across 48 updates. On Outpost the
   base projectile pass takes 39.6–64.7k cycles per update across the
@@ -1180,8 +1184,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   health and shields. The [single-approach staging replay](audits/2026-11-12-z8-normal-physical.md#stage-the-eastern-formation-together)
   fresh-loads all eleven at frame 65,165 with Kerrigan separate
   at 400 HP. An attack from the same approach removes 48 Nexus
-  shields and costs ten Hydralisks. Reinforce the staged group
-  before the next attack.
+  shields and costs ten Hydralisks. A [reinforced assault](audits/2026-11-12-z8-normal-physical.md#reinforce-and-destroy-the-eastern-nexus)
+  fields sixteen and destroys the eastern Nexus at frame 70,971.
+  Fresh HOME retains the result and Kerrigan at full health.
+  A separate defensive branch removes three attackers and
+  fresh-loads the southern Hatchery, Pool and both Dens. Its
+  second defense keeps the new Den and Kerrigan, with the Hatchery
+  at 359 HP and all workers lost. Recover the economy, combine base
+  defense with the eastern assault and defeat the western Nexus.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -1785,15 +1795,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z3 wins after a paid economy and independently replayed assaults,
   bringing the exact-package victory count to 22 of 30. P4 also
   passes fresh field and victory save reloads.
-  An ordinary T5 retreat keeps Raynor at full health through
+  An ordinary T5 retreat keeps Kerrigan at full health through
   frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
-  Move near input call 22,000 stalls. Redirecting Kerrigan around
-  call 12,000 takes her to (856,398). A separate empty-ground order
-  moves Raynor away from his previous target. Both retain 294 and 250 HP
+  Move near input call 22,000 stalls. Redirecting Raynor around
+  call 12,000 takes him to (856,398). A separate empty-ground order
+  moves Kerrigan away from her previous target. Both retain 294 and 250 HP
   respectively through frame 19,288. The branch has only the two
   heroes and still needs a full win. A direct approach also enters
-  the recruitment zone, where Kerrigan dies before reinforcement.
+  the recruitment zone with Raynor, who dies there. Recruitment
+  requires Kerrigan to enter.
   An earlier checkpoint and three short escort waypoints preserve both
   heroes and seven Marines at full health through frame 13,603. The
   fresh [escort journal](audits/2026-11-24-kodak-package-checks.md#terran-chapter-5-input-divergence)
@@ -1867,9 +1878,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Guardian raid before advancing on the objective. The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second
-  verified save at frame 22,304 has cleared a Vulture, with both
-  heroes and six Marines at full health. Reach the base and
-  trigger recruitment.
+  verified save at frame 22,304 has cleared a Vulture. At frame
+  27,001 the six Marines and both full-health heroes reload at
+  the south approach. Two focused attacks clear the first two
+  bunkers. Both heroes are at full health and five Marines
+  survive in the fresh frame-27,771 save. Kerrigan enters through
+  the east corridor and recruits the rebel base. Fresh HOME
+  restores 27 units and 19 buildings with both heroes alive.
+  The captured Factory and Starport complete paid Vulture and
+  Wraith orders, and those units survive reload. Build the assault
+  force and eliminate the enemy buildings.
   Finish T5 and Z7–Z10 on this package,
   and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
@@ -1887,9 +1905,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   observes the 150-mineral charge on both systems. The native
   construction resumes after a fresh load. The infantry advisor
   activates the five-of-ten Marine counter. A new B Harvest
-  order raises the native bank from 10 to 34. GBA trains
-  five Marines at 50 each and wins. Verify native Marine
-  production, victory and the next mission unlock.
+  order raises the native bank from 10 to 34. A later native
+  run trains a Marine for the displayed price of 50. After fresh
+  load, a second paid Marine completes and the objective reaches
+  seven of ten. GBA trains five at that price and wins. Verify
+  native victory and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
