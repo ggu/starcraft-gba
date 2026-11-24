@@ -995,14 +995,19 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
  int origin=x-phase;
  int first=left&~3,last=(right+3)&~3;
  int groups=(phase+width+3)/4;
- const u32 *row=frame->phase_words[phase]+top*groups*2+(first-origin)/4*2;
- for(int dy=y+top;dy<y+bottom;dy++) {
-  volatile u32 *dst=(volatile u32 *)(void *)(pixels+dy*120+first/2);
-  const u32 *src=row;
+ /* Integer row addresses keep the terminal increment valid at clipped edges. */
+ uintptr_t src_row=(uintptr_t)(frame->phase_words[phase]+top*groups*2+(first-origin)/4*2);
+ uintptr_t dst_row=(uintptr_t)(pixels+(y+top)*120+first/2);
+#ifndef GBA_HOST
+ unsigned count=(unsigned)(last-first)>>2;
+#endif
+ for(int dy=top;dy<bottom;dy++) {
+  volatile u32 *dst=(volatile u32 *)dst_row;
+  const u32 *src=(const u32 *)src_row;
 #ifndef GBA_HOST
   /* Each packed word is followed by its opacity mask in ROM. Load the
    * pair in one sequential transfer, and read VRAM only for mixed lanes. */
-  unsigned count=(unsigned)(last-first)>>2;
+  unsigned remaining=count;
   __asm__ volatile(
    "1: ldmia %[src]!, {r2, r3}\n\t"
    "cmp r3, #0\n\t"
@@ -1015,7 +1020,7 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
    "2: add %[dst], %[dst], #4\n\t"
    "subs %[count], %[count], #1\n\t"
    "bne 1b"
-   : [src] "+&r"(src), [dst] "+&r"(dst), [count] "+&r"(count)
+   : [src] "+&r"(src), [dst] "+&r"(dst), [count] "+&r"(remaining)
    :
    : "r2", "r3", "ip", "cc", "memory");
 #else
@@ -1027,7 +1032,8 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
    else *dst=(*dst&~mask)|color;
   }
 #endif
-  row+=groups*2;
+  src_row+=groups*2*sizeof(u32);
+  dst_row+=240;
  }
 }
 #endif

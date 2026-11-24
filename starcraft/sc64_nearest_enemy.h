@@ -56,14 +56,17 @@ nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker
 #else
     int i, best = -1, best_distance = max_distance * max_distance, d;
     (void)attacker;
+    /* Only consult fog for candidates that could replace the current best. */
     if (target_lists_valid) {
         int p;
         for (p = 0; p < 5; ++p) {
             if (!owners_hostile(owner, p)) continue;
             for (i = target_unit_head[p]; i >= 0; i = target_unit_next[i]) {
-                if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance || !sc64_auto_target_visible(i,owner))continue;
+                if (!u[i].alive || FAST_ABS(x - u[i].x) >= max_distance ||
+                    FAST_ABS(y - u[i].y) >= max_distance) continue;
                 d = dist2(x, y, u[i].x, u[i].y);
-                if (d < best_distance || (best >= 0 && d == best_distance && i < best)) {
+                if ((d < best_distance || (best >= 0 && d == best_distance && i < best)) &&
+                    sc64_auto_target_visible(i, owner)) {
                     best_distance = d; best = i;
                 }
             }
@@ -72,27 +75,34 @@ nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker
             if (!owners_hostile(owner, p)) continue;
             for (i = target_building_head[p]; i >= 0; i = target_building_next[i]) {
                 int candidate = MAX_UNITS + i;
-                if (!b[i].alive || FAST_ABS(x-b[i].x)>=max_distance || FAST_ABS(y-b[i].y)>=max_distance || !sc64_auto_target_visible(candidate,owner))continue;
+                if (!b[i].alive || FAST_ABS(x - b[i].x) >= max_distance ||
+                    FAST_ABS(y - b[i].y) >= max_distance) continue;
                 d = dist2(x, y, b[i].x, b[i].y);
-                if (d < best_distance || (best >= 0 && d == best_distance && candidate < best)) {
+                if ((d < best_distance || (best >= 0 && d == best_distance && candidate < best)) &&
+                    sc64_auto_target_visible(candidate, owner)) {
                     best_distance = d; best = candidate;
                 }
             }
         }
     } else {
         for (i = 0; i < MAX_UNITS; i++) {
-            if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance ||
-                FAST_ABS(y-u[i].y)>=max_distance || !owners_hostile(owner,u[i].owner) ||
-                !sc64_auto_target_visible(i,owner)) continue;
-            d = dist2(x,y,u[i].x,u[i].y);
-            if (d < best_distance) { best_distance = d; best = i; }
+            if (!u[i].alive || FAST_ABS(x - u[i].x) >= max_distance ||
+                FAST_ABS(y - u[i].y) >= max_distance || !owners_hostile(owner, u[i].owner)) continue;
+            d = dist2(x, y, u[i].x, u[i].y);
+            if (d < best_distance && sc64_auto_target_visible(i, owner)) {
+                best_distance = d;
+                best = i;
+            }
         }
         for (i = 0; i < MAX_BUILDINGS; i++) {
-            if (!b[i].alive || FAST_ABS(x-b[i].x)>=max_distance ||
-                FAST_ABS(y-b[i].y)>=max_distance || !owners_hostile(owner,b[i].owner) ||
-                !sc64_auto_target_visible(MAX_UNITS+i,owner)) continue;
-            d = dist2(x,y,b[i].x,b[i].y);
-            if (d < best_distance) { best_distance = d; best = MAX_UNITS+i; }
+            if (!b[i].alive || FAST_ABS(x - b[i].x) >= max_distance ||
+                FAST_ABS(y - b[i].y) >= max_distance || !owners_hostile(owner, b[i].owner)) continue;
+            int candidate = MAX_UNITS + i;
+            d = dist2(x, y, b[i].x, b[i].y);
+            if (d < best_distance && sc64_auto_target_visible(candidate, owner)) {
+                best_distance = d;
+                best = candidate;
+            }
         }
     }
     result = best;

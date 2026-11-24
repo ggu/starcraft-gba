@@ -205,6 +205,9 @@ int main(int argc,char** argv) {
     std::unique_lock lock(p.mutex);
     if(!p.failed && p.callbacks==0) p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.callbacks>0;});
   }
+  root->save();
+  p.systemPak->save(p.systemPak->location);
+  p.gamePak->save(p.gamePak->location);
   root->unload(); root.reset(); // joins the upstream screen thread before reading frames
   std::lock_guard lock(p.mutex);
   std::ofstream status(out/"status.log"), observations(out/"callbacks.csv");
