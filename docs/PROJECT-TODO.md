@@ -1674,10 +1674,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T1–T4, T6, T7, T9 and T10 win through ordinary inputs on the
   exact Terran image, including fresh mid-mission and victory
   loads. The pinned Protoss image has P9 and P10 full wins and
-  fresh loads. Update the T5 ordinary-input route after the
-  pause-corrected paid-air tape reaches a different army count.
+  fresh loads. Update the T5 ordinary-input route to protect Raynor
+  through the observed frame-56,506 defeat.
   The same audit records fresh N64 reset replays of the two-slot
-  Challenger and four-slot Blood Bath Melee lobbies.
+  Challenger and four-slot Blood Bath Melee lobbies, plus the
+  Wasteland opening bank and five-Marine R selection on both systems.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
 

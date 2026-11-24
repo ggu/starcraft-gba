@@ -73,6 +73,20 @@ after 281,447 calls and P10 wins at frame 93,377 after 94,852
 calls. Both restore the mid-mission save and the victory in fresh
 HOME processes.
 
+### Wasteland opening on N64 and KODAK
+
+A new ares v148 reset uses the retained Wasteland opening and
+ordinary R press. Both framebuffer captures match the retained
+run. The N64 HUD shows 40 minerals and 10/18 supply, and the
+second capture shows the five Marines selected.
+
+The exact KODAK image starts at 10/18 supply and grants 40
+minerals between game frames 29 and 30. In separate fresh
+launches, R selects the five Marines and leaves the five SCVs
+unselected. The five Marines are still selected 1,000 updates
+later. All units stay unselected in the neutral control. The two
+platforms use independent clocks.
+
 ### Terran chapter 5 input divergence
 
 The old paid-air route matches all checked observations through
@@ -82,7 +96,12 @@ The following R chord restarts at call 20,403 from game frame
 ordinary Start input. It reaches call 22,000 at the expected game
 frame 21,668, with the expected 18 friendly buildings. It has 27
 friendly units versus the retained 35, and 200 minerals versus
-512. The route still needs current-cartridge victory qualification.
+512. Continuing the same pause-corrected inputs reaches RESULT
+at call 57,747, game frame 56,506, with Raynor dead and Kerrigan
+alive. The runtime records defeat and zero trigger faults.
+The current cartridge still needs a winning route.
+
+## Custom Game saves
 
 Thirty-six early Custom Game save/continue pairs pass across all
 four products. Each saves after 120 updates, loads from a fresh
@@ -136,8 +155,8 @@ identify the expensive paths in the measured windows.
 
 The same 16 cuts contain 450 uncached ground contact queries
 with speeds one through three. Of 2,406 observed bucket visits,
-1,622 are nonempty. No mover repeats the same position and speed
-within one sampled update. The late cut also draws 164 packed
+1,622 are nonempty. Each mover, position and speed combination
+occurs at most once within a sampled update. The late cut also draws 164 packed
 sprites across 3,251 rows. These counts provide workload sizes
 for synthetic renderer and collision tests.
 
@@ -153,6 +172,7 @@ for synthetic renderer and collision tests.
 | Terran chapter 4 full run and fresh loads | `16434fb2891a5426c396f615312c0ab4ff992f6bb7206ada371cba276c9f922c` |
 | Terran chapter 5 screen transitions | `91317b3116e15d7d9b92626a37fd52af05cc6009a30a697319c490c9b30e2e17` |
 | Terran chapter 5 pause-corrected divergence | `19133241bc024bc6096a698611de030155e3c341679fb26105ea012e843835ab` |
+| Terran chapter 5 pause-corrected defeat | `5045cef4db7af2cd8c214745ef1761e011972a1266df7490112d6e5fe6606aea` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
@@ -166,6 +186,8 @@ for synthetic renderer and collision tests.
 | Protoss 10 sprite and contact workload census | `67f20dae00085613182e2471d1d594100e038637edf1a29e61b035c2c47e8b6f` |
 | N64 Challenger reset replay | `5c84d1b8ae1e5f57a5731ceb9a6417d636788f58a2d39c67a63cca34bc6c1fdc` |
 | N64 Blood Bath reset replay | `66a9c657369c58decea5a0f27079ed785fadc60f6c43357590541b70c70eb426` |
+| N64 Wasteland opening and R reset replay | `9b2616e869232132aeb149afb9e953b4321618c8c7a440ced8576e97e52e8fd8` |
+| KODAK Wasteland mineral grant and R selection | `c6941222e9f2ebb4e0672b0ed381d48e56fe3e60c7b67b92501b04ca413bf4f4` |
 
 Wider campaign victory and mid-mission SRAM coverage and hardware
 timings remain open on this package.
