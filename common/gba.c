@@ -995,14 +995,19 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
  int origin=x-phase;
  int first=left&~3,last=(right+3)&~3;
  int groups=(phase+width+3)/4;
- const u32 *row=frame->phase_words[phase]+top*groups*2+(first-origin)/4*2;
- for(int dy=y+top;dy<y+bottom;dy++) {
-  volatile u32 *dst=(volatile u32 *)(void *)(pixels+dy*120+first/2);
-  const u32 *src=row;
+ /* Integer row addresses keep the terminal increment valid at clipped edges. */
+ uintptr_t src_row=(uintptr_t)(frame->phase_words[phase]+top*groups*2+(first-origin)/4*2);
+ uintptr_t dst_row=(uintptr_t)(pixels+(y+top)*120+first/2);
+#ifndef GBA_HOST
+ unsigned count=(unsigned)(last-first)>>2;
+#endif
+ for(int dy=top;dy<bottom;dy++) {
+  volatile u32 *dst=(volatile u32 *)dst_row;
+  const u32 *src=(const u32 *)src_row;
 #ifndef GBA_HOST
   /* Each packed word is followed by its opacity mask in ROM. Load the
    * pair in one sequential transfer, and read VRAM only for mixed lanes. */
-  unsigned count=(unsigned)(last-first)>>2;
+  unsigned remaining=count;
   __asm__ volatile(
    "1: ldmia %[src]!, {r2, r3}\n\t"
    "cmp r3, #0\n\t"
@@ -1015,7 +1020,7 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
    "2: add %[dst], %[dst], #4\n\t"
    "subs %[count], %[count], #1\n\t"
    "bne 1b"
-   : [src] "+&r"(src), [dst] "+&r"(dst), [count] "+&r"(count)
+   : [src] "+&r"(src), [dst] "+&r"(dst), [count] "+&r"(remaining)
    :
    : "r2", "r3", "ip", "cc", "memory");
 #else
@@ -1027,7 +1032,8 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
    else *dst=(*dst&~mask)|color;
   }
 #endif
-  row+=groups*2;
+  src_row+=groups*2*sizeof(u32);
+  dst_row+=240;
  }
 }
 #endif
@@ -1119,12 +1125,83 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
         if(left)*dst=(*dst&0xff00)|color;
     }
 }
+void gfx_fill_rows(int y, int height, u8 color)
+{
+#if defined(GBA_HOST)
+    gfx_rect(0, y, 240, height, color);
+#else
+#ifdef SC64_TILE_RENDERER
+    if (gfx_tile_on) {
+        gfx_rect(0, y, 240, height, color);
+        return;
+    }
+#endif
+#ifdef GBA_SCENE_CLIP
+    int top = gfx_clip_top, bottom = gfx_clip_bottom;
+#else
+    int top = 0, bottom = 160;
+#endif
+    if (height <= 0 || y >= bottom || y + height <= top) return;
+    int end = y + height < bottom ? y + height : bottom;
+    if (y < top) y = top;
+    if (y >= end) return;
+
+    /* Like the other synchronous Mode 4 transfers, use aligned words and
+     * keep the fixed source on the stack through DMA completion. */
+    volatile u32 fill = (u32)color * 0x01010101u;
+    REG32(0x040000d4) = (u32)&fill;
+    REG32(0x040000d8) = (u32)(pixels + y * 120);
+    REG32(0x040000dc) = 0x85000000u | (u32)((end - y) * 60);
+    while (REG32(0x040000dc) & 0x80000000u) {}
+#endif
+}
+
 #if defined(GBA_SHAPES_ROM_ARM) && !defined(GBA_HOST)
 #define SHAPE_HOT __attribute__((long_call,target("arm")))
 #else
 #define SHAPE_HOT HOT
 #endif
-SHAPE_HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,y+h-1,w,1,c);gfx_rect(x,y,1,h,c);gfx_rect(x+w-1,y,1,h,c);}
+/* Clip the vertical edges together and leave their row loop in ROM to
+ * preserve the shared IWRAM shape budget. */
+static void __attribute__((noinline))
+gfx_frame_sides(int x0, int x1, int y, int height, u8 color)
+{
+#ifdef GBA_SCENE_CLIP
+    int top = gfx_clip_top, bottom = gfx_clip_bottom;
+#else
+    int top = 0, bottom = 160;
+#endif
+    if (height <= 0 || y >= bottom || y + height <= top) return;
+    int end = y + height < bottom ? y + height : bottom;
+    if (y < top) y = top;
+    if (y >= end) return;
+
+    int draw_left = (unsigned)x0 < 240u;
+    int draw_right = (unsigned)x1 < 240u;
+    if (!draw_left && !draw_right) return;
+    color = GFX_TILE_COLOR(color);
+    if (draw_left) GFX_TILE_TOUCH(x0, y, x0 + 1, end);
+    if (draw_right) GFX_TILE_TOUCH(x1, y, x1 + 1, end);
+
+    unsigned left_mask = (x0 & 1) ? 0x00ffu : 0xff00u;
+    unsigned right_mask = (x1 & 1) ? 0x00ffu : 0xff00u;
+    unsigned left_color = (x0 & 1) ? (unsigned)color << 8 : color;
+    unsigned right_color = (x1 & 1) ? (unsigned)color << 8 : color;
+    unsigned left_column = (unsigned)x0 >> 1;
+    unsigned right_column = (unsigned)x1 >> 1;
+    volatile u16 *row = pixels + y * 120;
+    for (; y < end; ++y, row += 120) {
+        if (draw_left) row[left_column] = (row[left_column] & left_mask) | left_color;
+        if (draw_right) row[right_column] = (row[right_column] & right_mask) | right_color;
+    }
+}
+
+SHAPE_HOT void gfx_frame(int x, int y, int width, int height, u8 color)
+{
+    gfx_rect(x, y, width, 1, color);
+    gfx_rect(x, y + height - 1, width, 1, color);
+    gfx_frame_sides(x, x + width - 1, y, height, color);
+}
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
 SHAPE_HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){
@@ -1275,7 +1352,7 @@ static const u8 font[96][7]={
  [7]={4,4,0,0,0,0,0},
 };
 
-static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
+static __attribute__((noinline)) void glyph_row_clipped(int x,int y,u8 bits,u8 color) {
 #ifdef GBA_SCENE_CLIP
     if ((unsigned)y-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top)) return;
 #else
@@ -1310,11 +1387,70 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
         }
     }
 }
-HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;
+HOT void gfx_text(int x, int y, const char *text, u8 color)
+{
+    int origin = x;
 #ifdef SC64_TILE_RENDERER
-if(gfx_tile_on){c=GFX_TILE_COLOR(c);int w=0,h=1,line=0;for(const char*q=t;*q;q++){if(*q=='\n'){h++;line=0;}else if(++line>w)w=line;}gfx_tile_touch(x,y,x+w*6,y+(h-1)*9+7);}
+    if (gfx_tile_on) {
+        color = GFX_TILE_COLOR(color);
+        int width = 0, height = 1, line = 0;
+        for (const char *ch = text; *ch; ++ch) {
+            if (*ch == '\n') {
+                ++height;
+                line = 0;
+            } else if (++line > width) {
+                width = line;
+            }
+        }
+        gfx_tile_touch(x, y, x + width * 6, y + (height - 1) * 9 + 7);
+    }
 #endif
-for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
+    for (; *text; ++text) {
+        u8 ch = (u8)*text;
+        if (ch == '\n') {
+            x = origin;
+            y += 9;
+            continue;
+        }
+        if (ch >= 'a' && ch <= 'z') ch -= 32;
+        /* A space advances and is included in tile coverage. */
+        if (ch > 32 && ch < 128 && x > -6 && x < 240) {
+            const u8 *glyph = font[ch - 32];
+#ifdef GBA_SCENE_CLIP
+            int top = gfx_clip_top, bottom = gfx_clip_bottom;
+#else
+            int top = 0, bottom = 160;
+#endif
+            if ((unsigned)x <= 235 && y >= top && y <= bottom - 7) {
+                volatile u16 *dst = pixels + y * 120 + (x >> 1);
+                int odd = x & 1;
+                u16 both = color | ((u16)color << 8);
+                for (int row = 0; row < 7; ++row) {
+                    if (row) dst += 120;
+                    u8 bits = glyph[row];
+                    /* Odd starts have one unpaired column on the left. */
+                    if (odd) {
+                        if (bits & 16) dst[0] = (dst[0] & 255) | ((u16)color << 8);
+                        bits <<= 1;
+                    }
+                    for (int pair = 0; pair < 2; ++pair) {
+                        int mask = (bits >> (3 - pair * 2)) & 3;
+                        volatile u16 *word = dst + pair + odd;
+                        if (mask == 3) *word = both;
+                        else if (mask == 2) *word = (*word & 0xff00) | color;
+                        else if (mask == 1) *word = (*word & 255) | ((u16)color << 8);
+                    }
+                    if (!odd && (bits & 1)) dst[2] = (dst[2] & 0xff00) | color;
+                }
+            } else {
+                for (int row = 0; row < 7; ++row)
+                    glyph_row_clipped(x, y + row, glyph[row], color);
+            }
+        }
+        x += 6;
+    }
+}
+
 #if defined(SC64_ZP_FULL_STORAGE) || defined(GBA_SCENE_CLIP)
 /* Later campaign actors need the hot-code reserve; number formatting can
  * run from ROM while glyph drawing stays in IWRAM. Scene clipping also uses

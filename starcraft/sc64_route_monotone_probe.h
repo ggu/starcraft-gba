@@ -25,6 +25,11 @@ static inline unsigned sc64_route_probe_col(unsigned cell, unsigned cols, unsign
     return cell - row * cols;
 }
 
+#if defined(SC64_ROUTE_MONOTONE_CLEAR_PREFIX) && !defined(SC64_ROUTE_MONOTONE_WITNESS_ENABLED) && \
+    !defined(SC64_ROUTE_MONOTONE_DIAGNOSTICS)
+#define SC64_ROUTE_MONOTONE_CLEAR_PREFIX_ENABLED 1
+#endif
+
 static int __attribute__((noinline))
 sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
                           int cells, u16 *scratch, unsigned scratch_bytes,
@@ -66,85 +71,131 @@ sc64_route_monotone_probe(const u8 *walkable, int cols, int rows,
 
     failed = (u8 *)(void *)scratch;
     for (root_i = 0; root_i < root_count; ++root_i) {
-        unsigned depth = 0, min_col, min_row, width, height;
+        enum { TRY_BOTH, TRY_VERTICAL, FINISHED };
+        unsigned depth = 1;
         int root = roots[root_i];
         int root_row = (int)sc64_route_probe_row((unsigned)root, (unsigned)cols);
         int root_col = (int)sc64_route_probe_col((unsigned)root, (unsigned)cols, (unsigned)root_row);
         int distance = (ox > root_col ? ox-root_col : root_col-ox) +
                        (oy > root_row ? oy-root_row : root_row-oy);
         if (distance != min_distance) continue;
-        min_col = (unsigned)(ox < root_col ? ox : root_col);
-        min_row = (unsigned)(oy < root_row ? oy : root_row);
-        width = (unsigned)(ox > root_col ? ox-root_col : root_col-ox) + 1u;
-        height = (unsigned)(oy > root_row ? oy-root_row : root_row-oy) + 1u;
+        unsigned horizontal = (unsigned)(ox > root_col ? ox-root_col : root_col-ox);
+        unsigned vertical = (unsigned)(oy > root_row ? oy-root_row : root_row-oy);
+        unsigned width = horizontal + 1u, height = vertical + 1u;
+        unsigned local = width * height - 1u;
+        int x_step = ox > root_col ? 1 : -1;
+        int y_step = oy > root_row ? cols : -cols;
+        int cell = root;
         bit_bytes = (width * height + 7u) / 8u;
         stack_offset = (bit_bytes + 1u) & ~1u;
         if (stack_offset > scratch_bytes) return SC64_ROUTE_PROBE_UNSUPPORTED;
         stack_capacity = (scratch_bytes - stack_offset) / sizeof(u16);
         if (stack_capacity < (unsigned)min_distance + 1u) return SC64_ROUTE_PROBE_UNSUPPORTED;
+#ifdef SC64_ROUTE_MONOTONE_CLEAR_PREFIX_ENABLED
+        unsigned prefix_x = 0, prefix_y = 0;
+        if (distance > 0 && stats->nodes <= budget &&
+            (unsigned)distance <= budget - stats->nodes) {
+            while (prefix_x < horizontal && SC64_GRID_GET(walkable, cell + x_step)) {
+                cell += x_step;
+                ++prefix_x;
+            }
+            if (prefix_x == horizontal) {
+                while (prefix_y < vertical && SC64_GRID_GET(walkable, cell + y_step)) {
+                    cell += y_step;
+                    ++prefix_y;
+                }
+                if (prefix_y == vertical) {
+                    *predecessor = origin - (vertical ? y_step : x_step);
+                    stats->nodes += (unsigned)distance;
+                    stats->candidates += (unsigned)distance;
+                    stats->memo_checks += (unsigned)distance - 1u;
+                    ++stats->seeds_tried;
+                    return 1;
+                }
+            }
+        }
+#endif
         stack = (u16 *)(void *)((u8 *)(void *)scratch + stack_offset);
         memset(failed, 0, bit_bytes);
         stats->memo_clear_bytes += bit_bytes;
         stats->seeds_tried++;
-        stack[depth++] = (u16)root;
-        while (depth) {
-            unsigned top = depth - 1u;
-            u16 state = stack[top];
-            unsigned cell = state & 0x3fffu;
-            unsigned row_u = sc64_route_probe_row(cell, (unsigned)cols);
-            unsigned col_u = sc64_route_probe_col(cell, (unsigned)cols, row_u);
-            int row = (int)row_u, col = (int)col_u;
-            unsigned flags = state & 0xc000u;
+        if (!distance) {
             if (stats->nodes >= budget) return SC64_ROUTE_PROBE_BUDGET;
             stats->nodes++;
-            if ((int)cell == origin) {
-                *predecessor = depth > 1u ? (int)(stack[depth - 2u] & 0x3fffu) : origin;
-                return 1;
-            }
+            *predecessor = origin;
+            return 1;
+        }
+        /* Bitmap coordinates count steps remaining toward the origin.
+         * The parent's phase identifies the edge to undo on backtracking. */
+#ifdef SC64_ROUTE_MONOTONE_CLEAR_PREFIX_ENABLED
+        /* Resume the exact DFS at the obstruction with the same ancestor
+         * phases. The clear prefix has not read or written the memo. */
+        for (unsigned i = 0; i < prefix_x; ++i) stack[i] = TRY_VERTICAL;
+        unsigned prefix = prefix_x + prefix_y;
+        for (unsigned i = prefix_x; i < prefix; ++i) stack[i] = FINISHED;
+        depth += prefix;
+        horizontal -= prefix_x;
+        vertical -= prefix_y;
+        local -= prefix_x + prefix_y * width;
+        stats->nodes += prefix;
+        stats->candidates += prefix;
+        stats->memo_checks += prefix;
+#endif
+        stack[depth - 1] = TRY_BOTH;
+        while (depth) {
+            unsigned top = depth - 1u;
+            unsigned phase = stack[top];
+            if (stats->nodes >= budget) return SC64_ROUTE_PROBE_BUDGET;
+            stats->nodes++;
             /* Horizontal before vertical matches FIFO L/R/U/D root expansion. */
-            if (!(flags & 0x4000u)) {
-                stack[top] = (u16)(state | 0x4000u);
-                if (col != ox) {
-                    int next_col = col + (ox > col ? 1 : -1);
-                    int next = (int)cell + (ox > col ? 1 : -1);
-                    unsigned local = (unsigned)(row - (int)min_row) * width +
-                                     (unsigned)(next_col - (int)min_col);
+            if (phase == TRY_BOTH) {
+                stack[top] = TRY_VERTICAL;
+                if (horizontal) {
+                    int next = cell + x_step;
+                    unsigned next_local = local - 1u;
                     stats->candidates++;
-                    if (next == origin) { *predecessor = (int)cell; return 1; }
+                    if (next == origin) { *predecessor = cell; return 1; }
                     stats->memo_checks++;
                     if (SC64_GRID_GET(walkable, next) &&
-                        !((failed[local >> 3] >> (local & 7u)) & 1u)) {
+                        !((failed[next_local >> 3] >> (next_local & 7u)) & 1u)) {
                         if (depth >= stack_capacity) return SC64_ROUTE_PROBE_UNSUPPORTED;
-                        stack[depth++] = (u16)next;
+                        cell = next;
+                        local = next_local;
+                        horizontal--;
+                        stack[depth++] = TRY_BOTH;
                         continue;
                     }
                 }
-                state = stack[top]; flags = state & 0xc000u;
             }
-            if (!(flags & 0x8000u)) {
-                stack[top] = (u16)(state | 0x8000u);
-                if (row != oy) {
-                    int next_row = row + (oy > row ? 1 : -1);
-                    int next = (int)cell + (oy > row ? cols : -cols);
-                    unsigned local = (unsigned)(next_row - (int)min_row) * width +
-                                     (unsigned)(col - (int)min_col);
+            if (phase != FINISHED) {
+                stack[top] = FINISHED;
+                if (vertical) {
+                    int next = cell + y_step;
+                    unsigned next_local = local - width;
                     stats->candidates++;
-                    if (next == origin) { *predecessor = (int)cell; return 1; }
+                    if (next == origin) { *predecessor = cell; return 1; }
                     stats->memo_checks++;
                     if (SC64_GRID_GET(walkable, next) &&
-                        !((failed[local >> 3] >> (local & 7u)) & 1u)) {
+                        !((failed[next_local >> 3] >> (next_local & 7u)) & 1u)) {
                         if (depth >= stack_capacity) return SC64_ROUTE_PROBE_UNSUPPORTED;
-                        stack[depth++] = (u16)next;
+                        cell = next;
+                        local = next_local;
+                        vertical--;
+                        stack[depth++] = TRY_BOTH;
                         continue;
                     }
                 }
-                state = stack[top]; flags = state & 0xc000u;
             }
-            if ((flags & 0xc000u) == 0xc000u) {
-                unsigned local = (unsigned)(row - (int)min_row) * width +
-                                 (unsigned)(col - (int)min_col);
-                failed[local >> 3] |= (u8)(1u << (local & 7u));
-                depth--;
+            failed[local >> 3] |= (u8)(1u << (local & 7u));
+            if (--depth == 0) break;
+            if (stack[depth - 1u] == FINISHED) {
+                cell -= y_step;
+                local += width;
+                vertical++;
+            } else {
+                cell -= x_step;
+                local++;
+                horizontal++;
             }
         }
     }

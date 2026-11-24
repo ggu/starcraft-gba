@@ -54,6 +54,24 @@ three images permits an all-Closed lobby and keeps it on the setup
 screen on A at Launch. Reopening the third row as Zerg allows play.
 The Outpost result covers the authored GBA map.
 
+Separate reset replays extend the same sequence in the reverse
+direction. The N64 first shows Random, then D-pad Right changes the
+last open row to Zerg, and D-pad Left returns it to Random while the
+first two rows remain Closed. Start then launches play. This holds
+in both Blood Bath Melee and Free for All. The N64 observer uses an
+isolated D-pad Left binding and reproduces the prior Right witness
+in the same run. The cuts show the configured lobby and launch.
+
+All three GBA race builds repeat Zerg to Random with D-pad Left in
+both Blood Bath modes. Each launch has only the third row active;
+it resolves to a legal race and advances from frame 1 to frame 9.
+The randomly resolved faction is allowed to differ across launches.
+
+| N64 mode | Random | Right to Zerg | Left to Random | Gameplay |
+| --- | ---: | ---: | ---: | ---: |
+| Melee | 5,700 | 5,750 | 5,800 | 6,360 |
+| Free for All | 5,750 | 5,800 | 5,850 | 6,410 |
+
 ## Campaign, Showcase and fresh saves
 
 All 30 campaign entries open from their race cartridge. The test
@@ -139,6 +157,324 @@ physical calls. A separate run saves at frame 8,663, reloads via
 fresh HOME and reaches the same victory. The uninterrupted win
 also reloads through HOME and re-exports identical victory SRAM.
 
+Z1 has a winning receipt with a fresh save continuation on the
+earlier November 23 Melee build. Its input tape is missing from
+the retained local path. The [installed Z10 victory](#zerg-1-victory-replay)
+uses a different ordinary controller continuation from the early
+pause journal.
+
+The installed Z10 loads both earlier Z1 journals when pressing
+L from fresh HOME. The paused journal restores frame 984 with a
+matching world fingerprint, 55 units and 18 buildings, then advances
+to frame 992 after release. The victory journal restores the frozen
+frame 50,669, the completion bit and matching objective flags, army,
+resources and living Chrysalis. Both export SRAM byte for byte.
+This qualifies loading the earlier save and result on the exact
+current image. The new run below separately reaches victory by
+advancing ordinary play from that early pause.
+
+An ordinary-button continuation from that pause queues a Drone
+at frame 1,476 by paying 50 minerals. Three Drones are present by
+frame 1,856, including the one already queued in the input save.
+A Drone travels to the selected geyser and starts the paid
+Extractor, completed by frame 2,864. A remaining Drone assigned
+to the Extractor returns gas by frame 3,468. A fresh process uses
+the recorded inputs to reproduce the terminal world fingerprint,
+60 units, 19 buildings, and player resources of 218 minerals and
+8 gas. This is a continuation from the earlier pause journal.
+
+The first Den placement is refused with the in-game "No gas"
+message. After the bank reaches 56 gas, the same build command
+sends a Drone to the snapped site. The build pays 100 minerals
+and 50 gas on arrival and consumes the Drone. Construction is
+visible by frame 5,271 and complete at frame 6,071.
+
+An independent run replays 5,418 physical updates from the earlier
+pause to the completed Den, with the terminal world fingerprint
+matching and the Chrysalis alive. It pauses and saves on the
+installed Z10 at frame 6,071. A fresh process restores the same
+world, exports byte-identical SRAM and advances to frame 6,079.
+
+A longer continuation restores enough gas to train a Hydralisk,
+but the first order is refused at the supply limit. The Hatchery
+then pays 100 minerals for an Overlord. It hatches by frame 8,034
+and restores capacity from 2 to 18. The Den is destroyed before
+then, and the next Hydralisk request is refused for a missing
+prerequisite. The validated opening needs the Den defended through
+supply recovery to advance to Hydralisk production.
+
+### Zerg 1 defended opening and economy
+
+An earlier Overlord purchase at frame 3,560 keeps supply available
+for the first Hydralisk. One branch queues that Hydralisk at frame
+6,112 for 75 minerals and 25 gas. It hatches by frame 6,712 while
+the Den is still standing. The player then loses both the unit and
+the Den in an unsupported first attack.
+
+A separate branch selects all twelve Zerglings and issues Attack
+Move at frame 5,977, shortly after the Den completes. Ten Zerglings
+hold near the approach. A paid Hydralisk hatches by frame 7,160 with
+the Hatchery at 1,250 health and the Den at 814. An independent
+6,521-update replay reaches the same world and living Chrysalis.
+Saving from pause exports the same journal bytes, and a fresh HOME
+load restores the world and re-exports those bytes.
+
+The next branch reaches four Hydralisks by frame 11,491, after all
+ten defending Zerglings have died. An ordinary attack order clears
+the immediate pressure on the Den. The gas Drone dies in that fight.
+The Hatchery buys two replacement Drones, both assigned to minerals.
+The save at frame 13,270 has three mining Drones, four Hydralisks,
+176 minerals and 90 gas. Hatchery and Den health are 1,250 and 142.
+A fresh fixed-input replay from the frame-12,180 journal produces
+byte-identical SRAM. Loading it from another fresh HOME restores
+the same world and living Chrysalis. The following 120 neutral
+updates retain all four Hydralisks and three miners. Minerals rise
+to 200 while Den health and the gas bank hold steady.
+
+The mission is still active with 42 enemy units and 14 enemy
+buildings at the saved checkpoint. The damaged Den and interrupted
+gas income remain the next constraints on an assault.
+
+### Zerg 1 Extractor defense and renewed gas delivery
+
+The frame-13,270 checkpoint had already lost its Extractor. An
+ordinary rebuild request is accepted at frame 13,370. A Drone dies
+and there is still no Extractor at frame 14,470. In another branch,
+moving four Hydralisks toward that approach loses all four within
+600 updates. A separate long continuation reaches frame 38,494 with
+32 enemy units and 14 enemy buildings. Its Hatchery is down to 370
+health, and the mission remains active.
+
+The stronger branch starts earlier, from the frame-7,160 save.
+An immediate Attack Move intercepts an air attacker. At frame 8,749,
+the Extractor still has full health, the Den remains at 814 health,
+and gas has increased from 37 to 85. At frame 12,222, a second
+attack order diverts attackers from the Extractor. The fight costs
+two Hydralisks, three Zerglings and the gas worker. New production
+restores four Hydralisks by frame 14,801, with the Extractor at 123
+health and 40 enemy units remaining.
+
+An ordinary A command assigns a remaining Drone to the Extractor.
+It delivers gas by frame 15,348, increasing the bank from 15 to 23.
+A previously queued fifth Hydralisk has also hatched. A fixed-input
+replay from the frame-7,160 save matches all three terminal worlds
+and their respective SRAM bytes. A fresh process restores the last
+save and the living Chrysalis, and after 120 more updates all five
+Hydralisks and both workers remain alive. The Hatchery, Den and
+Extractor remain at 1,250, 814 and 123 health. Gas stays at 23 in
+that final neutral window.
+
+Starting from that save, 1,200 neutral updates increase gas from
+23 to 55. The gas worker, five Hydralisks, Den and Extractor survive.
+One more paid Hydralisk hatches by frame 17,345, bringing the force
+to six. One forward Hydralisk is down to 36 health. The Extractor
+has 123 health and the chapter remains active with 39 enemy units
+and 14 enemy buildings. An independent controller replay matches
+the terminal world and SRAM bytes. A fresh process restores the
+save and advances to frame 17,465 with all six Hydralisks, the gas
+worker and the Extractor still alive.
+
+Conservative defense and paid production reach ten Hydralisks,
+four Drones and two Overlords by frame 23,161. Two follow-on
+attacks destroy three enemy buildings and three enemy units from
+that checkpoint. At frame 26,301 all ten Hydralisks are alive,
+gas is 210, and the Hatchery, Den and Extractor still have 1,250,
+814 and 123 health. The remaining 33 enemy units and 11 buildings
+are active. In a separate push toward the deeper base, six
+Hydralisks die. The preserved save precedes that attack.
+
+An independent ordinary-input replay reproduces all three pause
+checkpoints, their world fingerprints and their SRAM bytes from
+the frame-17,345 journal. A fresh emulator loads the last save
+with identical SRAM and advances another 120 updates. The living
+Chrysalis and all ten Hydralisks remain present. Victory is open.
+
+### Zerg 1 base raids and reinforcement
+
+The continuation from frame 26,301 responds to a Wraith near the
+Den and a Firebat near the Extractor. It loses the gas worker,
+intercepts the Firebat and assigns a replacement Drone. Gas rises
+from 233 to 249 and the Den stabilizes at 744 health. By frame
+32,759, paid production reaches 14 Hydralisks. In a neutral branch
+from there, the next raid destroys the Extractor and kills nine
+Hydralisks. An immediate Attack Move intercepts the raid in the
+preserved branch. Twelve Hydralisks and all four Drones survive,
+with the Extractor at 93 health and 28 enemy units remaining.
+
+Production reaches 16 Hydralisks with one queued by frame 37,754.
+The base retains the Extractor and four Drones, with 2,028 minerals,
+248 gas and 40/50 supply. Eleven enemy buildings remain. An
+independent controller replay matches the five checkpoint worlds
+and their SRAM bytes. A fresh load advances 120 updates with all
+16 Hydralisks and the Chrysalis alive. In separate longer branches,
+idling loses the Extractor and a preemptive regroup loses nine
+Hydralisks. The later successful sequence responds to this raid.
+
+### Zerg 1 victory requirements
+
+Targeting the incoming Marine's actual path preserves the army.
+In the subsequent assault, Hydralisks reduce 11 enemy buildings to
+five by frame 42,816 and to zero by frame 45,652. Thirteen Hydralisks
+and the Chrysalis survive. The Pool, Den and all Drones are gone.
+An independent replay matches the pause journal. A fresh load
+advances another 1,200 updates with zero enemy buildings and the
+mission still active.
+
+A separate branch returns to the base and rebuilds the Pool. The
+Den and two Drones survive, while all Hydralisks are lost. An
+Overlord hatches after being queued at 4/2 supply, allowing paid
+Hydralisk production. The following raid destroys the new Pool.
+The southwest evacuation reaches frame 43,412 with a living Den,
+ten Hydralisks and three full-health Drones. Five hostile buildings
+remain and the Pool needs rebuilding. The later push from this
+checkpoint clears every hostile building by frame 46,554. The Den
+survives and a raid kills the Drones before the Pool is rebuilt,
+leaving the mission active. Both southwest journals reload with
+identical SRAM in a fresh process and advance ordinary play.
+
+In-memory inspection of the owned USA N64 ROM's Zerg 1 victory
+trigger finds three simultaneous command-count conditions. Player 6
+has zero buildings, and the current player has at least one
+Spawning Pool and at least one Hydralisk Den. The victory row uses
+current counts. Initial building records in the standard building
+ID range belong to Player 4 and Player 6, with two and fourteen,
+respectively. This verifies the numerical conditions in the ROM.
+Native engine execution, ownership changes and trigger polling
+timing remain open.
+
+The retained N64 Z1 evidence covers the title and
+briefing after a progress edit. A native combat comparison still
+needs an ordinary mission unlock and capture.
+
+### Zerg 1 victory replay
+
+From the southwest pause, ordinary orders rebuild the Pool by
+frame 45,340. The Den and Hatchery are standing and four enemy
+buildings remain. The final attack intercepts the Goliath at the
+base and clears the last four structures. At frame 49,270 the
+result shows victory with ten Hydralisks, the Chrysalis at 800
+health, a 387-health Pool, and a 744-health Den. The Z1 completion
+bit is set and the unsupported-event counter is zero.
+
+One independent composed replay starts at the earlier-release
+frame-984 pause and executes 49,383 controller updates across 17
+segments. Each segment opens in a new process, loads the previous
+segment's SRAM through HOME, and matches the expected world and
+output SRAM. A new process loads the final victory and re-exports
+identical SRAM. Returning to HOME opens the Z2 briefing through
+ordinary menu input. The missing opening tape to frame 984 and
+native combat comparison remain open.
+
+### Zerg 3 early economy
+
+A new run from blank SRAM opens Z3 through HOME and deploys from
+its briefing. A paid Drone hatches, starts collecting minerals,
+then builds an Extractor. Two starting workers take mineral and
+gas orders. By frame 4,520 the resource banks hold 138 minerals
+and 90 gas. The 250-health Chrysalis survives along with the
+Hatchery, Pool, Den and completed Extractor. An independent replay
+matches all four journals. A fresh HOME process restores the
+latest journal byte for byte and advances another 120 updates
+with both workers still assigned.
+
+Continuing from that save with ordinary input raises ten
+Hydralisks and four Mutalisks by frame 11,342. Five Drones
+continue mining or gathering gas. By frame 12,156 the first
+hostile turret is down, leaving 45 hostile units and 25 hostile
+buildings. Nine Hydralisks and three Mutalisks survive.
+The Hatchery, Pool, Den, Extractor and 250-health Chrysalis
+remain intact. An independent replay matches both new saves
+byte for byte. A fresh HOME load restores the latter save
+and the same field state. A 120-update neutral continuation
+loses one more Hydralisk, so the next attempt needs immediate
+movement or reinforcement. Victory remains open.
+
+A separate branch from the verified frame-11,342 save trains
+20 Hydralisks and retains three Mutalisks by frame 23,023,
+with five Drones, all key buildings and the 250-health Chrysalis
+intact. A short attack on the nearest turret drops the hostile
+building count from 26 to 25 by frame 23,837. Nineteen Hydralisks
+and two Mutalisks survive. Both ordinary-input segments replay
+to matching field fingerprints and byte-identical saves, and a
+fresh HOME load restores the assault checkpoint. The earlier
+staging point keeps more forces for a longer offensive.
+
+From the earlier staging point, a paid Lair and Spire complete
+by frame 27,291. Reassigning one Drone to the Extractor restores
+gas income, and a newly paid Mutalisk hatches by frame 29,174.
+A second gas Drone and a replacement mineral Drone restore
+the workforce to five. With two gas orders active and no gas
+spending, the bank grows by 80 gas over 1,500 updates. A second
+paid Mutalisk hatches by frame 31,682. A fresh HOME load at that
+checkpoint restores 20 Hydralisks, five Mutalisks, five Drones
+and the intact Chrysalis and tech buildings. Independent replays
+match the three saved field states and journals. The air-tech
+branch has 26 hostile buildings remaining.
+
+The frame-31,682 save also continues through a third gas worker
+and seven more Mutalisks. At frame 44,345 the force has 19
+Hydralisks and 12 Mutalisks. An ordinary Move order concentrates
+both groups before the attacks. The two turret strikes remove
+two hostile buildings while all 31 combat units survive.
+The last save at frame 48,118 retains the full-health Chrysalis,
+key tech buildings, and six Drones split evenly between minerals
+and gas. There are 33 hostile units and 24 hostile buildings.
+
+An independent replay matches the six stage fingerprints and
+SRAM outputs byte for byte. A fresh HOME process restores frame
+48,118 and the same army. One Hydralisk dies after another 120
+neutral updates, so the next attack needs an immediate ground
+order before sending the Mutalisks ahead. A separate attempt
+shows the line ahead has siege tanks and costs nine Hydralisks
+on a direct advance.
+
+Starting before the ground push gives time to hatch 18
+Mutalisks. Two A taps on their stack select the air units,
+then a Move order gathers them clear of the Hydralisks.
+With the ground force near the base, the air group destroys
+both front turrets, an exposed tank and an additional hostile
+building. The frame-55,138 save retains 18 Hydralisks, 18
+Mutalisks, six Drones and the intact Chrysalis and tech.
+It has 34 hostile units and 23 hostile buildings remaining.
+The six stages replay to their retained field and SRAM hashes.
+A fresh HOME load restores that save byte for byte and keeps
+all 36 combat units alive for a further 120 neutral updates.
+
+Seven independent tape segments continue the verified frame-55,138
+save from 23 to nine hostile buildings by frame 61,132, with a
+fresh reload of the same field. The air force has 14 Mutalisks,
+the ground force has 16 Hydralisks, and the Chrysalis still has
+250 HP. An approaching Marine threatens the Chrysalis shortly
+after this checkpoint. A nearby Hydralisk intercepts it through
+ordinary input. The Chrysalis survives the attack at 170 HP.
+From that defended state, the air force clears four additional
+buildings with the combat force intact.
+
+Saving immediately after an intervening Command Center attack
+returns the save-failed notice at frame 64,486. A read-only
+breakpoint trace reaches the save adapter's pending-impact
+limit. The check receives 12 impacts and the serializer
+admits eight. The previous SRAM journal remains loadable.
+A later ordinary save succeeds after another building falls.
+The recovered frame-64,819 journal fresh-loads with three
+hostile buildings, 16 Hydralisks, 14 Mutalisks, six Drones and
+a 170-HP Chrysalis. A separate ground selection clears the
+approach while a Hydralisk stays near the Chrysalis. The
+frame-66,829 save retains the full army with 14 hostile units
+and three hostile buildings. Three independent input segments
+return the same save bytes and field fingerprints.
+
+The final two input segments move the ground force into the
+remaining Marines and send the Mutalisks to support it. Victory
+appears at frame 68,639 with two hostile units and two hostile
+buildings remaining. The Chrysalis survives at 170 HP. The
+result sets the primary objective and Z3 completion bit and
+records zero unsupported actions. Six Hydralisks, 14 Mutalisks
+and six Drones remain alive. An independent replay reproduces
+the victory and the 32 KiB autosave byte for byte. Fresh HOME
+load restores the same result. Ordinary menu input then opens
+the Z4 briefing and deploys the next mission.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -152,6 +488,71 @@ launches, R selects the five Marines and leaves the five SCVs
 unselected. The five Marines are still selected 1,000 updates
 later. All units stay unselected in the neutral control. The two
 platforms use independent clocks.
+
+A second isolated ares v148 run starts with fresh save storage and
+continues the ordinary Wasteland launch with A and analog movement.
+It reaches 11,420 emulator steps and retains five frames. The last
+frame shows the displaced camera over fog and the opening 40 minerals
+and 10/18 supply. This run confirms the controller and capture path
+for longer tests. Native campaign progression remains unverified.
+
+A fresh ordinary-input ares run verifies that R selects the five
+starting Marines. After a short analog cursor move and C-Right,
+the group changes position. A subsequent command moves the group
+into the trees. The native HUD identifies the C-button movement
+controls. These captures cover selection and movement. An enemy
+engagement and mission completion remain open.
+
+The ordinary pause menu saves Wasteland to the first empty slot.
+The original interactive bridge closed without writing FlashRAM.
+With the desktop ares save sequence added before unload, the same
+input writes a 128 KiB cartridge save. A fresh bridge process
+copies it into isolated save storage and opens Load Saved with two
+D-pad Right presses. `Terr01 01:53` identifies Wasteland. A confirms
+the slot and the field restores with the Marines by the trees,
+40 minerals and 10/18 supply. The original flash and the new run's
+export match byte for byte. The replay uses ordinary controller
+input and cartridge FlashRAM.
+
+From the first slot, two ordinary C-Right moves advance the
+Marines southeast across the road toward a water crossing. The
+pause menu saves the position to the second slot. A fresh process
+selects `Terr01 02:41` and restores the crossing with 40 minerals
+and 10/18 supply. The 128 KiB FlashRAM round trip matches byte for
+byte and the first slot is still listed. A later ordinary run
+moves the five Marines along the eastern shore to its southern
+edge. Continuing south finds Jim Raynor and displays the advisor's
+new survival objective. This supplies a native counterpart to the
+[GBA rescue checkpoint](2026-11-13-t1-t2-normal-physical.md#november-20-t1-fresh-sram-and-result-autosave).
+The first slot now stores `Terr01 03:47`. A fresh process reloads
+the field after the encounter with byte-identical FlashRAM and
+still lists the earlier second slot. A native mission win remains open.
+
+From that encounter, ordinary movement takes Raynor south to
+the Command Center, Supply Depot and mineral field. Raynor
+survives an enemy engagement with 270 HP. The first slot saves
+this position and a fresh process restores it with byte-identical
+128 KiB FlashRAM. The native Goals screen lists a Barracks,
+additional Marines and Raynor's survival. The bank still has
+40 minerals and five SCVs remain near the northwest start.
+Mining and production are the next verified-play checkpoints.
+
+Finer cursor placement selects a controllable 60-health SCV.
+The native unit panel shows its Build, Repair and Move choices.
+C-Right moves that SCV south from the northwest opening group
+to the rocky pass. The ordinary menu writes a first-slot save,
+and a fresh native process restores the SCV there with a
+byte-identical FlashRAM export. The field still shows 40 minerals
+and 10/18 supply. The next checkpoint is an explicit mining
+order at the base followed by a verified increase in minerals.
+
+A fresh continuation reselects the same SCV and issues another
+C-Right Move to the south. The original field HUD shows Build,
+Repair, Move and the ground-context B Attack label. The bank
+still has 40 minerals. A prepared follow-up aims the selected
+SCV at the mineral field. The wrapper stops that new launch
+before emulation when the disk falls below its 5 GiB reserve.
+The contextual gathering input remains to be observed.
 
 ### Terran chapter 5 input divergence
 
@@ -330,6 +731,134 @@ exceeds two VBlanks. Camera motion also changes visible draw
 work, so each pair measures that complete view change. A fixed
 camera already incurs most of the measured late-frame cost.
 
+### Late simulation and drawing budget across the race ROMs
+
+On the same three-CPU configurations, the ordinary-button observer
+reads the release ROM's built-in cycle counters for 120 consecutive
+advancing updates at launch, after update 9,000 and after update
+11,000. The player gives no orders and leaves the camera at its
+starting location. Each launch checks the occupied rows, resolved
+races and start locations. All 2,160 samples pass the counter
+nesting checks and keep the ROM, ELF and runner hashes unchanged.
+The six late windows match the corresponding fixed-camera replays
+in starting world fingerprint and all 720 total-cycle readings.
+
+| Cartridge and map | Total | Simulation interval | Orders | Drawing interval | Actors and effects | Simulation overruns |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 1,058 | 636 | 481 | 421 | 262 | 117/120 |
+| Terran 10 Blood Bath | 850 | 606 | 478 | 243 | 85 | 82/120 |
+| Zerg 10 Outpost | 1,275 | 804 | 628 | 470 | 283 | 120/120 |
+| Zerg 10 Blood Bath | 929 | 603 | 457 | 325 | 134 | 84/120 |
+| Protoss 10 Outpost | 1,268 | 799 | 610 | 469 | 288 | 120/120 |
+| Protoss 10 Blood Bath | 989 | 661 | 501 | 328 | 153 | 110/120 |
+
+The table shows mean thousands of guest cycles after update 11,000.
+Orders are part of the simulation interval, and actors and effects
+are part of the drawing interval. Each simulation mean exceeds the
+561,792-cycle two-VBlank budget by 41,354–242,681 cycles. All 720
+total samples in this late window exceed the same budget. Orders
+account for 45–56% of total cycles across the six means. Actors
+and effects account for 35–62% of drawing, compared with 43–52k
+cycles for the measured terrain background stage. The launch
+windows average 29.72–29.99 emulated updates per second and the
+late windows average 13.16–19.73.
+
+The profiling intervals charge interrupt work to the phase in
+which it occurs. The simulation interval also includes input reads.
+The residual includes audio update and presentation outside those
+two intervals. It typically includes a pacing wait in the launch
+window and averages under 500 cycles in the late windows. Use the
+instruction attribution below when comparing individual routines.
+These are cycle measurements in mGBA.
+
+Eight updates per late window also run under the instruction and
+call-stack observer. All 48 cuts match ordinary unprofiled replays
+on sampled world state, both framebuffer pages, palette, camera,
+display, and elapsed cycles. The built-in phase counters also
+match the table's underlying samples. The instruction and stack
+totals reconcile with each cut's emulator clock.
+
+| Cartridge and map | Movement | Uncached contact masks | Point route lookup | Depth-ordered drawing |
+| --- | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 198 | 91 | 15 | 235 |
+| Terran 10 Blood Bath | 326 | 105 | 99 | 69 |
+| Zerg 10 Outpost | 292 | 129 | 23 | 257 |
+| Zerg 10 Blood Bath | 247 | 92 | 21 | 104 |
+| Protoss 10 Outpost | 210 | 56 | 23 | 264 |
+| Protoss 10 Blood Bath | 225 | 51 | 41 | 131 |
+
+Each entry is a mean in thousands of inclusive guest cycles over
+eight updates. Movement is `move_toward`, contact masks are
+`sc64_contact_blocked_mask_uncached`, and point route lookup is
+`sc64_route_next`. Calls can nest. Within the Terran Blood Bath
+point route lookup, `sc64_route_monotone_probe` alone accounts for
+81k direct cycles. Uncached contact remains a substantial cost
+on all six configurations. Depth-ordered drawing is consistently
+heavier at the sampled Outpost starting views. These cuts support
+separate probes for collision traversal and the monotone route
+test, with actor and effect drawing paired across both maps.
+
+### Monotone route search outcomes
+
+The exact Terran 10 and Protoss 10 images run both three-CPU maps
+with ordinary buttons and no player orders. At launch, after update
+9,000 and after update 11,000, read-only breakpoints observe the
+monotone point-route call and return for 24 advancing updates.
+All 288 measured updates match uninstrumented controls on world
+fingerprints, both framebuffer pages, palette, display, camera,
+phase counters and elapsed cycles. Zerg 10 uses a separate point
+route path in these builds and is outside this call-site census.
+
+| Cartridge and map | Calls after update 11,000 | Searches visiting at least 32 nodes | Most visits in one search | Mean probe cycles per update |
+| --- | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 68 | 0 | 10 | 6,566 |
+| Terran 10 Blood Bath | 70 | 29 | 226 | 88,808 |
+| Protoss 10 Outpost | 83 | 0 | 15 | 8,382 |
+| Protoss 10 Blood Bath | 59 | 12 | 135 | 25,126 |
+
+All 280 late calls find a path. Across all three cuts, 496 of 498
+calls find a path and the other two exhaust their monotone search
+without hitting the 512-visit budget. The longest individual
+Terran Blood Bath call takes 82,428 guest cycles in this sample.
+The late Terran Blood Bath probes account for 10.3% of mean
+update-loop cycles. Prioritize cheaper successful long routes in
+these windows. Increasing the budget would skip none of the
+observed visits.
+
+An expanded Terran Blood Bath run reads 277 calls over 96 advancing
+updates from the same late boundary. All succeed. The observed
+walkability fingerprint stays identical, and 122 distinct endpoint
+pairs occur. Searches with at least 32 visits account for 96.0% of
+measured probe cycles. Four calls repeat a query within the same
+update and another 151 repeat one from a prior update.
+
+An offline eight-entry LRU simulation using exact endpoints and
+the walkability fingerprint would cover 83 calls. Those calls are
+all one-visit searches and account for 0.20% of the total observed
+loop cycles. A 32-entry LRU would cover 131 calls and 1.28% of
+loop cycles. The simulation has no lookup or invalidation cost.
+These bounds favor improving the long searches over an endpoint
+cache for this workload.
+
+A second replay of those 96 updates also tags calls whose origin
+is an earlier returned predecessor for the same goal and grid.
+It produces the same 277 calls and cycle readings. Among first-seen
+endpoint pairs, 99 meet that continuation condition. They account
+for 5.75 million guest cycles, or 7.07% of complete loop cycles in
+the sample. Seventy of those calls occur ten updates after the
+earlier query. These counts measure workload overlap before any
+cache overhead or route-slot eligibility checks.
+
+An asset-free sanitizer check records the parent of the returned
+step in the original search and asks for a fresh route from that
+step to the same goal. Across 110,940 successful nontrivial cases
+on byte and packed grids, the fresh search returns the recorded
+parent within the original visit count. This covers all 3×3 masks
+and endpoint choices at five caps, plus randomized larger grids
+and 26,640 successful cases with blocked goals. A runtime design
+would retain the actual path and preserve route-slot precedence,
+request aging, and invalidation on topology changes or load.
+
 ### Protoss 10 late battle attribution
 
 On the same Protoss 10 Blood Bath Melee lineup, a read-only ARM
@@ -354,6 +883,49 @@ with speeds one through three. Of 2,406 observed bucket visits,
 occurs at most once within a sampled update. The late cut also
 draws 164 packed sprites across 3,251 rows. These counts provide
 workload sizes for synthetic renderer and collision tests.
+
+### Paired ARM replay of observed route queries
+
+A repeat of the 96-update Terran Blood Bath cut records the ordered
+inputs and results of all 277 point probes on one unchanged packed
+walkability grid. It uses the installed cartridge and ordinary
+controller inputs. The breakpoint and uninstrumented runs agree
+on the world, video, camera, phase counters and elapsed cycles at
+each update. The calls spend 8,440,631 cycles within an 81,397,508-cycle
+window on that image.
+
+A freestanding ARM7 Thumb fixture runs the original and incremental
+probe from [draft #802](https://github.com/ggu/starcraft-gba/pull/802)
+with the observed inputs, an EWRAM grid and cartridge wait setting
+`0x4317`. All 277 statuses, first steps and five search counters
+match the original cartridge and both fixture builds.
+
+| Compiler mode | Original fixture cycles | Incremental fixture cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| `-O2` | 7,880,987 | 5,940,318 | 24.62% |
+| `-Os` | 9,291,740 | 5,943,830 | 36.03% |
+
+At `-O2`, eight calls grow by at most 13 cycles each. Applying the
+fixture's measured deltas to the original 96-update total suggests
+a 2.38% loop-cycle reduction. This projection uses one steady-grid
+window and excludes integrated code placement and dispatch interactions.
+Whole-cartridge timing, RAM qualification and GBA SP measurements
+remain open. The captured grid and query inputs stay local.
+
+The same 277 inputs also exercise the incremental route wrapper
+with and without the 16-path continuation table from
+[draft #805](https://github.com/ggu/starcraft-gba/pull/805).
+Both return the expected next cell on every call. The `-O2`
+fixture drops from 6,273,133 to 1,749,728 cycles, a 72.11%
+reduction. A total of 169 calls grow by up to 2,441 cycles.
+The savings occur in 62 update buckets, while 34 grow, with
+a maximum growth of 4,062 cycles in one bucket.
+
+This wrapper replay starts with empty route slots and an empty
+continuation table. The request clock is pinned to an eligible
+value. Qualification with the full dispatcher must cover existing
+route hits, age boundaries, earlier cache history and topology
+changes. The fixture adds 360 bytes of linked BSS.
 
 ## ROM space available for cutscenes
 
@@ -418,6 +990,16 @@ quality on the GBA SP.
 | One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
 | One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
 | Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
+| Three-race frame-budget breakdown | `336e4cfc4cf66286f99b97ec10166c29bdb38c3b6e6cf6861396dd166e372bbe` |
+| Three-race order and drawing instruction attribution | `fae6f5e019544c8bd74587010652717b685c93afbbc05f5bb31babea211e9874` |
+| Monotone point-route search outcomes | `f301862e71f5c4b52fba25cf93bc89f95b4ef769cd5952fa43553fc1db6fc43e` |
+| Terran Blood Bath exact endpoint repeats | `36e893debf67f5f26106a8fdbbc97af360742faabe3ff995e65e99af19773067` |
+| Terran Blood Bath calls that continue an earlier route | `1544bbbd940e70a3d4d964ffc0d6a28a715ed8c2e70da36f1f76d20da643676c` |
+| Terran Blood Bath ordered point-query capture | `fd2ed95b78f2d9261c99660ad5106745502c16c8e7c4deaab6337e2a8694d948` |
+| Paired ARM incremental probe replay | `027bbcec6709093824b200e5986d4244d8ebba2f07c958f8e821327462bf624c` |
+| Paired ARM continuation-table wrapper replay | `6f4b6225d1262d95014aef47b96472a976881e2479140e310733a6a9e50871cb` |
+| N64 D-pad Left witness manifests, Melee and Free for All | `34f44b7849a7590b6c31263c61c29f7fcc5f06f683caca0886ddfad3a8ac1831` / `b5ea9ab761801e97eab89383e0316bbdb78f54ad801dc6a57518f873e98ccc77` |
+| GBA D-pad Left and launch matrix | `228c88f2fdc12e9bce1711e1247a9f9b61d5c4e864ea782de01aaa5c420d23cd` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
 | Terran chapter 1 full run and fresh loads | `8c3642922e2358bcfe2d0264918d1cf381bf254e95c7b993a55ab55f8046cc94` |
 | Terran chapter 2 full run and fresh loads | `e51366eeaa6c55309aa3630a5c9e2da47ad51608be0b25f85f33d60fd20902b2` |
@@ -439,6 +1021,49 @@ quality on the GBA SP.
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
 | Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
+| Zerg chapter 1 previous-version pause and victory journal loads | `855aac8e466c4b7fa0266a0150dff9ba86420ae3dd746836cc6246881587a3c5` |
+| Zerg chapter 1 worker production and first gas from earlier pause | `ab38f823f63fefd21938bb7cc2fdf1df7b1d0a1efe016ecac6dad235c7243c81` |
+| Zerg chapter 1 independent fixed-input continuation | `4f5eee2586d2a301cd8c25ea701f24346e2b99eafd85a72680d116b1475a774f` |
+| Zerg chapter 1 paid Hydralisk Den from the earlier pause | `58d5cd1704e6badfa09cde17168fc1abd9b098bbd8bf191c4ab27900d1724cce` |
+| Zerg chapter 1 completed Den, new pause journal and fresh load | `7955f55008dff0fb8df79d35c6d26ad91c9205155ffbd1474c02fff25f54f5c3` |
+| Zerg chapter 1 Overlord hatching and Den loss | `b61993ff8441be3c34eaa209b4343522941ca4c30ff3a27745148ab4eb3ce7e3` |
+| Zerg chapter 1 earlier Overlord and first paid Hydralisk | `61157044ccd65d5b3c373cd0a3d6358597ed0694f254f731396053776e91373a` |
+| Zerg chapter 1 defended opening, independent replay and fresh load | `c07133279a15e890fc3f28192096dc7ccc2b85fbf5853ea319d8ecf15671bb6d` |
+| Zerg chapter 1 replacement workers, save and fresh load | `3fd25cfa02801e85481074f0d8a37b93601e3b8db07fd4afe5123f800f621a41` |
+| Zerg chapter 1 alternate Extractor rebuild and long continuation | `bfc4527f96611a285f3e52558b3d085e08fa89b9b9383df12296cc2227a51173` / `1f427cb257d3dec0488a07bfcbba7432fe9c3112e372671c63a3637d202cd4b3` |
+| Zerg chapter 1 three early-defense saves, gas delivery and fresh load | `78b17df4800f550c6a3346ebb072365975aa9cb2f1e4ac00956204b5cfdb3004` |
+| Zerg chapter 1 sustained gas delivery, sixth Hydralisk and fresh load | `8788f3c9c8d7b24cc1f2a0e0463409dde1bddc18fa0585829f4a0d7e15968b02` |
+| Zerg chapter 1 three assault checkpoints and fresh load | `9ae9c0dbcd4d146678eac97d235f6e52632afb3ab9f47c16587f4de3565b00cc` |
+| Zerg chapter 1 five raid and reinforcement checkpoints, with fresh load | `0aa1c8b34e4f9d8a18b0f6ec89be486c1c31c0b8ac9ce8a913afdd318487e4e6` |
+| Zerg chapter 1 assault, Pool recovery and three fresh loads | `fe4c144210505c8a6921fd9f6701d4cf9c8fb67b778ffc0e5681903e3e0331ec` |
+| Zerg chapter 1 southwest evacuation and final assault, with two fresh loads | `c8e7af793d05a7252a2e5cfa8abce99e8ccc6b48006b32b4dda44e1f57abd835` |
+| Zerg chapter 1 composed ordinary input from frame 984 to victory, with fresh load | `1972dd567660b95aedef54d66cc1425f1966cfc20f218861101f955bb85147ed` |
+| Zerg chapter 1 victory load and Zerg chapter 2 briefing | `e9b826443cda4a4dd44290896cf841577909b3eeba297e81fc5b9081d0266e4e` |
+| Zerg chapter 3 blank HOME deployment, paid economy and fresh pause continuation | `f00dfa77e6a95579fee276f2466d9b1f51215bd51b8dbf887f4f105e01201b7b` |
+| Zerg chapter 3 paid army, first turret destroyed and fresh reload | `465c036febfef23eebbd9028718ddde9fbcc2a5260290a38b4946ff3f6f39bf2` |
+| Zerg chapter 3 larger staging army and paired assault journals | `add479597eb38b1346b659a915453c0ff18e6780dd44698be74bf382d438594e` |
+| Zerg chapter 3 paid Lair, Spire, Mutalisk and fresh load | `19b35e7e434fb4a1e2ffe1f23ce38e49ab41459e21fc3915f907f83d17f7010b` |
+| Zerg chapter 3 two gas workers, replacement Drone, second paid Mutalisk and fresh load | `c03824f923eeccb8a403b2b300575e049ac4084477f558acc9bc9d23351667fa` |
+| Zerg chapter 3 concentrated force, two turrets destroyed and fresh load | `7ab53d373dce59910590b59f49578a5321981a5606444fcd64fc5b2a7781ca1b` |
+| Zerg chapter 3 air-only staging and two front turrets | `da15345f50c14de6ba9bc3e0596e3cf5d5e549d979164daa4e5009a52151e3e0` |
+| Zerg chapter 3 exposed tank and third building, with fresh load | `4edc0c308e971a5c01f44756e7de9224fb7e93bb394ac68454b0f4a520cd1ee2` |
+| Zerg chapter 3 northwest advance from 23 to nine hostile buildings | `56574ada7f77938fd7933883c334b44e444fd8ca2b288f8e8f560f6515689c79` |
+| Zerg chapter 3 base defense and five-building fresh checkpoint | `a5df21d6dddfbcdc5ea7ebdeba1339a07c89fd8cc2339bda6bde96681f87b6ab` |
+| Zerg chapter 3 rejected pause save with 12 pending impacts | `dda019fe449f93ef34b3c922cd683d6a6305b536a574d06ad428d53e4cf35f51` |
+| Zerg chapter 3 coordinated ground and air checkpoint | `ba1377b8ac2fdb5bce7f7513206820f03a1848c1fa0bf38eb4cfe1c3a522765a` |
+| Zerg chapter 3 victory, exact autosave reload and Zerg chapter 4 deployment | `4fdf64e727696beabe40bf58d4c61fb2df92e78d75a9400a3937a27e14a087c6` |
+| N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
+| N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
+| N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
+| N64 Wasteland ordinary save with persistent media enabled | `c864ce55ae39739209c890552f956d783d8a34e9bbe156d20ab457d133aec9b5` |
+| N64 Wasteland ordinary fresh title load manifest | `16a8056ac4ac05cf2bd7e7e08ee89d75a8d86f6e0672322c5de251a89b41bf2b` |
+| N64 Wasteland second-slot save and fresh load manifests | `911d224bd8d631db1f0c00dc91dc3038f642e293c1883ba628b091c9ae875953` / `073a5f77a61d7703a8668e4ec9304d75fd926775fe6d2ec8a6497ac577b60cbc` |
+| N64 Wasteland eastern-shore movement manifest | `42afda84d1d1eb620e709d738be1e1f9cbc3f641077041b0b1e03a5ea9783a2a` |
+| N64 Wasteland Raynor survival objective manifest | `ab665a6572572da554ecc7da81a67ad8a02f21306149d2b22009a5b54190cdbd` |
+| N64 Wasteland post-encounter save and fresh title-load manifests | `e3ace99f57f04f37b5c743e92b8c38f516e4d6af4b4078890b16de5817e71d43` / `0bcebe5d9b9519e578797c3b2a33bcedcd6522c3d9b1243411b46ae9a0ee249a` |
+| N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
+| N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
+| N64 Wasteland SCV reselection and southward move | `d634dc26e7a39a6cb21b1939c929db6de2612e9d0c4a79ea251a08f032fe899e` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
