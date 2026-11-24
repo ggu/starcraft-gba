@@ -27,6 +27,11 @@ mineral, tracer, vision, AI, RNG and camera digest matches, as do both
 Mode 4 pages, the palette and display control. These are emulator
 measurements from an authored skirmish fixture.
 
+Extending the panned pair to 600 updates retains matching state and
+display cuts. The mean falls from 631,696 to 627,942 cycles, and p95
+falls from 1,076,127 to 917,265. The number of frames above two
+VBlanks drops from 147 to 142 as the initial battle settles.
+
 The sanitizer oracle compares 3,000 shapes against the prior
 four-rectangle implementation, both as tile data and Mode 4
 framebuffer data. The clipped cases include degenerate sizes,
