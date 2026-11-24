@@ -545,15 +545,16 @@ static void test_witness_limits(void)
     reset_world();
     grid_fill(1);
     origin = 0;
-    int goal = 128 * 128 - 1;
-    assert(sc64_route_monotone_next_step(origin, goal, 2047, 2047, &nx, &ny));
-    assert(sc64_route_monotone_next_step(origin, goal, 2047, 2047, &nx, &ny));
+    /* The retained 112 steps cross the corner of the original clear L. */
+    int goal = 127 + 80 * 128;
+    assert(sc64_route_monotone_next_step(origin, goal, 2047, 1287, &nx, &ny));
+    assert(sc64_route_monotone_next_step(origin, goal, 2047, 1287, &nx, &ny));
     assert(sc64_route_witness.paths[0].steps == SC64_ROUTE_WITNESS_MAX_STEPS);
     for (int i = 0; i <= SC64_ROUTE_WITNESS_MAX_STEPS; ++i) {
         int expected;
-        assert(reference_step(origin % 128, origin / 128, 127, 127, &expected));
+        assert(reference_step(origin % 128, origin / 128, 127, 80, &expected));
         bfs_queue[0] = 0xa55a;
-        assert(sc64_route_monotone_next_step(origin, goal, 2047, 2047, &nx, &ny));
+        assert(sc64_route_monotone_next_step(origin, goal, 2047, 1287, &nx, &ny));
         assert(nx / 16 + ny / 16 * 128 == expected);
         /* The truncated tail must trigger a fresh search, never a raw jump. */
         if (i == SC64_ROUTE_WITNESS_MAX_STEPS) {
