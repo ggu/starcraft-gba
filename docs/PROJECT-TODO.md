@@ -1192,8 +1192,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   second defense keeps the new Den and Kerrigan, with the Hatchery
   at 359 HP. A paid worker recovery restores a miner, a queued
   Drone and a replacement Pool under construction at frame
-  75,299. Defend that economy, combine base defense with the
-  eastern assault and defeat the western Nexus.
+  75,299. A [separate same-chain recovery](audits/2026-11-12-z8-normal-physical.md#rebuild-after-the-eastern-nexus-falls)
+  continues directly after destroying the eastern Nexus and
+  fresh-loads a full-health Hatchery and Pool at frame 77,041.
+  Intercept the next Reaver before extending the base and
+  advance on the western Nexus.
+  [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
+  fresh-loads an Extractor, Lair, Den, Spire and three full-health
+  paid Mutalisks at frame 8,925. Preserve the wounded gas worker
+  and reinforce the air group before the crystal route.
+  [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
+  average 19.15–20.46 emulated updates per second. A sparse-aware
+  Pylon row grouping trial roughly halves the authored dense
+  power-check cost. Qualify the actual ROM frame and stack
+  budgets with dense and low-Pylon campaign and skirmish workloads.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -1888,8 +1900,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the east corridor and recruits the rebel base. Fresh HOME
   restores 27 units and 19 buildings with both heroes alive.
   The captured Factory and Starport complete paid Vulture and
-  Wraith orders, and those units survive reload. Build the assault
-  force and eliminate the enemy buildings.
+  Wraith orders. Two miners establish minerals and gas. The air
+  force destroys the eastern Command Center and Refinery.
+  Frame 57,882 fresh-loads seven Wraiths and both heroes. Clear
+  the 21 remaining enemy buildings.
   Finish T5 and Z7–Z10 on this package,
   and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
@@ -1911,8 +1925,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   run trains a Marine for the displayed price of 50. After fresh
   load, a second paid Marine completes. A fresh seven-Marine
   load then adds a third paid Marine and the objective reaches
-  eight of ten. GBA trains five at that price and wins. Verify
-  native victory and the next mission unlock.
+  eight of ten. Three further native saves and continuations
+  carry mining and paid infantry through ten of ten and victory.
+  Accepting the result opens Backwater Station. A fresh process
+  retains the unlock, opens its briefing and deploys to the playable
+  map at Raynor's first dialogue. Continue field parity in Backwater.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

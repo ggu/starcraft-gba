@@ -830,6 +830,21 @@ minerals and queues at 13/18 supply. The resulting field capture
 shows eight of ten Marines. This continuation ends before a
 new save.
 
+The eight-Marine state is then saved and reloads in a fresh
+process. Mining funds the ninth Marine, and a new first-slot
+save holds nine Marines and 74 minerals. After another fresh
+load, the tenth paid Marine produces the native victory
+screen. Accepting the result changes FlashRAM and transitions
+to Backwater Station, including the briefing. A separate native
+process loads the resulting FlashRAM and lists Backwater Station
+as available while Desperate Alliance remains locked. Its
+FlashRAM export matches byte for byte. Selecting Backwater
+Station through the ordinary menu reaches briefing page six
+with the two mission objectives. Advancing past the final
+briefing opens the playable map and Raynor's opening dialogue
+in a fresh-process replay. The FlashRAM export still matches
+the post-victory journal.
+
 A read-only replay of the full GBA Wasteland input tape observes
 the matching 150-mineral charge, from 463 to 313, when the
 Barracks first appears at frame 6,367. It completes with 1,000 HP
@@ -985,6 +1000,26 @@ The new Wraith finishes with 120 HP by frame 32,826. The
 original recruited Wraith is still present. Fresh HOME
 restores both Wraiths, both heroes and the exact SRAM.
 The mission still needs a winning attack on the hostile base.
+
+Two recruited SCVs collect minerals and later split between
+minerals and the captured Refinery. A fresh frame-39,237 save
+retains both 60-HP workers, the 471/72 bank and four surviving
+Wraiths. Four Wraiths knock out three hostile Wraiths while
+advancing south. The two heroes remain at the recruited base.
+
+Reinforcing to six Wraiths opens an eastern approach around
+the western Missile Turrets. The eastern Command Center's
+Goliaths repel the first small assault. Three more paid
+Wraiths join the formation. The nine-aircraft attack destroys
+the eastern Command Center at (1040,1496) by frame 56,984.
+Seven Wraiths survive with 20–120 HP. Both heroes remain alive
+and the fresh HOME export exactly matches the attack save.
+Twenty-two hostile buildings remain, including a western
+Command Center and the Missile Turret line. A further attack
+destroys the eastern Refinery at (1376,1296). At frame 57,882
+all seven Wraiths and both heroes survive. An independent fresh
+HOME process verifies both eastern structures are gone, the
+21 remaining hostile buildings, and byte-identical SRAM.
 
 ## Custom Game saves
 
@@ -1536,6 +1571,10 @@ quality on the GBA SP.
 | Terran chapter 5 independent four-stage recruitment and fresh HOME | `31968bfc272f8faa187e28eddf086873bfd249ff5cdc22744bf8d362cb296b72` |
 | Terran chapter 5 paid Vulture and fresh HOME | `1da0fa927fc9f7f556b7a93ab54de12f3a8d5db7e51555e9cc585a37b8c44cbb` / `a2d875fc61f9563eab413c6988deeb93e888dfa3d6743f1c09784e1f1f9a08f8` |
 | Terran chapter 5 paid Wraith and fresh HOME | `98aa3f1d508177d0f03482756e63c36da1900df782dd1c5cc06253d7fd6aee4b` / `48a6f3878187a272f89e640c0471ca6ae554aa235b94ec1f6f42516d88ee4b30` |
+| Terran chapter 5 mineral and gas SCVs and fresh HOME | `8cc5bfab0ad27d665cd4fc8d562f15ec3e3c5e7fa16ad8d86c67c1fd26476af4` / `3b3ad3bf54e55dac8388a5b550f7c79370e6bd7ed2281001f2dcc2035494079a` |
+| Terran chapter 5 eastern Command Center destruction and fresh HOME | `c7cda989d7dd11ed4b2ad05c153b59d9b10c451b6ae2963ebfa881df828d1424` / `24458b5b15b48aaf6e74eabfe2557f78822655875427d0e822d7e862e08fc2ac` |
+| Terran chapter 5 independent Command Center endpoint and hostile census | `b7f1769ff2f6e2fd9575e801724bcd1324937f5b8f234a2669ccb87a09503844` |
+| Terran chapter 5 eastern Refinery and independent fresh HOME | `567159f9cd73903650f2ac8287455c3ad73ba7584d9e8be928ec9b4f5e037dcb` / `f37cfcdb13e075a453419d5f8f46dab401c8522b68fc607270de22600e90fe40` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -1635,6 +1674,13 @@ quality on the GBA SP.
 | N64 Wasteland first paid Marine and six-of-ten count | `c31ad1788d22f742d33233fcca8de0fa39e64843b3d6b0057d8d65deb9757c72` |
 | N64 Wasteland fresh six-Marine load and second paid Marine | `203a609a90089d60376da24517dd40cadfdb5679efb443ff0fc3af511c8be8c4` |
 | N64 Wasteland fresh seven-Marine load and third paid Marine | `f2785703c13676c42af8dbf3afad3cce84de4256b30085723b283617c039f309` |
+| N64 Wasteland eight-Marine save | `cc8ae1cbf59f686bc70bb14ad46aae9ff4d6554948130e4c0a10489118c73878` |
+| N64 Wasteland ninth Marine and new first-slot save | `e2be9ce7aa63ec7af1769d41c663ace9737e0271dff7f781a30e9b6f1460ca3a` |
+| N64 Wasteland tenth Marine and victory | `29d8eb7046ba393b37b369885e813f5aafa399dab35f9829942062853b5fd7cb` |
+| N64 Wasteland result acceptance and Backwater Station briefing | `e4f9495cd5285b8f5ab33246e3145397e7addfc51ee08ff6d429eec8478d528e` |
+| N64 Backwater Station unlock retained after fresh load | `e175a0e7c2b4ba90d783ae2c19a5657bac34f86ba82618f2211fa565486249fb` |
+| N64 Backwater Station selection and briefing after fresh load | `6c65e723b9bc00dea2e1d010ab25f5fddfcff4616ce7a838e74636e872a926e2` |
+| N64 Backwater Station deployment after fresh load | `7b2e77e2db1cacceab60cc18214a252c366c3934b70391776b6296458f0721d5` |
 | Exact KODAK Wasteland Barracks payment, completion and Marine queue | `a4ea776e6036165fa886abc96e0be45dff38b78a70dba3a0e845010f31af90b4` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
