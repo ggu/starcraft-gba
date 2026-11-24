@@ -1671,8 +1671,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   maps, every player race and every explicit one-to-three CPU
   lineup. All 30 campaign entries and eight Showcase scenes start.
   Thirty-six Custom Game fresh saves load and match continuation.
-  T7 and T10 win through ordinary inputs on the exact Terran image,
-  including fresh mid-mission and victory loads.
+  T1–T4, T6, T7, T9 and T10 win through ordinary inputs on the
+  exact Terran image, including fresh mid-mission and victory
+  loads. The pinned Protoss image has P9 and P10 full wins and
+  fresh loads. Update the T5 ordinary-input route after the
+  pause-corrected paid-air tape reaches a different army count.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies.
   Wider campaign wins, deeper load checkpoints and GBA SP timing

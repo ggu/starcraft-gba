@@ -47,20 +47,42 @@ opening messages where necessary and observes a live world advancing
 at least two updates. The eight Showcase selections open paused and
 advance after pressing A.
 
-Terran chapters 7 and 10 also win on the exact installed cartridge
+The Terran chapters below win on the exact installed cartridge
 image. Each replay starts from HOME, continues a mid-mission pause
 save in a fresh process and reloads its victory in a third process.
 The final SRAM readback matches the victory save byte for byte.
 
 | Terran chapter | Saved game frame | Victory frame | Matching gameplay checkpoints | Emulated updates/s |
 | --- | ---: | ---: | ---: | ---: |
+| 1 | 6,214 | 10,120 | 12 | 29.39 |
+| 2 | 18,204 | 29,366 | 31 | 28.56 |
+| 3 | 26,993 | 54,000 | 56 | 28.74 |
+| 4 | 4,968 | 8,911 | 10 | 24.02 |
+| 6 | 19,466 | 23,536 | 42 | 16.34 |
 | 7 | 2,289 | 3,931 | 12 | 22.09 |
+| 9 | 35,363 | 47,266 | 51 | 17.12 |
 | 10 | 2,276 | 3,361 | 6 | 17.83 |
 
-In chapter 7 the emitter reaches its goal with Kerrigan alive. In
-chapter 10 the Ion Cannon is destroyed with Raynor alive. The timing
-includes briefing, pauses and presentation, and comes from the
-GBA guest clock.
+The timing includes briefing, pauses and presentation, and comes
+from the GBA guest clock.
+
+The retained [Protoss qualification](2026-11-13-p9-normal-home.md)
+also covers full HOME wins on the exact packaged Protoss image.
+The package manifest pins both receipts. P9 wins at frame 272,857
+after 281,447 calls and P10 wins at frame 93,377 after 94,852
+calls. Both restore the mid-mission save and the victory in fresh
+HOME processes.
+
+### Terran chapter 5 input divergence
+
+The old paid-air route matches all checked observations through
+call 17,000. Select opens pause at call 20,401 with no selection.
+The following R chord restarts at call 20,403 from game frame
+20,073. A diagnostic replay resumes each unintended pause with
+ordinary Start input. It reaches call 22,000 at the expected game
+frame 21,668, with the expected 18 friendly buildings. It has 27
+friendly units versus the retained 35, and 200 minerals versus
+512. The route still needs current-cartridge victory qualification.
 
 Thirty-six early Custom Game save/continue pairs pass across all
 four products. Each saves after 120 updates, loads from a fresh
@@ -112,18 +134,36 @@ actor drawing uses about 396,340 cycles within rendering, including
 154,678 for unit images and 106,647 for tracers. These nested costs
 identify the expensive paths in the measured windows.
 
+The same 16 cuts contain 450 uncached ground contact queries
+with speeds one through three. Of 2,406 observed bucket visits,
+1,622 are nonempty. No mover repeats the same position and speed
+within one sampled update. The late cut also draws 164 packed
+sprites across 3,251 rows. These counts provide workload sizes
+for synthetic renderer and collision tests.
+
 ## Local receipts
 
 | Check | SHA-256 |
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
+| Terran chapter 1 full run and fresh loads | `8c3642922e2358bcfe2d0264918d1cf381bf254e95c7b993a55ab55f8046cc94` |
+| Terran chapter 2 full run and fresh loads | `e51366eeaa6c55309aa3630a5c9e2da47ad51608be0b25f85f33d60fd20902b2` |
+| Terran chapter 3 full run and fresh loads | `48487a363f9112b3d443e625ccba187254320a29f9e2ae028e4438fa4bf1fdd9` |
+| Terran chapter 4 full run and fresh loads | `16434fb2891a5426c396f615312c0ab4ff992f6bb7206ada371cba276c9f922c` |
+| Terran chapter 5 screen transitions | `91317b3116e15d7d9b92626a37fd52af05cc6009a30a697319c490c9b30e2e17` |
+| Terran chapter 5 pause-corrected divergence | `19133241bc024bc6096a698611de030155e3c341679fb26105ea012e843835ab` |
+| Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
+| Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
+| Protoss chapter 9 full comparison | `93151835a97657694c868c183a81ec82aac9f41c9ff1ee49af472e299761f48c` |
+| Protoss chapter 10 full run and fresh loads | `a018c1ee1cc0fd42631ae5a91101db087adf0466f680ea532e0115ce556d0605` |
 | Showcase scene starts | `5ceefdcea04deea53c7d5795810dbef47e3873b33415449528b668e5d8e34029` |
 | Fresh-process Custom Game saves | `9e8ef3557675969874a6b8697c5b7b5d7df03481c0d107fb295ce938916adb10` |
 | Three-CPU timing samples | `9f7147388661e7ec06e5c9bf0f84c263082e386514ee3362bd066c1cb45cebe5` |
 | Protoss 10 Blood Bath instruction attribution | `e942247d1615ef449b116e9fcaf85950d335d59ed063701d7dcd20b1153e9799` |
+| Protoss 10 sprite and contact workload census | `67f20dae00085613182e2471d1d594100e038637edf1a29e61b035c2c47e8b6f` |
 | N64 Challenger reset replay | `5c84d1b8ae1e5f57a5731ceb9a6417d636788f58a2d39c67a63cca34bc6c1fdc` |
 | N64 Blood Bath reset replay | `66a9c657369c58decea5a0f27079ed785fadc60f6c43357590541b70c70eb426` |
 
