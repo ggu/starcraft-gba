@@ -2607,11 +2607,12 @@ merges do not update an already copied ROM.
   distinct C-Right/Up/Down inputs alongside D-pad Right, with a public mapping
   test. The initial missing-Move-command failure, subsequent delivery check and
   one preplanned scouting/return run are retained in the
-  [native fog audit](audits/2026-11-07-native-fog-memory/README.md). Root checked
-  source/binary/capture/log hashes and viewed the captures. Rocky coastal
-  movement and textured dark boundaries were seen, but no identifiable world
-  cell was proven outside all unit/Nexus sight after discovery. Terrain and
-  resource memory remain unverified; do not infer them from a camera pan.
+  [native fog audit](audits/2026-11-07-native-fog-memory/README.md).
+  A [fresh scout-and-return run](audits/2026-11-07-native-fog-memory/README.md#scout-and-return)
+  shows the same shoreline transition from dark to lit to dim after four
+  Probes move away. This confirms retained terrain in the sampled area.
+  A remote mineral or geyser test and a matched GBA display comparison
+  remain open.
 - **Read-only native discovery:** the separate
   [observer branch](https://github.com/ggu/starcraft-gba/tree/codex/n64-actor-readonly-observer-20261107)
   records one bounded Terran custom attempt at runtime `d03052c2`: two 8 MiB
