@@ -777,9 +777,10 @@ the original FlashRAM intact. A second ordinary run saves the
 active construction into the first slot and exits successfully with
 a changed FlashRAM export. The final frame still shows the foundation
 and its SCV at 10 minerals. A fresh first-slot load restores that
-construction and advances with neutral inputs. By step 9,120,
-the Barracks is complete and the advisor prompts the player to
-train infantry. The fresh FlashRAM export matches the construction
+construction and advances with neutral inputs. By step 8,120,
+the Barracks is complete and the advisor calls for ten Marines.
+The dialogue holds the field through the step-9,120 capture.
+The fresh FlashRAM export matches the construction
 checkpoint byte for byte.
 
 A read-only replay of the full GBA Wasteland input tape observes
