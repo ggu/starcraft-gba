@@ -691,6 +691,23 @@ save remains the continuation point. Test a closer defensive
 position before sending the Mutalisks north. Receipt SHA-256
 `bf195f978d97a4f4d61d1e2cc20598903ca602967ec7ecd0fd0e0678af24cb63`.
 
+A separate branch from frame 6,410 builds two full-health
+Sunkens on the western side. Fresh HOME at frame 9,891
+matches the export and retains the starting eight Hydralisks
+and four Mutalisks. A paid Den completes in the follow-up.
+The closer attack order at (1008, 1640) preserves that mobile
+force through frame 12,430 while the Hatchery, Pool and Den
+fall. Both Sunkens remain at full health. A second hold at
+(1144, 1624) also loses the base. Correct the defensive
+placement against the actual attacker route before relying
+on the two-Sunken opening.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Two-Sunken checkpoint SRAM and fresh readback | `7c7cd992ba56528086db8be96ef176702c3e74f5a4d8d9e0cc51d795a1409802` |
+| Completed Den and first close hold | `c887d92734fc97a789178eec0eb1092f3bef299f207f40a806418b1737f299f9` |
+| Second close hold | `dc905a5ba02f37334a18cc1a3bb342e62f2e901cc5cf551b9a5daa3b9e85309c` |
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -1810,7 +1827,8 @@ changes. The fixture adds 360 bytes of linked BSS.
 
 [PR #823](https://github.com/ggu/starcraft-gba/pull/823) was
 linked with prepared inputs on the source release at `ba2541bd`.
-The tested merge tree is `048c4022`. The paired Terran runs
+The tested merge tree is `048c4022`. The initial Terran and
+Showcase links use the unpacked shared sight path. The Terran runs
 load the same late skirmish journals. Eight 120-update
 windows cover two and three CPU opponents, both maps and
 fixed and panned views. Worlds, camera, palette, both
@@ -1833,13 +1851,83 @@ page agree again at the next input boundary, with both pages
 matching throughout. This comparison does not measure
 physical display duration. The current samples show modest
 or flat timing, and the earlier stronger panned Protoss
-result still needs a current-source product comparison.
+result is covered by the canonical comparisons below.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | Late Terran pair summaries and per-window hashes | `bcbf5aca52f33fb33b051c2c7958f0edb65fb4470fd15eca12740b9ed87e5a5e` |
 | Five paired Showcase scenes | `ebb6721eb8869ffffb11a0eea85d65afe787d2f6fc14a8b2b1e19b835431f2f0` |
 | Selected page, pending flip and cumulative flip checks | `5314da82da885fedd5fd7ebaf70f2a8432fdd2e45c7c56d83f24fa448df18b5f` |
+
+#### Canonical renderer qualification on all four profiles
+
+The corrected Terran and Showcase links include the normal
+packed and sparse shared sight flags. Z10 and P10 use their
+normal sight configurations. All four links pass the existing
+RAM reserve guards. The three-CPU Terran samples match in both
+views on both maps, including both pages, selected scanout
+and fresh HOME saves. Mean timing is effectively flat.
+The two Showcase scene pairs match selections and pixels
+and improve mean timing by about 0.2–0.25%.
+
+Canonical P10 and Z10 each measure 120 ordinary updates
+after panning to (520, 790) in a three-CPU Outpost fight.
+Both pairs match world, both framebuffer pages, palette
+and selected display at the observed input boundaries.
+The regular pause journal and 60-update fresh continuation
+also agree. Z10's presentation interval counts differ, so
+matching boundary images do not establish equal flip times.
+
+| Product | Panned mean cycles, control → renderer | Reduction |
+| --- | ---: | ---: |
+| Protoss P10 | 1,474,500 → 1,349,855 | 8.45% |
+| Zerg Z10 | 1,279,205 → 1,186,722 | 7.23% |
+
+The fixed P10 holdout and both default-camera Z10 runs
+match timing. Every sampled update in the two panned fights
+still exceeds the two-VBlank budget. The renderer merged
+in [#823](https://github.com/ggu/starcraft-gba/pull/823).
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Canonical Terran four skirmish pairs | `35086baa1b95424274c69df70992e3b39f42f8c09d0c46aa1da686bfb6329f19` |
+| Canonical Showcase scene pairs | `d5397043aab33cc2f777d8e90a506380d2848d96bd73887fce57ea6f486e91a3` |
+| Canonical P10 fixed and panned Outpost | `e8cf4c1185ef2046d72681ed3065218d68b4206f95b41c93d0133e0e8ddfd5c4` |
+| Canonical Z10 fixed Outpost | `70bbc2cda6f6725dfc031339f22fb4680ad91758bd46746c5d4524568b703abd` |
+| Canonical Z10 panned Outpost | `611fc257aa9b6079dfc858ab4bd2caa16fa1f66abef8cf5cf6d43003fae9db3d` |
+
+#### Compose the renderer and ROM collision option
+
+The combined Z10 merge tree `992670ca` builds with the
+collision option off and on. The off build reproduces the
+renderer-only ROM byte for byte. The same panned Outpost
+replay saves 1.03% in mean whole-step cycles when enabling
+the option, from 1,186,722 to 1,174,526. The p95 rises
+from 1,527,386 to 1,536,482. All 120 samples remain over
+budget. The observed world, both framebuffer pages, selected
+display, pause save and fresh continuation match. The resumed
+presentation histogram differs. The flag stays off by default.
+The local receipt has SHA-256
+`8ba2f573608a1ff263362cbbef0e5bfa5bda9c8293f82b1963e5ef419736e6ff`.
+
+### Reusing contact scan coordinates in complete frames
+
+The [query-coordinate trial](https://github.com/ggu/starcraft-gba/pull/828)
+matches observed worlds, both framebuffer pages and save
+continuations in 12 Terran skirmish pairs with unpacked
+sight. All mean timing changes are within 0.02%. Two stops
+select different display pages. Five Showcase scene pairs
+with the same sight configuration match frames and cycles.
+A canonical current P10 pair from the late three-CPU Outpost
+journal gives exactly the same fixed and panned loop-cycle
+samples and matches the display and journals. The kernel
+fixture improvement does not carry over to these samples.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Terran skirmish pairs | `4dd8cabf52bcf62bb97ebce46f61d641bcdef38b81a46176180ed1fc105b8338` |
+| Showcase scene pairs | `2e4265c793d5aac9a144bc1044f6aca39df1a7d4ea4c340f05d6d8b7b21a363a` |
+| Canonical P10 fixed and panned pairs | `4388e7b4e96ea461d641234cffdfa0a6738d68404ebb39da01960b4cbafaa46e` |
 
 ### Monotone route witnesses on two current Terran saves
 

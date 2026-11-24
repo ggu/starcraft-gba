@@ -1340,6 +1340,11 @@ at 400 HP. Both objective Nexuses are still at 750 HP and
 750 shields. A follow-up Pool starts, but the miner disappears
 within 100 updates of construction. Retain the verified mining
 position to stage another defense before spending a worker.
+One continuation intercepts the northern hostile and starts
+a Pool, then loses the remaining workers. A different Pool
+order at the disconnected south location stays pending while
+the builder remains at its initial position. The worker
+recovery save remains the usable continuation.
 
 | Local receipt | SHA-256 |
 | --- | --- |

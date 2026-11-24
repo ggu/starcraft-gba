@@ -179,3 +179,30 @@ Hatchery while the fighters are still together.
 | Recovered position fresh HOME | `216951752de3ccc56d9100e2eff5730c455316f54680529e51fc0896054afd61` |
 | Second Hatchery construction SRAM | `c4e65f00fbee815d7cba49c44320fcc1298e417aaca6dd0069b2cd345f95c77d` |
 | Second Hatchery fresh HOME | `ad1960a0dae859808476ab0b8be5f4dbb6a150776840903cf48928e2a6edc2ac` |
+
+### Relocate workers and restore mineral income
+
+A direct interception during the next raid loses both
+Hatcheries and the remaining ground force. Moving three
+Drones individually toward (600, 1400) leaves two alive at
+frame 19,479, after the old buildings have fallen. One
+starts a Hatchery at (560, 1360). Generic construction and
+fresh HOME preserve the completed 1,250-HP hall at frame
+22,008. Hostile units are still concentrated near the old
+base in that observation.
+
+A paid Overlord restores supply access. Three paid Drones
+reach the local mineral line and raise the bank from 1,227
+to 1,275. Fresh HOME at frame 24,934 restores the full-health
+Hatchery, three miners, a fourth idle Drone, the Overlord,
+and 725 gas. A passive continuation sees the next Reavers
+damage the new hall by frame 25,834 and destroy it by 26,434.
+Preserve the earlier recovery branch and begin the defense
+while the new hall is still healthy.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Completed relocated Hatchery SRAM | `6b81b016cbc3bafc4a8628c15c5f2b922f3403c98f4b7cdad8d4d8ef0801d5c3` |
+| Relocated Hatchery fresh HOME | `1a98e3251b17b6247bd3a5249a43afd39290d441e548498f8965117d47e1a43a` |
+| Relocated mining checkpoint SRAM | `8427260cbcb3679fc950cde346ccdb5175778a7d4fab847bea2eb02a80092f10` |
+| Relocated mining fresh HOME | `afb9589f1ad22e74f3cbbb9867b25e8963d6cff371fbad0ae34ed413ca220599` |
