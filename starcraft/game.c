@@ -4499,24 +4499,26 @@ __attribute__((optimize("Os")))
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     SC64_P7_SOURCE_OWNER_PARAM)
 {
+    const int radius_squared = max_distance * max_distance;
 #ifdef SC64_EGG_RUNTIME
-    int egg_best = -1, egg_distance = max_distance * max_distance;
+    int egg_best = -1, egg_distance = radius_squared;
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
-    int best = -1, best_distance = max_distance * max_distance, d;
-    int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
-    int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
-    int col0 = (x - max_distance) / SC64_TARGET_CELL_SIZE;
-    int row0 = (y - max_distance) / SC64_TARGET_CELL_SIZE;
-    int col1 = (x + max_distance) / SC64_TARGET_CELL_SIZE;
-    int row1 = (y + max_distance) / SC64_TARGET_CELL_SIZE;
+    int best = -1, best_distance = radius_squared, d;
+    int left = x - max_distance, top = y - max_distance;
+    int right = x + max_distance, bottom = y + max_distance;
+    const int width = WORLD_W, height = WORLD_H;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right >= width) right = width - 1;
+    if (bottom >= height) bottom = height - 1;
+    const unsigned col0 = (unsigned)left / SC64_TARGET_CELL_SIZE;
+    const unsigned row0 = (unsigned)top / SC64_TARGET_CELL_SIZE;
+    const unsigned col1 = (unsigned)right / SC64_TARGET_CELL_SIZE;
+    const unsigned row1 = (unsigned)bottom / SC64_TARGET_CELL_SIZE;
     u32 col_mask, row_mask;
     int p;
     u8 hostile_mask;
-    if (col0 < 0) col0 = 0;
-    if (row0 < 0) row0 = 0;
-    if (col1 >= cols) col1 = cols - 1;
-    if (row1 >= rows) row1 = rows - 1;
     col_mask = (0xffffffffu >> (31 - col1)) & (0xffffffffu << col0);
     row_mask = (0xffffffffu >> (31 - row1)) & (0xffffffffu << row0);
     if (target_hostile_masks_valid && owner >= 0 && owner < 5) {
@@ -4553,9 +4555,10 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                         if (!b[bi].alive) continue;
                         candidate_x = b[bi].x; candidate_y = b[bi].y;
                     }
-                    if (FAST_ABS(x - candidate_x) >= max_distance ||
-                        FAST_ABS(y - candidate_y) >= max_distance) continue;
+                    /* The live index bounds positions to the grid. A target
+                     * on or outside the circle cannot win either distance tie. */
                     d = dist2(x, y, candidate_x, candidate_y);
+                    if (d >= radius_squared) continue;
 #ifdef SC64_EGG_RUNTIME
                     if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance &&
@@ -4585,7 +4588,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
     return best;
 #endif
 #else
-    int best = -1, best_distance = max_distance * max_distance, d;
+    int best = -1, best_distance = radius_squared, d;
     int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int col0 = (x - max_distance) / SC64_TARGET_CELL_SIZE;
