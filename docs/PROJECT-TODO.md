@@ -1196,9 +1196,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   continues directly after destroying the eastern Nexus and
   fresh-loads a full-health Hatchery and Pool at frame 77,041.
   An earlier direct Move to the Reaver's approach leaves
-  Kerrigan at her starting position. Test intermediate
-  waypoints or pre-position defenders on the eastern side,
-  then advance on the western Nexus.
+  Kerrigan at her starting position. The [connected approach](audits/2026-11-12-z8-normal-physical.md#intercept-the-reaver-from-the-connected-approach)
+  reaches the Reaver through six ordinary waypoints and
+  defeats it. Fresh HOME at frame 77,066 preserves Kerrigan
+  at 204 HP and the Hatchery at full health. Recover workers
+  and stop the next wave before the western Nexus assault.
   [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
   fresh-loads an Extractor, Lair, Den, Spire and three full-health
   paid Mutalisks at frame 8,925. Preserve the wounded gas worker
