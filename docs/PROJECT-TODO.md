@@ -31,6 +31,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
   update exceeds two VBlanks. Preserve the one-CPU
   pacing while tracking both maps at two and three CPUs.
+  [Late moving-camera pairs](audits/2026-11-24-kodak-package-checks.md#late-camera-movement)
+  cover all six three-CPU configurations. Mean cycle changes span
+  −3.75% to +4.92% with matching sampled world state. Every fixed
+  and moving update still exceeds two VBlanks, so keep busy field
+  and simulation costs ahead of camera-specific changes.
   The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
@@ -1692,7 +1697,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   call 12,000 takes her to (856,398). A separate empty-ground order
   moves Raynor away from his previous target. Both retain 294 and 250 HP
   respectively through frame 19,288. The branch has only the two
-  heroes and still needs a full win.
+  heroes and still needs a full win. A direct approach also enters
+  the recruitment zone, where Kerrigan dies before reinforcement.
+  Preserve enough of the allied force for a protected approach.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.

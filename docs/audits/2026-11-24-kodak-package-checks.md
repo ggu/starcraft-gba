@@ -214,6 +214,14 @@ old attack order with Move. At frame 19,288 Kerrigan remains at
 are the two remaining player units. The mission is still active
 and this branch has yet to produce a victory.
 
+The direct recruitment attempt moves the rescued Kerrigan alone
+toward the rebel base. At frame 12,814 her position is (1348,257),
+inside the base-entry rectangle, and she has 118 of her earlier
+294 HP. She dies by frame 13,306 and the mission is lost before
+any observed recruitment. The existing fixture allows up to 2,400
+updates for its delayed sequence. This attempt did not establish
+a safe approach or dwell window for it.
+
 ## Custom Game saves
 
 Thirty-six early Custom Game save/continue pairs pass across all
@@ -298,6 +306,29 @@ The one-CPU Blood Bath range is 140 to 411 overruns of 600 despite
 its higher mean rate. Blood Bath resolves different start locations
 across lineups, so these are full-match observations for the stated
 configurations. They measure guest cycles in mGBA.
+
+### Late camera movement
+
+The six three-CPU match configurations also run a 360-update
+window following update 11,000 with ordinary directional input.
+The player pans toward the center and then reverses toward the
+starting area. Each pair starts with the same camera and resolved
+seats. Five world fingerprints match between the moving and fixed
+runs in each pair. The camera moves on every sampled update.
+
+| Cartridge and map | Fixed camera | Moving camera | Change in mean cycles |
+| --- | ---: | ---: | ---: |
+| Terran 10 Outpost | 15.60 | 15.76 | −0.99% |
+| Terran 10 Blood Bath | 20.10 | 19.15 | +4.92% |
+| Zerg 10 Outpost | 13.99 | 14.39 | −2.75% |
+| Zerg 10 Blood Bath | 17.22 | 17.67 | −2.57% |
+| Protoss 10 Outpost | 13.36 | 13.57 | −1.59% |
+| Protoss 10 Blood Bath | 15.45 | 16.05 | −3.75% |
+
+Rates are emulated updates per second. Every sampled update
+exceeds two VBlanks. Camera motion also changes visible draw
+work, so each pair measures that complete view change. A fixed
+camera already incurs most of the measured late-frame cost.
 
 ### Protoss 10 late battle attribution
 
@@ -386,6 +417,7 @@ quality on the GBA SP.
 | Late three-CPU Custom Game saves across both maps | `e79983735242bb069af925993797d8c7e8edba8b2f715eab29432e6dc0bbdaa2` |
 | One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
 | One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
+| Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
 | Terran chapter 1 full run and fresh loads | `8c3642922e2358bcfe2d0264918d1cf381bf254e95c7b993a55ab55f8046cc94` |
 | Terran chapter 2 full run and fresh loads | `e51366eeaa6c55309aa3630a5c9e2da47ad51608be0b25f85f33d60fd20902b2` |
@@ -401,6 +433,7 @@ quality on the GBA SP.
 | Terran chapter 5 earlier Kerrigan route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
 | Terran chapter 5 Kerrigan staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
 | Terran chapter 5 both heroes healthy at frame 19,288 | `abd770a652624759162b89b7f73a5f5b07fd1723991baa5a8f7e5dda366dfee5` |
+| Terran chapter 5 direct recruitment approach | `c3dc75496ad1a132b8167009000f52b0a81e11f7306ba9c4921b2a66d24862bb` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
