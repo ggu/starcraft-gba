@@ -412,11 +412,12 @@ pre-edit lobby, post-edit lobby and ensuing gameplay.
 | Free for All | 3,824 / 3,914 / 4,524 | `147c3445195202dc584a3a4421b93d0b3918b51a0c6f2cc7b106b7c4d98335ce` | `2d50d3ef57f9a093320e5e18b75461fbdc2bae7ff29d754532bb75684772d2c4` |
 | Melee | 3,859 / 3,949 / 4,559 | `b95e2dc312e0010ac3b484cf7246ad89034ee1512b8afd489c5f7512bdd6a1c1` | `a325ddc8d0a897f4f651cbdb97cf7b5dfc909e12607a8b7b1d3ba37da7a6a370` |
 
-Keep the supported launch and resolved-save range at one to three CPUs
-in both GBA modes. The GBA preview can display all Closed while editing
-but disables Launch; the native observation supports the same launch
-floor and identifies a separate menu difference. It does not cover
-other maps, all directions or injected state.
+The GBA preview at the time of this observation could display all
+Closed while editing and blocked Launch. The [November 24 cartridge
+checks](2026-11-24-kodak-package-checks.md#last-open-cpu-row) verify
+that both Blood Bath modes on all three race ROMs now skip Closed
+when pressing Right on the last Random row. Outpost retains its
+all-Closed editing state and one-CPU launch floor.
 
 ## Terran CPU's first observed purchase
 

@@ -1683,12 +1683,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z2, P3 and P5–P10 also have exact-image wins and fresh save
   checks, for 17 of 30 missions overall. An ordinary T5 retreat
   keeps Raynor at full health through frame 129,658. Local box
-  selection moves Marines with
-  both heroes excluded. The mission still needs an active route
-  from that branch through all victory conditions.
+  selection moves Marines with both heroes excluded. An explicit
+  Move gives Kerrigan a destination, and she stalls at the tested
+  waypoint. A reachable route for her and a full win remain open.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.
+  [The last open CPU edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
+  matches in both Blood Bath modes on N64 and all three race ROMs.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
 
@@ -1795,6 +1797,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   separate qualification. The [ordinary-profile Blood Bath preview](audits/2026-11-12-skirmish-seat-options.md#ordinary-four-profile-blood-bath-preview)
   matches the last-open CPU edit and passes 24 physical same-build checks
   and 20 cross-build checks. The old ROMs reject Melee saves as intended.
+  The [November 24 delivery rechecks the last-row edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
+  through ordinary inputs in both Blood Bath modes on both systems.
   The [November 18 Terran terminal pair](audits/2026-11-12-skirmish-seat-options.md#current-terran-arm-terminal-and-save-checks)
   reaches identical defeats from HOME and fresh SRAM within each mode. Two
   human survivors keep their owner on GBA. Keep the flag off while active

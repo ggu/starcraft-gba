@@ -39,6 +39,21 @@ observed changes to the race on individual computer rows.
 The two-slot Challenger observation applies to that N64 map. The
 GBA launch matrix exercises up to three CPUs on both GBA maps.
 
+### Last open CPU row
+
+Two more N64 reset replays keep the first two Blood Bath CPU rows
+Closed and highlight the third row at Random. Right changes it
+directly to Zerg in both Melee and Free for All. Start then opens the
+field. The three witness frames per mode show the edit and play.
+
+The exact Terran 10, Zerg 10 and Protoss 10 images repeat that
+sequence in both Blood Bath modes. Right moves from Random to Zerg
+with the other rows still Closed. Launch starts with the third row
+as the only CPU and the world advances. Outpost Free for All on all
+three images permits an all-Closed lobby and keeps it on the setup
+screen on A at Launch. Reopening the third row as Zerg allows play.
+The Outpost result covers the authored GBA map.
+
 ## Campaign, Showcase and fresh saves
 
 All 30 campaign entries open from their race cartridge. The test
@@ -150,6 +165,14 @@ offsets. Kerrigan retains her idle target, and Raynor retains
 his retreat target and idles on arrival. This verifies local
 command of an assault group with both heroes excluded.
 
+The explicit Move test selects Kerrigan and uses B, Up and A to
+choose Move from the command menu. Placing the cursor at (1379,203)
+sets her movement order and destination. She remains around
+(1319,203–205) at 45 HP for 2,000 updates. Raynor reaches (1528,7)
+at 250 HP. This establishes command acceptance and isolates the
+remaining route problem to reaching that waypoint. A previous
+contextual A click on nearby ground selected another actor.
+
 ## Custom Game saves
 
 Thirty-six early Custom Game save/continue pairs pass across all
@@ -248,6 +271,9 @@ workload sizes for synthetic renderer and collision tests.
 | Check | SHA-256 |
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
+| Last open CPU row on the three race ROMs | `8000e67d551101aab15b51ef8d5d3f2816f150038fefe7388445aad82437b872` |
+| N64 Blood Bath Melee last CPU replay | `05cba75a4bc6a037250ae56b65e32b18d1b32160a1cd4350242f2daf5036ed3b` |
+| N64 Blood Bath Free for All last CPU replay | `c663999f091021032510d2bb8a3b1ba79e85e5c3c49515d3e843d0904e229aac` |
 | Late three-CPU Custom Game saves across both maps | `e79983735242bb069af925993797d8c7e8edba8b2f715eab29432e6dc0bbdaa2` |
 | One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
 | One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
@@ -262,6 +288,7 @@ workload sizes for synthetic renderer and collision tests.
 | Terran chapter 5 Raynor retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
 | Terran chapter 5 retreat with the older suffix | `99ecca6a4f17266c65ccafbf47d41b93cd5e6830adaa7ce71aaf1325b2ed3cad` |
 | Terran chapter 5 hero-safe local selection and order | `1848f80e7fe00f9d303bb853b661dd32add344459f56f878facaf4474a833698` |
+| Terran chapter 5 explicit Move with stalled hero waypoint | `b0a318d3447b14132d09f800c2602ff5ba28b7682100c973dc89a8f2fee06fb0` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
