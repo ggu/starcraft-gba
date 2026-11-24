@@ -81,3 +81,26 @@ skips, and the host sanitizer checks completed.
 | Mixed arithmetic fixture, original and guarded | `cb5f733f77d404c3daed13bf70b50c1bf729a3f49493e5745769d0afeca18c57` / `c7db060aad0f09c2d46c1c0412c32694ec2c9844615ea2fa8b513a98983f8c42` |
 | Original cartridge query capture | `21f0cc454fd83205ca96bac703260bbd91099219e0229372d1f4c0ef52ec132d` |
 | Scoped placement fixture and mask comparisons | `eb711dac99819bb06f15407cbc762d38a380619a87a301405f54a46e13d4b25d` |
+
+### Opt in to the early bound in speed-optimized ROM builds
+
+`CANONICAL_CONTACT_ROM_AXIS=1` requests the existing early
+bound in the speed-optimized ROM kernel with packed actor
+coordinates and the geometry table. A change to the option
+invalidates the canonical ROM ELF configuration stamp. The
+default is zero. The existing IWRAM path has its own flag.
+
+The [Outpost query census](2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
+supplies 874 Terran and Zerg queries from one- and two-CPU
+matches. The actual guarded source matches all cartridge
+masks and repeats each timing from the direct-enable trial.
+The fixture uses 21.9–27.0% fewer kernel cycles and adds
+92 kernel bytes. Its BSS endpoint moves by 0–4 bytes. Verify
+complete frame time, working RAM, stack and save continuation
+before enabling it in the release builds.
+
+The guarded source fixture receipt has SHA-256
+`d16ffcb2b180f27ae038582eecc93384e613dc8a9be04fe156188a57ce4c0a2f`.
+A separate `-Os` pair produces byte-identical ROMs and
+matching cycles. Its receipt has SHA-256
+`ff2918f5e1f136b0f0273e11ebf40f79fcf79bc7fe76377e3d424585d1bbd83e`.
