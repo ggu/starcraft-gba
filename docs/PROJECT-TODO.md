@@ -119,9 +119,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
   per update. The [paired ARM query replay](audits/2026-11-24-kodak-package-checks.md#paired-arm-replay-of-observed-route-queries)
-  matches all 277 steps and five search counters. The incremental
-  search in [draft #802](https://github.com/ggu/starcraft-gba/pull/802)
-  uses 24.62% fewer fixture cycles at `-O2`. Qualify the full race
+  matches all 277 steps and five search counters. The [incremental
+  search](audits/2026-10-29-monotone-route-step/README.md#incremental-coordinates-during-the-search)
+  in [draft #802](https://github.com/ggu/starcraft-gba/pull/802) also
+  matches 460,800 host comparisons and uses 24.62% fewer fixture
+  cycles at `-O2` for the observed calls. Qualify the full race
   runtime and its memory on both maps. The eight-entry exact
   endpoint cache simulation covers at most 0.20% of loop cycles in
   the expanded Terran Blood Bath window, before cache overhead.
