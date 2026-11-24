@@ -134,7 +134,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   passes authored ARM and Mode 0 host differentials. The retained
   P10 [Blood Bath and save holdouts](audits/2026-11-24-kodak-package-checks.md#blood-bath-holdout-and-late-skirmish-journals)
   are flat on timing, match the selected scanout, and reproduce both
-  maps' late saves and 180-update continuations. Qualify the current
+  maps' late saves and 180-update continuations. The retained pair also
+  [wins Protoss 7 from a campaign save](audits/2026-11-24-kodak-package-checks.md#protoss-7-victory-from-a-saved-campaign)
+  with matching sampled state and scanout and byte-identical victory
+  journals. The full replay timing is flat. Qualify the current
   race and Showcase links with mixed fog and the existing memory
   guards. Busy fights remain over budget.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
@@ -1854,10 +1857,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   with 400 HP. The victory reload is byte-identical and Z7 deploys
   through HOME. The installed package has 25 of 30 verified wins.
   The [Z7 guarded opening](audits/2026-11-24-kodak-package-checks.md#zerg-7-guarded-opening-and-production)
-  completes a full-health Hatchery, then the Pool, Lair and Den.
-  Verify a local gas supply and the objective. The T5 escort
-  is safely staged north at frame 14,692 with both heroes and
-  seven full-health Marines. Finish T5 and Z7–Z10 on this package,
+  completes a full-health Hatchery, then the Pool, Lair, Den
+  and Sunken Colony. A paid defense save at frame 10,885
+  restores eight Hydralisks, three Mutalisks and four Drones.
+  Establish a gas supply and sustain production through the
+  Guardian raid before advancing on the objective. The T5 escort
+  regroups through the south corridor and fresh-loads at frame
+  21,884 with both heroes and seven full-health Marines. A second
+  verified save at frame 22,304 has cleared a Vulture, with both
+  heroes and six Marines at full health. Reach the base and
+  trigger recruitment.
+  Finish T5 and Z7–Z10 on this package,
   and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
@@ -1872,9 +1882,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   two full-health SCV deliveries and resumes mining from a fresh HOME
   load with matching SRAM. The [Barracks comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-barracks-construction)
   observes the 150-mineral charge on both systems. The native
-  construction resumes after a fresh load and reaches the infantry
-  prompt. GBA trains five Marines at 50 each and wins. Verify native
-  Marine production, victory and the next mission unlock.
+  construction resumes after a fresh load. The infantry advisor
+  activates the five-of-ten Marine counter. GBA trains five
+  Marines at 50 each and wins. Verify native Marine production,
+  victory and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
