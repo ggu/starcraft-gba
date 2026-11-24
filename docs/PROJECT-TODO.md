@@ -2620,10 +2620,10 @@ merges do not update an already copied ROM.
   the group leaves. GBA currently hides the world art and has no resource
   minimap overlay on the source release. The [remembered-mineral branch](audits/2026-11-24-remembered-minerals.md)
   retains observations through fog and the existing SRAM formats. The
-  host skirmish witnesses cover Terran and P6 save/reload and depletion.
-  Qualify the release race and Showcase builds, campaign saves and
-  busy-map frame pacing. Geyser memory and a matched GBA display
-  comparison remain open.
+  host skirmish witnesses cover Terran, P6, Z10, P10 and Showcase
+  save/reload and depletion. Replay the release cartridges, including
+  campaign saves and busy-map pacing. Geyser memory and a matched GBA
+  display comparison remain open.
 - **Read-only native discovery:** the separate
   [observer branch](https://github.com/ggu/starcraft-gba/tree/codex/n64-actor-readonly-observer-20261107)
   records one bounded Terran custom attempt at runtime `d03052c2`: two 8 MiB

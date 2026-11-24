@@ -44,17 +44,18 @@ The wire test compares every position and the empty and full bitmaps
 against an independent little-endian byte fixture. It also checks
 legacy state and rejects malformed markers or padding.
 
-The Terran and P6 host witnesses use the authored skirmish map and
-existing prepared profile inputs. The witnesses exercise the production
-collection helper, including last-load depletion in stationary sight.
+The Terran, Z10, P6, P10 and Showcase host witnesses use the authored
+skirmish map and existing prepared profile inputs. They exercise the
+production collection helper, including stationary-sight depletion.
 Hidden depletion survives save/load and clears on return. Terran also
 loads a legacy record through the worker-cargo and transport save paths.
-P6 covers the 144-slot save layout with no pending impacts.
-The canonical Terran ARM syntax check passes with the prepared inputs.
+The P6 and P10 witnesses exercise 144-slot saves without pending
+impacts. The Showcase witness also checks force-revealed mineral
+observation and the existing scene save restriction.
 
-The Z10, P10 and Showcase release checks need profile-specific
-generated headers. Campaign replay, populated P6 impact saves and
-on-hardware frame pacing still need qualification.
+ARM syntax checking passes with the recorded Terran, Z10, P10 and
+Showcase flags. Replays of those cartridges, campaign save checkpoints,
+populated impact saves and on-hardware frame pacing remain open.
 
 ## Observer cost
 
@@ -74,3 +75,17 @@ incremental visibility gate skips that scan during unchanged sight
 unless collection exhausting a remembered patch requests an update.
 Full-frame timings also include draw admission, minimap markers and
 any additional visible work.
+
+## Original-art title replay
+
+An mGBA physical-input replay presses A from the title screen and
+measures the first 60 advancing updates. The baseline is
+`35781d0f` and the mineral-memory code is `45bbb346`.
+
+| Build | Mean update cycles | Mean draw cycles | Mean paced cycles |
+| --- | ---: | ---: | ---: |
+| Baseline | 84,561 | 355,362 | 561,378 |
+| Remembered minerals | 84,779 | 358,527 | 561,378 |
+
+The candidate costs 218 more update cycles and 3,165 more draw cycles
+per frame in this scene. Both builds keep the same VBlank-paced cadence.
