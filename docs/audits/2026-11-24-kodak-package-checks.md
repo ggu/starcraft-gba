@@ -440,6 +440,41 @@ The six stages replay to their retained field and SRAM hashes.
 A fresh HOME load restores that save byte for byte and keeps
 all 36 combat units alive for a further 120 neutral updates.
 
+Seven independent tape segments continue the verified frame-55,138
+save from 23 to nine hostile buildings by frame 61,132, with a
+fresh reload of the same field. The air force has 14 Mutalisks,
+the ground force has 16 Hydralisks, and the Chrysalis still has
+250 HP. An approaching Marine threatens the Chrysalis shortly
+after this checkpoint. A nearby Hydralisk intercepts it through
+ordinary input. The Chrysalis survives the attack at 170 HP.
+From that defended state, the air force clears four additional
+buildings with the combat force intact.
+
+Saving immediately after an intervening Command Center attack
+returns the save-failed notice at frame 64,486. A read-only
+breakpoint trace reaches the save adapter's pending-impact
+limit. The check receives 12 impacts and the serializer
+admits eight. The previous SRAM journal remains loadable.
+A later ordinary save succeeds after another building falls.
+The recovered frame-64,819 journal fresh-loads with three
+hostile buildings, 16 Hydralisks, 14 Mutalisks, six Drones and
+a 170-HP Chrysalis. A separate ground selection clears the
+approach while a Hydralisk stays near the Chrysalis. The
+frame-66,829 save retains the full army with 14 hostile units
+and three hostile buildings. Three independent input segments
+return the same save bytes and field fingerprints.
+
+The final two input segments move the ground force into the
+remaining Marines and send the Mutalisks to support it. Victory
+appears at frame 68,639 with two hostile units and two hostile
+buildings remaining. The Chrysalis survives at 170 HP. The
+result sets the primary objective and Z3 completion bit and
+records zero unsupported actions. Six Hydralisks, 14 Mutalisks
+and six Drones remain alive. An independent replay reproduces
+the victory and the 32 KiB autosave byte for byte. Fresh HOME
+load restores the same result. Ordinary menu input then opens
+the Z4 briefing and deploys the next mission.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -510,6 +545,14 @@ and a fresh native process restores the SCV there with a
 byte-identical FlashRAM export. The field still shows 40 minerals
 and 10/18 supply. The next checkpoint is an explicit mining
 order at the base followed by a verified increase in minerals.
+
+A fresh continuation reselects the same SCV and issues another
+C-Right Move to the south. The original field HUD shows Build,
+Repair, Move and the ground-context B Attack label. The bank
+still has 40 minerals. A prepared follow-up aims the selected
+SCV at the mineral field. The wrapper stops that new launch
+before emulation when the disk falls below its 5 GiB reserve.
+The contextual gathering input remains to be observed.
 
 ### Terran chapter 5 input divergence
 
@@ -1004,6 +1047,11 @@ quality on the GBA SP.
 | Zerg chapter 3 concentrated force, two turrets destroyed and fresh load | `7ab53d373dce59910590b59f49578a5321981a5606444fcd64fc5b2a7781ca1b` |
 | Zerg chapter 3 air-only staging and two front turrets | `da15345f50c14de6ba9bc3e0596e3cf5d5e549d979164daa4e5009a52151e3e0` |
 | Zerg chapter 3 exposed tank and third building, with fresh load | `4edc0c308e971a5c01f44756e7de9224fb7e93bb394ac68454b0f4a520cd1ee2` |
+| Zerg chapter 3 northwest advance from 23 to nine hostile buildings | `56574ada7f77938fd7933883c334b44e444fd8ca2b288f8e8f560f6515689c79` |
+| Zerg chapter 3 base defense and five-building fresh checkpoint | `a5df21d6dddfbcdc5ea7ebdeba1339a07c89fd8cc2339bda6bde96681f87b6ab` |
+| Zerg chapter 3 rejected pause save with 12 pending impacts | `dda019fe449f93ef34b3c922cd683d6a6305b536a574d06ad428d53e4cf35f51` |
+| Zerg chapter 3 coordinated ground and air checkpoint | `ba1377b8ac2fdb5bce7f7513206820f03a1848c1fa0bf38eb4cfe1c3a522765a` |
+| Zerg chapter 3 victory, exact autosave reload and Zerg chapter 4 deployment | `4fdf64e727696beabe40bf58d4c61fb2df92e78d75a9400a3937a27e14a087c6` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
@@ -1015,6 +1063,7 @@ quality on the GBA SP.
 | N64 Wasteland post-encounter save and fresh title-load manifests | `e3ace99f57f04f37b5c743e92b8c38f516e4d6af4b4078890b16de5817e71d43` / `0bcebe5d9b9519e578797c3b2a33bcedcd6522c3d9b1243411b46ae9a0ee249a` |
 | N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
 | N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
+| N64 Wasteland SCV reselection and southward move | `d634dc26e7a39a6cb21b1939c929db6de2612e9d0c4a79ea251a08f032fe899e` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
