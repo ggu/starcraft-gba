@@ -115,19 +115,26 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   uncached contact masks. Terran Blood Bath also spends about 81k
   direct cycles in the monotone route probe. Pair those workloads
   separately and keep both maps in the actor and effect draw tests.
-  [Incremental route coordinates](audits/2026-10-29-monotone-route-step/README.md#incremental-coordinates-during-the-search)
-  match the original search across 460,800 host comparisons and cut
-  packed `-O2` probe cycles by 26.15–31.98% on 64/96/128-column
-  open grids and exhausted-budget cases. Qualify the race-cartridge
-  memory limits and repeat the paired Terran Blood Bath and Protoss
-  route windows.
-  The [retained-prefix experiment](audits/2026-10-29-monotone-route-step/README.md#retaining-successful-path-prefixes)
-  now fits sixteen routes in the same 360 linked BSS bytes. It
-  saves 66.52–69.62% of authored ARM route cycles in the sixteen-
-  stream batches. Distinct goals cost 1.24–1.30% more than the
-  flag-off baseline. The observed Terran replay puts 8.04% of loop
-  cycles in covered calls before cache costs. Verify production
-  replay equivalence and RAM margins before enabling the flag.
+  [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
+  finds that all 280 late Terran and Protoss calls succeed within
+  the existing budget. Terran Blood Bath averages 88.8k probe cycles
+  per update. The [paired ARM query replay](audits/2026-11-24-kodak-package-checks.md#paired-arm-replay-of-observed-route-queries)
+  matches all 277 steps and five search counters. The [incremental
+  search](audits/2026-10-29-monotone-route-step/README.md#incremental-coordinates-during-the-search)
+  in [PR #802](https://github.com/ggu/starcraft-gba/pull/802) also
+  matches 460,800 host comparisons and uses 24.62% fewer fixture
+  cycles at `-O2` for the observed calls. Qualify the full race
+  runtime and its memory on both maps. The eight-entry exact
+  endpoint cache simulation covers at most 0.20% of loop cycles in
+  the expanded Terran Blood Bath window, before cache overhead.
+  The opt-in [16-path continuation table](https://github.com/ggu/starcraft-gba/pull/805)
+  saves 72.11% of route-wrapper cycles in the bounded ARM replay
+  of those calls. The [paired host dispatch check](audits/2026-10-29-monotone-route-step/README.md#retaining-successful-path-prefixes)
+  matches 642,890 route-state samples. Check integrated race-ROM
+  frame timing and linked memory before enabling the cache.
+  The 99 new endpoints that continue an earlier path account for
+  7.07% of loop cycles. Verify reuse with the existing route-slot
+  precedence, aging, and grid invalidation before activation.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
@@ -1738,6 +1745,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all three race ROMs. Recover or replace the missing Z1 input tape
   for an exact-package win. The earlier Z1 pause and victory journals
   both load on the installed Z10 through HOME and export identical SRAM.
+  The fixed-input continuation buys a Drone, completes an Extractor,
+  collects gas and builds a Hydralisk Den. Its completed-Den save
+  reloads in a fresh process. A paid Overlord restores the supply
+  cap, but the Den falls before it hatches. Protect the Den through
+  supply recovery. The [earlier defense branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-defended-opening-and-economy)
+  hatches a paid Hydralisk and reaches a freshly reloaded save with
+  four Hydralisks, three mining Drones and a living Den. The
+  [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
+  sustains gas delivery and reaches a frame-26,301 save with ten
+  Hydralisks and three enemy buildings destroyed. It reloads byte
+  for byte. The deeper push lost six Hydralisks. Reinforce before
+  continuing the assault and verify an ordinary victory.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

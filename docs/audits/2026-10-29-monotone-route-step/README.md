@@ -180,6 +180,26 @@ race-cartridge RAM and timing qualification remain open.
 | Production wait states | `096a6ced99d4361f90681cdebdccf50367c272e924998db7524f7171d06778a7` |
 | Reset wait states | `f81e50522bafd76ce187c81767314668376e3d7fba0751e0d894ce19e7f57878` |
 
+### Shared dispatcher comparison
+
+On source release `369b6008`, the original and incremental probes
+run behind the same shared dispatch with sanitizers. Two packed-grid
+configurations exercise active stride with and without retaining
+fields across topology changes. Each runs 321,445 queries on
+authored maps with blocked cells, edited terrain, rotating goals
+and cache eviction. Both builds pass the independent FIFO oracle.
+Each pair produces byte-identical semantic cache-state traces and
+identical rebuild counts. The archived comparison covers 642,890
+dispatch samples and has SHA-256
+`512730c1ddefbc8cf249467563d37a1e64dbcfac9e33a9e913d79ed78570e49f`.
+
+The [paired observed-query replay](../2026-11-24-kodak-package-checks.md#paired-arm-replay-of-observed-route-queries)
+matches the original cartridge response on all 277 inputs and
+saves 24.62% of ARM fixture cycles at `-O2`. The changed function
+adds no persistent state. Together the dispatch and ARM checks
+qualify the source change. Full race-cartridge RAM and pacing,
+including timing on GBA SP, still need a paired release test.
+
 ## Retaining successful path prefixes
 
 `SC64_ROUTE_MONOTONE_WITNESS` is an opt-in experiment for profiles
@@ -293,3 +313,13 @@ matched whole-race ROM replay is still required to measure net gain.
 
 The compact-cache ARM receipt SHA-256 is
 `35f5962bd9d5ee8d43437e5d6fa3a386902d497cca137426ee342a0a96e8723b`.
+
+The full host dispatcher also matches the incremental probe alone
+over 642,890 authored route samples. Two sanitizer configurations
+exercise active map stride with and without retained fields. Both
+pass the independent FIFO oracle and emit identical cache-state
+traces and rebuild counts. An instrumented rerun observes four
+actual witness hits per configuration. Runs with sustained long
+movement exercise reuse more often. Whole-cartridge qualification
+remains open. The host receipt SHA-256 is
+`933881e9bef623dc2c1667c36124883053753ab67d48b366dbebe7aa8fe3009c`.
