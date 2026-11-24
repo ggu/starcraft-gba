@@ -75,3 +75,34 @@ after the copy to the Mac. Its checksum-file SHA-256 is
 The 54-case receipt SHA-256 is
 `faf8b3f524bc9c512d8bf2932d865284f9f5ed7c3e31e2292fd0365416f91103`.
 SD readback and physical performance remain open.
+
+## November 24 cartridge opening and first raid
+
+The [Z9 victory continuation](2026-11-13-z9-normal-physical.md#road-assault-crystal-return-and-victory)
+enters Full Circle from RESULT and fresh-loads it at frame 11.
+The next ordinary pause save at frame 597 holds a Spawning Pool
+under construction. Fresh HOME restores the save byte for byte.
+
+At frame 5,667 the Pool, Hydralisk Den and two Sunken Colonies
+are complete. Three paid Drones are mining, a second Hatchery
+is under construction, and the bank holds 1,142 minerals and
+950 gas. Fresh HOME restores the world and re-exports identical
+SRAM. This is the retained pre-raid position.
+
+A continuation queues three paid Hydralisks at frame 5,732.
+The first raid is still active at frame 7,532. All six starting
+Zerglings have been lost. Three Hydralisks and two Overlords
+remain. The main Hatchery has 1,152 HP, the eastern Sunken
+has 28 HP and the western Sunken is at full health. All
+three miners survive. The old winning route used a much
+larger defense. Build additional Colonies and start Hydralisk
+production earlier, then intercept the Reaver before it
+reaches the mining line.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Frame-597 SRAM and fresh readback | `1c8352db71b2caca0dcc92b0a0974aabb40ce95a7e9d223f28678d63a2da3752` |
+| Paid economy and defense inputs | `3c3f8b7c5f9023a4be8550d3db42c2ecc25155a3d61d9ade05a559a3f89905fb` |
+| Frame-5,667 SRAM and fresh readback | `751e3044e6807b417a8e7a27bd098df16727e1f1c4ed592a0c8659be259e3be8` |
+| Raid continuation and fresh HOME | `ada84b29a54a7f16a41af8ace928d2c07baad2b78455e06f98b25ef7864126ef` |
+| Frame-7,532 SRAM and fresh readback | `5a47068922ab1fc120ee2b53d569ea86ddafaa5e48dfcaa72dba21a61f88f8a2` |

@@ -998,7 +998,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   keeps the RAM guards and repeats the campaign and skirmish
   startup and save checks, including the single-CPU active Terran
   win. Confirm local release integration, hardware pacing and
-  active multi-CPU results. The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
+  active multi-CPU results. The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
+  restores Terran recovery in three cases across the race
+  profiles. Qualify busy ARM matches and address the six
+  remaining host failures, including one new mineral-float
+  failure in the mixed Zerg-profile match.
+  The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
   place the largest costs in orders and depth-ordered drawing.
   The [current one- and two-CPU budget](audits/2026-11-24-kodak-package-checks.md#late-frame-budget-with-one-or-two-cpus)
   measures the extra order cost at 66–73% of the Outpost
@@ -1235,6 +1240,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   return the crystal at 27 HP. Z9 declares victory at frame
   57,089 and restores RESULT and byte-identical SRAM from HOME.
   A advances into Z10, whose opening save also restores from HOME.
+  The [first Z10 raid](audits/2026-11-21-z10-current-full-circle.md#november-24-cartridge-opening-and-first-raid)
+  leaves the eastern Sunken at 28 HP with the mining line still
+  active. Use the earlier save with 1,142 minerals and 950 gas
+  to build up the defense, or begin production earlier.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
