@@ -1668,9 +1668,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   maps, every player race and every explicit one-to-three CPU
   lineup. All 30 campaign entries and eight Showcase scenes start.
   Thirty-six Custom Game fresh saves load and match continuation.
+  T7 and T10 win through ordinary inputs on the exact Terran image,
+  including fresh mid-mission and victory loads.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies.
-  Full campaign wins, deeper load checkpoints and GBA SP timing
+  Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and

@@ -47,6 +47,21 @@ opening messages where necessary and observes a live world advancing
 at least two updates. The eight Showcase selections open paused and
 advance after pressing A.
 
+Terran chapters 7 and 10 also win on the exact installed cartridge
+image. Each replay starts from HOME, continues a mid-mission pause
+save in a fresh process and reloads its victory in a third process.
+The final SRAM readback matches the victory save byte for byte.
+
+| Terran chapter | Saved game frame | Victory frame | Matching gameplay checkpoints | Emulated updates/s |
+| --- | ---: | ---: | ---: | ---: |
+| 7 | 2,289 | 3,931 | 12 | 22.09 |
+| 10 | 2,276 | 3,361 | 6 | 17.83 |
+
+In chapter 7 the emitter reaches its goal with Kerrigan alive. In
+chapter 10 the Ion Cannon is destroyed with Raynor alive. The timing
+includes briefing, pauses and presentation, and comes from the
+GBA guest clock.
+
 Thirty-six early Custom Game save/continue pairs pass across all
 four products. Each saves after 120 updates, loads from a fresh
 HOME process and advances another 120 updates. The checks compare
@@ -85,11 +100,13 @@ open for busy play on these cartridges.
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
+| Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
+| Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
 | Showcase scene starts | `5ceefdcea04deea53c7d5795810dbef47e3873b33415449528b668e5d8e34029` |
 | Fresh-process Custom Game saves | `9e8ef3557675969874a6b8697c5b7b5d7df03481c0d107fb295ce938916adb10` |
 | Three-CPU timing samples | `9f7147388661e7ec06e5c9bf0f84c263082e386514ee3362bd066c1cb45cebe5` |
 | N64 Challenger reset replay | `5c84d1b8ae1e5f57a5731ceb9a6417d636788f58a2d39c67a63cca34bc6c1fdc` |
 | N64 Blood Bath reset replay | `66a9c657369c58decea5a0f27079ed785fadc60f6c43357590541b70c70eb426` |
 
-Campaign wins, wider mid-mission SRAM coverage and hardware timings
-remain separate checks.
+Wider campaign victory and mid-mission SRAM coverage and hardware
+timings remain open on this package.
