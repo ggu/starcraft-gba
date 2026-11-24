@@ -86,17 +86,13 @@ skips, and the host sanitizer checks completed.
 
 `CANONICAL_CONTACT_ROM_AXIS=1` requests the existing early
 bound in the speed-optimized ROM kernel with packed actor
-coordinates and the geometry table. A change to the option
+coordinates. A change to the option
 invalidates the canonical ROM ELF configuration stamp. The
 default is zero.
 
-Of the default product configurations, Zerg Z10 meets all
-the ROM guard conditions. Terran's ROM kernel uses arithmetic
-and lacks the geometry-table flag. Protoss P10 and Showcase
-use the separately configured IWRAM path. Measure the Z10
-pair first. A Terran trial with the table would also require
-an independent table-versus-arithmetic comparison and a
-new ROM budget check.
+The option covers the Zerg Z10 geometry table and the Terran
+arithmetic path. Protoss P10 and Showcase use the separately
+configured IWRAM path.
 
 The [Outpost query census](2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
 supplies 874 Terran and Zerg queries from one- and two-CPU
@@ -112,3 +108,51 @@ The guarded source fixture receipt has SHA-256
 A separate `-Os` pair produces byte-identical ROMs and
 matching cycles. Its receipt has SHA-256
 `ff2918f5e1f136b0f0273e11ebf40f79fcf79bc7fe76377e3d424585d1bbd83e`.
+
+### Whole-frame Terran arithmetic comparison
+
+Two local Terran links from `4e24202f` use the same prepared
+inputs, including audio, and differ only in the early-axis
+compile definition. After adding the option to the arithmetic
+path, a second link for each setting matches its measured
+ROM byte for byte. Both links meet the existing static RAM
+guards. The contact kernel grows by 44 ROM bytes. The linked
+IWRAM and working RAM endpoints are identical. Both contact
+kernel prologues allocate 176 bytes including saved registers.
+
+Each pair starts a match through the ordinary Custom Game
+menu. The player gives no orders and keeps the starting
+camera. The cases place Terran, then Zerg and Protoss CPUs
+in order, with Outpost in Free for All and Blood Bath in
+Melee. Each row covers 120 consecutive updates starting
+after 11,000. The two-VBlank budget is 561,792 guest cycles.
+
+| Map and CPU count | Mean cycles, base → early | Reduction | Budget overruns, base → early |
+| --- | ---: | ---: | ---: |
+| Outpost, 1 CPU | 580,859 → 565,614 | 2.62% | 98 → 65 |
+| Outpost, 2 CPUs | 824,818 → 798,788 | 3.16% | 120 → 120 |
+| Outpost, 3 CPUs | 1,018,688 → 1,006,875 | 1.16% | 120 → 120 |
+| Blood Bath, 1 CPU | 561,367 → 561,367 | 0.00% | 30 → 30 |
+| Blood Bath, 2 CPUs | 629,575 → 616,898 | 2.01% | 120 → 120 |
+| Blood Bath, 3 CPUs | 908,885 → 897,867 | 1.21% | 120 → 120 |
+
+Nine checkpoints per match pair agree on world state, both
+framebuffer pages and palette. The six pause saves and
+fresh HOME exports agree between builds. Each pair matches
+again after 60 resumed updates. The three-CPU Blood Bath
+peak rises from 1,215,014 to 1,225,063 cycles, despite the
+lower mean and p95. The 1-CPU Outpost mean reaches 29.66
+emulated updates per second. Busy matches still exceed
+the budget. The product option stays off pending broader
+campaign, stack and device checks, and a Z10 frame pair.
+
+The paired receipt has SHA-256
+`e76e2b17291ff5de075e7638fd750240d6dd983482a689d673b9c34ece9fb228`.
+
+A campaign pair fresh-loads a late Terran 5 KODAK journal at
+frame 97,617 and plays 160 updates with two camera moves.
+All nine observed worlds and framebuffer pairs agree. The
+ordinary save, fresh HOME, and 60 neutral continuation
+updates agree again. Mean cost changes from 734,317 to
+734,299 cycles in that window. The campaign receipt has
+SHA-256 `a8973a1a9a057011f09611fd0a755ba7e3e65892b591a459e071e32724f7c7a0`.
