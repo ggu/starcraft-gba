@@ -934,6 +934,32 @@ to 256 while gas and 5/26 supply hold. An A press aimed at
 the vehicle yields no visible selection panel or ring. That
 capture leaves its ownership and the hit test unresolved.
 
+#### Backwater Marine production
+
+A separate fresh N64 process loads the first slot and uses
+the stick and A to select the Barracks. Its panel shows
+1,000 HP. C-Right opens Build and the ordinary stick
+selection highlights a Marine for 50 minerals and one
+supply. A confirms the order. The next cut has a queued
+portrait and progress bar, 206 minerals from the prior
+256, and 6/26 supply from 5/26. With neutral input, the
+queue clears and another Marine is visible beside the
+Barracks. Mining continues. The input and output FlashRAM
+match byte for byte.
+
+A separate selection attempt snaps the cursor to Raynor's
+Vulture, then A produces no unit panel. That distinguishes
+cursor snap from a confirmed player selection in this position.
+
+On the exact KODAK Terran ROM, ordinary opening controls
+select the preplaced Barracks and queue one Marine.
+Minerals fall from 200 to 150. The queue contains one
+active unit while current supply remains at 6/26. The
+Marine completes during neutral updates and current supply
+rises to 7/26. The observations cover the paid production
+path on both systems. N64 displays the extra supply at
+queue time. These GBA observations read actual used supply.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |
@@ -944,6 +970,9 @@ capture leaves its ownership and the hit test unresolved.
 | N64 unit supply table inspection | `18cf32940064e50f2a6872388622061cb6360a04f27ea5e0183d0d2edad89751` |
 | N64 Backwater starting roster and action counts | `7ac41e6b4fab6762aca295fed9b07792ae277aa329b72d1d716e755524328f2b` |
 | N64 follow-up harvesting and selection probe | `161e81ca5e295a135ee7a21855f6a4e9181db425ff0e7248921b9777b85d37a5` |
+| N64 Backwater Marine payment, queue and completion | `23e8f1bd1493d4b378b20afaa32dd775d4bd1d1279e0f6eb13d1f6cbc21740f0` |
+| N64 field cursor snap and selection attempt | `7fe3baa1973ccc388c2970e53c80bec68c7d10ede87f3cff671001fde6af3a8a` |
+| Exact-KODAK Backwater Marine payment, queue and completion | `29fe8339b66cf3f39d56ec0f0b399ca6213a26b5ad4d44a420bc38095f8b513a` |
 
 ### Terran chapter 5 input divergence
 
@@ -1469,6 +1498,11 @@ and effects account for 35–62% of drawing, compared with 43–52k
 cycles for the measured terrain background stage. The launch
 windows average 29.72–29.99 emulated updates per second and the
 late windows average 13.16–19.73.
+
+A later independent pair repeats these six launches and
+all 2,160 cycle observations twice with byte-identical
+receipts. The repeated census has SHA-256
+`faa11662f1f3d880a5e8c8a7efc66e9c16aeb831a6132f63ea2badc170f769b0`.
 
 The profiling intervals charge interrupt work to the phase in
 which it occurs. The simulation interval also includes input reads.

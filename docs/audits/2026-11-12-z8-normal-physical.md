@@ -1289,6 +1289,27 @@ transport policy.
 | Southern transfer under ground attack | `f028a0303b694a168dd3a879e590b4b0349434f5c0631d3caefaa4e98f573660` |
 | Western withdrawal under ground attack | `236b081e6aaba4d7420426962918e866f63f83e7a45f349c3d0422151b6a1634` |
 
+### Evacuate workers before the eastern Reaver reaches the base
+
+An earlier branch from frame 71,099 moves five Drones away
+from the raid and pays for replacement Hydralisks. Fresh HOME
+at frame 72,755 restores all five Drones, Kerrigan at 400 HP,
+a full-health Hatchery, the new Den and 19 Hydralisks, including
+11 staged to the east. Both remaining Nexuses and the approaching
+Reaver are visible in the read-only actor census. The three
+nearby Hydralisks lose their follow-up interception while
+all five evacuated workers survive. An earlier attempt to
+bring the large eastern force directly back through the contested
+corridor also loses most of its Hydralisks. Retain the evacuation
+save and combine the worker move with an earlier local defense
+or a second production base.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Worker evacuation and paid Hydralisk inputs | `772c6a78ab490c0d23ae499aa1607fb26fb120f8b3aa212be83bb2514b52c3e1` |
+| Evacuation checkpoint SRAM and readback | `71888030a6470bd692bf626be7edd148c1792bb9f82b8736dc68d38a50d33619` |
+| Evacuation fresh HOME verification | `22db8614a82d6a89173455dc23bfae950e2637dd737724a67ec055389614e161` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

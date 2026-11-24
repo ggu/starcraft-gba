@@ -106,3 +106,43 @@ reaches the mining line.
 | Frame-5,667 SRAM and fresh readback | `751e3044e6807b417a8e7a27bd098df16727e1f1c4ed592a0c8659be259e3be8` |
 | Raid continuation and fresh HOME | `ada84b29a54a7f16a41af8ace928d2c07baad2b78455e06f98b25ef7864126ef` |
 | Frame-7,532 SRAM and fresh readback | `5a47068922ab1fc120ee2b53d569ea86ddafaa5e48dfcaa72dba21a61f88f8a2` |
+
+### Earlier defense and Reaver pursuit
+
+From frame 2,359, the Drone places the Den and morphs both
+existing Colonies. These structures finish by frame 3,425,
+and paid Hydralisk production begins at frame 3,483.
+At frame 4,983 the player has five Hydralisks, all six starting
+Zerglings and both Sunkens. Fresh HOME restores this earlier
+position and re-exports identical SRAM.
+
+A flank continuation moves the combat group west and targets
+the nearby Reaver at frame 6,616. The Reaver disappears by
+frame 7,118. The attack continues, and by frame 8,818 the Den,
+western Sunken and all miners have been lost. Two Hydralisks
+remain. Prioritize extra static defenses from the earlier
+economy save, then keep trained units near the mining line.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Frame-4,983 SRAM and fresh readback | `2ee81e0cde1fe4b4a506fa08130fc1150fc1ce2bf1a6c7d880bfeeff66726d99` |
+| Earlier defense fresh HOME verification | `4b12d0a292df953d25a515d255b6a7c50ca15d4a9b1defa966cfffd4da5783a5` |
+| Flank fresh HOME verification | `774a4f4f8ff96a082e0f39e51e29dcdb87127d487611d4f2df5ebbda7db80776` |
+
+### Four Sunkens before the raid
+
+An alternate opening completes two additional western
+Sunkens, the original two Sunkens and the Den by frame
+4,640. Hydralisks are queued and two miners remain. The
+fresh HOME replay re-exports identical SRAM. In a passive
+continuation to frame 7,849 the extra Sunkens and Den fall
+while both original Sunkens and both miners hold. The
+Reaver is at 39 HP in the frame-7,649 observation. Keep
+the earlier checkpoint and focus available Hydralisks on
+the approaching Reaver while the static defenses are up.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Four-Sunken SRAM and fresh readback | `8f3f8fcec358c7ab0e4bd2a364da7d6790fb5afb041f9eced6926f513a62a3a8` |
+| Four-Sunken HOME verification | `dcda4c3e1182f3b3407de0d200765b1757dc91769b9dde1c96b536c8e8f93ce5` |
+| Continuation through the first raid | `70cd9ffc1b5890806f011f952b0e64328001fa65a19b14288d671b3219afca44` |
