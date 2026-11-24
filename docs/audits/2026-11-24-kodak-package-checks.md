@@ -389,6 +389,28 @@ and the same field state. A 120-update neutral continuation
 loses one more Hydralisk, so the next attempt needs immediate
 movement or reinforcement. Victory remains open.
 
+A separate branch from the verified frame-11,342 save trains
+20 Hydralisks and retains three Mutalisks by frame 23,023,
+with five Drones, all key buildings and the 250-health Chrysalis
+intact. A short attack on the nearest turret drops the hostile
+building count from 26 to 25 by frame 23,837. Nineteen Hydralisks
+and two Mutalisks survive. Both ordinary-input segments replay
+to matching field fingerprints and byte-identical saves, and a
+fresh HOME load restores the assault checkpoint. The earlier
+staging point keeps more forces for a longer offensive.
+
+From the earlier staging point, a paid Lair and Spire complete
+by frame 27,291. Reassigning one Drone to the Extractor restores
+gas income, and a newly paid Mutalisk hatches by frame 29,174.
+A second gas Drone and a replacement mineral Drone restore
+the workforce to five. With two gas orders active and no gas
+spending, the bank grows by 80 gas over 1,500 updates. A second
+paid Mutalisk hatches by frame 31,682. A fresh HOME load at that
+checkpoint restores 20 Hydralisks, five Mutalisks, five Drones
+and the intact Chrysalis and tech buildings. Independent replays
+match the three saved field states and journals. The air-tech
+branch has 26 hostile buildings remaining.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -938,6 +960,9 @@ quality on the GBA SP.
 | Zerg chapter 1 victory load and Zerg chapter 2 briefing | `e9b826443cda4a4dd44290896cf841577909b3eeba297e81fc5b9081d0266e4e` |
 | Zerg chapter 3 blank HOME deployment, paid economy and fresh pause continuation | `f00dfa77e6a95579fee276f2466d9b1f51215bd51b8dbf887f4f105e01201b7b` |
 | Zerg chapter 3 paid army, first turret destroyed and fresh reload | `465c036febfef23eebbd9028718ddde9fbcc2a5260290a38b4946ff3f6f39bf2` |
+| Zerg chapter 3 larger staging army and paired assault journals | `add479597eb38b1346b659a915453c0ff18e6780dd44698be74bf382d438594e` |
+| Zerg chapter 3 paid Lair, Spire, Mutalisk and fresh load | `19b35e7e434fb4a1e2ffe1f23ce38e49ab41459e21fc3915f907f83d17f7010b` |
+| Zerg chapter 3 two gas workers, replacement Drone, second paid Mutalisk and fresh load | `c03824f923eeccb8a403b2b300575e049ac4084477f558acc9bc9d23351667fa` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |

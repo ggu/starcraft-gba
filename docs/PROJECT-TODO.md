@@ -1769,8 +1769,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   produces a paid economy and a Hydralisk–Mutalisk army. Its
   first hostile turret falls by frame 12,156. The fresh save
   keeps the 250-health Chrysalis intact and restores with
-  25 hostile buildings left. Move or reinforce the exposed
-  army immediately on load, then finish the mission.
+  25 hostile buildings left. A separate staging branch reaches
+  a completed Lair and Spire, two Drones on gas, 20 Hydralisks
+  and five Mutalisks by frame 31,682. Its fresh load restores
+  the full staging force and intact Chrysalis. Build a stronger
+  air force from that checkpoint, then verify victory on the exact ROM.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
