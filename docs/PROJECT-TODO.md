@@ -22,7 +22,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
   and fall to 14.14–17.90 in the last measured window. Every sampled
-  busy update exceeds two VBlanks. Prioritize sustained combat cost.
+  busy update exceeds two VBlanks. The exact Protoss 10 late sample
+  spends 396,340 guest cycles per update on depth-ordered actor
+  drawing and 152,204 on movement orders. Prioritize those paths for
+  the race cartridges.
   The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost

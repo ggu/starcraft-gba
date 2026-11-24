@@ -94,6 +94,24 @@ exceeds the two-VBlank budget. Even the openings have 123–170
 overruns of that budget per 600 updates. The 30 fps target remains
 open for busy play on these cartridges.
 
+### Protoss 10 late battle attribution
+
+On the same Protoss 10 Blood Bath Melee lineup, a read-only ARM
+instruction profiler samples eight updates after 9,000 and another
+eight after 11,384. The profiled and ordinary runs match the observed
+world, both framebuffer pages, palette, camera, display and elapsed
+cycles in each cut. Instruction and call-stack cycle totals balance.
+
+The early cut averages 778,400 guest cycles per update. The late cut
+averages 1,342,585, about 2.39 times the two-VBlank budget. In that
+late cut, the game update uses about 654,022 cycles, rendering uses
+581,292 and audio IRQ work uses 106,345. Orders account for about
+495,182 cycles within the update. Movement and resource-worker
+orders account for 152,204 and 82,688 respectively. Depth-ordered
+actor drawing uses about 396,340 cycles within rendering, including
+154,678 for unit images and 106,647 for tracers. These nested costs
+identify the expensive paths in the measured windows.
+
 ## Local receipts
 
 | Check | SHA-256 |
@@ -105,6 +123,7 @@ open for busy play on these cartridges.
 | Showcase scene starts | `5ceefdcea04deea53c7d5795810dbef47e3873b33415449528b668e5d8e34029` |
 | Fresh-process Custom Game saves | `9e8ef3557675969874a6b8697c5b7b5d7df03481c0d107fb295ce938916adb10` |
 | Three-CPU timing samples | `9f7147388661e7ec06e5c9bf0f84c263082e386514ee3362bd066c1cb45cebe5` |
+| Protoss 10 Blood Bath instruction attribution | `e942247d1615ef449b116e9fcaf85950d335d59ed063701d7dcd20b1153e9799` |
 | N64 Challenger reset replay | `5c84d1b8ae1e5f57a5731ceb9a6417d636788f58a2d39c67a63cca34bc6c1fdc` |
 | N64 Blood Bath reset replay | `66a9c657369c58decea5a0f27079ed785fadc60f6c43357590541b70c70eb426` |
 
