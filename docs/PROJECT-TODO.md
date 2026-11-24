@@ -1673,9 +1673,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Thirty-six Custom Game fresh saves load and match continuation.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
-  Z2, P3, P5, P7, P9 and P10 also have exact-image wins and fresh
-  save checks. An ordinary T5 retreat keeps Raynor at full health
-  through frame 129,658. The mission still needs an active route
+  Z2, P3 and P5–P10 also have exact-image wins and fresh save
+  checks, for 17 of 30 missions overall. An ordinary T5 retreat
+  keeps Raynor at full health
+  through frame 129,658. Local box selection moves Marines with
+  both heroes excluded. The mission still needs an active route
   from that branch through all victory conditions.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the

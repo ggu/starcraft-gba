@@ -69,7 +69,7 @@ from the GBA guest clock.
 
 ### Protoss and Zerg victories
 
-P3 and P5 both win from HOME on the exact installed Protoss image.
+P3, P5 and P6 win from HOME on the exact installed Protoss image.
 Each resumes the pause save from a fresh HOME and restores the
 terminal world from a third process. Each victory journal re-exports
 byte for byte.
@@ -78,11 +78,17 @@ byte for byte.
 | --- | ---: | ---: | ---: | ---: |
 | 3 | 48,168 | 20,000 | 47,661 | 49 |
 | 5 | 5,172 | 2,700 | 5,057 | 7 |
+| 6 | 94,430 | 64,800 | 92,986 | 105 |
 
 P7 also wins from HOME after 57,636 gameplay calls. The replay
 checks the frame at each retained input edge, saves at frame 8,845
 and reaches the frame-55,892 victory after a fresh HOME load.
 A third process loads the victory and re-exports identical SRAM.
+
+P8 wins at frame 104,113 after 106,011 physical calls. All 40
+observations match, and the fresh HOME continuation restores the
+frame-30,949 pause save. The run records the victory on the live
+result screen and includes the pause journal.
 
 The manifest also pins both retained
 [Protoss finale receipts](2026-11-13-p9-normal-home.md).
@@ -135,6 +141,12 @@ four friendly buildings remaining.
 Applying the old suffix after that retreat recalls Raynor through
 the global combat-group selection and later orders. That variant
 loses at frame 108,946 with all 21 hostile buildings still standing.
+
+A fresh retreat test uses an ordinary L-drag box to select two
+nearby Marines. A ground order moves both with formation
+offsets. Kerrigan retains her idle target, and Raynor retains
+his retreat target and idles on arrival. This verifies local
+command of an assault group with both heroes excluded.
 
 ## Custom Game saves
 
@@ -210,6 +222,7 @@ workload sizes for synthetic renderer and collision tests.
 | Terran chapter 5 pause-corrected defeat | `5045cef4db7af2cd8c214745ef1761e011972a1266df7490112d6e5fe6606aea` |
 | Terran chapter 5 Raynor retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
 | Terran chapter 5 retreat with the older suffix | `99ecca6a4f17266c65ccafbf47d41b93cd5e6830adaa7ce71aaf1325b2ed3cad` |
+| Terran chapter 5 hero-safe local selection and order | `1848f80e7fe00f9d303bb853b661dd32add344459f56f878facaf4474a833698` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -219,7 +232,9 @@ workload sizes for synthetic renderer and collision tests.
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 3 full run and fresh loads | `dcca91454a924eafebc47440a7a1fda1a0dd25b21d9b23024ee6e05690e6e221` |
 | Protoss chapter 5 full run and fresh loads | `6135c1f184640ecf9f4cf77a9c48da534bc19f60a0e7c33685be970a50e051a2` |
+| Protoss chapter 6 full run and fresh loads | `fe85625beb73116126eecb82bc244a3d6328fee40ce881f3ee67e89191ef2974` |
 | Protoss chapter 7 full run and fresh loads | `54d8fd3811c16883ad7bbd0c0991240a8e80737af43d282e8c2b62bcc1a548d0` |
+| Protoss chapter 8 full run and fresh pause load | `5e74681fbd24e824a60d4ea3a8d9cc02ac854177c69afd7ada032bab79c0c458` |
 | Protoss chapter 9 full comparison | `93151835a97657694c868c183a81ec82aac9f41c9ff1ee49af472e299761f48c` |
 | Protoss chapter 10 full run and fresh loads | `a018c1ee1cc0fd42631ae5a91101db087adf0466f680ea532e0115ce556d0605` |
 | Showcase scene starts | `5ceefdcea04deea53c7d5795810dbef47e3873b33415449528b668e5d8e34029` |
