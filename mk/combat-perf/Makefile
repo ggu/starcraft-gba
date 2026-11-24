@@ -85,7 +85,16 @@ endif
 endif
 CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE) \
 	$(if $(filter 1,$(CANONICAL_ARMED_TYPE_TABLE)),-DSC64_Z7_ARMED_TABLE_PROBE)
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):batch-dirty
+
+# Compare the early collision bound in speed-optimized ROM kernels.
+CANONICAL_CONTACT_ROM_AXIS ?= 0
+ifneq ($(CANONICAL_CONTACT_ROM_AXIS),0)
+ifneq ($(CANONICAL_CONTACT_ROM_AXIS),1)
+$(error CANONICAL_CONTACT_ROM_AXIS must be 0 or 1)
+endif
+endif
+CANONICAL_CONTACT_ROM_AXIS_FLAGS = $(if $(filter 1,$(CANONICAL_CONTACT_ROM_AXIS)),-DSC64_CONTACT_EARLY_AXIS_ROM_PROBE)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):batch-dirty
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:
@@ -98,7 +107,7 @@ build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z
 
 # Reconcile the existing collision buckets on all four normal products.
 CANONICAL_GAME_ELFS := build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf
-$(CANONICAL_GAME_ELFS): CFLAGS += -DSC64_PERSISTENT_COLLISION_BUCKETS
+$(CANONICAL_GAME_ELFS): CFLAGS += -DSC64_PERSISTENT_COLLISION_BUCKETS $(CANONICAL_CONTACT_ROM_AXIS_FLAGS)
 $(CANONICAL_GAME_ELFS): mk/combat-perf/Makefile
 
 .PHONY: test-sc64-custom-defense-cells

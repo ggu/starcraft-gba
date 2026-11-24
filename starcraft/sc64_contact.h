@@ -55,10 +55,15 @@ static u8 sc64_contact_class[SC64_CONTACT_TYPES];
 #define SC64_CONTACT_STEER_ROM 1
 #endif
 
-/* Enable the early axis probe only for the fast-memory steering kernel.
- * The ROM kernel keeps its original instruction sequence. */
+/* The fast-memory kernel and the optional ROM trial share the proven bound. */
 #if defined(SC64_CONTACT_EARLY_AXIS_IWRAM_PROBE) && \
     !defined(SC64_CONTACT_STEER_ROM) && !defined(SC64_CONTACT_EARLY_AXIS_PROBE)
+#define SC64_CONTACT_EARLY_AXIS_PROBE 1
+#endif
+#if defined(SC64_CONTACT_EARLY_AXIS_ROM_PROBE) && \
+    defined(SC64_CONTACT_STEER_ROM) && defined(SC64_CONTACT_COINCIDENT_PROBE) && \
+    (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)) && \
+    !defined(__OPTIMIZE_SIZE__) && !defined(SC64_CONTACT_EARLY_AXIS_PROBE)
 #define SC64_CONTACT_EARLY_AXIS_PROBE 1
 #endif
 #if defined(SC64_CONTACT_EARLY_DIRECT) && \
