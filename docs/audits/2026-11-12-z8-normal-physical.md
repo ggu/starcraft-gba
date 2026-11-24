@@ -1182,6 +1182,36 @@ sustain production.
 | Second Reaver wave and fresh HOME | `ab2620100cf6b32887b4374f00297f1195c59ce97321f43d22618faf18b934e3` / `f9fb9a51dc12e56c744be87fe1d45adabbcbc344086e8e89abb48a2e1dabd492` |
 | Worker recovery and replacement Pool fresh HOME | `756e85581be9f42c917bc51b2739e60bee9845e7c98b0bdf97ba0ff6d5b30967` / `e9435467f708ae3521ab362d2cc4d90cbad0c14b599f9dbefe4761b7e4fad8e0` |
 
+### Rebuild after the eastern Nexus falls
+
+Continue from the verified frame-70,971 eastern victory over
+the first Nexus. Acknowledge the authored text, then move Kerrigan
+south and evacuate all three Drones east ahead of the Reaver.
+At frame 71,985 Kerrigan has 400 HP at (1205,2000), and the
+Drones survive with 32, 32 and 12 HP. One Drone pays 300
+minerals for a Hatchery at (1952,1664). It completes with 1,250
+HP at frame 74,303. The original buildings have fallen and the
+eastern Nexus stays destroyed.
+
+Three more paid Drones hatch during the next continuation.
+The recovered base finishes a Pool at (2000,1664) with 750 HP
+by frame 77,041. Fresh HOME restores the full-health Hatchery,
+the Pool, three Drones, Kerrigan at 400 HP and the 8,959/259
+bank. The western Nexus still stands. Independent replays of
+the evacuation, Hatchery, paid Drones and Pool reproduce all
+five checkpoints and their SRAM.
+
+The next Den order is paid but a Reaver damages the new Hatchery
+before the nearest Hydralisks can reinforce it. Two miners die
+before the Den finishes. Preserve the frame-77,041 save and
+prepare a defense before extending the base.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent post-Nexus evacuation and Hatchery | `050ed6fa7278eb19a8b89709da4181999011c2bcc4e504658bf48852b33559b5` |
+| Independent paid Drones, Pool construction and fresh HOME | `ebe2ed0edb5bd9745e7aa4f9c45494509df26bc6d385cf4a5387bffc32fe24fe` |
+| Recovered base SRAM | `7d4644978c21f581b8f026931ba79dcaa61297647142d3cbb246466e46dd46c9` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source
