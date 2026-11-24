@@ -659,6 +659,22 @@ ground rush and northern Guardian attack leave the Spore at 12 HP,
 the Lair at 926 HP and one surviving Drone by frame 12,316. This
 branch has yet to sustain mining or deliver gas through the raid.
 
+In a continuation from frame 10,885, the three Mutalisks fly
+north toward the approaching Guardians. Two watched Guardian
+slots disappear from the local scan. A separate read-only
+fresh HOME census at frame 12,926 finds those slots reused by
+Zerglings and three other live Guardians. The Lair and Den
+remain at 1,155 and 78 HP. The ground force destroys the Pool,
+and the bank reaches 261 minerals with gas at 50. The saved
+defense establishes an air interception under ground pressure.
+Pair the north interception with a ground defense before
+committing to the Extractor.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Northern interception | `c75a0a80763b2b6336dfb5360096199a4d179d82d62267ad341defda7aa10112` |
+| Fresh HOME global census and identical SRAM | `8fad131038f4ad5f2a2f701cc0f6866730ce5ea8495b634c8505e9b80e2f3904` |
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -870,8 +886,26 @@ the same mission and the read-only observer sees those six units
 and four buildings, 200 minerals, 200 gas and 6/26 supply. The
 human units report idle orders. In a separate replay, after
 600 neutral updates the SCV is still idle and the bank is
-still 200/200. The N64 supply exclusion still needs an
-isolated test.
+still 200/200. Its N64 counterpart is seen beside the mineral
+patch and then on the way back to the Command Center. The
+controller tape has neutral steps and A taps between these cuts.
+
+The authenticated USA cartridge's unit table has 2 half-units
+of required supply for Marine (raw 0) and SCV (raw 7), and
+0 for both Raynor units (raw 19 and 20). The human slot starts
+with four Marines and an SCV, for 5 supply. The CHK places
+Raynor in a separate slot. The opening counter alone leaves
+his transfer timing open. The source rule for the GBA's
+Raynor alias charges two half-units.
+
+The Backwater CHK contains 15 triggers and zero Order or
+Run AI Script actions. The starting SCV is a preplaced unit.
+This constrains the worker-order comparison to the opening
+engine behavior. The N64 render snapshots establish gathering
+and a changing bank, while the exact internal order and the
+initial mineral target require a separate trace.
+The [OpenBW units.dat loader](https://github.com/OpenBW/openbw/blob/master/data_loading.h#L1433-L1443)
+identifies the supply columns in the cartridge table.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -880,6 +914,8 @@ isolated test.
 | N64 fresh-process reload | `2c9d3141c995bf315e72a9e500aa91601b60c507af72631d02d2f6c6b07ebab4` |
 | GBA opening and neutral updates | `c23236098c12c013370634bb91fda62357c34a4273d9420be5d62243e3904cd6` |
 | GBA independent opening and 600 neutral updates | `4fa9651e09dccc7efc4770cdd8a633823e7c7863722ed1c6f55218aeefbc099f` |
+| N64 unit supply table inspection | `18cf32940064e50f2a6872388622061cb6360a04f27ea5e0183d0d2edad89751` |
+| N64 Backwater starting roster and action counts | `7ac41e6b4fab6762aca295fed9b07792ae277aa329b72d1d716e755524328f2b` |
 
 ### Terran chapter 5 input divergence
 
@@ -1092,6 +1128,60 @@ for byte.
 | Fresh HOME observations | `226f101271cbeaa22ae94cf789d94ebf105eeae74886be8b80044ba87987de9c` |
 | Reinforced home force SRAM | `5443aa0f97ff386c2a7c8932fa964cf873e8e79001245431c6370b1384583e61` |
 
+From the reinforced home save, three more paid Wraiths
+complete. Fresh HOME at frame 75,800 has thirteen Wraiths
+at 50/50 supply and both heroes at 269 and 250 HP. An
+approaching hostile Wraith disappears before the assault.
+The larger wing attacks from the northeast and removes the
+turret at (528,1344) in this branch. Fresh HOME after the
+withdrawal restores ten friendly Wraiths, two hostile
+Wraiths and 20 hostile buildings at frame 84,749.
+
+Another two paid Wraiths reinforce the attack on the turret at
+(432,1280). It falls. Both remaining hostile Wraiths are absent
+from the full fresh HOME census. The Starport takes incidental
+damage and remains at 929 HP. Two friendly Wraiths are lost.
+At frame 92,815 the ten remaining aircraft and both heroes
+fresh-load with 932 gas.
+
+A follow-up attack removes the western Starport. All ten
+friendly Wraiths retreat, including three below 20 HP.
+Fresh HOME at frame 94,976 restores both heroes at 269 and
+250 HP, 1,020 gas and 44/50 supply. The census finds zero
+hostile Wraiths and 18 hostile buildings, including the
+western Command Center and six Missile Turrets. An independent
+controller replay reproduces the attack checkpoints and SRAM
+byte for byte.
+
+The next sortie removes the northern Missile Turrets at
+(400,944) and (336,944) and loses two Wraiths. Fresh HOME at
+frame 96,735 restores eight Wraiths, both heroes, 1,092 gas
+and 62 minerals. The hostile census has 16 buildings,
+including four Missile Turrets, and zero Wraiths. An
+independent replay reproduces the sortie and save.
+
+The mineral worker is idle beside the recruited base and its
+prior field is empty. An ordinary Harvest order to an adjacent
+nonempty field returns eight minerals, lifting the bank from
+62 to 70. Fresh HOME preserves the two workers' mineral and
+gas orders, both heroes and all eight Wraiths. The order that
+preceded the interruption still needs a replay from before
+depletion to test automatic handoff.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Thirteen-Wraith fresh HOME | `d73a5ad034ea834c924683ce1711e88adf6e73bb7ffb06f226d5aef5bd8f7a7a` |
+| Northeast turret attack and withdrawal | `9690aff56cb652598e3d4c290408290a40e8798ed9ec79c6932e3aadc1822b9e` |
+| Fresh HOME with two hostile Wraiths | `1cd4a36633bd25ef67923955634514d8f661b3ae59d5cd81ef55772ae871d783` |
+| Fresh save after the second turret falls | `964f9224e27b0f7832d09fd88c32b5b083af1f023038cfae2dfa58caaa46c3a1` |
+| Western Starport assault | `1e89975fc608e0665f6e2f3bcff26947df8775a50d1eebc7176d530ab6d4a874` |
+| Fresh HOME after Starport destruction | `3a5ef357c5fa7f930b4583829ae73a227f69e8de2a4c67e58a1797e1f76ad808` |
+| Post-Starport SRAM | `012672dc8f05301c04183180285cb31b2574f0273da9e804026d41ef175a4591` |
+| Two northern Missile Turrets removed | `34692b8b1155f99ba0730a8193a5ab8b153bd7b3644d8ac70e136de27e71ecb9` |
+| Fresh HOME after the northern sortie | `b4e91d5b2e67c13b01faed8ba20aa1251ce12444a5e61484558c068922f0ab4a` |
+| Mineral worker reassignment and deposit | `8dee86c45e2031215bd43f51ccd585e428b5bc15fd05f0dd57395811f39d7592` |
+| Fresh HOME with resumed mineral income | `b21dfea87a4aa5177b2ba0305c05b0263223cc7f1ac7e653a6eaa0c4d30fffed` |
+
 ## Custom Game saves
 
 Thirty-six early Custom Game save/continue pairs pass across all
@@ -1176,6 +1266,53 @@ The one-CPU Blood Bath range is 140 to 411 overruns of 600 despite
 its higher mean rate. Blood Bath resolves different start locations
 across lineups, so these are full-match observations for the stated
 configurations. They measure guest cycles in mGBA.
+
+### Late frame budget with one or two CPUs
+
+A second set of 12 ordinary-button runs samples 120 consecutive
+updates at launch and after updates 9,000 and 11,000 in each
+configuration. All 4,320 total-cycle samples and resolved
+seats match the corresponding portions of the retained pacing
+replays. The component counters also pass the nesting checks.
+The player gives no orders, with the starting camera fixed.
+
+| Race ROM and map | One CPU total | One CPU orders | One CPU draw | Two CPUs total | Two CPUs orders | Two CPUs draw |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Terran Outpost | 592 | 251 | 272 | 842 | 424 | 299 |
+| Terran Blood Bath | 561 | 191 | 222 | 669 | 334 | 223 |
+| Zerg Outpost | 641 | 251 | 308 | 902 | 441 | 329 |
+| Zerg Blood Bath | 561 | 198 | 263 | 681 | 295 | 265 |
+| Protoss Outpost | 641 | 252 | 300 | 852 | 392 | 320 |
+| Protoss Blood Bath | 567 | 230 | 247 | 712 | 328 | 252 |
+
+Values are mean thousands of guest cycles after update 11,000.
+Outpost needs a 5.2–12.4% reduction in total mean cost with
+one CPU and 33.2–37.7% with two. On Outpost the extra order cost
+is 66–73% of the increase from one to two CPUs. In the one-CPU
+Blood Bath cuts, the mean is near budget but 25–77 of 120 frames
+still exceed two VBlanks. With two CPUs, every complete frame
+exceeds the budget across both maps. Simulation alone exceeds
+budget on 12–63 of 120 two-CPU Outpost samples. Keep a one-CPU
+Blood Bath tail check and prioritize savings in orders for
+Outpost, then measure those savings together with drawing.
+
+The detailed local receipt has SHA-256
+`161b4ffa9d460ac48acb701817d9a1d47e543b5c8f21ad36ec848ae988bf761a`.
+
+Eight read-only instruction cuts per Outpost configuration
+match separate uninstrumented runs on elapsed cycles, both
+framebuffer pages, main world state, palette and camera.
+Adding the second CPU increases inclusive movement cost from
+178 to 334k cycles on Terran, 195 to 338k on Zerg, and 116
+to 193k on Protoss. Movement accounts for 61–81% of the
+additional order cycles in these cuts. Uncached contact
+masks account for 68–203k of the two-CPU updates; point route
+lookup accounts for 10–13k. Those routines can be nested
+inside movement. Target contact work before expanding the
+point-route cache for this measured workload.
+
+The instruction receipt has SHA-256
+`6f0adcd8555466213ebc464a7a3ac065489e07cf4a9df0066000d0d78f6bc0ff`.
 
 ### Late camera movement
 

@@ -1000,6 +1000,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   win. Confirm local release integration, hardware pacing and
   active multi-CPU results. The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
   place the largest costs in orders and depth-ordered drawing.
+  The [current one- and two-CPU budget](audits/2026-11-24-kodak-package-checks.md#late-frame-budget-with-one-or-two-cpus)
+  measures the extra order cost at 66–73% of the Outpost
+  increase. Its instruction cuts place 61–81% of the extra
+  order cost in movement. Target contact work first for Outpost.
+  Keep a one-CPU Blood Bath tail check, where a near-budget
+  mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
   video pages. Trials in raster fog lookup, audio decoding and a
   single-direction contact bound did not improve these samples.
@@ -1199,8 +1205,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Kerrigan at her starting position. The [connected approach](audits/2026-11-12-z8-normal-physical.md#intercept-the-reaver-from-the-connected-approach)
   reaches the Reaver through six ordinary waypoints and
   defeats it. Fresh HOME at frame 77,066 preserves Kerrigan
-  at 204 HP and the Hatchery at full health. Recover workers
-  and stop the next wave before the western Nexus assault.
+  at 204 HP and the Hatchery at full health. A [later Pool](audits/2026-11-12-z8-normal-physical.md#pool-completion-under-the-next-attack)
+  completes with Kerrigan still at 204 HP, but both buildings
+  take damage before the first reinforcements hatch. Five
+  Hydralisks reach the first connected waypoint with three
+  injured. Clear the approach and reinforce the Hatchery
+  before the western Nexus assault.
   [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
   fresh-loads an Extractor, Lair, Den, Spire and three full-health
   paid Mutalisks at frame 8,925. Preserve the wounded gas worker
@@ -1892,8 +1902,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   completes a full-health Hatchery, then the Pool, Lair, Den
   and Sunken Colony. A paid defense save at frame 10,885
   restores eight Hydralisks, three Mutalisks and four Drones.
-  Establish a gas supply and sustain production through the
-  Guardian raid before advancing on the objective. The T5 escort
+  After a northern interception, two watched Guardian slots
+  hold Zerglings and three Guardians remain at fresh HOME.
+  The ground push destroys the Pool. Combine the air response
+  with a ground defense and establish gas before advancing.
+  The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second
   verified save at frame 22,304 has cleared a Vulture. At frame
@@ -1912,8 +1925,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   buildings. Seven hostile Wraiths remain. A [separate reinforcement branch](audits/2026-11-24-kodak-package-checks.md#expand-supply-and-reinforce-before-the-western-assault)
   pays for a Depot and a tenth Wraith. Fresh HOME at frame
   68,291 has room for more at 44/50 supply, with both heroes
-  and the gas worker alive. Reinforce from the home branch
-  and draw enemy aircraft away from the turrets.
+  and the gas worker alive. The reinforced wing destroys two
+  western turrets, the Starport and two northern Missile
+  Turrets. At frame 96,735, fresh HOME keeps eight Wraiths,
+  both heroes and 1,092 gas. The hostile Wraith count is zero
+  and 16 buildings remain. A new harvest order restores
+  mineral income and is retained at fresh HOME frame 97,618.
+  Reinforce before attacking the western Command Center and
+  four remaining turrets.
   Finish T5 and Z7–Z10 on this package,
   and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
@@ -1943,8 +1962,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches the starting bank and roster. N64 shows 5/26 and
   starts the SCV gathering, while GBA shows 6/26 and the worker
   starts idle. The native checkpoint fresh-loads and resumes
-  mining. Isolate the native supply exclusion and starting
-  worker order before changing the GBA initialization.
+  mining. The N64 unit table gives both Raynor variants zero
+  supply. Qualify the corrected GBA total and existing saves,
+  and trace the native SCV's first target and order separately.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
