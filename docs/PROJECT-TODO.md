@@ -1803,8 +1803,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Z4's installed-ROM replay](audits/2026-11-24-kodak-package-checks.md#zerg-4-victory-and-zerg-5-deployment)
   hatches the Chrysalis, completes paid air production and wins at
   frame 47,951 with Kerrigan alive. The victory loads byte for byte
-  and Z5 deploys from HOME. The package now has 23 of 30 verified
-  victories. Continue with Z5 and the remaining T5 replay.
+  and Z5 deploys from HOME.
+  [Z5's fourteen-stage replay](audits/2026-11-24-kodak-package-checks.md#zerg-5-victory-and-zerg-6-deployment)
+  advances the terminal pause and wins with Kerrigan alive. The
+  victory loads byte for byte and Z6 deploys. The package now has
+  24 of 30 verified wins. Z6 restores a paid Lair and Extractor
+  after the first gas delivery at frame 3,519. Paid Ventral Sacs
+  completes, Kerrigan boards an Overlord, and fresh HOME restores
+  the cargo. Qualify unloading and the rest of Z6. The T5
+  completion replay also remains open.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)

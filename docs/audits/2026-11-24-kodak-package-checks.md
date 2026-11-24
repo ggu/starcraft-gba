@@ -101,7 +101,7 @@ The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
 
 Victories with fresh SRAM readback on the installed package now cover
-23 of 30 chapters: nine Terran, all ten Protoss, and Zerg 1 through 4.
+24 of 30 chapters: nine Terran, all ten Protoss, and Zerg 1 through 5.
 
 ### Protoss and Zerg victories
 
@@ -497,7 +497,34 @@ the Z3 victory, matching each world fingerprint and SRAM export.
 Fresh HOME Load restores the frozen victory with completion mask
 `0xc000` and re-exports the same 32 KiB. Returning to HOME and pressing
 A, Right, A and Start with releases opens the Z5 briefing and deploys
-the first field frame. Z5's victory remains open on this package.
+the first field frame.
+
+### Zerg 5 victory and Zerg 6 deployment
+
+The independent Z5 replay starts from that Z4 victory and uses
+24,349 controller updates across 14 fresh-HOME segments. Every
+segment matches the retained world fingerprint and 32 KiB SRAM.
+Recalling the Zerglings clears Kerrigan's route at the early gates.
+With cloak active she reaches gate 25 by frame 5,599. She withdraws
+to recover to 400 HP and at least 225 energy before the final approach.
+
+The terminal Bring condition fires at frame 17,286. The later source
+pause advances on an ordinary A press, and the mission wins at
+frame 18,974 with Kerrigan at 241 HP and zero unsupported actions.
+Fresh HOME Load restores the result, completion mask `0x1c000`, and
+the byte-identical SRAM. From the result, B, A, Down, A and Start
+with releases opens Z6 and deploys the first field frame. On a
+separate continuation, the starting Hatchery pays for and finishes
+a Lair by frame 1,981 and an Extractor by frame 3,005. Assigning a
+Drone brings the first gas delivery by frame 3,519. A fresh load
+restores the bank at 158 gas, both buildings, and Kerrigan at full
+health. All four opening stages independently match their world and
+SRAM. A further continuation pays 200 minerals and 200 gas for
+Ventral Sacs. The research is complete by frame 10,163. Ordinary
+selection and targeting then board the full-health Kerrigan into an
+Overlord by frame 11,111. Fresh HOME restores both the completed
+research and boarded state with a byte-identical SRAM export. Separate
+controller replays reproduce each field and journal.
 
 ### Wasteland opening on N64 and KODAK
 
@@ -1080,6 +1107,14 @@ quality on the GBA SP.
 | Zerg chapter 4 fresh air-production save | `d1fe57cc5a21e1d44ff004d583b5ac4e71eaf6ebcafc72345542a31c766d4e0e` |
 | Zerg chapter 4 independent ten-stage victory replay | `5870e567b34e5d044deb4313cbb84229347a6a987c8f1975a2ed719ccb5a29a8` |
 | Zerg chapter 4 victory readback and Zerg chapter 5 deployment | `43529b8ca8065c56258378257bd92bca46f119e2728293a8b0e829406cff7232` |
+| Zerg chapter 5 independent fourteen-stage victory replay | `09d7b8bedd7217ff2b5d921f43877cfd55be3891206983f0db2efa68a7c5890c` |
+| Zerg chapter 5 victory readback and Zerg chapter 6 deployment | `f3411d20910da9f646bf692ad390db1ef8908a6fb65b4bbadb0475a0b30cfdcd` |
+| Zerg chapter 6 paid Lair and fresh readback | `11cd5eff2a143bb1919d47f31791250182e73b14e5c3a6a03ac2350470686c1b` |
+| Zerg chapter 6 paid Extractor, first gas and fresh readback | `4a60c576ac69a5bcbee6fe2782063b74963e006a82d0ca792087987533c6ef86` |
+| Zerg chapter 6 independent four-stage opening replay | `94edc6c57c802767d1dbe0ba180efc349829947e60d9bbb606decb683051b7d4` |
+| Zerg chapter 6 paid Ventral Sacs and fresh readback | `04ffdd063ccf3d5b3176de0bb24ae2f3c8839d08c988a32c06132182a5e24a0d` |
+| Zerg chapter 6 ordinary boarding and fresh readback | `0f995723b88ab792ed1b3a50929ed2c19574d016026bfffb47689aca07ed3a6c` |
+| Zerg chapter 6 independent research and boarding replays | `af7a0420ab248b560d4d342b805d3432f0b9c818b837387354530765fa8e5d9d` / `31ccd1d2128474c5f77c90d59826df89c49647bb7a197f0896d29a54e5fcb3c6` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
