@@ -131,8 +131,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   resumes the same search after the clear cells. It saves 3.38%
   across the captured late Terran route calls and reduces frame
   budget misses from 18 to 13 in the authored 280-update test.
-  Keep it opt-in until the intended race profiles pass busy
-  frame, save and memory checks.
+  The [four late Terran and Protoss probe replays](audits/2026-11-24-monotone-clear-prefix.md#exact-package-route-call-coverage)
+  match every route result and save 204–2,413 probe cycles per
+  sampled update. Both Z10 far-read call sites are unused in the
+  four matched Z10 cuts. Keep the option disabled until a linked
+  release passes frame, save and memory checks. Prioritize recurring
+  movement/contact and actor drawing for the larger frame-budget gap.
   The eight-entry exact
   endpoint cache simulation covers at most 0.20% of loop cycles in
   the expanded Terran Blood Bath window, before cache overhead.
@@ -1810,8 +1814,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   24 of 30 verified wins. Z6 restores a paid Lair and Extractor
   after the first gas delivery at frame 3,519. Paid Ventral Sacs
   completes, Kerrigan boards an Overlord, and fresh HOME restores
-  the cargo. Qualify unloading and the rest of Z6. The T5
-  completion replay also remains open.
+  the cargo. The [Z6 ferry and assault replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-ferry-and-mainland-assault)
+  unloads her on the island at full health. A later fresh save
+  retains 25 Hydralisks near region 4. The subsequent strike leaves
+  one Photon Cannon there and Kerrigan at full health. Finish that
+  clearance, defeat the Force 2 defenders in region 5 and verify
+  victory. The T5 completion replay also remains open.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
