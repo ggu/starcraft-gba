@@ -88,7 +88,15 @@ skips, and the host sanitizer checks completed.
 bound in the speed-optimized ROM kernel with packed actor
 coordinates and the geometry table. A change to the option
 invalidates the canonical ROM ELF configuration stamp. The
-default is zero. The existing IWRAM path has its own flag.
+default is zero.
+
+Of the default product configurations, Zerg Z10 meets all
+the ROM guard conditions. Terran's ROM kernel uses arithmetic
+and lacks the geometry-table flag. Protoss P10 and Showcase
+use the separately configured IWRAM path. Measure the Z10
+pair first. A Terran trial with the table would also require
+an independent table-versus-arithmetic comparison and a
+new ROM budget check.
 
 The [Outpost query census](2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
 supplies 874 Terran and Zerg queries from one- and two-CPU
