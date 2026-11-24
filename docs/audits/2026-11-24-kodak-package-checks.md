@@ -96,9 +96,11 @@ matches the victory journal byte for byte.
 P4 wins at frame 86,150 after 87,100 tape calls. All 88
 recorded observations match. The replay advances seven briefing
 pages and thirteen gameplay pages. Raynor and Tassadar match the
-recorded owner and position at both rescue and extraction. This
-run verifies victory from HOME on the installed image. P4 still
-needs a fresh victory-journal readback on that image.
+recorded owner and position at both rescue and extraction. A second
+run saves at frame 986 and restores the field and trigger state in
+a fresh HOME process. That continuation matches all 88 observations
+and reaches the same win. A third process restores the terminal world
+and victory state, then re-exports byte-identical SRAM.
 
 P3, P5 and P6 win from HOME on the exact installed Protoss image.
 Each resumes the pause save from a fresh HOME and restores the
@@ -203,7 +205,14 @@ of the Move order and keeps 294 HP through game frame 19,160. Raynor
 follows his prior order and falls to 23 HP. A later attempt selects
 his verified slot at frame 13,229 while he still has 250 HP. That
 attempt ends before issuing an order because the menu sequence does
-not enter Move mode. Raynor still needs a verified earlier retreat.
+not enter Move mode.
+
+A second early branch selects Raynor at frame 13,229 and uses an
+ordinary A click on empty ground at (702,538). This replaces his
+old attack order with Move. At frame 19,288 Kerrigan remains at
+(856,398) with 294 HP and Raynor is at (702,527) with 250 HP. They
+are the two remaining player units. The mission is still active
+and this branch has yet to produce a victory.
 
 ## Custom Game saves
 
@@ -330,18 +339,46 @@ the following space in the installed package.
 
 The [native campaign audit](2026-11-04-n64-parity/README.md#what-was-reached)
 observed a captioned still-image cutscene at the opening of a Brood
-War episode. Stills with captions are the lower-cost format for
-that presentation. For short full-motion scenes, 30 seconds at a
-combined 96–160 kbit/s would use 360,000–600,000 bytes for picture
-and audio. This is a storage estimate before decoder, alignment and
-other content. An authored test clip is needed to verify image
-quality, decode time, scratch RAM and audio on the GBA SP.
+War episode. The USA N64 ROM's BOLT archive gives the actual
+stored sizes below. Compressed entry sizes count input consumed
+by the decoder and exclude inter-entry padding.
+
+| N64 content | Stored bytes | MiB |
+| --- | ---: | ---: |
+| Opening animation, 308 indexed 160×100 frames | 2,017,192 | 1.924 |
+| Dedicated opening soundtrack and six palettes | 171,288 | 0.163 |
+| Complete opening payload | 2,188,480 | 2.087 |
+| All 13 campaign slideshow scripts and their bank | 1,363,958 | 1.301 |
+| Opening plus slideshow bank | 3,552,438 | 3.388 |
+
+The slideshow scripts reference 38 unique images with 1,292,358
+stored bytes. Their scripts consume another 8,356 bytes. The full
+98-entry bank also counts palettes, display assets and any unused
+entries there. It excludes separate shared audio banks and mission
+briefings. Individual scenes reference roughly 24–166 KiB of still
+images. One image is shared across two scripts. The [BOLT format
+notes](https://github.com/dmang-dev/sc64-maps/blob/main/docs/FORMAT.md#55-related-script-directories)
+identify the link between scripts and image indices. The
+[native opening trace](https://github.com/n0madic/StarCraft64-recomp/blob/master/docs/research.md#audio-path-and-cinematics)
+identifies the indexed animation with separate audio. The original
+startup path selects video `002/008`, palettes `002/009`–`002/00E`,
+and track `015/00F`.
+
+The whole slideshow bank fits the measured space on each race ROM
+by bytes. The native opening payload exceeds the Zerg and Protoss
+headroom. Opening plus slideshow content exceeds the space on all
+four ROMs. For a smaller re-encode, 30 seconds at a combined
+96–160 kbit/s would use 360,000–600,000 bytes. This is a storage
+estimate before decoder, alignment and other content. An authored
+test clip is needed to verify decode time, scratch RAM and playback
+quality on the GBA SP.
 
 ## Local receipts
 
 | Check | SHA-256 |
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
+| Native opening and slideshow storage, including opening audio | `635b532ef788ef11e04ce387b01ad156890f66ecd8945967864497615daf8b0e` |
 | Random human and CPU saves and restarts | `19489f05aabd0dacfee3ac22a595a01a649308faeba4b92dabd039617bddb6a8` |
 | Last open CPU row on the three race ROMs | `8000e67d551101aab15b51ef8d5d3f2816f150038fefe7388445aad82437b872` |
 | N64 Blood Bath Melee last CPU replay | `05cba75a4bc6a037250ae56b65e32b18d1b32160a1cd4350242f2daf5036ed3b` |
@@ -363,6 +400,7 @@ quality, decode time, scratch RAM and audio on the GBA SP.
 | Terran chapter 5 explicit Move with stalled hero waypoint | `b0a318d3447b14132d09f800c2602ff5ba28b7682100c973dc89a8f2fee06fb0` |
 | Terran chapter 5 earlier Kerrigan route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
 | Terran chapter 5 Kerrigan staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
+| Terran chapter 5 both heroes healthy at frame 19,288 | `abd770a652624759162b89b7f73a5f5b07fd1723991baa5a8f7e5dda366dfee5` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -374,6 +412,7 @@ quality, decode time, scratch RAM and audio on the GBA SP.
 | Protoss chapter 2 full run and victory journal | `aefbd075604bdf941464e02443ee7625e799c165c41084bf5c94ed3b3c7cffd7` |
 | Protoss chapter 3 full run and fresh loads | `dcca91454a924eafebc47440a7a1fda1a0dd25b21d9b23024ee6e05690e6e221` |
 | Protoss chapter 4 full run and both hero positions | `369935061512182039552c30dfa01c4ac18f4aaa746729ef0a245fed1c4c5db6` |
+| Protoss chapter 4 fresh field and victory loads | `ccb6f8e31782bbcbdf067e31f6c3d68dfac9a31f0e79cdeddb4f481e038d4fad` |
 | Protoss chapter 5 full run and fresh loads | `6135c1f184640ecf9f4cf77a9c48da534bc19f60a0e7c33685be970a50e051a2` |
 | Protoss chapter 6 full run and fresh loads | `fe85625beb73116126eecb82bc244a3d6328fee40ce881f3ee67e89191ef2974` |
 | Protoss chapter 7 full run and fresh loads | `54d8fd3811c16883ad7bbd0c0991240a8e80737af43d282e8c2b62bcc1a548d0` |

@@ -1683,14 +1683,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
   Z2 and all ten Protoss chapters also win on the exact images,
-  for 20 of 30 missions overall. P4 still needs a fresh save check.
+  for 20 of 30 missions overall. P4 also passes fresh field and
+  victory save reloads.
   An ordinary T5 retreat keeps Raynor at full health through
   frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
   Move near input call 22,000 stalls. Redirecting Kerrigan around
-  call 12,000 takes her to (856,398) with 294 HP through frame
-  19,160. Raynor needs a separate early retreat and a full win
-  remains open.
+  call 12,000 takes her to (856,398). A separate empty-ground order
+  moves Raynor away from his previous target. Both retain 294 and 250 HP
+  respectively through frame 19,288. The branch has only the two
+  heroes and still needs a full win.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.
@@ -1700,7 +1702,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
-  Captioned stills match an observed N64 cutscene format. Short
+  The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
+  2.09 MiB for the opening animation, palettes and music. Short
   full-motion playback needs a benchmark on GBA SP.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
