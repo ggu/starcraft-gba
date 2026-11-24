@@ -129,3 +129,53 @@ corrected summary reads the actual build field, with cycle calculations
 unchanged. No Actions, physical-hardware, full-campaign or fresh-process
 SRAM-continuation result is claimed. Remaining campaign work and large route
 stalls stay open.
+
+## Incremental coordinates during the search
+
+The shared probe now counts horizontal and vertical steps remaining
+toward the origin. Its bitmap index decreases by one on a horizontal
+step and by the rectangle width on a vertical step. Each stack entry
+records the node's search phase. On backtracking the parent's phase
+identifies which step to undo. The search no longer converts the
+current cell to a row and column on every visit.
+
+The search keeps the original seed order, horizontal-first tie break,
+iteration budget, scratch allocation rule and full-route fallback.
+Under ASan and UBSan, 460,800 direct comparisons match the original
+status, predecessor, and all five diagnostic counters for byte and
+packed grids. The comparisons cover all 3×3 occupancy masks and
+endpoint pairs at five budgets, as well as randomized rectangles,
+unsupported inputs and short or odd scratch lengths. Scratch guard
+bytes match. The three `make test-sc64-route-monotone` configurations
+also pass the independent FIFO and dispatch checks.
+
+The exact source runs on ARM7 Thumb in mGBA with eleven authored
+cases. Each case repeats 64 times with the original and incremental
+loops. Status, predecessor, and all counters match at both compiler
+optimization levels and with both grid representations. The results
+below use `-O2`, packed grids, and the production cartridge wait-state
+setting of `0x4317`, read back by the fixture before each timed batch.
+
+| 64-query case | Original cycles | Incremental cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Open 64-column grid | 2,665,538 | 1,897,602 | 28.81% |
+| Open 96-column grid | 3,655,938 | 2,486,850 | 31.98% |
+| Open 128-column grid | 6,390,274 | 4,682,114 | 26.73% |
+| Open 95-column grid | 4,901,826 | 1,824,322 | 62.78% |
+| Barrier requiring backtracking | 3,112,450 | 2,160,130 | 30.60% |
+| Blocked goal with a walkable seed | 2,946,370 | 2,043,778 | 30.63% |
+| Exhausts the 512-visit budget | 10,271,298 | 7,468,354 | 27.29% |
+| Exhausts the 1,536-visit budget | 30,192,898 | 22,296,642 | 26.15% |
+
+In the `-O2` packed fixture, text increases by 48 bytes and the
+function's static stack allocation grows by 8 bytes. Data and BSS
+stay the same. All eleven cases improve with the production wait
+setting. With reset wait states, the one-cell zero-budget case takes
+0.36–2.61% more cycles at `-Os`, less than 42 cycles per call. The
+fixture measures the synchronous probe and its caller loop. Full
+race-cartridge RAM and timing qualification remain open.
+
+| Local ARM receipt | SHA-256 |
+| --- | --- |
+| Production wait states | `096a6ced99d4361f90681cdebdccf50367c272e924998db7524f7171d06778a7` |
+| Reset wait states | `f81e50522bafd76ce187c81767314668376e3d7fba0751e0d894ce19e7f57878` |

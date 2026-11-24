@@ -115,6 +115,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   uncached contact masks. Terran Blood Bath also spends about 81k
   direct cycles in the monotone route probe. Pair those workloads
   separately and keep both maps in the actor and effect draw tests.
+  [Incremental route coordinates](audits/2026-10-29-monotone-route-step/README.md#incremental-coordinates-during-the-search)
+  match the original search across 460,800 host comparisons and cut
+  packed `-O2` probe cycles by 26.15–31.98% on 64/96/128-column
+  open grids and exhausted-budget cases. Qualify the race-cartridge
+  memory limits and repeat the paired Terran Blood Bath and Protoss
+  route windows.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
