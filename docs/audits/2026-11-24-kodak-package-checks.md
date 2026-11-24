@@ -273,6 +273,21 @@ the terminal world and SRAM bytes. A fresh process restores the
 save and advances to frame 17,465 with all six Hydralisks, the gas
 worker and the Extractor still alive.
 
+Conservative defense and paid production reach ten Hydralisks,
+four Drones and two Overlords by frame 23,161. Two follow-on
+attacks destroy three enemy buildings and three enemy units from
+that checkpoint. At frame 26,301 all ten Hydralisks are alive,
+gas is 210, and the Hatchery, Den and Extractor still have 1,250,
+814 and 123 health. The remaining 33 enemy units and 11 buildings
+are active. In a separate push toward the deeper base, six
+Hydralisks die. The preserved save precedes that attack.
+
+An independent ordinary-input replay reproduces all three pause
+checkpoints, their world fingerprints and their SRAM bytes from
+the frame-17,345 journal. A fresh emulator loads the last save
+with identical SRAM and advances another 120 updates. The living
+Chrysalis and all ten Hydralisks remain present. Victory is open.
+
 The retained N64 Z1 evidence covers the title and
 briefing after a progress edit. A native combat comparison still
 needs an ordinary mission unlock and capture.
@@ -290,6 +305,13 @@ launches, R selects the five Marines and leaves the five SCVs
 unselected. The five Marines are still selected 1,000 updates
 later. All units stay unselected in the neutral control. The two
 platforms use independent clocks.
+
+A second isolated ares v148 run starts with fresh save storage and
+continues the ordinary Wasteland launch with A and analog movement.
+It reaches 11,420 emulator steps and retains five frames. The last
+frame shows the displaced camera over fog and the opening 40 minerals
+and 10/18 supply. This run confirms the controller and capture path
+for longer tests. Native campaign progression remains unverified.
 
 ### Terran chapter 5 input divergence
 
@@ -621,6 +643,49 @@ occurs at most once within a sampled update. The late cut also
 draws 164 packed sprites across 3,251 rows. These counts provide
 workload sizes for synthetic renderer and collision tests.
 
+### Paired ARM replay of observed route queries
+
+A repeat of the 96-update Terran Blood Bath cut records the ordered
+inputs and results of all 277 point probes on one unchanged packed
+walkability grid. It uses the installed cartridge and ordinary
+controller inputs. The breakpoint and uninstrumented runs agree
+on the world, video, camera, phase counters and elapsed cycles at
+each update. The calls spend 8,440,631 cycles within an 81,397,508-cycle
+window on that image.
+
+A freestanding ARM7 Thumb fixture runs the original and incremental
+probe from [draft #802](https://github.com/ggu/starcraft-gba/pull/802)
+with the observed inputs, an EWRAM grid and cartridge wait setting
+`0x4317`. All 277 statuses, first steps and five search counters
+match the original cartridge and both fixture builds.
+
+| Compiler mode | Original fixture cycles | Incremental fixture cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| `-O2` | 7,880,987 | 5,940,318 | 24.62% |
+| `-Os` | 9,291,740 | 5,943,830 | 36.03% |
+
+At `-O2`, eight calls grow by at most 13 cycles each. Applying the
+fixture's measured deltas to the original 96-update total suggests
+a 2.38% loop-cycle reduction. This projection uses one steady-grid
+window and excludes integrated code placement and dispatch interactions.
+Whole-cartridge timing, RAM qualification and GBA SP measurements
+remain open. The captured grid and query inputs stay local.
+
+The same 277 inputs also exercise the incremental route wrapper
+with and without the 16-path continuation table from
+[draft #805](https://github.com/ggu/starcraft-gba/pull/805).
+Both return the expected next cell on every call. The `-O2`
+fixture drops from 6,273,133 to 1,749,728 cycles, a 72.11%
+reduction. A total of 169 calls grow by up to 2,441 cycles.
+The savings occur in 62 update buckets, while 34 grow, with
+a maximum growth of 4,062 cycles in one bucket.
+
+This wrapper replay starts with empty route slots and an empty
+continuation table. The request clock is pinned to an eligible
+value. Qualification with the full dispatcher must cover existing
+route hits, age boundaries, earlier cache history and topology
+changes. The fixture adds 360 bytes of linked BSS.
+
 ## ROM space available for cutscenes
 
 The final ROM-backed load segment in each matching ELF ends exactly
@@ -689,6 +754,9 @@ quality on the GBA SP.
 | Monotone point-route search outcomes | `f301862e71f5c4b52fba25cf93bc89f95b4ef769cd5952fa43553fc1db6fc43e` |
 | Terran Blood Bath exact endpoint repeats | `36e893debf67f5f26106a8fdbbc97af360742faabe3ff995e65e99af19773067` |
 | Terran Blood Bath calls that continue an earlier route | `1544bbbd940e70a3d4d964ffc0d6a28a715ed8c2e70da36f1f76d20da643676c` |
+| Terran Blood Bath ordered point-query capture | `fd2ed95b78f2d9261c99660ad5106745502c16c8e7c4deaab6337e2a8694d948` |
+| Paired ARM incremental probe replay | `027bbcec6709093824b200e5986d4244d8ebba2f07c958f8e821327462bf624c` |
+| Paired ARM continuation-table wrapper replay | `6f4b6225d1262d95014aef47b96472a976881e2479140e310733a6a9e50871cb` |
 | N64 D-pad Left witness manifests, Melee and Free for All | `34f44b7849a7590b6c31263c61c29f7fcc5f06f683caca0886ddfad3a8ac1831` / `b5ea9ab761801e97eab89383e0316bbdb78f54ad801dc6a57518f873e98ccc77` |
 | GBA D-pad Left and launch matrix | `228c88f2fdc12e9bce1711e1247a9f9b61d5c4e864ea782de01aaa5c420d23cd` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
@@ -724,6 +792,8 @@ quality on the GBA SP.
 | Zerg chapter 1 alternate Extractor rebuild and long continuation | `bfc4527f96611a285f3e52558b3d085e08fa89b9b9383df12296cc2227a51173` / `1f427cb257d3dec0488a07bfcbba7432fe9c3112e372671c63a3637d202cd4b3` |
 | Zerg chapter 1 three early-defense saves, gas delivery and fresh load | `78b17df4800f550c6a3346ebb072365975aa9cb2f1e4ac00956204b5cfdb3004` |
 | Zerg chapter 1 sustained gas delivery, sixth Hydralisk and fresh load | `8788f3c9c8d7b24cc1f2a0e0463409dde1bddc18fa0585829f4a0d7e15968b02` |
+| Zerg chapter 1 three assault checkpoints and fresh load | `9ae9c0dbcd4d146678eac97d235f6e52632afb3ab9f47c16587f4de3565b00cc` |
+| N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
