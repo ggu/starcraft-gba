@@ -43,6 +43,10 @@ The host sanitizer differential compares 126,004 answers and policy
 call sequences against the prior function. It covers map sizes from
 1 to 2,048 pixels, both hostility paths, strict radius boundaries,
 equal-distance slot ties and the egg fallback.
+The moving-index run covers 150,004 queries, including 5,760 cross-cell
+moves and 360 full owner-list rebuilds. It also queries after 1,600
+unit deaths and 1,280 building deaths while the dead entries are
+still linked. All returned targets and policy-call sequences match.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -50,3 +54,4 @@ equal-distance slot ties and the egg fallback.
 | Terran standard buildings with eggs | `7be7f4d453b26ed25e36a5142e359595184d275fb10a588fd1149c23e96d8089` |
 | Compact buildings without the egg rule | `8f3f79f92d80933b6a2681f11ad33b7e845271581c539e60162f3697e4a50ffd` |
 | Generated host differential source | `8e98ba7b9fd69487c208cd61ab2622b6d92ffd20f4802e7857f0d0e43e63d1a0` |
+| Generated moving-index differential source | `9334b7b24f7eea7cc4c511407840571a114b1dff654a1fb5ba52c3f576fcbad1` |
