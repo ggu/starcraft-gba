@@ -54,6 +54,24 @@ three images permits an all-Closed lobby and keeps it on the setup
 screen on A at Launch. Reopening the third row as Zerg allows play.
 The Outpost result covers the authored GBA map.
 
+Separate reset replays extend the same sequence in the reverse
+direction. The N64 first shows Random, then D-pad Right changes the
+last open row to Zerg, and D-pad Left returns it to Random while the
+first two rows remain Closed. Start then launches play. This holds
+in both Blood Bath Melee and Free for All. The N64 observer uses an
+isolated D-pad Left binding and reproduces the prior Right witness
+in the same run. The cuts show the configured lobby and launch.
+
+All three GBA race builds repeat Zerg to Random with D-pad Left in
+both Blood Bath modes. Each launch has only the third row active;
+it resolves to a legal race and advances from frame 1 to frame 9.
+The randomly resolved faction is allowed to differ across launches.
+
+| N64 mode | Random | Right to Zerg | Left to Random | Gameplay |
+| --- | ---: | ---: | ---: | ---: |
+| Melee | 5,700 | 5,750 | 5,800 | 6,360 |
+| Free for All | 5,750 | 5,800 | 5,850 | 6,410 |
+
 ## Campaign, Showcase and fresh saves
 
 All 30 campaign entries open from their race cartridge. The test
@@ -138,6 +156,12 @@ the Warp Point. It reproduces the win from blank SRAM in 10,500
 physical calls. A separate run saves at frame 8,663, reloads via
 fresh HOME and reaches the same victory. The uninterrupted win
 also reloads through HOME and re-exports identical victory SRAM.
+
+Z1 has a winning receipt with a fresh save continuation on the
+earlier November 23 Melee build. Its input tape is missing from
+the retained local path, and the current host trace recipe depends
+on generated inputs absent from the checkout. The installed Z10
+still needs its own victory replay.
 
 ### Wasteland opening on N64 and KODAK
 
@@ -330,6 +354,73 @@ exceeds two VBlanks. Camera motion also changes visible draw
 work, so each pair measures that complete view change. A fixed
 camera already incurs most of the measured late-frame cost.
 
+### Late simulation and drawing budget across the race ROMs
+
+On the same three-CPU configurations, the ordinary-button observer
+reads the release ROM's built-in cycle counters for 120 consecutive
+advancing updates at launch, after update 9,000 and after update
+11,000. The player gives no orders and leaves the camera at its
+starting location. Each launch checks the occupied rows, resolved
+races and start locations. All 2,160 samples pass the counter
+nesting checks and keep the ROM, ELF and runner hashes unchanged.
+The six late windows match the corresponding fixed-camera replays
+in starting world fingerprint and all 720 total-cycle readings.
+
+| Cartridge and map | Total | Simulation interval | Orders | Drawing interval | Actors and effects | Simulation overruns |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 1,058 | 636 | 481 | 421 | 262 | 117/120 |
+| Terran 10 Blood Bath | 850 | 606 | 478 | 243 | 85 | 82/120 |
+| Zerg 10 Outpost | 1,275 | 804 | 628 | 470 | 283 | 120/120 |
+| Zerg 10 Blood Bath | 929 | 603 | 457 | 325 | 134 | 84/120 |
+| Protoss 10 Outpost | 1,268 | 799 | 610 | 469 | 288 | 120/120 |
+| Protoss 10 Blood Bath | 989 | 661 | 501 | 328 | 153 | 110/120 |
+
+The table shows mean thousands of guest cycles after update 11,000.
+Orders are part of the simulation interval, and actors and effects
+are part of the drawing interval. Each simulation mean exceeds the
+561,792-cycle two-VBlank budget by 41,354–242,681 cycles. All 720
+total samples in this late window exceed the same budget. Orders
+account for 45–56% of total cycles across the six means. Actors
+and effects account for 35–62% of drawing, compared with 43–52k
+cycles for the measured terrain background stage. The launch
+windows average 29.72–29.99 emulated updates per second and the
+late windows average 13.16–19.73.
+
+The profiling intervals charge interrupt work to the phase in
+which it occurs. The simulation interval also includes input reads.
+The residual includes audio update and presentation outside those
+two intervals. It typically includes a pacing wait in the launch
+window and averages under 500 cycles in the late windows. Use the
+instruction attribution below when comparing individual routines.
+These are cycle measurements in mGBA.
+
+Eight updates per late window also run under the instruction and
+call-stack observer. All 48 cuts match ordinary unprofiled replays
+on sampled world state, both framebuffer pages, palette, camera,
+display, and elapsed cycles. The built-in phase counters also
+match the table's underlying samples. The instruction and stack
+totals reconcile with each cut's emulator clock.
+
+| Cartridge and map | Movement | Uncached contact masks | Point route lookup | Depth-ordered drawing |
+| --- | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 198 | 91 | 15 | 235 |
+| Terran 10 Blood Bath | 326 | 105 | 99 | 69 |
+| Zerg 10 Outpost | 292 | 129 | 23 | 257 |
+| Zerg 10 Blood Bath | 247 | 92 | 21 | 104 |
+| Protoss 10 Outpost | 210 | 56 | 23 | 264 |
+| Protoss 10 Blood Bath | 225 | 51 | 41 | 131 |
+
+Each entry is a mean in thousands of inclusive guest cycles over
+eight updates. Movement is `move_toward`, contact masks are
+`sc64_contact_blocked_mask_uncached`, and point route lookup is
+`sc64_route_next`. Calls can nest. Within the Terran Blood Bath
+point route lookup, `sc64_route_monotone_probe` alone accounts for
+81k direct cycles. Uncached contact remains a substantial cost
+on all six configurations. Depth-ordered drawing is consistently
+heavier at the sampled Outpost starting views. These cuts support
+separate probes for collision traversal and the monotone route
+test, with actor and effect drawing paired across both maps.
+
 ### Protoss 10 late battle attribution
 
 On the same Protoss 10 Blood Bath Melee lineup, a read-only ARM
@@ -418,6 +509,10 @@ quality on the GBA SP.
 | One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
 | One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
 | Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
+| Three-race frame-budget breakdown | `336e4cfc4cf66286f99b97ec10166c29bdb38c3b6e6cf6861396dd166e372bbe` |
+| Three-race order and drawing instruction attribution | `fae6f5e019544c8bd74587010652717b685c93afbbc05f5bb31babea211e9874` |
+| N64 D-pad Left witness manifests, Melee and Free for All | `34f44b7849a7590b6c31263c61c29f7fcc5f06f683caca0886ddfad3a8ac1831` / `b5ea9ab761801e97eab89383e0316bbdb78f54ad801dc6a57518f873e98ccc77` |
+| GBA D-pad Left and launch matrix | `228c88f2fdc12e9bce1711e1247a9f9b61d5c4e864ea782de01aaa5c420d23cd` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
 | Terran chapter 1 full run and fresh loads | `8c3642922e2358bcfe2d0264918d1cf381bf254e95c7b993a55ab55f8046cc94` |
 | Terran chapter 2 full run and fresh loads | `e51366eeaa6c55309aa3630a5c9e2da47ad51608be0b25f85f33d60fd20902b2` |

@@ -107,6 +107,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   queries. The exact KODAK Protoss 10 sample takes 152 indexed
   queries and zero fallback scans in four late three-CPU updates.
   Prioritize draw and movement costs measured on the race path.
+  The [six race-cartridge phase cuts](audits/2026-11-24-kodak-package-checks.md#late-simulation-and-drawing-budget-across-the-race-roms)
+  put the late simulation interval alone over the 30 fps budget on
+  both maps. Orders consume 45–56% of total cycles. Profile movement
+  and depot/route work across the three cartridges first. The eight
+  instruction-attributed updates per case put 51–129k cycles in
+  uncached contact masks. Terran Blood Bath also spends about 81k
+  direct cycles in the monotone route probe. Pair those workloads
+  separately and keep both maps in the actor and effect draw tests.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
@@ -1713,7 +1721,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.
   [The last open CPU edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
-  matches in both Blood Bath modes on N64 and all three race ROMs.
+  matches in both directions and both Blood Bath modes on N64 and
+  all three race ROMs. Recover or replace the missing Z1 input tape
+  for an exact-package win and fresh-save replay.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
