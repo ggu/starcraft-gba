@@ -44,6 +44,28 @@ The most common frame sizes include 20×26, 11×17 and 16×16. The
 fixture also tests the larger 74×68 size seen in both windows.
 Full-frame timing with the new path in the race cartridges remains open.
 
+### Ordered geometry replay
+
+A second read-only pass records sprite rectangles, clipping bounds
+and order for both eight-update cuts. All sampled worlds, cameras,
+framebuffer pages and palettes match the retained cuts. The early
+window has 11 packed calls and 552 rows. The late window has 164
+calls and 3,251 rows. A freestanding fixture replays the rectangles
+with authored color and opacity data stored in ROM. It alternates
+real Mode 4 pages and uses wait setting `0x4317`.
+
+| Compiler mode and ordered batch | Previous cycles | Row-stride cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| `-O2`, early | 245,329 | 238,826 | 2.65% |
+| `-O2`, late | 614,069 | 576,861 | 6.06% |
+| `-Os`, early | 246,165 | 239,022 | 2.90% |
+| `-Os`, late | 618,216 | 576,445 | 6.76% |
+
+Every batch matches on both framebuffer pages and the palette at
+both optimization levels. EWRAM and IWRAM endpoints match in each
+pair. The fixture times the packed draw batches. Full-frame race
+timing and GBA SP measurements remain open.
+
 ### Packed group opacity
 
 Read-only instruction stops count the masks actually tested in the
@@ -113,6 +135,8 @@ drawing and movement costs on the combined builds.
 | Authored packed sprite timing and pixels | `8d1a6e2fee3345903f204ca4c9bf430c6299eeab73a8ee016a386e077cc6f1eb` |
 | Four graphics object profiles | `fc938f69f67eb6769f9388a71e37b664d641daaa76e6d90f87d7296c96abdc67` |
 | Exact Protoss 10 sprite and movement census | `67f20dae00085613182e2471d1d594100e038637edf1a29e61b035c2c47e8b6f` |
+| Exact Protoss 10 ordered sprite geometry | `90b0425df4acd3b53c375644ff65773b759ee38d29455288cb0ca66657d39f58` |
+| Paired ARM draw batches on observed geometry | `f6881dbf1c00306febc7af7a0f4ae96589da861e4b4335937f7554457148af6b` |
 | Exact Protoss 10 packed group mask counts | `58db3b6fab1d25b44bb5d5f19c9059205f6b0799493383684d70613dd0e650b9` |
 | Packed two-group unroll | `b46a46708b8aa57d2f91aabc172605cb58f577acd2439fe6000cfb2483632c49` |
 | Predicated mixed-loop timing | `e728250881ae7300c54f3f28896cd0ebfd0ad59e5e63c9835caaeac69c3eb337` |

@@ -175,10 +175,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles and the P10 campaign tail is flat. Keep the trial out of the
   regular builds while reducing the unaligned and mixed-opacity
   cost. [Packed sprite row setup](audits/2026-11-24-packed-sprite-row-stride.md)
-  saves 2.04–7.91% in authored drawing batches with matching pixels.
-  The exact Protoss 10 late sample draws 164 packed sprites across
-  eight updates. Verify shared frame timing and the four complete
-  links before attributing a cartridge frame-rate gain.
+  saves 6.06% of packed draw-batch cycles at `-O2` when replaying
+  the 164 sprite rectangles from eight late Protoss 10 updates
+  with authored colors and masks. Both framebuffer pages and the
+  palette match. Verify full-frame timing on the race cartridges.
   The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
   saves 1.19% over the same visible fight and 0.16% on the P10
   victory tail. Five long Custom Game pairs improve slightly and the
