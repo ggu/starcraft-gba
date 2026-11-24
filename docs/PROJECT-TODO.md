@@ -115,6 +115,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   uncached contact masks. Terran Blood Bath also spends about 81k
   direct cycles in the monotone route probe. Pair those workloads
   separately and keep both maps in the actor and effect draw tests.
+  [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
+  finds that all 280 late Terran and Protoss calls succeed within
+  the existing budget. Terran Blood Bath averages 88.8k probe cycles
+  per update. Qualify the incremental search in [draft #802](https://github.com/ggu/starcraft-gba/pull/802)
+  against these longer successful searches. The eight-entry exact
+  endpoint cache simulation covers at most 0.20% of loop cycles in
+  the expanded Terran Blood Bath window, before cache overhead.
+  Retaining path continuations has a larger measured opportunity.
+  The 99 new endpoints that continue an earlier path account for
+  7.07% of loop cycles. Verify reuse with the existing route-slot
+  precedence, aging, and grid invalidation before activation.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
@@ -1725,6 +1736,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all three race ROMs. Recover or replace the missing Z1 input tape
   for an exact-package win. The earlier Z1 pause and victory journals
   both load on the installed Z10 through HOME and export identical SRAM.
+  The fixed-input continuation buys a Drone, completes an Extractor,
+  collects gas and builds a Hydralisk Den. Its completed-Den save
+  reloads in a fresh process. A paid Overlord restores the supply
+  cap, but the Den falls before it hatches. Protect the Den through
+  supply recovery, then verify Hydralisk production and the result.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

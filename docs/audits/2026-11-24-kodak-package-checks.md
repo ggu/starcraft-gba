@@ -172,6 +172,36 @@ resources and living Chrysalis. Both export SRAM byte for byte.
 This qualifies loading the earlier save and result on the exact
 current image. A full win replay on that image remains open.
 
+An ordinary-button continuation from that pause queues a Drone
+at frame 1,476 by paying 50 minerals. Three Drones are present by
+frame 1,856, including the one already queued in the input save.
+A Drone travels to the selected geyser and starts the paid
+Extractor, completed by frame 2,864. A remaining Drone assigned
+to the Extractor returns gas by frame 3,468. A fresh process uses
+the recorded inputs to reproduce the terminal world fingerprint,
+60 units, 19 buildings, and player resources of 218 minerals and
+8 gas. This is a continuation from the earlier pause journal.
+
+The first Den placement is refused with the in-game "No gas"
+message. After the bank reaches 56 gas, the same build command
+sends a Drone to the snapped site. The build pays 100 minerals
+and 50 gas on arrival and consumes the Drone. Construction is
+visible by frame 5,271 and complete at frame 6,071.
+
+An independent run replays 5,418 physical updates from the earlier
+pause to the completed Den, with the terminal world fingerprint
+matching and the Chrysalis alive. It pauses and saves on the
+installed Z10 at frame 6,071. A fresh process restores the same
+world, exports byte-identical SRAM and advances to frame 6,079.
+
+A longer continuation restores enough gas to train a Hydralisk,
+but the first order is refused at the supply limit. The Hatchery
+then pays 100 minerals for an Overlord. It hatches by frame 8,034
+and restores capacity from 2 to 18. The Den is destroyed before
+then, and the next Hydralisk request is refused for a missing
+prerequisite. The validated opening needs the Den defended through
+supply recovery to advance to Hydralisk production.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -430,6 +460,67 @@ heavier at the sampled Outpost starting views. These cuts support
 separate probes for collision traversal and the monotone route
 test, with actor and effect drawing paired across both maps.
 
+### Monotone route search outcomes
+
+The exact Terran 10 and Protoss 10 images run both three-CPU maps
+with ordinary buttons and no player orders. At launch, after update
+9,000 and after update 11,000, read-only breakpoints observe the
+monotone point-route call and return for 24 advancing updates.
+All 288 measured updates match uninstrumented controls on world
+fingerprints, both framebuffer pages, palette, display, camera,
+phase counters and elapsed cycles. Zerg 10 uses a separate point
+route path in these builds and is outside this call-site census.
+
+| Cartridge and map | Calls after update 11,000 | Searches visiting at least 32 nodes | Most visits in one search | Mean probe cycles per update |
+| --- | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 68 | 0 | 10 | 6,566 |
+| Terran 10 Blood Bath | 70 | 29 | 226 | 88,808 |
+| Protoss 10 Outpost | 83 | 0 | 15 | 8,382 |
+| Protoss 10 Blood Bath | 59 | 12 | 135 | 25,126 |
+
+All 280 late calls find a path. Across all three cuts, 496 of 498
+calls find a path and the other two exhaust their monotone search
+without hitting the 512-visit budget. The longest individual
+Terran Blood Bath call takes 82,428 guest cycles in this sample.
+The late Terran Blood Bath probes account for 10.3% of mean
+update-loop cycles. Prioritize cheaper successful long routes in
+these windows. Increasing the budget would skip none of the
+observed visits.
+
+An expanded Terran Blood Bath run reads 277 calls over 96 advancing
+updates from the same late boundary. All succeed. The observed
+walkability fingerprint stays identical, and 122 distinct endpoint
+pairs occur. Searches with at least 32 visits account for 96.0% of
+measured probe cycles. Four calls repeat a query within the same
+update and another 151 repeat one from a prior update.
+
+An offline eight-entry LRU simulation using exact endpoints and
+the walkability fingerprint would cover 83 calls. Those calls are
+all one-visit searches and account for 0.20% of the total observed
+loop cycles. A 32-entry LRU would cover 131 calls and 1.28% of
+loop cycles. The simulation has no lookup or invalidation cost.
+These bounds favor improving the long searches over an endpoint
+cache for this workload.
+
+A second replay of those 96 updates also tags calls whose origin
+is an earlier returned predecessor for the same goal and grid.
+It produces the same 277 calls and cycle readings. Among first-seen
+endpoint pairs, 99 meet that continuation condition. They account
+for 5.75 million guest cycles, or 7.07% of complete loop cycles in
+the sample. Seventy of those calls occur ten updates after the
+earlier query. These counts measure workload overlap before any
+cache overhead or route-slot eligibility checks.
+
+An asset-free sanitizer check records the parent of the returned
+step in the original search and asks for a fresh route from that
+step to the same goal. Across 110,940 successful nontrivial cases
+on byte and packed grids, the fresh search returns the recorded
+parent within the original visit count. This covers all 3×3 masks
+and endpoint choices at five caps, plus randomized larger grids
+and 26,640 successful cases with blocked goals. A runtime design
+would retain the actual path and preserve route-slot precedence,
+request aging, and invalidation on topology changes or load.
+
 ### Protoss 10 late battle attribution
 
 On the same Protoss 10 Blood Bath Melee lineup, a read-only ARM
@@ -520,6 +611,9 @@ quality on the GBA SP.
 | Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
 | Three-race frame-budget breakdown | `336e4cfc4cf66286f99b97ec10166c29bdb38c3b6e6cf6861396dd166e372bbe` |
 | Three-race order and drawing instruction attribution | `fae6f5e019544c8bd74587010652717b685c93afbbc05f5bb31babea211e9874` |
+| Monotone point-route search outcomes | `f301862e71f5c4b52fba25cf93bc89f95b4ef769cd5952fa43553fc1db6fc43e` |
+| Terran Blood Bath exact endpoint repeats | `36e893debf67f5f26106a8fdbbc97af360742faabe3ff995e65e99af19773067` |
+| Terran Blood Bath calls that continue an earlier route | `1544bbbd940e70a3d4d964ffc0d6a28a715ed8c2e70da36f1f76d20da643676c` |
 | N64 D-pad Left witness manifests, Melee and Free for All | `34f44b7849a7590b6c31263c61c29f7fcc5f06f683caca0886ddfad3a8ac1831` / `b5ea9ab761801e97eab89383e0316bbdb78f54ad801dc6a57518f873e98ccc77` |
 | GBA D-pad Left and launch matrix | `228c88f2fdc12e9bce1711e1247a9f9b61d5c4e864ea782de01aaa5c420d23cd` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
@@ -544,6 +638,11 @@ quality on the GBA SP.
 | Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
 | Zerg chapter 1 previous-version pause and victory journal loads | `855aac8e466c4b7fa0266a0150dff9ba86420ae3dd746836cc6246881587a3c5` |
+| Zerg chapter 1 worker production and first gas from earlier pause | `ab38f823f63fefd21938bb7cc2fdf1df7b1d0a1efe016ecac6dad235c7243c81` |
+| Zerg chapter 1 independent fixed-input continuation | `4f5eee2586d2a301cd8c25ea701f24346e2b99eafd85a72680d116b1475a774f` |
+| Zerg chapter 1 paid Hydralisk Den from the earlier pause | `58d5cd1704e6badfa09cde17168fc1abd9b098bbd8bf191c4ab27900d1724cce` |
+| Zerg chapter 1 completed Den, new pause journal and fresh load | `7955f55008dff0fb8df79d35c6d26ad91c9205155ffbd1474c02fff25f54f5c3` |
+| Zerg chapter 1 Overlord hatching and Den loss | `b61993ff8441be3c34eaa209b4343522941ca4c30ff3a27745148ab4eb3ce7e3` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
