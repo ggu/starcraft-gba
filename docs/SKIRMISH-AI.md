@@ -55,7 +55,16 @@ different updates, so no update runs more than one plan.
 - If every depot is lost, the next depot is rebuilt at the owner's start
   location, or at a free start location. This comes before supply: with no
   depot nothing is mined, and a Protoss owner otherwise spent the Nexus
-  price on Pylons to replace the supply the Nexus had provided.
+  price on Pylons to replace the supply the Nexus had provided. While no
+  depot stands, a surviving producer (a powered one, for Protoss) still
+  trains army units within the remaining supply. While ore remains on the
+  map, the bank keeps the new depot's price until one is placed (if a
+  worker survives to build it) and a worker's price (while a worker
+  survives or a new depot is under way); with no worker left, army also
+  leaves one slot of the unit share for that worker. Zerg have no larva
+  until a new Hatchery stands.
+  Without this an owner raided at update 9,000 sat on about 2,500 minerals
+  and trained nothing until the new Command Center finished.
 - When the home mineral field drops below 3,000, the owner builds a depot at
   the nearest free start location that still has minerals. Zerg also build
   extra Hatcheries at home as larva sources.
@@ -383,3 +392,27 @@ SRAM with L on HOME. The restored world must equal the saved world, and the
 continuation must equal the reference, compared by a fingerprint of frame,
 banks, mineral fields and every live unit's and building's semantic fields.
 `--tamper-sram` corrupts the record as a negative control, which must fail.
+
+### Depot-raid recovery
+
+[PR #795](https://github.com/ggu/starcraft-gba/pull/795) was
+checked against the current source release using the same
+prepared inputs in both runs. The Terran, Zerg and Protoss
+host matrix moves from 452 of 460 passing to 454 of 460.
+All three Blood Bath cases in which a Terran opponent loses
+its main depot and most workers now recover. In the Terran
+profile, the opponent resumes mining at frame 12,900 and
+delivers 772 minerals by the result. The base version ends
+at frame 14,480 without recovering.
+
+Six cases remain. The newly failing Zerg-profile mixed match
+ends with a different winner and exceeds the mineral-float
+threshold. The other five fail in both runs. Continue tracking
+those leads in the project TODO. This matrix measures host
+behavior. Busy ARM frame timing remains open.
+
+The local merge tree at `cd6292e2` passed `./dev doctor`,
+`./dev build`, `./dev test`, and `python3 tools/check_source_tree.py`.
+The base and merged host matrix report hashes are
+`02f4f996f0164752936c4f05c9ab6996309ad600383de0a4e929f2c6cc394caa`
+and `aef442bee64b19408643233c55cb4b1c81a704be365247c4b89e05732a41a893`.

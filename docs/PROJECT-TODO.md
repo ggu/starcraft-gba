@@ -998,16 +998,24 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   keeps the RAM guards and repeats the campaign and skirmish
   startup and save checks, including the single-CPU active Terran
   win. Confirm local release integration, hardware pacing and
-  active multi-CPU results. The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
+  active multi-CPU results. The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
+  restores Terran recovery in three cases across the race
+  profiles. Qualify busy ARM matches and address the six
+  remaining host failures, including one new mineral-float
+  failure in the mixed Zerg-profile match.
+  The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
   place the largest costs in orders and depth-ordered drawing.
   The [current one- and two-CPU budget](audits/2026-11-24-kodak-package-checks.md#late-frame-budget-with-one-or-two-cpus)
   measures the extra order cost at 66–73% of the Outpost
   increase. Its instruction cuts place 61–81% of the extra
   order cost in movement. Target contact work first for Outpost.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
-  favor the guarded early axis check in the Terran and Zerg
-  ROM kernels. Replay it on complete late frames and older
-  saves before changing the default.
+  favor the guarded early axis check in the placed ROM kernel
+  fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
+  matches the default Z10 geometry-table configuration.
+  Replay it on complete Z10 late frames and older saves
+  before changing the default. Terran's arithmetic ROM
+  kernel needs a separately paired comparison.
   Keep a one-CPU Blood Bath tail check, where a near-budget
   mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
@@ -1227,7 +1235,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   frame 26,691 restores fourteen full-health Mutalisks. The
   combined air group destroys the first road Cannon. A fresh
   frame-27,561 load keeps all fourteen and the gas line.
-  Continue the attack until the Drone can reach the countdown.
+  The [road assault and crystal return](audits/2026-11-13-z9-normal-physical.md#road-assault-crystal-return-and-victory)
+  clear four more Cannons, start the 600-second countdown and
+  return the crystal at 27 HP. Z9 declares victory at frame
+  57,089 and restores RESULT and byte-identical SRAM from HOME.
+  A advances into Z10, whose opening save also restores from HOME.
+  The [first Z10 raid](audits/2026-11-21-z10-current-full-circle.md#november-24-cartridge-opening-and-first-raid)
+  leaves the eastern Sunken at 28 HP with the mining line still
+  active. Use the earlier save with 1,142 minerals and 950 gas
+  to build up the defense, or begin production earlier.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
@@ -1910,7 +1926,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   clear both Force 2 regions. The [Z6 victory replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-victory-and-zerg-7-deployment)
   moves Kerrigan across the island trigger and wins at frame 177,044
   with 400 HP. The victory reload is byte-identical and Z7 deploys
-  through HOME. The installed package has 26 of 30 verified wins.
+  through HOME. With Z9, the installed package has 27 of 30
+  verified wins.
   The [Z7 guarded opening](audits/2026-11-24-kodak-package-checks.md#zerg-7-guarded-opening-and-production)
   completes a full-health Hatchery, then the Pool, Lair, Den
   and Sunken Colony. A paid defense save at frame 10,885
@@ -1949,7 +1966,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reinforces, removes the remaining production and clears the
   last depots at frame 170,041. Fresh HOME restores RESULT
   and identical victory SRAM. A advances into Terran 6.
-  Finish Z7–Z10 on this package and qualify GBA SP timing.
+  Finish Z7, Z8 and Z10 on this package and qualify GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
