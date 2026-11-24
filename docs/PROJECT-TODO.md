@@ -36,6 +36,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   −3.75% to +4.92% with matching sampled world state. Every fixed
   and moving update still exceeds two VBlanks, so keep busy field
   and simulation costs ahead of camera-specific changes.
+  The [shared contact scan draft](https://github.com/ggu/starcraft-gba/pull/799)
+  saves 1.80% in a synthetic ARM7 traversal while matching all returned
+  masks. Qualify full race and Showcase frame timing before integration.
   The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
