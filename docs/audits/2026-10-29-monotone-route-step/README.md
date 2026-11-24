@@ -183,9 +183,9 @@ race-cartridge RAM and timing qualification remain open.
 ## Retaining successful path prefixes
 
 `SC64_ROUTE_MONOTONE_WITNESS` is an opt-in experiment for profiles
-using the monotone point-route shortcut. After two qualifying
-successful searches for a goal, it retains the latest path with
-one bit per edge. Each of the eight entries can serve the same
+using the monotone point-route shortcut. The initial eight-entry
+version retains the latest path after two qualifying successful
+searches for a goal, with one bit per edge. Each entry can serve the same
 tile again or follow the next tile toward the same goal. Qualifying
 searches visit at least 32 nodes and take at least two steps. The
 caller packs the path before returning the borrowed search stack.
@@ -246,3 +246,50 @@ memory check.
 | Immediate admission trial | `f25e979eeeb63f5de940498115b6f9241cdc11e7ffbd3c6431856cd6141aad8e` |
 | Exact Terran call identities and costs | `9acd03c2d3998302dff7e8f0d3c710121e8546153cf5d1ba5e19cd5f8b584ac5` |
 | Offline admission and capacity comparison | `4bd2748c01f9afe2f2a4380108f52e33e15e6655f69c80a349bb289d75f8c24f` |
+
+### Sixteen entries in the same RAM
+
+The compact cache puts the two direction signs in the unused high
+bits of the goal key and stores one map shape for the table. The
+sixteen entries retain at most 112 edges each, starting nearest the
+origin. When the retained steps end, the caller runs the full probe,
+which preserves the current target pixels at the actual goal.
+The entire table, including admission history and geometry, is 358
+bytes before linker alignment.
+
+The 128×128 sanitizer case follows 112 stored edges of a 254-edge
+path, then verifies the next step against the independent FIFO
+oracle and observes a fresh probe. A separate case fills sixteen
+entries and checks that the next admission replaces the oldest
+entry only. The existing direction, fallback, topology and aging
+checks still pass.
+
+The authored fixture adds sixteen interleaved streams and compares
+the flag-off baseline, the original eight-entry cache and the
+compact sixteen-entry cache. All 2,526 route steps match in each
+configuration, with and without the L-shaped fast path.
+
+| Workload | Flag off cycles | Eight entries | Sixteen entries |
+| --- | ---: | ---: | ---: |
+| Sixteen interleaved routes | 15,455,833 | 15,658,313 | 4,696,189 |
+| Sixteen interleaved routes with L fast path | 11,482,145 | 11,067,096 | 3,843,827 |
+| One request per distinct goal | 2,357,504 | 2,365,760 | 2,388,178 |
+| One request per goal with L fast path | 2,469,104 | 2,477,360 | 2,499,778 |
+
+The compact cache saves 66.52–69.62% of cycles in the sixteen-route
+batches. The four- and eight-route batches still save 67.65–70.03%.
+The one-off batches take 1.24–1.30% more cycles than the flag-off
+baseline. Both cache layouts add 360 linked BSS bytes and 40 static
+stack bytes in the same fixture. The compact version adds 24 ROM
+text bytes relative to the eight-entry version. The linked IWRAM
+size matches.
+
+The observed late Terran Blood Bath probes that qualify for storage
+have goal distances of 41–64 cells. Even a blocked goal's adjacent
+seed leaves those paths within the compact limit. In the earlier
+offline simulation, sixteen entries with two-query admission cover
+99 measured calls and 8.04% of loop cycles before cache costs. A
+matched whole-race ROM replay is still required to measure net gain.
+
+The compact-cache ARM receipt SHA-256 is
+`35f5962bd9d5ee8d43437e5d6fa3a386902d497cca137426ee342a0a96e8723b`.

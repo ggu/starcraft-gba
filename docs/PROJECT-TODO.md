@@ -122,10 +122,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   memory limits and repeat the paired Terran Blood Bath and Protoss
   route windows.
   The [retained-prefix experiment](audits/2026-10-29-monotone-route-step/README.md#retaining-successful-path-prefixes)
-  now saves 67.84–70.08% of authored ARM route cycles when requests
-  advance along interleaved paths. Distinct goals cost 0.33–0.35%
-  more. Verify production replay equivalence and RAM margins before
-  using the opt-in flag on race cartridges.
+  now fits sixteen routes in the same 360 linked BSS bytes. It
+  saves 66.52–69.62% of authored ARM route cycles in the sixteen-
+  stream batches. Distinct goals cost 1.24–1.30% more than the
+  flag-off baseline. The observed Terran replay puts 8.04% of loop
+  cycles in covered calls before cache costs. Verify production
+  replay equivalence and RAM margins before enabling the flag.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have

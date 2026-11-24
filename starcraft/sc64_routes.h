@@ -44,25 +44,32 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #endif
 
 #ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
-enum { SC64_ROUTE_WITNESS_COUNT = 8, SC64_ROUTE_WITNESS_MIN_NODES = 32 };
+enum {
+    SC64_ROUTE_WITNESS_COUNT = 16,
+    SC64_ROUTE_WITNESS_MIN_NODES = 32,
+    SC64_ROUTE_WITNESS_MAX_STEPS = 112,
+    SC64_ROUTE_WITNESS_GOAL_MASK = 0x3fffu,
+    SC64_ROUTE_WITNESS_X_NEGATIVE = 0x4000u,
+    SC64_ROUTE_WITNESS_Y_NEGATIVE = 0x8000u
+};
 typedef struct {
-    u16 cell, goal;
-    u8 cols, rows, steps;
-    signed char x_step, y_sign;
-    u8 vertical[32]; /* At most 254 cardinal edges. */
+    u16 cell, goal_and_signs;
+    u8 steps, vertical[SC64_ROUTE_WITNESS_MAX_STEPS / 8];
 } Sc64RouteWitness;
-static Sc64RouteWitness sc64_route_witness[SC64_ROUTE_WITNESS_COUNT];
-static u8 sc64_route_witness_count, sc64_route_witness_next;
-static u16 sc64_route_witness_recent_goals[SC64_ROUTE_WITNESS_COUNT];
-static u8 sc64_route_witness_recent_count, sc64_route_witness_recent_next;
+static struct {
+    Sc64RouteWitness paths[SC64_ROUTE_WITNESS_COUNT];
+    u16 recent_goals[SC64_ROUTE_WITNESS_COUNT];
+    u8 count, next, recent_count, recent_next, cols, rows;
+} sc64_route_witness;
+_Static_assert(sizeof(sc64_route_witness) <= 360u, "route witness cache exceeds RAM budget");
 #endif
 
 #ifdef SC64_ROUTE_MONOTONE_WITNESS
 static inline void sc64_route_witness_reset(void)
 {
 #ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
-    sc64_route_witness_count = sc64_route_witness_next = 0;
-    sc64_route_witness_recent_count = sc64_route_witness_recent_next = 0;
+    sc64_route_witness.count = sc64_route_witness.next = 0;
+    sc64_route_witness.recent_count = sc64_route_witness.recent_next = 0;
 #endif
 }
 #else
@@ -3172,47 +3179,48 @@ sc64_route_preferred_l_clear(int start_col, int start_row,
 /* Admit a long route only after seeing the same goal twice. */
 static int sc64_route_witness_admit(int goal)
 {
-    for (unsigned i = 0; i < sc64_route_witness_recent_count; ++i)
-        if (sc64_route_witness_recent_goals[i] == goal) return 1;
-    sc64_route_witness_recent_goals[sc64_route_witness_recent_next] = (u16)goal;
-    if (sc64_route_witness_recent_count < SC64_ROUTE_WITNESS_COUNT)
-        ++sc64_route_witness_recent_count;
-    if (++sc64_route_witness_recent_next == SC64_ROUTE_WITNESS_COUNT)
-        sc64_route_witness_recent_next = 0;
+    for (unsigned i = 0; i < sc64_route_witness.recent_count; ++i)
+        if (sc64_route_witness.recent_goals[i] == goal) return 1;
+    sc64_route_witness.recent_goals[sc64_route_witness.recent_next] = (u16)goal;
+    if (sc64_route_witness.recent_count < SC64_ROUTE_WITNESS_COUNT)
+        ++sc64_route_witness.recent_count;
+    sc64_route_witness.recent_next = (sc64_route_witness.recent_next + 1u) % SC64_ROUTE_WITNESS_COUNT;
     return 0;
 }
 
-static void sc64_route_witness_store(int cell, int goal, int cols, int rows,
+static void sc64_route_witness_store(int cell, int goal,
                                      const sc64_route_probe_stats *stats)
 {
-    Sc64RouteWitness *path = &sc64_route_witness[sc64_route_witness_next];
-    const unsigned steps = stats->path_steps;
+    Sc64RouteWitness *path = &sc64_route_witness.paths[sc64_route_witness.next];
+    const unsigned steps = stats->path_steps < SC64_ROUTE_WITNESS_MAX_STEPS ?
+                           stats->path_steps : SC64_ROUTE_WITNESS_MAX_STEPS;
+    /* The search stack runs from the root to the origin. Keep the edges
+     * closest to the origin so the next request can use this witness. */
+    const u16 *near_origin = stats->path_stack + (stats->path_steps - steps);
     path->cell = (u16)cell;
-    path->goal = (u16)goal;
-    path->cols = (u8)cols;
-    path->rows = (u8)rows;
+    path->goal_and_signs = (u16)((unsigned)goal |
+        (stats->x_step < 0 ? SC64_ROUTE_WITNESS_X_NEGATIVE : 0u) |
+        (stats->y_sign < 0 ? SC64_ROUTE_WITNESS_Y_NEGATIVE : 0u));
     path->steps = (u8)steps;
-    path->x_step = stats->x_step;
-    path->y_sign = stats->y_sign;
     memset(path->vertical, 0, (steps + 7u) >> 3);
     for (unsigned i = 0; i + 1u < steps; ++i)
-        if (stats->path_stack[i] == SC64_PROBE_FINISHED)
+        if (near_origin[i] == SC64_PROBE_FINISHED)
             path->vertical[i >> 3] |= (u8)(1u << (i & 7u));
     if (stats->last_vertical) {
         unsigned last = steps - 1u;
         path->vertical[last >> 3] |= (u8)(1u << (last & 7u));
     }
-    if (sc64_route_witness_count < SC64_ROUTE_WITNESS_COUNT) ++sc64_route_witness_count;
-    if (++sc64_route_witness_next == SC64_ROUTE_WITNESS_COUNT) sc64_route_witness_next = 0;
+    if (sc64_route_witness.count < SC64_ROUTE_WITNESS_COUNT) ++sc64_route_witness.count;
+    sc64_route_witness.next = (sc64_route_witness.next + 1u) % SC64_ROUTE_WITNESS_COUNT;
 }
 
-static int sc64_route_witness_predecessor(const Sc64RouteWitness *path)
+static int sc64_route_witness_predecessor(const Sc64RouteWitness *path, int cols)
 {
-    if (!path->steps) return path->cell;
     unsigned last = path->steps - 1u;
     int delta = path->vertical[last >> 3] & (1u << (last & 7u)) ?
-                path->y_sign * path->cols : path->x_step;
-    return (int)path->cell - delta;
+        (path->goal_and_signs & SC64_ROUTE_WITNESS_Y_NEGATIVE ? cols : -cols) :
+        (path->goal_and_signs & SC64_ROUTE_WITNESS_X_NEGATIVE ? 1 : -1);
+    return path->cell + delta;
 }
 
 /* Successive requests use the same reverse-BFS prefix on an unchanged grid.
@@ -3220,15 +3228,21 @@ static int sc64_route_witness_predecessor(const Sc64RouteWitness *path)
 static int sc64_route_witness_lookup(int origin, int goal, int cols, int rows,
                                       int *predecessor)
 {
-    for (unsigned i = 0; i < sc64_route_witness_count; ++i) {
-        Sc64RouteWitness *path = &sc64_route_witness[i];
-        if (path->goal != goal || path->cols != cols || path->rows != rows) continue;
-        int step = sc64_route_witness_predecessor(path);
+    if (sc64_route_witness.cols != cols || sc64_route_witness.rows != rows) {
+        sc64_route_witness_reset();
+        sc64_route_witness.cols = (u8)cols;
+        sc64_route_witness.rows = (u8)rows;
+    }
+    for (unsigned i = 0; i < sc64_route_witness.count; ++i) {
+        Sc64RouteWitness *path = &sc64_route_witness.paths[i];
+        if ((path->goal_and_signs & SC64_ROUTE_WITNESS_GOAL_MASK) != goal) continue;
+        int step = sc64_route_witness_predecessor(path, cols);
         if (origin != path->cell) {
-            if (origin != step) continue;
+            /* Exhaustion asks for a new proof, even at the actual root. */
+            if (origin != step || path->steps == 1) continue;
             path->cell = (u16)origin;
             --path->steps;
-            step = sc64_route_witness_predecessor(path);
+            step = sc64_route_witness_predecessor(path, cols);
         }
         *predecessor = step;
         return 1;
@@ -3276,7 +3290,7 @@ sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
 #ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
         if (status == 1 && stats.nodes >= SC64_ROUTE_WITNESS_MIN_NODES && stats.path_steps > 1 &&
             sc64_route_witness_admit(goal))
-            sc64_route_witness_store(origin, goal, cols, rows, &stats);
+            sc64_route_witness_store(origin, goal, &stats);
 #endif
     }
 #ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED

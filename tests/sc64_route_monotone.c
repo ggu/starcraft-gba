@@ -435,8 +435,8 @@ static void test_active_geometry(void)
 static void test_retained_witness(void)
 {
     for (unsigned direction = 0; direction < 4; ++direction) {
-        int sx = direction & 1u ? MAP_COLS - 2 : 1;
-        int sy = direction & 2u ? MAP_ROWS - 2 : 1;
+        int sx = direction & 1u ? MAP_COLS - 5 : 4;
+        int sy = direction & 2u ? MAP_ROWS - 5 : 4;
         int gx = MAP_COLS - sx - 1, gy = MAP_ROWS - sy - 1;
         int goal = gx + gy * MAP_COLS, origin = sx + sy * MAP_COLS;
         int nx, ny, expected;
@@ -445,7 +445,7 @@ static void test_retained_witness(void)
         grid_fill(1);
         if (direction == 3) grid_set(gx, gy, 0);
         assert(sc64_route_monotone_next_step(origin, goal, gx * 16 + 3, gy * 16 + 12, &nx, &ny));
-        assert(sc64_route_witness_count == 0 && sc64_route_witness_recent_count == 1);
+        assert(sc64_route_witness.count == 0 && sc64_route_witness.recent_count == 1);
         unsigned clock_before = sc64_route_clock;
         for (unsigned call = 0; ; ++call) {
             assert(call < 256);
@@ -453,12 +453,14 @@ static void test_retained_witness(void)
             /* The FIFO oracle overwrites the scratch holding the first path. */
             bfs_queue[0] = 0xa55a;
             assert(sc64_route_monotone_next_step(origin, goal, gx * 16 + 3, gy * 16 + 12, &nx, &ny));
-            if (call) assert(bfs_queue[0] == 0xa55a);
-            assert(sc64_route_witness_count == 1 && sc64_route_witness_next == 1);
+            if (call && expected != origin && (expected != goal || grid_get(gx, gy)))
+                assert(bfs_queue[0] == 0xa55a);
+            assert(sc64_route_witness.count == 1 && sc64_route_witness.next == 1);
 #ifdef SC64_ROUTE_DECAY_FREQ
             assert(sc64_route_clock == clock_before + call + 1u);
 #endif
-            assert(sc64_route_witness[0].cell == origin);
+            if (expected != origin && (expected != goal || grid_get(gx, gy)))
+                assert(sc64_route_witness.paths[0].cell == origin);
             if (expected == origin || (expected == goal && !grid_get(gx, gy))) {
                 assert(nx == gx * 16 + 3 && ny == gy * 16 + 12);
                 assert(sc64_route_monotone_next_step(origin, goal, gx * 16 + 11, gy * 16 + 4, &nx, &ny));
@@ -476,9 +478,9 @@ static void test_retained_witness(void)
     /* Block the preferred L path and exercise the public dispatch. */
     grid_set(1, 2, 0);
     check_dispatch(24, 24, tx, ty);
-    assert(sc64_route_witness_count == 0);
+    assert(sc64_route_witness.count == 0);
     check_dispatch(24, 24, tx, ty);
-    assert(sc64_route_witness_count == 1);
+    assert(sc64_route_witness.count == 1);
     bfs_queue[0] = 0xa55a;
     unsigned clock_before = sc64_route_clock;
     assert(sc64_route_next(24, 24, tx, ty, &nx, &ny));
@@ -494,12 +496,12 @@ static void test_retained_witness(void)
     sc64_routes_reset();
     check_dispatch(24, 24, tx, ty);
     check_dispatch(24, 24, tx, ty);
-    assert(sc64_route_witness_count == 1);
+    assert(sc64_route_witness.count == 1);
     path_grid_valid = 0;
     grid_set(1, 2, 1);
     build_path_grid();
-    assert(sc64_route_witness_count == 0);
-    assert(sc64_route_witness_recent_count == 0);
+    assert(sc64_route_witness.count == 0);
+    assert(sc64_route_witness.recent_count == 0);
     assert(sc64_route_next(24, 24, tx, ty, &nx, &ny));
     assert(nx == 24 && ny == 40);
 #ifdef TEST_ACTIVE
@@ -508,11 +510,54 @@ static void test_retained_witness(void)
     grid_fill(1);
     assert(sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
     assert(sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
-    assert(sc64_route_witness_count == 1);
+    assert(sc64_route_witness.count == 1);
     race_cols = 96;
     assert(sc64_route_configure());
-    assert(sc64_route_witness_count == 0);
+    assert(sc64_route_witness.count == 0);
     race_cols = 64;
+    sc64_routes_reset();
+#endif
+}
+
+static void test_witness_limits(void)
+{
+    reset_world();
+    grid_fill(1);
+    int origin = MAP_COLS + 1, nx, ny, next;
+    /* More goals than slots: first admission replaces just the oldest path. */
+    for (int i = 0; i <= SC64_ROUTE_WITNESS_COUNT; ++i) {
+        int goal = 12 + i + (MAP_ROWS - 2) * MAP_COLS;
+        assert(sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
+        assert(sc64_route_monotone_next_step(origin, goal, 0, 0, &nx, &ny));
+    }
+    int oldest = 12 + (MAP_ROWS - 2) * MAP_COLS;
+    assert(sc64_route_witness.count == SC64_ROUTE_WITNESS_COUNT);
+    assert(!sc64_route_witness_lookup(origin, oldest, MAP_COLS, MAP_ROWS, &next));
+    assert(sc64_route_witness_lookup(origin, oldest + 1, MAP_COLS, MAP_ROWS, &next));
+#ifdef TEST_ACTIVE
+    race_cols = race_rows = 128;
+    reset_world();
+    grid_fill(1);
+    origin = 0;
+    int goal = 128 * 128 - 1;
+    assert(sc64_route_monotone_next_step(origin, goal, 2047, 2047, &nx, &ny));
+    assert(sc64_route_monotone_next_step(origin, goal, 2047, 2047, &nx, &ny));
+    assert(sc64_route_witness.paths[0].steps == SC64_ROUTE_WITNESS_MAX_STEPS);
+    for (int i = 0; i <= SC64_ROUTE_WITNESS_MAX_STEPS; ++i) {
+        int expected;
+        assert(reference_step(origin % 128, origin / 128, 127, 127, &expected));
+        bfs_queue[0] = 0xa55a;
+        assert(sc64_route_monotone_next_step(origin, goal, 2047, 2047, &nx, &ny));
+        assert(nx / 16 + ny / 16 * 128 == expected);
+        /* The truncated tail must trigger a fresh search, never a raw jump. */
+        if (i == SC64_ROUTE_WITNESS_MAX_STEPS) {
+            assert(bfs_queue[0] != 0xa55a && sc64_route_witness.count == 2);
+        } else {
+            assert(bfs_queue[0] == 0xa55a && sc64_route_witness.count == 1);
+        }
+        origin = expected;
+    }
+    race_cols = race_rows = 64;
     sc64_routes_reset();
 #endif
 }
@@ -534,6 +579,7 @@ int main(void)
     test_active_geometry();
 #ifdef SC64_ROUTE_MONOTONE_WITNESS_ENABLED
     test_retained_witness();
+    test_witness_limits();
 #endif
     printf("route monotone dispatch OK active=%d builds=%u hits=%u\n",
            SC64_ROUTE_ACTIVE_SLOTS, (unsigned)sc64_route_builds,
