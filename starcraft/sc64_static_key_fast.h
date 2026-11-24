@@ -7,10 +7,9 @@
  * generation advances exactly when the reference would see one of its
  * compared fields change.
  *
- * The reference keeps one "drawn" field per slot (0, or 1/3 for a building
- * drawn while complete/under construction) and the payload fields of the
- * slot as of the last frame it was drawn. Here the drawn fields are bit
- * words (one bit per slot, plus a construction bit for buildings that is set
+ * The reference keeps a draw-state field per slot and the payload fields of
+ * the slot as of the last frame it was drawn. Here the draw states are bit
+ * words (including remembered minerals and building construction bits set
  * only for drawn slots), so an undrawn slot costs no field-array access and a
  * whole word of undrawn slots is checked with one compare. A drawn-field
  * mismatch in the reference is a bit mismatch here, and payload fields are
@@ -47,6 +46,7 @@ sc64_static_objects_key(void)
     static Field geyser_fields[MAX_RACE_GEYSERS * 2];
     static Field building_fields[MAX_BUILDINGS * 5];
     static u32 mineral_drawn[SC64_STATIC_KEY_WORDS(MAX_MINERALS)];
+    static u32 mineral_remembered[SC64_STATIC_KEY_WORDS(MAX_MINERALS)];
     static u32 geyser_drawn[SC64_STATIC_KEY_WORDS(MAX_RACE_GEYSERS)];
     static u32 building_drawn[SC64_STATIC_KEY_WORDS(MAX_BUILDINGS)];
     static u32 building_built[SC64_STATIC_KEY_WORDS(MAX_BUILDINGS)];
@@ -89,12 +89,15 @@ sc64_static_objects_key(void)
     /* An undrawn slot costs its presence test and the loop step; the slot's
      * bit and fields are derived from its index only when it is drawn. */
 #define SC64_STATIC_FAST_MINERAL(p) \
-    if ((p)->amount > 0) { \
+    { \
         int x = (p)->x - view_x, y = (p)->y - view_y + 12; \
-        if (x > -6 && x < 245 && y > 7 && y < 123 && \
-            sc64_static_key_visible((p)->x, (p)->y, cols, rows)) { \
+        int state = x > -6 && x < 245 && y > 7 && y < 123 ? \
+                    sc64_mineral_draw_state((unsigned)((p) - m)) : SC64_MINERAL_HIDDEN; \
+        if (state != SC64_MINERAL_HIDDEN) { \
+            u32 bit = 1u << ((p) - first); \
             Field *f = mineral_fields + 3 * ((p) - m); \
-            drawn |= 1u << ((p) - first); \
+            drawn |= bit; \
+            if (state == SC64_MINERAL_REMEMBERED) remembered |= bit; \
             SC64_STATIC_FAST_FIELD(f[0], (p)->x); \
             SC64_STATIC_FAST_FIELD(f[1], (p)->y); \
             SC64_STATIC_FAST_FIELD(f[2], (p)->style); \
@@ -106,12 +109,13 @@ sc64_static_objects_key(void)
             const Mineral *first = p;
             const Mineral *end = p + (MAX_MINERALS - w * 32 < 32 ?
                                       MAX_MINERALS - w * 32 : 32);
-            u32 drawn = 0;
+            u32 drawn = 0, remembered = 0;
             for (; p < end; ++p) {
                 SC64_STATIC_FAST_MINERAL(p)
             }
-            if (mineral_drawn[w] != drawn) {
+            if (mineral_drawn[w] != drawn || mineral_remembered[w] != remembered) {
                 mineral_drawn[w] = drawn;
+                mineral_remembered[w] = remembered;
                 changed = 1;
             }
         }

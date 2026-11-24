@@ -720,6 +720,7 @@ race_campaign_init(void)
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
     memset(m, 0, sizeof(m));
+    memset(sc64_mineral_memory, 0, sizeof(sc64_mineral_memory));
     memset(&race_campaign, 0, sizeof(race_campaign));
     memset(race_player, 0, sizeof(race_player));
     memset(race_minerals, 0, sizeof(race_minerals));

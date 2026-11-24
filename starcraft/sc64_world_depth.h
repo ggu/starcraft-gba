@@ -520,12 +520,14 @@ sc64_draw_depth_ordered_actors(void)
     unsigned pose_units=0;
 #endif
     unsigned size = 0;
+    u8 mineral_state[MAX_MINERALS];
     for (unsigned i = 0; i < MAX_MINERALS; ++i) {
-        if (m[i].amount <= 0) continue;
         int x = m[i].x - camx, y = m[i].y - camy + 12;
-        if (mineral_in_view(&m[i], x, y) &&
-            currently_visible(m[i].x, m[i].y))
+        int state = mineral_draw_state_in_view(i, x, y);
+        if (state != SC64_MINERAL_HIDDEN) {
+            mineral_state[i] = (u8)state;
             sc64_depth_push(heap, &size, 4, m[i].y, DEPTH_MINERAL, i);
+        }
     }
     for (int i = 0; i < geyser_count; ++i) {
         int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
@@ -651,7 +653,8 @@ sc64_draw_depth_ordered_actors(void)
         /* Admission already applies resource visibility and viewport clipping. */
         case DEPTH_MINERAL:
             if (i < DEPTH_MINERAL_WORK_BASE)
-                draw_map_mineral_art((int)i, m[i].x - camx, m[i].y - camy + 12);
+                draw_map_mineral_art((int)i, m[i].x - camx, m[i].y - camy + 12,
+                                     mineral_state[i]);
             else
                 sc64_draw_mining_effect(&u[i - DEPTH_MINERAL_WORK_BASE]);
             break;

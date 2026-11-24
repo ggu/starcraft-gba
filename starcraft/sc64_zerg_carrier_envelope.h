@@ -6,6 +6,9 @@
  * Include after the normal RaceSave, impact and transport codecs.
  * The ordinary Z10 reader and writer do not use the compact envelope. */
 #include "sc64_interceptor_pool_codec.h"
+#ifdef SC64_MINERAL_MEMORY_BYTES
+#include "sc64_mineral_memory_marker.h"
+#endif
 
 enum {
     SC64_ZC_UNIT_BITS = 280,
@@ -66,6 +69,14 @@ static int sc64_zc_custom(const u8 *version, const u8 *state)
     int mode, map;
     memcpy(&mode,state,sizeof(mode));
     memcpy(&map,state+20*sizeof(int),sizeof(map));
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    u32 human;
+    memcpy(&human,state+sizeof(int),sizeof(human));
+    if ((human & 0xffff0000u) == SC64_MINERAL_MEMORY_MAGIC) {
+        mode = (int)((unsigned)mode & 1u);
+        map = (int)((unsigned)map & 255u);
+    }
+#endif
     if (memcmp(version,&expected,sizeof(expected)) || mode != 1) return 0;
     if (map == 0) return 1; /* authored Outpost geometry */
     return map == SC64_MAP_BLOOD_BATH && map <= SC64_SKIRMISH_IMPORTED_COUNT &&

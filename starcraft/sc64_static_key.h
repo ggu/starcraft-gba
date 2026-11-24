@@ -52,8 +52,8 @@ sc64_static_objects_key(void)
 #endif
     for (int i = 0; i < MAX_MINERALS; ++i) {
         int x = m[i].x - camx, y = m[i].y - camy + 12;
-        int drawn = m[i].amount > 0 && x > -6 && x < 245 &&
-                    y > 7 && y < 123 && currently_visible(m[i].x, m[i].y);
+        int drawn = x > -6 && x < 245 && y > 7 && y < 123 ?
+                    sc64_mineral_draw_state((unsigned)i) : SC64_MINERAL_HIDDEN;
         SC64_STATIC_FIELD(drawn);
         if (drawn) {
             SC64_STATIC_FIELD(m[i].x);

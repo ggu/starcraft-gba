@@ -328,6 +328,10 @@ static int race_q8_flash_write(const void *data,u32 length)
     suffix_length=length-suffix_start;
     memcpy(suffix,(const u8 *)data+suffix_start,suffix_length);
     original_hash=gba_fj_hash(2166136261u,data,length);
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    int mineral_wire_state[32];
+    memcpy(mineral_wire_state,race_data.state,sizeof mineral_wire_state);
+#endif
 #ifdef SC64_CONTROLLER_FLASH_P1_HOST_STAGE
     /* Preflight can normalize rows before rejecting. Preserve the original
      * wire bytes on every path, including semantic failure. */
@@ -345,6 +349,9 @@ static int race_q8_flash_write(const void *data,u32 length)
     for(unsigned i=0;i<MAX_BUILDINGS;++i)
         ((u8 *)race_data.buildings)[i*SC64_PR_ROW_WIDTH+SC64_PR_ROW_WIDTH-1]=padding[i];
     memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    memcpy(race_data.state,mineral_wire_state,sizeof mineral_wire_state);
+#endif
     if(!valid || gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
 #else
     if(!race_worker_cargo_prepare_selected(data,length,
@@ -371,6 +378,9 @@ static int race_q8_flash_write(const void *data,u32 length)
 #endif
                               &plan.research_levels)) return 0;
     memcpy((u8 *)&race_impact_record+suffix_start,suffix,suffix_length);
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    memcpy(race_data.state,mineral_wire_state,sizeof mineral_wire_state);
+#endif
     if(gba_fj_hash(2166136261u,data,length)!=original_hash) return 0;
 #endif
     Sc64Q8FlashGuard guard={io,0};

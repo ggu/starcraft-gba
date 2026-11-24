@@ -1,0 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef SC64_MINERAL_MEMORY_MARKER_H
+#define SC64_MINERAL_MEMORY_MARKER_H
+#define SC64_MINERAL_MEMORY_MAGIC 0x4d4d0000u
+#endif
