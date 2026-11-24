@@ -868,9 +868,10 @@ gas and 5/26 supply. Its FlashRAM export is byte-identical.
 On the installed Terran ROM, ordinary controller inputs open
 the same mission and the read-only observer sees those six units
 and four buildings, 200 minerals, 200 gas and 6/26 supply. The
-human units report idle orders. After 60 neutral updates the SCV
-is still idle and the bank is still 200/200. The N64 supply
-exclusion still needs an isolated test.
+human units report idle orders. In a separate replay, after
+600 neutral updates the SCV is still idle and the bank is
+still 200/200. The N64 supply exclusion still needs an
+isolated test.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -878,6 +879,7 @@ exclusion still needs an isolated test.
 | N64 first-slot save | `bbb280c07d827e96135ee6ee17b3268bec83d20a20681e18662a4e40b08306f6` |
 | N64 fresh-process reload | `2c9d3141c995bf315e72a9e500aa91601b60c507af72631d02d2f6c6b07ebab4` |
 | GBA opening and neutral updates | `c23236098c12c013370634bb91fda62357c34a4273d9420be5d62243e3904cd6` |
+| GBA independent opening and 600 neutral updates | `4fa9651e09dccc7efc4770cdd8a633823e7c7863722ed1c6f55218aeefbc099f` |
 
 ### Terran chapter 5 input divergence
 

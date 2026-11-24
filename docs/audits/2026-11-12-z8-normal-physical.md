@@ -1215,12 +1215,39 @@ This establishes that giving the direct order earlier does not
 protect the Hatchery. Check intermediate waypoints or stage the
 defenders on the eastern side before the evacuation.
 
+#### Intercept the Reaver from the connected approach
+
+The read-only walk grid at frame 74,304 puts the earlier
+destination (1860,1700) in a different connected region
+from Kerrigan. The Reaver's approach at (1808,1640) is
+reachable. Six ordinary move orders through (1400,2008),
+(1512,1928), (1576,1800), (1592,1624), (1768,1608) and
+(1816,1640) take Kerrigan to (1812,1640) by frame 75,525.
+Fresh HOME restores her at 400 HP and the Hatchery at
+1,250 HP with byte-identical SRAM.
+
+Continuing from that save, an attack order toward (1684,1640)
+kills the incoming Reaver by frame 76,966. Fresh HOME at
+77,066 restores Kerrigan at 204 HP, the Hatchery at 1,250 HP
+and identical SRAM. The eastern Nexus is still gone and the
+western Nexus still has 750 HP and 750 shields. A longer
+continuation takes further damage from another assault.
+An independent replay of both recorded controller sequences
+matches the two saved states and their SRAM byte for byte.
+Recover workers and prepare a second defense from this checkpoint.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent post-Nexus evacuation and Hatchery | `050ed6fa7278eb19a8b89709da4181999011c2bcc4e504658bf48852b33559b5` |
 | Independent paid Drones, Pool construction and fresh HOME | `ebe2ed0edb5bd9745e7aa4f9c45494509df26bc6d385cf4a5387bffc32fe24fe` |
 | Recovered base SRAM | `7d4644978c21f581b8f026931ba79dcaa61297647142d3cbb246466e46dd46c9` |
 | Earlier Kerrigan move order and Reaver arrival | `6919601987baf63e20bf4dbfe1141ba0b3bab9523a0baf31eefb5207ac5f3d74` |
+| Connected approach and waypoint orders | `f9c5b455cabd969241cce5ff4f2caf8a27d01ca7862d577ff9a24b2a1159ce47` |
+| Fresh HOME before the Reaver arrives | `9b2f51a46f1dbdfa4e66d129562de5269f7f72f8c2b3c79ac4bcbed9f468039a` |
+| Reaver interception | `c5c7a7124d1b56e041ea7cd2ec5dd559fc1ea05cd0e184c92f359cda09b9f214` |
+| Fresh HOME after the interception | `3bcce9106cdc40b817a93ec9c47afc23b3f7f67e86b73f4d96a81723656e2a5a` |
+| Independent replay of both controller sequences | `fef400e34cae62e698496d4d7ff1a598c936c034c718b01c4a9bd8581df15e0c` |
+| Post-Reaver SRAM | `4c8f492030fb634fbee9a244924fbc0a896e6c478b95daa7d748eca6cedff9a8` |
 
 ### Native Overlord research permission
 
