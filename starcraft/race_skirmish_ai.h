@@ -413,6 +413,10 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
     }
     c->supply_cap = sc64_supply_limit(c->supply_cap);
     c->supply_queued += race_supply_nuke_reservations(owner, c->race);
+    /* Production reads this cache. race_ai_supply() refreshes it, but the
+     * planner skips that while every depot is lost, and a zero here refused
+     * every army unit: a raided owner sat on its bank under attack. */
+    c->free_supply = c->supply_cap - c->supply_used - c->supply_queued;
     c->threat_d = best_threat;
     if (c->threat_count == 0) c->threat = -1;
 }
@@ -1410,6 +1414,20 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
             if (race_ai_try_queue(c, depot, c->worker_raw, 1)) ++committed;
             c->reserve_minerals = saved_m; c->reserve_gas = saved_g;
         }
+    }
+    /* With every depot lost, nothing bought here may take what the rebuild
+     * needs: the new hall's price until one is placed (a walking builder's
+     * is already held by the census, a placed one is paid), and its first
+     * worker's, even after the last worker became the hall. With no worker
+     * left, army also leaves that worker a slot of the unit share. */
+    if (!c->depots && c->ore_patches) {
+        int hall = c->race == R_ZERG ? B_HATCHERY : c->race == R_PROTOSS ? B_NEXUS : B_COMMAND;
+        int pending = c->pend[AK_COMMAND] + c->pend[AK_NEXUS] + c->pend[AK_HATCHERY];
+        if (!pending && c->workers)
+            c->reserve_minerals += sc64_race_building_rule(hall)->minerals;
+        if (pending || c->workers)
+            c->reserve_minerals += sc64_race_unit_rule(c->worker_type)->minerals;
+        if (pending && !c->workers) --unit_cap;
     }
     if (committed >= unit_cap) {
 #ifdef RACE_AI_REAVERS

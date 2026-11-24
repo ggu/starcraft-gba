@@ -55,7 +55,16 @@ different updates, so no update runs more than one plan.
 - If every depot is lost, the next depot is rebuilt at the owner's start
   location, or at a free start location. This comes before supply: with no
   depot nothing is mined, and a Protoss owner otherwise spent the Nexus
-  price on Pylons to replace the supply the Nexus had provided.
+  price on Pylons to replace the supply the Nexus had provided. While no
+  depot stands, a surviving producer (a powered one, for Protoss) still
+  trains army units within the remaining supply. While ore remains on the
+  map, the bank keeps the new depot's price until one is placed (if a
+  worker survives to build it) and a worker's price (while a worker
+  survives or a new depot is under way); with no worker left, army also
+  leaves one slot of the unit share for that worker. Zerg have no larva
+  until a new Hatchery stands.
+  Without this an owner raided at update 9,000 sat on about 2,500 minerals
+  and trained nothing until the new Command Center finished.
 - When the home mineral field drops below 3,000, the owner builds a depot at
   the nearest free start location that still has minerals. Zerg also build
   extra Hatcheries at home as larva sources.
