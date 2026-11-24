@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # CANONICAL_FOG_FLAGS is defined in the top-level Makefile.
 
+# The existing mapped-sprite oracles also exercise the shared effect raster.
+build/test-gba-mapped-sprite build/test-gba-mapped-sprite-full-screen: \
+    starcraft/sc64_weapon_source_vfx_render.h starcraft/sc64_weapon_vfx.h
+
 .PHONY: test-terrain-soft-fog
 build/test-terrain-dirty-capture: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h starcraft/sc64_static_dirty_rows.h starcraft/sc64_fog.h starcraft/sc64_obj_vram.h common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_TERRAIN_SCROLL -DSC64_TERRAIN_ROW_MASKS -DSC64_TERRAIN_CACHE_VRAM -DSC64_TERRAIN_DIRTY_CAPTURE -DSC64_P7_PROJECTILES_ENABLED -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_FOG_TEST_PACKED -DSC64_SOFT_FOG -DSC64_FOG_TEST_REAL_RASTER -Icommon $< common/gba.c -o $@
