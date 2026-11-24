@@ -1682,13 +1682,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rows and starts through fresh HOME load and pause restart.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
-  Z2, P1–P3 and P5–P10 also have exact-image wins and fresh save
-  checks, for 19 of 30 missions overall. An ordinary T5 retreat
-  keeps Raynor at full health through frame 129,658. Local box
+  Z2 and all ten Protoss chapters also win on the exact images,
+  for 20 of 30 missions overall. P4 still needs a fresh save check.
+  An ordinary T5 retreat keeps Raynor at full health through
+  frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
-  Move near input call 22,000 stalls. An earlier order at call
-  18,000 moves Kerrigan more than 100 pixels without HP loss.
-  A reliable follow-up route and full win remain open.
+  Move near input call 22,000 stalls. Redirecting Kerrigan around
+  call 12,000 takes her to (856,398) with 294 HP through frame
+  19,160. Raynor needs a separate early retreat and a full win
+  remains open.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.
@@ -1696,6 +1698,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches in both Blood Bath modes on N64 and all three race ROMs.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
+  [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
+  leaves 1.96–2.81 MiB per race cartridge for all future content.
+  Captioned stills match an observed N64 cutscene format. Short
+  full-motion playback needs a benchmark on GBA SP.
 
 - **KODAK delivery (2026-11-13):** Terran T10, Zerg Z10, Protoss P10 and
   Showcase built from runtime `cbba1c5` were copied to

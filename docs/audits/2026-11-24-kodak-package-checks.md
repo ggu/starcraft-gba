@@ -93,6 +93,13 @@ final checkpoint. Both victories reload in fresh HOME processes
 with the correct mission and completion bit. The re-exported SRAM
 matches the victory journal byte for byte.
 
+P4 wins at frame 86,150 after 87,100 tape calls. All 88
+recorded observations match. The replay advances seven briefing
+pages and thirteen gameplay pages. Raynor and Tassadar match the
+recorded owner and position at both rescue and extraction. This
+run verifies victory from HOME on the installed image. P4 still
+needs a fresh victory-journal readback on that image.
+
 P3, P5 and P6 win from HOME on the exact installed Protoss image.
 Each resumes the pause save from a fresh HOME and restores the
 terminal world from a third process. Each victory journal re-exports
@@ -189,6 +196,14 @@ to (1456,383) by 200 updates and stays there through update 500.
 She keeps 45 HP and Raynor keeps 250 HP. The test establishes an
 earlier route that clears the original position. This waypoint is
 short of its target, and the mission outcome is still open.
+
+An earlier branch at call 12,000 redirects Kerrigan from (945,397)
+to a staging area near (856,398). She reaches it within 100 updates
+of the Move order and keeps 294 HP through game frame 19,160. Raynor
+follows his prior order and falls to 23 HP. A later attempt selects
+his verified slot at frame 13,229 while he still has 250 HP. That
+attempt ends before issuing an order because the menu sequence does
+not enter Move mode. Raynor still needs a verified earlier retreat.
 
 ## Custom Game saves
 
@@ -300,6 +315,28 @@ occurs at most once within a sampled update. The late cut also
 draws 164 packed sprites across 3,251 rows. These counts provide
 workload sizes for synthetic renderer and collision tests.
 
+## ROM space available for cutscenes
+
+The final ROM-backed load segment in each matching ELF ends exactly
+where the cartridge's `0xff` padding begins. The 32 MiB files leave
+the following space in the installed package.
+
+| Cartridge | Padding bytes | MiB |
+| --- | ---: | ---: |
+| Terran 10 | 2,947,440 | 2.811 |
+| Zerg 10 | 2,053,104 | 1.958 |
+| Protoss 10 | 2,060,716 | 1.965 |
+| Showcase | 3,396,720 | 3.239 |
+
+The [native campaign audit](2026-11-04-n64-parity/README.md#what-was-reached)
+observed a captioned still-image cutscene at the opening of a Brood
+War episode. Stills with captions are the lower-cost format for
+that presentation. For short full-motion scenes, 30 seconds at a
+combined 96–160 kbit/s would use 360,000–600,000 bytes for picture
+and audio. This is a storage estimate before decoder, alignment and
+other content. An authored test clip is needed to verify image
+quality, decode time, scratch RAM and audio on the GBA SP.
+
 ## Local receipts
 
 | Check | SHA-256 |
@@ -325,6 +362,7 @@ workload sizes for synthetic renderer and collision tests.
 | Terran chapter 5 hero-safe local selection and order | `1848f80e7fe00f9d303bb853b661dd32add344459f56f878facaf4474a833698` |
 | Terran chapter 5 explicit Move with stalled hero waypoint | `b0a318d3447b14132d09f800c2602ff5ba28b7682100c973dc89a8f2fee06fb0` |
 | Terran chapter 5 earlier Kerrigan route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
+| Terran chapter 5 Kerrigan staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -335,6 +373,7 @@ workload sizes for synthetic renderer and collision tests.
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
 | Protoss chapter 2 full run and victory journal | `aefbd075604bdf941464e02443ee7625e799c165c41084bf5c94ed3b3c7cffd7` |
 | Protoss chapter 3 full run and fresh loads | `dcca91454a924eafebc47440a7a1fda1a0dd25b21d9b23024ee6e05690e6e221` |
+| Protoss chapter 4 full run and both hero positions | `369935061512182039552c30dfa01c4ac18f4aaa746729ef0a245fed1c4c5db6` |
 | Protoss chapter 5 full run and fresh loads | `6135c1f184640ecf9f4cf77a9c48da534bc19f60a0e7c33685be970a50e051a2` |
 | Protoss chapter 6 full run and fresh loads | `fe85625beb73116126eecb82bc244a3d6328fee40ce881f3ee67e89191ef2974` |
 | Protoss chapter 7 full run and fresh loads | `54d8fd3811c16883ad7bbd0c0991240a8e80737af43d282e8c2b62bcc1a548d0` |
