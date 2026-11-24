@@ -116,8 +116,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   instruction-attributed updates per case put 51–129k cycles in
   uncached contact masks. [Reusing the query origin and dimensions](https://github.com/ggu/starcraft-gba/pull/828)
   matches 450 observed masks and saves 5.96–6.06% in the paired
-  IWRAM kernel fixture. Qualify full frames and saves across the
-  current production cartridges before adopting it. Terran Blood
+  IWRAM kernel fixture. The [full-frame pairs](audits/2026-11-24-kodak-package-checks.md#reusing-contact-scan-coordinates-in-complete-frames)
+  are flat on canonical P10 and within 0.02% on the unpacked
+  Terran and Showcase variants. Prioritize larger measured
+  reductions. Terran Blood
   Bath also spends about 81k direct cycles in the monotone route
   probe. Pair those workloads separately and keep both maps in
   the actor and effect draw tests.
@@ -139,20 +141,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   raster entry. The [tile-row trial](audits/2026-11-24-kodak-package-checks.md#reusing-effect-visibility-for-each-tile-row)
   improves the panned P10 loop mean by 8.16% with matching pixels
   and world, while the fixed mean is flat and its p95 rises 0.45%.
-  [The shared renderer draft](https://github.com/ggu/starcraft-gba/pull/823)
+  [The shared renderer](https://github.com/ggu/starcraft-gba/pull/823)
   passes authored ARM and Mode 0 host differentials. The retained
   P10 [Blood Bath and save holdouts](audits/2026-11-24-kodak-package-checks.md#blood-bath-holdout-and-late-skirmish-journals)
   are flat on timing, match the selected scanout, and reproduce both
   maps' late saves and 180-update continuations. The retained pair also
   [wins Protoss 7 from a campaign save](audits/2026-11-24-kodak-package-checks.md#protoss-7-victory-from-a-saved-campaign)
   with matching sampled state and scanout and byte-identical victory
-  journals. The full replay timing is flat. The [current Terran and Showcase pairs](audits/2026-11-24-kodak-package-checks.md#projectile-fog-spans-on-current-terran-and-showcase)
-  match worlds, both render pages and Terran journals. Two
-  sampled VBlank flips happen earlier on the candidate, with
-  matching counts at the following boundary. The strongest
-  mean gain in those pairs is 0.37%. Qualify current Z10 and
-  P10 links with mixed fog and the existing memory
-  guards. Busy fights remain over budget.
+  journals. The full replay timing is flat. The [four canonical profiles](audits/2026-11-24-kodak-package-checks.md#canonical-renderer-qualification-on-all-four-profiles)
+  qualify the merged renderer. Panned three-CPU Outpost
+  gains are 8.45% on P10 and 7.23% on Z10. The fixed
+  views are flat and the panned fights still exceed the
+  two-VBlank budget.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
@@ -1021,13 +1021,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
-  now covers the arithmetic path as well. Six paired Terran
-  late skirmish windows preserve the sampled state and display
-  and all six SRAM continuations. Outpost mean frame costs
-  fall 1.16–3.16%, depending on CPU count. The 2- and
-  3-CPU samples still exceed the budget. Qualify the same
-  option in complete Z10 frames, test stack use and finish
-  active-match and campaign checks before changing the default.
+  covers both ROM kernels. The [canonical pairs](audits/2026-11-24-contact-axis-bias.md#canonical-terran-and-z10-whole-frame-pairs)
+  measure 1.55–4.81% reductions on Z10 and byte-identical
+  P10 and Showcase links. Terran one-CPU Outpost averages
+  within the budget while 52 individual updates still miss it.
+  The [combined renderer and collision pair](audits/2026-11-24-kodak-package-checks.md#compose-the-renderer-and-rom-collision-option)
+  saves another 1.03% of mean time in the panned Z10 fight
+  with a higher p95. Keep the collision option off by default.
+  Qualify active fights and GBA SP frame delivery.
   Keep a one-CPU Blood Bath tail check, where a near-budget
   mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
@@ -1243,8 +1244,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Pool spends a Drone and the miner disappears. Defend the
   recovered economy before restarting production. The native
   scenario permits Ventral Sacs for the alternate transport
-  route. Qualify
-  human Z8 research, boarding and fresh SRAM as one path.
+  route. Qualify human Z8 research, boarding and fresh SRAM
+  as one path. A builder can wait indefinitely at a disconnected
+  footprint. The pending order charges resources only on arrival.
+  A shared reachability check must distinguish an exhausted
+  search from budget-limited work before cancelling that order.
   [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
   fresh-loads an Extractor, Lair, Den, Spire and three full-health
   paid Mutalisks at frame 8,925. At frame 12,531, a fresh HOME
@@ -1271,7 +1275,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rebuilds the Den, puts four Drones on minerals and starts a
   second Hatchery. Fresh HOME at frame 15,812 has six
   Hydralisks and the new hall at 714 HP. A two-sided raid
-  follows. Defend the new production site to completion.
+  destroys both halls. [Relocated workers](audits/2026-11-21-z10-current-full-circle.md#relocate-workers-and-restore-mineral-income)
+  establish a full-health Hatchery and resume mineral
+  deliveries at fresh HOME frame 24,934. The next Reavers
+  destroy the hall during passive play. Prepare an active
+  defense before they arrive.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
