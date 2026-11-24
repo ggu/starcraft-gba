@@ -142,6 +142,48 @@ The bank is 490/1,106 and the countdown remains at zero.
 | First road Cannon attack | `53394856447841e82b979826b04771490834e05732f8f94ef58f020daf3084f6` |
 | Road attack fresh HOME and matching SRAM | `c53b63e53bada5cd317a0c9aaa1419527d4dda58b55d8a0e1663ebe3f1c4326e` |
 
+### Road assault, crystal return and victory
+
+The next road assault destroys four more Photon Cannons and
+retains all fourteen Mutalisks. Fresh HOME restores the force
+at frame 29,511 with matching SRAM. A full-health Drone moves
+to the approach through the connected ground path. Fresh HOME
+at frame 34,920 retains the Drone, all fourteen Mutalisks and
+the 610/1,834 resource bank.
+
+The formation removes the entering Drone and opens a dialogue.
+Acknowledging the sequence through the controller starts the
+600-second countdown at frame 37,497. The air force stays near
+the formation while the enemy overruns the starting base. At
+frame 49,543 the countdown expires and a new 40-HP Drone
+appears with the crystal. A fresh HOME process restores both
+at the formation with byte-identical SRAM.
+
+On the winning return, the air group follows the cleared
+road waypoints and attacks ahead of the carrier. The air
+force is lost, and the carrier reaches the return location
+at frame 56,952 with 27 HP and the crystal. A fresh HOME load
+from that checkpoint reaches the victory result at frame
+57,089 with the chapter completion bit, zero scheduler fault
+bytes and zero unsupported events. A separate fresh HOME load
+restores the victory result and exports byte-identical SRAM.
+A advances to live Z10. An ordinary pause save at frame 11
+restores Z10 and the Z9 completion bit in a new process,
+with another matching SRAM export. The replay uses the exact
+November 24 Z10 ROM, SHA-256 `86f25892cb127bcd325c954e02d9ae5aa3122635901c167a74b85ff569109105`.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Four road Cannons and fresh HOME | `f64908f8d2f4ac9e524dcf5ea3332dc42d166b1871c224c4f5cd6e5b195ce04a` |
+| Drone approach and fresh HOME | `4cf7d91095111c1a5328e0569c70f7b7c6eea19b738945b70ee2cc75374044ed` |
+| Formation dialogue and active countdown | `b32608e1bae794bdab80641345395ba6cdbfc7b40174414fee2061db9d0271a6` |
+| Countdown expiry and crystal appearance | `d86914c1c6b44abf7ecd1a3cf32e295cdf02076f536478e7d55e20ec907303c8` |
+| Crystal appearance SRAM and fresh readback | `3bb1ce0c14757203879b6d6064987564ead7246d7ed45c62cfb8eb4744bd9b71` |
+| Road escort and crystal return | `80e29168104811bd7ed1208aebc7e8ae243ae386709a9f717aacd9c9c216bd83` |
+| Victory SRAM and fresh readback | `a7c026b062dfa0a3db2f0de09d04b3bdb4073970663cca1159fc4530652cfc68` |
+| Victory, next mission and fresh HOME | `5753d84fc7dba773bce47c83269982463ccdabb003076ab27f6be53f89e6980d` |
+| Z10 live SRAM and fresh readback | `7ca9c39810ed6171def425da2d225ccbfafd9e8fa9d93b842d992c42287c1eb8` |
+
 ### Opening frame cost
 
 Three independent 120-update windows use neutral buttons after

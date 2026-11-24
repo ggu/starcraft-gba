@@ -101,9 +101,12 @@ The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
 
 The [Terran chapter 5 victory](#terran-5-victory-and-fresh-home)
-adds the last Terran chapter through a staged controller replay.
+adds the last Terran chapter through a staged controller replay. The
+[Zerg chapter 9 victory](2026-11-13-z9-normal-physical.md#road-assault-crystal-return-and-victory)
+delivers the crystal through a cleared road and restores RESULT from HOME.
 Victories with fresh SRAM readback on the installed package now cover
-26 of 30 chapters: all ten Terran, all ten Protoss, and Zerg 1 through 6.
+27 of 30 chapters, including all ten Terran, all ten Protoss, Zerg 1
+through 6 and Zerg 9.
 
 ### Protoss and Zerg victories
 
@@ -873,6 +876,12 @@ with the two mission objectives. Advancing past the final
 briefing opens the playable map and Raynor's opening dialogue
 in a fresh-process replay. The FlashRAM export still matches
 the post-victory journal.
+
+A separate fresh native replay from the nine-Marine save reproduces
+the final victory frame byte for byte. Thirteen of fifteen captured
+frames agree across the two runs. This replay ends on the result
+screen with the input and output FlashRAM identical. The local
+manifest has SHA-256 `9ff9b0386480d3b6f8376375066139798bfa6b04ba830e746ae6fc4349735296`.
 
 A read-only replay of the full GBA Wasteland input tape observes
 the matching 150-mineral charge, from 463 to 313, when the
