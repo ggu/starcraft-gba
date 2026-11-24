@@ -446,6 +446,9 @@ sc64_tile_background_done:
     draw_death_vfx(0);
 #endif
     draw_tracers_pass(1);
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_flash_draw();
+#endif
 #if defined(SC64_SHARED_NUKE_PROBE) && !defined(SC64_WORLD_DEPTH)
     race_nuke_draw();
 #endif
