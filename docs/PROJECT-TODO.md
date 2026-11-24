@@ -1736,9 +1736,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all three race ROMs. Recover or replace the missing Z1 input tape
   for an exact-package win. The earlier Z1 pause and victory journals
   both load on the installed Z10 through HOME and export identical SRAM.
-  The fixed-input continuation buys a Drone, completes an Extractor
-  and collects its first gas. Continue from that verified branch to
-  Hydralisk production and the mission result.
+  The fixed-input continuation buys a Drone, completes an Extractor,
+  collects gas and builds a Hydralisk Den. Its completed-Den save
+  reloads in a fresh process. A paid Overlord restores the supply
+  cap, but the Den falls before it hatches. Protect the Den through
+  supply recovery, then verify Hydralisk production and the result.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

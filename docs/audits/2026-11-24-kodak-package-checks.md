@@ -182,6 +182,26 @@ the recorded inputs to reproduce the terminal world fingerprint,
 60 units, 19 buildings, and player resources of 218 minerals and
 8 gas. This is a continuation from the earlier pause journal.
 
+The first Den placement is refused with the in-game "No gas"
+message. After the bank reaches 56 gas, the same build command
+sends a Drone to the snapped site. The build pays 100 minerals
+and 50 gas on arrival and consumes the Drone. Construction is
+visible by frame 5,271 and complete at frame 6,071.
+
+An independent run replays 5,418 physical updates from the earlier
+pause to the completed Den, with the terminal world fingerprint
+matching and the Chrysalis alive. It pauses and saves on the
+installed Z10 at frame 6,071. A fresh process restores the same
+world, exports byte-identical SRAM and advances to frame 6,079.
+
+A longer continuation restores enough gas to train a Hydralisk,
+but the first order is refused at the supply limit. The Hatchery
+then pays 100 minerals for an Overlord. It hatches by frame 8,034
+and restores capacity from 2 to 18. The Den is destroyed before
+then, and the next Hydralisk request is refused for a missing
+prerequisite. The validated opening needs the Den defended through
+supply recovery to advance to Hydralisk production.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -620,6 +640,9 @@ quality on the GBA SP.
 | Zerg chapter 1 previous-version pause and victory journal loads | `855aac8e466c4b7fa0266a0150dff9ba86420ae3dd746836cc6246881587a3c5` |
 | Zerg chapter 1 worker production and first gas from earlier pause | `ab38f823f63fefd21938bb7cc2fdf1df7b1d0a1efe016ecac6dad235c7243c81` |
 | Zerg chapter 1 independent fixed-input continuation | `4f5eee2586d2a301cd8c25ea701f24346e2b99eafd85a72680d116b1475a774f` |
+| Zerg chapter 1 paid Hydralisk Den from the earlier pause | `58d5cd1704e6badfa09cde17168fc1abd9b098bbd8bf191c4ab27900d1724cce` |
+| Zerg chapter 1 completed Den, new pause journal and fresh load | `7955f55008dff0fb8df79d35c6d26ad91c9205155ffbd1474c02fff25f54f5c3` |
+| Zerg chapter 1 Overlord hatching and Den loss | `b61993ff8441be3c34eaa209b4343522941ca4c30ff3a27745148ab4eb3ce7e3` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
