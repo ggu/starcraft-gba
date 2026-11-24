@@ -149,6 +149,27 @@ Pylons and unsupported owners. This is a local source
 experiment. Verify stack, full-frame cost and saves across
 low- and high-Pylon production workloads before adoption.
 
+### Shared build option
+
+`CANONICAL_DEFENSE_PYLON_BUCKETS=1` selects the adaptive
+lookup in a paired Terran, Z10, P10 and Showcase build. The
+option defaults to zero. Changing it invalidates the four
+ELFs through the existing combat configuration stamp.
+
+The authored ARM fixture rerun with the shared header's
+actual lookup matches all eight result masks and repeats
+80,203 to 41,838 cycles at `-O2` and 106,011 to 52,561 at
+`-Os` in the dense case. The caller and lookup together
+use an additional 40 and 48 bytes of stack, respectively.
+Separate sanitizer runs each match 153,600 scalar power
+queries with the compact and wide coordinate types.
+
+Before enabling it in the release builds, compare complete
+frame costs, stack margins, replay state and fresh saves
+in dense Z9/Z10 fights and sparse campaign, Showcase and
+Custom Game cases. The fixture measures the lookup and
+roster setup only.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Opening launch and fresh HOME | `6e76e7e22d0a4f5cdcfb0070d750df11b5973a92a6487bfa37ea3ff4aabbc4be` |
@@ -160,3 +181,4 @@ low- and high-Pylon production workloads before adoption.
 | Authored paired power-bucket timing | `65374ac4e3f78acdf8c979d3aa21751ed43751d648ba4a929d7c0844b794a971` |
 | Authored paired adaptive power-bucket timing | `c08867d3ba536ce6bf1f02422f9248be4076e726e1ade947270e6e34801885a1` |
 | Adaptive power-bucket sanitizer result | `e054e695d0dbe8d87f4d5d60bbac30309a6507a1607714154162e04ba2c070b2` |
+| Paired timing for the shared source | `ecfa4b1b70829b96c70fec8214372558cdfbf93e27b99122d6a03aa9140e1b5c` |
