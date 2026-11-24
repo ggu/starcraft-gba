@@ -117,6 +117,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   uncached contact masks. Terran Blood Bath also spends about 81k
   direct cycles in the monotone route probe. Pair those workloads
   separately and keep both maps in the actor and effect draw tests.
+  The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
+  finds only seven redundant crops across 48 updates. On Outpost the
+  base projectile pass takes 39.6–64.7k cycles per update across the
+  three race cartridges. No sampled tracer draw has a ground depth layer.
+  Profile motion and raster work with the merged FOLLOW viewport
+  cull in the fixed-camera cut and a visible holdout. Retain the
+  current ground-trail picker until a measured workload exercises it.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
@@ -1768,7 +1775,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   respectively through frame 19,288. The branch has only the two
   heroes and still needs a full win. A direct approach also enters
   the recruitment zone, where Kerrigan dies before reinforcement.
-  Preserve enough of the allied force for a protected approach.
+  An earlier checkpoint and three short escort waypoints preserve both
+  heroes and seven Marines at full health through frame 13,603. The
+  fresh [escort journal](audits/2026-11-24-kodak-package-checks.md#terran-chapter-5-input-divergence)
+  advances eight of the nine units. Advance the escort through
+  additional short waypoints and verify recruitment at the rebel base.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.
@@ -1817,9 +1828,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the cargo. The [Z6 ferry and assault replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-ferry-and-mainland-assault)
   unloads her on the island at full health. A later fresh save
   retains 25 Hydralisks near region 4. Reinforced attacks clear
-  the region by frame 63,540 with Kerrigan at full health. Defeat
-  the Force 2 defenders in region 5 and verify victory. The T5
-  completion replay also remains open.
+  the region by frame 63,540 with Kerrigan at full health. The
+  [region 5 replay](audits/2026-11-24-kodak-package-checks.md#region-5-storm-attacks-and-evacuation)
+  cuts the defending army from 67 to 30 with paid Storm casts
+  and evacuates Kerrigan. A fresh continuation rebuilds a
+  30-Hydralisk force. After another ferry and two more Storms,
+  the fresh frame-130,610 checkpoint keeps Kerrigan on the island
+  at 400 HP and all 30 Hydralisks, with 26 defenders and 14
+  buildings left in region 5. Defeat that force and verify victory.
+  The T5 completion replay also remains open.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)

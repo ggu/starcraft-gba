@@ -560,6 +560,34 @@ clearance and the victory journal remain open.
 An independent replay matches both final controller segments and their
 SRAM journals.
 
+#### Region 5 Storm attacks and evacuation
+
+After region 4 clears, paid production stages 21 Hydralisks. The
+surviving advance reduces region 5 from 19 structures to 14.
+The Overlord ferries Kerrigan back to the cleared mainland, where
+she cloaks and casts Psionic Storm. Three pairs of paid casts across
+three sorties reduce region 5 from 67 living units to 30 by frame
+109,548, including reinforcements during the last recharge. Kerrigan
+retains 400 HP through the attacks.
+
+The Overlord then evacuates Kerrigan to the island at full health.
+At frame 113,206 the fresh save has 32 hostile units and 14 buildings
+in region 5. Protected production rebuilds the force to 30 paid
+Hydralisks by frame 121,460. That save reloads through HOME with
+Kerrigan at 400 HP, region 4 still clear, and 37 hostile units and
+14 buildings in region 5. A separate controller replay from frame
+63,540 matches the world fingerprint and SRAM bytes of all 12
+checkpoints. The terminal journal also exports byte for byte after
+an independent HOME load.
+
+A further ferry and two paid Storms reduce the region 5 army
+from 37 to 24. Two reinforcements arrive during the evacuation.
+The frame-130,610 journal restores Kerrigan on the island at
+400 HP, all 30 Hydralisks, and 26 hostile units and 14 buildings
+in region 5. Six more independent controller stages match their
+worlds and SRAM. The final HOME load also exports identical SRAM.
+Region 5 clearance and victory are open.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -708,6 +736,17 @@ inside the base-entry rectangle, and she has 118 of her earlier
 any observed recruitment. The existing fixture allows up to 2,400
 updates for its delayed sequence. This attempt did not establish
 a safe approach or dwell window for it.
+
+An earlier branch at input call 8,000 preserves seven Marines and both
+heroes at full health at frame 10,093. A long group order to (200,700)
+stalls through 1,000 updates. Ordinary L-box selection and three shorter
+ground orders to (110,590), (180,540) and (260,500) advance the escort.
+At frame 13,603 six Marines and both heroes are between (229,496)
+and (255,516). One Marine stalls at (190,534). All seven Marines
+retain 40 HP, Kerrigan 300 HP and Raynor 250 HP. The bank stays
+at 300 minerals and 300 gas. Independent HOME reload restores the
+frame, every observed friendly actor field and the exact SRAM bytes.
+Recruitment and victory are open.
 
 ## Custom Game saves
 
@@ -970,6 +1009,40 @@ occurs at most once within a sampled update. The late cut also
 draws 164 packed sprites across 3,251 rows. These counts provide
 workload sizes for synthetic renderer and collision tests.
 
+### Sprite crop and projectile draw calls
+
+Read-only call/return traces cover frames 11,002–11,009 on each
+race cartridge and map. The 48 fixed-camera cuts match the
+ordinary runs on world, both framebuffer pages,
+palette, camera, display, phase counters and elapsed cycles.
+
+The renderer makes 18 exact unit crop calls. Seven are repeated
+successful checks on the same unit between painter admission and
+body drawing. The repeats cost 11,028 cycles across the 48 cuts,
+with six of the seven on Zerg 10 Blood Bath. A separate eight-update
+Protoss 7 cut after frame 48,426 makes zero exact crop calls. That
+run matches the retained frame-48,426 world and video and the
+frame-55,892 victory state and video. It covers one camera position.
+A cache for repeated exact crops has little payoff in these cuts.
+
+| Cartridge | Outpost tracer calls/update | Outpost tracer cycles/update | Blood Bath tracer cycles/update |
+| --- | ---: | ---: | ---: |
+| Terran 10 | 55.6 | 50,801 | 0 |
+| Zerg 10 | 62.3 | 78,069 | 3,059 |
+| Protoss 10 | 57.8 | 55,215 | 6,408 |
+
+The base projectile-only pass accounts for 39,563–64,678 cycles
+per Outpost update. It spends more cycles than the attacker-image
+calls or the split trail passes on each race cartridge. None of
+these calls collects sorted ground-trail picks. A separate readback
+of each sampled draw slot finds only layers 5 and 19, above the
+ground-layer world-Y projection. Both proposed reuse paths have
+zero covered draws here. This package predates the [FOLLOW
+viewport change](https://github.com/ggu/starcraft-gba/pull/782).
+Profile the current source's base projectile motion and raster
+work at this fixed camera position and after an ordinary-input
+pan to the visible fight. These are mGBA guest-cycle observations.
+
 ### Paired ARM replay of observed route queries
 
 A repeat of the 96-update Terran Blood Bath cut records the ordered
@@ -1078,6 +1151,10 @@ quality on the GBA SP.
 | Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
 | Three-race frame-budget breakdown | `336e4cfc4cf66286f99b97ec10166c29bdb38c3b6e6cf6861396dd166e372bbe` |
 | Three-race order and drawing instruction attribution | `fae6f5e019544c8bd74587010652717b685c93afbbc05f5bb31babea211e9874` |
+| Late three-race exact crop calls | `71c00f4b93bd65b4f32f7ad80db1a516ec7fc8487b25bf24bc50ef50b7a9c207` |
+| Protoss 7 late exact crop calls and victory | `1a716f7f8c938d9b8a1945c068c94a9d8c0bcaeeb059cd294028ca07a9d9e18f` |
+| Late three-race tracer draw calls and timings | `e3ec7ca92ca312e0417034da49f19079826ce2faa992b3e0581621601b275ad6` |
+| Late three-race tracer depth readback | `90963fb5bb184ef515bf078de40366c193d459e6fdf1437dff11754a4d67f9eb` |
 | Monotone point-route search outcomes | `f301862e71f5c4b52fba25cf93bc89f95b4ef769cd5952fa43553fc1db6fc43e` |
 | Terran Blood Bath exact endpoint repeats | `36e893debf67f5f26106a8fdbbc97af360742faabe3ff995e65e99af19773067` |
 | Terran Blood Bath calls that continue an earlier route | `1544bbbd940e70a3d4d964ffc0d6a28a715ed8c2e70da36f1f76d20da643676c` |
@@ -1102,6 +1179,9 @@ quality on the GBA SP.
 | Terran chapter 5 Kerrigan staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
 | Terran chapter 5 both heroes healthy at frame 19,288 | `abd770a652624759162b89b7f73a5f5b07fd1723991baa5a8f7e5dda366dfee5` |
 | Terran chapter 5 direct recruitment approach | `c3dc75496ad1a132b8167009000f52b0a81e11f7306ba9c4921b2a66d24862bb` |
+| Terran chapter 5 seven-Marine early checkpoint | `11bb068c5d26f5dd67c45b311099e5bdf8a27b2601c68ddb6d03bfaab4c8786c` |
+| Terran chapter 5 short escort waypoints, frame 13,603 | `ecdfc1cbd05edfd866f9206329846f730980b5556da8cc62136c32b6ffe078e4` |
+| Terran chapter 5 escort fresh HOME reload and SRAM readback | `c4c78410820830d55d0de4e9d35dbeef53a41246f471612e8cbcd8fd8cad2336` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -1145,6 +1225,10 @@ quality on the GBA SP.
 | Zerg chapter 5 victory readback and Zerg chapter 6 deployment | `f3411d20910da9f646bf692ad390db1ef8908a6fb65b4bbadb0475a0b30cfdcd` |
 | Zerg chapter 6 paid Lair and fresh readback | `11cd5eff2a143bb1919d47f31791250182e73b14e5c3a6a03ac2350470686c1b` |
 | Zerg chapter 6 paid Extractor, first gas and fresh readback | `4a60c576ac69a5bcbee6fe2782063b74963e006a82d0ca792087987533c6ef86` |
+| Zerg chapter 6 independently replayed region 5 buildup, Storm and evacuation | `0552fb2ccd653f7af25f6f7f530c6ea18e7629d2b88136364a0974c92a02a931` |
+| Zerg chapter 6 second ferry, further Storms and safe return, six-stage independent replay | `14923c08c5e52518cbfa7c33cf2e49eef3f2953bdd1424b9f74d05cf93cba298` |
+| Zerg chapter 6 frame-130,610 fresh terminal census | `32f8f2944e2b88118473bb5b21c4ee48df4ebb37a5872bd718a011b9c837b156` |
+| Zerg chapter 6 fresh terminal region 5 and army census | `5229b39b62dbe14eff9dd34b8a007659f05983bf58af9831831859439d9017e3` |
 | Zerg chapter 6 independent four-stage opening replay | `94edc6c57c802767d1dbe0ba180efc349829947e60d9bbb606decb683051b7d4` |
 | Zerg chapter 6 paid Ventral Sacs and fresh readback | `04ffdd063ccf3d5b3176de0bb24ae2f3c8839d08c988a32c06132182a5e24a0d` |
 | Zerg chapter 6 ordinary boarding and fresh readback | `0f995723b88ab792ed1b3a50929ed2c19574d016026bfffb47689aca07ed3a6c` |
