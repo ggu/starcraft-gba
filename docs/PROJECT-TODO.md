@@ -81,11 +81,6 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 552 guest cycles for five minerals and two geysers in an
   authored ARM batch with the production heap. Measure the same
   change with imported sprites and the full actor roster.
-  [Packed sprite row setup](audits/2026-11-24-packed-sprite-row-stride.md)
-  saves 2.04–7.91% in authored drawing batches with matching pixels.
-  The exact Protoss 10 late sample draws 164 packed sprites across
-  eight updates. Verify shared frame timing and the four complete
-  links before attributing a cartridge frame-rate gain.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
@@ -126,7 +121,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pixels and state. The three Outpost matches use 0.33–0.42% more
   cycles and the P10 campaign tail is flat. Keep the trial out of the
   regular builds while reducing the unaligned and mixed-opacity
-  cost. The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
+  cost. [Packed sprite row setup](audits/2026-11-24-packed-sprite-row-stride.md)
+  saves 2.04–7.91% in authored drawing batches with matching pixels.
+  The exact Protoss 10 late sample draws 164 packed sprites across
+  eight updates. Verify shared frame timing and the four complete
+  links before attributing a cartridge frame-rate gain.
+  The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
   saves 1.19% over the same visible fight and 0.16% on the P10
   victory tail. Five long Custom Game pairs improve slightly and the
   sixth stays within 0.003%. All 48 ordinary save/reload cases pass.
