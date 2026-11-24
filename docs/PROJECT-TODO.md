@@ -132,6 +132,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   of those calls. The [paired host dispatch check](audits/2026-10-29-monotone-route-step/README.md#retaining-successful-path-prefixes)
   matches 642,890 route-state samples. Check integrated race-ROM
   frame timing and linked memory before enabling the cache.
+  The [full observed point-dispatch trace](audits/2026-10-29-monotone-route-step/README.md#route-dispatcher-chronology-in-late-terran-blood-bath)
+  captures 381 calls and a stable field pool. The conditional ARM
+  replay matches outputs and cache counters with the observed clock
+  and age inputs and uses 61.16% fewer cycles. Thirty-seven of 96
+  update groups cost more. Measure whole-frame peaks and replay the
+  grid and route-slot lifecycle in a paired game loop.
   The 99 new endpoints that continue an earlier path account for
   7.07% of loop cycles. Verify reuse with the existing route-slot
   precedence, aging, and grid invalidation before activation.

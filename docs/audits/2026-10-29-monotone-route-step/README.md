@@ -323,3 +323,45 @@ actual witness hits per configuration. Runs with sustained long
 movement exercise reuse more often. Whole-cartridge qualification
 remains open. The host receipt SHA-256 is
 `933881e9bef623dc2c1667c36124883053753ab67d48b366dbebe7aa8fe3009c`.
+
+### Route dispatcher chronology in late Terran Blood Bath
+
+Two read-only captures of the exact November 24 Terran cartridge
+recorded all 381 point-route dispatcher calls during the 96-update
+window beginning at update 11,000. The captures matched the plain
+control at each update on sampled world state, both display pages,
+palette, camera and elapsed guest cycles. All calls succeeded and
+used 9,924,632 guest cycles in total. The 104 route-field hits
+advance the route clock. The other 277 calls match the independently
+captured monotone origins, goals and returned cells in frame order.
+
+The capture retains the initial 64×64 packed grid, the 14 logical
+slots and the 86,016-byte pool of 48 physical fields. The full
+pool hash is constant at all 762 before-call and after-call
+boundaries. Between successive calls, 133 transitions change the
+recorded route clock, slot ages or hit count outside the point
+dispatcher. No slot topology change appears in those observations.
+
+A conditional paired ARM replay restores the initial pool,
+relocates its pointers and applies the captured clock, slot ages,
+hits and builds before each call. It retains candidate prefix
+entries between calls. Both variants match all 381 returned
+coordinates, status values, post-call clocks, slot ages, hits
+and build counts from the installed cartridge. The fixture uses
+the non-inlined ARM dispatcher in IWRAM at `-O2`.
+
+Guest cycles inside the timed call boundaries drop from
+7,255,012 to 2,817,726, a 61.16% reduction in the fixture.
+Thirty-seven of 96 per-update groups still cost more, with a
+maximum increase of 4,813 cycles. The fixture uses selected
+release flags and stand-ins for unrelated routines. It applies
+metadata snapshots from the original interleaved activity
+outside the timed region. A paired full game loop is still needed
+to qualify frame timing and linked memory across the cartridges.
+
+| Local capture | SHA-256 |
+| --- | --- |
+| All point-route dispatcher calls | `001e144d4d336358f0b669b9db114d87cce689fa599f3fb65cd2b6920c414bfc` |
+| Initial private route state | `f7bc3f46b18cfac42da2e931c9847fb94b4f99d68d6f74699da87a878e40cae6` |
+| Full route pool boundary checks | `1257bf6e413e9910056b1f62a1da3e2d518aad49312dbdc6a219ed03854385c7` |
+| Paired ARM dispatcher replay with metadata checks | `7428bbfe88b54f0362dfa794555d2150d8c56019f734765819ea5746bda010ad` |
