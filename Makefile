@@ -6180,3 +6180,4 @@ include mk/sc64-nuke/Makefile
 include mk/native-melee-starts/Makefile
 include mk/skirmish-controller/Makefile
 include mk/monotone-clear-prefix/Makefile
+include mk/padded-impact-save/Makefile

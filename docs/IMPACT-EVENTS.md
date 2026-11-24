@@ -183,9 +183,35 @@ The previous ROM also loads the fixed ROM's completed journal.
 All four production HOST vectors also pass win and loss cases with a full
 32-row live queue. Z10 and P10 continue to reject an oversized active save.
 
-Real play stays well under these limits. In the T10 replay and in neutral
-three-bot skirmishes, at most 4–6 impacts were pending at once; only the
-constructed 48-unit stress battle reaches 29–30.
+The T10 replay and neutral three-bot skirmishes had at most four to six
+pending impacts. The 48-unit stress battle reaches 29–30. The November 24
+Z10 chapter 3 replay also [reached 12 during normal play](audits/2026-11-24-kodak-package-checks.md#zerg-3-early-economy),
+which exceeded the installed cartridge's eight-row active save limit.
+
+### Full-queue journal candidate
+
+The opt-in `SC64_BUILDING_PAD_IMPACT_SAVE` codec targets the standard
+16,296-byte packed worker and transport layout. Records with zero to
+eight impacts keep the existing encoding. For nine to 32, the first
+140 bytes of the ordered impact body occupy the seven unused high bits
+in each of 160 packed building rows. The tail before the existing
+16-byte transport trailer holds the three-byte `IPB` marker, an event
+count, and any remaining body bytes. At 32 events the tail is 56 bytes,
+and the record payload is exactly 16,368 bytes.
+
+The reader checks the current version, count, exact record length and
+zero padding outside the body. It decodes the ordinary event rows and
+clears the building padding before world validation. An older reader
+can still use an intact earlier record that it understands. It cannot
+read the new packed record.
+
+`make test-sc64-padded-impact-save` checks every count from nine to 32,
+exact event order and building-field preservation, and rejects malformed
+records under ASan and UBSan. The option remains off in normal builds.
+Before promotion, qualify a linked game build with exact prepared inputs,
+the existing campaign and custom saves and their normal HOME continuations.
+Layouts with typed projectile journals require separate capacity and
+compatibility checks.
 
 ## Memory
 
