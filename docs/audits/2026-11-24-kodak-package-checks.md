@@ -87,8 +87,10 @@ A third process loads the victory and re-exports identical SRAM.
 
 P8 wins at frame 104,113 after 106,011 physical calls. All 40
 observations match, and the fresh HOME continuation restores the
-frame-30,949 pause save. The run records the victory on the live
-result screen and includes the pause journal.
+frame-30,949 pause save. A second continuation from that same pause
+journal exports a victory journal. A fresh HOME process restores
+the terminal mission and world and re-exports byte-identical SRAM.
+Both journal slots validate and the pause bank stays identical.
 
 The manifest also pins both retained
 [Protoss finale receipts](2026-11-13-p9-normal-home.md).
@@ -157,6 +159,14 @@ the saved and restored lobby, game type, seat masks, resolved starts
 and world state, then compare the resumed world with uninterrupted
 play. There are 24 Free for All cases across both maps and 12 Blood
 Bath Melee cases, spanning one, two and three CPU lineups.
+
+Six later matches also pass across the three race cartridges and
+both maps. They save after 11,000 updates with Terran, Zerg and
+Protoss CPUs active. The saved worlds contain 120–156 living
+units and 45–58 buildings. A fresh HOME load restores the lobby,
+game type, seats, starts and persisted-world fingerprint in each
+case. The fingerprint 180 updates later matches the uninterrupted
+run, and readback preserves the full 32 KiB journal byte for byte.
 
 ## Three-CPU cartridge pacing
 
@@ -238,6 +248,7 @@ workload sizes for synthetic renderer and collision tests.
 | Check | SHA-256 |
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
+| Late three-CPU Custom Game saves across both maps | `e79983735242bb069af925993797d8c7e8edba8b2f715eab29432e6dc0bbdaa2` |
 | One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
 | One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
@@ -263,6 +274,7 @@ workload sizes for synthetic renderer and collision tests.
 | Protoss chapter 6 full run and fresh loads | `fe85625beb73116126eecb82bc244a3d6328fee40ce881f3ee67e89191ef2974` |
 | Protoss chapter 7 full run and fresh loads | `54d8fd3811c16883ad7bbd0c0991240a8e80737af43d282e8c2b62bcc1a548d0` |
 | Protoss chapter 8 full run and fresh pause load | `5e74681fbd24e824a60d4ea3a8d9cc02ac854177c69afd7ada032bab79c0c458` |
+| Protoss chapter 8 victory journal continuation and readback | `c0a3a95e628bb675fd64f64a0682b658af78fe8bf2305a812cb9928e426ae1ce` |
 | Protoss chapter 9 full comparison | `93151835a97657694c868c183a81ec82aac9f41c9ff1ee49af472e299761f48c` |
 | Protoss chapter 10 full run and fresh loads | `a018c1ee1cc0fd42631ae5a91101db087adf0466f680ea532e0115ce556d0605` |
 | Showcase scene starts | `5ceefdcea04deea53c7d5795810dbef47e3873b33415449528b668e5d8e34029` |

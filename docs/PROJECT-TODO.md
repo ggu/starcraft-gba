@@ -1675,13 +1675,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   verify 1,134 normal-button Custom Game launches spanning both
   maps, every player race and every explicit one-to-three CPU
   lineup. All 30 campaign entries and eight Showcase scenes start.
-  Thirty-six Custom Game fresh saves load and match continuation.
+  Thirty-six early Custom Game fresh saves load and match
+  continuation. Six late three-CPU saves on both maps and all
+  race cartridges also match uninterrupted play for 180 updates.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
   Z2, P3 and P5–P10 also have exact-image wins and fresh save
   checks, for 17 of 30 missions overall. An ordinary T5 retreat
-  keeps Raynor at full health
-  through frame 129,658. Local box selection moves Marines with
+  keeps Raynor at full health through frame 129,658. Local box
+  selection moves Marines with
   both heroes excluded. The mission still needs an active route
   from that branch through all victory conditions.
   The same audit records fresh N64 reset replays of the two-slot
