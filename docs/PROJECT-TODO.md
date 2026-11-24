@@ -131,10 +131,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   improves the panned P10 loop mean by 8.16% with matching pixels
   and world, while the fixed mean is flat and its p95 rises 0.45%.
   [The shared renderer draft](https://github.com/ggu/starcraft-gba/pull/823)
-  passes the authored ARM differential. Qualify the current race
-  and Showcase links, with mixed fog, ordinary controller
-  continuations and the existing memory guards. Busy fights remain
-  over budget.
+  passes authored ARM and Mode 0 host differentials. The retained
+  P10 [Blood Bath and save holdouts](audits/2026-11-24-kodak-package-checks.md#blood-bath-holdout-and-late-skirmish-journals)
+  are flat on timing, match the selected scanout, and reproduce both
+  maps' late saves and 180-update continuations. Qualify the current
+  race and Showcase links with mixed fog and the existing memory
+  guards. Busy fights remain over budget.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
@@ -1851,8 +1853,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   moves Kerrigan across the island trigger and wins at frame 177,044
   with 400 HP. The victory reload is byte-identical and Z7 deploys
   through HOME. The installed package has 25 of 30 verified wins.
-  Finish T5 and Z7–Z10 on this package, and qualify deeper
-  checkpoints and GBA SP timing.
+  The [Z7 guarded opening](audits/2026-11-24-kodak-package-checks.md#zerg-7-guarded-opening-and-production)
+  completes a full-health Hatchery, then the Pool, Lair and Den.
+  Verify a local gas supply and the objective. The T5 escort
+  is safely staged north at frame 14,692 with both heroes and
+  seven full-health Marines. Finish T5 and Z7–Z10 on this package,
+  and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
@@ -1864,8 +1870,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   load from a separate save continues mining with no new order
   and identical FlashRAM. The installed GBA cartridge also completes
   two full-health SCV deliveries and resumes mining from a fresh HOME
-  load with matching SRAM. Compare native Barracks placement, Marine
-  production, victory and the next mission unlock.
+  load with matching SRAM. The [Barracks comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-barracks-construction)
+  observes the 150-mineral charge on both systems. The native
+  construction resumes after a fresh load and reaches the infantry
+  prompt. GBA trains five Marines at 50 each and wins. Verify native
+  Marine production, victory and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
