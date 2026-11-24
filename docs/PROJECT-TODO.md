@@ -69,6 +69,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   occupied row. Authored ARM batches save 0.7–7.8% across the
   speed- and size-optimized query builds. Measure the change during
   a full busy battle before attributing a frame-rate gain.
+  The [row-local column trial](audits/2026-11-22-steady-order-cost.md#column-masks-per-occupied-row)
+  slows compact crowds and every 32-query rebuild batch. Keep the
+  shared masks and measure the real query count and actor spread
+  before revisiting this design.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have

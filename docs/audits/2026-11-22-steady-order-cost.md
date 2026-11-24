@@ -144,6 +144,41 @@ measurements are still open.
 | Size-optimized ARM timing output | `6bcfabd71d31135cb3fca7f5714d8eba990190f9c1e67877aac796af9222c3f6` |
 | Authored host differential runner | `ae763c1c6b53f62c2fe31bede694e7df354cfa67b50fb2e7a12f9ba9d1e1af56` |
 
+### Column masks per occupied row
+
+A separate prototype records one column mask per owner and row.
+The first insert into a row initializes its mask before publishing
+the existing owner row bit. Later inserts add columns, and a move
+can leave a harmless set bit until the next rebuild. This adds 640
+bytes with 32 rows and avoids clearing those bytes every update.
+The query still visits owners, rows, columns and entities in the
+same order.
+
+The authored ARM fixture measures one bulk owner-list rebuild with
+208 generated actor slots, followed by a fixed query batch. Every
+query answer hash matches across the four layouts and three batch
+sizes. The initial 2,048-pixel case includes the cold index clear.
+Positive values in the table mean more total guest cycles.
+
+| Actor placement span | Search radius | 32 queries | 64 queries | 128 queries |
+| ---: | ---: | ---: | ---: | ---: |
+| 2,048 | 90 | +1.28% | −1.81% | −5.24% |
+| 1,024 | 64 | +6.89% | +1.05% | −2.82% |
+| 512 | 90 | +5.01% | +2.92% | +1.40% |
+| 128 | 64 | +1.12% | +1.34% | +1.48% |
+
+The compact layouts either saturate the row masks or save too few
+cell-head reads to offset the extra work. The engine keeps the
+existing global owner masks. A real battle census would need to
+measure how many queries share a rebuild, actor spread and memory
+headroom before another implementation trial.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| 32 queries per owner-list rebuild | `91662429023d8272171d1408745834c0684ef7a138db78f4e848a111a5f9ada3` |
+| 64 queries per owner-list rebuild | `c84fbb278f08b02e63916a2d7ea07b92292be4fc296516a8b6fe573624f0583a` |
+| 128 queries per owner-list rebuild | `a0e88d06f7c238c513e8acc8896eaca71232d75a38d28e16b810d2539de59614` |
+
 ### Walk direct corridors by grid cell
 
 The direct path follows both axes until one reaches its
