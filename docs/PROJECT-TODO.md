@@ -1252,9 +1252,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   active. The [earlier defense](audits/2026-11-21-z10-current-full-circle.md#earlier-defense-and-reaver-pursuit)
   brings paid Hydralisks out before the raid. The mobile flank
   loses the mining line. The [four-Sunken branch](audits/2026-11-21-z10-current-full-circle.md#four-sunkens-before-the-raid)
-  preserves two miners during the raid and brings the Reaver
-  to 39 HP. Focus the available ground defenders while the
-  extra Sunkens are still alive.
+  preserves both miners. After a focused attack the Reaver
+  disappears, four Hydralisks survive and the Den falls.
+  Rebuild the Den and protect income through the rest of
+  the raid.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense

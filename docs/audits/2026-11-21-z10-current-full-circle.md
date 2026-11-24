@@ -138,11 +138,16 @@ fresh HOME replay re-exports identical SRAM. In a passive
 continuation to frame 7,849 the extra Sunkens and Den fall
 while both original Sunkens and both miners hold. The
 Reaver is at 39 HP in the frame-7,649 observation. Keep
-the earlier checkpoint and focus available Hydralisks on
-the approaching Reaver while the static defenses are up.
+the earlier checkpoint. In a focused continuation, the Reaver
+disappears after the attack order. At frame 8,850 two miners,
+the eastern Sunken, Pool and Hatchery survive with four
+Hydralisks and three Zerglings. The Den is destroyed and
+a hostile actor remains nearby. This supports a defensive
+continuation with workers available to rebuild.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | Four-Sunken SRAM and fresh readback | `8f3f8fcec358c7ab0e4bd2a364da7d6790fb5afb041f9eced6926f513a62a3a8` |
 | Four-Sunken HOME verification | `dcda4c3e1182f3b3407de0d200765b1757dc91769b9dde1c96b536c8e8f93ce5` |
 | Continuation through the first raid | `70cd9ffc1b5890806f011f952b0e64328001fa65a19b14288d671b3219afca44` |
+| Focused Reaver continuation | `efb10364be2a9ca47938a3c9f66488449ed2e595065f957e94a06bd8ad91e4a1` |
