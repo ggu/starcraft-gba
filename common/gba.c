@@ -1154,34 +1154,67 @@ void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r
 #else
 HOT void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)gfx_pixel(x+xx,y+yy,c);}
 #endif
-/* Sprite-heavy profiles can leave this fallback in ROM to make room for
- * clipping in the sprite compositors without reducing the stack reserve. */
-#ifndef GBA_DIAMOND_ROM
-HOT
+/* Small diamonds fit eight half-widths in one word. Compute their exact
+ * row spans at compile time and keep larger radii on the scalar path. */
+#define DIAMOND_NIBBLE(x, y, row) (((u32)(((x) * (row) / (y)) & 15u)) << (4u * (row)))
+#define DIAMOND_WORD(x, y) (DIAMOND_NIBBLE(x, y, 1) | DIAMOND_NIBBLE(x, y, 2) | \
+    DIAMOND_NIBBLE(x, y, 3) | DIAMOND_NIBBLE(x, y, 4) | DIAMOND_NIBBLE(x, y, 5) | \
+    DIAMOND_NIBBLE(x, y, 6) | DIAMOND_NIBBLE(x, y, 7))
+#define DIAMOND_ROW(y) { DIAMOND_WORD(0, y), DIAMOND_WORD(1, y), DIAMOND_WORD(2, y), \
+    DIAMOND_WORD(3, y), DIAMOND_WORD(4, y), DIAMOND_WORD(5, y), DIAMOND_WORD(6, y), \
+    DIAMOND_WORD(7, y), DIAMOND_WORD(8, y), DIAMOND_WORD(9, y), DIAMOND_WORD(10, y), \
+    DIAMOND_WORD(11, y), DIAMOND_WORD(12, y), DIAMOND_WORD(13, y), DIAMOND_WORD(14, y), \
+    DIAMOND_WORD(15, y) }
+static const u32 gfx_diamond_spans[7][16] = {
+    DIAMOND_ROW(1), DIAMOND_ROW(2), DIAMOND_ROW(3), DIAMOND_ROW(4),
+    DIAMOND_ROW(5), DIAMOND_ROW(6), DIAMOND_ROW(7)
+};
+#undef DIAMOND_ROW
+#undef DIAMOND_WORD
+#undef DIAMOND_NIBBLE
+
+#if !defined(GBA_DIAMOND_ROM) && !defined(GBA_HOST)
+__attribute__((section(".iwram"),long_call,target("thumb"),optimize("Os")))
 #endif
 void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
-    if(rx<0||ry<0||rx>480||ry>320)return;
-    if(!ry){gfx_rect(x-rx,y,rx*2+1,1,color);return;}
-    color=GFX_TILE_COLOR(color);
-    GFX_TILE_TOUCH(x-rx,y-ry,x+rx+1,y+ry+1);
-    const u16 pair=color|((u16)color<<8);
-    for(int yy=-ry;yy<=ry;yy++) {
-        int span=ry-(yy<0?-yy:yy);
-        int half=rx==2*ry?span*2:(rx==ry?span:rx*span/ry);
-        int left=x-half,right=x+half,sy=y+yy;
-        if(right<0||left>=240
 #ifdef GBA_SCENE_CLIP
-           ||(unsigned)sy-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top)
+    const int clip_top = gfx_clip_top, clip_bottom = gfx_clip_bottom;
 #else
-           ||(unsigned)sy>=160
+    const int clip_top = 0, clip_bottom = 160;
 #endif
-           )continue;
-        if(left<0)left=0;
-        if(right>239)right=239;
-        volatile u16 *dst=pixels+sy*120+(left>>1);
-        if(left&1){*dst=(*dst&255)|((u16)color<<8);dst++;left++;}
-        for(;left+1<=right;left+=2)*dst++=pair;
-        if(left<=right)*dst=(*dst&0xff00)|color;
+    if ((unsigned)rx > 480u || (unsigned)ry > 320u ||
+        x < -rx || x >= 240 + rx || y < -ry || y >= 160 + ry) return;
+    if (!ry) {
+        gfx_rect(x-rx,y,rx*2+1,1,color);
+        return;
+    }
+    color = GFX_TILE_COLOR(color);
+    GFX_TILE_TOUCH(x-rx,y-ry,x+rx+1,y+ry+1);
+    int top = y - ry, bottom = y + ry + 1;
+    if (top < clip_top) top = clip_top;
+    if (bottom > clip_bottom) bottom = clip_bottom;
+
+    const u32 spans = (rx < 16 && ry <= 7) ? gfx_diamond_spans[ry - 1][rx] : 0;
+    const u16 pair = color | ((u16)color << 8);
+    for (int row = top; row < bottom; ++row) {
+        int span = ry - absi(row - y);
+        int half;
+        if (spans) half = (int)((spans >> (4u * (unsigned)span)) & 15u);
+        else if (rx == ry) half = span;
+        else if (rx == 2 * ry) half = span * 2;
+        else half = rx * span / ry;
+        int left = x - half, right = x + half;
+        if (right < 0 || left >= 240) continue;
+        if (left < 0) left = 0;
+        if (right > 239) right = 239;
+        volatile u16 *dst = pixels + row * 120 + (left >> 1);
+        if (left & 1) {
+            *dst = (*dst & 255) | ((u16)color << 8);
+            ++dst;
+            ++left;
+        }
+        for (; left + 1 <= right; left += 2) *dst++ = pair;
+        if (left <= right) *dst = (*dst & 0xff00) | color;
     }
 }
 static const u8 font[96][7]={
