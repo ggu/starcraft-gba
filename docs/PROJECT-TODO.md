@@ -121,6 +121,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Bath also spends about 81k direct cycles in the monotone route
   probe. Pair those workloads separately and keep both maps in
   the actor and effect draw tests.
+  The [Terran witness-table pairs](audits/2026-11-24-kodak-package-checks.md#monotone-route-witnesses-on-two-current-terran-saves)
+  are flat in two-CPU Outpost and cut 1.56% of mean frame
+  cycles in three-CPU Blood Bath. Both save continuations
+  match. Measure witness hits and repeat with active orders
+  before enabling the cache.
   The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
   finds only seven redundant crops across 48 updates. On Outpost the
   base projectile pass takes 39.6–64.7k cycles per update across the
@@ -141,8 +146,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   maps' late saves and 180-update continuations. The retained pair also
   [wins Protoss 7 from a campaign save](audits/2026-11-24-kodak-package-checks.md#protoss-7-victory-from-a-saved-campaign)
   with matching sampled state and scanout and byte-identical victory
-  journals. The full replay timing is flat. Qualify the current
-  race and Showcase links with mixed fog and the existing memory
+  journals. The full replay timing is flat. The [current Terran and Showcase pairs](audits/2026-11-24-kodak-package-checks.md#projectile-fog-spans-on-current-terran-and-showcase)
+  match worlds, both render pages and Terran journals. Two
+  sampled VBlank flips happen earlier on the candidate, with
+  matching counts at the following boundary. The strongest
+  mean gain in those pairs is 0.37%. Qualify current Z10 and
+  P10 links with mixed fog and the existing memory
   guards. Busy fights remain over budget.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
@@ -1227,8 +1236,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   injured. Both tested follow-up paths lose two. Test an
   earlier ground intercept. The [worker evacuation](audits/2026-11-12-z8-normal-physical.md#evacuate-workers-before-the-eastern-reaver-reaches-the-base)
   preserves all five Drones, 19 Hydralisks and Kerrigan at
-  fresh HOME frame 72,755. Pair the escape with an earlier
-  local defense or build a second production base. The native
+  fresh HOME frame 72,755. The [replacement base](audits/2026-11-12-z8-normal-physical.md#found-a-replacement-base-without-moving-the-whole-refuge)
+  completes with four surviving Drones, then produces
+  a fifth that brings in 72 minerals. Fresh HOME at frame
+  76,885 retains the miner and both enemy Nexuses. A follow-up
+  Pool spends a Drone and the miner disappears. Defend the
+  recovered economy before restarting production. The native
   scenario permits Ventral Sacs for the alternate transport
   route. Qualify
   human Z8 research, boarding and fresh SRAM as one path.
@@ -1254,8 +1267,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   loses the mining line. The [four-Sunken branch](audits/2026-11-21-z10-current-full-circle.md#four-sunkens-before-the-raid)
   preserves both miners. After a focused attack the Reaver
   disappears, four Hydralisks survive and the Den falls.
-  Rebuild the Den and protect income through the rest of
-  the raid.
+  The [recovery](audits/2026-11-21-z10-current-full-circle.md#rebuild-after-the-first-raid)
+  rebuilds the Den, puts four Drones on minerals and starts a
+  second Hatchery. Fresh HOME at frame 15,812 has six
+  Hydralisks and the new hall at 714 HP. A two-sided raid
+  follows. Defend the new production site to completion.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
