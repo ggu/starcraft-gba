@@ -16,7 +16,10 @@ frontier_draw_terrain(int col0, int row0, int col1, int row1)
                 } else if (SC64_GRID_GET(explored, idx)) color = C_FOG;
             }
             if (run_width && color != run_color) {
-                gfx_rect(run_x, y, run_width, 16, (u8)run_color);
+                if (run_x <= 0 && run_x + run_width >= 240)
+                    gfx_fill_rows(y, 16, (u8)run_color);
+                else
+                    gfx_rect(run_x, y, run_width, 16, (u8)run_color);
                 run_width = 0;
             }
             if (color >= 0) {

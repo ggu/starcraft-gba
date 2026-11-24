@@ -36,9 +36,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   −3.75% to +4.92% with matching sampled world state. Every fixed
   and moving update still exceeds two VBlanks, so keep busy field
   and simulation costs ahead of camera-specific changes.
-  The [shared contact scan draft](https://github.com/ggu/starcraft-gba/pull/799)
-  saves 1.80% in a synthetic ARM7 traversal while matching all returned
-  masks. Qualify full race and Showcase frame timing before integration.
+  The [shared contact scan comparison](audits/2026-11-24-contact-axis-bias.md#verified-kernel-placement-and-late-battle-inputs)
+  matches all 229 masks from a late three-CPU field. The speed-optimized
+  ROM kernel uses 0.41% fewer cycles with the table and 4.06% fewer
+  with arithmetic. Retain the ARM and size-optimized comparisons.
+  Check whole-cartridge peak timing across the race and Showcase builds.
   The [shared Carrier frame roster](audits/2026-11-21-carrier-frame-roster.md)
   cuts mean Blood Bath guest cycles by 4.58% and the Outpost Run busy
   window by 3.42%. The Blood Bath p95 falls 3.69%, and the Outpost
@@ -121,7 +123,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   per update. The [paired ARM query replay](audits/2026-11-24-kodak-package-checks.md#paired-arm-replay-of-observed-route-queries)
   matches all 277 steps and five search counters. The [incremental
   search](audits/2026-10-29-monotone-route-step/README.md#incremental-coordinates-during-the-search)
-  in [PR #802](https://github.com/ggu/starcraft-gba/pull/802) also
+  in [merged PR #802](https://github.com/ggu/starcraft-gba/pull/802) also
   matches 460,800 host comparisons and uses 24.62% fewer fixture
   cycles at `-O2` for the observed calls. Qualify the full race
   runtime and its memory on both maps. The eight-entry exact
@@ -181,7 +183,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pixels and state. The three Outpost matches use 0.33–0.42% more
   cycles and the P10 campaign tail is flat. Keep the trial out of the
   regular builds while reducing the unaligned and mixed-opacity
-  cost. The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
+  cost. [Packed sprite row setup](audits/2026-11-24-packed-sprite-row-stride.md)
+  saves 6.06% of packed draw-batch cycles at `-O2` when replaying
+  the 164 sprite rectangles from eight late Protoss 10 updates
+  with authored colors and masks. Both framebuffer pages and the
+  palette match. Verify full-frame timing on the race cartridges.
+  The [combined targeting and pose index](audits/2026-11-22-steady-order-cost.md#target-column-and-crowded-pose-indices)
   saves 1.19% over the same visible fight and 0.16% on the P10
   victory tail. Five long Custom Game pairs improve slightly and the
   sixth stays within 0.003%. All 48 ordinary save/reload cases pass.
@@ -197,6 +204,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   original-art crowd with matching pixels and world state. Two exact
   ratios cost more in the IWRAM microbench. Measure fallback shape
   frequency and combined pacing on the race cartridges.
+  [Shared outlines, full-width fills and glyph drawing](audits/2026-11-24-shared-frame-borders.md)
+  cut mean emulated frame cycles by 5.74% in a fixed-camera 76-unit
+  authored skirmish and 0.92% with the battle in view and camera
+  panning, after pairing against the packed-sprite release. The
+  600-update visible pair matches state and both pages and reduces
+  two-VBlank overruns from 115 to 101. The earlier visible battle
+  changes about 14 of 105 tiles on average between uses of the same
+  page at a fixed camera. The first exact band-command trial
+  reuses 3,341 of 4,200 bands and raises whole-frame mean by 10.6%.
+  Its forced fallback also disagrees on 13 frames. Prioritize
+  cheaper contributor tracking and validate fallback before
+  offering finished-pixel reuse. Replay the race cartridges and
+  keep reducing the larger movement and painter costs.
   [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in
@@ -1730,9 +1750,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rows and starts through fresh HOME load and pause restart.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
-  Z2 and all ten Protoss chapters also win on the exact images,
-  for 20 of 30 missions overall. P4 also passes fresh field and
-  victory save reloads.
+  Z2 and all ten Protoss chapters also win on the exact images.
+  Z1 adds a verified continuation from an earlier-release pause,
+  bringing the exact-package victory count to 21 of 30. P4 also
+  passes fresh field and victory save reloads.
   An ordinary T5 retreat keeps Raynor at full health through
   frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
@@ -1748,23 +1769,28 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Wasteland opening bank and five-Marine R selection on both systems.
   [The last open CPU edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
   matches in both directions and both Blood Bath modes on N64 and
-  all three race ROMs. Recover or replace the missing Z1 input tape
-  for an exact-package win. The earlier Z1 pause and victory journals
-  both load on the installed Z10 through HOME and export identical SRAM.
-  The fixed-input continuation buys a Drone, completes an Extractor,
-  collects gas and builds a Hydralisk Den. Its completed-Den save
-  reloads in a fresh process. A paid Overlord restores the supply
-  cap, but the Den falls before it hatches. Protect the Den through
-  supply recovery. The [earlier defense branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-defended-opening-and-economy)
-  hatches a paid Hydralisk and reaches a freshly reloaded save with
-  four Hydralisks, three mining Drones and a living Den. The
-  [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
-  sustains gas delivery and reaches a frame-26,301 save with ten
-  Hydralisks and three enemy buildings destroyed. It reloads byte
-  for byte. The deeper push lost six Hydralisks. Reinforce before
-  continuing the assault and verify an ordinary victory.
+  all three race ROMs. The [Z1 victory replay](audits/2026-11-24-kodak-package-checks.md#zerg-1-victory-replay)
+  runs 17 matching ordinary-input segments from the imported
+  frame-984 pause to victory. The result reloads byte for byte
+  and the Z2 briefing opens through HOME. Recover or replace
+  the input tape before frame 984 for an exact blank-SRAM run.
+  [Z3's fresh start](audits/2026-11-24-kodak-package-checks.md#zerg-3-early-economy)
+  produces a paid economy and a Hydralisk–Mutalisk army. Its
+  first hostile turret falls by frame 12,156. The fresh save
+  keeps the 250-health Chrysalis intact and restores with
+  25 hostile buildings left. A separate staging branch reaches
+  a completed Lair and Spire, two Drones on gas, 20 Hydralisks
+  and five Mutalisks by frame 31,682. Its fresh load restores
+  the full staging force and intact Chrysalis. Build a stronger
+  air force from that checkpoint, then verify victory on the exact ROM.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
+  [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
+  reaches the base with Raynor at 270 HP through ordinary controls.
+  The first FlashRAM slot reloads at the base, and the second
+  retains the earlier crossing. Bring the five SCVs to the
+  mineral field, verify a Barracks and Marine production, and
+  qualify the native win and mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

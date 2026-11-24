@@ -6,6 +6,8 @@ This separate experimental prototype keeps a fresh emulator process for bounded 
 
 A neutral smoke and fresh Protoss custom runs exercised this bridge; see `docs/audits/2026-11-06-protoss-native-reference/README.md`. The 30-second command and 60-second cumulative idle caps require a responsive visual supervisor. An outer 180-second kill is the hard bound if the core blocks inside a chunk. Continue to inspect output, timeout behavior, fresh save isolation and input logs for each run. No audio is retained.
 
+On normal exit the bridge asks ares to save and flushes the media into the run's isolated directories. The cartridge FlashRAM file is `saves/Nintendo 64/game.flash`. Pass it to a new run with `--flash-input` to copy its 128 KiB into the new run directory, then load the slot through the game menu. The manifest records the input and output hashes and the output size. The source save remains untouched.
+
 The callback command bits are independent: D-pad Right (16) does not press C-Right (64), which is used by the observed Probe Move command. The asset-free mapping check can be compiled and run without ROM or emulator inputs:
 
 ```sh

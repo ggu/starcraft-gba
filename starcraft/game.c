@@ -12329,7 +12329,7 @@ draw_title(void)
     frontier_title_draw();
     return;
 #elif defined(SC_ORIGINAL_SKIRMISH)
-    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_fill_rows(0, 160, C_BLACK);
     gfx_rect(16, 16, 208, 128, C_PANEL);
     gfx_frame(16, 16, 208, 128, C_CYAN);
     gfx_text(38, 28, "FRONTIER SKIRMISH", C_GOLD);
@@ -12349,7 +12349,7 @@ draw_title(void)
     field_ui_draw_title();
     return;
 #endif
-    gfx_rect(0, 0, 240, 160, C_BLACK);
+    gfx_fill_rows(0, 160, C_BLACK);
     gfx_rect(15, 18, 210, 124, C_PANEL);
     gfx_frame(15, 18, 210, 124, C_CYAN);
     gfx_text(45, 32, "STARCRAFT", C_GOLD);
@@ -12542,7 +12542,7 @@ draw_hud_resources(void)
     int used = supply_used / 2;
     int cap = sc64_supply_limit(supply_cap) / 2;
 #endif
-    gfx_rect(0, 0, 240, 12, C_PANEL);
+    gfx_fill_rows(0, 12, C_PANEL);
 #ifdef SC64_HUD_ICONS
     card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
     gfx_num(16, 3, minerals, C_WHITE);
@@ -12592,7 +12592,7 @@ static void
 draw_hud_commands_body(void)
 {
     int i, n = selected_count();
-    gfx_rect(0, 121, 240, 39, C_PANEL);
+    gfx_fill_rows(121, 39, C_PANEL);
     gfx_line(0, 120, 240, 120, C_EDGE);
 #ifdef SC_COMMAND_RING
     if (command_ring_draw_hud()) return;
