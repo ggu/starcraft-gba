@@ -1744,9 +1744,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   hatches a paid Hydralisk and reaches a freshly reloaded save with
   four Hydralisks, three mining Drones and a living Den. The
   [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
-  keeps the Extractor alive through frame 15,348, restores gas
-  delivery and reaches five Hydralisks. Use that verified save and
-  protect the damaged Extractor while building toward the result.
+  keeps the Extractor alive through frame 17,345 and reaches six
+  Hydralisks. Gas delivery persists for 1,200 neutral updates and
+  the latest save reloads byte for byte. Use that checkpoint to
+  build toward the result while protecting the damaged Extractor.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

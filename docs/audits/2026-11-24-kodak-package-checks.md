@@ -263,8 +263,17 @@ Hydralisks and both workers remain alive. The Hatchery, Den and
 Extractor remain at 1,250, 814 and 123 health. Gas stays at 23 in
 that final neutral window.
 
-The chapter remains active with 40 enemy units and 14 enemy
-buildings. The retained N64 Z1 evidence covers the title and
+Starting from that save, 1,200 neutral updates increase gas from
+23 to 55. The gas worker, five Hydralisks, Den and Extractor survive.
+One more paid Hydralisk hatches by frame 17,345, bringing the force
+to six. One forward Hydralisk is down to 36 health. The Extractor
+has 123 health and the chapter remains active with 39 enemy units
+and 14 enemy buildings. An independent controller replay matches
+the terminal world and SRAM bytes. A fresh process restores the
+save and advances to frame 17,465 with all six Hydralisks, the gas
+worker and the Extractor still alive.
+
+The retained N64 Z1 evidence covers the title and
 briefing after a progress edit. A native combat comparison still
 needs an ordinary mission unlock and capture.
 
@@ -714,6 +723,7 @@ quality on the GBA SP.
 | Zerg chapter 1 replacement workers, save and fresh load | `3fd25cfa02801e85481074f0d8a37b93601e3b8db07fd4afe5123f800f621a41` |
 | Zerg chapter 1 alternate Extractor rebuild and long continuation | `bfc4527f96611a285f3e52558b3d085e08fa89b9b9383df12296cc2227a51173` / `1f427cb257d3dec0488a07bfcbba7432fe9c3112e372671c63a3637d202cd4b3` |
 | Zerg chapter 1 three early-defense saves, gas delivery and fresh load | `78b17df4800f550c6a3346ebb072365975aa9cb2f1e4ac00956204b5cfdb3004` |
+| Zerg chapter 1 sustained gas delivery, sixth Hydralisk and fresh load | `8788f3c9c8d7b24cc1f2a0e0463409dde1bddc18fa0585829f4a0d7e15968b02` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
