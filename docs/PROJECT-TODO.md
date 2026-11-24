@@ -118,11 +118,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
-  per update. Qualify the incremental search in [draft #802](https://github.com/ggu/starcraft-gba/pull/802)
-  against these longer successful searches. The eight-entry exact
+  per update. The [paired ARM query replay](audits/2026-11-24-kodak-package-checks.md#paired-arm-replay-of-observed-route-queries)
+  matches all 277 steps and five search counters. The incremental
+  search in [draft #802](https://github.com/ggu/starcraft-gba/pull/802)
+  uses 24.62% fewer fixture cycles at `-O2`. Qualify the full race
+  runtime and its memory on both maps. The eight-entry exact
   endpoint cache simulation covers at most 0.20% of loop cycles in
   the expanded Terran Blood Bath window, before cache overhead.
-  Retaining path continuations has a larger measured opportunity.
+  The opt-in [16-path continuation table](https://github.com/ggu/starcraft-gba/pull/805)
+  saves 72.11% of route-wrapper cycles in the bounded ARM replay
+  of those calls. Check full dispatch and frame timing before
+  selecting a production cache size.
   The 99 new endpoints that continue an earlier path account for
   7.07% of loop cycles. Verify reuse with the existing route-slot
   precedence, aging, and grid invalidation before activation.
@@ -1744,10 +1750,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   hatches a paid Hydralisk and reaches a freshly reloaded save with
   four Hydralisks, three mining Drones and a living Den. The
   [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
-  keeps the Extractor alive through frame 17,345 and reaches six
-  Hydralisks. Gas delivery persists for 1,200 neutral updates and
-  the latest save reloads byte for byte. Use that checkpoint to
-  build toward the result while protecting the damaged Extractor.
+  sustains gas delivery and reaches a frame-26,301 save with ten
+  Hydralisks and three enemy buildings destroyed. It reloads byte
+  for byte. The deeper push lost six Hydralisks. Reinforce before
+  continuing the assault and verify an ordinary victory.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
