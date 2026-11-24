@@ -1768,16 +1768,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and the Z2 briefing opens through HOME. Recover or replace
   the input tape before frame 984 for an exact blank-SRAM run.
   [Z3's fresh start](audits/2026-11-24-kodak-package-checks.md#zerg-3-early-economy)
-  produces a paid Drone and Extractor, assigns both resource
-  workers and reloads with the 250-health Chrysalis intact.
-  Finish the mission from this new exact-package checkpoint.
+  produces a paid economy and a Hydralisk–Mutalisk army. Its
+  first hostile turret falls by frame 12,156. The fresh save
+  keeps the 250-health Chrysalis intact and restores with
+  25 hostile buildings left. A separate staging branch reaches
+  a completed Lair and Spire, two Drones on gas, 20 Hydralisks
+  and five Mutalisks by frame 31,682. Its fresh load restores
+  the full staging force and intact Chrysalis. Build a stronger
+  air force from that checkpoint, then verify victory on the exact ROM.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
-  reaches Raynor's survival objective through ordinary controls.
-  The first FlashRAM slot reloads after the encounter, and the
-  second retains the earlier crossing. Qualify the native win
-  and mission unlocks from the stronger save.
+  reaches the base with Raynor at 270 HP through ordinary controls.
+  The first FlashRAM slot reloads at the base, and the second
+  retains the earlier crossing. Bring the five SCVs to the
+  mineral field, verify a Barracks and Marine production, and
+  qualify the native win and mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
