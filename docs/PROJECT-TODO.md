@@ -1678,14 +1678,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Thirty-six early Custom Game fresh saves load and match
   continuation. Six late three-CPU saves on both maps and all
   race cartridges also match uninterrupted play for 180 updates.
+  Twenty-seven cases with Random seats preserve resolved races,
+  rows and starts through fresh HOME load and pause restart.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
-  Z2, P3 and P5–P10 also have exact-image wins and fresh save
-  checks, for 17 of 30 missions overall. An ordinary T5 retreat
+  Z2, P1–P3 and P5–P10 also have exact-image wins and fresh save
+  checks, for 19 of 30 missions overall. An ordinary T5 retreat
   keeps Raynor at full health through frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
-  Move gives Kerrigan a destination, and she stalls at the tested
-  waypoint. A reachable route for her and a full win remain open.
+  Move near input call 22,000 stalls. An earlier order at call
+  18,000 moves Kerrigan more than 100 pixels without HP loss.
+  A reliable follow-up route and full win remain open.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.

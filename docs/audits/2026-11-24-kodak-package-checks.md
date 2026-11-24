@@ -84,6 +84,15 @@ from the GBA guest clock.
 
 ### Protoss and Zerg victories
 
+P1 and P2 win from HOME on the exact installed Protoss image. P1
+wins at frame 15,305 with 16 matching observations. P2 wins at
+frame 33,698 with 36 matching observations. Its victory appears
+five input calls before the tape ends. The remaining input is a
+neutral release, and the victory fields stay stable through the
+final checkpoint. Both victories reload in fresh HOME processes
+with the correct mission and completion bit. The re-exported SRAM
+matches the victory journal byte for byte.
+
 P3, P5 and P6 win from HOME on the exact installed Protoss image.
 Each resumes the pause save from a fresh HOME and restores the
 terminal world from a third process. Each victory journal re-exports
@@ -173,6 +182,14 @@ at 250 HP. This establishes command acceptance and isolates the
 remaining route problem to reaching that waypoint. A previous
 contextual A click on nearby ground selected another actor.
 
+The retained route puts Kerrigan at the stalled location by input
+call 20,000. A new branch at call 18,000 verifies selection of her
+slot and issues Move toward (1448,398). She moves from (1352,290)
+to (1456,383) by 200 updates and stays there through update 500.
+She keeps 45 HP and Raynor keeps 250 HP. The test establishes an
+earlier route that clears the original position. This waypoint is
+short of its target, and the mission outcome is still open.
+
 ## Custom Game saves
 
 Thirty-six early Custom Game save/continue pairs pass across all
@@ -190,6 +207,23 @@ units and 45–58 buildings. A fresh HOME load restores the lobby,
 game type, seats, starts and persisted-world fingerprint in each
 case. The fingerprint 180 updates later matches the uninterrupted
 run, and readback preserves the full 32 KiB journal byte for byte.
+
+### Random races and restart
+
+Twenty-seven ordinary-button tests cover the three race ROMs and
+both maps. On Blood Bath, six cases per cartridge use Human Random
+and one, two or three CPUs across Melee and Free for All. Three
+Outpost cases per cartridge use a named human Protoss player and
+the same CPU layouts. Each race cartridge resolves Human Random to
+all three playable factions somewhere in its six Blood Bath trials.
+
+Each case confirms the chosen rows and starting locations, saves
+after 240 updates, loads in a fresh HOME process and matches the
+uninterrupted world after 120 more updates. SRAM readbacks match
+byte for byte. Restart from pause uses the same resolved human and
+CPU races, occupied rows and hall locations. The [native launch
+observation](2026-11-12-n64-blood-bath-opening.md#random-races-consume-the-launch-stream-first)
+records native Random race and start draws for its pinned seeds.
 
 ## Three-CPU cartridge pacing
 
@@ -271,6 +305,7 @@ workload sizes for synthetic renderer and collision tests.
 | Check | SHA-256 |
 | --- | --- |
 | Custom Game launches | `8c990bc25747578cdb2ad4f269046e46e7f6163565a9ea3af2edc16e276622c5` |
+| Random human and CPU saves and restarts | `19489f05aabd0dacfee3ac22a595a01a649308faeba4b92dabd039617bddb6a8` |
 | Last open CPU row on the three race ROMs | `8000e67d551101aab15b51ef8d5d3f2816f150038fefe7388445aad82437b872` |
 | N64 Blood Bath Melee last CPU replay | `05cba75a4bc6a037250ae56b65e32b18d1b32160a1cd4350242f2daf5036ed3b` |
 | N64 Blood Bath Free for All last CPU replay | `c663999f091021032510d2bb8a3b1ba79e85e5c3c49515d3e843d0904e229aac` |
@@ -289,6 +324,7 @@ workload sizes for synthetic renderer and collision tests.
 | Terran chapter 5 retreat with the older suffix | `99ecca6a4f17266c65ccafbf47d41b93cd5e6830adaa7ce71aaf1325b2ed3cad` |
 | Terran chapter 5 hero-safe local selection and order | `1848f80e7fe00f9d303bb853b661dd32add344459f56f878facaf4474a833698` |
 | Terran chapter 5 explicit Move with stalled hero waypoint | `b0a318d3447b14132d09f800c2602ff5ba28b7682100c973dc89a8f2fee06fb0` |
+| Terran chapter 5 earlier Kerrigan route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -296,6 +332,8 @@ workload sizes for synthetic renderer and collision tests.
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
+| Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
+| Protoss chapter 2 full run and victory journal | `aefbd075604bdf941464e02443ee7625e799c165c41084bf5c94ed3b3c7cffd7` |
 | Protoss chapter 3 full run and fresh loads | `dcca91454a924eafebc47440a7a1fda1a0dd25b21d9b23024ee6e05690e6e221` |
 | Protoss chapter 5 full run and fresh loads | `6135c1f184640ecf9f4cf77a9c48da534bc19f60a0e7c33685be970a50e051a2` |
 | Protoss chapter 6 full run and fresh loads | `fe85625beb73116126eecb82bc244a3d6328fee40ce881f3ee67e89191ef2974` |
