@@ -81,6 +81,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves 552 guest cycles for five minerals and two geysers in an
   authored ARM batch with the production heap. Measure the same
   change with imported sprites and the full actor roster.
+  [Packed sprite row setup](audits/2026-11-24-packed-sprite-row-stride.md)
+  saves 2.04–7.91% in authored drawing batches with matching pixels.
+  The exact Protoss 10 late sample draws 164 packed sprites across
+  eight updates. Verify shared frame timing and the four complete
+  links before attributing a cartridge frame-rate gain.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
