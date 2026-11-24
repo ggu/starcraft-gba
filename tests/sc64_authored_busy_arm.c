@@ -4,6 +4,10 @@
 #include "game.c"
 #undef game_init
 
+#ifndef SC64_BUSY_CAMERA_Y
+#define SC64_BUSY_CAMERA_Y 512
+#endif
+
 volatile u32 busy_initial_count;
 volatile u32 busy_setup_fault;
 
@@ -45,5 +49,5 @@ void game_init(void)
     busy_initial_count = (u32)alive;
     busy_setup_fault = alive != goal;
     cx = 512;
-    cy = 512;
+    cy = SC64_BUSY_CAMERA_Y;
 }

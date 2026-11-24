@@ -32,6 +32,21 @@ display cuts. The mean falls from 631,696 to 627,942 cycles, and p95
 falls from 1,076,127 to 917,265. The number of frames above two
 VBlanks drops from 147 to 142 as the initial battle settles.
 
+The initial camera in these pairs starts south of much of the fighting.
+A second 600-update panned replay centers the camera closer to the
+fighting at world y 420. All sampled state and display cuts match.
+Mean frame cycles fall from 672,914 to 670,564, p95 stays within
+three cycles, and updates over two VBlanks fall from 196 to 176.
+Mean drawing costs 476,353 versus 470,576 cycles.
+
+The closer-baseline replay changes an average of 13.95 of the 105
+battlefield tiles between successive uses of the same display page
+at unchanged camera coordinates, across 82 early comparisons.
+During the 36 camera-change comparisons it changes 60.44 tiles on
+average. These are indexed-pixel observations covering display rows
+12–119. Reuse still needs proof at the level of the original painter's
+ordered contributors, and should include both camera patterns.
+
 The sanitizer oracle compares 3,000 shapes against the prior
 four-rectangle implementation, both as tile data and Mode 4
 framebuffer data. The clipped cases include degenerate sizes,
@@ -59,8 +74,9 @@ python3 tools/sc64_authored_busy_arm.py \
 ```
 
 Use a fresh output directory for each pair. Add `--arm-scene-clip --pan`
-to replay the clipped pan. The command builds both ROMs from the
-same authored fixture and writes per-update hashes and timing
+to replay the clipped pan. Add `--camera-y 420 --updates 600` to
+reproduce the closer battle window. The command builds both ROMs from
+the same authored fixture and writes per-update hashes and timing
 receipts. A changed sample causes a nonzero exit. Both checkouts
 build with the project's standard ARM tools and the authored
 skirmish source.

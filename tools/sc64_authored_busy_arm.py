@@ -32,7 +32,7 @@ STATE = ("u", "b", "m", "tracers", "visible", "explored", "skirmish_ai", "seed",
 PAN_INPUT = [(20, 16), (39, 0), (76, 32), (95, 0)]
 
 
-def build(tree, output, arm_scene_clip):
+def build(tree, output, arm_scene_clip, camera_y):
     elf = output / "crowd.elf"
     rom = output / "crowd.gba"
     cpu = ["-mcpu=arm7tdmi", "-mthumb", "-mthumb-interwork"]
@@ -43,6 +43,7 @@ def build(tree, output, arm_scene_clip):
         "-fdata-sections", "-Icommon", "-Istarcraft",
         "-DGBA_PRESENT_VBLANK_EPOCH", "-DSC64_SKIRMISH",
         "-DSC_ORIGINAL_SKIRMISH", "-DSC_FRONTIER_ROUTE_CACHE",
+        f"-DSC64_BUSY_CAMERA_Y={camera_y}",
     ]
     if arm_scene_clip:
         flags += ["-DGBA_SCENE_CLIP", "-DGBA_SHAPES_ROM_ARM"]
@@ -73,9 +74,9 @@ def summary(samples):
     }
 
 
-def replay(tree, runner, output, updates, arm_scene_clip, inputs):
+def replay(tree, runner, output, args, inputs):
     output.mkdir(parents=True, exist_ok=False)
-    rom, elf = build(tree, output, arm_scene_clip)
+    rom, elf = build(tree, output, args.arm_scene_clip, args.camera_y)
     address, sizes = symbols(elf), symbol_sizes(elf)
     process, remote, log = PhysicalReplay.start(runner, rom, output, address, sizes)
 
@@ -90,7 +91,7 @@ def replay(tree, runner, output, updates, arm_scene_clip, inputs):
 
     try:
         samples = []
-        for tick in range(1, updates + 1):
+        for tick in range(1, args.updates + 1):
             remote.play_to(tick, inputs)
             if word("busy_setup_fault") or word("busy_initial_count") != 76:
                 raise RuntimeError("Crowd setup failed")
@@ -139,18 +140,20 @@ def main():
                         help="Use the ARM shape wrappers and the scene clip")
     parser.add_argument("--pan", action="store_true",
                         help="Move the viewport right and back during the run")
+    parser.add_argument("--camera-y", type=int, default=512,
+                        help="Set the initial camera center in the 1024-pixel map")
     args = parser.parse_args()
     output = args.output.resolve()
     runner = args.runner.resolve()
     if args.updates < 1:
         parser.error("--updates must be positive")
+    if not 0 <= args.camera_y < 1024:
+        parser.error("--camera-y must be within the map")
     if not runner.is_file():
         parser.error(f"Replay runner not found: {runner}")
     inputs = PAN_INPUT if args.pan else []
-    baseline = replay(args.baseline.resolve(), runner, output / "baseline", args.updates,
-                      args.arm_scene_clip, inputs)
-    candidate = replay(args.candidate.resolve(), runner, output / "candidate", args.updates,
-                       args.arm_scene_clip, inputs)
+    baseline = replay(args.baseline.resolve(), runner, output / "baseline", args, inputs)
+    candidate = replay(args.candidate.resolve(), runner, output / "candidate", args, inputs)
     fields = ("state", "camera", "pages", "palette", "display")
     differences = {field: [] for field in fields}
     for tick, (old, new) in enumerate(zip(baseline["samples"], candidate["samples"]), 1):
@@ -160,6 +163,7 @@ def main():
     result = {
         "runner_sha256": sha256(runner.read_bytes()).hexdigest(),
         "arm_scene_clip": args.arm_scene_clip,
+        "camera_y": args.camera_y,
         "input_changes": inputs,
         "baseline": baseline["summary"],
         "candidate": candidate["summary"],
