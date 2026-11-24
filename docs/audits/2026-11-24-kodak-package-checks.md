@@ -101,7 +101,7 @@ The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
 
 Victories with fresh SRAM readback on the installed package now cover
-24 of 30 chapters: nine Terran, all ten Protoss, and Zerg 1 through 5.
+25 of 30 chapters: nine Terran, all ten Protoss, and Zerg 1 through 6.
 
 ### Protoss and Zerg victories
 
@@ -586,7 +586,38 @@ The frame-130,610 journal restores Kerrigan on the island at
 400 HP, all 30 Hydralisks, and 26 hostile units and 14 buildings
 in region 5. Six more independent controller stages match their
 worlds and SRAM. The final HOME load also exports identical SRAM.
-Region 5 clearance and victory are open.
+
+Another ferry, Storm pair and evacuation reduce region 5 to
+17 hostile units and 14 buildings by frame 147,057, with Kerrigan
+at 400 HP on the island and 30 Hydralisks ready. All seven
+independent controller stages reproduce their world and SRAM.
+Fresh HOME also exports the final journal byte for byte.
+
+A separate push from frame 147,057 takes region 5 to nine units
+and 12 buildings but leaves only nine Hydralisks. Returning to
+the 30-Hydralisk checkpoint and sending Kerrigan on one more
+sortie reduces the defenders to nine units with the force
+intact. The subsequent Hydralisk advance destroys all 14
+structures and the last two Probes. Kerrigan has 400 HP and does
+not join the ground assault. The ten-stage sortie and attack
+replay matches each world and SRAM.
+
+#### Zerg 6 victory and Zerg 7 deployment
+
+The cleared regions satisfy the Force 2 conditions, but the
+island position at (959,1020) stays inside the smaller location
+used by the next trigger. With Kerrigan alive and unloaded,
+ordinary movement takes her to (1025,1004), inside the island
+and past that smaller rectangle. The authored sequence completes
+at frame 177,044. The first terminal screen shows victory with
+Kerrigan at 400 HP and the Z6 completion bit set. Two independent
+controller segments reproduce the region clearance, the final
+world and the victory journal.
+
+Fresh HOME Load restores the victory and exports identical SRAM.
+Ordinary buttons reach the Zerg 7 briefing and deploy mission 18
+at frame 1 with zero unsupported-mission faults. This brings the
+installed package to 25 of 30 verified wins.
 
 ### Wasteland opening on N64 and KODAK
 
@@ -686,14 +717,29 @@ process selects the updated first slot, `Terr01 08:31`. It advances
 at step 5,120. The exported FlashRAM is byte-identical to the file
 created by the save run.
 
+A later native checkpoint saves at 120 minerals. Reloading it
+and letting the same worker continue brings the bank to 152.
+The explored base and mineral line remain visible. Barracks
+placement and paid production are still open in the native
+replay.
+
 On the exact KODAK Terran ROM, A on an unrevealed patch destination
 issues Move. The selected SCV reaches the location, idles, and
 keeps the bank at 40 without collecting by proximity. Contextual A
 on a visible neighboring patch at (272,472) issues Mine by frame
 1,661. At frame 1,861 the SCV is carrying eight minerals. The worker
 dies on its return path before delivery, and the bank stays at 40
-through frame 2,061. Qualify a protected delivery with controller
-input, then compare sustained mining and production.
+through frame 2,061.
+
+A separate ordinary-input Wasteland playthrough on the same installed
+ROM reaches victory at frame 10,120. Its frame-6,214 pause journal
+matches the retained win replay byte for byte. A fresh branch from
+that earlier journal observes two 60-HP SCVs carrying eight minerals
+each with the bank at 439. After 60 neutral updates both SCVs still
+have 60 HP, their cargo is empty, and the bank is 455. A regular
+pause save at frame 6,274 loads through HOME with the same frame,
+bank and five worker records. The fresh export is byte-identical.
+The bank rises to 463 after 60 more neutral updates.
 
 ### Terran chapter 5 input divergence
 
@@ -1070,6 +1116,57 @@ Profile the current source's base projectile motion and raster
 work at this fixed camera position and after an ordinary-input
 pan to the visible fight. These are mGBA guest-cycle observations.
 
+#### Pan from the base to the Outpost fight
+
+Across three exact race-ROM runs, an ordinary R and D-pad hold
+moves the Outpost camera from (40,106) to (520,790) before frames
+11,002–11,009. Both views match the world and route counters. The
+traced pan matches a second uninstrumented pan across both video
+pages, display, palette, counters, and elapsed cycles.
+
+| Cartridge | Fixed tracer cycles/update | Panned tracer cycles/update | Panned cycles/update in the watched raster function |
+| --- | ---: | ---: | ---: |
+| Terran 10 | 50,801 | 85,317 | 9,713 |
+| Zerg 10 | 78,069 | 390,611 | 204,004 |
+| Protoss 10 | 55,215 | 324,503 | 155,848 |
+
+The watched function is the raster entry on Terran and Protoss
+and the resolved image-frame entry on Zerg, where the raster is
+inlined. Those costs are inclusive and are part of the tracer
+costs. The panned Zerg and Protoss cuts spend about half of their
+tracer cost inside that function.
+
+All 272 split trail draws across both camera cuts use bullet type
+0. The merged FOLLOW viewport rule therefore does not need to
+expand to those split draws for this workload. The fixed camera
+places every sampled cached launch and target envelope outside
+the viewport using the conservative 66- and 61-pixel radii. These bounds
+exclude none after the pan. Compare the offscreen rejection and
+visible raster work separately. This measures the installed build,
+which predates the merged FOLLOW change.
+
+#### Reusing effect visibility for each tile row
+
+A paired 120-update P10 Outpost replay uses the installed image
+and a retained build from its source revision with the tile-row
+renderer trial. It starts at frame 11,002 and tests both views.
+All 240 frame pairs match the world, camera, both framebuffer pages,
+palette, display and route counters. Both links have the same
+IWRAM and EWRAM static endpoints.
+
+| Camera | Mean loop cycles, original → trial | Mean draw cycles, original → trial | p95 loop cycles, original → trial |
+| --- | ---: | ---: | ---: |
+| Fixed | 1,268,499 → 1,268,401 | 469,200 → 468,820 | 1,485,000 → 1,491,629 |
+| Panned | 1,456,009 → 1,337,136 | 597,250 → 476,840 | 1,696,269 → 1,572,520 |
+
+At the fight, mean loop cycles fall 8.16%, mean drawing falls
+20.16% and p95 falls 7.30%. The fixed-camera mean is flat and
+its p95 rises 0.45%. All 120 updates in each case remain above
+the two-VBlank budget. These measurements apply to the retained
+P10 pair. Qualify the current combined source against the other
+cartridges, campaign and Showcase, including save continuation,
+before promoting the renderer to the release builds.
+
 ### Paired ARM replay of observed route queries
 
 A repeat of the 96-update Terran Blood Bath cut records the ordered
@@ -1181,6 +1278,9 @@ quality on the GBA SP.
 | Late three-race exact crop calls | `71c00f4b93bd65b4f32f7ad80db1a516ec7fc8487b25bf24bc50ef50b7a9c207` |
 | Protoss 7 late exact crop calls and victory | `1a716f7f8c938d9b8a1945c068c94a9d8c0bcaeeb059cd294028ca07a9d9e18f` |
 | Late three-race tracer draw calls and timings | `e3ec7ca92ca312e0417034da49f19079826ce2faa992b3e0581621601b275ad6` |
+| Late three-race Outpost pan and nested tracer/raster attribution | `367528075a2cffa35f0c45de9fc89215731a243305e3f3e310dfdfb361c2a50e` |
+| P10 paired fixed and panned tile-row effect bench | `7e8d95ce4175b2befa682238ef2c02551265cecf25489522540a43c4011cf843` |
+| Current-source asset-free Mode 4 ARM differential | `66b15e3234ecf39ebe02a087b5ba8d8d7c7fda447fa602f468c2598131fd2d34` |
 | Late three-race tracer depth readback | `90963fb5bb184ef515bf078de40366c193d459e6fdf1437dff11754a4d67f9eb` |
 | Monotone point-route search outcomes | `f301862e71f5c4b52fba25cf93bc89f95b4ef769cd5952fa43553fc1db6fc43e` |
 | Terran Blood Bath exact endpoint repeats | `36e893debf67f5f26106a8fdbbc97af360742faabe3ff995e65e99af19773067` |
@@ -1254,6 +1354,11 @@ quality on the GBA SP.
 | Zerg chapter 6 paid Extractor, first gas and fresh readback | `4a60c576ac69a5bcbee6fe2782063b74963e006a82d0ca792087987533c6ef86` |
 | Zerg chapter 6 independently replayed region 5 buildup, Storm and evacuation | `0552fb2ccd653f7af25f6f7f530c6ea18e7629d2b88136364a0974c92a02a931` |
 | Zerg chapter 6 second ferry, further Storms and safe return, six-stage independent replay | `14923c08c5e52518cbfa7c33cf2e49eef3f2953bdd1424b9f74d05cf93cba298` |
+| Zerg chapter 6 final sorties and structure clearance, ten-stage replay | `e49ba9d8bff12a103c3a3e53d607c1e400b4a80673d0ef4517081159838769d6` |
+| Zerg chapter 6 final defenders, victory and Zerg 7, independent replay | `edfd65ace98a422cec802aea684fee66ee1c82372251c031c46c9f924aa572f5` |
+| Zerg chapter 6 fresh victory load and Zerg 7 deployment | `13d4cb35f525874774cb9bb5ae808f134483d31e0577432d6e0b1ca3731f01a3` |
+| Zerg chapter 6 seven-stage third-sortie replay, safe evacuation and fresh load | `a24ec13fcb7a82d06b2d11236a51f0194c9772986aa145386499198b4b350b06` |
+| Zerg chapter 6 frame-147,057 fresh force and hero census | `032ffeb493f4c87d1a072c4851f935c530711bc322f772a5c0ccbc74433cf5cf` |
 | Zerg chapter 6 frame-130,610 fresh terminal census | `32f8f2944e2b88118473bb5b21c4ee48df4ebb37a5872bd718a011b9c837b156` |
 | Zerg chapter 6 fresh terminal region 5 and army census | `5229b39b62dbe14eff9dd34b8a007659f05983bf58af9831831859439d9017e3` |
 | Zerg chapter 6 independent four-stage opening replay | `94edc6c57c802767d1dbe0ba180efc349829947e60d9bbb606decb683051b7d4` |
@@ -1283,7 +1388,11 @@ quality on the GBA SP.
 | N64 Wasteland B-enabled scratch bridge binary | `52ca094d2fbc0d723305546b0e6cef7f0b0a19a7a436de09dfab30950b05a3da` |
 | N64 Wasteland B Harvest deliveries before the observer failure | `cd7844c9cb1cf4acc307d3c40a158d7c7011a084d07374b291375535f00137e2` |
 | N64 Wasteland first mineral delivery and ordinary FlashRAM save | `6625cd459e1e46a7cf95d6259e6e462db23cdc90a752d0224952608d354cb577` |
+| N64 Wasteland 120-mineral save checkpoint | `85b3c46e143e6e74ec9a5930278fff04918b52e8fc5412d94ec7d0128f529563` |
+| N64 Wasteland bank checkpoint reload and 152 minerals | `d9c4111ea52ca8b9ad0669c2ac8e7092307cd8f42e613d5f89bb6c45ed7f75fb` |
 | N64 Wasteland first slot fresh reload, continued mining and FlashRAM readback | `7106dfa869740ea0d859dfb9882b815e61655b470bcec19e93ee19e6bac61299` |
+| Exact KODAK Wasteland fresh start, matching pause journal and victory | `46368011e850ec911ce585edb1c8a64747a7fe14a2a08ba9d6a676e0adbd7b1f` |
+| Exact KODAK Wasteland two SCV deposits and independent fresh HOME continuation | `568c075b6d633c88b85975fa2979ce3910c0dc163efd22c88dfddd02353616e0` |
 | KODAK Wasteland contextual Mine, eight-mineral cargo and return-path loss | `ac949cbde3012f37ff65a20296c9cfc0b4ba5fc8327856bb73c96df18c7dab21` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |

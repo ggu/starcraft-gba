@@ -124,6 +124,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Profile motion and raster work with the merged FOLLOW viewport
   cull in the fixed-camera cut and a visible holdout. Retain the
   current ground-trail picker until a measured workload exercises it.
+  The [Outpost camera holdout](audits/2026-11-24-kodak-package-checks.md#pan-from-the-base-to-the-outpost-fight)
+  moves the same battle into view. Zerg and Protoss now use 325–391k
+  tracer cycles per update, roughly half of those inside the watched
+  raster entry. The [tile-row trial](audits/2026-11-24-kodak-package-checks.md#reusing-effect-visibility-for-each-tile-row)
+  improves the panned P10 loop mean by 8.16% with matching pixels
+  and world, while the fixed mean is flat and its p95 rises 0.45%.
+  [The shared renderer draft](https://github.com/ggu/starcraft-gba/pull/823)
+  passes the authored ARM differential. Qualify the current race
+  and Showcase links, with mixed fog, ordinary controller
+  continuations and the existing memory guards. Busy fights remain
+  over budget.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
@@ -1821,8 +1832,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and Z5 deploys from HOME.
   [Z5's fourteen-stage replay](audits/2026-11-24-kodak-package-checks.md#zerg-5-victory-and-zerg-6-deployment)
   advances the terminal pause and wins with Kerrigan alive. The
-  victory loads byte for byte and Z6 deploys. The package now has
-  24 of 30 verified wins. Z6 restores a paid Lair and Extractor
+  victory loads byte for byte and Z6 deploys. Z6 restores a paid Lair
+  and Extractor
   after the first gas delivery at frame 3,519. Paid Ventral Sacs
   completes, Kerrigan boards an Overlord, and fresh HOME restores
   the cargo. The [Z6 ferry and assault replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-ferry-and-mainland-assault)
@@ -1835,10 +1846,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   30-Hydralisk force. After another ferry and two more Storms,
   the fresh frame-130,610 checkpoint keeps Kerrigan on the island
   at 400 HP and all 30 Hydralisks, with 26 defenders and 14
-  buildings left in region 5. Defeat that force and verify victory.
-  The T5 completion replay also remains open.
-  Wider campaign wins, deeper load checkpoints and GBA SP timing
-  remain open for this package.
+  buildings left in region 5. A further ferry and coordinated advance
+  clear both Force 2 regions. The [Z6 victory replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-victory-and-zerg-7-deployment)
+  moves Kerrigan across the island trigger and wins at frame 177,044
+  with 400 HP. The victory reload is byte-identical and Z7 deploys
+  through HOME. The installed package has 25 of 30 verified wins.
+  Finish T5 and Z7–Z10 on this package, and qualify deeper
+  checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
@@ -1848,10 +1862,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mineral patch shows B Harvest. The [harvest comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-mineral-collection)
   confirms native deposits from 40 to 72. A fresh first-slot
   load from a separate save continues mining with no new order
-  and identical FlashRAM. The GBA SCV collects eight minerals
-  after contextual A and dies before delivery. Verify an escorted
-  GBA deposit, then a native Barracks, Marine production, victory
-  and the next mission unlock.
+  and identical FlashRAM. The installed GBA cartridge also completes
+  two full-health SCV deliveries and resumes mining from a fresh HOME
+  load with matching SRAM. Compare native Barracks placement, Marine
+  production, victory and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
