@@ -1673,9 +1673,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Thirty-six Custom Game fresh saves load and match continuation.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
-  The pinned Protoss image has P9 and P10 full wins and
-  fresh loads. Update the T5 ordinary-input route to protect Raynor
-  through the observed frame-56,506 defeat.
+  Z2, P3, P5, P7, P9 and P10 also have exact-image wins and fresh
+  save checks. An ordinary T5 retreat keeps Raynor at full health
+  through frame 129,658. The mission still needs an active route
+  from that branch through all victory conditions.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.

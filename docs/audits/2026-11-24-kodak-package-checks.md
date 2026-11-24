@@ -67,12 +67,36 @@ The final SRAM readback matches the victory save byte for byte.
 The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
 
-The retained [Protoss qualification](2026-11-13-p9-normal-home.md)
-also covers full HOME wins on the exact packaged Protoss image.
-The package manifest pins both receipts. P9 wins at frame 272,857
-after 281,447 calls and P10 wins at frame 93,377 after 94,852
-calls. Both restore the mid-mission save and the victory in fresh
-HOME processes.
+### Protoss and Zerg victories
+
+P3 and P5 both win from HOME on the exact installed Protoss image.
+Each resumes the pause save from a fresh HOME and restores the
+terminal world from a third process. Each victory journal re-exports
+byte for byte.
+
+| Protoss chapter | Gameplay calls | Saved game frame | Victory frame | Matching checkpoints |
+| --- | ---: | ---: | ---: | ---: |
+| 3 | 48,168 | 20,000 | 47,661 | 49 |
+| 5 | 5,172 | 2,700 | 5,057 | 7 |
+
+P7 also wins from HOME after 57,636 gameplay calls. The replay
+checks the frame at each retained input edge, saves at frame 8,845
+and reaches the frame-55,892 victory after a fresh HOME load.
+A third process loads the victory and re-exports identical SRAM.
+
+The manifest also pins both retained
+[Protoss finale receipts](2026-11-13-p9-normal-home.md).
+P9 wins at frame 272,857 after 281,447 calls and P10 wins at frame
+93,377 after 94,852 calls. Both restore the mid-mission save and
+the victory in fresh HOME processes.
+
+Z2 wins on the exact Zerg image at game frame 10,209. The retained
+older route stopped with the Chrysalis carrier idle. The new
+ordinary-input route selects the carrying Drone and moves it to
+the Warp Point. It reproduces the win from blank SRAM in 10,500
+physical calls. A separate run saves at frame 8,663, reloads via
+fresh HOME and reaches the same victory. The uninterrupted win
+also reloads through HOME and re-exports identical victory SRAM.
 
 ### Wasteland opening on N64 and KODAK
 
@@ -101,6 +125,16 @@ friendly units versus the retained 35, and 200 minerals versus
 at call 57,747, game frame 56,506, with Raynor dead and Kerrigan
 alive. The runtime records defeat and zero trigger faults.
 The current cartridge still needs a winning route.
+
+An ordinary move order after input call 22,000 takes Raynor to the
+northeast edge. He reaches it by game frame 24,775 and stays at
+full health through frame 129,658 in the neutral continuation.
+The mission is still active with all 21 hostile buildings and
+four friendly buildings remaining.
+
+Applying the old suffix after that retreat recalls Raynor through
+the global combat-group selection and later orders. That variant
+loses at frame 108,946 with all 21 hostile buildings still standing.
 
 ## Custom Game saves
 
@@ -174,11 +208,18 @@ workload sizes for synthetic renderer and collision tests.
 | Terran chapter 5 screen transitions | `91317b3116e15d7d9b92626a37fd52af05cc6009a30a697319c490c9b30e2e17` |
 | Terran chapter 5 pause-corrected divergence | `19133241bc024bc6096a698611de030155e3c341679fb26105ea012e843835ab` |
 | Terran chapter 5 pause-corrected defeat | `5045cef4db7af2cd8c214745ef1761e011972a1266df7490112d6e5fe6606aea` |
+| Terran chapter 5 Raynor retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
+| Terran chapter 5 retreat with the older suffix | `99ecca6a4f17266c65ccafbf47d41b93cd5e6830adaa7ce71aaf1325b2ed3cad` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
 | Terran chapter 9 full run and fresh loads | `6c41688de2a262328a542e7fc5809d1833c399de539deb5ab87b0f96c835aa14` |
 | Terran chapter 10 full run and fresh loads | `aa7affb64e6f9bb455758e4f7b20d9e8bb26b8aaefd6da625bb28834657d21f4` |
+| Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
+| Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
+| Protoss chapter 3 full run and fresh loads | `dcca91454a924eafebc47440a7a1fda1a0dd25b21d9b23024ee6e05690e6e221` |
+| Protoss chapter 5 full run and fresh loads | `6135c1f184640ecf9f4cf77a9c48da534bc19f60a0e7c33685be970a50e051a2` |
+| Protoss chapter 7 full run and fresh loads | `54d8fd3811c16883ad7bbd0c0991240a8e80737af43d282e8c2b62bcc1a548d0` |
 | Protoss chapter 9 full comparison | `93151835a97657694c868c183a81ec82aac9f41c9ff1ee49af472e299761f48c` |
 | Protoss chapter 10 full run and fresh loads | `a018c1ee1cc0fd42631ae5a91101db087adf0466f680ea532e0115ce556d0605` |
 | Showcase scene starts | `5ceefdcea04deea53c7d5795810dbef47e3873b33415449528b668e5d8e34029` |
