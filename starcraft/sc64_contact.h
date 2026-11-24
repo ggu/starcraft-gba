@@ -691,16 +691,20 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
         if (layers & (1u << mover_flying)) axis_span = 2u * (unsigned)reach;
     }
 #endif
-    minx = (q->x - reach) >> 4; maxx = (q->x + reach) >> 4;
-    miny = (q->y - reach) >> 4; maxy = (q->y + reach) >> 4;
+    /* Candidate checks may fill the type cache but do not move the origin
+     * or change the active map dimensions during the scan. */
+    const int origin_x = q->x, origin_y = q->y;
+    const int map_cols = MAP_COLS, map_rows = MAP_ROWS;
+    minx = (origin_x - reach) >> 4; maxx = (origin_x + reach) >> 4;
+    miny = (origin_y - reach) >> 4; maxy = (origin_y + reach) >> 4;
     if (minx < 0) minx = 0;
     if (miny < 0) miny = 0;
-    if (maxx >= MAP_COLS) maxx = MAP_COLS - 1;
-    if (maxy >= MAP_ROWS) maxy = MAP_ROWS - 1;
+    if (maxx >= map_cols) maxx = map_cols - 1;
+    if (maxy >= map_rows) maxy = map_rows - 1;
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
+            for (i = sc64_unit_bucket_head[col + row * map_cols]; i != 0xff;
                  i = sc64_unit_bucket_next[i]) {
                 const Unit *c = &u[i];
                 u8 cc;
@@ -719,7 +723,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #ifdef SC64_CONTACT_EARLY_AXIS_PROBE
                 s16 coordinates[2];
                 __builtin_memcpy(coordinates, &xy, sizeof(xy));
-                ox = coordinates[0] - q->x; oy = coordinates[1] - q->y;
+                ox = coordinates[0] - origin_x; oy = coordinates[1] - origin_y;
                 if ((unsigned)ox + (unsigned)reach > axis_span ||
                     (unsigned)oy + (unsigned)reach > axis_span) continue;
 #endif
@@ -742,9 +746,9 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                  * coordinates. Extract them in native halfword order. */
                 s16 coordinates[2];
                 __builtin_memcpy(coordinates, &xy, sizeof(xy));
-                ox = coordinates[0] - q->x; oy = coordinates[1] - q->y;
+                ox = coordinates[0] - origin_x; oy = coordinates[1] - origin_y;
 #else
-                ox = c->x - q->x; oy = c->y - q->y;
+                ox = c->x - origin_x; oy = c->y - origin_y;
 #endif
 #endif
                 /* For nonzero speed every step is farther than the current
