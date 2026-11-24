@@ -137,6 +137,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   original-art crowd with matching pixels and world state. Two exact
   ratios cost more in the IWRAM microbench. Measure fallback shape
   frequency and combined pacing on the race cartridges.
+  [Shared rectangle borders](audits/2026-11-24-shared-frame-borders.md)
+  save 1.06–1.81% mean frame cycles in an authored 76-unit ARM skirmish.
+  All 120 updates in each fixed-camera and panning pair match state
+  and video. The reusable comparison tool records both physical pages
+  each update. Every sampled frame still exceeds two VBlanks. Measure
+  the same graphics change on the race cartridges and keep profiling
+  the larger draw and movement costs.
   [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in

@@ -1124,7 +1124,47 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
 #else
 #define SHAPE_HOT HOT
 #endif
-SHAPE_HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,y+h-1,w,1,c);gfx_rect(x,y,1,h,c);gfx_rect(x+w-1,y,1,h,c);}
+/* Clip the vertical edges together and leave their row loop in ROM to
+ * preserve the shared IWRAM shape budget. */
+static void __attribute__((noinline))
+gfx_frame_sides(int x0, int x1, int y, int height, u8 color)
+{
+#ifdef GBA_SCENE_CLIP
+    int top = gfx_clip_top, bottom = gfx_clip_bottom;
+#else
+    int top = 0, bottom = 160;
+#endif
+    if (height <= 0 || y >= bottom || y + height <= top) return;
+    int end = y + height < bottom ? y + height : bottom;
+    if (y < top) y = top;
+    if (y >= end) return;
+
+    int draw_left = (unsigned)x0 < 240u;
+    int draw_right = (unsigned)x1 < 240u;
+    if (!draw_left && !draw_right) return;
+    color = GFX_TILE_COLOR(color);
+    if (draw_left) GFX_TILE_TOUCH(x0, y, x0 + 1, end);
+    if (draw_right) GFX_TILE_TOUCH(x1, y, x1 + 1, end);
+
+    unsigned left_mask = (x0 & 1) ? 0x00ffu : 0xff00u;
+    unsigned right_mask = (x1 & 1) ? 0x00ffu : 0xff00u;
+    unsigned left_color = (x0 & 1) ? (unsigned)color << 8 : color;
+    unsigned right_color = (x1 & 1) ? (unsigned)color << 8 : color;
+    unsigned left_column = (unsigned)x0 >> 1;
+    unsigned right_column = (unsigned)x1 >> 1;
+    volatile u16 *row = pixels + y * 120;
+    for (; y < end; ++y, row += 120) {
+        if (draw_left) row[left_column] = (row[left_column] & left_mask) | left_color;
+        if (draw_right) row[right_column] = (row[right_column] & right_mask) | right_color;
+    }
+}
+
+SHAPE_HOT void gfx_frame(int x, int y, int width, int height, u8 color)
+{
+    gfx_rect(x, y, width, 1, color);
+    gfx_rect(x, y + height - 1, width, 1, color);
+    gfx_frame_sides(x, x + width - 1, y, height, color);
+}
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
 SHAPE_HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){
