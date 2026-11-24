@@ -1004,6 +1004,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   measures the extra order cost at 66–73% of the Outpost
   increase. Its instruction cuts place 61–81% of the extra
   order cost in movement. Target contact work first for Outpost.
+  The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
+  favor the guarded early axis check in the Terran and Zerg
+  ROM kernels. Replay it on complete late frames and older
+  saves before changing the default.
   Keep a one-CPU Blood Bath tail check, where a near-budget
   mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
@@ -1209,12 +1213,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   completes with Kerrigan still at 204 HP, but both buildings
   take damage before the first reinforcements hatch. Five
   Hydralisks reach the first connected waypoint with three
-  injured. Clear the approach and reinforce the Hatchery
-  before the western Nexus assault.
+  injured. Both tested follow-up paths lose two. Test an
+  earlier ground intercept. For the alternate transport
+  route, the native scenario permits Ventral Sacs. Qualify
+  human Z8 research, boarding and fresh SRAM as one path.
   [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
   fresh-loads an Extractor, Lair, Den, Spire and three full-health
-  paid Mutalisks at frame 8,925. Preserve the wounded gas worker
-  and reinforce the air group before the crystal route.
+  paid Mutalisks at frame 8,925. At frame 12,531, a fresh HOME
+  load restores all five full-health Mutalisks at the first
+  rally and three gas workers. The next fresh save has eight
+  full-health Mutalisks. Intercept the Reaver approaching the
+  gas line before clearing the crystal road.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
@@ -1897,15 +1906,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   clear both Force 2 regions. The [Z6 victory replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-victory-and-zerg-7-deployment)
   moves Kerrigan across the island trigger and wins at frame 177,044
   with 400 HP. The victory reload is byte-identical and Z7 deploys
-  through HOME. The installed package has 25 of 30 verified wins.
+  through HOME. The installed package has 26 of 30 verified wins.
   The [Z7 guarded opening](audits/2026-11-24-kodak-package-checks.md#zerg-7-guarded-opening-and-production)
   completes a full-health Hatchery, then the Pool, Lair, Den
   and Sunken Colony. A paid defense save at frame 10,885
   restores eight Hydralisks, three Mutalisks and four Drones.
   After a northern interception, two watched Guardian slots
   hold Zerglings and three Guardians remain at fresh HOME.
-  The ground push destroys the Pool. Combine the air response
-  with a ground defense and establish gas before advancing.
+  The ground push destroys the Pool. A combined defense with
+  a distant attack order also loses the Hydralisks and Drones.
+  Try a closer ground hold before sending the intercept north.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second
@@ -1931,10 +1941,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   both heroes and 1,092 gas. The hostile Wraith count is zero
   and 16 buildings remain. A new harvest order restores
   mineral income and is retained at fresh HOME frame 97,618.
-  Reinforce before attacking the western Command Center and
-  four remaining turrets.
-  Finish T5 and Z7–Z10 on this package,
-  and qualify deeper checkpoints and GBA SP timing.
+  The [Terran 5 victory run](audits/2026-11-24-kodak-package-checks.md#terran-5-victory-and-fresh-home)
+  reinforces, removes the remaining production and clears the
+  last depots at frame 170,041. Fresh HOME restores RESULT
+  and identical victory SRAM. A advances into Terran 6.
+  Finish Z7–Z10 on this package and qualify GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
