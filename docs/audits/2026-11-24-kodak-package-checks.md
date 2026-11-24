@@ -330,6 +330,46 @@ exceeds two VBlanks. Camera motion also changes visible draw
 work, so each pair measures that complete view change. A fixed
 camera already incurs most of the measured late-frame cost.
 
+### Late simulation and drawing budget across the race ROMs
+
+On the same three-CPU configurations, the ordinary-button observer
+reads the release ROM's built-in cycle counters for 120 consecutive
+advancing updates at launch, after update 9,000 and after update
+11,000. The player gives no orders and leaves the camera at its
+starting location. Each launch checks the occupied rows, resolved
+races and start locations. All 2,160 samples pass the counter
+nesting checks and keep the ROM, ELF and runner hashes unchanged.
+The six late windows match the corresponding fixed-camera replays
+in starting world fingerprint and all 720 total-cycle readings.
+
+| Cartridge and map | Total | Simulation interval | Orders | Drawing interval | Actors and effects | Simulation overruns |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Terran 10 Outpost | 1,058 | 636 | 481 | 421 | 262 | 117/120 |
+| Terran 10 Blood Bath | 850 | 606 | 478 | 243 | 85 | 82/120 |
+| Zerg 10 Outpost | 1,275 | 804 | 628 | 470 | 283 | 120/120 |
+| Zerg 10 Blood Bath | 929 | 603 | 457 | 325 | 134 | 84/120 |
+| Protoss 10 Outpost | 1,268 | 799 | 610 | 469 | 288 | 120/120 |
+| Protoss 10 Blood Bath | 989 | 661 | 501 | 328 | 153 | 110/120 |
+
+The table shows mean thousands of guest cycles after update 11,000.
+Orders are part of the simulation interval, and actors and effects
+are part of the drawing interval. Each simulation mean exceeds the
+561,792-cycle two-VBlank budget by 41,354–242,681 cycles. All 720
+total samples in this late window exceed the same budget. Orders
+account for 45–56% of total cycles across the six means. Actors
+and effects account for 35–62% of drawing, compared with 43–52k
+cycles for the measured terrain background stage. The launch
+windows average 29.72–29.99 emulated updates per second and the
+late windows average 13.16–19.73.
+
+The profiling intervals charge interrupt work to the phase in
+which it occurs. The simulation interval also includes input reads.
+The residual includes audio update and presentation outside those
+two intervals. It typically includes a pacing wait in the launch
+window and averages under 500 cycles in the late windows. Use the
+instruction attribution below when comparing individual routines.
+These are cycle measurements in mGBA.
+
 ### Protoss 10 late battle attribution
 
 On the same Protoss 10 Blood Bath Melee lineup, a read-only ARM
@@ -418,6 +458,7 @@ quality on the GBA SP.
 | One- and two-CPU Terran and Zerg pacing | `debd5b6b54170dd4dd49497ca50856c5db4341e2226429044bf6e55f7d37d739` |
 | One- and two-CPU Protoss pacing | `05918d9053971077e8cc8b54f73c77dfa6446fe668610e2552413100b6f3e5ed` |
 | Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
+| Three-race frame-budget breakdown | `336e4cfc4cf66286f99b97ec10166c29bdb38c3b6e6cf6861396dd166e372bbe` |
 | Campaign starts | `6f3b47661f367e051f938c8f7ad23b190b45389bacccfd9d2adde760ebea796f` |
 | Terran chapter 1 full run and fresh loads | `8c3642922e2358bcfe2d0264918d1cf381bf254e95c7b993a55ab55f8046cc94` |
 | Terran chapter 2 full run and fresh loads | `e51366eeaa6c55309aa3630a5c9e2da47ad51608be0b25f85f33d60fd20902b2` |

@@ -107,6 +107,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   queries. The exact KODAK Protoss 10 sample takes 152 indexed
   queries and zero fallback scans in four late three-CPU updates.
   Prioritize draw and movement costs measured on the race path.
+  The [six race-cartridge phase cuts](audits/2026-11-24-kodak-package-checks.md#late-simulation-and-drawing-budget-across-the-race-roms)
+  put the late simulation interval alone over the 30 fps budget on
+  both maps. Orders consume 45–56% of total cycles. Profile movement
+  and depot/route work across the three cartridges first, then pair
+  the same workloads for actor and effect drawing improvements.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have
