@@ -665,8 +665,35 @@ Repair, Move and the ground-context B Attack label. The bank
 still has 40 minerals. The next guarded replay positions the cursor
 over a mineral patch while the SCV is selected. The native prompt
 switches to **B Harvest**. Pressing A selects the patch. The bank
-still reads 40 after that input. Qualify a B press at that cursor
-position, delivery, and fresh FlashRAM readback.
+still reads 40 after that input.
+
+#### Wasteland mineral collection
+
+An isolated ares v148 replay uses the same starting FlashRAM.
+The scratch bridge exposes the ordinary B button alongside the
+existing mapped controls. The receipts pin the compiled binary
+and its actual source separately from the wrapper's tracked
+source entries. With the SCV selected and the cursor on the
+patch, the HUD shows **B Harvest** and 40 minerals at step 9,890.
+A B press and neutral updates raise the bank to 48 by step 10,900,
+64 by 11,900 and 72 by 12,900. These three HUD captures precede
+a later snapshot failure in that observer. A separate guarded run
+repeats the first delivery, writes the first save slot through the
+ordinary menu, and exits successfully with a changed FlashRAM hash.
+The frame after saving still shows 48 minerals. A fresh ares
+process selects the updated first slot, `Terr01 08:31`. It advances
+800 neutral steps after confirming the load and shows 64 minerals
+at step 5,120. The exported FlashRAM is byte-identical to the file
+created by the save run.
+
+On the exact KODAK Terran ROM, A on an unrevealed patch destination
+issues Move. The selected SCV reaches the location, idles, and
+keeps the bank at 40 without collecting by proximity. Contextual A
+on a visible neighboring patch at (272,472) issues Mine by frame
+1,661. At frame 1,861 the SCV is carrying eight minerals. The worker
+dies on its return path before delivery, and the bank stays at 40
+through frame 2,061. Qualify a protected delivery with controller
+input, then compare sustained mining and production.
 
 ### Terran chapter 5 input divergence
 
@@ -1252,6 +1279,12 @@ quality on the GBA SP.
 | N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
 | N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
 | N64 Wasteland SCV reselection and southward move | `d634dc26e7a39a6cb21b1939c929db6de2612e9d0c4a79ea251a08f032fe899e` |
+| N64 Wasteland B-enabled scratch bridge source | `2bcb6ce41b28950fdbc5abb891e263a8a28ff74c255ea3093905d189ea2ff0b6` |
+| N64 Wasteland B-enabled scratch bridge binary | `52ca094d2fbc0d723305546b0e6cef7f0b0a19a7a436de09dfab30950b05a3da` |
+| N64 Wasteland B Harvest deliveries before the observer failure | `cd7844c9cb1cf4acc307d3c40a158d7c7011a084d07374b291375535f00137e2` |
+| N64 Wasteland first mineral delivery and ordinary FlashRAM save | `6625cd459e1e46a7cf95d6259e6e462db23cdc90a752d0224952608d354cb577` |
+| N64 Wasteland first slot fresh reload, continued mining and FlashRAM readback | `7106dfa869740ea0d859dfb9882b815e61655b470bcec19e93ee19e6bac61299` |
+| KODAK Wasteland contextual Mine, eight-mineral cargo and return-path loss | `ac949cbde3012f37ff65a20296c9cfc0b4ba5fc8327856bb73c96df18c7dab21` |
 | N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
