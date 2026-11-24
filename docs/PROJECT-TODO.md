@@ -138,8 +138,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   captures 381 calls and a stable field pool. The conditional ARM
   replay matches outputs and cache counters with the observed clock
   and age inputs and uses 61.16% fewer cycles. Thirty-seven of 96
-  update groups cost more. Measure whole-frame peaks and replay the
-  grid and route-slot lifecycle in a paired game loop.
+  update groups cost more. The [paired authored game-loop test](audits/2026-10-29-monotone-route-step/README.md#paired-authored-game-loop-test)
+  matches 280 updates through two live grid edits. Its mean
+  simulation cost falls 2.84%. The two-VBlank misses stay
+  at 18. Check the intended release profiles' frame peaks and
+  save boundaries before enabling the cache. The preferred-L
+  shortcut after slot and age checks reduces misses from 18
+  to 13 with matching route counters on the authored aging
+  workload. Prioritize a separate live-slot, recency and
+  fallback test with the shortcut before considering activation.
   The 99 new endpoints that continue an earlier path account for
   7.07% of loop cycles. Verify reuse with the existing route-slot
   precedence, aging, and grid invalidation before activation.

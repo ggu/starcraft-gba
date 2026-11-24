@@ -365,3 +365,83 @@ to qualify frame timing and linked memory across the cartridges.
 | Initial private route state | `f7bc3f46b18cfac42da2e931c9847fb94b4f99d68d6f74699da87a878e40cae6` |
 | Full route pool boundary checks | `1257bf6e413e9910056b1f62a1da3e2d518aad49312dbdc6a219ed03854385c7` |
 | Paired ARM dispatcher replay with metadata checks | `7428bbfe88b54f0362dfa794555d2150d8c56019f734765819ea5746bda010ad` |
+
+### Paired authored game-loop test
+
+A standalone ARM route loop first moves 16 synthetic actors
+for 48 updates per batch on an authored 64×64 grid. It exercises
+a resident point field and six depot queries per batch. The
+second batch also changes a tile and resets the route state
+every eight updates. Both variants return the same 1,536 cells
+and report the same field and depot hit counts. The witness
+variant records 566 hits in the steady batch and 516 during
+resets. Measured cycles fall from 14,887,194 to 4,150,644
+and from 24,629,346 to 14,990,879 respectively. These batches
+include initialization, resets and the candidate hit counter.
+
+A second fixture uses the normal race-engine update and draw
+loop with authored 64×64 terrain, 20 moving actors, two live
+building placements and identical D-pad input. Blank display
+data supplies the optional interface schemas. Both profiles
+use the ARM dispatcher in IWRAM and differ only by the
+prefix-cache flag.
+
+All 280 updates match on the actor state, walk grid, clock,
+route-field counters, both display pages, palette and display
+state. Both walk-grid edits are visible in the samples. The
+candidate admits up to 16 cached prefixes. An independent
+breakpoint pass on that binary observes 148 live prefix hits,
+100 before the first edit and 48 between the two edits.
+The breakpoint pass reproduces the plain candidate's cycle,
+world and page observations.
+
+| Cycle measure | Baseline | Prefix cache |
+| --- | ---: | ---: |
+| Frame mean | 576,650 | 573,627 |
+| Frame p95 | 581,088 | 581,957 |
+| Frame peak | 2,028,301 | 2,024,568 |
+| Updates above two VBlanks | 18 of 280 | 18 of 280 |
+| Simulation mean | 240,444 | 233,617 |
+| Simulation p95 | 281,517 | 274,167 |
+
+The authored scene's simulation mean falls 2.84%, and frame
+p95 rises 0.15%. The pair links with the standard working
+RAM guards. The prefix cache adds 360 BSS bytes and 808 text
+bytes in this fixture. Qualification for routine activation
+still requires paired busy-window budgets and save checks on
+the intended race profiles.
+
+Moving the building placements earlier and enabling request
+aging gives a second 280-update pair. All sampled outcomes
+and route counters match, with admissions reaching 16
+prefixes. Mean simulation cycles drop from 240,905 to 237,583
+and both variants still miss the two-VBlank budget 18 times.
+
+With the older preferred-L shortcut also enabled, neither
+variant admits a prefix on that workload. The shortcut itself
+cuts baseline mean simulation cycles to 224,653 and misses to
+13. Actor state and display still match the aging-only
+baseline, but route clocks differ on 279 updates. The shortcut
+returns before the dispatcher ages or touches a field. Confirm
+clock and slot policy before considering it for release.
+
+A private follow-up places the shortcut after live-slot and
+request-aging checks and advances the clock on success. In
+the same authored aging workload, all 280 world, display,
+clock and field-counter samples match the shortcut-off baseline.
+Mean simulation cycles fall from 240,905 to 228,754 and
+two-VBlank misses fall from 18 to 13. This experiment is
+separate from the prefix cache. Before enabling it, exercise
+resident exact and nearby slots, the recency boundary, blocked
+endpoints and fallback. Also check diagnostic counts and
+probe scratch limits. The authored frame fixture has no
+resident route-field builds or hits.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Authored route loop with resident fields and resets | `97276056727236757bdd0150dade9fef0fa5e43120cdacdc15b5fc77adc9a586` |
+| Authored race-engine frame comparison | `1ff4a3aeb2476857bd4a0b33fda98c66ae2b35fb69f274f9cce7e6f04f219a0b` |
+| Read-only trace of actual prefix hits | `90b79f0361880b3224c8e8b5b51243f4ac53e20fb4f01531ba32504688a69055` |
+| Paired game loop with route request aging | `3d63b6770ea06c81b4e0fc7e7be26b574a4bf9325f7dd7cc8cdce35aa5565f9b` |
+| Preferred-L experiment with zero prefix admissions | `a82cfc684980ccc1d5a9ccf24d3db2d53fa77fadcf4865f7ea005e39edaacdb6` |
+| Preferred-L experiment after slot and clock checks | `266a3c1bf98a99c9e0b589eb05f388b3c9bd39881bf083dffceef300217cf12a` |
