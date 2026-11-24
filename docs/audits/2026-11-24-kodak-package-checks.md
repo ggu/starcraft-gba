@@ -100,8 +100,10 @@ The final SRAM readback matches the victory save byte for byte.
 The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
 
+The [Terran chapter 5 victory](#terran-5-victory-and-fresh-home)
+adds the last Terran chapter through a staged controller replay.
 Victories with fresh SRAM readback on the installed package now cover
-25 of 30 chapters: nine Terran, all ten Protoss, and Zerg 1 through 6.
+26 of 30 chapters: all ten Terran, all ten Protoss, and Zerg 1 through 6.
 
 ### Protoss and Zerg victories
 
@@ -675,6 +677,17 @@ committing to the Extractor.
 | Northern interception | `c75a0a80763b2b6336dfb5360096199a4d179d82d62267ad341defda7aa10112` |
 | Fresh HOME global census and identical SRAM | `8fad131038f4ad5f2a2f701cc0f6866730ce5ea8495b634c8505e9b80e2f3904` |
 
+A combined air and ground branch from frame 10,885 selects all
+eight Hydralisks and issues a distant eastern attack order.
+The cursor travel and repeated retargeting leave time for the
+ground attack to reach the base. At frame 11,764, five
+Hydralisks remain and the Extractor has 58 HP. All Hydralisks
+and Drones fall by frame 13,451, and only three Mutalisks
+survive after the Pool and Lair fall. The original frame-10,885
+save remains the continuation point. Test a closer defensive
+position before sending the Mutalisks north. Receipt SHA-256
+`bf195f978d97a4f4d61d1e2cc20598903ca602967ec7ecd0fd0e0678af24cb63`.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -907,6 +920,11 @@ initial mineral target require a separate trace.
 The [OpenBW units.dat loader](https://github.com/OpenBW/openbw/blob/master/data_loading.h#L1433-L1443)
 identifies the supply columns in the cartridge table.
 
+A further controller-only load sees minerals rise from 248
+to 256 while gas and 5/26 supply hold. An A press aimed at
+the vehicle yields no visible selection panel or ring. That
+capture leaves its ownership and the hit test unresolved.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |
@@ -916,6 +934,7 @@ identifies the supply columns in the cartridge table.
 | GBA independent opening and 600 neutral updates | `4fa9651e09dccc7efc4770cdd8a633823e7c7863722ed1c6f55218aeefbc099f` |
 | N64 unit supply table inspection | `18cf32940064e50f2a6872388622061cb6360a04f27ea5e0183d0d2edad89751` |
 | N64 Backwater starting roster and action counts | `7ac41e6b4fab6762aca295fed9b07792ae277aa329b72d1d716e755524328f2b` |
+| N64 follow-up harvesting and selection probe | `161e81ca5e295a135ee7a21855f6a4e9181db425ff0e7248921b9777b85d37a5` |
 
 ### Terran chapter 5 input divergence
 
@@ -1182,6 +1201,34 @@ depletion to test automatic handoff.
 | Mineral worker reassignment and deposit | `8dee86c45e2031215bd43f51ccd585e428b5bc15fd05f0dd57395811f39d7592` |
 | Fresh HOME with resumed mineral income | `b21dfea87a4aa5177b2ba0305c05b0263223cc7f1ac7e653a6eaa0c4d30fffed` |
 
+#### Terran 5 victory and fresh HOME
+
+The recovered mineral and gas orders fund five more Wraiths.
+The first air attack removes a Missile Turret at (304,1264).
+The next removes the western Factory and four other buildings,
+including a second turret. Fresh HOME at frame 135,584
+preserves eleven Wraiths, both heroes, 1,128 minerals, and
+ten hostile buildings. The exported SRAM is byte-identical.
+
+The next stages remove the Barracks, both remaining turrets
+and western Command Center. Twelve Wraiths attack the final
+four Supply Depots. At frame 170,041, the game reaches the
+victory screen with both heroes alive. A fresh HOME load
+restores RESULT, the Terran 5 completion bit and the same
+victory SRAM. All orders use normal controls on the exact
+installed Terran image. A second controller replay of the
+final attack produces the same checkpoints and victory SRAM.
+From a separately loaded victory save, A advances into the
+playable Terran 6 field and retains the Terran 5 completion bit.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| West Factory SRAM | `8f4e43561641363f17c1d72453f65bbdd6a3f26d4e68847532921f0d78e74e71` |
+| West Factory fresh HOME | `958e327a17647a47d8e5f8d140804652571b928b62f1053c66cddd3a2b9246da` |
+| Final depot attack | `e20dff44342515903f644ae77ce0060afdeef06ce392fc15c1c003ac73f4e71b` |
+| Victory SRAM | `ae43a22a259d651ff4e975449b993209b53e72d147cd893bdf6d30752261f876` |
+| Fresh HOME and Terran 6 deployment | `5addd6b63f37eb6153d1f4c80cbd4dfbc2ac5e0e8e57c7dd703114a953f16908` |
+
 ## Custom Game saves
 
 Thirty-six early Custom Game save/continue pairs pass across all
@@ -1313,6 +1360,51 @@ point-route cache for this measured workload.
 
 The instruction receipt has SHA-256
 `6f0adcd8555466213ebc464a7a3ac065489e07cf4a9df0066000d0d78f6bc0ff`.
+
+#### Contact queries in those Outpost windows
+
+Read-only entry and return observations record 1,299 contact
+queries across the same six eight-update Outpost cuts. Each
+cut matches the uninstrumented run on elapsed cycles, cycle
+counters, both video pages, palette, display, camera and
+world state. The installed Terran and Zerg kernels run in
+Thumb ROM. Protoss uses ARM in IWRAM.
+
+Author-created ARM fixtures replay the captured bucket inputs
+at the corresponding placements. All masks match their
+observed cartridge values. Keeping the query origin and map
+dimensions in locals saves 0.11–0.19% of the Terran and Zerg
+fixture kernel cost and 6.50–7.03% on Protoss. The Protoss
+fixture explicitly keeps the kernel out of line and checks
+its IWRAM address. Trials with
+incremental bucket row addresses or a prepared geometry
+table offset make the busiest Thumb cases slightly slower.
+
+The early axis check already used in the IWRAM kernel saves
+more when enabled in the speed-optimized ROM fixture.
+
+| Case | Original kernel cycles | Early check cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Terran, one CPU | 841,775 | 627,127 | 25.5% |
+| Terran, two CPUs | 1,394,919 | 1,088,709 | 22.0% |
+| Zerg, one CPU | 945,323 | 690,035 | 27.0% |
+| Zerg, two CPUs | 1,555,013 | 1,213,921 | 21.9% |
+
+The kernel gains equal approximately 4.9–5.2% of two-CPU
+loop cycles if the fixture rates carry to the measured
+contact costs. The trial adds 92 bytes to each fixture
+kernel and changes the linked BSS endpoint by zero or four
+bytes. Whole-ROM timing, stack, RAM and save checks still
+need a paired run. Use the ROM early-axis trial first for
+busy Terran and Zerg Outpost qualification.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Verified Outpost query census | `835855435a5343bbbaf28187f24febce13960f95cbd9d026f0ea337a6fa13a86` |
+| Thumb local variables and incremental row addresses | `adf2bcdd19826bd73eba8360b4cc8a17fbf5c738ad34228531f0833d283742b8` |
+| Protoss IWRAM fixture with placement verified | `4acf4b134893ac7020cd593f0c7865c7473c81add398df6461f6493e5b7c4d2d` |
+| Prepared geometry offset | `96fc97d65e95a7eb099dbff5f46a0ddd962632bfc1a8ac7f0c8e295b72cbaad7` |
+| ROM early-axis matching masks, timing and memory | `32218fb7d46a7a91778cc2b27dbb88e760b875e56bd7678a9c8556cdcd594d9e` |
 
 ### Late camera movement
 

@@ -1260,6 +1260,15 @@ Kerrigan at 204 HP and the Hatchery at 1,250 HP. Hostile units
 hold the approach ahead, so a route through the terrain needs
 separate combat coverage.
 
+Two further transfers start from the same fresh HOME, with all
+five Hydralisks already selected. One orders them toward the
+next southern waypoint and the other withdraws west. Both lose
+two Hydralisks in about 150 updates. Kerrigan and the Hatchery
+retain 204 and 1,250 HP. A Dragoon and two Zealots hold the
+southern approach. Continue from the five-Hydralisk save while
+testing an earlier intercept or an independently qualified
+transport policy.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent post-Nexus evacuation and Hatchery | `050ed6fa7278eb19a8b89709da4181999011c2bcc4e504658bf48852b33559b5` |
@@ -1277,6 +1286,8 @@ separate combat coverage.
 | Zergling queue during the following attack | `c74a00c5a14f396e4c7a210d5fddf24d9421818f492e9f95506ce5de628c0664` |
 | Hydralisk movement and first damage checkpoint | `70e8152c86bc073afc922148e4536eb44150685a87f273f4bc3ecfe88209679e` |
 | Fresh HOME for the Hydralisk waypoint | `b7e07a0cb5d3f400cf687afceac85a85884c66725bd1b8b54dca689e94282464` |
+| Southern transfer under ground attack | `f028a0303b694a168dd3a879e590b4b0349434f5c0631d3caefaa4e98f573660` |
+| Western withdrawal under ground attack | `236b081e6aaba4d7420426962918e866f63f83e7a45f349c3d0422151b6a1634` |
 
 ### Native Overlord research permission
 

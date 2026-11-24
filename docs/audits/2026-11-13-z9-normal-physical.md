@@ -93,6 +93,55 @@ All three stages replay independently with matching state and
 SRAM. Fresh HOME restores the force, buildings and bank. Build
 more air and secure the gas line before attempting the crystal.
 
+Two more paid Mutalisks hatch and two new Drones work the gas
+line. An ordinary move order brings all five full-health air
+units to the first rally of the earlier winning route. Fresh
+HOME at frame 12,531 restores them near (560,250), three gas
+Drones and the 822/486 bank with identical SRAM. The objective
+countdown is still at zero. The earlier winning tape gathers
+fourteen Mutalisks before clearing the road.
+
+The next paid orders bring the group to eight full-health
+Mutalisks and fill available supply. Fresh HOME at frame
+19,211 keeps the three gas workers, a mineral worker and
+an 866/874 bank with identical SRAM. Three paid Overlords
+in a later branch allow further Mutalisk production. In
+that branch, an approaching Reaver reaches the gas line
+before the air group stops it, and the Extractor and gas
+workers are gone by frame 24,041. Continue from frame
+19,211 and target that Reaver before committing the air
+group to the crystal road.
+
+On a separate branch from frame 19,211, the eight Mutalisks
+attack-move into the Reaver's approach. The Reaver is gone
+from the base area in later observations. Fresh HOME at
+frame 23,282 gives nine full-health Mutalisks, two more
+queued, three surviving gas workers and a full-health Extractor.
+The next paid orders raise the group to fourteen full-health
+Mutalisks by game frame 26,691. Fresh HOME keeps both groups
+and the 442/1,018 bank with identical SRAM. The eight
+forward fighters and six near the Hatchery still need to
+assemble for the crystal route.
+
+The combined group destroys the first Photon Cannon on the
+road at (992,304). Fresh HOME at frame 27,561 restores all
+fourteen Mutalisks. Twelve have 120 HP and two have 100 HP.
+The gas line survives and the Extractor retains 750 HP.
+The bank is 490/1,106 and the countdown remains at zero.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paid air units and gas workers | `90cb4bc3dbdc2b12b2c28c54108be3cd401d849377ab954e2139cbf21b1447fd` |
+| Air rally and fresh HOME | `679241e68bc02b3d997abdec94b2ac6a9d04392764ec0c4e951a7ba0ca4e33b1` |
+| Rally SRAM | `4e499a8d708913fdc1c9d3755925ed56e0c6610fda6e68565d9faf4a9405999c` |
+| Eight Mutalisks with gas workers and fresh HOME | `6da811f52de1caab0785e426fcea3c0b8aa42339e50b16d2ae58115a3d46e4d3` |
+| Reinforced SRAM | `c4d4911f41e0b30d8f5093489f423bc8cd10c155501021c1d24ba1e82600ae27` |
+| Reaver interception and protected gas | `5c9a4eabe96c3291d1229999cda87ae4bc36c8308bfb35bc6c6087ea2e008c7f` |
+| Fourteen paid Mutalisks and fresh HOME | `2594f3ed328f1f2bbf4034423acfab02f959e8bde74a37f184e484a963a505d3` |
+| Fourteen-Mutalisk SRAM | `92bc86d2702d6c8969a4ac80190c1b6aedad85dc2303f2e1950d5171d912c1ae` |
+| First road Cannon attack | `53394856447841e82b979826b04771490834e05732f8f94ef58f020daf3084f6` |
+| Road attack fresh HOME and matching SRAM | `c53b63e53bada5cd317a0c9aaa1419527d4dda58b55d8a0e1663ebe3f1c4326e` |
+
 ### Opening frame cost
 
 Three independent 120-update windows use neutral buttons after
