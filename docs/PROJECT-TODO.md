@@ -1741,9 +1741,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rows and starts through fresh HOME load and pause restart.
   T1–T4 and T6–T10 win through ordinary inputs on the exact
   Terran image, including fresh mid-mission and victory loads.
-  Z2 and all ten Protoss chapters also win on the exact images,
-  for 20 of 30 missions overall. P4 also passes fresh field and
-  victory save reloads.
+  Z2 and all ten Protoss chapters also win on the exact images.
+  Z1 adds a verified continuation from an earlier-release pause,
+  bringing the exact-package victory count to 21 of 30. P4 also
+  passes fresh field and victory save reloads.
   An ordinary T5 retreat keeps Raynor at full health through
   frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
@@ -1759,29 +1760,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Wasteland opening bank and five-Marine R selection on both systems.
   [The last open CPU edit](audits/2026-11-24-kodak-package-checks.md#last-open-cpu-row)
   matches in both directions and both Blood Bath modes on N64 and
-  all three race ROMs. Recover or replace the missing Z1 input tape
-  for an exact-package win. The earlier Z1 pause and victory journals
-  both load on the installed Z10 through HOME and export identical SRAM.
-  The fixed-input continuation buys a Drone, completes an Extractor,
-  collects gas and builds a Hydralisk Den. Its completed-Den save
-  reloads in a fresh process. A paid Overlord restores the supply
-  cap, but the Den falls before it hatches. Protect the Den through
-  supply recovery. The [earlier defense branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-defended-opening-and-economy)
-  hatches a paid Hydralisk and reaches a freshly reloaded save with
-  four Hydralisks, three mining Drones and a living Den. The
-  [stronger early interception branch](audits/2026-11-24-kodak-package-checks.md#zerg-1-extractor-defense-and-renewed-gas-delivery)
-  sustains gas delivery and reaches a frame-37,754 save with 16
-  Hydralisks and three enemy buildings destroyed. The [later assault](audits/2026-11-24-kodak-package-checks.md#zerg-1-victory-requirements)
-  clears every enemy building but loses the Pool and the builders.
-  The original N64 victory trigger also requires a Pool and Den at
-  the moment of victory. Continue from the five-building branch
-  with three full-health Drones and rebuild the Pool under cover.
+  all three race ROMs. The [Z1 victory replay](audits/2026-11-24-kodak-package-checks.md#zerg-1-victory-replay)
+  runs 17 matching ordinary-input segments from the imported
+  frame-984 pause to victory. The result reloads byte for byte
+  and the Z2 briefing opens through HOME. Recover or replace
+  the input tape before frame 984 for an exact blank-SRAM run.
+  [Z3's fresh start](audits/2026-11-24-kodak-package-checks.md#zerg-3-early-economy)
+  produces a paid Drone and Extractor, assigns both resource
+  workers and reloads with the 250-health Chrysalis intact.
+  Finish the mission from this new exact-package checkpoint.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
-  has two ordinary-input FlashRAM slots. The second reloads at the
-  water crossing in a fresh ares process. Continue from that
-  checkpoint to qualify native mission progression and unlocks.
+  reaches Raynor's survival objective through ordinary controls.
+  The first FlashRAM slot reloads after the encounter, and the
+  second retains the earlier crossing. Qualify the native win
+  and mission unlocks from the stronger save.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
