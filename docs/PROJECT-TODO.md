@@ -1909,9 +1909,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Frame 57,882 fresh-loads seven Wraiths and both heroes. The
   next western attack removes a Missile Turret. Fresh HOME at
   frame 64,503 retains nine Wraiths, both heroes and 20 enemy
-  buildings. Seven hostile Wraiths remain. From the earlier
-  staging save, draw them away from the turrets before the
-  next attack.
+  buildings. Seven hostile Wraiths remain. A [separate reinforcement branch](audits/2026-11-24-kodak-package-checks.md#expand-supply-and-reinforce-before-the-western-assault)
+  pays for a Depot and a tenth Wraith. Fresh HOME at frame
+  68,291 has room for more at 44/50 supply, with both heroes
+  and the gas worker alive. Reinforce from the home branch
+  and draw enemy aircraft away from the turrets.
   Finish T5 and Z7–Z10 on this package,
   and qualify deeper checkpoints and GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
@@ -2216,6 +2218,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
+  The [adaptive Cannon power draft](https://github.com/ggu/starcraft-gba/pull/834)
+  cuts the dense lookup fixture from 80,203 to 41,838 cycles.
+  Compare whole frames, stack and fresh saves on all four products
+  before enabling it.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.

@@ -1050,8 +1050,8 @@ HOME process verifies both eastern structures are gone, the
 21 remaining hostile buildings, and byte-identical SRAM.
 
 A western staging run pays for two more Wraiths and reaches
-84/84 supply. A nine-Wraith attack removes the northern Missile
-Turret at (528,1344). Fresh HOME at frame 64,503 restores all
+42/42 displayed supply (84/84 half-units). A nine-Wraith attack
+removes the northern Missile Turret at (528,1344). Fresh HOME at frame 64,503 restores all
 nine aircraft, both heroes and byte-identical SRAM. The hostile
 census contains seven turrets, eight depots and five other
 buildings. Six of the seven remaining enemy Wraiths are clustered
@@ -1066,6 +1066,31 @@ new approach that separates enemy aircraft from the turret line.
 | Western Missile Turret attack | `0587019f430cec3382e80b5ee6030bd763ad3c8274c3bbb3d076218c4656f89d` |
 | Western Missile Turret fresh HOME | `94ef81c771f372d71a38eea6d6857fefc2e57b0f0292a070b1ca21e89cd41596` |
 | Second turret attack | `f784de0e78d93711283e484fe308de0f9da740755ca9039450512897b2213a1f` |
+
+#### Expand supply and reinforce before the western assault
+
+An ordinary construction order from the earlier staging
+save pays 100 minerals to build a Supply Depot at (1104,200).
+It completes by frame 65,724 and raises displayed supply
+capacity from 42 to 50. The captured Starport takes a paid
+150-mineral, 100-gas Wraith order at frame 65,790. The
+tenth Wraith completes by frame 66,990.
+
+Fresh HOME restores the force at 44/50 supply and the bank
+at 812 minerals and 448 gas. Raynor has 269 HP and Kerrigan
+250 HP. The SCV at the captured Refinery is still harvesting.
+During the attempt, an A input moved the original nine
+Wraiths back near the recruited base. This branch prepares a
+larger force at home. The earlier western turret-kill save
+holds the forward position. A second run of the same ordinary
+inputs reproduces the checkpoint observations and save byte
+for byte.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Depot and paid Wraith continuation | `6d52271de7406614aaeef881a77047bc20a9f86792f017aa2c67c8ba53a758ea` |
+| Fresh HOME observations | `226f101271cbeaa22ae94cf789d94ebf105eeae74886be8b80044ba87987de9c` |
+| Reinforced home force SRAM | `5443aa0f97ff386c2a7c8932fa964cf873e8e79001245431c6370b1384583e61` |
 
 ## Custom Game saves
 
