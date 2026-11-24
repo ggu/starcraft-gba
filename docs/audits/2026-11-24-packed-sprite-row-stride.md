@@ -44,6 +44,34 @@ The most common frame sizes include 20×26, 11×17 and 16×16. The
 fixture also tests the larger 74×68 size seen in both windows.
 Full-frame timing with the new path in the race cartridges remains open.
 
+### Packed group opacity
+
+Read-only instruction stops count the masks actually tested in the
+same 16 updates. All world, camera, both framebuffer pages and palette
+checks match the uninstrumented run. The counts are of four-pixel
+groups, including groups at a sprite or clipping boundary.
+
+| Update window | Transparent | Opaque | Mixed |
+| --- | ---: | ---: | ---: |
+| 9,001–9,008 | 4,675 | 4,732 | 1,505 |
+| 11,385–11,392 | 8,480 | 8,048 | 6,563 |
+
+A two-group unroll costs 88 more bytes of IWRAM and regresses the
+small right-edge clip from 32,085 to 33,121 guest cycles. The larger
+74×68 batch improves from 1,237,568 to 1,180,992. A shorter predicated
+loop saves eight IWRAM bytes and 1–2.3% in the original authored mix.
+It replaces the opaque fast path with a framebuffer read for every
+nontransparent group, so the result depends on group composition.
+
+Four additional authored mixes approximate the measured early and
+late group rates, with both clustered and spread masks. Padding and
+clipping shift the resulting counts toward mixed groups. At `-O2`,
+the 74×68 batch regresses in all four mixes, by 0.28–1.84%. The
+20×26 batch improves by 0.33% in the late spread case and regresses
+in the other three. Both framebuffer pages and the palette match for
+both alternatives at `-O2` and `-Os`. Keep the row-stride change as
+the packed drawing candidate.
+
 ## Byte sprites and contact traversal trials
 
 The byte-sprite painter also tried advancing the row addresses once
@@ -85,6 +113,11 @@ drawing and movement costs on the combined builds.
 | Authored packed sprite timing and pixels | `8d1a6e2fee3345903f204ca4c9bf430c6299eeab73a8ee016a386e077cc6f1eb` |
 | Four graphics object profiles | `fc938f69f67eb6769f9388a71e37b664d641daaa76e6d90f87d7296c96abdc67` |
 | Exact Protoss 10 sprite and movement census | `67f20dae00085613182e2471d1d594100e038637edf1a29e61b035c2c47e8b6f` |
+| Exact Protoss 10 packed group mask counts | `58db3b6fab1d25b44bb5d5f19c9059205f6b0799493383684d70613dd0e650b9` |
+| Packed two-group unroll | `b46a46708b8aa57d2f91aabc172605cb58f577acd2439fe6000cfb2483632c49` |
+| Predicated mixed-loop timing | `e728250881ae7300c54f3f28896cd0ebfd0ad59e5e63c9835caaeac69c3eb337` |
+| Predicated early clustered / spread timings | `416d5fd39f848284064bd210deda06ec0b413f4823aa79a900c4e368d3156217` / `ffb1d0ac4e3009046dcc122b2afe1025e6f3023490a30986a99e247a8d59997a` |
+| Predicated late clustered / spread timings | `c23c0f42336120d740b469161a79b86b038efa026b6456bec093e00903640be6` / `cdba04d96e35d47261597d630051b9e5b6ee8b038b8954ccfd87bca79d11f0f2` |
 | Byte sprite baseline | `caa0f2fb81e5cf39e33af1e831026179010130e776817dfc4ea79a15b3a35cbd` |
 | Byte sprite row-address trial | `ba2522af2f4d63dc112aacb2ddf12aa3c6f81eb280251a4191944ced0ff0b111` |
 | Identical contact traversal receipts | `8e67a3015a7857de17bf6706f6bc8e50be7a0bcb487db34ae3f5ca3e2390dc46` |
