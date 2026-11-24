@@ -411,6 +411,35 @@ and the intact Chrysalis and tech buildings. Independent replays
 match the three saved field states and journals. The air-tech
 branch has 26 hostile buildings remaining.
 
+The frame-31,682 save also continues through a third gas worker
+and seven more Mutalisks. At frame 44,345 the force has 19
+Hydralisks and 12 Mutalisks. An ordinary Move order concentrates
+both groups before the attacks. The two turret strikes remove
+two hostile buildings while all 31 combat units survive.
+The last save at frame 48,118 retains the full-health Chrysalis,
+key tech buildings, and six Drones split evenly between minerals
+and gas. There are 33 hostile units and 24 hostile buildings.
+
+An independent replay matches the six stage fingerprints and
+SRAM outputs byte for byte. A fresh HOME process restores frame
+48,118 and the same army. One Hydralisk dies after another 120
+neutral updates, so the next attack needs an immediate ground
+order before sending the Mutalisks ahead. A separate attempt
+shows the line ahead has siege tanks and costs nine Hydralisks
+on a direct advance.
+
+Starting before the ground push gives time to hatch 18
+Mutalisks. Two A taps on their stack select the air units,
+then a Move order gathers them clear of the Hydralisks.
+With the ground force near the base, the air group destroys
+both front turrets, an exposed tank and an additional hostile
+building. The frame-55,138 save retains 18 Hydralisks, 18
+Mutalisks, six Drones and the intact Chrysalis and tech.
+It has 34 hostile units and 23 hostile buildings remaining.
+The six stages replay to their retained field and SRAM hashes.
+A fresh HOME load restores that save byte for byte and keeps
+all 36 combat units alive for a further 120 neutral updates.
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -472,6 +501,15 @@ this position and a fresh process restores it with byte-identical
 additional Marines and Raynor's survival. The bank still has
 40 minerals and five SCVs remain near the northwest start.
 Mining and production are the next verified-play checkpoints.
+
+Finer cursor placement selects a controllable 60-health SCV.
+The native unit panel shows its Build, Repair and Move choices.
+C-Right moves that SCV south from the northwest opening group
+to the rocky pass. The ordinary menu writes a first-slot save,
+and a fresh native process restores the SCV there with a
+byte-identical FlashRAM export. The field still shows 40 minerals
+and 10/18 supply. The next checkpoint is an explicit mining
+order at the base followed by a verified increase in minerals.
 
 ### Terran chapter 5 input divergence
 
@@ -963,6 +1001,9 @@ quality on the GBA SP.
 | Zerg chapter 3 larger staging army and paired assault journals | `add479597eb38b1346b659a915453c0ff18e6780dd44698be74bf382d438594e` |
 | Zerg chapter 3 paid Lair, Spire, Mutalisk and fresh load | `19b35e7e434fb4a1e2ffe1f23ce38e49ab41459e21fc3915f907f83d17f7010b` |
 | Zerg chapter 3 two gas workers, replacement Drone, second paid Mutalisk and fresh load | `c03824f923eeccb8a403b2b300575e049ac4084477f558acc9bc9d23351667fa` |
+| Zerg chapter 3 concentrated force, two turrets destroyed and fresh load | `7ab53d373dce59910590b59f49578a5321981a5606444fcd64fc5b2a7781ca1b` |
+| Zerg chapter 3 air-only staging and two front turrets | `da15345f50c14de6ba9bc3e0596e3cf5d5e549d979164daa4e5009a52151e3e0` |
+| Zerg chapter 3 exposed tank and third building, with fresh load | `4edc0c308e971a5c01f44756e7de9224fb7e93bb394ac68454b0f4a520cd1ee2` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
@@ -973,6 +1014,7 @@ quality on the GBA SP.
 | N64 Wasteland Raynor survival objective manifest | `ab665a6572572da554ecc7da81a67ad8a02f21306149d2b22009a5b54190cdbd` |
 | N64 Wasteland post-encounter save and fresh title-load manifests | `e3ace99f57f04f37b5c743e92b8c38f516e4d6af4b4078890b16de5817e71d43` / `0bcebe5d9b9519e578797c3b2a33bcedcd6522c3d9b1243411b46ae9a0ee249a` |
 | N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
+| N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |

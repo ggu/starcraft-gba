@@ -1774,16 +1774,23 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   25 hostile buildings left. A separate staging branch reaches
   a completed Lair and Spire, two Drones on gas, 20 Hydralisks
   and five Mutalisks by frame 31,682. Its fresh load restores
-  the full staging force and intact Chrysalis. Build a stronger
-  air force from that checkpoint, then verify victory on the exact ROM.
+  the full staging force and intact Chrysalis. Three gas Drones
+  bring the force to 12 Mutalisks. A concentrated push removes
+  two turrets with all 19 Hydralisks and 12 Mutalisks still alive
+  at the fresh frame-48,118 checkpoint. A branch that keeps the
+  ground force near the base clears three buildings and an
+  exposed tank with 18 Mutalisks. The fresh frame-55,138 save
+  retains all 18 Hydralisks, 18 Mutalisks and the intact Chrysalis.
+  Continue the air offensive and verify victory on the exact ROM.
   Wider campaign wins, deeper load checkpoints and GBA SP timing
   remain open for this package.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
-  retains the earlier crossing. Bring the five SCVs to the
-  mineral field, verify a Barracks and Marine production, and
-  qualify the native win and mission unlock.
+  retains the earlier crossing. The next native save fresh-loads
+  a 60-health SCV moved to the rocky pass. Reach the mineral
+  field with it, verify mining, a Barracks and Marine production,
+  and qualify the native win and mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
