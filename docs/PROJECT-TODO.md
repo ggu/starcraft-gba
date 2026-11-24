@@ -1012,10 +1012,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
-  matches the default Z10 geometry-table configuration.
-  Replay it on complete Z10 late frames and older saves
-  before changing the default. Terran's arithmetic ROM
-  kernel needs a separately paired comparison.
+  now covers the arithmetic path as well. Six paired Terran
+  late skirmish windows preserve the sampled state and display
+  and all six SRAM continuations. Outpost mean frame costs
+  fall 1.16–3.16%, depending on CPU count. The 2- and
+  3-CPU samples still exceed the budget. Qualify the same
+  option in complete Z10 frames, test stack use and finish
+  active-match and campaign checks before changing the default.
   Keep a one-CPU Blood Bath tail check, where a near-budget
   mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
@@ -1222,8 +1225,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   take damage before the first reinforcements hatch. Five
   Hydralisks reach the first connected waypoint with three
   injured. Both tested follow-up paths lose two. Test an
-  earlier ground intercept. For the alternate transport
-  route, the native scenario permits Ventral Sacs. Qualify
+  earlier ground intercept. The [worker evacuation](audits/2026-11-12-z8-normal-physical.md#evacuate-workers-before-the-eastern-reaver-reaches-the-base)
+  preserves all five Drones, 19 Hydralisks and Kerrigan at
+  fresh HOME frame 72,755. Pair the escape with an earlier
+  local defense or build a second production base. The native
+  scenario permits Ventral Sacs for the alternate transport
+  route. Qualify
   human Z8 research, boarding and fresh SRAM as one path.
   [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
   fresh-loads an Extractor, Lair, Den, Spire and three full-health
@@ -1242,8 +1249,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A advances into Z10, whose opening save also restores from HOME.
   The [first Z10 raid](audits/2026-11-21-z10-current-full-circle.md#november-24-cartridge-opening-and-first-raid)
   leaves the eastern Sunken at 28 HP with the mining line still
-  active. Use the earlier save with 1,142 minerals and 950 gas
-  to build up the defense, or begin production earlier.
+  active. The [earlier defense](audits/2026-11-21-z10-current-full-circle.md#earlier-defense-and-reaver-pursuit)
+  brings paid Hydralisks out before the raid. The mobile flank
+  loses the mining line. The [four-Sunken branch](audits/2026-11-21-z10-current-full-circle.md#four-sunkens-before-the-raid)
+  preserves both miners. After a focused attack the Reaver
+  disappears, four Hydralisks survive and the Den falls.
+  Rebuild the Den and protect income through the rest of
+  the raid.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
@@ -1994,7 +2006,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   matches the starting bank and roster. N64 shows 5/26 and
   starts the SCV gathering, while GBA shows 6/26 and the worker
   starts idle. The native checkpoint fresh-loads and resumes
-  mining. The N64 unit table gives both Raynor variants zero
+  mining. [Both Backwater Barracks](audits/2026-11-24-kodak-package-checks.md#backwater-marine-production)
+  train a Marine for 50 minerals through ordinary controls.
+  The N64 unit table gives both Raynor variants zero
   supply. Qualify the corrected GBA total and existing saves,
   and trace the native SCV's first target and order separately.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
