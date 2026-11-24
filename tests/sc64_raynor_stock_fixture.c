@@ -20,6 +20,10 @@ int main(void)
     );
     assert(sc64_race_unit_rule(U_RAYNOR)->hp == stock->hp);
     assert(sc64_race_unit_rule(U_RAYNOR)->shields == stock->shields);
+    assert(sc64_race_unit_rule(U_RAYNOR)->supply == stock->supply_required);
+    assert(4 * sc64_race_unit_rule(U_MARINE)->supply +
+           sc64_race_unit_rule(U_SCV)->supply +
+           sc64_race_unit_rule(U_RAYNOR)->supply == 10);
     assert(sc64_race_unit_armor(U_RAYNOR) == stock->armor);
     assert(sc64_race_unit_can_attack_air(U_RAYNOR) ==
            (stock->air_weapon != 130));
