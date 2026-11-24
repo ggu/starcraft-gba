@@ -20,28 +20,33 @@ mineral_in_view(const Mineral *mineral, int x, int y)
 }
 
 static inline void
-draw_map_mineral(int i)
+draw_map_mineral_art(int i, int x, int y)
 {
-    if (m[i].amount <= 0) return;
-    int x = m[i].x - camx, y = m[i].y - camy + 12;
-    if (!mineral_in_view(&m[i], x, y) ||
-        !currently_visible(m[i].x, m[i].y)) return;
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
     if (sprite) {
         draw_static_mineral_sprite(sprite, x, y);
         return;
     }
+#else
+    (void)i;
 #endif
     gfx_diamond(x, y, 7, 4, C_CYAN);
     gfx_pixel(x, y, C_WHITE);
 }
 
 static inline void
-draw_map_geyser(int i)
+draw_map_mineral(int i)
 {
-    int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
-    if (!geyser_in_view(x, y) || !currently_visible(geysers[i].x, geysers[i].y)) return;
+    if (m[i].amount <= 0) return;
+    int x = m[i].x - camx, y = m[i].y - camy + 12;
+    if (mineral_in_view(&m[i], x, y) && currently_visible(m[i].x, m[i].y))
+        draw_map_mineral_art(i, x, y);
+}
+
+static inline void
+draw_map_geyser_art(int x, int y)
+{
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_geyser_sprite();
     if (sprite) {
@@ -50,6 +55,14 @@ draw_map_geyser(int i)
     }
 #endif
     gfx_diamond(x, y, 6, 4, C_GREEN);
+}
+
+static inline void
+draw_map_geyser(int i)
+{
+    int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
+    if (geyser_in_view(x, y) && currently_visible(geysers[i].x, geysers[i].y))
+        draw_map_geyser_art(x, y);
 }
 
 /* The tile renderer still lifts its static objects into a background

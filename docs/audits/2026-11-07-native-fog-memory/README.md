@@ -52,3 +52,46 @@ records are retained only in the ignored local run output.
 | Viewport before scout | `8c4923a905d7f9abd06189d19cf8b6ed2ca10e95f3e40cbf49308e154aae1fc4` |
 | Lit shoreline | `2c7fd74ed9466ba6e103e9f02c11c5e69f53b89b9bd57367cc3a4bc01c8994a1` |
 | Dim shoreline | `b4a44539f6b57d32a95f84926bd6e5f7d43655092afb39a6bc49da0d3b33efe6` |
+
+## Remote mineral patches
+
+A fresh run sent the four selected Probes down the coast, then
+scrolled farther south. Two blue crystal patches appeared near the
+bottom of the field at step 8,669. A leftward move returned the Probes
+to the base area, where all four were visible at step 10,128. The
+return pan shows the same two crystal groups in dim form at step
+10,547. The cyan minimap mark in that area contains the same seven
+qualifying pixels in both resource frames, near `(100, 193)` in the
+640×240 callback buffer. The mark is absent from the earlier step
+8,489 frame before the crystal groups appear. The bright and dim
+frames show a minimap mark associated with this discovery. The
+replay leaves hidden depletion, remote geysers, and the exact marker
+color and visibility thresholds open.
+
+GBA Mode 4 and tile resource painters currently require live sight.
+The minimap terrain is followed by building and unit dots. A shared
+resource memory should retain the last observed presence of a patch
+while it is hidden, then clear it when the player sees it depleted.
+Using the live amount to draw a remembered marker would reveal enemy
+mining through fog. Include the resource state in save/load and cache
+coverage. Legacy saves require a conservative initialization because
+they carry exploration and current mineral amounts without the last
+observation.
+
+The standalone packed Protoss 6 save illustrates the storage constraint.
+Its 16,348-byte `RaceSave` and four-byte packed-impact marker leave
+16 bytes under the 16,368-byte record payload limit. A 144-slot bitmap
+needs 18 bytes. Qualify a representation that fits the existing
+profiles and keeps the observation and world in the same save record.
+
+The pinned native bridge completed in 70.335 seconds with 17
+local frames and verified its checked inputs after the run.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Run manifest | `4d9fad8b5e2b4c6e17d7192a0ccba70bf66c5b6fb305f7e58d22f66d6df57b1d` |
+| Controller commands | `7481c84e9fbc15d60e3f2d42bc7ff1c3305d852c52b8e126f7cffaf8c4eb7204` |
+| Before the crystal groups appear | `00205a563b739481378d5b5129cf33d084351edfee204dd8275e176f5e5af4be` |
+| Lit crystals | `3fbf19212e5a2d8a021f77ae8bb9da09ea145774c92820e3fca22f8d0a7ef841` |
+| Four Probes after returning | `491dab9203daab9494b941d1de097b1b2a1916bb3171ed6a2435b29d6da3ba15` |
+| Dim crystals | `386db62c84e53febfdf9544fb526c30283155c5d7ea330abba0d35faf1f166d4` |

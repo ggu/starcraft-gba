@@ -648,14 +648,15 @@ sc64_draw_depth_ordered_actors(void)
 #endif
         unsigned i = key & DEPTH_SLOT_MASK;
         switch ((key >> DEPTH_SLOT_BITS) & DEPTH_KIND_MASK) {
+        /* Admission already applies resource visibility and viewport clipping. */
         case DEPTH_MINERAL:
             if (i < DEPTH_MINERAL_WORK_BASE)
-                draw_map_mineral((int)i);
+                draw_map_mineral_art((int)i, m[i].x - camx, m[i].y - camy + 12);
             else
                 sc64_draw_mining_effect(&u[i - DEPTH_MINERAL_WORK_BASE]);
             break;
         case DEPTH_GEYSER:
-            draw_map_geyser((int)i);
+            draw_map_geyser_art(geysers[i].x - camx, geysers[i].y - camy + 12);
             break;
         case DEPTH_BUILDING: {
             if (selected_building == (int)i) draw_world_building_ring(&b[i]);
