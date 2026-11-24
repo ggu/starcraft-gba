@@ -134,6 +134,32 @@ stays at 660,677 cycles with 163 updates above two VBlanks. Keep
 both trials local and prioritize the larger movement and painting
 work. Additional camera positions may exercise other row phases.
 
+## Paired frame loops after the packed-sprite merge
+
+Source release `fc17165b` includes the packed-sprite row change and
+the current shared simulation. It is the baseline for both replay
+pairs below. The same authored setup and normal frame loop drive
+both builds. All 720 sampled updates match on the simulation digest,
+camera, both framebuffer pages, palette and display control.
+
+| Workload | Mean frame cycles before → after | Mean draw cycles before → after | Two-VBlank misses before → after |
+| --- | ---: | ---: | ---: |
+| Fixed camera, 120 updates | 652,700 → 615,256 | 284,137 → 255,060 | 70 → 62 |
+| Visible pan, 600 updates | 609,143 → 603,527 | 297,605 → 260,105 | 115 → 101 |
+
+The whole-frame means fall 5.74% and 0.92%, respectively, and
+mean drawing cost falls 10.23% and 12.60%. The panned p95 stays
+within four cycles. Linked IWRAM falls by 88 bytes in the fixed
+fixture and 64 in the panned fixture. Linked data and BSS match
+within each pair. The fixed pair's latest peak rises by 1,173
+cycles. The fixture still misses the two-VBlank budget during
+busy play. Race-cartridge and GBA SP timing remain open.
+
+| Local paired receipt | SHA-256 |
+| --- | --- |
+| Fixed camera | `b1caa6b977985d2cef30ee691b6b599ee4489c98d49d1a3e0e8dec390a2d735d` |
+| Visible pan | `e49fe7009e9644291e9ed7871b6c99ca52be355dbb113d8cc0cebe688849cc14` |
+
 ## Reproduce the comparison
 
 Use a headless mGBA runner built from the current
