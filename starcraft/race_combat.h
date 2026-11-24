@@ -106,9 +106,28 @@ _Static_assert(sizeof(((Building *)0)->x) == sizeof(RaceDefenseCoordinate) &&
                sizeof(((Building *)0)->y) == sizeof(RaceDefenseCoordinate),
                "defense Pylon roster preserves building coordinate width");
 
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+enum {
+    RACE_DEFENSE_PYLON_BUCKET_MIN = 24,
+    RACE_DEFENSE_PYLON_BUCKETS = 8,
+    RACE_DEFENSE_PYLON_BUCKET_MASK = RACE_DEFENSE_PYLON_BUCKETS - 1
+};
+
+/* Hash 128-pixel rows. Unsigned shifts preserve the bucket number for negative
+ * coordinates, and colliding rows are still checked against the exact mask. */
+static inline unsigned race_defense_pylon_row(unsigned y)
+{
+    return (y >> 7) & RACE_DEFENSE_PYLON_BUCKET_MASK;
+}
+#endif
+
 typedef struct {
     int count;
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+    u8 head[5][RACE_DEFENSE_PYLON_BUCKETS];
+#else
     u8 head[5];
+#endif
     u8 next[MAX_BUILDINGS];
     RaceDefenseCoordinate x[MAX_BUILDINGS], y[MAX_BUILDINGS];
 } RaceDefensePylons;
@@ -131,26 +150,72 @@ race_defense_powered(RaceDefensePylons *pylons, const Building *q)
     if ((unsigned)owner >= 5) return race_site_powered(owner, q->x, q->y);
     if (pylons->count < 0) {
         int count = 0;
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+        for (unsigned owner = 0; owner < 5; ++owner)
+            pylons->head[owner][0] = 0xff;
+#else
         memset(pylons->head, 0xff, sizeof(pylons->head));
-        /* Descending slots plus push-front preserves scalar traversal order. */
+#endif
+        /* Descending slots plus push-front keeps sparse lists in slot order. */
         for (int i = MAX_BUILDINGS - 1; i >= 0; --i) {
             const Building *p = &b[i];
             if (p->type != B_PYLON || !building_complete(i) ||
                 (unsigned)p->owner >= 5) continue;
             pylons->x[count] = p->x;
             pylons->y[count] = p->y;
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+            /* Keep sparse rosters as one list per owner. When a dense roster
+             * first needs rows, redistribute the admitted slots once. */
+            if (count == RACE_DEFENSE_PYLON_BUCKET_MIN - 1) {
+                for (unsigned owner = 0; owner < 5; ++owner) {
+                    unsigned slot = pylons->head[owner][0];
+                    memset(pylons->head[owner], 0xff, sizeof(pylons->head[owner]));
+                    while (slot != 0xffu) {
+                        unsigned next = pylons->next[slot];
+                        unsigned row = race_defense_pylon_row((unsigned)pylons->y[slot]);
+                        u8 *head = &pylons->head[owner][row];
+                        pylons->next[slot] = *head;
+                        *head = (u8)slot;
+                        slot = next;
+                    }
+                }
+            }
+            unsigned row = count >= RACE_DEFENSE_PYLON_BUCKET_MIN - 1
+                ? race_defense_pylon_row((unsigned)p->y) : 0;
+            u8 *head = &pylons->head[p->owner][row];
+            pylons->next[count] = *head;
+            *head = (u8)count++;
+#else
             pylons->next[count] = pylons->head[p->owner];
             pylons->head[p->owner] = (u8)count++;
+#endif
         }
         pylons->count = count;
     }
     int x = q->x, y = q->y;
-    for (int k = pylons->head[owner]; k != 0xff; k = pylons->next[k]) {
-        int dx = x - pylons->x[k];
-        if ((unsigned)(dx + 127) >= 255) continue;
-        int dy = y - pylons->y[k];
-        if ((unsigned)(dy + 79) < 159 && sc64_p7_in_psi_range(dx, dy))
-            return 1;
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+    unsigned row = 0, last = 0;
+    if (pylons->count >= RACE_DEFENSE_PYLON_BUCKET_MIN) {
+        row = race_defense_pylon_row((unsigned)y - 79u);
+        last = race_defense_pylon_row((unsigned)y + 79u);
+    }
+    for (;;) {
+        int k = pylons->head[owner][row];
+#else
+    {
+        int k = pylons->head[owner];
+#endif
+        for (; k != 0xff; k = pylons->next[k]) {
+            int dx = x - pylons->x[k];
+            if ((unsigned)(dx + 127) >= 255) continue;
+            int dy = y - pylons->y[k];
+            if ((unsigned)(dy + 79) < 159 && sc64_p7_in_psi_range(dx, dy))
+                return 1;
+        }
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+        if (row == last) break;
+        row = (row + 1u) & RACE_DEFENSE_PYLON_BUCKET_MASK;
+#endif
     }
     return 0;
 }
