@@ -1097,6 +1097,32 @@ approach before committing it.
 | Direct bypass trace | `f8e9f1c8861ca940edb5e8bfb3abb72cf506582800d38a952c45946631b6a139` |
 | Frame-66,877 HOME SRAM | `2e5671fb9b0a38abee46de8e3bf675344d09a55d6ac654e2d10a9254b2a7f35a` |
 
+### Stage the eastern formation together
+
+The installed Zerg cartridge loads the retained formation
+journal and moves the eleven Hydralisks near (1848,1400)
+through the ordinary command menu. At frame 65,165 all eleven
+are within x1836–1868 and y1401–1417. Kerrigan stays near
+(1350,1865) at 400 HP. An independent replay matches the
+world fingerprint, followed by a fresh HOME load with the
+same friendly roster and byte-identical SRAM.
+
+Moving this group to (1880,1320) and then issuing Attack Move
+toward (1768,1264) reaches firing range. The Nexus remains
+at 750 HP with 702 shields at frame 66,866. Ten of the
+eleven Hydralisks die, and Kerrigan keeps 400 HP. Fresh HOME
+restores the assault result and exact SRAM. The intact
+formation remains available, with a 9,067-mineral and 409-gas
+bank. Reinforce at that position before committing the next
+attack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent eleven-Hydralisk staging replay and fresh HOME | `8403e3e4258222774f468cee87c5f75c518bf7d12cc76cb564f284e1abaa90bb` |
+| Eastern staging SRAM | `cc444b662f6de1ee57859a7357e5d7b4465f73be425c7ac4d4c04faed9565264` |
+| Staged Nexus attack | `c5cd2592000ad471e1e022d5983120466ca1cf17e4374ec1962067b5396d7eee` |
+| Assault fresh HOME | `6cffd5bbf2b6659436836d8c9a1968a2dc72f04125be17c352e1d3bde5c2e94e` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

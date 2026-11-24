@@ -1177,8 +1177,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   increases the force to eleven Hydralisks at fresh HOME frame
   64,983. Attacking the Pylon first leaves seven for the Nexus.
   A direct bypass splits the force and leaves the Nexus at full
-  health and shields. Stage the eleven together near one approach
-  before issuing the objective attack.
+  health and shields. The [single-approach staging replay](audits/2026-11-12-z8-normal-physical.md#stage-the-eastern-formation-together)
+  fresh-loads all eleven at frame 65,165 with Kerrigan separate
+  at 400 HP. An attack from the same approach removes 48 Nexus
+  shields and costs ten Hydralisks. Reinforce the staged group
+  before the next attack.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -1883,9 +1886,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   load with matching SRAM. The [Barracks comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-barracks-construction)
   observes the 150-mineral charge on both systems. The native
   construction resumes after a fresh load. The infantry advisor
-  activates the five-of-ten Marine counter. GBA trains five
-  Marines at 50 each and wins. Verify native Marine production,
-  victory and the next mission unlock.
+  activates the five-of-ten Marine counter. A new B Harvest
+  order raises the native bank from 10 to 34. GBA trains
+  five Marines at 50 each and wins. Verify native Marine
+  production, victory and the next mission unlock.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
