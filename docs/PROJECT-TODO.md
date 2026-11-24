@@ -115,6 +115,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   contributors are stable. Retain moving-camera cases, with 105
   changed tiles on each pan update in one P10 window. Continue
   profiling movement and route work toward the two-VBlank budget.
+  The [shared small-diamond lookup](audits/2026-11-24-shared-diamond-spans.md)
+  saves 21,635–42,273 draw cycles per update in an authored
+  original-art crowd with matching pixels and world state. Two exact
+  ratios cost more in the IWRAM microbench. Measure fallback shape
+  frequency and combined pacing on the race cartridges.
   [Reusing detached sprite records](audits/2026-11-22-steady-order-cost.md#detached-attack-sprite-draw-records)
   saves 0.63% in Crossfire and slightly increases both measured
   Custom Game means. Keep it local. Count transparent row edges in
