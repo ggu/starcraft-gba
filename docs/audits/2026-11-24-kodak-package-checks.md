@@ -920,6 +920,11 @@ initial mineral target require a separate trace.
 The [OpenBW units.dat loader](https://github.com/OpenBW/openbw/blob/master/data_loading.h#L1433-L1443)
 identifies the supply columns in the cartridge table.
 
+A further controller-only load sees minerals rise from 248
+to 256 while gas and 5/26 supply hold. An A press aimed at
+the vehicle yields no visible selection panel or ring. That
+capture leaves its ownership and the hit test unresolved.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |
@@ -929,6 +934,7 @@ identifies the supply columns in the cartridge table.
 | GBA independent opening and 600 neutral updates | `4fa9651e09dccc7efc4770cdd8a633823e7c7863722ed1c6f55218aeefbc099f` |
 | N64 unit supply table inspection | `18cf32940064e50f2a6872388622061cb6360a04f27ea5e0183d0d2edad89751` |
 | N64 Backwater starting roster and action counts | `7ac41e6b4fab6762aca295fed9b07792ae277aa329b72d1d716e755524328f2b` |
+| N64 follow-up harvesting and selection probe | `161e81ca5e295a135ee7a21855f6a4e9181db425ff0e7248921b9777b85d37a5` |
 
 ### Terran chapter 5 input divergence
 
@@ -1368,7 +1374,9 @@ Author-created ARM fixtures replay the captured bucket inputs
 at the corresponding placements. All masks match their
 observed cartridge values. Keeping the query origin and map
 dimensions in locals saves 0.11–0.19% of the Terran and Zerg
-fixture kernel cost and 4.24–4.64% on Protoss. Trials with
+fixture kernel cost and 6.50–7.03% on Protoss. The Protoss
+fixture explicitly keeps the kernel out of line and checks
+its IWRAM address. Trials with
 incremental bucket row addresses or a prepared geometry
 table offset make the busiest Thumb cases slightly slower.
 
@@ -1393,7 +1401,8 @@ busy Terran and Zerg Outpost qualification.
 | Local receipt | SHA-256 |
 | --- | --- |
 | Verified Outpost query census | `835855435a5343bbbaf28187f24febce13960f95cbd9d026f0ea337a6fa13a86` |
-| Local variables and incremental row addresses | `adf2bcdd19826bd73eba8360b4cc8a17fbf5c738ad34228531f0833d283742b8` |
+| Thumb local variables and incremental row addresses | `adf2bcdd19826bd73eba8360b4cc8a17fbf5c738ad34228531f0833d283742b8` |
+| Protoss IWRAM fixture with placement verified | `4acf4b134893ac7020cd593f0c7865c7473c81add398df6461f6493e5b7c4d2d` |
 | Prepared geometry offset | `96fc97d65e95a7eb099dbff5f46a0ddd962632bfc1a8ac7f0c8e295b72cbaad7` |
 | ROM early-axis matching masks, timing and memory | `32218fb7d46a7a91778cc2b27dbb88e760b875e56bd7678a9c8556cdcd594d9e` |
 

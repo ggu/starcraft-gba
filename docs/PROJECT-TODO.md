@@ -1222,8 +1222,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   paid Mutalisks at frame 8,925. At frame 12,531, a fresh HOME
   load restores all five full-health Mutalisks at the first
   rally and three gas workers. The next fresh save has eight
-  full-health Mutalisks. Intercept the Reaver approaching the
-  gas line before clearing the crystal road.
+  full-health Mutalisks. A successful interception keeps the
+  full-health Extractor and all three workers. Fresh HOME at
+  frame 26,691 restores fourteen full-health Mutalisks. The
+  combined air group destroys the first road Cannon. A fresh
+  frame-27,561 load keeps all fourteen and the gas line.
+  Continue the attack until the Drone can reach the countdown.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
