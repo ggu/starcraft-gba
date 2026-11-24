@@ -288,6 +288,27 @@ the frame-17,345 journal. A fresh emulator loads the last save
 with identical SRAM and advances another 120 updates. The living
 Chrysalis and all ten Hydralisks remain present. Victory is open.
 
+### Zerg 1 base raids and reinforcement
+
+The continuation from frame 26,301 responds to a Wraith near the
+Den and a Firebat near the Extractor. It loses the gas worker,
+intercepts the Firebat and assigns a replacement Drone. Gas rises
+from 233 to 249 and the Den stabilizes at 744 health. By frame
+32,759, paid production reaches 14 Hydralisks. In a neutral branch
+from there, the next raid destroys the Extractor and kills nine
+Hydralisks. An immediate Attack Move intercepts the raid in the
+preserved branch. Twelve Hydralisks and all four Drones survive,
+with the Extractor at 93 health and 28 enemy units remaining.
+
+Production reaches 16 Hydralisks with one queued by frame 37,754.
+The base retains the Extractor and four Drones, with 2,028 minerals,
+248 gas and 40/50 supply. Eleven enemy buildings remain. An
+independent controller replay matches the five checkpoint worlds
+and their SRAM bytes. A fresh load advances 120 updates with all
+16 Hydralisks and the Chrysalis alive. In separate longer branches,
+idling loses the Extractor and a preemptive regroup loses nine
+Hydralisks. The next raid and the mission victory remain open.
+
 The retained N64 Z1 evidence covers the title and
 briefing after a progress edit. A native combat comparison still
 needs an ordinary mission unlock and capture.
@@ -312,6 +333,24 @@ It reaches 11,420 emulator steps and retains five frames. The last
 frame shows the displaced camera over fog and the opening 40 minerals
 and 10/18 supply. This run confirms the controller and capture path
 for longer tests. Native campaign progression remains unverified.
+
+A fresh ordinary-input ares run verifies that R selects the five
+starting Marines. After a short analog cursor move and C-Right,
+the group changes position. A subsequent command moves the group
+into the trees. The native HUD identifies the C-button movement
+controls. These captures cover selection and movement. An enemy
+engagement and mission completion remain open.
+
+The ordinary pause menu saves Wasteland to the first empty slot.
+The original interactive bridge closed without writing FlashRAM.
+With the desktop ares save sequence added before unload, the same
+input writes a 128 KiB cartridge save. A fresh bridge process
+copies it into isolated save storage and opens Load Saved with two
+D-pad Right presses. `Terr01 01:53` identifies Wasteland. A confirms
+the slot and the field restores with the Marines by the trees,
+40 minerals and 10/18 supply. The original flash and the new run's
+export match byte for byte. The replay uses ordinary controller
+input and cartridge FlashRAM.
 
 ### Terran chapter 5 input divergence
 
@@ -793,7 +832,11 @@ quality on the GBA SP.
 | Zerg chapter 1 three early-defense saves, gas delivery and fresh load | `78b17df4800f550c6a3346ebb072365975aa9cb2f1e4ac00956204b5cfdb3004` |
 | Zerg chapter 1 sustained gas delivery, sixth Hydralisk and fresh load | `8788f3c9c8d7b24cc1f2a0e0463409dde1bddc18fa0585829f4a0d7e15968b02` |
 | Zerg chapter 1 three assault checkpoints and fresh load | `9ae9c0dbcd4d146678eac97d235f6e52632afb3ab9f47c16587f4de3565b00cc` |
+| Zerg chapter 1 five raid and reinforcement checkpoints, with fresh load | `0aa1c8b34e4f9d8a18b0f6ec89be486c1c31c0b8ac9ce8a913afdd318487e4e6` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
+| N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
+| N64 Wasteland ordinary save with persistent media enabled | `c864ce55ae39739209c890552f956d783d8a34e9bbe156d20ab457d133aec9b5` |
+| N64 Wasteland ordinary fresh title load manifest | `16a8056ac4ac05cf2bd7e7e08ee89d75a8d86f6e0672322c5de251a89b41bf2b` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |
