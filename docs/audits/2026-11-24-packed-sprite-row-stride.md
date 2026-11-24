@@ -61,6 +61,25 @@ compiled ROM, the same 1,536 returned masks and the same
 12,449,234 guest cycles. Continue to measure the contacts visited
 inside each occupied bucket.
 
+## Opaque rectangle word-copy trials
+
+On the current graphics path, a per-row alignment test gives fast
+word copies for an aligned 64×32 batch. The 11×17 and small clipped
+fallbacks cost more. A test that checks whole-rectangle alignment once
+reduces the 64×32 batch from 1,827,187 to 653,203 guest cycles at `-O2`.
+The mixed 16×16 rectangle batch goes from 274,619 to 229,315. The
+24×24 minimap-shaped batch rises from 262,163 to 273,555. At `-Os`, a
+large unaligned batch rises from 5,368,236 to 6,968,340. Both trials
+match both indexed pages and the palette for all 13 authored batches
+at each optimization level. Their fixture RAM endpoints stay fixed.
+
+The exact Protoss 10 Blood Bath profile records one opaque rectangle
+call and 3,724 guest cycles per late update across a 16-update cut.
+That is 0.28% of the 1,350,466-cycle loop. The read-only profile counts
+calls and cycles. It does not log their dimensions or alignment.
+Keep the existing opaque path and prioritize depth-ordered sprite
+drawing and movement costs on the combined builds.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Authored packed sprite timing and pixels | `8d1a6e2fee3345903f204ca4c9bf430c6299eeab73a8ee016a386e077cc6f1eb` |
@@ -69,3 +88,6 @@ inside each occupied bucket.
 | Byte sprite baseline | `caa0f2fb81e5cf39e33af1e831026179010130e776817dfc4ea79a15b3a35cbd` |
 | Byte sprite row-address trial | `ba2522af2f4d63dc112aacb2ddf12aa3c6f81eb280251a4191944ced0ff0b111` |
 | Identical contact traversal receipts | `8e67a3015a7857de17bf6706f6bc8e50be7a0bcb487db34ae3f5ca3e2390dc46` |
+| Opaque per-row alignment trial | `e4888d685fe322e50dff7eb26da323ab1d029adb3974e020be10c1eb1caf44b5` |
+| Opaque whole-rectangle alignment trial | `d16f735aeb56b4ebdfba43fb8781784d8febe6159d424d1aff30fc62a0927613` |
+| Exact Protoss 10 opaque call and cycle attribution | `45a99a47d032f7004a61d8af6a9b44d0d6dc84de7bb70b967d778d775786b302` |
