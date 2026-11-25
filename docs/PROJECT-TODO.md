@@ -49,8 +49,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T6 on the supply build also produces a byte-identical frame-101
   pause and HOME reload. Rebuild a continuous T5 input route from the
   opening to the late checkpoint on the combined release.
-  The paired-outline build replays T3 from HOME to victory at frame
-  54,000, including a pause restore. The recovered P7 assault wins
+  The paired-outline build repeats [Z7 from HOME through all 206
+  named checkpoints](audits/2026-11-12-z7-normal-physical.md#november-25-combined-supply-and-outline-release-replay)
+  and wins at frame 267,585. It also replays T3 from HOME to victory
+  at frame 54,000, including a pause restore. The recovered P7 assault wins
   at frame 80,828. Z8 repeats the full HOME replay to frame 86,969 and
   Z10 wins from the late frame-60,123 pause. All four restore the
   victory journal byte for byte through fresh HOME.
