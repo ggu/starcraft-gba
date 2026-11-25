@@ -107,9 +107,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   site. Outpost uses an authored 5,000. On the Terran cartridge a legacy T9 save
   opened with zero consumption. After 512 ordinary updates, a fresh load
   preserved 128 gas consumed at site 2. The older cartridge refused the new
-  record and fell back when an older journal slot was available. Repeat on
-  the other cartridges, check normal placement after a campaign's preplaced
-  refinery is destroyed, and measure memory budgets before release activation.
+  record and fell back when an older journal slot was available. On all four cartridges, legacy Outpost and Blood
+  Bath three-AI saves loaded with zero depletion. After 256 ordinary updates
+  all eight cases had consumed gas and a fresh emulator loaded the same frame
+  and site amounts from the new pause save. Relative to release, the linked
+  race ROM code grew by 856–992 bytes, Showcase by 896, and static EWRAM by
+  64–200 bytes across the four profiles. IWRAM section sizes held steady.
+  Check normal placement after a preplaced campaign refinery is destroyed
+  and measure busy-frame timing before activation.
   The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
