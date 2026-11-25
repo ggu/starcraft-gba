@@ -10,6 +10,20 @@ typedef struct {
     int used, provided, queued;
 } Sc64RaceSupplyLedger;
 
+/* A paid first order reserves supply immediately. The production tick
+ * consumes this marker before advancing its first frame. */
+enum { SC64_QUEUE_ADMITTED = 32767 };
+
+static inline int race_training_progress(const Building *q)
+{
+    return q->queue_progress == SC64_QUEUE_ADMITTED ? 0 : q->queue_progress;
+}
+
+static inline int race_supply_deferred_facility(int faction)
+{
+    return faction == R_TER || faction == R_PROTOSS;
+}
+
 static inline int race_supply_building_provides(const Building *q)
 {
     return !q->under_construction ||
@@ -38,9 +52,11 @@ race_supply_count_building(Sc64RaceSupplyLedger *ledger, const Building *q,
     }
     /* Count the product's race, not the producer's race or origin owner.
      * The current owner of the alive producer owns its pending products. */
-    /* The resource bar counts the active order. Admission also counts every
-     * paid order waiting behind it. */
-    int count = include_waiting ? q->queue_count : q->queue_count != 0;
+    /* The resource bar and a new job's start budget count running orders.
+     * A facility's zero-progress head can be paid and waiting for supply. */
+    int count = include_waiting ? q->queue_count :
+        q->queue_count != 0 &&
+        (!race_supply_deferred_facility(faction) || q->queue_progress > 0);
     for (int j = 0; j < count; ++j) {
         int type = q->queue[(q->queue_head + j) % 5];
         const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
