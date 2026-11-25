@@ -5,8 +5,9 @@ root=pathlib.Path.cwd(); args_path=pathlib.Path(sys.argv[1]).resolve(); out=path
 argv=json.loads(args_path.read_text());  units=[a for a in argv[1:] if a.endswith(('.c','.s','.S'))];flags=[];skip=False
 for a in argv[1:]:
  if skip:skip=False;continue
- if a=='-o':skip=True;continue
- if a in units or a=='-nostdlib' or a.startswith(('-Wl,','-T','-l')):continue
+ if a in ('-o','-dumpdir'):skip=True;continue
+ # The cartridge's stack-check dumps (-fcallgraph-info, -fdump-ipa-cgraph) belong to its own link only.
+ if a in units or a=='-nostdlib' or a.startswith(('-Wl,','-T','-l','-fcallgraph-info','-fdump-')):continue
  flags.append(a)
 objs={}; source_root=root
 for unit in units:

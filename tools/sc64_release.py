@@ -280,12 +280,24 @@ def ram_margins(elf: Path, root: Path = ROOT) -> dict[str, dict[str, int]] | Non
                              stderr=subprocess.PIPE, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
-    limits = linker_limits(root)
+    return ram_margins_from_symbols(out, linker_limits(root))
+
+
+def ram_margins_from_symbols(symbols: str, limits: dict[str, int]) -> dict[str, dict[str, int]] | None:
+    """Margins from `nm` output. A ROM linked with common/gba_hot.ld carries its
+    own IWRAM limit in __iwram_hot_limit. That limit is the last allowed end
+    address, so its margin may be 0; gba.ld's is the first address that is
+    not allowed."""
+    limits = dict(limits)
     values = {}
-    for line in out.splitlines():
+    for line in symbols.splitlines():
         parts = line.split()
-        if len(parts) == 3 and parts[2] in limits:
+        if len(parts) != 3:
+            continue
+        if parts[2] in limits:
             values[parts[2]] = int(parts[0], 16)
+        elif parts[2] == "__iwram_hot_limit":
+            limits["__iwram_end"] = int(parts[0], 16)
     if set(values) != set(limits):
         return None
     return {name: {"end": values[name], "limit": limits[name],
