@@ -19,6 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Custom Game pack correction.** The `b206b062` race binaries used an
+  older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
+  regenerated from `d39bd015` use 56 source patches (styles 176/177/178:
+  19/17/20). Tested older saves restored and matched for 512 updates; 72
+  lobby combinations and all 30 saved-result transitions passed. The product
+  build gate checks the header actually selected by include precedence.
+  Hardware pacing remains open.
+
 - **Zealot native vitals.** All 30 original campaign maps select the
   ordinary Zealot defaults. Two completed Zealots in retained native
   Blood Bath states had 80 HP and 80 shields. The shared rule uses
