@@ -27,7 +27,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the source coordinates, amounts and three mineral sprite types in mGBA.
   Fresh loads restored mined amounts and continued play. Old 32-patch
   saves re-exported byte for byte on all four ROMs and matched the
-  original builds for 512 further updates. Measure later expansion and
+  original builds for 512 further updates. In three-CPU matches with each
+  human race, workers mined a restored patch within 4,500–6,500 updates.
+  All three matches ran for 12,000 updates. Measure later expansion and
   resource contention now that all the map's minerals are available.
   Regenerate the private skirmish header with
   `tools/sc64_skirmish_pack.py` before building. Use `--cover` for
