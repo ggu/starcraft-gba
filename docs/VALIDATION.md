@@ -8520,3 +8520,53 @@ The paired Z9/Z10/P10 receipt SHA-256 is
 `e594eec948eba3f96cdb287aca0c42cf434a64206e913e9efa9d33779ddb6355`;
 the Showcase receipt SHA-256 is
 `92d62710516aa40ef00adc07573ad213c1ca4b3927a2c643a557f3f6ce717fc1`.
+
+#### Qualification with the queue and contact changes
+
+The Pylon-enabled builds at `f0901660` were paired against byte-identical
+rebuilds of release `853e0715`. Both builds retain the linker endpoints
+below. The 43,200-query ASan/UBSan differential also passes with the current
+Z10 release flags.
+
+| Product | EWRAM BSS end | IWRAM end |
+| --- | --- | --- |
+| Terran 10 | `0x0203a6f4` | `0x03004b20` |
+| Zerg 10 | `0x02039890` | `0x03004f70` |
+| Protoss 10 | `0x0203b150` | `0x03004ea8` |
+| Showcase | `0x020389bc` | `0x03004e38` |
+
+Over 160 advancing updates per case, the two 69-Pylon Z9 saves improved mean
+frame cost by 1.96% and 1.11%. Panned Outpost 9 in P10 and Z10 improved by
+0.053% and 0.047%. World, objects, both framebuffer pages, palette, SRAM and
+fresh-load continuations matched. Four isolated display-register samples
+differed. Every update in these four windows exceeded the 561,792-cycle
+budget. Two 120-update Terran Outpost windows improved by 0.04% each, and
+three 120-update Showcase windows matched state, display and timing samples.
+
+The two dense Z9 cases also ran with an IWRAM stack watermark during startup,
+fresh save load and 160 updates. The deepest observed writes matched with the
+lookup on and off. The watermark retained 6,960 and 6,208 untouched bytes
+above the linker boundary in those windows. This measures writes within the
+sampled workload. Whole-program stack use and physical GBA timing remain
+open.
+
+All 54 Custom Game opening and save cases passed across the three race ROMs,
+both maps, all human races and one to three CPUs. Each case continued for 60
+updates after a fresh load. Terran 2 Backwater Station won at frame 29,366 with
+31 matching gameplay observations, eight briefing pages and 12 dialogue
+pages. Its pause and victory journals matched the control byte for byte.
+Protoss 5 Choosing Sides won at frame 5,057 with a fresh mid-mission load
+and a fresh victory readback. Zerg 10 won at frame 63,523 from the existing
+late checkpoint with the expected completion bit. The all-mission sweep on
+a single release trio remains open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z9, Z10 and P10 paired windows | `cc3fd3e1361ba5967d170b4e43658fa4798fe2a86890253b7323f61f027321fd` |
+| Terran paired windows | `cd19e9407d5a81d61ef5f24a8446f8b00de9bdbe59bb5b45861909fccf0f5fa4` |
+| Showcase paired windows | `df3341ce783fc4f388cbe11a1c486be1e382af77df2f80ad70c6008cfc1e85a4` |
+| Custom Game opening and fresh-load matrix | `26b009165b1c841fd3590de2bcda9d1b5b3ca5b2a2f2d0a985a95fd307699398` |
+| Stack watermark | `1bfbac56add7489a4f9c54cf14f2e7ddc8706eeae9dc35d9abb82ed9434cf031` |
+| Terran 2 release and Pylon-on full runs | `f84a434e9ec46c8cefa1f507aea8d64b7c502f2123c5bd62425c95295f0598df` / `f7ad2c0421a32197262141a6639952fb4b3054b072d173c2057e599e81440a43` |
+| Protoss 5 full run | `d2fbaa53a5e44f60c6fcf5318ea5297545039d525c06fc43c8c0b3f1bc6f1e6d` |
+| Zerg 10 late checkpoint through victory | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
