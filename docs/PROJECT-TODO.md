@@ -1046,8 +1046,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   worlds agree. Confirm GBA SP frame delivery before
   enabling it by default. P10 spends 131,466 cycles per
   sampled update in direct nearest-target queries and
-  36,473 in rebuilding the target index. Test conservative
-  per-row occupancy and retain stable entity ties.
+  36,473 in rebuilding the target index. [Per-row occupancy trials](audits/2026-11-24-contact-axis-bias.md#per-row-target-mask-trials)
+  raise both costs. Reuse facts from the existing index
+  when testing further pruning, and retain stable entity ties.
   Keep a one-CPU Blood Bath tail check, where a near-budget
   mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
