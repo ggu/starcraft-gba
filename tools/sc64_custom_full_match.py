@@ -65,11 +65,11 @@ MAP_NAMES = {0: "Outpost", 1: "Blood Bath"}
 # docs/audits/2026-11-25-custom-game-full-matches.md.
 QUALIFIED: tuple[str, ...] = (
     "terran:0:zpt:PRODUCERS=3",
-    "terran:0:tz",
+    "terran:0:tz:PRODUCERS=2,WORKERS=14",
     "terran:1:zpt:LOBBY_WAIT=8",
     "terran:1:pz:LOBBY_WAIT=8,FIRST_ATTACK=7000",
-    "zerg:0:tzp:WORKERS=10,LINE=38",
-    "zerg:0:pz:WORKERS=12,LINE=38",
+    "zerg:0:tzp:WORKERS=12,LINE=38",
+    "zerg:0:pz:WORKERS=10,LINE=38",
     "zerg:1:tz:LINE=38,PRODUCERS=1,LOBBY_WAIT=22",
     "protoss:0:ptz:LINE=65,DEFENSE=162,DEFENSES=4",
     "protoss:0:tz:WORKERS=14,PRODUCERS=3,LINE=66,DEFENSE=162,DEFENSES=8",

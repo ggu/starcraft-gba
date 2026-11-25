@@ -74,6 +74,7 @@ enum {
     RACE_AI_HOME_PYLON_RANGE = 256,
     RACE_AI_WORKER_FLOOR = 4,
     RACE_AI_EGG_WORKER_SLACK = 2,       /* Drone Eggs beyond the worker target */
+    RACE_AI_LARVA_BOUND_BANK = 1000,    /* bank at which Larva limit a Zerg owner */
     RACE_AI_FLOAT_MINERALS = 400,
     /* First offensive, measured on the StarCraft 64 computer players (Blood
      * Bath, Free for All; docs/audits/2026-11-19-n64-skirmish-ai.md). Their
@@ -1167,6 +1168,36 @@ static int race_ai_hall(RaceAiCensus *c, int count)
     return -1;
 }
 
+/* Whether holding a hall's price can ever fund it. A Zerg owner with Larva
+ * and no ore near any of its halls gains minerals only from the ore its
+ * Drones still carry back, so it holds the price only when that cargo and
+ * its bank reach it; otherwise it spends what it has and goes all in. Every
+ * other owner keeps an income and may always hold. */
+static int race_ai_hall_fundable(const RaceAiCensus *c, int price)
+{
+    int bank;
+    if (c->race != R_ZERG || c->patches) return 1;
+#ifdef SC64_EGG_RUNTIME
+    if (!SC64_EGG_CONTEXT()) return 1;
+#else
+    return 1;
+#endif
+    bank = race_owner_minerals(c->owner);
+    for (int i = 0; i < MAX_UNITS && bank < price; ++i) {
+        const Unit *q = &u[i];
+        /* A Drone walking to a site spends its cargo on the structure. */
+        if (!q->alive || q->owner != c->owner || !sc64_race_is_worker(q->type) || q->carry <= 0 ||
+            q->order == ORDER_BUILD) continue;
+#ifdef SC64_WORKER_CARGO_KIND
+        if (sc64_worker_cargo_is_gas(q)) continue;
+#else
+        if (q->order != ORDER_MINE) continue;
+#endif
+        bank += q->carry;
+    }
+    return bank >= price;
+}
+
 /* One structure start per pass. An unaffordable eligible step reserves its
  * price so army production cannot starve the next tech step. */
 static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
@@ -1204,17 +1235,21 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
     /* A Zerg owner spends every mineral on Larva as it arrives, so with no
      * ore left near any of its halls it would never bank a Hatchery at a
      * field that still has ore (the plan's later halls wait for a rich
-     * bank). Once its Drones are back, hold the price and expand. */
+     * bank). Once its Drones are back, hold the price and expand. With no
+     * ore near home the bank grows only by the ore the Drones still carry,
+     * so hold it only when that reaches the price; otherwise the owner
+     * spends what it has and goes all in instead of waiting forever. */
     if (c->race == R_ZERG && SC64_EGG_CONTEXT() && !c->patches && c->ore_patches &&
         !c->pend[AK_HATCHERY] && c->workers + c->egg_workers >= worker_target) {
         const Sc64RaceBuildingRule *hall = sc64_race_building_rule(B_HATCHERY);
         int x, y;
         if (hall && race_ai_expansion_site(c, &x, &y)) {
             if (!race_ai_affordable(c, hall->minerals, hall->gas)) {
-                c->reserve_minerals += hall->minerals;
-                return;
-            }
-            if (race_ai_start_build(c, B_HATCHERY, x, y)) return;
+                if (race_ai_hall_fundable(c, hall->minerals)) {
+                    c->reserve_minerals += hall->minerals;
+                    return;
+                }
+            } else if (race_ai_start_build(c, B_HATCHERY, x, y)) return;
         }
     }
 #endif
@@ -1223,8 +1258,17 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
         const Sc64SkirmishRecord *r;
         const Sc64RaceBuildingRule *rule;
         int key = race_ai_key(step->raw), type, have, x, y, started = 0, parent = -1;
+        int larva_bound = 0;
+#ifdef SC64_EGG_RUNTIME
+        /* A Zerg owner that banks this much with every Larva spent is short
+         * of Larva, not of Drones: its next Hatchery does not wait for the
+         * worker count (a raided owner rebuilds its army from its Larva
+         * first). */
+        larva_bound = c->race == R_ZERG && SC64_EGG_CONTEXT() && step->kind == RACE_AI_STEP_HALL &&
+                      !c->larva && race_owner_minerals(c->owner) >= RACE_AI_LARVA_BOUND_BANK;
+#endif
         /* Small mineral fields lower the worker gates with the target. */
-        if (c->workers < step->workers && c->workers < worker_target - 1) continue;
+        if (!larva_bound && c->workers < step->workers && c->workers < worker_target - 1) continue;
         if ((step->flags & RACE_AI_IF_AIR) && !c->enemy_air && !c->enemy_air_tech) continue;
         if ((step->flags & RACE_AI_IF_LATE) && frame < 18000) continue;
         if ((step->flags & RACE_AI_ZERG_OPENING_DEFENSE) && frame < RACE_AI_FIRST_CREEP) continue;
@@ -1243,7 +1287,8 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
                 int halls = c->have[key] + c->pend[key] + c->have[AK_LAIR] + c->have[AK_HIVE];
                 if (halls < step->count && c->ore_patches &&
-                    (race_ai_home_ore(c) < 3000 || c->race == R_ZERG)) {
+                    (race_ai_home_ore(c) < 3000 || c->race == R_ZERG) &&
+                    race_ai_hall_fundable(c, rule->minerals)) {
                     c->reserve_minerals += rule->minerals; return;
                 }
                 continue;
