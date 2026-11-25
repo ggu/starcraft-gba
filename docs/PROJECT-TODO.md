@@ -70,7 +70,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and held the terminal frame through eight updates. All 20 SRAM exports
   matched their inputs byte for byte. The private receipt SHA-256 is
   `f8920c61db85532b944c56f51fb638a1275fb3741f6b8d8a0131fcef504235d4`.
-  Continue full opening-to-victory replays on this release.
+  T1, T2 and T4 also replay from the ordinary campaign menu through
+  victory on these exact ROM bytes, with a mid-mission pause and fresh
+  HOME reload of each victory. Their terminal frames are 10,120, 29,366
+  and 8,911 respectively. The earlier full T3 run on the same bytes
+  ends at frame 54,000. Continue with T5–T10 on this package.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
