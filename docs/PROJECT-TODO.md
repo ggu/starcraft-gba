@@ -94,6 +94,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Separately, the P1 save clears P2 and P3, with matching checkpoint
   observations and byte-identical victory readbacks. Its P4 frame-101
   field save restores the first three completion flags (4,194,316).
+  The P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
+  victory retains all three completion bits (234,881,024).
 
   A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
@@ -180,8 +182,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Probe at 9/9 exposes its Build command. C-left opens the build card
   with a 100-mineral Pylon selected. A enters placement. Moving the
   green preview toward the geyser turns it red. Confirming there shows
-  “You can’t build there” and keeps supply at 9/9. Verify accepted
-  placement and queue recovery on the native version.
+  “You can’t build there” and keeps supply at 9/9. Confirming the green
+  preview on a second run starts a blue warp-in. The HUD still shows 9/9
+  at step 14,330 and reads 10/17 by step 16,330 with no further orders.
+  This agrees with the GBA check that paid waiting production resumes
+  on Pylon completion. Check the remaining queued Probe on native.
 
   The packaged Terran ROM at `5f758095` restores a retained pause and
   victory save from earlier builds for each of T1–T10 (20 fresh emulator
