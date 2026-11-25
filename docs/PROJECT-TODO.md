@@ -86,6 +86,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Advancing to P9 and saving and loading at frame 101 preserves the
   P8 completion bit. The tape SHA-256 is
   `8cd63fc978c64ca7e639cd89432f88c439d1de5bc655be1792b431cdfd1c04d0`.
+  Continuing from that P8 victory save, P9 wins at frame 134,481 and P10
+  at frame 53,225. Both played through the normal chapter advance with
+  controller input on package `5f758095`. All 57 P9 and 22 P10 checkpoint
+  observations matched the recorded frame and result state. Each victory
+  restored its world fingerprint, mission runtime and completion flags
+  in a fresh mGBA process and re-exported byte-identical SRAM. The final
+  mask is `0x38000000` (P8–P10). P3 also wins from HOME at frame 47,661
+  and preserves its completion bit through a fresh-process save reload.
+
   P4 still needs a winning route on this package. Its earlier inputs
   first diverge by 100 minerals at input 18,000, and the regenerated
   host controller loses at frame 111,670.
