@@ -34,14 +34,26 @@ the final candidate is
 `e14e491edc17d8dbbfc76abd76fda40d3893e8cb9a142b820f9bc57d86c5dcb1`.
 These checks do not prove equality at every update or on physical hardware.
 
-A separate Z9 route on the first equivalent wide-only trial ran 8,851
-ordinary inputs and 256 after fresh SRAM reload. All 86 sampled state and
-display observations, restored state and SRAM matched the memo-only control.
-The trial consumed 7,315,775,980 guest cycles over the first interval, 0.0882%
-less than control. The trial save SHA-256 begins `28395f85`. This comparison
-used ROM `b86e97768fed36ee330f4b60bcc0559a4976a1dfcb13a92d4da1455f039b7396`;
-the final source uses the same wide-only logic with the scope expressed as a
-separate flag. It needs its own longer replay qualification.
+A separate Z9 route on the final candidate ran 8,851 ordinary inputs and
+256 after fresh SRAM reload. All 86 sampled state and display observations,
+restored state and SRAM matched the memo-only control. The trial consumed
+7,315,775,980 guest cycles over the first interval, 0.0882% less than
+control. The save SHA-256 is
+`28395f85eb499cdb4311ae4b7df7946a35dbe586364015a851d0da4af306c5cb`.
+
+### Display-page follow-up
+
+The same paired Z7 input was replayed with every update from 1,008 through
+1,041 sampled. At each stop the observer read both actual 38,400-byte VRAM
+pages, the palette, display control, frame and semantic world. At update
+1,024 both corresponding pages, palette, frame and world matched, but the
+control selected page 0 and the candidate page 1. The visible indexed images
+differed at 14,545 of 38,400 pixels. The candidate image at 1,024 exactly
+matched the control image at 1,025; at 1,025 both selected page 1 and matched.
+All other sampled updates in that interval matched in visible image and page
+selection. This is a transient one-sample early selection in this replay,
+not a persistent rendering delay; it is still a visible difference at 1,024.
+The sample does not establish the sub-update flip time or other situations.
 
 Still needed before enabling the option: final-source full campaign and SRAM
 qualification, other map shapes and all four production cartridge builds,
