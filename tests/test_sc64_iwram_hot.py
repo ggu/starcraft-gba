@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Asset-free checks for tools/gba_iwram_hot.py and common/gba_hot.ld."""
+import contextlib
+import io
 from pathlib import Path
 import re
 import sys
@@ -68,7 +70,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_fragments_place_each_section_and_define_the_limit(self):
         files = hot.fragments(0x03005DC0, ["memset", "foo*"])
-        self.assertIn("*(.text.memset)\n*(.text.foo*)\n", files[hot.SECTIONS_NAME])
+        self.assertIn("*(.text.memset)\n*(.text.foo)\n*(.text.foo.*)\n", files[hot.SECTIONS_NAME])
         self.assertIn("__iwram_hot_limit = 0x03005dc0;", files[hot.LIMIT_NAME])
 
     def test_every_run_rewrites_both_fragments_limit_last(self):
@@ -93,6 +95,17 @@ class ConfigTest(unittest.TestCase):
             self.assertTrue(config["names"], path)
             self.assertLess(config["limit"], hot.STACK_TOP, path)
             self.assertTrue(config["recursion"] and config["callback-cycle"], path)
+
+
+class PatternTest(unittest.TestCase):
+    def test_star_takes_compiler_clones_only(self):
+        self.assertTrue(hot.matches("mask", "mask"))
+        self.assertTrue(hot.matches("mask", "mask*"))
+        self.assertTrue(hot.matches("mask.isra.0", "mask*"))
+        self.assertTrue(hot.matches("mask.constprop.0", "mask*"))
+        self.assertFalse(hot.matches("mask_reference", "mask*"))
+        self.assertFalse(hot.matches("mask.isra.0", "mask"))
+        self.assertFalse(hot.matches("callback", "call*"))
 
 
 class BoundTest(unittest.TestCase):
@@ -126,7 +139,7 @@ class BoundTest(unittest.TestCase):
         once = bound(frames, calls, taken={"callback"}, callback_cycles={"validate": 1})
         self.assertEqual(once["undeclared"], [])
         self.assertEqual(once["bytes"], 10 + 100 + (200 + 50) + 7 + hot.HELPER_BYTES)
-        twice = bound(frames, calls, taken={"callback"}, callback_cycles={"call*": 2})
+        twice = bound(frames, calls, taken={"callback"}, callback_cycles={"callback*": 2})
         self.assertEqual(twice["bytes"], 10 + 100 + 2 * (200 + 50) + 7 + hot.HELPER_BYTES)
 
     def test_recursion_must_be_declared_and_multiplies_the_cycle(self):
@@ -352,6 +365,147 @@ foo.constprop.0/5 (foo.constprop)
         self.assertEqual(aliases, {"game.c:census_p10": "game.c:census_p8"})
         edges = {source: {aliases.get(t, t) for t in targets} for source, targets in edges.items()}
         self.assertEqual(hot.stack_bound(frames, edges, set(), "main")["bytes"], 310 + hot.HELPER_BYTES)
+
+
+class CheckTest(unittest.TestCase):
+    """The gate itself, on a made-up program: main -> draw -> leaf, with the
+    toolchain replaced by canned readelf and objdump output."""
+    MAIN, DRAW, LEAF, HOT = 0x08000200, 0x08000300, 0x08000400, 0x03004000
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.frames = {"main": 96, "file.c:draw": 400, "file.c:leaf": 40, "file.c:hot": 8}
+        self.calls = [("main", "file.c:draw"), ("file.c:draw", "file.c:leaf"), ("main", "file.c:hot")]
+        self.measured = {self.MAIN: 96, self.DRAW: 400, self.LEAF: 40, self.HOT: 8}
+        self.end = 0x03004100
+        self.limit = 0x03004200
+        self.symbols = [(self.MAIN + 1, 64, "FUNC", "GLOBAL", "main"), (self.DRAW + 1, 64, "FUNC", "LOCAL", "draw"),
+                        (self.LEAF + 1, 64, "FUNC", "LOCAL", "leaf"), (self.HOT + 1, 32, "FUNC", "LOCAL", "hot")]
+        self.branches = [(self.MAIN + 8, self.DRAW), (self.DRAW + 8, self.LEAF)]
+        self.config = "limit 0x03004200\nhot\n"
+        self.cgraph = ("main/1 (main)\n  Type: function definition analyzed\n"
+                       "draw/2 (draw)\n  Type: function definition analyzed\n"
+                       "leaf/3 (leaf)\n  Type: function definition analyzed\n"
+                       "hot/4 (hot)\n  Type: function definition analyzed\n")
+        original = hot.tool_output
+        self.addCleanup(setattr, hot, "tool_output", original)
+        hot.tool_output = self.fake_tool
+
+    def fake_tool(self, tool, *args):
+        if tool == "readelf" and args[0] == "-s":
+            rows = self.symbols + [(self.end, 0, "NOTYPE", "GLOBAL", "__iwram_end"),
+                                   (self.HOT, 0, "NOTYPE", "GLOBAL", "__iwram_hot_start"),
+                                   (self.limit, 0, "NOTYPE", "GLOBAL", "__iwram_hot_limit"),
+                                   (0, 0, "FILE", "LOCAL", "file.c")]
+            return symtab(rows)
+        if tool == "readelf":
+            return "".join(f"00000020 00000028 00000000 FDE cie=00000000 pc={start:08x}..{start + 64:08x}\n"
+                           f"   LOC   CFA      ra\n{start:08x} r13+0    u\n{start + 2:08x} r13+{size}   c-4\n\n"
+                           for start, size in self.measured.items())
+        if tool == "objdump" and args[0] == "-h":
+            return "  0 .text 00000164\n  1 .iwram 00006000\n  2 .rom 01e00000\n"
+        if tool == "objdump" and ".rom" in args:
+            return "".join(f" {a:x}:\tbl\t{t:x} <f>\n" for a, t in self.branches)
+        return ""
+
+    def run_check(self, margin=512):
+        (self.dir / "file.ci").write_text(ci(self.frames, self.calls))
+        (self.dir / "file.c.000i.cgraph").write_text(self.cgraph)
+        (self.dir / "list.txt").write_text(self.config)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return hot.main(["check", "--elf", str(self.dir / "game.elf"), "--dump-dir", str(self.dir), "--config",
+                             str(self.dir / "list.txt"), "--margin", str(margin), "--json",
+                             str(self.dir / "out.json")])
+
+    def report(self):
+        import json
+        return json.loads((self.dir / "out.json").read_text())
+
+    def test_a_program_that_fits_passes(self):
+        self.assertEqual(self.run_check(), 0)
+        report = self.report()
+        self.assertEqual(report["stack_bound_bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
+        self.assertEqual(report["highest_safe_iwram_end"], (hot.STACK_TOP - 544 - 512) & ~3)
+        self.assertEqual((report["hot_functions"], report["errors"]), (1, []))
+
+    def test_code_at_the_highest_safe_address_passes_and_one_word_higher_fails(self):
+        highest = (hot.STACK_TOP - 544 - 512) & ~3
+        self.end = self.limit = highest
+        self.config = f"limit {highest:#010x}\nhot\n"
+        self.assertEqual(self.run_check(), 0)
+        self.end = self.limit = highest + 4
+        self.config = f"limit {highest + 4:#010x}\nhot\n"
+        self.assertEqual(self.run_check(), 1)
+        self.assertIn("the stack may reach", self.report()["errors"][0])
+
+    def test_the_margin_is_part_of_the_gate(self):
+        self.end = self.limit = (hot.STACK_TOP - 544 - 512) & ~3
+        self.config = f"limit {self.limit:#010x}\nhot\n"
+        self.assertEqual(self.run_check(margin=516), 1)
+
+    def test_linked_function_without_a_frame_record_is_refused(self):
+        self.symbols.append((0x08000501, 16, "FUNC", "LOCAL", "stranger"))
+        self.assertEqual(self.run_check(), 2)
+
+    def test_frame_from_another_build_is_refused(self):
+        self.measured[self.DRAW] = 800          # the linked code uses more than the dump says
+        self.assertEqual(self.run_check(), 2)
+        self.measured[self.DRAW] = 200          # or less
+        self.assertEqual(self.run_check(), 2)
+
+    def test_pushed_register_arguments_raise_the_frame(self):
+        self.measured[self.LEAF] = 40 + hot.PRETEND_ARGS_BYTES
+        self.assertEqual(self.run_check(), 0)
+        report = self.report()
+        self.assertEqual(report["stack_bound_bytes"], 96 + 400 + 56 + hot.HELPER_BYTES)
+        self.assertEqual(report["frames_raised_from_elf"], 1)
+
+    def test_call_missing_from_the_dump_is_taken_from_the_elf(self):
+        self.calls = [("main", "file.c:hot")]   # the dump lost both calls on the deep chain
+        self.assertEqual(self.run_check(), 0)
+        report = self.report()
+        self.assertEqual(report["stack_bound_bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
+        self.assertEqual(report["edges_added_from_elf"], 2)
+
+    def test_undeclared_cycle_fails(self):
+        self.calls.append(("file.c:leaf", "file.c:draw"))
+        self.assertEqual(self.run_check(), 1)
+        self.assertIn("undeclared call cycle", self.report()["errors"][0])
+
+    def test_limit_other_than_the_linked_one_fails(self):
+        self.config = "limit 0x030041fc\nhot\n"
+        self.assertEqual(self.run_check(), 1)
+        self.assertIn("relink", self.report()["errors"][0])
+
+    def test_dump_that_omits_a_compiled_function_is_refused(self):
+        self.cgraph = self.cgraph.replace("leaf/3 (leaf)\n  Type: function definition analyzed\n", "")
+        self.assertEqual(self.run_check(), 2)
+
+    def test_address_taken_function_is_a_pointer_target(self):
+        self.frames["file.c:deep"] = 2000
+        self.symbols.append((0x08000601, 64, "FUNC", "LOCAL", "deep"))
+        self.measured[0x08000600] = 2000
+        self.cgraph += "deep/5 (deep)\n  Type: function definition analyzed\n  Address is taken.\n"
+        self.calls.append(("file.c:leaf", hot.INDIRECT))
+        self.assertEqual(self.run_check(), 0)
+        self.assertEqual(self.report()["stack_bound_bytes"], 96 + 400 + 40 + 2000 + hot.HELPER_BYTES)
+
+    def test_unlisted_function_in_the_hot_range_is_reported(self):
+        self.config = "limit 0x03004200\nother\n"
+        self.assertEqual(self.run_check(), 0)
+        warnings = self.report()["warnings"]
+        self.assertTrue(any("hot is in the hot IWRAM range" in w for w in warnings))
+        self.assertTrue(any("other is listed but is not in this ROM" in w for w in warnings))
+
+    def test_missing_dumps_or_config_is_a_usage_failure(self):
+        (self.dir / "list.txt").write_text(self.config)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(hot.main(["check", "--elf", str(self.dir / "game.elf"), "--dump-dir", str(self.dir),
+                                       "--config", str(self.dir / "list.txt")]), 2)
+            self.assertEqual(hot.main(["check", "--elf", str(self.dir / "game.elf"), "--dump-dir", str(self.dir),
+                                       "--config", str(self.dir / "absent.txt")]), 2)
 
 
 class LinkerScriptTest(unittest.TestCase):

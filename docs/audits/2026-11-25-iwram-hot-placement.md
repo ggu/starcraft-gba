@@ -4,7 +4,7 @@
 11,776 bytes up to the stack top at `0x03007E00` for the main stack.
 That reserve was never derived from the program. On `71937af5` the
 three race cartridges end their IWRAM code at `0x03004B78` (Terran),
-`0x03004FD0` (Zerg) and `0x03004F08` (Protoss), and 66–77% of late
+`0x03004FD0` (Zerg) and `0x03004F08` (Protoss), and 64–79% of late
 Custom Game cycles run from ROM.
 
 This change bounds the stack per ROM and links each cartridge's
@@ -103,9 +103,11 @@ covers them.
 All figures are ARM7 guest cycles in mGBA with no player orders. The
 lists hold 12 (Terran), 15 (Zerg) and 16 (Protoss) functions. They were
 chosen by profiling 32 late updates per map with every candidate
-relocated, keeping the functions that saved at least four cycles per
-byte. Small wrappers that call back into ROM got slower and were left
-out.
+relocated, keeping, within each cartridge's byte limit, the functions
+that saved at least four cycles per byte. On Terran the limit left out
+two that qualified, `sc64_contact_memo_move_cells` and
+`sc64_p3_can_attack_from`. Small wrappers that call back into ROM got
+slower and were left out.
 
 Paired runs load the same late three-computer save and compare 300
 advancing updates.
@@ -166,7 +168,8 @@ ROM. The dispatcher cycle's single
 activation rests on reading the bind code, not on a proof; a callback
 that re-entered its own dispatcher would need a higher count and a
 shorter list. The busy windows remain far above the frame budget:
-this is a 3–8% step in a gap of about 45%.
+this is a 3–8% step in a gap of 27–47% (about 45% on Zerg and
+Protoss, about 30% on Terran).
 
 The profiler, the stack-tracking runner and the saves are private local
 tools and inputs. The lists can be re-derived with any per-function
