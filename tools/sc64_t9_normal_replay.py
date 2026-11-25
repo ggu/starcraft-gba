@@ -39,7 +39,7 @@ T4_FIELDS = t4.TRACE_STATE_FIELDS + ("actor_slot", "race_mode", "race_selected_m
 T5_FIELDS = (*t5.OBS_FIELDS, *t5.OPTIONAL_OBS_FIELDS, "phase", "human_outcome", "race_completed")
 T7_DIALOGUE = {1: (1, 2), 682: (661, 1), 4189: (3931, 1)}
 T8_DIALOGUE = {1404: (1321, 1)}
-T8_LAST_ASSAULT = 143122
+T8_ROUTES = {143260: (143122, 272), 290459: (289962, 471)}
 T9_DIALOGUE = {1: (1, 4), 47969: (47251, 9)}
 T6_FIELDS = (
     "frame", "screen", "won", "lost", "mission", "faults", "campaign_phase",
@@ -88,7 +88,9 @@ def load_late_trace(path, chapter, fields, stop, expected_ticks):
             raise ValueError(f"T{chapter} observations disagree at {tick}")
         observations[tick] = row
         labels.setdefault(tick, []).append(row["kind"])
-    expected_rows = {6: 42, 7: 15, 8: 272}
+    expected_rows = {6: 42, 7: 15}
+    if chapter == 8:
+        expected_rows[8] = T8_ROUTES[stop][1]
     if not expected_ticks <= observations.keys() or len(rows) != expected_rows.get(chapter, len(rows)):
         raise ValueError(f"T{chapter} trace is missing a checkpoint from the qualified route")
     transitions = [(tick - launch + 1, held) for tick, held in reference["inputs"] if tick >= launch]
@@ -267,6 +269,12 @@ def main():
                        3: ("race_campaign", "race_t3", "race_t3_buildings_killed"),
                        4: ("race_t4",), 5: ("race_campaign", "race_t5"),
                        6: ("race_t6",)}.get(chapter, ("race_late",))
+    t8_stop = 143260
+    if chapter == 8:
+        t8_trace = validate_trace(json.loads(args.trace.read_text()), 256)
+        t8_stop = t8_trace["stop_tick"] - t8_trace["launch_tick"]
+        if t8_stop not in T8_ROUTES:
+            parser.error("T8 trace is not a supported qualifying route")
     briefing_pages, dialogue_cuts, stop, compared = {
         1: (9, {}, 10144, T1_FIELDS),
         2: (8, {}, 29380, T2_FIELDS),
@@ -275,14 +283,14 @@ def main():
         5: (9, {}, 127883, T5_FIELDS),
         6: (15, {}, 23849, T6_FIELDS),
         7: (17, T7_DIALOGUE, 4189, T7_FIELDS),
-        8: (9, T8_DIALOGUE, 143260, T8_FIELDS),
+        8: (9, T8_DIALOGUE, t8_stop, T8_FIELDS),
         9: (9, T9_DIALOGUE, 47984, COMPARED),
         10: (14, {1: (1, 4)}, 3446, T10_FIELDS),
     }[chapter]
     qualified_ticks = {
         6: {0, 680, 1792, 3765, 9056, 11559, 19659, 20578, 23846, 23849},
         7: {0, 1, 2, 347, 1000, 1264, 2000, 2200, 2334, 3000, 4000, 4189},
-        8: {0, 120, 332, 507, 1645, 5795, 143260, *range(1000, 143260, 1000)},
+        8: {0, 120, 332, 507, 1645, 5795, t8_stop, *range(1000, t8_stop, 1000)},
         10: {0, 120, 1000, 2000, 3000, 3446},
     }
     if chapter == 1:
@@ -530,7 +538,7 @@ def main():
     # added physical acknowledgements cannot swallow a tape transition.
     # The retained T1–T6 tapes omit physical dialogue boundaries.
     dialogue_scan = (range(1, stop + 1) if chapter <= 6 else
-                     range(T8_LAST_ASSAULT + 1, stop + 1) if chapter == 8 else ())
+                     range(T8_ROUTES[stop][0] + 1, stop + 1) if chapter == 8 else ())
     dialogue_count = {1: 8, 2: 12, 3: 6, 4: 11, 5: 48, 6: 13, 8: 7}.get(
         chapter, sum(count for _, count in dialogue_cuts.values()))
     try:
