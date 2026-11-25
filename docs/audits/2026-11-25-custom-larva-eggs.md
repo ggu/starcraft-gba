@@ -132,7 +132,7 @@ finite gas ([gas audit](2026-11-26-n64-gas-pickup.md#custom-matches-with-finite-
 With Larva and Eggs the Zerg opponents are stronger and 9 of those 18 plans
 fail on HOST: six lose, Protoss on Outpost against three computers reaches the
 update limit, and both Zerg Outpost lobbies with two or three computers win
-without ever having enough hostile units on one screen for the pause save.
+without the player ever taking its mid-battle pause save.
 Every failing lobby has a Zerg computer.
 
 A HOST search over the plan settings (workers, producers, attack timing,
@@ -163,7 +163,7 @@ save reopens RESULT without changing SRAM:
 | Protoss P10 | Blood Bath | Terran, Zerg | new | 21,804 | 15,544 (27 own, 5 hostile) | 50 | 18.46 |
 | Protoss P10 | Blood Bath | Terran, Zerg, Protoss | new | 28,246 | 8,716 (19 own, 8 hostile) | 203 | 16.31 |
 
-Zerg on Blood Bath against three computers is open (`OPEN_CELLS`): 104 plans
+Zerg on Blood Bath against three computers is open (`OPEN_CELLS`): 62 plans
 against three Zerg computers lost between frames 20,348 and 72,698, and 24
 plans over four lineups with no Zerg computer (`tpt`, `tpp`, `ttt`, `ppt`)
 lost too. The base
