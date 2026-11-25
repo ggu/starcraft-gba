@@ -84,6 +84,16 @@ class CarrierReleaseTest(unittest.TestCase):
             with self.subTest(flags=flags):
                 self.assertNotEqual(self.macros(*selector, *flags).returncode, 0)
 
+    def test_z10_impact_padding_only_applies_to_carrier_build(self):
+        name = "Z10_PADDED_IMPACT_FLAGS"
+        [enabled] = self.release_flags(name)
+        [legacy] = self.release_flags(name, settings=("CANONICAL_Z10_PADDED_IMPACTS=0",))
+        [without_carrier] = self.release_flags(
+            name, settings=("CANONICAL_Z10_PADDED_IMPACTS=1", "Z10_CARRIER_RELEASE=0"))
+        self.assertEqual(enabled, ["-DSC64_BUILDING_PAD_IMPACT_SAVE"])
+        self.assertEqual(legacy, [])
+        self.assertEqual(without_carrier, [])
+
     def test_normal_z10_preserves_fact_and_target_flags(self):
         names = ("Z10_CARRIER_FLAGS", "Z10_ARM_SOURCES", "Z10_FACT_FLAGS",
                  "Z10_FACT_REFERENCE_FLAGS")

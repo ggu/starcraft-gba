@@ -161,8 +161,17 @@ static RaceSave race_data;
 #define SC64_ZERG_CARRIER_TAG SC64_SAVE_TAG_ZERG_CARRIER(SC64_TRANSPORT_SAVE_VERSION)
 #define SC64_ZC_SCRATCH ((u8 *)&sc64_zp_route_save_scratch)
 #ifndef SC64_PACKED_MINERAL_FIFO
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+#define SC64_Z10_IMPACTS_TAG SC64_SAVE_TAG_Z10_IMPACTS(SC64_TRANSPORT_SAVE_VERSION)
+#endif
 static const u32 race_zc_tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
-                                 SC64_TRANSPORT_SAVE_VERSION,SC64_ZERG_CARRIER_TAG};
+                                 SC64_TRANSPORT_SAVE_VERSION,SC64_ZERG_CARRIER_TAG
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+                                 ,SC64_Z10_IMPACTS_TAG
+#endif
+};
+_Static_assert(sizeof(race_zc_tags)/sizeof(race_zc_tags[0]) <= GBA_SAVE_MAX_ACCEPTED_TAGS,
+               "Z10 journal family fits the selector");
 #endif
 static u8 race_zc_packet[SC64_ZC_PACKET_MAX];
 static u16 race_zc_size;
@@ -4891,6 +4900,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #endif
 #ifdef SC64_SHARED_TRANSPORT
     if (tag != SC64_TRANSPORT_SAVE_VERSION && tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+        && tag != SC64_Z10_IMPACTS_TAG
+#endif
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
         && tag != SC64_SHOWCASE_CARRIER_TAG
 #endif

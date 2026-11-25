@@ -1015,9 +1015,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   win. Confirm local release integration, hardware pacing and
   active multi-CPU results. The [current P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
   rejects nine impacts and keeps the earlier journal intact.
-  The proposed padded codec is incompatible with the actual
-  Z10 Carrier profile and P10's typed research layout.
-  Prioritize an authenticated layout for the complete queues.
+  The [Z10 campaign journal](IMPACT-EVENTS.md#z10-campaign-with-the-carrier-cartridge-layout)
+  saves the exact Z3 12-impact burst and restores all 32
+  rows in the maximum fixture. The [P10 layout prototype](IMPACT-EVENTS.md#typed-p10-layout)
+  fits both shots, transport and research in the same slot.
+  Integrate and qualify P10's typed journal and real replay.
   The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
   restores Terran recovery in three cases across the race
   profiles. Qualify busy ARM matches and address the six
@@ -1273,8 +1275,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   frame 82,525 before losing on the neutral continuation.
   A [second guarded interception](audits/2026-11-12-z8-normal-physical.md#intercept-the-second-southern-raid)
   fresh-loads at frame 82,409 with Kerrigan and 12 Hydralisks.
-  The eastern group falls on the continued attack. Redirect
-  that group earlier and stage it with the remote force.
+  The eastern group falls on the continued attack. An
+  [alternate route with the economy intact](audits/2026-11-12-z8-normal-physical.md#keep-the-replacement-economy-through-both-southern-raids)
+  kills both Templars and fresh-loads at the same frame with
+  full-health Hatchery and Kerrigan, the Pool and one Drone.
+  Use the preserved production to assemble the next assault.
   The native
   scenario permits Ventral Sacs for the alternate transport
   route. Qualify human Z8 research, boarding and fresh SRAM

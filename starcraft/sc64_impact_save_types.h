@@ -39,6 +39,45 @@ _Static_assert(sizeof(RaceSave) == 16348 && MAX_BUILDINGS == 160 &&
                "P6 impact envelope must preserve the legacy save and building fields");
 #endif
 
+#if defined(SC64_BUILDING_PAD_IMPACT_SAVE) && defined(SC64_ZERG_CARRIER_PROBE)
+#define SC64_Z10_PADDED_IMPACT_SAVE 1
+#if defined(SC64_PACKED_MINERAL_FIFO)
+#error "Z10 campaign impact padding requires a separate packed FIFO record"
+#endif
+#endif
+
+#ifdef SC64_BUILDING_PAD_IMPACT_SAVE
+#if !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || \
+    !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_WORKER_CARGO_KIND) || \
+    defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
+    defined(SC64_P6_PACKED_IMPACT_SAVE) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    defined(SC64_SCARAB_WEAPON_PROBE) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
+    defined(SC64_TERRAN_CARRIER_PROBE) || \
+    defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
+    defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || defined(SC64_Q8_FLASH_HOST_STAGE) || \
+    defined(SC64_Q8_FLASH_ARM_PROBE) || defined(SC64_NUKE_SILO_JOURNAL)
+#error "building padding impacts require the standard packed worker and transport layout"
+#endif
+enum {
+    SC64_BUILDING_PAD_IMPACT_BITS = 7,
+    SC64_BUILDING_PAD_IMPACT_BYTES = MAX_BUILDINGS * SC64_BUILDING_PAD_IMPACT_BITS / 8,
+    SC64_BUILDING_PAD_IMPACT_META_BYTES = 4,
+    SC64_BUILDING_PAD_IMPACT_BODY_MAX = RACE_IMPACT_ROWS * sizeof(Sc64ImpactEvent),
+    SC64_BUILDING_PAD_IMPACT_TAIL_MAX = SC64_BUILDING_PAD_IMPACT_META_BYTES +
+        SC64_BUILDING_PAD_IMPACT_BODY_MAX - SC64_BUILDING_PAD_IMPACT_BYTES
+};
+_Static_assert(MAX_BUILDINGS * SC64_BUILDING_PAD_IMPACT_BITS % 8 == 0 &&
+               SC64_PACKED_BUILDING_SAVE_USED_BITS % 8 == 1 &&
+               SC64_PACKED_BUILDING_SAVE_USED_BITS + SC64_BUILDING_PAD_IMPACT_BITS ==
+               sizeof(((RaceSave *)0)->buildings[0]) * 8,
+               "impact payload may use only canonical building padding");
+_Static_assert(SC64_BUILDING_PAD_IMPACT_BODY_MAX >= SC64_BUILDING_PAD_IMPACT_BYTES &&
+               sizeof(RaceSave) + SC64_TRANSPORT_TRAILER_BYTES +
+               SC64_BUILDING_PAD_IMPACT_TAIL_MAX <= RACE_IMPACT_RECORD_MAX,
+               "all impact rows and the transport trailer must fit one SRAM record");
+#endif
+
 enum {
     RACE_IMPACT_RAW_SAVE_ROOM = (RACE_IMPACT_RECORD_MAX - SC64_TRANSPORT_TRAILER_BYTES - ((int)sizeof(RaceSave) - (int)SC64_BC_SAVE_EXTRA_BYTES) -
                                  (int)sizeof(Sc64ImpactSaveHeader)) /
@@ -46,6 +85,8 @@ enum {
 #ifdef SC64_P6_PACKED_IMPACT_SAVE
     RACE_IMPACT_SAVE_ROOM = (SC64_P6_IMPACT_PAD_BYTES - sizeof(Sc64ImpactSaveHeader)) /
                             sizeof(Sc64ImpactEvent),
+#elif defined(SC64_BUILDING_PAD_IMPACT_SAVE)
+    RACE_IMPACT_SAVE_ROOM = RACE_IMPACT_ROWS,
 #else
     RACE_IMPACT_SAVE_ROOM = RACE_IMPACT_RAW_SAVE_ROOM,
 #endif
@@ -85,6 +126,11 @@ typedef struct {
 } RaceImpactRecord;
 _Static_assert(sizeof(RaceImpactRecord) <= RACE_IMPACT_RECORD_MAX + SC64_BC_SAVE_EXTRA_BYTES,
                "impact record exceeds one SRAM record");
+#ifdef SC64_BUILDING_PAD_IMPACT_SAVE
+_Static_assert(SC64_BUILDING_PAD_IMPACT_TAIL_MAX + SC64_TRANSPORT_TRAILER_BYTES <=
+               sizeof(((RaceImpactRecord *)0)->impacts),
+               "packed impacts and transport must fit the record buffer");
+#endif
 #ifdef SC64_P6_PACKED_IMPACT_SAVE
 _Static_assert(SC64_P6_IMPACT_MARKER_BYTES > 0 &&
                SC64_P6_IMPACT_MARKER_BYTES < sizeof(Sc64ImpactSaveHeader) + sizeof(Sc64ImpactEvent) &&
