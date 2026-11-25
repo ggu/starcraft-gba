@@ -53,6 +53,15 @@ reproduced the victory state and semantic-world fingerprint, with unchanged
 SRAM on export. These fingerprints cover selected persisted world fields,
 not every transient byte; this is one Z7 continuation, not every campaign.
 
+Three more paired campaign saves ran for 2,048 neutral-input updates each.
+The late T5 save started with 80 units and 30 buildings, the P9 opening
+with 162 and 114, and the P10 battle with 232 and 80. In each pair all
+129 samples matched for the game-state fingerprint, actor arrays, camera,
+both framebuffer pages, currently displayed pixels, and palette. Mean cost
+changed by under three guest cycles per update in each scene. These runs
+extend cross-cartridge regression coverage; the measured speedup remains
+specific to the tested Z7 battle.
+
 An earlier build of the probe kept a walkability snapshot. Its
 neutral-input Z7 comparison caught a different display-page bit at update
 496. Both pages, palette and visible pixels matched at that update, and
