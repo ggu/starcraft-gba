@@ -270,6 +270,33 @@ static int race_z7_morphing_egg_hall(int owner, int producer)
 #ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
 static int __attribute__((noinline)) race_product_slots_available(unsigned wanted);
 #endif
+static int race_egg_exit_open(int x, int y);
+#ifdef SC64_RACES
+/* A pair's second unit is born inside the order loop, after the target index
+ * and the owner lists were built, and spawn_unit reconciles only the
+ * collision buckets. If its slot comes later in the loop and it moves, the
+ * index would unlink it through the stale links of the slot's previous
+ * occupant and corrupt that cell's list. An unlinked slot is linked now. A
+ * slot whose occupant died earlier in this update is still linked, possibly
+ * in another owner's list: then the index and the owner lists stop for the
+ * rest of this update, as for a Scarab birth. Bounded: five cell lists. */
+static void race_egg_link_birth(int slot)
+{
+    unsigned cell = sc64_target_cell[slot], steps = 0;
+    if (!sc64_target_index_active) return;
+    if (cell < SC64_TARGET_CELL_COUNT)
+        for (int p = 0; p < 5; ++p)
+            for (int e = sc64_target_head[p][cell]; e != SC64_TARGET_NONE &&
+                 steps++ < SC64_TARGET_ENTITY_COUNT; e = sc64_target_next[e])
+                if (e == slot) {
+                    sc64_target_index_end();
+                    target_lists_valid = 0;
+                    return;
+                }
+    if (steps >= SC64_TARGET_ENTITY_COUNT ||
+        !sc64_target_insert(slot, u[slot].owner, u[slot].x, u[slot].y)) sc64_target_index_active = 0;
+}
+#endif
 
 /* Egg rows are independent timers. The product and remaining clock live in
  * fields already serialized for every Unit, so no producer link or extra
@@ -326,6 +353,17 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
 #endif
     x = q->x;
     y = q->y;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    /* A Custom Game newborn steps up from the Egg row (race_egg_place), when
+     * it can walk away from there. The collision buckets and the target index
+     * follow the move at once, as for every relocated unit; a loaded game
+     * rebuilds both from positions. */
+    if (race_mode && y >= SC64_EGG_ROW_DROP + 8 && race_egg_exit_open(x, y - SC64_EGG_ROW_DROP)) {
+        y -= SC64_EGG_ROW_DROP; q->y = y;
+        sc64_unit_bucket_move(q);
+        sc64_target_index_move(q);
+    }
+#endif
     old_hp = q->hp;
     old_supply = unit_slot_supply(q);
     new_hp = product->hp > 0 ? (old_hp * product->hp) / 200 : 1;
@@ -368,15 +406,36 @@ static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
     q->path_y = y;
     q->flags = 0;
     if (owner == SIDE) supply_used += unit_supply(q->type) - old_supply;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+    /* A Custom Game worker goes to the nearest field when it appears, as a
+     * trained worker of any race does (race_tick_buildings). */
+    if (race_mode && sc64_race_is_worker(q->type)) {
+        int patch = nearest_mineral(x, y);
+        if (patch >= 0 && patch < MAX_MINERALS && m[patch].amount > 0) {
+            q->order = ORDER_MINE; q->target = patch;
+        }
+    }
+#endif
 
     /* Brood War attempts the paired Ling as one birth event. If the unit pool
      * is full, it still completes the first Ling and does not retry later. */
     if (sc64_z7_egg_product_count(q->type) == 2) {
-        second = spawn_unit(owner, q->type, x + 8 < WORLD_W - 8 ? x + 8 : x - 8, y);
+        {
+            int sx = x + 8 < WORLD_W - 8 ? x + 8 : x - 8;
+#ifdef SC64_SHARED_EGG_PRODUCER_HOST_STAGE
+            /* A Custom Game pair's second unit takes the open side. */
+            if (race_mode && !sc64_race_unit_flying(q->type) && !race_egg_exit_open(sx, y) &&
+                x - 8 >= 8 && race_egg_exit_open(x - 8, y)) sx = x - 8;
+#endif
+            second = spawn_unit(owner, q->type, sx, y);
+        }
 #if defined(SC64_SHARED_EGG_HOST_STAGE) || defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE)
         if (!SC64_EGG_IS_Z7() && second>=0) {
             u[second].raw_type=sc64_race_raw_unit(q->type);
             u[second].raw_owner=source_owner;
+#ifdef SC64_RACES
+            race_egg_link_birth(second);
+#endif
         }
 #endif
         (void)second;
@@ -857,6 +916,55 @@ static int __attribute__((noinline)) race_product_slots_available(unsigned wante
 }
 #endif
 
+#ifdef SC64_EGG_RUNTIME
+/* Whether a unit standing at (x,y) can walk away: one of the four path tiles
+ * next to its own is open. Its own tile does not decide it: is_traversable
+ * lets an actor leave the tile it was placed in, as trained units are placed
+ * inside their producer, and an open tile with no open neighbour is a trap. */
+static int race_egg_exit_open(int x, int y)
+{
+    int col = x / 16, row = y / 16;
+    for (int k = 0; k < 4; ++k)
+        if (is_traversable(col + (k == 0) - (k == 1), row + (k == 2) - (k == 3), -1)) return 1;
+    return 0;
+}
+
+/* Where the next Egg of this hall stands. Custom Game Eggs take the first
+ * free place of a row of SC64_EGG_PLACES places that starts at the point a
+ * trained unit appears at and runs away from the hall, so Eggs that morph
+ * together can each be seen and selected. The row lies SC64_EGG_ROW_DROP
+ * below that point and a unit born from an Egg steps up to it, so newborns do
+ * not cover the Eggs. A place is used only if a ground unit born there can
+ * walk away; with none, the Egg takes the first place, below the
+ * trained-unit point, and its unit is born where a queued unit was. Missions
+ * keep that single point. Bounded: one pass over the unit
+ * table and at most SC64_EGG_PLACES path checks per order. */
+static void race_egg_place(int producer, int *x, int *y)
+{
+    int step = 9, px = b[producer].x + 20, py = b[producer].y + 4, ey;
+    unsigned taken = 0;
+    if (px >= WORLD_W - 8) { px = b[producer].x - 20; step = -9; }
+    *x = px; *y = py;
+    if (!race_mode) return;
+    ey = py + SC64_EGG_ROW_DROP;
+    if (ey > WORLD_H - 9) ey = WORLD_H - 9;
+    *y = ey;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        int d;
+        if (!u[i].alive || u[i].type != SC64_EGG_ACTOR || u[i].y != ey) continue;
+        d = (u[i].x - px) / step;
+        if (d < 0 || d >= SC64_EGG_PLACES || px + d * step != u[i].x) continue;
+        taken |= 1u << d;
+    }
+    for (int k = 0; k < SC64_EGG_PLACES; ++k) {
+        int cx = px + k * step;
+        if ((taken & (1u << k)) || cx < 8 || cx > WORLD_W - 9 || !race_egg_exit_open(cx, py)) continue;
+        *x = cx; *y = ey;
+        return;
+    }
+}
+#endif
+
 static int race_queue_unit(int owner, int producer, int type)
 {
     int tail, count;
@@ -1084,9 +1192,8 @@ static int race_queue_unit(int owner, int producer, int type)
     if (r->flags & SC_RACE_F_LARVA) --b[producer].larva;
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
-        int x = b[producer].x + 20, y = b[producer].y + 4;
-        int slot;
-        if (x >= WORLD_W - 8) x = b[producer].x - 20;
+        int x, y, slot;
+        race_egg_place(producer, &x, &y);
         slot = spawn_unit(owner, SC64_EGG_ACTOR, x, y);
         if (slot < 0) {
             /* Admission checked for a slot before debiting the bank. This is
@@ -1352,9 +1459,9 @@ static void race_tick_state(void)
          0) &&
         b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG &&
         sc64_race_is_zerg_townhall(b[i].type)) {
-        if (b[i].larva < 3 && ++b[i].larva_timer >= 428) {
+        if (b[i].larva < SC64_LARVA_CAP && ++b[i].larva_timer >= SC64_LARVA_PERIOD) {
             b[i].larva_timer = 0;
-            if (b[i].larva < 3) ++b[i].larva;
+            if (b[i].larva < SC64_LARVA_CAP) ++b[i].larva;
         }
     }
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type >= 0 && u[i].type < SC_RU_COUNT) {
@@ -1565,6 +1672,13 @@ static void race_complete_building(int i)
     if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
     if (sc64_race_is_zerg_townhall(b[i].type) &&
         (!race_mode || b[i].type == B_HATCHERY)) b[i].larva = 3;
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
+    /* A Hatchery finished during a Custom Game starts as the reference's
+     * does: its timer is zero, so one Larva appears at once and the others
+     * follow at the spawn rate (OpenBW bwgame.h 15896, 8284-8289). Only the
+     * match's starting hall begins with three (21171-21172). */
+    if (race_mode && b[i].type == B_HATCHERY) { b[i].larva = 1; b[i].larva_timer = 0; }
+#endif
 }
 
 #ifdef SC64_CONSTRUCTION_HP

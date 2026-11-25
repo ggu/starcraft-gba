@@ -39,6 +39,8 @@ MAKE_VARS = (
 # live in optional Makefile fragments; the test skips, with a reason, when a
 # vector cannot be expanded in the current checkout.
 SHIPPED_VECTORS = (
+    "ZERG_Z7_RELEASE_FLAGS",
+    "ZERG_Z8_RELEASE_FLAGS",
     "ZERG_Z9_RELEASE_FLAGS",
     "ZERG_Z10_RELEASE_FLAGS",
     "PROTOSS_P10_FLAGS",
@@ -56,6 +58,14 @@ PROBE_SOURCE = r"""
 
 _Static_assert(SC64_ENGINE_CORE_CAPABILITIES == SC64_ENGINE_CORE_EXPECTED,
                "production profile is missing a shared core mechanic");
+/* A product with Custom Games in the shared transport save envelope produces
+ * Zerg units through Larva and Eggs; nothing else does. */
+#if defined(SC64_IMPORTED_SKIRMISH) && defined(SC64_SHARED_TRANSPORT) && !defined(SC64_CUSTOM_EGGS_ACTIVE)
+#error "a delivered profile with Custom Games left Larva and Egg production off"
+#endif
+#if (!defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_SHARED_TRANSPORT)) && defined(SC64_CUSTOM_EGGS_ACTIVE)
+#error "Larva and Egg production is active outside a delivered Custom Game profile"
+#endif
 int sc64_engine_capability_probe(void) { return (int)SC64_ENGINE_CORE_CAPABILITIES; }
 """
 
@@ -133,9 +143,24 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 self.assertIn("-DSC64_SIEGE_SPLASH", args)
                 self.assertIn("-DSC64_SHARED_BATTERY", args)
                 self.assertIn("-DSC64_SHARED_BUNKER", args)
+                self.assertIn("-DSC64_CUSTOM_LARVA_EGGS", args)
                 self.assertEqual(args.count("-DSC64_DEPOT_BOUNDED"), 1)
                 result = self._compile_probe(values[name])
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_larva_and_eggs_are_active_in_every_delivered_custom_game_profile(self) -> None:
+        values = self._make_values()
+        probe = "#ifndef SC64_CUSTOM_EGGS_ACTIVE\n#error inactive\n#endif\nint p;\n"
+        for name, active in (("TERRAN_ROM_FLAGS", True), ("PROTOSS_P7_CANONICAL_FLAGS", True),
+                             ("SHOWCASE_FLAGS", True), ("T3_FLAGS", False), ("Z4_FLAGS", False),
+                             ("RACES_FLAGS", False)):
+            with self.subTest(profile=name):
+                result = subprocess.run(
+                    [self.clang, "-std=c11", "-fsyntax-only", "-Istarcraft",
+                     *shlex.split(values[name]), "-include", "sc64_engine_capabilities.h", "-x", "c", "-"],
+                    cwd=ROOT, input=probe, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    check=False)
+                self.assertEqual(result.returncode == 0, active, result.stderr)
 
     def test_shipped_release_vectors_compile_with_shared_mechanics(self) -> None:
         result = self._expand(SHIPPED_VECTORS)
@@ -151,7 +176,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 args = shlex.split(values[name])
                 for flag in ("-DSC64_ENGINE_CORE_REQUIRED", "-DSC64_CONSTRUCTION_HP",
                              "-DSC64_SIEGE_SPLASH", "-DSC64_SHARED_BATTERY",
-                             "-DSC64_SHARED_BUNKER"):
+                             "-DSC64_SHARED_BUNKER", "-DSC64_CUSTOM_LARVA_EGGS"):
                     self.assertIn(flag, args)
                 self.assertEqual(args.count("-DSC64_DEPOT_BOUNDED"), 1)
                 result = self._compile_probe(values[name])
@@ -175,6 +200,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
             "-USC64_SIEGE_SPLASH",
             "-USC64_SHARED_BATTERY",
             "-USC64_SHARED_BUNKER",
+            "-USC64_CUSTOM_LARVA_EGGS",
         ):
             with self.subTest(removed=removal):
                 result = self._compile_probe(flags, removal)
@@ -194,6 +220,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
         self.assertIn("-DSC64_CONSTRUCTION_HP", flags)
         self.assertIn("-DSC64_SIEGE_SPLASH", flags)
         self.assertIn("-DSC64_SHARED_BATTERY", flags)
+        self.assertIn("-DSC64_CUSTOM_LARVA_EGGS", flags)
         self.assertNotIn("-DSC64_CONSTRUCTION_SOURCE_ART", flags)
         self.assertFalse(any(".local/sc64/construction/generated" in arg for arg in flags))
         self.assertNotIn("sc64_construction_sprites_generated.h",

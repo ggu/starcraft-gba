@@ -73,6 +73,8 @@ enum {
     RACE_AI_OBJECTIVE_REACH = 64,
     RACE_AI_HOME_PYLON_RANGE = 256,
     RACE_AI_WORKER_FLOOR = 4,
+    RACE_AI_EGG_WORKER_SLACK = 2,       /* Drone Eggs beyond the worker target */
+    RACE_AI_LARVA_BOUND_BANK = 1000,    /* bank at which Larva limit a Zerg owner */
     RACE_AI_FLOAT_MINERALS = 400,
     /* First offensive, measured on the StarCraft 64 computer players (Blood
      * Bath, Free for All; docs/audits/2026-11-19-n64-skirmish-ai.md). Their
@@ -159,6 +161,7 @@ typedef struct {
     int depot[RACE_AI_MAX_DEPOTS], depots;
     int refinery[RACE_AI_MAX_REFINERIES], refinery_load[RACE_AI_MAX_REFINERIES], refineries;
     int workers, miners, gas_workers, idle_workers, pending_builders;
+    int egg_workers;                    /* workers still in their Eggs */
     int army, army_supply, home_army, home_anti_air, deployed, deployed_supply, units, buildings;
     int producers, larva, pending_supply, patches, ore_patches, queued_units, free_supply, site_searches;
     int supply_used, supply_cap, supply_queued;
@@ -359,6 +362,21 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
             continue;
         }
         ++c->units;
+#ifdef SC64_EGG_RUNTIME
+        if (q->type == SC64_EGG_ACTOR) {
+            /* An Egg is its product: ordered and paid, not yet born. It
+             * holds one actor slot and its product's whole supply now; the
+             * second of a pair takes its slot at birth. */
+            int product = q->target;
+            int qk = race_ai_key(sc64_race_raw_unit(product));
+            if (qk >= 0 && c->pend[qk] < 255) ++c->pend[qk];
+            if (c->race == R_ZERG) c->supply_used += unit_slot_supply(q);
+            if (product == U_OVERLORD && c->race == R_ZERG) ++c->pending_supply;
+            if (sc64_race_is_worker(product)) ++c->egg_workers;
+            c->queued_units += sc64_race_product_count(product) - 1;
+            continue;
+        }
+#endif
         {
             int key = race_ai_key(sc64_race_raw_unit(q->type));
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(q->type);
@@ -873,8 +891,32 @@ static int race_ai_supply(RaceAiCensus *c)
         if (c->pending_supply >= (cap >= 64 ? 2 : 1)) return 0;
     }
     if (c->race == R_ZERG) {
+#ifdef SC64_EGG_RUNTIME
+        /* An owner whose unit share is full orders nothing but the workers
+         * it still wants. Supply beyond theirs would only be more actors
+         * over the share, in the room those workers need. */
+        if (SC64_EGG_CONTEXT() && !repower) {
+            int wanted = race_ai_worker_target(c) - c->workers - c->egg_workers;
+            int slots = race_ai_unit_cap() - c->units - c->queued_units, fill;
+            if (wanted < 0) wanted = 0;
+            /* A full share orders nothing more. Its last slots go to the
+             * wanted Drones they can hold when the supply, with what is
+             * already on order, admits them, not to another Overlord. */
+            if (slots <= 0) return 0;
+            fill = wanted < slots ? wanted : slots;
+            /* Supply already on order counts: it hatches in time for them. */
+            if (slots <= wanted &&
+                free_supply + c->pending_supply * sc64_race_unit_supply_provided(U_OVERLORD) >=
+                    fill * sc64_race_unit_rule(U_DRONE)->supply) return 0;
+        }
+#endif
         for (int k = 0; k < c->depots; ++k)
             if (b[c->depot[k]].larva > 0 && race_queue_unit(c->owner, c->depot[k], U_OVERLORD)) {
+#ifdef SC64_EGG_RUNTIME
+                /* The Egg is an actor of the owner's share from this
+                 * update; the production pass below reads this census. */
+                if (SC64_EGG_CONTEXT()) ++c->units;
+#endif
                 ++c->pending_supply; return 1;
             }
         /* Reserve the Overlord price until a larva is available. */
@@ -954,8 +996,9 @@ static const RaceAiStep race_ai_terran_bunker_opening[] = {
 };
 #endif
 
-/* A Hatchery's larva queue is serial in these products, so Zerg production
- * capacity comes from additional Hatcheries rather than from bank size. */
+/* Every Zerg order takes a Larva and each hall spawns one about every 14
+ * seconds, so Zerg production capacity comes from additional Hatcheries
+ * rather than from bank size. */
 static const RaceAiStep race_ai_zerg_plan[] = {
     { RACE_AI_STEP_BUILD, 142, 1, 9, 0 },        /* Spawning Pool */
     { RACE_AI_STEP_HALL,  131, 2, 9, 0 },        /* macro Hatchery / expansion */
@@ -1125,6 +1168,39 @@ static int race_ai_hall(RaceAiCensus *c, int count)
     return -1;
 }
 
+/* Whether holding a hall's price can ever fund it. A Zerg owner with Larva
+ * and no ore near any of its halls is treated as out of income, as the
+ * all-in rule treats it: it holds the price only when the ore its Drones
+ * already carry back and its unreserved bank reach it; otherwise it spends
+ * what it has and goes all in. Trips to a distant field are not counted:
+ * holding for them would keep the bank above the all-in limit while they
+ * trickle in. Every other owner keeps an income and may always hold. */
+static int race_ai_hall_fundable(const RaceAiCensus *c, int price)
+{
+    int bank;
+    if (c->race != R_ZERG || c->patches) return 1;
+#ifdef SC64_EGG_RUNTIME
+    if (!SC64_EGG_CONTEXT()) return 1;
+#else
+    return 1;
+#endif
+    bank = race_owner_minerals(c->owner) - c->reserve_minerals;
+    for (int i = 0; i < MAX_UNITS && bank < price; ++i) {
+        const Unit *q = &u[i];
+        if (!q->alive || q->owner != c->owner || !sc64_race_is_worker(q->type)) continue;
+        /* A Drone walking to a site spends its cargo on the structure, and
+         * gas or migrated unknown cargo never becomes minerals. */
+        if (q->carry <= 0 || SC64_BUILD_WORKER_ORDER(q->order) || sc64_worker_cargo_is_unknown(q)) continue;
+#ifdef SC64_WORKER_CARGO_KIND
+        if (sc64_worker_cargo_is_gas(q)) continue;
+#else
+        if (q->order != ORDER_MINE) continue;
+#endif
+        bank += q->carry;
+    }
+    return bank >= price;
+}
+
 /* One structure start per pass. An unaffordable eligible step reserves its
  * price so army production cannot starve the next tech step. */
 static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
@@ -1158,13 +1234,44 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
     else { plan = race_ai_terran_plan; steps = (int)(sizeof race_ai_terran_plan / sizeof *plan); }
     if (c->buildings >= race_ai_building_cap()) return;
     if (!c->depots) { (void)race_ai_hall(c, 1); return; }
+#ifdef SC64_EGG_RUNTIME
+    /* A Zerg owner spends every mineral on Larva as it arrives, so with no
+     * ore left near any of its halls it would never bank a Hatchery at a
+     * field that still has ore (the plan's later halls wait for a rich
+     * bank). Once its Drones are back, hold the price and expand. With no
+     * ore near home the bank grows only by the ore the Drones still carry,
+     * so hold it only when that reaches the price; otherwise the owner
+     * spends what it has and goes all in instead of waiting forever. */
+    if (c->race == R_ZERG && SC64_EGG_CONTEXT() && !c->patches && c->ore_patches &&
+        !c->pend[AK_HATCHERY] && c->workers + c->egg_workers >= worker_target) {
+        const Sc64RaceBuildingRule *hall = sc64_race_building_rule(B_HATCHERY);
+        int x, y;
+        if (hall && race_ai_expansion_site(c, &x, &y)) {
+            if (!race_ai_affordable(c, hall->minerals, hall->gas)) {
+                if (race_ai_hall_fundable(c, hall->minerals)) {
+                    c->reserve_minerals += hall->minerals;
+                    return;
+                }
+            } else if (race_ai_start_build(c, B_HATCHERY, x, y)) return;
+        }
+    }
+#endif
     for (int s = 0; s < steps; ++s) {
         const RaceAiStep *step = &plan[s];
         const Sc64SkirmishRecord *r;
         const Sc64RaceBuildingRule *rule;
         int key = race_ai_key(step->raw), type, have, x, y, started = 0, parent = -1;
+        int larva_bound = 0;
+#ifdef SC64_EGG_RUNTIME
+        /* A Zerg owner that banks this much with every Larva spent is short
+         * of Larva, not of Drones: its next Hatchery does not wait for the
+         * worker count (a raided owner rebuilds its army from its Larva
+         * first). */
+        larva_bound = c->race == R_ZERG && SC64_EGG_CONTEXT() && step->kind == RACE_AI_STEP_HALL &&
+                      !c->larva && race_owner_minerals(c->owner) >= RACE_AI_LARVA_BOUND_BANK;
+#endif
         /* Small mineral fields lower the worker gates with the target. */
-        if (c->workers < step->workers && c->workers < worker_target - 1) continue;
+        if (!larva_bound && c->workers < step->workers && c->workers < worker_target - 1) continue;
         if ((step->flags & RACE_AI_IF_AIR) && !c->enemy_air && !c->enemy_air_tech) continue;
         if ((step->flags & RACE_AI_IF_LATE) && frame < 18000) continue;
         if ((step->flags & RACE_AI_ZERG_OPENING_DEFENSE) && frame < RACE_AI_FIRST_CREEP) continue;
@@ -1183,7 +1290,8 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
                 int halls = c->have[key] + c->pend[key] + c->have[AK_LAIR] + c->have[AK_HIVE];
                 if (halls < step->count && c->ore_patches &&
-                    (race_ai_home_ore(c) < 3000 || c->race == R_ZERG)) {
+                    (race_ai_home_ore(c) < 3000 || c->race == R_ZERG) &&
+                    race_ai_hall_fundable(c, rule->minerals)) {
                     c->reserve_minerals += rule->minerals; return;
                 }
                 continue;
@@ -1376,12 +1484,18 @@ static int race_ai_gas_fallback(RaceAiCensus *c, int producer, int raw)
 {
     int type = sc64_race_unit_from_raw(raw), alt = -1;
     const Sc64RaceUnitRule *r = type >= 0 ? sc64_race_unit_rule(type) : 0;
+    int waiting = 1;
     if (!r) return 0;
+#ifdef SC64_EGG_RUNTIME
+    /* A Zerg owner with no worker on gas gets no more gas, and every Larva
+     * held for a gas unit is an order lost: take the Zergling at once. */
+    if (c->race == R_ZERG && SC64_EGG_CONTEXT() && !c->gas_workers) waiting = 0;
+#endif
     /* With no ore left anywhere the bank is final: take the line unit
      * whenever the pick cannot be paid for. */
     if (c->ore_patches &&
         (!r->gas || race_owner_gas(c->owner) - c->reserve_gas >= r->gas ||
-         race_owner_minerals(c->owner) - c->reserve_minerals < RACE_AI_FLOAT_MINERALS)) return 0;
+         (waiting && race_owner_minerals(c->owner) - c->reserve_minerals < RACE_AI_FLOAT_MINERALS))) return 0;
     if (c->race == R_TER) {
         if (b[producer].type == B_BARRACKS) alt = 0;            /* Marine */
         else if (b[producer].type == B_FACTORY) alt = 2;        /* Vulture */
@@ -1389,20 +1503,51 @@ static int race_ai_gas_fallback(RaceAiCensus *c, int producer, int raw)
     return alt >= 0 && alt != raw && race_ai_try_queue(c, producer, alt, 1);
 }
 
+/* Actor slots one Larva order of this product takes against the owner's
+ * share: a Zergling or Scourge Egg is two units. Larva can place many such
+ * orders in one pass, so each is counted whole. The serial queue keeps its
+ * one-per-order count. */
+static int race_ai_order_slots(int raw)
+{
+#ifdef SC64_EGG_RUNTIME
+    int type = sc64_race_unit_from_raw(raw);
+    if (SC64_EGG_CONTEXT() && type >= 0) return sc64_race_product_count(type);
+#endif
+    (void)raw;
+    return 1;
+}
+
+/* How many orders a Zerg town hall can take in this pass. With Larva and
+ * Eggs every Larva is an order and they all morph at once. Where a product
+ * still has the serial Hatchery queue, one order at a time keeps it short. */
+static int race_ai_larva_orders(int hall)
+{
+#ifdef SC64_EGG_RUNTIME
+    if (SC64_EGG_CONTEXT()) return b[hall].larva > 0 ? b[hall].larva : 0;
+#endif
+    return b[hall].larva >= 1 && b[hall].queue_count < 2;
+}
+
 static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
 {
-    int worker_target = race_ai_worker_target(c), unit_cap = race_ai_unit_cap();
+    /* Workers still in their Eggs count toward the target, so a hall's
+     * Larva are not all spent on workers the owner has already ordered.
+     * Two of them do not count: Zerg structures are made of Drones, and the
+     * serial queue likewise kept up to two replacements on order. */
+    int worker_target = race_ai_worker_target(c) -
+                        (c->egg_workers > RACE_AI_EGG_WORKER_SLACK ? c->egg_workers - RACE_AI_EGG_WORKER_SLACK : 0);
+    int unit_cap = race_ai_unit_cap();
     int committed = c->units + c->queued_units;
 #ifdef RACE_AI_CARRIERS
     int carrier_reserve = 0;
 #endif
     /* Workers first, from every depot; only pending builds are reserved. */
     for (int k = 0; k < c->depots && c->workers < worker_target && committed < unit_cap; ++k) {
-        int depot = c->depot[k];
+        int depot = c->depot[k], orders = 1;
         if (c->race == R_ZERG) {
-            /* A Hatchery's queue is serial in these products. Keep it short
-             * and stop droning while the army is small or under threat. */
-            if (b[depot].larva < 1 || b[depot].queue_count >= 2) continue;
+            /* Stop droning while the army is small or under threat. */
+            orders = race_ai_larva_orders(depot);
+            if (orders < 1) continue;
             if (c->have[AK_POOL] && c->workers >= 9 &&
                 (c->threat >= 0 || c->army_supply < c->workers)) continue;
         } else if (b[depot].queue_count >= 1) continue;
@@ -1411,7 +1556,8 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
             int pending_m = 0, pending_g = 0;
             race_pending_build_cost(c->owner, &pending_m, &pending_g);
             c->reserve_minerals = pending_m; c->reserve_gas = pending_g;
-            if (race_ai_try_queue(c, depot, c->worker_raw, 1)) ++committed;
+            while (orders-- > 0 && c->workers < worker_target && committed < unit_cap &&
+                   race_ai_try_queue(c, depot, c->worker_raw, 1)) ++committed;
             c->reserve_minerals = saved_m; c->reserve_gas = saved_g;
         }
     }
@@ -1448,6 +1594,16 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
     if (c->depots && c->ore_patches &&
         race_ai_count(c, race_ai_key(c->worker_raw)) < RACE_AI_WORKER_FLOOR)
         c->reserve_minerals += sc64_race_unit_rule(c->worker_type)->minerals;
+#ifdef SC64_EGG_RUNTIME
+    /* With Larva and Eggs a Zerg owner can fill its unit share within
+     * minutes, where the serial queue took most of a match. Its army leaves
+     * the slots of the workers it still wants, so an owner that lost or
+     * spent its Drones can always order them again. */
+    if (c->race == R_ZERG && SC64_EGG_CONTEXT() && worker_target > c->workers) {
+        unit_cap -= worker_target - c->workers;
+        if (committed >= unit_cap) return;
+    }
+#endif
 #ifdef RACE_AI_CARRIERS
     race_ai_stock_hangars(c);
     carrier_reserve = race_ai_save_for_carrier(c);
@@ -1456,13 +1612,32 @@ static void __attribute__((noinline)) race_ai_produce(RaceAiCensus *c)
     race_ai_stock_reavers(c);
 #endif
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
-        int raw;
+        int raw, orders = 1;
         if (!b[i].alive || b[i].owner != c->owner) continue;
         if (c->race == R_ZERG) {
-            if (!sc64_race_is_zerg_townhall(b[i].type) || b[i].larva < 1 ||
-                b[i].queue_count >= 2) continue;
+            if (!sc64_race_is_zerg_townhall(b[i].type)) continue;
+            orders = race_ai_larva_orders(i);
+            if (orders < 1) continue;
             if (b[i].under_construction && b[i].type == B_HATCHERY) continue;
-            raw = race_ai_pick_zerg(c);
+            /* Every Larva of this hall takes the next pick while the whole
+             * order, both units of a pair, fits the owner's share. */
+            while (orders > 0) {
+                int slots;
+                raw = race_ai_pick_zerg(c);
+                if (raw < 0) break;
+                slots = race_ai_order_slots(raw);
+                if (committed + slots > unit_cap) return;
+                if (!race_ai_try_queue(c, i, raw, 1)) {
+                    /* The Zergling fallback is two units: only where both fit. */
+                    if (committed + race_ai_order_slots(37) > unit_cap ||
+                        !race_ai_gas_fallback(c, i, raw)) break;
+                    slots = race_ai_order_slots(37);
+                }
+                committed += slots;
+                if (committed >= unit_cap) return;
+                --orders;
+            }
+            continue;
         } else {
             if (!building_complete(i) || b[i].queue_count >= 1 || race_ai_is_depot(b[i].type)) continue;
             raw = c->race == R_TER ? race_ai_pick_terran(c, i) : race_ai_pick_protoss(c, i);

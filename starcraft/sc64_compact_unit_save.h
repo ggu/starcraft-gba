@@ -245,12 +245,15 @@ SC64_COMPACT_DECODE(Unit *out, const Sc64PackedUnitSave *row,
 }
 
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#ifndef SC64_EGG_ROWS_DEFAULT
+#define SC64_EGG_ROWS_DEFAULT 0
+#endif
 static int sc64_unit_save_fields_valid(const Unit *q,unsigned w,unsigned h)
-{ return sc64_unit_save_fields_valid_for(q,w,h,0); }
+{ return sc64_unit_save_fields_valid_for(q,w,h,SC64_EGG_ROWS_DEFAULT); }
 static int sc64_unit_save_encode(Sc64PackedUnitSave *r,const Unit *q,unsigned w,unsigned h)
-{ return sc64_unit_save_encode_for(r,q,w,h,0); }
+{ return sc64_unit_save_encode_for(r,q,w,h,SC64_EGG_ROWS_DEFAULT); }
 static int sc64_unit_save_decode(Unit *q,const Sc64PackedUnitSave *r,unsigned w,unsigned h)
-{ return sc64_unit_save_decode_for(q,r,w,h,0); }
+{ return sc64_unit_save_decode_for(q,r,w,h,SC64_EGG_ROWS_DEFAULT); }
 
 #endif /* SC64_SHARED_EGG_WIRE_HOST_STAGE */
 

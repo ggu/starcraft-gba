@@ -2,7 +2,8 @@
 #ifndef SC64_SHARED_EGG_WIRE_HOST_H
 #define SC64_SHARED_EGG_WIRE_HOST_H
 #if !defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || \
-    (!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && !defined(SC64_SHARED_EGG_LATE_SERVICE))
+    (!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) && !defined(SC64_SHARED_EGG_LATE_SERVICE) && \
+     !defined(SC64_CUSTOM_EGGS_ACTIVE))
 #error "Egg wire validation requires the isolated Egg candidate"
 #endif
 /* This is an admission primitive, not an installed journal decoder. The

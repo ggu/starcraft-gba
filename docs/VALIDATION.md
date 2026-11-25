@@ -4097,6 +4097,13 @@ qualification. With the gate off, the six-gate ARM ROM is byte-identical to
 `bed9feb7…9bc2f`.
 
 
+### Custom Game Larva and Eggs
+
+Host lifecycle, fresh-process saves, earlier-record loads, the AI matrix, the
+ARM save and resume from a blank save, performance and memory for Custom Game
+Larva and Eggs are recorded in the
+[Larva and Egg audit](audits/2026-11-25-custom-larva-eggs.md).
+
 ### Experimental independent Z7 Egg production
 
 The default-off `SC64_Z7_EGG_PRODUCTION` path creates a real raw-36 Egg in an

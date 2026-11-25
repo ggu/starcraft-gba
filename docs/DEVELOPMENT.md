@@ -2856,6 +2856,102 @@ route fixtures remain unchanged. See
 for the measured intervals and qualification limits.
 
 
+### Custom Game Larva and Eggs
+
+`SC64_CUSTOM_LARVA_EGGS` is part of `SC64_SHARED_ENGINE_FLAGS`, so every
+race-engine build carries it and the production-build contract requires it
+([Shared engine](SHARED-ENGINE.md)). It takes effect in every build that has
+Custom Games in the shared transport save envelope: the Terran, Z7 to Z10, P7
+and P10 cartridges and Showcase. The older chapter profiles (T3, Z3, P3, Z4,
+P6 and the full-Terran and Zerg canonical profiles) store raw word rows with
+no Egg admission and keep the serial Hatchery queue. In a Custom Game, a Zerg
+human and every Zerg computer opponent
+produce only through Larva and Eggs; the serial Hatchery queue is not used.
+Campaign missions are unchanged: the producer is active only in a Custom Game,
+and Z7 keeps its own mission Eggs.
+
+| Rule | Behaviour | Basis |
+| --- | --- | --- |
+| Larva | Each completed Hatchery, Lair and Hive holds up to three. While it holds fewer, one more appears every 428 updates. A Lair or Hive keeps its Larva and its timer while it morphs. | Pinned OpenBW `bwgame.h` 8273–8289: a timer of 37 on a secondary order that runs every ninth frame, stopped at three connected Larva, is 342 frames; times 5/4 for this engine's update rate. |
+| First Larva | The match's starting hall begins with three. A Hatchery finished during the match begins with one and a cleared timer. | `bwgame.h` 21171–21172 (two spawned at the start, plus the zero timer) and 15896 (a new building's timer is zero). |
+| Order | The selected hall is the Larva source: R picks the product, A orders one. The order takes one Larva, the whole price and the supply at once and becomes one Egg. With no Larva, or no supply, nothing is charged. An Overlord needs no supply. | `bwgame.h` 6298–6316 (`order_ZergUnitMorph`) and 2217–2233 (`has_available_supply_for`). |
+| Egg | 200 hit points, armor 10, its product's build time. Every Egg counts down on every update on its own timer, so Eggs from one hall morph at once. | `bwgame.h` 6315–6326 (the Egg takes its product's build time and counts it down itself); BWAPI unit values. |
+| Pairs | One Zergling or Scourge Egg holds the supply of both units from the order and hatches two. | `bwgame.h` 2219–2220, 6346–6365. |
+| Cancel | Select the Egg, open the menu and choose **CANCEL EGG**: the whole mineral and gas price returns, the Egg and its Larva are gone. | `bwgame.h` 2383–2427 (`cancel_building_unit`: the full product refund at 2399–2401, then the Egg is killed at 2425). |
+| Death | A killed Egg is the unit lost. Nothing is refunded. | The Egg is an ordinary actor. |
+
+These are PC-reference facts from the pinned OpenBW revision. No StarCraft 64
+observation was made for this change; the [native Blood Bath
+observations](audits/2026-11-21-native-blood-bath-lurker.md) already record a
+native Larva, Egg and Drone in one actor slot and a Zergling pair hatch.
+
+Authored GBA choices, not reference behaviour:
+
+- Larva are a count on the town hall, shown beside its name, not actors. They
+  cannot be selected or killed one by one. The unit table is unchanged: an Egg
+  takes one slot, as a queued unit did when it was trained.
+- Eggs stand in a row of six places nine pixels apart, starting below the
+  point a trained unit appears at and running away from the hall. A place is
+  used only if a ground unit born there can walk away; a unit born from an Egg
+  steps up ten pixels, onto the row of that point, when it can walk away from
+  there. With no usable place an Egg takes the first one. The second unit of a
+  pair is born on whichever side of the first it can walk away from. In the
+  Terran and Showcase builds Eggs collide with the six-pixel radius most
+  units use; in builds with campaign actor tables (every Zerg cartridge, P7
+  and P10) they use the raw-36 source box, as Z7's Eggs do.
+- An Egg has no link to its hall. It survives the hall, and a hatched unit
+  does not follow a rally point. A hatched Drone goes to the nearest mineral
+  field, as a trained worker of any race does here.
+- The second unit of a pair is reserved at the order. If the unit table has no
+  free slot when a pair is due, the Egg waits at its last update until one is
+  free (the reference hatches one unit and drops the other).
+
+**Saves.** An Egg is an ordinary unit row: its product and remaining time use
+the row's target and timer fields, and Larva and Larva timers were already in
+every building row. No record layout and no save tag changed. A Custom Game
+record may hold Egg rows; a campaign record may not, except Z7's own, and the
+load preflight refuses one that does (`race_custom_egg_rows_valid`). A record
+without Eggs is left to the rules it was written under, so earlier saves load
+as before; a serial queue they hold keeps completing, and new orders are Eggs.
+A build from before this change refuses a record that holds Eggs and stays on
+the HOME screen. Products with no Z7 runtime append the Egg as their last unit
+identity, after every identity their saves can already hold.
+
+**Computer opponents.** `race_skirmish_ai.h` orders through the same service
+as the human. Each planning pass orders one unit for every Larva a hall holds.
+Because Larva let a Zerg owner fill its unit share in minutes, an order counts
+both units of a pair, the army leaves room for the Drones the owner still
+wants, and a full share orders no further Overlords. See
+[Skirmish AI](SKIRMISH-AI.md).
+
+With the private inputs prepared:
+
+```sh
+make test-custom-larva-eggs                 # all six profiles below
+make test-custom-larva-eggs-zerg-z10        # or terran, protoss-p10, showcase, zerg-z7, protoss-p7
+```
+
+Each profile builds `tests/sc64_custom_larva_eggs.c` under ASan and UBSan with
+that product's flags and runs the lifecycle (Larva, orders through the
+controls, simultaneous hatch, pairs, cancel, death, supply, a new Hatchery and
+a Zerg computer opponent), a pause save with Eggs on both sides that a fresh
+process resumes, and the load of an earlier serial-queue record. The Zerg
+profiles write that record with a build of the same sources without the
+capability, which must also refuse the record with Eggs; the other products
+append the Egg to their roster, so their fact tables cannot be built without
+it, and the test places the queue entries itself. On the ARM product ROM:
+
+```sh
+python3 tools/sc64_custom_larva_eggs_arm.py --runner RUNNER \
+  --rom build/StarCraft-Zerg-Z10-Transport1-GBA.gba --elf build/starcraft-zerg-z10.elf \
+  --output OUT
+```
+
+It plays from a blank save with the physical buttons only: a Zerg human orders
+three Drones at once while a Zerg computer opponent has Eggs in progress,
+saves through the pause menu, and a fresh process loads and continues. See
+[the Larva and Egg audit](audits/2026-11-25-custom-larva-eggs.md) for results and limits.
+
 ### Experimental independent Z7 Egg production
 
 `SC64_Z7_EGG_PRODUCTION` requires the race and Z7 runtimes and is active only

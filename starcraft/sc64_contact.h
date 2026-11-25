@@ -95,7 +95,7 @@ sc64_contact_class_compute(int type)
         collidable = !actor || (actor & SC64_GAME_ACTOR_COLLIDABLE) != 0;
     }
 #endif
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_EGG_COLLISION_RADIUS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
     {
         int r = sc64_game_unit_collision_radius(type);
         if (r < 0 || r >= (int)SC64_CONTACT_IGNORE) return 0;
@@ -170,7 +170,7 @@ sc64_contact_candidate_reference(const Unit *q, int i, int nx, int ny,
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed(i)) return 0;
 #endif
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_EGG_COLLISION_RADIUS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
     {
         int candidate_radius = sc64_game_unit_collision_radius(c->type);
         radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -214,7 +214,7 @@ sc64_contact_mover(const Unit *q, int *radius, int *flying)
 #define SC64_CONTACT_REACH(flying) ((flying) ? 18 : 9)
 #elif defined(SC64_GUARDIAN_DISTINCT_STAGE)
 #define SC64_CONTACT_REACH(flying) 10 /* staged Guardian radius 11 */
-#elif defined(SC64_SHARED_EGG_WIRE_HOST_STAGE)
+#elif defined(SC64_EGG_COLLISION_RADIUS)
 #define SC64_CONTACT_REACH(flying) 7 /* raw36 radius 8, strict inequality */
 #else
 #define SC64_CONTACT_REACH(flying) 5
@@ -237,7 +237,7 @@ static unsigned __attribute__((noinline))
 sc64_contact_check_reach_layers(void)
 {
     unsigned layers = 3;
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_EGG_COLLISION_RADIUS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
     for (int type = -128; type < SC64_CONTACT_TYPES; ++type) {
         if (type == U_CHRYSALIS) continue;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
