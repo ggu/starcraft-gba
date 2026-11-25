@@ -47,8 +47,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory at frame 143,281, with both heroes alive. It matches all 13
   stage journals on the supply and paired-outline builds. Advancing to
   T6 on the supply build also produces a byte-identical frame-101
-  pause and HOME reload. Rebuild a continuous T5 input route from the
-  opening to the late checkpoint on the combined release.
+  pause and HOME reload. On the packaged `5f758095` Terran ROM, a new
+  opening-to-victory T5 route restores its own pause saves throughout. The
+  replay reaches the first pause at frame 19,419 with identical save bytes;
+  the frame-21,519 save differs from its historical counterpart. The release
+  route reaches frame 88,779, then replays the 13 retained input segments.
+  Three additional selection and attack sequences finish the six remaining
+  buildings. A fresh HOME process restores victory at frame 145,471 with
+  both heroes alive, zero enemy buildings, and byte-identical SRAM
+  (`0a327a1841ff9a75cc1a0bd127323e8eaf8e91db344655280fd44c3543332393`).
   The paired-outline build repeats [Z7 from HOME through all 206
   named checkpoints](audits/2026-11-12-z7-normal-physical.md#november-25-combined-supply-and-outline-release-replay)
   and wins at frame 267,585. It also replays T3 from HOME to victory
@@ -89,7 +96,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   16 matched checkpoints. On the packaged Zerg ROM, Z2 reaches victory
   at frame 10,209 with objective flags 17. Z2's input replay checks the
   terminal objective state. Both victory saves reload byte for byte in a
-  fresh emulator process. Continue full campaign runs on the package.
+  fresh emulator process. All nine intermediate Protoss chapter transitions
+  also reach the expected next mission on this package. Each following
+  mission saves and reloads with the same frame and completion mask.
+  Z1–Z6 and Z8 pass the corresponding transitions. The three finales retry
+  the final chapter with A and preserve its completion bit through a new
+  pause save. The new T5 victory also advances into T6 and reloads at
+  frame 101. On T9 the strict historical comparison first diverges at
+  input 15,000 (198 minerals and 70 gas versus 498 and 270). The same
+  buttons still finish the mission at frame 47,266 with a fresh pause
+  reload during play and a byte-identical victory readback. The diagnostic
+  replay recorded the differing checkpoints and kept the terminal objective
+  and save checks active. Repeat these checks from retained victory SRAM with
+  `python3 tools/sc64_chapter_transition.py --help` for the required paths.
+  Continue Z7 and Z9 transitions and full campaign runs. Recorded P2, Z4
+  and Z5 inputs currently leave the mission active, and the historical Z3
+  cursor checkpoint diverges at input 7,269.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
