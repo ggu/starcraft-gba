@@ -1534,6 +1534,7 @@ record, and fails the ROM unless the stack fits above the IWRAM code with a
 ```sh
 make terran                    # relinked, stack-checked
 make terran SC64_IWRAM_HOT=0   # previous link, for matched comparisons
+make terran TERRAN_CARRIER_RELEASE=0   # stock comparison build: previous link too
 make test-sc64-iwram-hot       # asset-free tool and linker-script checks
 ```
 

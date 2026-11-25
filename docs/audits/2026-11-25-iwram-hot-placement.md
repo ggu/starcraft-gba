@@ -33,9 +33,10 @@ ELF and completed from it.
 The graph and the ELF leave seven things open, and the check has a rule
 for each.
 
-- A call through a pointer may reach any function that GCC's
-  `-fdump-ipa-cgraph` dump marks `Address is taken`: 37 functions on
-  Terran, 49 on Zerg and 50 on Protoss.
+- A call through a pointer may reach any linked function that GCC's
+  `-fdump-ipa-cgraph` dump marks `Address is taken`: 34 functions on
+  Terran, 44 on Zerg and 48 on Protoss. A callback the linker
+  discarded is not a target.
 - A function merged into an identical one is an ELF alias with no
   frame record. It resolves through its address (one to three per ROM),
   as a callee and as a pointer target.
@@ -51,7 +52,7 @@ for each.
   its add-on through `race_bc_parent_detach`, or on Zerg a Nydus Canal
   and its exit through `race_nydus_note_building_lost`, which unlinks
   the pair before it destroys the exit.
-- The pointer rule also makes one cycle per ROM out of 12 to 15 trigger
+- The pointer rule also makes one cycle per ROM out of 8 to 15 trigger
   and save dispatchers. Each is declared as one activation. The basis
   is the code: GCC's dump shows every member installed through a named
   ops table or a bind function for one layer (source dispatch, count
@@ -80,16 +81,16 @@ margin stays at or below the stack top.
 
 | Cartridge | Stack bound | Deepest chain | IWRAM may end at | IWRAM ends at | Spare |
 | --- | ---: | --- | ---: | ---: | ---: |
-| Terran 10 | 7,808 | pause save, the dispatcher cycle, then a trigger action | `0x03005D80` | `0x03005AE0` | 672 |
-| Zerg 10 | 6,076 | campaign tick, the dispatcher cycle, then a save validator | `0x03006444` | `0x03006108` | 828 |
+| Terran 10 | 7,792 | pause save, the dispatcher cycle, then a trigger action | `0x03005D90` | `0x03005AE0` | 688 |
+| Zerg 10 | 5,848 | depth-ordered actor drawing | `0x03006528` | `0x03006108` | 1,056 |
 | Protoss 10 | 5,940 | campaign tick, the dispatcher cycle, then a save validator | `0x030064CC` | `0x03006018` | 1,204 |
 
-Values are bytes. All three deepest chains pass through the dispatcher
-cycle and join code the game does not combine, such as a save callback
-reaching a trigger action. They are bounds, and the measured depth
-below is lower. The deepest chain without pointer calls is actor
-drawing: `sc64_draw_depth_ordered_actors` alone has a 3,384–4,280 byte
-frame. Interrupt handlers run on the IRQ stack; their bound is 304 of
+Values are bytes. The Terran and Protoss chains pass through the
+dispatcher cycle and join code the game does not combine, such as a
+save callback reaching a trigger action. They are bounds, and the
+measured depth below is lower. The deepest chain without pointer calls
+is actor drawing: `sc64_draw_depth_ordered_actors` alone has a
+3,384–4,280 byte frame. Interrupt handlers run on the IRQ stack; their bound is 304 of
 416 bytes on all three.
 
 A private single-step mGBA runner records the lowest stack pointer of

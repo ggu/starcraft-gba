@@ -514,6 +514,20 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.run_check(), 1)
         self.assertTrue(any("replaces a libgcc routine" in e for e in self.report()["errors"]))
 
+    def test_libgcc_hook_that_is_an_alias_of_a_program_function_fails(self):
+        # `leaf` is also exported as __aeabi_ldiv0; the alias has no frame record of its own.
+        self.symbols.append((self.LEAF + 1, 0, "FUNC", "GLOBAL", "__aeabi_ldiv0"))
+        self.assertEqual(self.run_check(), 1)
+        self.assertTrue(any("__aeabi_ldiv0 replaces a libgcc routine" in e for e in self.report()["errors"]))
+
+    def test_discarded_callback_and_its_discarded_callee_do_not_fail_a_rom(self):
+        self.frames.update({"file.c:dead_cb": 3000, "file.c:dead_leaf": 100})
+        self.calls += [("file.c:dead_cb", "file.c:dead_leaf"), ("file.c:leaf", hot.INDIRECT)]
+        self.cgraph += ("dead_cb/7 (dead_cb)\n  Type: function definition analyzed\n  Address is taken.\n"
+                        "dead_leaf/8 (dead_leaf)\n  Type: function definition analyzed\n")
+        self.assertEqual(self.run_check(), 0)
+        self.assertEqual(self.report()["stack_bound_bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
+
     def test_branch_from_code_without_a_record_into_the_program_fails(self):
         self.symbols.append((0x08000701, 32, "FUNC", "GLOBAL", "__divsi3"))
         self.branches.append((0x08000708, self.LEAF))

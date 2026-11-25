@@ -19,7 +19,7 @@ IWRAM_HOT_ELFS := build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/
 .PHONY: force-iwram-hot-config test-sc64-iwram-hot
 force-iwram-hot-config:
 build/iwram-hot-config: force-iwram-hot-config | build
-	@printf '%s\n' '$(SC64_IWRAM_HOT)' > $@.tmp
+	@printf '%s\n' '$(SC64_IWRAM_HOT) $(TERRAN_CARRIER_RELEASE) $(Z10_CARRIER_RELEASE)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 $(IWRAM_HOT_ELFS): build/iwram-hot-config
 
@@ -43,9 +43,16 @@ build/iwram-hot/$(1)/stack.json: $(2) $$(IWRAM_HOT_TOOL) config/iwram-hot/$(1).t
 	mv $$@.tmp $$@
 $(3): build/iwram-hot/$(1)/stack.json
 endef
+# The lists and their reviewed call cycles are for the shipped feature set.
+# The stock comparison builds (TERRAN_CARRIER_RELEASE=0, Z10_CARRIER_RELEASE=0)
+# drop functions from those cycles, so they keep the previous link.
 ifeq ($(SC64_IWRAM_HOT),1)
+ifneq ($(TERRAN_CARRIER_RELEASE),0)
 $(eval $(call iwram_hot_rules,terran,build/starcraft-terran.elf,build/StarCraft-Terran-Transport1-GBA.gba))
+endif
+ifneq ($(Z10_CARRIER_RELEASE),0)
 $(eval $(call iwram_hot_rules,zerg-z10,build/starcraft-zerg-z10.elf,build/StarCraft-Zerg-Z10-Transport1-GBA.gba))
+endif
 $(eval $(call iwram_hot_rules,protoss-p10,build/starcraft-protoss-p10.elf,build/StarCraft-Protoss-P10-Transport1-GBA.gba))
 endif
 

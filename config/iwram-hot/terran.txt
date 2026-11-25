@@ -22,7 +22,7 @@ recursion destroy_building* 2 c1c7a2ed
 # below it, so no function here is entered while it is active. The cycle
 # exists only because the check lets a pointer call reach every function
 # whose address is taken.
-callback-cycle sc64_t6_dispatch_action 1 3421b543
+callback-cycle sc64_t6_dispatch_action 1 4fd14ca5
 
 # A trailing * also takes a function's .constprop/.isra clones.
 memset

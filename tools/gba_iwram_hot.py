@@ -626,7 +626,8 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
         with dump.open(encoding="utf-8", errors="replace") as lines:
             marked, defined[unit] = parse_address_taken(lines)
         for name in marked:
-            found = {t for t in titles.get(name, ()) if unit_of(t) in (None, unit)}
+            # A callback GCC compiled and the linker discarded is no target.
+            found = {t for t in titles.get(name, ()) if unit_of(t) in (None, unit)} if name in values else set()
             if not found:       # merged into an identical function: use the frame at its address
                 found = {t for start in addresses.get(name, ()) for other in names_at[start]
                          for t in titles.get(other, ())}
@@ -705,7 +706,9 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
     if hidden:
         errors.append(f"{len(hidden)} linked functions are reached from no call the check can see "
                       f"(first: {', '.join(hidden[:6])})")
-    hooks = sorted(name for _, _, name in functions if name in titles and LIBGCC.match(name))
+    # By address, so that a hook defined as an alias of another function is found too.
+    hooks = sorted(name for name, value in values.items() if LIBGCC.match(name)
+                   and any(titles.get(other) for other in names_at.get((owner(value & ~1) or (None,))[0], ())))
     if hooks:
         errors.append(f"{', '.join(hooks)} replaces a libgcc routine in C; libgcc calls it from code "
                       "that has no call-graph record")
