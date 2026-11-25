@@ -19,13 +19,14 @@ For each successful win, the ordinary physical-button ARM replay starts from HOM
 | zerg / Blood Bath / P | release | 7 | won, 11,073 | win, 28 after reload |
 | zerg / Blood Bath / TZ | release | 6 | won, 38,190 | win, 267 after reload |
 | protoss / Outpost / T | release | 0 | lost, 18,090 | loss, 132 checks |
+| protoss / Outpost / T | adjusted | 0 | won, 23,732 | win, 73 after reload |
 | protoss / Outpost / TZ | release | 0 | lost, 26,607 | loss, 180 checks |
 | protoss / Outpost / TZ | adjusted | 0 | won, 29,622 | win, 81 after reload |
 | protoss / Blood Bath / T | release | 8 | lost, 26,343 | loss, 267 checks |
 | protoss / Blood Bath / T | adjusted | 2 | won, 16,795 | win, 52 after reload |
 | protoss / Blood Bath / TZ | release | 24 | won, 16,117 | win, 103 after reload |
 
-The adjusted plan that ended before a pause is excluded from the qualified wins. A one-opponent Protoss Outpost victory remains a gap after the plans tried; its release plan loss was confirmed on ARM.
+The adjusted plan that ended before a pause is excluded from the qualified wins. The one-opponent Protoss Outpost release plan loss was confirmed on ARM. Its adjusted all-Zealot plan opts into `GLOBAL_ATTACK_RATIO=0`, removing the controller’s extra non-melee requirement that its army be at least twice the total enemy army before attacking. The default remains 2. In the observed loss, the two home mineral patches were depleted before the decisive counterattack and the Terran army had built a substantial lead. The adjusted controller committed earlier and won; this is one strategy outcome, not a claim that the ratio is generally optimal. Its ARM replay matched 169 uninterrupted checks and 73 fresh-save continuation checks, with victory SRAM and result reload verified.
 
 ## Reproduction inputs
 
@@ -44,6 +45,7 @@ For each row, build the FIFO-enabled HOST author and matching FIFO ARM cartridge
 | zerg / 1 / p / release: `LINE=38,WORKERS=12,PRODUCERS=1,FIRST_ATTACK=7000,LOBBY_WAIT=16` | `ca1a3ee51df897a1f8d8728025ed47882d94ef10e53a7fe3f3c2d06853d00d62` |
 | zerg / 1 / tz / release: `LINE=38,WORKERS=12,PRODUCERS=1,FIRST_ATTACK=7000,LOBBY_WAIT=22` | `a5229297c214c3d920607c3b93a65c410546663ddbd4923e1abda0cadc93466e` |
 | protoss / 0 / t / release: `LINE=66,WORKERS=12,DEFENSES=4,PRODUCERS=2,FIRST_ATTACK=7000,DEFENSE=162` | `fe7c829d0bdb7f2bed76793016ed7adca8d611e3999911bd5af737b8916615d1` |
+| protoss / 0 / t / adjusted: `LINE=65,WORKERS=9,PRODUCERS=3,MAX_PRODUCERS=3,FIRST_ATTACK=3000,ATTACK_MIN=5,ATTACK_RATIO=0,ATTACK_MARGIN=0,GLOBAL_ATTACK_RATIO=0,TECH_FRAME=30000,RECALL_THREAT=5,RETREAT=0,DEFENSES=0,VERBOSE=1` | `a24e0cf5070b544160d34617b35663e679694f8508ccaa51db13dfd62af983e5` |
 | protoss / 0 / tz / release: `LINE=65,WORKERS=10,DEFENSE=162,DEFENSES=4,PRODUCERS=2,FIRST_ATTACK=7000` | `4105b8dfd2383e834c1ddb081bd98264e50bdbb5c4f1e0c25897c1ba6a948153` |
 | protoss / 0 / tz / adjusted: `LINE=65,WORKERS=10,DEFENSES=4,PRODUCERS=3,FIRST_ATTACK=3000,ATTACK_RATIO=1,ATTACK_MIN=6,ATTACK_MARGIN=0,DEFENSE=162,TECH_FRAME=30000` | `787933a5f208ce04749fd7c6831fb6460404841dc1d9e8e8584a0b211f8898a0` |
 | protoss / 1 / t / release: `LINE=66,TECH_FRAME=8000,LOBBY_WAIT=18` | `4f7c5b5c9864a2ce6cf2358ec1fbe4cdc8d1db929bb704464595e4a9ef413333` |

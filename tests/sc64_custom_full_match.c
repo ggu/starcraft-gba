@@ -667,7 +667,7 @@ static int try_busy_save(void)
 typedef struct {
     int worker, hall, supply, supply_unit, gas, pre, producer, tech, lab, line, basic, support, support_ratio;
     int defense, defenses, defense_frame, tech_frame;
-    int workers, producers, attack_min, attack_margin, attack_ratio, retreat_army, first_attack;
+    int workers, producers, attack_min, attack_margin, attack_ratio, global_attack_ratio, retreat_army, first_attack;
     int tech_after, lab_after, tech_deadline, max_producers, recall_threat, all_in_frame, defense_weight, strength_px, early_workers, grow_frame;
 } Plan;
 
@@ -754,6 +754,8 @@ static void setup_plan(void)
     plan.attack_min = plan_option("ATTACK_MIN", melee ? 10 : 12);
     plan.attack_margin = plan_option("ATTACK_MARGIN", melee ? 4 : 6);
     plan.attack_ratio = plan_option("ATTACK_RATIO", melee ? 2 : 3);
+    /* Optional policy threshold for non-melee matches; preserve the default. */
+    plan.global_attack_ratio = plan_option("GLOBAL_ATTACK_RATIO", 2);
     plan.retreat_army = plan_option("RETREAT", 6);
     plan.first_attack = plan_option("FIRST_ATTACK", melee ? 4500 : 6000);
 }
@@ -1065,7 +1067,7 @@ static int policy_attack(void)
          (!strength && frame >= plan.first_attack && army >= 4) ||
          (frame >= plan.first_attack && army >= plan.attack_min &&
           army >= plan.attack_ratio * strength + plan.attack_margin &&
-          (race_skirmish_melee || army >= 2 * all_hostile_army())))) {
+          (race_skirmish_melee || army >= plan.global_attack_ratio * all_hostile_army())))) {
         attacking = 1; attack_owner = owner; next_attack = 0; last_target = -1;
         say("attack owner %d strength %d with %d%s", owner, strength, army, all_in ? " (all in)" : "");
     }
