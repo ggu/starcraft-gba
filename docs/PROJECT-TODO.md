@@ -1042,6 +1042,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preserves both framebuffer pages across seven ARM windows, with
   no reduction in budget overruns and slower drawing in all three
   panned Outpost windows. Keep the current raster.
+  The [selection-ring renderer](audits/2026-11-22-dense-release-attribution.md#selection-ring-work-in-zerg-9)
+  cuts Z9 overlay cost by 25.4% and the separate busy window's
+  mean loop time by 2.20%, with unchanged video-page bytes and RAM
+  guard endpoints. The window remains above the two-VBlank budget.
+  Continue profiling actor and effect drawing in dense battles.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -2040,12 +2045,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   active with 16 surviving actors under its zero-total-actors loss
   rule. Verify the equivalent state on N64 when a matching campaign
   checkpoint is available.
+  The [regenerated Z7 winning input tape](audits/2026-11-12-z7-normal-physical.md#november-25-rendered-controller-recovery)
+  wins on the prepared HOST build and matches the first 166 checks on
+  the current Z10 ARM build. Verify the remaining normal replay.
   The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
   preserve the economy at frame 87,554 and hold the Pool with four
   Hydralisks through frame 89,195. Protect the forward detector before
-  pushing the Nexus. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
+  pushing the Nexus. The [staged eastern attack](audits/2026-11-12-z8-normal-physical.md#stage-the-eastern-formation-together)
+  destroys a Pylon and lowers the Nexus to 170 shields before losing
+  the assault force. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
   verifies three Hydralisks and a new mining Drone at frame 35,958.
   Establish the defense earlier from frame 34,723 to survive the raid.
+  The [new Z10 controller replay](audits/2026-11-21-z10-current-full-circle.md#november-25-controller-replay-on-the-padded-journal-build)
+  wins on HOST. The ARM continuation first differs at frame 8,518.
+  Inspect the controller's macro inputs between frames 6,021 and 8,518.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second

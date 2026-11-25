@@ -21,6 +21,23 @@ The emulator measured 70,347,482,196 guest cycles across 49,540 updates, about 1
 
 The prepared cartridge, controller, save, runner and detailed receipts are local. The first continuation process stopped after call 30,000. The successful continuation restarted from the validated HOME save.
 
+## November 25 controller replay on the padded journal build
+
+The current HOST controller wins in 53,430 ordinary input calls at frame
+51,588, with zero scheduler faults. It writes a pause save at frame 2,527.
+The same input tape from empty HOME on the padded ARM ROM matches the
+first five checked observations through frame 6,021. It diverges at call
+8,953, frame 8,518. The ARM world has 17 friendly units and 1,237 minerals
+where HOST reports 14 and 879. Both remain active with the same enemy
+counts, 625 gas and zero scheduler faults. Treat this as a reproduced
+controller mismatch and inspect the preceding macro inputs before counting
+a current ARM win.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current HOST controller tape | `c9c4b76362e3bb389a16068b02fc48c52ebb6b82c5477cb6ba71e396434353b9` |
+| Padded ARM prefix and first differing checkpoint | `6653dd78b0f46b910899ec9d972ee157fe35ccc918b31f713a0eb44226d06de4` |
+
 ## All three current finales
 
 Ordinary controller tapes also completed the finales on the exact T10 and

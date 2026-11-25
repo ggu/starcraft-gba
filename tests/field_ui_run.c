@@ -688,7 +688,39 @@ selection_cover_tests(void)
     }
 }
 
-/* Selections are StarCraft ellipses at the actor's base, not boxes. */
+static void
+selection_geometry_tests(void)
+{
+    int same = 1;
+    for (int rx = 3; rx <= SELECTION_RX_MAX && same; ++rx) {
+        for (int ry = 2; ry <= SELECTION_RY_MAX && same; ++ry) {
+            int x = 120 + rx % 4, y = 60, d = 2 * ry + 1;
+            gfx_begin(C_BLACK);
+            draw_selection_ellipse(x, y, rx, ry, C_GREEN, SELECTION_RING, 0);
+            for (int dy = 0; dy <= ry && same; ++dy) {
+                int outer = rx, inner = 0;
+                while (outer * outer * d * d > rx * rx * (d * d - 4 * dy * dy))
+                    --outer;
+                if (dy < ry) {
+                    int next = dy + 1;
+                    inner = outer;
+                    while (inner * inner * d * d > rx * rx * (d * d - 4 * next * next))
+                        --inner;
+                    if (inner < outer) ++inner;
+                }
+                for (int dx = -rx; dx <= rx; ++dx) {
+                    int reach = dx < 0 ? -dx : dx;
+                    u8 color = reach >= inner && reach <= outer ? C_GREEN : C_BLACK;
+                    same &= gfx_test_pixel(x + dx, y + dy) == color &&
+                            gfx_test_pixel(x + dx, y - dy) == color;
+                }
+            }
+        }
+    }
+    check(same, "all selection ring radii match the direct ellipse equation");
+}
+
+/* Selection outlines follow the actor's base. */
 static void
 selection_circle_tests(void)
 {
@@ -719,6 +751,7 @@ selection_circle_tests(void)
     check(count_color(100, 61, 41, 20, C_GREEN) == 0 &&
           gfx_test_pixel(120, 54) == C_GREEN, "far arc stays above centre");
     selection_cover_tests();
+    selection_geometry_tests();
 
     fixture();
     int marine = slot_of(SIDE, U_MARINE);

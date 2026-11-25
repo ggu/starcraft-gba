@@ -11054,7 +11054,9 @@ selection_color(int owner)
 static void
 selection_row(int left,int right,int row,u8 color)
 {
-    if (row >= 12 && row < 120) gfx_rect(left,row,right-left+1,1,color);
+    if (row < 12 || row >= 120) return;
+    if (left == right) gfx_pixel(left, row, color);
+    else gfx_rect(left, row, right - left + 1, 1, color);
 }
 
 static void
@@ -11086,9 +11088,20 @@ draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int parts,
      * i.e. a^2*(2ry+1)^2 <= rx^2*((2ry+1)^2 - 4dy^2). Sampling row centres
      * keeps the top and bottom rows flat instead of single-pixel points. */
     int a = rx, d = 2*ry + 1;
+    int d_squared = d * d, rx_squared = rx * rx;
+    int width_term = rx_squared * d_squared, row_limit = width_term;
+    int width_step = (2 * rx - 1) * d_squared, row_step = 4 * rx_squared;
     for (int dy = 0; dy <= ry; ++dy) {
-        while (a > 0 && a*a*d*d > rx*rx*(d*d - 4*dy*dy)) --a;
+        /* The difference of consecutive squares is odd. Advance the
+         * original inequality by these differences between rows and widths. */
+        while (a > 0 && width_term > row_limit) {
+            width_term -= width_step;
+            width_step -= 2 * d_squared;
+            --a;
+        }
         half[dy] = (u8)a;
+        row_limit -= row_step;
+        row_step += 8 * rx_squared;
     }
     half[ry+1] = 0;
     /* Each row joins its edge to the next row's so the outline has no gaps. */
