@@ -194,8 +194,18 @@ regenerates the corrected 270,585-call tape. Normal inputs win at frame
 267,585 with terminal consistency, zero adapter faults and zero enemy
 buildings. The tape SHA-256 is
 `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`,
-matching the November 22 corrected tape. The current padded Z10 ARM ROM
-then starts the same tape from empty HOME with ordinary buttons. The
-first 166 named observations through call 156,197, frame 154,166, match.
-The ARM replay still needs to reach the victory before it can count
-toward current-cartridge coverage.
+matching the November 22 corrected tape. The padded-journal Z10 ARM ROM
+replays it from empty HOME using ordinary buttons. All 206 named model,
+entity-count and economy checkpoints match. It wins at the same frame
+with seven enemy units, zero enemy buildings and zero adapter faults.
+
+The full replay averages 1,313,688 guest cycles per update, about 12.77
+emulated updates per second including rendering and pacing. This run
+verifies the entire ordinary route to victory on this exact ARM build.
+Full actor arrays and a fresh reload of the victory are outside this run.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Padded-journal Z10 ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
+| Matching ELF | `da20e5abc0457b5d60b6476fbdb4d9a06bf2f9756cb271963de63c908b1f14f9` |
+| Full physical-button win receipt | `115a0db4473784c8b10927c20acd0f58dda1dae1972d365c9f04135b03f7a33f` |
