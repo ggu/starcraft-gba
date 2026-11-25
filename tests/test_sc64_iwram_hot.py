@@ -173,6 +173,15 @@ class BoundTest(unittest.TestCase):
         self.assertNotEqual(a, c)
         self.assertRegex(a, hot.FINGERPRINT)
 
+    def test_new_call_inside_a_recursion_group_changes_its_fingerprint(self):
+        frames = {"main": 10, "destroy": 40, "detach": 24}
+        calls = [("main", "destroy"), ("destroy", "detach"), ("detach", "destroy")]
+        seen = bound(frames, calls)["cycles"][0]["fingerprint"]
+        self.assertEqual(bound(frames, calls, recursion={"destroy": (2, seen)})["changed"], [])
+        # A self-call keeps the members but can nest without limit.
+        result = bound(frames, calls + [("destroy", "destroy")], recursion={"destroy": (2, seen)})
+        self.assertEqual(cycles(result, "changed"), [("recursion", ["destroy", "detach"])])
+
     def test_pointer_call_back_into_a_recursion_group_needs_its_own_declaration(self):
         frames = {"main": 10, "a": 40, "b": 24}
         calls = [("main", "a"), ("a", "b"), ("b", "a")]
@@ -300,6 +309,38 @@ foo.constprop.0/5 (foo.constprop)
         self.assertEqual(values["__iwram_end"], 0x03005AE0)
         self.assertEqual(functions, [(0x08000100, 40, "static_fn"), (0x08000200, 12, "weak_fn"),
                                      (0x08000300, 12, "global_fn")])
+
+    def test_frames_come_from_call_frame_information(self):
+        listing = """Contents of the .debug_frame section:
+
+00000000 0000000c ffffffff CIE "" cf=2 df=-4 ra=14
+   LOC   CFA      
+00000000 r13+0    
+
+00000010 0000000c 00000000 FDE cie=00000000 pc=08005c48..08005c4a
+
+00000020 00000028 00000000 FDE cie=00000000 pc=08005c4c..08005e84
+   LOC   CFA      r4    r5    ra    
+08005c4c r13+0    u     u     u     
+08005c4e r13+20   c-20  c-16  c-4   
+08005c58 r13+96   c-20  c-16  c-4   
+08005c60 r13+36   c-20  c-16  c-4   
+"""
+        self.assertEqual(hot.parse_frames(listing), {0x08005C48: 0, 0x08005C4C: 96})
+        with self.assertRaises(hot.HotError):       # a frame-pointer frame has no fixed bound here
+            hot.parse_frames(listing + "08005c70 r7+8     c-20  c-16  c-4   \n")
+
+    def test_branches_with_fixed_targets_are_found(self):
+        listing = "\n".join([
+            " 801594e:\tpush\t{r4, lr}",
+            " 801595c:\tbl\t8015930 <sc64_direct_target_valid.isra.0>",
+            " 8015962:\tbeq.n\t801596a <sc64_direct_target_can_damage+0x1e>",
+            " 8015972:\tbx\tr3",
+            " 3000010:\tb\t3000400 <gfx_rect>",
+            " 8015974:\t.word\t0x03000400",
+            " 8015978:\tbics\tr0, r1"])
+        self.assertEqual(hot.parse_branches(listing),
+                         [(0x801595C, 0x8015930), (0x8015962, 0x801596A), (0x3000010, 0x3000400)])
 
     def test_merged_function_resolves_to_the_frame_at_its_address(self):
         frames, edges, _ = hot.parse_callgraph([ci({"main": 10, "game.c:census_p8": 300},

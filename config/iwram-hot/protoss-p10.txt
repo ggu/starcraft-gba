@@ -15,7 +15,7 @@ limit 0x030064c0
 #
 # Recursion: destroying a building with an add-on destroys the add-on from
 # race_bc_parent_detach; the add-on has no add-on of its own.
-recursion destroy_building* 2 7ed2e2a7
+recursion destroy_building* 2 c1c7a2ed
 # The trigger layers call one another through ops tables: source dispatch,
 # count snapshot, world adapter, timed service, then game services. Each
 # table is bound once to the layer below it, so no function here is entered

@@ -18,8 +18,20 @@ previous link.
 ## Stack bound
 
 `tools/gba_iwram_hot.py check` computes the longest call chain in
-GCC's call graph (`-fcallgraph-info=su`) with GCC's frame sizes. The
-graph leaves five things open, and the check has a rule for each.
+GCC's call graph (`-fcallgraph-info=su`), checked against the linked
+ELF and completed from it.
+
+- Frame sizes come from the ELF's call-frame information. GCC's
+  figure agrees for every function but one: on Zerg,
+  `sc64_direct_target_can_damage` pushes its four register arguments
+  and uses 32 bytes where GCC reports 16. A difference of any other
+  kind means the dumps are from another build and fails the check.
+- Every branch in the ELF from one function into another is an edge.
+  This adds 91 to 110 edges per ROM that the graph leaves out, almost
+  all to GCC's switch and division helpers.
+
+The graph and the ELF leave five things open, and the check has a rule
+for each.
 
 - A call through a pointer may reach any function that GCC's
   `-fdump-ipa-cgraph` dump marks `Address is taken`: 37 functions on
@@ -46,7 +58,8 @@ graph leaves five things open, and the check has a rule for each.
   cache, world adapter, timed service), and their pointer calls go to
   the layer below or to game services.
 - Each declaration carries a fingerprint of the cycle as it was read:
-  the member functions for recursion; for a dispatcher cycle, the
+  the member functions and the calls among them for recursion; for a
+  dispatcher cycle, the
   members that call through a pointer or have their address taken, with
   their pointer-call site counts. An undeclared cycle fails the check,
   and so does a declared one whose fingerprint no longer matches.
@@ -65,7 +78,7 @@ cycle and join code the game does not combine, such as a save callback
 reaching a trigger action. They are bounds, and the measured depth
 below is lower. The deepest chain without pointer calls is actor
 drawing: `sc64_draw_depth_ordered_actors` alone has a 3,384–4,280 byte
-frame. Interrupt handlers run on the IRQ stack; their bound is 296 of
+frame. Interrupt handlers run on the IRQ stack; their bound is 304 of
 416 bytes on all three.
 
 A private single-step mGBA runner records the lowest stack pointer of
@@ -80,7 +93,7 @@ Zerg 1, 2 and 4–9, and Protoss 10.
 | Zerg 10 | 10 | 5,720 | drawing in Zerg 9 | 1,696 |
 | Protoss 10 | 4 | 5,016 | drawing in late Outpost | 2,640 |
 
-The IRQ stack reaches 296 bytes in these runs. The numbers are the same
+The IRQ stack reaches 296 bytes in these runs, 8 below its bound. The numbers are the same
 before and after the relink. Protoss 1–9, Terran 2, Zerg 3 and Zerg 10
 pause saves were not available for this measurement; the static bound
 covers them.
@@ -147,8 +160,9 @@ their veneers and the ROM offsets that follow.
 These are emulator cycle counts. Hardware timing, hardware saves and
 full campaign replays on the relinked ROMs remain open. The Showcase
 ROM and the older mission ROMs keep `gba.ld`. The stack bound depends
-on GCC's frame records and address-taken record and on the declared
-nesting of the two cycles per ROM. The dispatcher cycle's single
+on the ELF's call-frame information, GCC's call graph and
+address-taken record, and the declared nesting of the two cycles per
+ROM. The dispatcher cycle's single
 activation rests on reading the bind code, not on a proof; a callback
 that re-entered its own dispatcher would need a higher count and a
 shorter list. The busy windows remain far above the frame budget:

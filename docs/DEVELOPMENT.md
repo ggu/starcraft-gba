@@ -1524,9 +1524,10 @@ The Terran, Zerg 10 and Protoss 10 cartridges link with `common/gba_hot.ld`.
 It runs the functions listed in `config/iwram-hot/<cartridge>.txt` from IWRAM,
 in the part of the old 11 KiB stack reserve that the stack cannot reach. The
 functions are ordinary Thumb code; only their address changes. After the link,
-`tools/gba_iwram_hot.py check` bounds the program's stack depth from GCC's call
-graph, frame sizes and address-taken record and fails the ROM unless the stack
-fits above the IWRAM code with a 512-byte margin. The report is
+`tools/gba_iwram_hot.py check` bounds the program's stack depth from the ELF's
+call-frame information and branches and from GCC's call graph and address-taken
+record, and fails the ROM unless the stack fits above the IWRAM code with a
+512-byte margin. The cartridges are already built with `-g`, which it needs. The report is
 `build/iwram-hot/<cartridge>/stack.json`; the GCC dumps beside it take about
 80 MB per cartridge.
 

@@ -36,7 +36,7 @@ build/iwram-hot/$(1)/iwram_hot_limit.ld: build/iwram-hot/$(1)/iwram_hot_sections
 # which functions have their address taken (.cgraph). They do not change the
 # generated code. `override` keeps the script and the dumps when LDFLAGS is
 # set on the command line, because the stack check needs both.
-$(2): override LDFLAGS := $$(filter-out -Tcommon/gba.ld,$$(LDFLAGS)) -Tcommon/gba_hot.ld -Lbuild/iwram-hot/$(1) -fcallgraph-info=su -fdump-ipa-cgraph -dumpdir build/iwram-hot/$(1)/
+$(2): override LDFLAGS := $$(subst -T common/gba.ld,,$$(filter-out -Tcommon/gba.ld,$$(LDFLAGS))) -Tcommon/gba_hot.ld -Lbuild/iwram-hot/$(1) -fcallgraph-info=su -fdump-ipa-cgraph -dumpdir build/iwram-hot/$(1)/
 $(2): build/iwram-hot/$(1)/iwram_hot_sections.ld build/iwram-hot/$(1)/iwram_hot_limit.ld common/gba_hot.ld mk/iwram-hot/Makefile
 build/iwram-hot/$(1)/stack.json: $(2) $$(IWRAM_HOT_TOOL) config/iwram-hot/$(1).txt
 	$$(PYTHON) $$(IWRAM_HOT_TOOL) check --elf $$< --dump-dir build/iwram-hot/$(1) --config config/iwram-hot/$(1).txt --json $$@.tmp

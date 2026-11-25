@@ -14,10 +14,20 @@ build can use the part of the reserve the stack cannot reach.
   check --elf ELF --dump-dir DIR --config CONFIG
       Bound the stack depth of the linked program and fail unless
       __iwram_end + bound + margin <= stack top. The ELF must be compiled with
-      -fcallgraph-info=su -fdump-ipa-cgraph -dumpdir DIR/.
+      -g -fcallgraph-info=su -fdump-ipa-cgraph -dumpdir DIR/.
 
 The bound is the longest call chain in GCC's own call graph (the .ci files),
-using GCC's frame sizes. The rules for what that graph does not say:
+checked against the linked ELF and completed from it:
+
+- Frame sizes come from the ELF's call-frame information (.debug_frame): the
+  largest distance between the stack pointer and its value at entry. GCC's
+  .ci figure must agree, except that it leaves out up to 16 bytes when a
+  function pushes its own register arguments. Any other difference means the
+  dumps belong to another build and fails the check.
+- Every branch in the ELF's code from one function into another is an edge,
+  whether or not the .ci files have it, so a direct call cannot be missing.
+
+The rules for what neither says:
 
 - A call through a pointer may reach any function whose address GCC records
   as taken (the .cgraph dumps). Calls to long_call functions go through a
@@ -61,6 +71,7 @@ IRQ_HANDLERS = ("audio_irq", "present_epoch_irq")   # stored to 0x03007FFC in co
 HELPER_BYTES = 8            # __gnu_thumb1_case_*: push {r0, r1}
 # Deepest libgcc chain: __aeabi_(u)ldivmod 16, __udivmoddi4 48, __clzdi2 8.
 LIBGCC_BYTES = 96
+PRETEND_ARGS_BYTES = 16     # r0-r3 pushed by a callee; absent from GCC's stack usage
 LIBGCC = re.compile(r"__(aeabi_\w+|gnu_thumb1_case_\w+|u?(div|mod|divmod)[sd]i[34]|(clz|ctz)[sd]i2|muldi3)\Z")
 VENEER = re.compile(r"__.+(_veneer|_from_arm|_from_thumb)\Z")
 IWRAM_BASE = 0x03000000
@@ -212,15 +223,19 @@ def parse_address_taken(lines) -> tuple[set[str], set[str]]:
     return taken, defined
 
 
-def cycle_fingerprint(kind: str, group: list[str], sites: dict[str, int], taken: set[str]) -> str:
+def cycle_fingerprint(kind: str, group: list[str], sites: dict[str, int], taken: set[str],
+                      edges: dict[str, set[str]] | None = None) -> str:
     """What a reviewer read when declaring a cycle. For recursion, the member
-    functions. For a callback cycle, the members that call through a pointer
-    or have their address taken, with their pointer-call site counts. Compiler
-    clone suffixes are dropped so an unrelated optimization does not change it."""
+    functions and the direct calls among them. For a callback cycle, the
+    members that call through a pointer or have their address taken, with
+    their pointer-call site counts. Compiler clone suffixes are dropped so an
+    unrelated optimization does not change it."""
     def plain(title):
         return CLONE.sub("", symbol_of(title))
     if kind == "recursion":
-        items: list = sorted({plain(m) for m in group})
+        inside = set(group)
+        calls = sorted({(plain(m), plain(t)) for m in group for t in (edges or {}).get(m, ()) if t in inside})
+        items: list = [sorted({plain(m) for m in group}), [list(pair) for pair in calls]]
     else:
         surface: dict[str, list] = {}
         for member in group:
@@ -336,7 +351,7 @@ def stack_bound(frames: dict[str, int], edges: dict[str, set[str]], taken: set[s
             found = declared(group, table)
             names = [symbol_of(m) for m in group]
             cycle = {"kind": kind, "functions": names, "count": found[0] if found else None,
-                     "fingerprint": cycle_fingerprint(kind, group, sites, taken)}
+                     "fingerprint": cycle_fingerprint(kind, group, sites, taken, edges)}
             cycles.append(cycle)
             if found is None:
                 undeclared.append(cycle)
@@ -408,6 +423,37 @@ def parse_symbols(listing: str) -> tuple[dict[str, int], list[tuple[int, int, st
     return values, sorted(functions), files
 
 
+FDE = re.compile(r"FDE cie=[0-9a-f]+ pc=([0-9a-f]+)\.\.([0-9a-f]+)")
+CFA = re.compile(r"[0-9a-f]{8} (r\d+)\+(\d+)")
+BRANCH = re.compile(r"\s*([0-9a-f]+):\tb[a-z.]*\t([0-9a-f]+) <")
+
+
+def parse_frames(listing: str) -> dict[int, int]:
+    """From `readelf --debug-dump=frames-interp`: the deepest stack-pointer
+    offset of each function, by start address. A frame described through
+    another register cannot be bounded here."""
+    depth: dict[int, int] = {}
+    start = None
+    for line in listing.splitlines():
+        fde = FDE.search(line)
+        if fde:
+            start = int(fde.group(1), 16) & ~1
+            depth.setdefault(start, 0)
+            continue
+        row = CFA.match(line)
+        if row and start is not None:
+            if row.group(1) != "r13":
+                raise HotError(f"the function at {start:#010x} addresses its frame through {row.group(1)}")
+            depth[start] = max(depth[start], int(row.group(2)))
+    return depth
+
+
+def parse_branches(listing: str) -> list[tuple[int, int]]:
+    """From `objdump -d --no-show-raw-insn`: (address, target) of every branch
+    instruction with a fixed target."""
+    return [(int(a, 16), int(t, 16)) for a, t in BRANCH.findall(listing)]
+
+
 def resolve_aliases(frames: dict[str, int], edges: dict[str, set[str]],
                     functions: list[tuple[int, int, str]]) -> dict[str, str]:
     """Map each callee title without a frame to the title that owns the same
@@ -465,6 +511,85 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
         raise HotError(f"{len(uncovered)} linked functions have no frame record in {dump_dir} "
                        f"(first: {', '.join(sorted(uncovered)[:6])}); the dumps do not match {elf}")
 
+    def owner(address: int):
+        """(start, size, name) of the function holding an address."""
+        low, high = 0, len(functions)
+        while low < high:
+            mid = (low + high) // 2
+            if functions[mid][0] <= address:
+                low = mid + 1
+            else:
+                high = mid
+        for start, size, name in reversed(functions[max(0, low - 8):low]):
+            if start <= address < start + size:
+                return start, size, name
+        return None
+
+    def node_at(start: int) -> str | None:
+        """The call-graph node for the function at an address."""
+        found = sorted(t for name in names_at.get(start, ()) for t in titles.get(name, ()))
+        if found:
+            return found[0] if len(found) == 1 else None
+        helpers = sorted(name for name in names_at.get(start, ()) if LIBGCC.match(name))
+        return helpers[0] if helpers else None
+
+    # Frames: the ELF's call-frame information is what the linked code does.
+    measured = parse_frames(tool_output("readelf", "--debug-dump=frames-interp", str(elf)))
+    adjusted = 0
+    for start, _, name in functions:
+        for title in titles.get(name, ()):
+            if start not in measured:
+                raise HotError(f"{name} has no call-frame information in {elf}; build with -g")
+            extra = measured[start] - frames[title]
+            if len(titles[name]) == 1 and not 0 <= extra <= PRETEND_ARGS_BYTES:
+                raise HotError(f"{name} uses {measured[start]} bytes of stack in {elf} but {frames[title]} in "
+                               f"{dump_dir}; the dumps are from another build")
+            if extra > 0:
+                frames[title] += extra
+                adjusted += 1
+
+    # Edges: every branch from one linked function into another.
+    code_end = max(start + size for start, size, _ in functions if start >> 24 == 8)
+    code = tool_output("objdump", "-d", "--no-show-raw-insn", "-j", ".text", "-j", ".iwram", str(elf))
+    if any(line.split()[1:2] == [".rom"] for line in tool_output("objdump", "-h", str(elf)).splitlines()):
+        first = min(start for start, _, _ in functions if start >> 24 == 8)
+        code += tool_output("objdump", "-d", "--no-show-raw-insn", "-j", ".rom", f"--start-address={first:#x}",
+                            f"--stop-address={code_end:#x}", str(elf))
+    # libgcc's assembly entry points have no size; find them by exact address.
+    helper_at: dict[int, str] = {}
+    for name, value in values.items():
+        if LIBGCC.match(name):
+            helper_at.setdefault(value & ~1, name)
+
+    def node_for(address: int, via: str) -> str | None:
+        """The node a branch to this address calls; None when it leaves the
+        functions (the reset code)."""
+        callee = owner(address)
+        if callee is None:
+            return helper_at.get(address)
+        if VENEER.match(callee[2]):     # a veneer stands for the function it is named after
+            real = values.get(re.sub(r"\A__|_(veneer|from_arm|from_thumb)\Z", "", callee[2]))
+            if real is None:
+                raise HotError(f"cannot resolve the veneer {callee[2]} reached from {via}")
+            return node_for(real & ~1, via)
+        to = node_at(callee[0])
+        if to is None:
+            raise HotError(f"{via} branches to {callee[2]}, which has no single frame record")
+        return to
+
+    added = 0
+    for address, target in parse_branches(code):
+        source, callee = owner(address), owner(target)
+        if not source or VENEER.match(source[2]) or (callee and callee[0] == source[0]):
+            continue
+        to = node_for(target, source[2])
+        if to is None:
+            continue
+        for title in titles.get(source[2], ()):
+            if to not in edges.setdefault(title, set()):
+                edges[title].add(to)
+                added += 1
+
     taken: set[str] = set()
     defined: dict[str, set[str]] = {}
     dumps = sorted(dump_dir.glob("*.cgraph"))
@@ -491,15 +616,16 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
     if absent:
         raise HotError(f"the .cgraph dumps in {dump_dir} do not list {len(absent)} compiled functions "
                        f"(first: {', '.join(absent[:6])}); they are truncated or from another build")
-    # The reset code's reference to the entry point is its call, and nothing
-    # else may call it.
+    # The reset code's reference to the entry point is in assembly and leaves
+    # no address-taken record. If C code takes its address, the record stays
+    # and the entry point shows up in a callback cycle that must be declared.
     roots = titles.get(entry, [])
     if len(roots) != 1:
         raise HotError(f"entry point {entry} is not a single function in the call graph")
-    taken.discard(roots[0])
 
     options = dict(recursion=config["recursion"], callback_cycles=config["callback-cycle"], sites=sites,
-                   frameless=lambda name: LIBGCC_BYTES if LIBGCC.match(name) else None)
+                   frameless=lambda name: ((HELPER_BYTES if name.startswith("__gnu_thumb1_case_") else LIBGCC_BYTES)
+                                           if LIBGCC.match(name) else None))
     main = stack_bound(frames, edges, taken, roots[0], **options)
     irq = []
     undeclared = list(main["undeclared"])
@@ -523,6 +649,7 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
               "highest_safe_iwram_end": highest, "spare_bytes": highest - end,
               "limit": config["limit"], "chain": main["chain"], "cycles": main["cycles"],
               "address_taken": sorted(symbol_of(t) for t in taken), "aliases": len(aliases),
+              "frames_raised_from_elf": adjusted, "edges_added_from_elf": added,
               "irq_stack_bytes": irq_bytes, "irq_stack_room": IRQ_STACK_TOP - STACK_TOP, "irq_handlers": irq,
               "hot_bytes": end - hot_start,
               "hot_functions": sum(1 for name in placed if any(fnmatchcase(name, p) for p in config["names"])),

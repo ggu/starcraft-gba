@@ -16,7 +16,7 @@ limit 0x03006440
 # Recursion: destroying a Nydus Canal destroys its exit through
 # race_nydus_note_building_lost. The pair is unlinked first, so the exit
 # does not come back for the entrance.
-recursion destroy_building* 2 98d3a072
+recursion destroy_building* 2 c6a68339
 # The trigger and save layers call one another through ops tables: count
 # cache, world adapter, then game services; and save selection, then record
 # validators. Each table is bound once to the layer below it, so no function
