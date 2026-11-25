@@ -231,3 +231,21 @@ from a position that can complete its morph before arrival.
 | Second relocated Hatchery SRAM and fresh HOME | `29f835ea78a9c8e4c633f00543fe1a56f8dfb4a349a01d8716bccb01077b5bba` / `bdcb0f1ff2d09aaef2af76e577c3d8aadc03885b1204459da4bc06edc078fe7d` |
 | Frame 34,571 economy input | `00f468c48da9b3a1140034b3b6d8ecd5f6e59b99228a711636c593a4933a7d42` |
 | Frame 34,571 SRAM and fresh HOME | `cf6e16e7dafbc46e7a1f26f031d2c8f0edaf9202af7d726274cbbf9554c2d9f9` / `00d6d4d1391c77116d2abd5a41fc17d69aa6a1b1ea49a0935b8ca92aa49b77ff` |
+
+### Hydralisks before the raid
+
+In a separate branch from frame 31,944, ordinary controls
+place a Den at (320, 1120). It completes by frame 32,909.
+The Hatchery produces an Overlord and queues three
+Hydralisks for 225 minerals and 75 gas. Fresh HOME at
+34,723 restores the full-health Den, three 80-HP Hydralisks,
+the full-health Hatchery and the Pool at 462 HP. The two
+SRAM exports match. An attack-move toward (400, 1650)
+loses the group by frame 35,690. The checkpoint verifies
+production before the attack and provides an earlier
+mobile-defense starting point.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Den and Hydralisk production trace | `e1c478e09985587793a3a6dfd8e7fc512fd95ec09e2417342956a8ff040223de` |
+| Frame 34,723 SRAM and fresh HOME | `16ab2580cd5d70016b4887b0aaac0d716882ec802b3eeea7a8ef16dc03c0f0c9` / `2483c0ec0597d5b2864dedf1174b3820ea856ebb53b17191b02853d3b652a8d9` |
