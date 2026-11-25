@@ -44,10 +44,10 @@ sc64_static_objects_key(void)
     typedef int Field;
 #endif
     static Field mineral_fields[MAX_MINERALS * 3];
-    static Field geyser_fields[MAX_RACE_GEYSERS * 2];
+    static Field geyser_fields[SC64_FIELD_GEYSER_LIMIT * 2];
     static Field building_fields[MAX_BUILDINGS * 5];
     static u32 mineral_drawn[SC64_STATIC_KEY_WORDS(MAX_MINERALS)];
-    static u32 geyser_drawn[SC64_STATIC_KEY_WORDS(MAX_RACE_GEYSERS)];
+    static u32 geyser_drawn[SC64_STATIC_KEY_WORDS(SC64_FIELD_GEYSER_LIMIT)];
     static u32 building_drawn[SC64_STATIC_KEY_WORDS(MAX_BUILDINGS)];
     static u32 building_built[SC64_STATIC_KEY_WORDS(MAX_BUILDINGS)];
 #if defined(SC64_T4_SCENARIO_RUNTIME) || defined(SC64_Z5_RUNTIME) || defined(SC64_P6_RUNTIME)
@@ -120,17 +120,22 @@ sc64_static_objects_key(void)
     {
         Field *f = geyser_fields;
         int i = 0;
-        for (w = 0; w < SC64_STATIC_KEY_WORDS(MAX_RACE_GEYSERS); ++w) {
-            int end = MAX_RACE_GEYSERS - w * 32 < 32 ? MAX_RACE_GEYSERS : i + 32;
+        for (w = 0; w < SC64_STATIC_KEY_WORDS(SC64_FIELD_GEYSER_LIMIT); ++w) {
+            int end = SC64_FIELD_GEYSER_LIMIT - w * 32 < 32 ? SC64_FIELD_GEYSER_LIMIT : i + 32;
+#ifdef SC64_SOURCE_GAS
+            /* Clearing the word below also clears bits for disappeared sites.
+             * Only active coordinates need a viewport and visibility test. */
+            if (end > field_geyser_count) end = field_geyser_count;
+#endif
             u32 drawn = 0, bit = 1;
             for (; i < end; ++i, f += 2, bit <<= 1) {
-                int x = geysers[i].x - view_x, y = geysers[i].y - view_y + 12;
-                if (!(i < geyser_count && geyser_in_view(x, y) &&
-                      sc64_static_key_visible(geysers[i].x, geysers[i].y, cols, rows)))
+                int x = field_geysers[i].x - view_x, y = field_geysers[i].y - view_y + 12;
+                if (!(i < field_geyser_count && geyser_in_view(x, y) &&
+                      sc64_static_key_visible(field_geysers[i].x, field_geysers[i].y, cols, rows)))
                     continue;
                 drawn |= bit;
-                SC64_STATIC_FAST_FIELD(f[0], geysers[i].x);
-                SC64_STATIC_FAST_FIELD(f[1], geysers[i].y);
+                SC64_STATIC_FAST_FIELD(f[0], field_geysers[i].x);
+                SC64_STATIC_FAST_FIELD(f[1], field_geysers[i].y);
             }
             if (geyser_drawn[w] != drawn) {
                 geyser_drawn[w] = drawn;

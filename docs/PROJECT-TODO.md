@@ -19,6 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Busy three-opponent performance.** The release's six recorded battle
+  windows measured 11.29–16.73 loop updates/s. The original controls and
+  camera are reproducible from the match traces. Prioritize ground orders
+  and depth-sorted actor drawing in the slow Zerg windows, then measure the
+  other races on both maps. Compare total guest cycles, actual bitmap
+  changes, save continuation and on-device pacing. See the
+  [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
+
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
   regenerated from `d39bd015` use 56 source patches (styles 176/177/178:
@@ -95,12 +103,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   skirmish importer now keeps each source site’s full 32-bit gas quantity
   in both the map descriptor and private report. Regenerating Blood Bath
   preserved the four existing coordinates and recorded 10,000 gas at each.
-  The shared worker still awards eight gas per normal trip. The
-  [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
-  pickups of eight while stocked and two below eight from authenticated N64
-  code; a live depleted trip remains to be captured. Implement remaining gas
-  per map site and preserve it through refinery destruction, rebuilding and
-  save/load.
+  The [N64 and GBA gas audit](audits/2026-11-26-n64-gas-pickup.md)
+  records natural eight- and two-unit cargo and the shared worker
+  implementation. Rebuilding a preplaced refinery, preserving its balance
+  through save/load, the 30 chapter transitions and four product stack
+  budgets are verified. Terran 10, Protoss 10, Zerg 7 and Zerg 10 all reached victory
+  with finite reserves and fresh-loaded their results. The four candidate
+  cartridge builds and their HOST match authors now enable the same rule.
+  Each race won on both maps against one, two and three opponents in
+  ordinary-input mGBA matches. All 18 pause continuations reached the same
+  victory and all terminal saves reloaded. The three-opponent Zerg Blood
+  Bath win used three allied Zerg CPUs. A win against the mixed Terran,
+  Zerg and Protoss alliance and hardware timing remain open.
+  The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
@@ -3770,6 +3785,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
+  A [Zerg Blood Bath Melee win against three allied Zerg CPUs](audits/2026-11-25-custom-game-full-matches.md#zerg-against-three-allied-zerg-opponents)
+  completes one ordinary-input two- and three-opponent win per map and human
+  race on mGBA; a mixed Terran/Zerg/Protoss alliance remains unqualified.
 - The [repeat-command save audit](audits/2026-11-18-saved-repeat-command.md)
   traces a normal Terran Outpost reload that changed 22 attack-move orders
   to move orders. Preserving only the remembered command keeps selection

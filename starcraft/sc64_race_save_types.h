@@ -272,6 +272,7 @@ typedef struct {
     Sc64BcYamatoShot battlecruiser_shots[SC64_BC_SHOT_LIMIT];
 #endif
 } RaceSave;
+#include "sc64_source_gas_save.h"
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 #define SC64_BC_SAVE_EXTRA_BYTES (sizeof(Sc64BcYamatoShot)*SC64_BC_SHOT_LIMIT)
 _Static_assert(offsetof(RaceSave,battlecruiser_shots)+SC64_BC_SAVE_EXTRA_BYTES==sizeof(RaceSave),
