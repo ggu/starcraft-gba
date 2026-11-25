@@ -49,13 +49,22 @@ class SkirmishPackTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'not mutually connected'):
             PACKER.select_starts(blocked, width, height, starts)
 
-    def test_minerals_are_bounded_and_report_omissions(self):
+    def test_all_minerals_follow_legacy_start_patch_indices(self):
         starts = [(0, 0), (300, 0), (0, 300), (300, 300)]
         resources = [{'x_source_px': x * 2, 'y_source_px': y * 2,
                       'resources': 1500, 'source_type': 176}
                      for y in range(0, 400, 40) for x in range(0, 400, 40)]
+        for i, patch in enumerate(resources):
+            patch['source_type'] = 176 + i % 3
         chosen, report = PACKER.choose_minerals(resources, starts)
-        self.assertLessEqual(len(chosen), 32)
+        self.assertCountEqual([(p['x'], p['y'], p['amount'], p['style']) for p in chosen],
+                              [(p['x_source_px']//2, p['y_source_px']//2, p['resources'],
+                                p['source_type']) for p in resources])
+        self.assertEqual(len(chosen), len(resources))
+        prefix = chosen[:32]
+        self.assertEqual([(p['x'], p['y']) for p in prefix[:4]],
+                         [(0, 0), (280, 0), (0, 280), (280, 280)])
+        self.assertEqual(chosen[32:], sorted(chosen[32:], key=lambda p: (p['x'], p['y'])))
         self.assertEqual(report['packed_count'], len(chosen))
         self.assertEqual(report['omitted_count'], len(resources) - len(chosen))
         self.assertEqual(report['new_patches_selected_per_start'], [8, 8, 8, 8])

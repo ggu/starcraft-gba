@@ -70,10 +70,24 @@ static void fill(void)
         music_offset[t] = blob_add(blob, &blob_used, sizeof blob, music_pcm[t], music_frames[t] * AUDIO_FRAME_SAMPLES);
 }
 
+/* out is never known to be silent here, so every frame is written. */
 static void mix(AudioMixer *m)
 {
+    u8 silent = 0;
     audio_mixer_service(m, &bank);
-    audio_mixer_mix(m, (volatile u16 *)out, (volatile u16 *)scratch);
+    audio_mixer_mix(m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+}
+
+/* Append one stream encoded with a given predictor. */
+static u32 blob_add_as(u8 *base, u32 *used, u32 cap, const s8 *samples, u32 n, u32 pred)
+{
+    u32 bytes, at = *used;
+    u8 *s = audio_ref_encode_alloc(samples, n, pred, &bytes, NULL);
+    if (at + bytes > cap) abort();
+    memcpy(base + at, s, bytes);
+    free(s);
+    *used = at + bytes;
+    return at;
 }
 
 static int music_frame_is(u32 track, u32 frame)
@@ -148,7 +162,8 @@ int main(void)
             for (u32 v = 1; v < voices; ++v) audio_mixer_request(&m, (u16)v, 1, AUDIO_CLASS_EFFECT);
             audio_mixer_service(&m, &rbank);
             for (u32 f = 0; f < 4; ++f) {
-                audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch);
+                u8 silent = 0;
+                audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
                 for (u32 i = 0; i < AUDIO_FRAME_SAMPLES; ++i) {
                     s32 ref = 0;
                     u32 at = f * AUDIO_FRAME_SAMPLES + i;
@@ -157,6 +172,104 @@ int main(void)
                 }
             }
         }
+    }
+
+    /* The same with every predictor in every voice: streams with the third
+     * predictor take the block-at-a-time path into the table. Voice v plays
+     * clip 3 * v + (its predictor), so 81 combinations of four voices. */
+    {
+        static s8 rnd[4][368];
+        static _Alignas(4) u8 rblob[16384];
+        static u32 roff[12], rlen[12];
+        static const u32 len[4] = { 368, 176, 352, 104 };
+        static const u32 none[1] = { 0 };
+        const AudioBank rbank = { rblob, roff, rlen, 12, none, none, 0 };
+        u32 lcg = 11, rused = 0;
+        for (u32 v = 0; v < 4; ++v)
+            for (u32 i = 0; i < len[v]; ++i) { lcg = lcg * 1103515245u + 12345u; rnd[v][i] = (s8)((lcg >> 16) % (v & 1u ? 256u : 90u) - (v & 1u ? 128u : 45u)); }
+        for (u32 v = 0; v < 4; ++v)
+            for (u32 p = 0; p < 3; ++p) {
+                roff[3u * v + p] = blob_add_as(rblob, &rused, sizeof rblob, rnd[v], len[v], p);
+                rlen[3u * v + p] = len[v];
+            }
+        for (u32 combo = 0; combo < 81; ++combo) {
+            u32 pred[4] = { combo % 3u, combo / 3u % 3u, combo / 9u % 3u, combo / 27u };
+            audio_mixer_reset(&m, decoders);
+            audio_mixer_request(&m, (u16)pred[0], 1, AUDIO_CLASS_SPEECH);
+            for (u32 v = 1; v < 4; ++v) audio_mixer_request(&m, (u16)(3u * v + pred[v]), 1, AUDIO_CLASS_EFFECT);
+            audio_mixer_service(&m, &rbank);
+            for (u32 v = 0; v < 4; ++v) CHECK(decoders[v].state >> 10 == pred[v], "fixture predictor");
+            for (u32 f = 0; f < 3; ++f) {
+                u8 silent = 0;
+                audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+                for (u32 i = 0; i < AUDIO_FRAME_SAMPLES; ++i) {
+                    s32 ref = 0;
+                    u32 at = f * AUDIO_FRAME_SAMPLES + i;
+                    for (u32 v = 0; v < 4; ++v) if (at < len[v]) ref += rnd[v][at];
+                    CHECK(sample_at(i) == audio_clip8(ref), "mixed-predictor sum matches reference");
+                }
+            }
+            for (u32 v = 0; v < AUDIO_VOICES; ++v) CHECK(!m.voice[v].remaining, "mixed-predictor voices retired");
+        }
+    }
+
+    /* The voice sum on every combination of extreme and middling samples.
+     * Combinations are visited in steps of 7, which is coprime to 9^n and so
+     * reaches each exactly once per pass, and puts four unrelated ones in
+     * each word: a clipping lane sits beside lanes that do not clip. */
+    {
+        static const s8 edge[9] = { -128, -127, -65, -1, 0, 1, 64, 126, 127 };
+        static _Alignas(4) u32 table[4 * 64], sum[64];
+        static u8 seen[6561];
+        for (u32 n = 2; n <= 4; ++n) {
+            u32 combos = 1;
+            for (u32 i = 0; i < n; ++i) combos *= 9u;
+            memset(seen, 0, sizeof seen);
+            for (u32 base = 0; base < combos; base += 64u * 4u) {
+                s32 want[64 * 4];
+                for (u32 j = 0; j < 64u * 4u; ++j) {
+                    u32 c = (u32)((unsigned long long)(base + j) * 7u % combos);
+                    seen[c] = 1;
+                    want[j] = 0;
+                    for (u32 v = 0; v < n; ++v, c /= 9u) {
+                        s8 x = edge[c % 9u];
+                        want[j] += x;
+                        u32 *w = &table[j / 4u * n + v];
+                        if (!(j % 4u)) *w = 0;
+                        *w |= (u32)((u8)x ^ 0x80u) << (8u * (j % 4u));
+                    }
+                }
+                audio_mixer_sum((volatile u32 *)sum, table, n, 64);
+                for (u32 j = 0; j < 64u * 4u; ++j)
+                    CHECK((s8)(u8)(sum[j / 4u] >> (8u * (j % 4u))) == audio_clip8(want[j]), "voice sum clamps each lane");
+            }
+            for (u32 c = 0; c < combos; ++c) CHECK(seen[c], "every edge combination summed");
+        }
+        audio_mixer_sum((volatile u32 *)sum, table, 4, 0);  /* no words: nothing read or written */
+    }
+
+    /* A frame without voices is written once per buffer: the flag says the
+     * buffer already holds silence, and any voice clears it. */
+    {
+        u8 silent = 0;
+        audio_mixer_reset(&m, decoders);
+        memset(out, 0x55, sizeof out);
+        audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+        CHECK(silent == 1 && !out[0] && !out[AUDIO_FRAME_SAMPLES / 2 - 1], "silence written and flagged");
+        memset(out, 0x55, sizeof out);
+        audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+        CHECK(silent == 1 && out[0] == 0x5555 && out[AUDIO_FRAME_SAMPLES / 2 - 1] == 0x5555, "silent buffer left alone");
+        audio_mixer_request(&m, 3, 1, AUDIO_CLASS_EFFECT);
+        audio_mixer_service(&m, &bank);
+        audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+        CHECK(!silent && sample_at(7) == 8 && sample_at(8) == 0, "a voice clears the flag");
+        audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+        CHECK(silent == 1 && sample_at(7) == 0, "silence written again after the voice");
+        audio_mixer_request(&m, 0, 1, AUDIO_CLASS_EFFECT);
+        audio_mixer_request(&m, 4, 1, AUDIO_CLASS_SPEECH);
+        audio_mixer_service(&m, &bank);
+        audio_mixer_mix(&m, (volatile u16 *)out, (volatile u16 *)scratch, &silent);
+        CHECK(!silent && sample_at(0) == 70, "two voices clear the flag");
     }
 
     /* Staggered starts over several frames, including lone-voice frames
@@ -335,8 +448,9 @@ int main(void)
     audio_mixer_reset(&m, decoders);
     audio_mixer_music(&m, 1, 0);
     audio_mixer_request(&m, 3, 1, AUDIO_CLASS_EFFECT);
-    CHECK(audio_mixer_frame(&m, &bank, (volatile u16 *)out, (volatile u16 *)scratch, (volatile u16 *)music_out) ==
-          AUDIO_MUSIC_RESTART && m.frames == 1 && music_frame_is(1, 0) && sample_at(7) == 8,
+    u8 frame_silent = 1;
+    CHECK(audio_mixer_frame(&m, &bank, (volatile u16 *)out, (volatile u16 *)scratch, (volatile u16 *)music_out, &frame_silent) ==
+          AUDIO_MUSIC_RESTART && m.frames == 1 && music_frame_is(1, 0) && sample_at(7) == 8 && !frame_silent,
           "frame entry point");
     puts("audio mixer checks passed");
     return 0;

@@ -14,8 +14,8 @@ static ProbePerf probe_perf[2];
 static u32 stack_paint(void) { return 0; }
 static u32 stack_lowest(u32 top) { (void)top; return 0x03007e00u; }
 #else
-static u32 stack_paint(void) { u32 sp0; __asm__ volatile("mov %0, sp":"=r"(sp0)); u32 top=(sp0-512u)&~3u; for(volatile u32 *p=(volatile u32 *)0x03005000u;(u32)p<top;++p)*p=0xa55aa55au; return top; }
-static u32 stack_lowest(u32 top) { for(volatile u32 *p=(volatile u32 *)0x03005000u;(u32)p<top;++p)if(*p!=0xa55aa55au)return (u32)p; return top; }
+static u32 stack_paint(void) { u32 sp0; __asm__ volatile("mov %0, sp":"=r"(sp0)); u32 top=(sp0-512u)&~3u; for(volatile u32 *p=(volatile u32 *)0x03005200u;(u32)p<top;++p)*p=0xa55aa55au; return top; }
+static u32 stack_lowest(u32 top) { for(volatile u32 *p=(volatile u32 *)0x03005200u;(u32)p<top;++p)if(*p!=0xa55aa55au)return (u32)p; return top; }
 #endif
 
 static unsigned replay_input_count, replay_tick;
@@ -169,7 +169,7 @@ static void report_stack(u32 top)
 {
     u32 low=stack_lowest(top);char s[180];unsigned n=0;
     append_text(s,&n,"STACK lowest=");append_num(s,&n,low);
-    append_text(s,&n," margin=");append_num(s,&n,low-0x03005000u);
+    append_text(s,&n," margin=");append_num(s,&n,low-0x03005200u);
     append_text(s,&n," used=");append_num(s,&n,0x03007e00u-low);emit_line(s,n);
 }
 

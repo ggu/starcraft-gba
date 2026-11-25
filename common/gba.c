@@ -2251,12 +2251,16 @@ volatile u32 audio_irq_cycles,audio_irq_peak,audio_irq_frames;
 /* audio_music_clear: the mixer zeroed one music half when music stopped;
  * the other half still holds the last frame and is zeroed next VBlank. */
 static u8 audio_half,audio_music_clear;
+/* audio_mix_silent[h]: mix half h holds a frame of silence, so a frame
+ * without voices need not write it again. */
+static u8 audio_mix_silent[2];
 #ifdef SC64_Q8_FLASH_ARM_PROBE
 /* Only audio_hw_init claims the channels in this engine; any future
  * DMA/timer ownership handoff must clear this before touching them. */
 static u8 audio_flash_owned;
 #endif
-/* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
+/* Thumb, from ROM; the stream decoder it calls runs from IWRAM
+ * (audio_decoder_linear in audio_codec.h). */
 static void __attribute__((noinline)) audio_vblank(void){
 #ifdef GBA_ASYNC_PRESENT_ACTIVE
  present_vblank();
@@ -2269,7 +2273,7 @@ static void __attribute__((noinline)) audio_vblank(void){
   half=AUDIO_FRAME_SAMPLES/2;
  }
  audio_half^=1;
- int music=audio_mixer_frame(&audio_mixer,&audio_bank,AUDIO_MIX_BUFFER+half,AUDIO_SCRATCH,AUDIO_MUSIC_BUFFER+half);
+ int music=audio_mixer_frame(&audio_mixer,&audio_bank,AUDIO_MIX_BUFFER+half,AUDIO_SCRATCH,AUDIO_MUSIC_BUFFER+half,&audio_mix_silent[half!=0]);
  if(audio_music_clear&&audio_mixer.music_track==AUDIO_MUSIC_NONE){
   volatile u32 *z=(volatile u32*)(volatile void*)(AUDIO_MUSIC_BUFFER+half);
   for(u32 i=0;i<AUDIO_FRAME_SAMPLES/4;i++)z[i]=0;
@@ -2290,6 +2294,7 @@ static void audio_hw_init(void){
  audio_mixer_reset(&audio_mixer,AUDIO_DECODER_STATES);
  for(u32 i=0;i<GBA_AUDIO_MIX_BYTES/2;i++)AUDIO_MIX_BUFFER[i]=0;
  audio_half=0;audio_music_clear=0;
+ audio_mix_silent[0]=audio_mix_silent[1]=1;
  /* PSG 100%, Direct Sound A 100% and B 50%, both on timer 0, both FIFOs
   * reset, both output to left and right; silent music is a zero buffer. */
  REG16(0x04000082)=0x0002|0x0004|0x0300|0x3000|0x0800|0x8000;

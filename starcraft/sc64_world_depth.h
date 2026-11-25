@@ -669,6 +669,9 @@ sc64_draw_depth_ordered_actors(void)
             if (first) sc64_draw_attacker_images(first, image_next, SC64_TRACE_ATTACKER_OVER);
 #endif
             draw_building_overlay(&b[i]);
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            sc64_shield_flash_draw_actor(MAX_UNITS + (int)i);
+#endif
             break;
         }
 #ifdef SC64_DEATH_WORLD_DEPTH
@@ -707,6 +710,9 @@ sc64_draw_depth_ordered_actors(void)
                                   image_next, &turret_lift);
 #else
             draw_unit_with_images(&u[i], 0, 0, 0, &turret_lift);
+#endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            sc64_shield_flash_draw_actor((int)i);
 #endif
 #ifdef SC64_UNIT_FACING
             /* The hull already left the heap. Its turret takes that
