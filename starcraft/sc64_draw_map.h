@@ -142,6 +142,9 @@ draw_map(void)
     Sc64TerrainCapturePage capture_page = sc64_terrain_capture_page();
     Sc64StaticDirtyRowsPlan capture_rows = {0};
 #endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_flash_prepare();
+#endif
     camx = viewport_left();
     camy = viewport_top();
 #ifdef SC64_IMPORTED_MISSION
@@ -486,9 +489,6 @@ sc64_tile_background_done:
     draw_tracers_pass(1);
 #ifdef SC64_TRACER_EMPTY_VIEW
     sc64_tracer_view = SC64_TRACER_VIEW_MAY_DRAW;
-#endif
-#ifdef SC64_SHIELD_FLASH_ENABLED
-    sc64_shield_flash_expire();
 #endif
 #if defined(SC64_SHARED_NUKE_PROBE) && !defined(SC64_WORLD_DEPTH)
     race_nuke_draw();

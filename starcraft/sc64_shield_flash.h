@@ -50,7 +50,9 @@ typedef struct {
 } Sc64ShieldFlash;
 
 static Sc64ShieldFlash sc64_shield_flashes[SC64_SHIELD_FLASH_SLOTS];
-static u8 sc64_shield_flash_next, sc64_shield_flash_seq;
+static u8 sc64_shield_flash_next, sc64_shield_flash_seq, sc64_shield_live_mask;
+static u8 sc64_shield_affected[(MAX_UNITS + MAX_BUILDINGS + 7) / 8];
+static u8 sc64_shield_flash_age[SC64_SHIELD_FLASH_SLOTS];
 static u8 sc64_shield_drawn[(MAX_UNITS + 7) / 8];  /* units drawn this frame */
 
 static void
@@ -59,6 +61,8 @@ sc64_shield_flash_reset(void)
     memset(sc64_shield_flashes, 0, sizeof(sc64_shield_flashes));
     memset(sc64_shield_drawn, 0, sizeof(sc64_shield_drawn));
     sc64_shield_flash_next = 0;
+    sc64_shield_live_mask = 0;
+    memset(sc64_shield_affected, 0, sizeof(sc64_shield_affected));
     sc64_shield_hit_dir = SC64_SHIELD_DIR_NONE;
     sc64_shield_launch_dir = SC64_SHIELD_DIR_NONE;
 }
@@ -69,13 +73,14 @@ sc64_shield_flash_clear_actor(int actor)
 {
     for (unsigned i = 0; i < SC64_SHIELD_FLASH_SLOTS; ++i)
         if (sc64_shield_flashes[i].live && sc64_shield_flashes[i].actor == (u16)actor)
-            sc64_shield_flashes[i].live = 0;
+            { sc64_shield_flashes[i].live = 0; sc64_shield_live_mask &= (u8)~(1u << i); }
 }
 
 static void
 sc64_shield_mark_drawn(int slot)
 {
-    if ((unsigned)slot < MAX_UNITS) sc64_shield_drawn[slot >> 3] |= (u8)(1u << (slot & 7));
+    if (sc64_shield_live_mask && (unsigned)slot < MAX_UNITS && (sc64_shield_affected[slot >> 3] & (1u << (slot & 7))))
+        sc64_shield_drawn[slot >> 3] |= (u8)(1u << (slot & 7));
 }
 
 static inline u8
@@ -175,47 +180,60 @@ sc64_shield_flash_hit(int target, int absorbed, int shield_left)
     f->dy = (s8)(oy / 2);
     f->type = (u8)(target < MAX_UNITS ? u[target].type : b[target - MAX_UNITS].type);
     f->live = 1;
+    sc64_shield_live_mask |= (u8)(1u << (f - sc64_shield_flashes));
 }
 
-/* After the units have been drawn: overlays on actors drawn this frame, then
- * the drawn marks are cleared for the next frame. */
+/* Build the small per-actor index once per frame, including offscreen slots.
+ * The overwhelmingly common empty case does no lookup, scan, or clear. */
+static void
+sc64_shield_flash_prepare(void)
+{
+    const Sc64WeaponSourceAnimation *init;
+    uint32_t life;
+    if (!sc64_shield_live_mask) return;
+    memset(sc64_shield_affected, 0, sizeof(sc64_shield_affected));
+    memset(sc64_shield_drawn, 0, sizeof(sc64_shield_drawn));
+    init = sc64_weapon_source_animation_lookup(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u);
+    life = init ? init->duration_ticks : 0u;
+    for (unsigned i = 0; i < SC64_SHIELD_FLASH_SLOTS; ++i) {
+        Sc64ShieldFlash *f = &sc64_shield_flashes[i];
+        uint32_t age;
+        if (!(sc64_shield_live_mask & (1u << i))) continue;
+        age = sc64_weapon_source_vfx_source_tick((u16)((u16)frame - f->born));
+        if (!f->live || !sc64_shield_actor_live(f->actor, f->type) || age >= life) {
+            f->live = 0;
+            sc64_shield_live_mask &= (u8)~(1u << i);
+            continue;
+        }
+        sc64_shield_flash_age[i] = (u8)age;
+        sc64_shield_affected[f->actor >> 3] |= (u8)(1u << (f->actor & 7));
+    }
+}
+
+/* Called after an admitted actor's art, before the next actor in depth order. */
 static void
 sc64_shield_flash_draw_actor(int actor)
 {
-    const Sc64WeaponSourceAnimation *init =
-        sc64_weapon_source_animation_lookup(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u);
-    uint32_t life = init ? init->duration_ticks : 0u;
+    if (!sc64_shield_live_mask || (unsigned)actor >= MAX_UNITS + MAX_BUILDINGS ||
+        !(sc64_shield_affected[actor >> 3] & (1u << (actor & 7)))) return;
+    if (actor < MAX_UNITS) {
+        if (!(sc64_shield_drawn[actor >> 3] & (1u << (actor & 7)))) return;
+        sc64_shield_drawn[actor >> 3] &= (u8)~(1u << (actor & 7));
+    } else if (!currently_visible(b[actor - MAX_UNITS].x, b[actor - MAX_UNITS].y)) return;
     for (unsigned i = 0; i < SC64_SHIELD_FLASH_SLOTS; ++i) {
-        Sc64ShieldFlash *f = &sc64_shield_flashes[i];
+        Sc64ShieldFlash *f;
         int ax, ay, x, y, sx, sy;
-        uint32_t age;
-        if (!f->live) continue;
-        age = sc64_weapon_source_vfx_source_tick((u16)((u16)frame - f->born));
-        if (!sc64_shield_actor_live(f->actor, f->type) || age >= life) { f->live = 0; continue; }
-        if ((int)f->actor != actor) continue;
-        if (f->actor < MAX_UNITS) {
-            if (!(sc64_shield_drawn[f->actor >> 3] & (1u << (f->actor & 7)))) continue;
-            ax = u[f->actor].x; ay = u[f->actor].y;
-        } else {
-            const Building *q = &b[f->actor - MAX_UNITS];
-            ax = q->x; ay = q->y;
-            if (!currently_visible(ax, ay)) continue;
-        }
-        x = ax + f->dx;
-        y = ay + f->dy;
+        if (!(sc64_shield_live_mask & (1u << i))) continue;
+        f = &sc64_shield_flashes[i];
+        if (f->actor != actor) continue;
+        ax = actor < MAX_UNITS ? u[actor].x : b[actor - MAX_UNITS].x;
+        ay = actor < MAX_UNITS ? u[actor].y : b[actor - MAX_UNITS].y;
+        x = ax + f->dx; y = ay + f->dy;
         sx = x - camx; sy = y - camy + 12;
         if (sx < -64 || sx > 304 || sy < -52 || sy > 172) continue;
-        sc64_weapon_source_vfx_draw_image(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u, age, 0u, x, y);
+        sc64_weapon_source_vfx_draw_image(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u,
+                                          sc64_shield_flash_age[i], 0u, x, y);
     }
-    if ((unsigned)actor < MAX_UNITS)
-        sc64_shield_drawn[actor >> 3] &= (u8)~(1u << (actor & 7));
-}
-
-static void
-sc64_shield_flash_expire(void)
-{
-    sc64_shield_flash_draw_actor(-1);
-    memset(sc64_shield_drawn, 0, sizeof(sc64_shield_drawn));
 }
 
 #endif

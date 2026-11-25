@@ -166,16 +166,16 @@ bounded_reused_and_expiring(void)
     for (int i = 0; i < 20; ++i) { u[zealot].shield = 60; marine_hits(zealot, 6); }
     assert(live_flashes() == (int)SC64_SHIELD_FLASH_SLOTS);
     gfx_begin(C_BLACK);
-    sc64_shield_flash_expire();
+    sc64_shield_flash_prepare();
     assert(live_flashes() == (int)SC64_SHIELD_FLASH_SLOTS);
     frame += (int)sc64_weapon_source_vfx_gba_duration(init->duration_ticks);
-    sc64_shield_flash_expire();
+    sc64_shield_flash_prepare();
     assert(live_flashes() == 0);
 
     fixture();
     marine_hits(zealot, 6);
     u[zealot].type = U_DRAGOON;            /* the slot now holds another actor */
-    sc64_shield_flash_expire();
+    sc64_shield_flash_prepare();
     assert(live_flashes() == 0);
 
     /* A same-type actor spawned into a recycled slot inherits nothing. */
@@ -196,6 +196,7 @@ paints_source_art(void)
     gfx_begin(C_BLACK);
     for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x) before[y * 240 + x] = gfx_test_pixel(x, y);
     marine_hits(zealot, 6);
+    sc64_shield_flash_prepare();
     sc64_shield_flash_draw_actor(zealot);                 /* the Zealot was not drawn: nothing */
     for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x) assert(gfx_test_pixel(x, y) == before[y * 240 + x]);
     sc64_shield_mark_drawn(zealot);
@@ -210,6 +211,35 @@ paints_source_art(void)
     assert(changed > 0);
 }
 
+/* Empty frames do not touch the cached index; offscreen and recycled slots
+ * are pruned at preparation, independently of actor admission. */
+static void
+preparation_fast_path_and_offscreen_expiry(void)
+{
+    const Sc64WeaponSourceAnimation *init =
+        sc64_weapon_source_animation_lookup(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u);
+    fixture();
+    sc64_shield_affected[zealot >> 3] = 0xa5;
+    sc64_shield_drawn[zealot >> 3] = 0x5a;
+    sc64_shield_flash_prepare();
+    sc64_shield_flash_draw_actor(zealot);
+    assert(sc64_shield_affected[zealot >> 3] == 0xa5);
+    assert(sc64_shield_drawn[zealot >> 3] == 0x5a);
+    marine_hits(zealot, 6);
+    sc64_shield_flash_prepare();
+    assert(sc64_shield_affected[zealot >> 3] & (1u << (zealot & 7)));
+    assert(!(sc64_shield_affected[marine >> 3] & (1u << (marine & 7))));
+    u[zealot].x = -1000;
+    frame += (int)sc64_weapon_source_vfx_gba_duration(init->duration_ticks);
+    sc64_shield_flash_prepare();
+    assert(!sc64_shield_live_mask && !live_flashes());
+    fixture();
+    marine_hits(zealot, 6);
+    sc64_shield_flash_prepare();
+    sc64_shield_flash_clear_actor(zealot);
+    assert(!sc64_shield_live_mask && !live_flashes());
+}
+
 /* Compare four actual painter renders. Pixels covered by the foreground body
  * must remain identical with and without the rear actor's shield flash. */
 static void
@@ -222,8 +252,9 @@ foreground_occludes_rear_flash(void)
     marine_hits(zealot, 6);
     for (int pass = 0; pass < 4; ++pass) {
         u[marine].alive = pass >= 2;
-        sc64_shield_flashes[0].live = pass & 1;
+        sc64_shield_live_mask = (u8)(pass & 1);
         gfx_begin(C_BLACK);
+        sc64_shield_flash_prepare();
         sc64_draw_depth_ordered_actors();
         for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x) {
             int at = y * 240 + x;
@@ -251,6 +282,7 @@ main(void)
     prefers_free_slots();
     bounded_reused_and_expiring();
     paints_source_art();
+    preparation_fast_path_and_offscreen_expiry();
     foreground_occludes_rear_flash();
     puts("PASS shield hit overlay: absorbed hits only, attacker side, queued directions, buildings, bounded, reuse, expiry, drawn-only source art");
     return 0;
