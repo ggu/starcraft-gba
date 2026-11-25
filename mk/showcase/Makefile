@@ -26,7 +26,7 @@ build/showcase-building-words-config: force-showcase-building-words-config | bui
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_INPUTS) $(SHOWCASE_BUILDING_WORD_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile mk/showcase/Makefile build/showcase-building-words-config $(SHOWCASE_BUILDING_WORD_CONFIG) | build
-	$(CC) $(if $(SHOWCASE_BUILDING_WORD_INPUTS),$(SHOWCASE_BUILDING_WORD_FLAGS)) $(CFLAGS) $(SHOWCASE_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
+	$(CC) -DSC64_REQUIRE_CURRENT_SKIRMISH_PACK $(if $(SHOWCASE_BUILDING_WORD_INPUTS),$(SHOWCASE_BUILDING_WORD_FLAGS)) $(CFLAGS) $(SHOWCASE_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Showcase-Transport1-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@

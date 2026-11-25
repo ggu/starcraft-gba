@@ -110,7 +110,7 @@ Since [#887](https://github.com/ggu/starcraft-gba/pull/887) the Blood Bath
 tapes need the regenerated private skirmish pack in both places the
 cartridges read it. Terran and Protoss include the Battlecruiser folder's
 cover-encoded copy first; a stale copy there keeps the old 32-patch table
-with no build error. `tools/sc64_skirmish_pack.py` needs the pinned
+unless it is regenerated. Product builds reject old packs. `tools/sc64_skirmish_pack.py` needs the pinned
 `references/sc64-maps` checkout, and the cover copy needs CV5-cover
 Backwater assets (here generated into a scratch folder):
 

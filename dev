@@ -811,6 +811,9 @@ def bc_inputs_ready() -> bool:
             if not re.search(r"^#define\s+" + marker + r"\s+1\s*$",
                              (ROOT / BC_DIR / name).read_text(encoding="ascii"), re.MULTILINE):
                 return False
+        pack = (ROOT / BC_DIR / "sc64_skirmish_generated.h").read_text(encoding="ascii")
+        if not re.search(r"^#define\s+SC64_SKIRMISH_PACK_REVISION\s+2\s*$", pack, re.MULTILINE):
+            return False
         body = (ROOT / BC_BODY_HEADER).read_text(encoding="ascii")
         yamato = (ROOT / BC_YAMATO_HEADER).read_text(encoding="ascii")
         return ("SC64_YAMATO_FRAME_COUNT" in yamato and "sc64_yamato_pixels" in yamato and

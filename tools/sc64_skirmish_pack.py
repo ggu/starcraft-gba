@@ -143,6 +143,11 @@ def choose_minerals(resources: list[dict], starts: list[tuple[int, int]]) -> tup
                       'policy': 'legacy start-patch indices first, then all remaining source placements'}
 
 
+def validate_pack_count(slug: str, path: str, minerals: list[dict]) -> None:
+    if slug == 'blood_bath' and len(minerals) != 56:
+        raise ValueError(f'{path} has {len(minerals)} mineral patches; expected 56 from the pinned source')
+
+
 def _emit_map(lines: list[str], index: int, slug: str, info, blocked: list[int],
               lookup: list[int], tiles: list[bytes], starts: list[tuple[int, int]],
               minerals: list[dict], geysers: list[dict]):
@@ -239,6 +244,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include
         if len(source_geysers) > MAX_GEYSERS:
             raise ValueError(f'{path} has {len(source_geysers)} geysers; runtime supports {MAX_GEYSERS} without truncation')
         geysers = source_geysers
+        validate_pack_count(slug, path, minerals)
         descriptors.append(_emit_map(lines, index, slug, info, blocked, lookup, pixels, starts, minerals, geysers))
         reports.append({'index': index + 1, 'path': path, 'title': info.name,
                         'dimensions': [info.width, info.height], 'tileset_id': tileset,
@@ -252,6 +258,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include
                         'blocked_cells': sum(v & 1 for v in blocked),
                         'chk_sha1': hashlib.sha1(chk).hexdigest(),
                         'terrain_assets_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in sources.items()}})
+    lines.append('#define SC64_SKIRMISH_PACK_REVISION 2\n')
     lines.extend([f'static const Sc64SkirmishMap sc64_skirmish_maps[{len(MAPS)}] = {{\n', *descriptors, '};\n', '#endif /* SC64_SKIRMISH_GENERATED_H */\n'])
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)

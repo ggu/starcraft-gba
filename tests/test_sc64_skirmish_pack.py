@@ -11,6 +11,11 @@ SPEC.loader.exec_module(PACKER)
 
 
 class SkirmishPackTests(unittest.TestCase):
+    def test_blood_bath_revision_rejects_incomplete_source(self):
+        PACKER.validate_pack_count("blood_bath", "008/04F", [None] * 56)
+        with self.assertRaisesRegex(ValueError, "expected 56"):
+            PACKER.validate_pack_count("blood_bath", "008/04F", [None] * 32)
+
     def test_flood_fill_rejects_disconnected_spawn_areas(self):
         width = height = 8
         blocked = [0] * (width * height)
