@@ -1498,7 +1498,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [ARM decoder trial](audits/2026-11-22-native-custom-game-lobby.md#first-order-audio-on-arm)
   increases late Protoss Melee cycles by 2.33%. A compact
   [IWRAM decoder and voice sum](audits/2026-11-25-audio-interrupt-cost.md)
-  later cut the audio interrupt by 40–48%. Reusing
+  later cut the audio interrupt by 40–48%. DMA captures on all three
+  race cartridges also match the previous mixer with four voices active.
+  Physical GBA timing remains open. Reusing
   [unit admission checks](audits/2026-11-22-native-custom-game-lobby.md#reusing-actor-admission-during-the-draw)
   reduces the late 600-update mean by 0.20%, while p95 rises
   0.46%. Late orders and drawing still need work to reach the
