@@ -18,7 +18,8 @@ every emulator process it starts to DIR/rec.jsonl:
           lowest main and IRQ stack pointer since the previous sample when the
           runner answers `SP`
   sram    SHA-256 of each exported save
-  end     lowest non-zero byte above __iwram_end and in the IRQ stack
+  end     number of exports, lowest non-zero byte above __iwram_end and in the
+          IRQ stack
   lost    the emulator was gone before its final sample could be taken
   bypass  a button, run, update or export command was sent around the recorder
 
@@ -103,7 +104,7 @@ class Recorder:
         advance = physical.PhysicalReplay._advance
         export, write = headless.HeadlessReplay.export_sram, headless.HeadlessReplay.write
 
-        def guarded(method):
+        def guarded(method):  # also used for the recorder's own reads, which are not bypasses
             def inner(self, *args, **kwargs):
                 recorder.inside += 1
                 try:
@@ -117,7 +118,8 @@ class Recorder:
                                    save_input=save_input, save_output=save_output)
             try:
                 rsp._rec = dict(proc=len(recorder.processes), sym=symbols, sizes=sizes, dead=False,
-                                sp=False, first_sp=None, save_output=save_output, kill=proc.kill)
+                                sp=False, first_sp=None, save_output=save_output, kill=proc.kill,
+                                exports=0, recorder=recorder)
                 if os.environ.get("PF_SYMS"):
                     try:  # the first answer is the low-water of boot, kept for the start sample
                         rsp._rec["first_sp"] = recorder.stack_query(rsp)
@@ -125,14 +127,17 @@ class Recorder:
                     except RuntimeError:
                         pass
                 recorder.processes.append(rsp)
-                transport = rsp.cmd
+                stream = proc.stdin.write
 
-                def recorded_command(text):
-                    # K sets buttons, U and c run the emulator, s exports the save.
-                    if not recorder.inside and text[:1] in ("K", "U", "c", "s"):
-                        recorder.emit({"t": "bypass", "proc": rsp._rec["proc"], "command": text[:1]})
-                    return transport(text)
-                rsp.cmd = recorded_command
+                def watched(text, *args, **kwargs):
+                    # K sets buttons, U and c run the emulator, s exports the save. Only the
+                    # recorded methods may send them; anything else bypasses the record.
+                    if not recorder.inside:
+                        for line in str(text).splitlines():
+                            if line[:1] in ("K", "U", "c", "s"):
+                                recorder.emit({"t": "bypass", "proc": rsp._rec["proc"], "command": line[:1]})
+                    return stream(text, *args, **kwargs)
+                proc.stdin.write = watched
                 recorder.emit({"t": "start", "proc": rsp._rec["proc"], "label": Path(out).name,
                                "save_in": sha(Path(save_input).read_bytes()) if save_input else None,
                                "saves_out": save_output is not None, "sp": rsp._rec["sp"],
@@ -171,6 +176,7 @@ class Recorder:
 
         def recorded_export(self):
             export(self)
+            self._rec["exports"] += 1
             recorder.sample(self, "export")
             path = self._rec["save_output"]
             recorder.emit({"t": "sram", "proc": self._rec["proc"], "at": self.completed,
@@ -202,9 +208,12 @@ class Recorder:
         watchdog = threading.Timer(READ_TIMEOUT, rsp._rec["kill"])
         watchdog.daemon = True
         watchdog.start()
+        recorder = rsp._rec["recorder"]
+        recorder.inside += 1
         try:
             return exchange()
         finally:
+            recorder.inside -= 1
             watchdog.cancel()
 
     @classmethod
@@ -282,7 +291,7 @@ class Recorder:
             if rsp.proc.poll() is not None:
                 raise RuntimeError("emulator exited before its final sample")
             self.sample(rsp, "close")
-            row = {"t": "end", "proc": info["proc"], "at": rsp.completed}
+            row = {"t": "end", "proc": info["proc"], "at": rsp.completed, "exports": info["exports"]}
             end = info["sym"].get("__iwram_end")
             if end:
                 stack, irq = self.bulk_read(rsp, [(end, STACK_TOP - end),
@@ -352,6 +361,8 @@ def gaps(rows: list[dict], every: int | None = None, pixels: tuple[str, ...] = P
         last = ends[0]["at"]
         if closes[0]["at"] != last or mine[-1] is not ends[0] or mine[-2] is not closes[0]:
             problems.append(f"process {proc} final sample is not its last row")
+        if ends[0].get("exports", sum(r["t"] == "sram" for r in mine)) != sum(r["t"] == "sram" for r in mine):
+            problems.append(f"process {proc} lacks rows for some of its exports")
         if any(r["t"] == "bypass" for r in mine):
             problems.append(f"process {proc} was sent commands around the recorder")
         if not mine or mine[0].get("kind") != "start" or mine[0].get("at") != 0:
@@ -453,6 +464,8 @@ def run(args) -> int:
                 runpy.run_path(args.tool, run_name="__main__")
             except SystemExit as exc:
                 status = 0 if exc.code is None else exc.code if isinstance(exc.code, int) else 1
+                if not isinstance(exc.code, (int, type(None))):
+                    recorder.emit({"t": "tool_error", "error": repr(exc)[:600]})
             except BaseException as exc:
                 recorder.emit({"t": "tool_error", "error": repr(exc)[:600]})
                 raise

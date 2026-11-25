@@ -27,6 +27,9 @@ class FakePipe:
             if line == "SP":
                 self.answers.append(self.machine.stack_answer())
                 continue
+            if line[:1] != "m":  # every other command goes through the pipe as on the real runner
+                self.answers.append(self.machine.handle(line))
+                continue
             address, length = line[1:].split(",")
             if self.machine.broken:
                 raise BrokenPipeError("runner is gone")
@@ -95,6 +98,11 @@ class FakeReplay(physical.PhysicalReplay):
         return bytes([self.history & 255]) * length
 
     def cmd(self, command):
+        self.proc.stdin.write(command + "\n")
+        self.proc.stdin.flush()
+        return self.proc.stdout.readline().rstrip("\n")
+
+    def handle(self, command):
         if command[0] == "K":
             return "OK"
         if command[0] == "U":
@@ -108,7 +116,7 @@ class FakeReplay(physical.PhysicalReplay):
         if command == "s":
             Path(self.save_output).write_bytes(bytes([self.history & 255]) * 32768)
             return "OK 32768"
-        raise AssertionError(command)
+        return "ERR command"
 
     def stack_answer(self):  # lowest since the previous query; the first covers boot
         low, self.stack_now = self.stack_now, self.stack
@@ -258,6 +266,7 @@ class TestPhysicalRecord(unittest.TestCase):
         self.assertFalse(record.compare(rows, rows[:-3])["match"])
         self.assertFalse(record.compare(rows[:-1], rows[:-1])["match"])
         self.assertEqual(failed[-1], {"t": "done", "status": 1})
+        self.assertIn({"t": "tool_error", "error": "SystemExit('')"}, failed)
         self.assertFalse(record.compare(failed, failed)["match"])
         self.assertEqual([r["t"] for r in crashed[-3:]], ["tool_error", "sample", "end"])
         self.assertFalse(record.compare(crashed, crashed)["match"])
@@ -274,6 +283,7 @@ class TestPhysicalRecord(unittest.TestCase):
             "no final sample": [r for r in rows if r.get("kind") != "close"],
             "without its export sample": [r for r in rows if r.get("kind") != "export"],
             "without its save hash": [r for r in rows if r["t"] != "sram"],
+            "lacks rows for some of its exports": [r for r in rows if r["t"] != "sram" and r.get("kind") != "export"],
             "without pixel hashes": [{k: v for k, v in r.items() if k != "page1"} for r in rows],
             "sample without pixel hashes": [dict(r, page0=None) if r["t"] == "sample" else r for r in rows],
             "a sample without pixel hashes": [dict(r, display="0404") if r["t"] == "sample" else r for r in rows],
@@ -300,9 +310,12 @@ class TestPhysicalRecord(unittest.TestCase):
 
     def test_commands_sent_around_the_recorder_make_the_record_incomplete(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for i, command in enumerate(("K2", "U5,0,0", "c", "s")):
-                with self.subTest(command=command):
-                    rows = self.play(Path(tmp) / str(i), ending=f"rsp.cmd({command!r}); proc.stdin.close()")
+            sends = [f"rsp.cmd({c!r})" for c in ("K2", "U5,0,0", "c", "s")]
+            sends += ["rsp.cmd(command='c')", "proc.stdin.write('s\\n'); proc.stdout.readline()"]
+            for i, send in enumerate(sends):
+                command = send.split("'")[1][0]
+                with self.subTest(send=send):
+                    rows = self.play(Path(tmp) / str(i), ending=f"{send}; proc.stdin.close()")
                     self.assertIn({"t": "bypass", "proc": 0, "command": command[0]}, rows)
                     result = record.compare(rows, rows)
                     self.assertFalse(result["match"])

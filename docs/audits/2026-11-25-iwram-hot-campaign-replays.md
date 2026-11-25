@@ -23,8 +23,8 @@ Zerg 5,848, Protoss 5,940 bytes) or came within 512 bytes of
 under. The closest to the code is also Zerg 3, with 1,696 bytes free.
 The IRQ stack reached 296 bytes, against its bound of 304 of 416. The
 relinked ROM's main-stack low-water equals the previous link's at
-every one of the 5,302 marks taken. Stack tracking covered 502,926
-updates of 35 pairs; the other routes are covered by the static bound
+every one of the 5,313 marks taken. Stack tracking covered 503,494
+updates of 36 pairs; the other routes are covered by the static bound
 the build checks.
 
 ## ROM pairs
@@ -68,7 +68,7 @@ and records every emulator process the tool starts:
 `compare` requires the two records to be equal row for row and each
 to be whole: a zero exit, at least one process, every periodic
 sample, an export sample with each save hash, a final sample, and no
-button, update or export command sent around the recorder. Guest
+button, run, update or export command sent around the recorder. Guest
 memory is only read; no run wrote any.
 
 Each route ran once per ROM, with the same driver, arguments, tapes
@@ -245,6 +245,7 @@ Zerg 10; Zerg 9 and Protoss 10 are here as well:
 | Protoss 6 | `p6`, `p6-export`, `p6-export-next` | 123,505 | 2,720 | 5,760 | 5,016 | 5,016 | 5,760 | `gfx_blit_sprite_mapped` | 296 | 180 | 1,896 |
 | Protoss 7 | `p7`, `p7-next`, `p7-brief` | 7,302 | 2,720 | 5,736 | 5,000 | 5,736 | 5,736 | `gfx_blit_sprite` | 296 | 204 | 1,920 |
 | Protoss 8 | `p8`, `p8-next` | 101,058 | 2,720 | 5,736 | 4,968 | 5,736 | 5,736 | `gfx_blit_sprite` | 296 | 204 | 1,920 |
+| Protoss 9 | `p9-brief` | 568 | 2,720 | 4,968 | 4,968 | n/a | 4,968 | `sc64_source_unit_attack_pose_resolve` | 296 | 972 | 2,688 |
 | Protoss 10 | `p10-next` | 429 | 2,720 | 4,960 | 4,920 | n/a | 4,960 | `gfx_blit_sprite` | 296 | 980 | 2,696 |
 
 Byte counts. Terran 2 is the one Terran mission tracked here; the
@@ -253,7 +254,7 @@ The deepest points are drawing (sprite blitters, weapon effects and
 selection ellipses) and the pause save's `memcpy`. The previous link
 reached the same low-water at every mark. At each process end the
 recorder also finds the lowest non-zero byte between `__iwram_end`
-and the stack top. In all 101 processes it lies at or above the
+and the stack top. In all 103 processes it lies at or above the
 tracked low-water, by 0–68 bytes where the deepest words pushed were
 zero, so the tracked figure is the deeper of the two.
 
@@ -275,6 +276,7 @@ Stack on the relinked tip ROMs:
 | Mission | Tracked runs | Updates tracked | Boot | Play | Pause and save | Result screen | Deepest | Function at the deepest point | IRQ | Under the bound | Free above the code |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
 | Terran 2 | `t2` | 29,455 | 2,712 | 4,944 | 4,168 | 5,872 | 5,872 | `memcpy` | 296 | 1,920 | 3,120 |
+| Zerg 3 | `z3-brief` | 542 | 2,680 | 4,960 | 4,960 | n/a | 4,960 | `sc64_source_unit_attack_pose_resolve` | 296 | 888 | 2,456 |
 | Zerg 9 | `z9-start`, `z9-road`, `z9-late` | 8,442 | 2,680 | 5,024 | 5,024 | n/a | 5,024 | `gfx_ellipse_outline_rows` | 296 | 824 | 2,392 |
 | Zerg 10 | `z10`, `z10-brief` | 4,147 | 2,680 | 5,632 | 4,960 | 5,632 | 5,632 | `sc64_weapon_source_vfx_draw_image_frame_resolved` | 296 | 216 | 1,784 |
 | Protoss 1 | `p1` | 15,522 | 2,720 | 5,760 | n/a | 5,000 | 5,760 | `gfx_blit_sprite_mapped` | 296 | 180 | 1,896 |
@@ -282,6 +284,7 @@ Stack on the relinked tip ROMs:
 | Protoss 3 | `p3-start`, `p3-mid`, `p3-brief` | 7,182 | 2,720 | 5,680 | 5,016 | n/a | 5,680 | `sc64_weapon_source_vfx_draw_raster` | 296 | 260 | 1,976 |
 | Protoss 5 | `p5-start`, `p5-mid`, `p5-brief` | 7,196 | 2,720 | 5,680 | 5,680 | n/a | 5,680 | `sc64_weapon_source_vfx_draw_raster` | 296 | 260 | 1,976 |
 | Protoss 7 | `p7`, `p7-brief` | 6,861 | 2,720 | 5,736 | 5,000 | 5,736 | 5,736 | `gfx_blit_sprite` | 296 | 204 | 1,920 |
+| Protoss 9 | `p9-brief` | 568 | 2,720 | 4,968 | 4,968 | n/a | 4,968 | `sc64_source_unit_attack_pose_resolve` | 296 | 972 | 2,688 |
 
 ## Limits
 
@@ -295,6 +298,11 @@ Stack on the relinked tip ROMs:
 - Zerg 9, Protoss 3 and Protoss 5 have pause saves only, and the
   Protoss 2 and 4 tapes do not reach victory. Their late game and
   result transition on the relinked ROMs are unreplayed.
+- The recorder gained its bypass and per-process export-count checks
+  during this work, after most pairs were recorded. The drivers used
+  here send buttons, updates and exports only through the transport's
+  methods, and a stray run command would have failed the transport's
+  own update-counter check on the next advance.
 - Several drivers adapt to game state, but each ran once per ROM.
   Neither ROM was asked to recover from a different state.
 - Terran 1 and 3–10 and Zerg 1, 2 and 4–8 ran without stack
