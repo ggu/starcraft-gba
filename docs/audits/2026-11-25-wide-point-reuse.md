@@ -103,3 +103,10 @@ and 14,324 on Showcase below the existing EWRAM guard. The final Z7 ARM
 build repeated the 1,867,971-cycle mean and 72 matched samples. The
 fixture also checks that a change
 of grid dimensions and invalid dimensions each clear a populated cache.
+
+The final shared-store ARM builds also matched all 633 sampled states and
+screens across nine additional campaign, skirmish and Showcase windows.
+In the recorded Z7 continuation, all 45 remaining checkpoints matched
+through victory at frame 267,585. The terminal SRAM and fresh reload were
+byte-identical to the release control (SHA-256
+`66fec8e5ac2dbd922de486cea21bd45784c92e3b22b741917640a3079d8fce0e`).
