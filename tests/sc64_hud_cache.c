@@ -195,7 +195,8 @@ test_selection_building_box_and_modes_invalidate_bottom(void)
     expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
     b[0].queue[1] = U_ZERGLING;
     b[0].queue_count = 2;
-    expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
+    /* The resource bar counts the running head, not waiting queue slots. */
+    expect_mask_and_match(HUD_BOTTOM);
 
 #ifdef SC64_FIELD_CONTROLS
     /* The imported icon follows raw identity, not just compact engine type. */
@@ -305,18 +306,19 @@ test_panel_shows_building_queue(void)
     q->queue[0] = q->queue[1] = q->queue[2] = U_SCV;
     q->queue_head = 0;
     q->queue_count = 3;
-    expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
+    /* Zero-progress Terran jobs do not yet reserve supply. */
+    expect_mask_and_match(HUD_BOTTOM);
     render_cached();
     assert(panel_slot_lit(0) && panel_slot_lit(1) && panel_slot_lit(2));
     assert(!panel_slot_lit(3) && !panel_slot_lit(4));
     assert(gfx_test_pixel(HUD_COLUMN, HUD_SLOT_Y) == C_GOLD);
     assert(gfx_test_pixel(HUD_COLUMN + HUD_SLOT_PITCH, HUD_SLOT_Y) != C_GOLD);
 
-    /* Progress is drawn over the cached band, so it never redraws the band
-       and still shows the current value on a cached frame. */
+    /* Starting the head reserves supply and redraws the top. Progress itself
+       is drawn over the cached bottom band. */
     render_cached();
     q->queue_progress = time / 2;
-    expect_mask_and_match(0);
+    expect_mask_and_match(HUD_TOP);
     render_cached();
     assert(panel_bar_fill() == HUD_BAR_W * (time / 2) / time);
     q->queue_progress = time / 4;

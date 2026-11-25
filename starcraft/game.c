@@ -7001,6 +7001,12 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_SHARED_TRANSPORT
+    if (!race_mode && choice == MENU_STOP + 1 && race_sk_transport_research_menu()) {
+        int result = race_skirmish_transport_tech.owner[0].remaining ?
+            race_sk_transport_cancel_owner(SIDE, 0) :
+            race_sk_transport_start_owner(SIDE, selected_building);
+        menu_open = 0; mode = MODE_NORMAL; toast(result ? 4 : 8); return;
+    }
     if (choice == MENU_STOP + 1 && race_shared_campaign_transport_menu_available()) {
         menu_open = 0; mode = MODE_UNLOAD; return;
     }
@@ -7281,7 +7287,7 @@ static int field_menu_count(void)
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_SHARED_TRANSPORT
-    if (race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
+    if (race_sk_transport_research_menu() || race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
 #endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
@@ -7320,7 +7326,7 @@ static int field_menu_count(void)
     if (race_battery_command_available()) return MENU_STOP+2;
 #endif
 #ifdef SC64_SHARED_TRANSPORT
-    if (race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
+    if (race_sk_transport_research_menu() || race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
 #endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
@@ -7479,6 +7485,8 @@ static const char *race_menu_label(int i)
         {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
     const char *const *labels=race_labels[race_command_race()];
 #ifdef SC64_SHARED_TRANSPORT
+    if (!race_mode && i == MENU_STOP + 1 && race_sk_transport_research_menu())
+        return race_skirmish_transport_tech.owner[0].remaining ? "CANCEL RESEARCH" : "VENTRAL SACS";
     if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
         return "UNLOAD CARGO";
 #endif
