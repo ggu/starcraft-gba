@@ -261,7 +261,7 @@ def find_missing_inputs(targets: Sequence[str], make_args: Sequence[str],
 # ELF / ROM facts
 
 def linker_limits(root: Path = ROOT) -> dict[str, int]:
-    limits = {"__iwram_end": 0x03005000, "__bss_end": 0x0203E000}
+    limits = {"__iwram_end": 0x03005200, "__bss_end": 0x0203E000}
     try:
         text = (root / "common" / "gba.ld").read_text(encoding="utf-8")
     except OSError:
