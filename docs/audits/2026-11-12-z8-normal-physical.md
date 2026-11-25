@@ -1546,7 +1546,22 @@ her to the front line. The southern interception still succeeds. The
 controller destroys both Nexuses and reaches victory at frame 86,969
 after 87,997 input calls, with Kerrigan at 392 HP and zero faults. This
 tape has SHA-256 `2a96ab60f75bc24365942051508ccc5039143453a839ec7654e7482dcb389330`.
-The ordinary ARM playback still needs to complete its victory check.
+
+### Ordinary ARM victory after the delayed retreat
+
+The padded-journal Z10 ROM replays the winning tape from empty HOME.
+Seven ordinary A presses acknowledge the queued dialogue. All 36 named
+checkpoint observations agree on the compared frame, screen, win/loss,
+unit and enemy building counts, resource bank and cursor. The ARM run
+reaches the result screen at frame 86,969 and logical call 87,997 with
+`won=1` and `lost=0`. At victory it reports 23 friendly units, 40 enemy
+units and 38 enemy buildings. This completes the ordinary-input route to
+victory on this version. The comparison covers the named observations.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Padded-journal ARM ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
+| Fresh HOME through victory | `97946f7862b7a648ba75c758e756df36647225ca1286b438276c1c3fd4af2800` |
 
 ### Native Overlord research permission
 

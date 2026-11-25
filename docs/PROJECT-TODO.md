@@ -19,6 +19,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Combined campaign qualification.** All 30 original missions now have
+  ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
+  finish on the padded-journal Z10 build. Repeat the replay matrix on the
+  latest combined Terran, Zerg and Protoss package, and continue native
+  parity and GBA SP timing checks.
+
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
   and fall to 14.14–17.90 in the last measured window. Every sampled
@@ -2050,9 +2056,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   checkpoint is available.
   The [regenerated Z7 winning input tape](audits/2026-11-12-z7-normal-physical.md#november-25-rendered-controller-recovery)
   wins on the padded-journal ARM build at frame 267,585 after
-  matching all 206 named checks from empty HOME. With the verified Z10
-  result below, recent normal build coverage is 29 of 30. Verify the
-  remaining Z8 route and qualify the latest combined package.
+  matching all 206 named checks from empty HOME. The Z8 and Z10 results
+  below bring recent normal build coverage to all 30 missions.
   The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
   preserve the economy at frame 87,554 and hold the Pool with four
   Hydralisks through frame 89,195. Protect the forward detector before
@@ -2060,8 +2065,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   destroys a Pylon and lowers the Nexus to 170 shields before losing
   the assault force. On HOST, [moving the southern guard forward at frame 32,000](audits/2026-11-12-z8-normal-physical.md#rendered-controller-interception-before-the-southern-escape)
   stops the earlier escape. Keeping Kerrigan at her retreat destination
-  lets the controller destroy both Nexuses and win on HOST at frame
-  86,969. Qualify that same route on ARM. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
+  lets the controller destroy both Nexuses and [win on ARM at frame
+  86,969](audits/2026-11-12-z8-normal-physical.md#ordinary-arm-victory-after-the-delayed-retreat).
+  The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
   verifies three Hydralisks and a new mining Drone at frame 35,958.
   Establish the defense earlier from frame 34,723 to survive the raid.
   The [Z10 dialogue-aware replay](audits/2026-11-21-z10-current-full-circle.md#victory-after-acknowledging-the-late-dialogue)
