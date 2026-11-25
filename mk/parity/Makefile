@@ -56,6 +56,8 @@ PARITY_SOURCES.zerg-z10 = $(filter-out starcraft/game.c,$(Z10_ARM_SOURCES))
 # build/parity/*.d files: they still name that header. The binary is
 # published last, so <binary>.d, .inputs and .flags (a copy of the command)
 # always describe the executable beside them, and a missing one rebuilds it.
+# The command is read once per build (<binary>.cmd.snap), used for every pass,
+# and recorded in .inputs together with the executable's SHA-256.
 define PARITY_BINARY
 $(PARITY_DIR)/$(1)-$(2)-$(3).cmd: $(PARITY_DIR)/$(1).romflags parity-force | build
 	@printf '%s %s %s %s\n' '$$(CLANG) $$(PARITY_CFLAGS_$(2))' "$$$$(cat $$<)" '$$(PARITY_CFLAGS_$(3))' \
@@ -65,19 +67,21 @@ $(PARITY_DIR)/$(1)-$(2)-$(3): $(PARITY_DIR)/$(1)-$(2)-$(3).cmd $$(PARITY_RUN_DEP
 	$$(PARITY_SOURCES.$(1)) $$(if $$(filter 4,$$(words $$(wildcard $(PARITY_DIR)/$(1)-$(2)-$(3).d \
 	  $(PARITY_DIR)/$(1)-$(2)-$(3).mmd $(PARITY_DIR)/$(1)-$(2)-$(3).flags \
 	  $(PARITY_DIR)/$(1)-$(2)-$(3).inputs))),,parity-force) | build
-	eval "$$$$(cat $$<) -M -MP -MT $$@" > $$@.d.tmp
-	eval "$$$$(cat $$<) -MM -MT $$@" > $$@.mmd.tmp
-	$$(PYTHON) tools/sc64_parity_selfgate.py inputs $$@.d.tmp --user-deps $$@.mmd.tmp > $$@.inputs.pre
-	eval "$$$$(cat $$<) -o $$@.tmp"
-	eval "$$$$(cat $$<) -M -MP -MT $$@" > $$@.d.post
+	cp $$< $$@.cmd.snap
+	eval "$$$$(cat $$@.cmd.snap) -M -MP -MT $$@" > $$@.d.tmp
+	eval "$$$$(cat $$@.cmd.snap) -MM -MT $$@" > $$@.mmd.tmp
+	$$(PYTHON) tools/sc64_parity_selfgate.py inputs $$@.d.tmp --user-deps $$@.mmd.tmp \
+	  --cmd-file $$@.cmd.snap > $$@.inputs.pre
+	eval "$$$$(cat $$@.cmd.snap) -o $$@.tmp"
+	eval "$$$$(cat $$@.cmd.snap) -M -MP -MT $$@" > $$@.d.post
 	cmp -s $$@.d.tmp $$@.d.post || { echo "$$@: dependencies changed while compiling; rebuild" >&2; exit 1; }
-	$$(PYTHON) tools/sc64_parity_selfgate.py inputs $$@.d.tmp --user-deps $$@.mmd.tmp --binary $$@.tmp \
-	  --expect $$@.inputs.pre > $$@.inputs.tmp
+	$$(PYTHON) tools/sc64_parity_selfgate.py inputs $$@.d.tmp --user-deps $$@.mmd.tmp \
+	  --cmd-file $$@.cmd.snap --binary $$@.tmp --expect $$@.inputs.pre > $$@.inputs.tmp
 	rm $$@.inputs.pre $$@.d.post
 	mv $$@.d.tmp $$@.d
 	mv $$@.mmd.tmp $$@.mmd
 	mv $$@.inputs.tmp $$@.inputs
-	cp $$< $$@.flags
+	mv $$@.cmd.snap $$@.flags
 	mv $$@.tmp $$@
 PARITY_BINARIES += $(PARITY_DIR)/$(1)-$(2)-$(3)
 endef

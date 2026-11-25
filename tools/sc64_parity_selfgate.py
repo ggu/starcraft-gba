@@ -81,7 +81,21 @@ def dependency_paths(dep_file: Path) -> list[Path]:
     return paths
 
 
-def generated_inputs(dep_file: Path, user_deps: Path) -> dict[str, dict[str, str]]:
+def include_dirs(command: str) -> list[Path]:
+    """The -isystem and -idirafter directories a compile command names. Headers
+    found there are left out of -MM output even when generated."""
+    argv = shlex.split(command)
+    dirs = []
+    for i, arg in enumerate(argv):
+        for option in ("-isystem", "-idirafter"):
+            if arg == option and i + 1 < len(argv):
+                dirs.append(argv[i + 1])
+            elif arg.startswith(option) and len(arg) > len(option):
+                dirs.append(arg[len(option):])
+    return [Path(os.path.normpath(d if os.path.isabs(d) else ROOT / d)) for d in dirs]
+
+
+def generated_inputs(dep_file: Path, user_deps: Path, command: str = "") -> dict[str, dict[str, str]]:
     """SHA-256 of every non-system input a clang -M dependency file names.
 
     "generated" holds listed paths, as the build named them (before symlinks),
@@ -91,6 +105,7 @@ def generated_inputs(dep_file: Path, user_deps: Path) -> dict[str, dict[str, str
     does not depend on git state, so staging a file never changes it. A listed
     file that is missing is an error, never an omission."""
     user = {os.path.normpath(t if os.path.isabs(t) else ROOT / t) for t in dependency_tokens(user_deps)}
+    explicit = include_dirs(command)
     generated: dict[str, str] = {}
     sources: dict[str, str] = {}
     for token in dict.fromkeys(dependency_tokens(dep_file)):
@@ -102,7 +117,7 @@ def generated_inputs(dep_file: Path, user_deps: Path) -> dict[str, dict[str, str
                 target = sources
         except ValueError:
             key = str(named)
-            if key not in user:
+            if key not in user and not any(named.is_relative_to(d) for d in explicit):
                 continue
         if not named.is_file():
             raise SystemExit(f"{dep_file}: input {named} is missing; rebuild with make")
@@ -175,14 +190,16 @@ def provenance(binary: Path) -> dict:
     built = record["inputs"]["generated"]
     if record.get("binary_sha256") != sha256_file(binary):
         raise SystemExit(f"{binary}: its .inputs record belongs to another build; rebuild with make")
-    now = generated_inputs(sidecars[".d"], sidecars[".mmd"])
+    command = record.get("compile_command", "")
+    if not command or sidecars[".flags"].read_text().strip() != command:
+        raise SystemExit(f"{binary}: its .flags file does not match the command recorded at build; rebuild")
+    now = generated_inputs(sidecars[".d"], sidecars[".mmd"], command)
     if record["inputs"] != now:
         old = {**record["inputs"]["generated"], **record["inputs"]["sources"]}
         new = {**now["generated"], **now["sources"]}
         changed = sorted(k for k in set(old) | set(new) if old.get(k) != new.get(k))
         raise SystemExit(f"{binary}: inputs changed since it was built ({', '.join(changed[:5])}); "
                          "rebuild with make")
-    command = sidecars[".flags"].read_text().strip()
     argv = shlex.split(command)
     return {
         "binary": str(binary.relative_to(ROOT)) if binary.is_relative_to(ROOT) else str(binary),
@@ -280,16 +297,28 @@ def check_trace_complete(trace: Path, report: dict, verify_body: bool = True) ->
         counts = {"S": 0, "D": 0, "A": 0, "X": 0, "+U": 0, "+B": 0, "-U": 0, "-B": 0}
         verbs_ok = verbs_failed = 0
         sequential = True
-        keyframes = set()
+        keyframes: set[bytes] = set()
+        group = None            # step of the current S group; None before S 1 or in a W group
+        group_frames: dict[bytes, bytes] = {}
         for line in body.split(b"\n"):
             if not record_ok(line):
                 sequential = False
-            # Fog deltas mean nothing without both keyframes, written on step 1.
+            if line.startswith((b"S ", b"W ")):
+                # A group that wrote keyframes must have written both, same size.
+                if group_frames and (len(group_frames) != 2 or len(set(group_frames.values())) != 1):
+                    sequential = False
+                group_frames = {}
+                group = int(line.split(b" ")[1]) if line.startswith(b"S ") else None
+                if group == 2 and len(keyframes) != 2:
+                    sequential = False
+            # Keyframes come on step 1 (and again when the map size changes),
+            # always inside an S group; fog deltas need both first.
             if line[:3] in (b"FV ", b"FE "):
+                if group is None or (not keyframes and group != 1) or line[:2] in group_frames:
+                    sequential = False
+                group_frames[line[:2]] = b" ".join(line.split(b" ")[1:3])
                 keyframes.add(line[:2])
             elif line.startswith(b"F ") and len(keyframes) != 2:
-                sequential = False
-            if line.startswith(b"S ") and line.split(b" ")[1] == b"2" and len(keyframes) != 2:
                 sequential = False
             tag = line.split(b" ", 1)[0].decode("ascii", "replace")
             if tag in counts:
@@ -305,6 +334,8 @@ def check_trace_complete(trace: Path, report: dict, verify_body: bool = True) ->
                     verbs_ok += 1
                 else:
                     verbs_failed += 1
+        if group_frames and (len(group_frames) != 2 or len(set(group_frames.values())) != 1):
+            sequential = False
         complete = (sequential and len(keyframes) == 2 and counts["S"] == report["steps"] and
                     counts["D"] == int(fields["damage"]) and counts["A"] == int(fields["sounds"]) and
                     counts["X"] == int(fields["text_boxes"]) and
@@ -458,6 +489,7 @@ def main() -> int:
     i.add_argument("--user-deps", type=Path, required=True, help="the -MM dependency file")
     i.add_argument("--binary", type=Path, help="the executable this record describes")
     i.add_argument("--expect", type=Path, help="an earlier record whose inputs must be unchanged")
+    i.add_argument("--cmd-file", type=Path, required=True, help="the compile command the build used")
     b = sub.add_parser("bench", help="measure host updates per second")
     b.add_argument("--dir", default="build/parity")
     b.add_argument("--profile", action="append", required=True)
@@ -476,7 +508,9 @@ def main() -> int:
             print(rom_flags(sys.stdin.read(), args.elf))
         return 0
     if args.command == "inputs":
-        record = {"inputs": generated_inputs(args.dep_file, args.user_deps)}
+        command = args.cmd_file.read_text().strip()
+        record = {"compile_command": command,
+                  "inputs": generated_inputs(args.dep_file, args.user_deps, command)}
         if args.expect and json.loads(args.expect.read_text())["inputs"] != record["inputs"]:
             raise SystemExit(f"inputs: generated inputs changed while {args.binary} was compiling; rebuild")
         if args.binary:
