@@ -253,6 +253,13 @@ build/test-sc64-z10-defense-pylon-roster: tests/sc64_zp_defense_targets.c $(STAR
 .PHONY: test-sc64-z10-defense-pylon-roster
 test-sc64-z10-defense-pylon-roster: build/test-sc64-z10-defense-pylon-roster
 	./build/test-sc64-z10-defense-pylon-roster
+# Exercise sparse and dense Pylon rows against the scalar power rule.
+build/test-sc64-z10-defense-pylon-buckets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER -DSC64_DEFENSE_PYLON_BUCKET_PROBE $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-z10-defense-pylon-buckets
+test-sc64-z10-defense-pylon-buckets: build/test-sc64-z10-defense-pylon-buckets
+	./build/test-sc64-z10-defense-pylon-buckets
+
 build/test-sc64-z10-defense-combined: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) tests/sc64-zerg-late/Makefile Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z10_RELEASE_FLAGS) -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-z10-defense-combined

@@ -28,9 +28,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   release](audits/2026-11-12-z7-normal-physical.md#november-25-selection-ring-release-replay)
   repeats all 206 Z7 checkpoints through victory. The combined collision
   and production build repeats the full Z8 win and confirms a byte-identical
-  victory re-export from fresh HOME. Complete the replay matrix on the
-  combined Terran, Zerg and Protoss package, and continue
-  native parity and GBA SP timing.
+  victory re-export from fresh HOME. The [adaptive Pylon builds](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
+  repeat full Terran 2 and Protoss 5 wins with fresh save and result loads,
+  plus the late Zerg 10 win. Use the retained ordinary-input tapes to
+  qualify the rest of the combined Terran, Zerg and Protoss package.
+  Continue native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
@@ -142,8 +144,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [Terran witness-table pairs](audits/2026-11-24-kodak-package-checks.md#monotone-route-witnesses-on-two-current-terran-saves)
   are flat in two-CPU Outpost and cut 1.56% of mean frame
   cycles in three-CPU Blood Bath. Both save continuations
-  match. Measure witness hits and repeat with active orders
-  before enabling the cache.
+  match. Repeat with active orders on the same 96-update Blood Bath
+  interval used by the [route overlap census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes).
+  Count witness uses, expiry, and admission misses before changing the
+  retention policy.
   The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
   finds only seven redundant crops across 48 updates. On Outpost the
   base projectile pass takes 39.6–64.7k cycles per update across the
@@ -1071,20 +1075,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Prioritize movement and targeting setup in the dense Custom Game
   samples. Those core simulation costs are larger and apply throughout
   a battle.
-  The meter-build profile still spends 46,596 cycles per frame in
-  Pylon power queries on the dense Z9 sample. Requalify the existing
-  [adaptive Pylon buckets](https://github.com/ggu/starcraft-gba/pull/834)
-  on the merged engine before activation. With the row renderer, the
-  paired option reduces mean loop cycles by 1.95% and 1.10% in two
-  69-Pylon Z9 windows. Both framebuffer pages, state and save continuation
-  match. The sparse pairs change which page is presented on isolated
-  updates. All four links retain their RAM endpoints. The Z10/P10
-  defense-call path uses 56 more static stack bytes. In eight paired
-  dense Z9 updates, minimum lookup entry SP is 0x030076f8 in the
-  control and 0x030076d8 with the option, leaving 9,944 bytes above
-  the code boundary at the sampled entries. Receipt SHA-256
-  `0ef41b44c8c2004a4503a453751b19f09f3fc9e5677cdf1c760f891f4be9a71e`.
-  Finish the composed check and broader peak stack sampling.
+  The [adaptive Pylon lookup](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
+  is enabled across all four canonical ROMs. On the combined engine it
+  reduces mean loop cycles by 1.96% and 1.11% in two 69-Pylon Z9 windows.
+  RAM endpoints, sampled stack high-water writes, both framebuffer pages,
+  state and fresh save continuation match. Isolated display-register
+  samples differ. The 54 Custom Game openings and fresh loads, full
+  Terran 2 and Protoss 5 replays, and Zerg 10 late checkpoint through
+  victory all passed. Keep whole-program peak stack, physical frame
+  delivery and the 30-mission sweep on one release trio open.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -2454,10 +2453,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
-  The [adaptive Cannon power draft](https://github.com/ggu/starcraft-gba/pull/834)
-  cuts the dense lookup fixture from 80,203 to 41,838 cycles.
-  Compare whole frames, stack and fresh saves on all four products
-  before enabling it.
+  The [adaptive Cannon power lookup](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
+  cuts the dense lookup fixture from 80,203 to 41,838 cycles and
+  retains sampled stack and fresh save behavior on the combined build.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.
