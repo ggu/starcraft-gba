@@ -56,3 +56,30 @@ sites run concurrently. Test fresh save/load during contention and older saves
 with multiple partial timers, without losing carried resources. Timer-field
 encoding and save compatibility have not been established. No behavior or
 shipping build setting is changed by this observation checker.
+
+## Experimental GBA save continuation
+
+In the shared queue trial, the same three-opponent Blood Bath save for each
+cartridge was advanced from frame 10,257 to 10,274. The ordinary pause menu
+wrote SRAM while a worker waited behind another. A fresh emulator loaded it
+with L on the title screen. The ordered worker slots and the captured world
+fingerprint matched immediately and after every one of the next 128 updates
+on Terran10, Zerg10, Protoss10 and Showcase. The earlier P10 trial lost its
+second worker at site 25 on the initial reload, despite matching the world
+fingerprint. That build fails this check. The input SRAM must match the product.
+
+```sh
+python3 tools/sc64_gas_service_continuation.py "$runner" "$rom" "$elf" "$busy_sram" "$new_output_dir" --advance 17 --steps 128
+```
+
+Tagged journals store queue rank, and preflight checks those ranks before
+publishing the candidate world. The Zerg product journal HOST test recomputes
+the checksum of a newer bank containing a duplicate rank. The selector accepts
+the older valid bank. When both banks are unusable, the load fails and preserves
+the checked live state and SRAM. An additional HOST fixture saves immediately
+after cancelling a waiter, before the next worker update removes it.
+
+At the qualified trial revision, the race cartridges cleared their configured
+512-byte stack margin with 240 spare bytes on Terran, 432 on Zerg and 816 on
+Protoss. Showcase uses a different link without this stack check. The trial
+still requires campaign and full-match economy and timing comparisons.

@@ -2136,6 +2136,29 @@ static int race_gas_save_eligible(void *opaque, unsigned slot, unsigned site,
 }
 #endif
 
+#ifdef SC64_GAS_SERVICE_TRIAL
+/* A command can cancel a worker, or combat can destroy its refinery, after
+ * the last orders pass. Serialize the queue the next pass will service.
+ * Keep both the live queue and worker timers intact while attempting a save. */
+static __attribute__((noinline)) int race_gas_save_snapshot(Sc64GasSaveContext *ctx)
+{
+    race_gas_service_candidate = gas_service;
+    for (unsigned slot = 0; slot < MAX_UNITS; ++slot) {
+        unsigned id = gas_service.site[slot];
+        if (!id || sc64_gas_service_eligible(slot, id - 1)) continue;
+        sc64_gas_service_remove(&race_gas_service_candidate, slot);
+        if (u[slot].order == ORDER_GAS && u[slot].work_timer) {
+            Unit wire;
+            if (!race_save_decode_unit(ctx->save, slot, ctx->width, ctx->height, &wire)) return 0;
+            wire.work_timer = 0;
+            if (!race_save_encode_unit(ctx->save, slot, ctx->width, ctx->height, &wire)) return 0;
+        }
+    }
+    return sc64_gas_queue_save_encode(ctx, &race_gas_service_candidate,
+        race_gas_save_read, race_gas_save_write, race_gas_save_eligible);
+}
+#endif
+
 static int race_save_game(void) {
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
     /* Everything that writes the route/save union comes through this entry
@@ -3236,8 +3259,7 @@ static int race_save_game(void) {
 #ifdef SC64_GAS_SERVICE_TRIAL
     {
         Sc64GasSaveContext gas_ctx = {&race_data, WORLD_W, WORLD_H};
-        if (!sc64_gas_queue_save_encode(&gas_ctx, &gas_service,
-                race_gas_save_read, race_gas_save_write, race_gas_save_eligible)) return 0;
+        if (!race_gas_save_snapshot(&gas_ctx)) return 0;
         race_data.state[16] |= SC64_GAS_QUEUE_SAVE_MARKER;
     }
 #endif

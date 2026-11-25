@@ -43,7 +43,9 @@ sc64_gas_queue_save_ranks(const Sc64GasServiceQueue *queue, uint8_t *sites, uint
     return 1;
 }
 
-static inline int
+/* Keep rank scratch off the journal-selection stack while other campaign
+ * validators run. The cartridge stack guard checks both call paths. */
+static __attribute__((noinline)) int
 sc64_gas_queue_save_encode(void *candidate, const Sc64GasServiceQueue *queue,
                            Sc64GasQueueReadRow read, Sc64GasQueueWriteCarry write,
                            Sc64GasQueueEligible eligible)
@@ -73,7 +75,7 @@ sc64_gas_queue_save_encode(void *candidate, const Sc64GasServiceQueue *queue,
 
 /* Authenticate the marker and payload BEFORE calling. Scratch queue and rows
  * remain detached through all checks; the output queue is assigned last. */
-static inline int
+static __attribute__((noinline)) int
 sc64_gas_queue_save_decode(void *candidate, Sc64GasServiceQueue *out,
                            Sc64GasQueueReadRow read, Sc64GasQueueWriteCarry write,
                            Sc64GasQueueEligible eligible)

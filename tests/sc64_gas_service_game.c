@@ -40,7 +40,13 @@ static void exercise(int race)
     }
     assert(u[workers[3]].carry == 8 && u[workers[4]].carry == 8);
     assert(sc64_geyser_consumed[0] == 8 && sc64_geyser_consumed[1] == 8);
+    assert(race_save_game());
     u[workers[2]].order = ORDER_MOVE;
+    assert(race_save_game()); /* Pause directly after cancelling a queued order. */
+    assert(gas_service.head[sites[0]] == workers[2] + 1);
+    assert(race_load_game());
+    assert(u[workers[2]].order == ORDER_MOVE && !gas_service.site[workers[2]]);
+    assert(gas_service.head[sites[0]] == workers[1] + 1);
     sc64_gas_service_begin();
     race_update_resource_worker(&u[workers[0]]);
     race_update_resource_worker(&u[workers[1]]);

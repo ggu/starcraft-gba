@@ -57,8 +57,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   at three buildings from 2/3/3 to 1/1/1. Separate sites worked in parallel
   on all 399 measured transitions. The 16 complete timer intervals (release:
   24) show why campaign economy and paid production need fresh replays.
-  The trial still needs authenticated save/reload of the waiting order, ARM
-  stack and performance measurements, and cross-product match qualification.
+  All four trial cartridges preserved the exact worker queues on a fresh boot
+  from frame 10,274 and through 128 subsequent updates. The three race ROMs
+  passed their ARM stack checks (spare bytes after the 512-byte margin:
+  Terran 240, Zerg 432, Protoss 816). Measure full-match outcomes and frame
+  timing before activation, and qualify representative campaign saves.
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
