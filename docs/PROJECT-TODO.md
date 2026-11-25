@@ -42,8 +42,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the restart shortcut at input tick 20,403. A P7 continuation stays
   active past the old tape's late input boundary with the three
   heroes alive and the enemy Nexus standing.
-  Retape T5 from the fresh-HOME checkpoint with seven Wraiths,
-  three gas workers and both heroes alive. The recovered P7
+  T5's ordinary air route reduces the enemy to 11 structures with
+  eight Wraiths at fresh-HOME frame 84,547. The selection release
+  also replays an ordinary retreat and Depot completion, reaching
+  60/80 supply with four Wraiths and both heroes at fresh-HOME
+  frame 88,779. Continue from the protected base. The recovered P7
   suffix rebuilds 64 Dragoons, destroys the Nexus, and reaches
   a fresh-load-verified victory at frame 80,828.
   Use the retained ordinary-input tapes to qualify the rest of the
@@ -57,6 +60,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. Prioritize those paths for
   the race cartridges.
+  On the sprite-row release's paired three-CPU P10 Outpost cut,
+  automatic targeting takes 131,032 inclusive cycles per update
+  and movement takes 161,711 within orders. The fogged viewport
+  reduces tracer drawing to 20,305. Focus on the orders path in
+  this cut and capture a separate visible three-CPU fight before
+  choosing a tracer change.
   [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
   lowers the visible P7 and Z9 frame means by about 0.9–1.0%
   with matching pixels. Keep profiling larger draw and order
@@ -2224,12 +2233,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [paired affordability check](audits/2026-11-25-visible-drawing-and-campaigns.md#backwater-marine-affordability)
   confirms both games reject an order under 50 minerals with a
   free slot and remaining supply.
-  In the [native local-cap replay](audits/2026-11-25-visible-drawing-and-campaigns.md#native-waiting-order-at-the-local-supply-limit),
-  the N64 pays for a waiting SCV with an active SCV and 18/18
-  supply. The GBA reserves supply for all paid slots at admission.
-  Verify native activation and cancellation at the local limit,
-  then implement the corresponding GBA queue and save behavior.
-  Verify the global 200 limit separately.
+  The [paired local-cap replay](audits/2026-11-25-waiting-training-supply.md)
+  verifies idle refusal, paid waiting and Depot recovery on N64. The GBA build
+  accepts a waiting order, stalls its head at 18/18, reloads that
+  state and resumes from a completed Depot. Expand the native
+  checks to Protoss, multi-facility start priority and the global 200
+  limit. Continue fresh-load and exact campaign qualification on
+  the shared implementation.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

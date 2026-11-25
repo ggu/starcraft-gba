@@ -8,6 +8,7 @@
 typedef struct { int alive, owner, type; } Unit;
 typedef struct {
     int alive, owner, type, under_construction, queue_count, queue_head, queue[5];
+    int queue_progress;
 } Building;
 enum { MAX_UNITS = 5, MAX_BUILDINGS = 5 };
 static int race_mode;
@@ -23,17 +24,18 @@ int main(void)
     u[2] = (Unit){1, 0, U_MUTALISK};
     u[3] = (Unit){1, 0, U_OVERLORD};
     u[4] = (Unit){0, 0, U_OVERLORD}; /* Dead provider. */
-    b[0] = (Building){1, 0, B_NEXUS, 0, 1, 4, {0, 0, 0, 0, U_PROBE}};
-    b[1] = (Building){1, 3, B_COMMAND, 0, 2, 4, {U_SCV, 0, 0, 0, U_SCV}};
-    b[2] = (Building){1, 0, B_PYLON, 1, 0, 0, {0}};
-    b[3] = (Building){1, 0, B_LAIR, 1, 1, 0, {U_ZERGLING}};
-    b[4] = (Building){0, 0, B_PYLON, 0, 0, 0, {0}};
+    b[0] = (Building){1, 0, B_NEXUS, 0, 1, 4, {0, 0, 0, 0, U_PROBE}, 0};
+    b[1] = (Building){1, 3, B_COMMAND, 0, 2, 4, {U_SCV, 0, 0, 0, U_SCV}, 1};
+    b[2] = (Building){1, 0, B_PYLON, 1, 0, 0, {0}, 0};
+    b[3] = (Building){1, 0, B_LAIR, 1, 1, 0, {U_ZERGLING}, 0};
+    b[4] = (Building){0, 0, B_PYLON, 0, 0, 0, {0}, 0};
 
     Sc64RaceSupplyLedger protoss = race_owner_supply_ledger(0, R_PROTOSS);
     assert(protoss.used == 2 && protoss.queued == 2 && protoss.provided == 18);
     assert(race_supply_ledger_reserved(race_owner_supply_ledger(0, R_TER)) == 0);
     Sc64RaceSupplyLedger terran = race_owner_supply_ledger(3, R_TER);
     assert(terran.used == 4 && terran.queued == 4 && terran.provided == 20);
+    assert(race_owner_supply_ledger_for_queue(0, R_PROTOSS, 0).queued == 0);
     u[1].owner = b[1].owner = 0;
     terran = race_owner_supply_ledger(0, R_TER);
     assert(terran.used == 4 && terran.queued == 4 && terran.provided == 20);

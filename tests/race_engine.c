@@ -179,8 +179,15 @@ static void mixed_supply_boundary(int faction, int owner, int custom)
     assert(other.used == 12 && other.queued == 2 && other.provided > other.used);
     assert(race_owner_reserved_supply(owner) < race_owner_supply_capacity(owner));
     int ore = race_owner_minerals(owner);
-    assert(!race_queue_unit(owner, base, workers[faction]) && race_refusal == 2);
-    assert(race_owner_minerals(owner) == ore && b[base].queue_count == 1);
+    if (faction == R_ZERG) {
+        assert(!race_queue_unit(owner, base, workers[faction]) && race_refusal == 2);
+        assert(race_owner_minerals(owner) == ore && b[base].queue_count == 1);
+    } else {
+        assert(race_queue_unit(owner, base, workers[faction]));
+        assert(race_owner_minerals(owner) == ore - unit_cost(workers[faction]) &&
+               b[base].queue_count == 2);
+        own = race_owner_supply_ledger(owner, faction);
+    }
     if (custom && owner != SIDE) {
         RaceAiCensus census;
         race_ai_census(owner, &census);
@@ -195,6 +202,58 @@ static void mixed_supply_boundary(int faction, int owner, int custom)
     }
 }
 
+static void waiting_supply_boundary(int faction, int custom)
+{
+    int type = faction == R_TER ? U_SCV : U_PROBE;
+    int hall = faction == R_TER ? B_COMMAND : B_NEXUS;
+    init_mission(0);
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    race_mode = custom;
+    race_human = race_player[SIDE] = faction;
+    minerals = 1000;
+    int producer = spawn_build(SIDE, hall, 128, 128, 0);
+    int other = spawn_build(SIDE, hall, 256, 128, 0);
+    assert(producer >= 0 && other >= 0);
+    int cap = race_owner_supply_capacity(SIDE);
+    int last = -1;
+    for (int k = 0; k < cap / 2; ++k) {
+        last = spawn_unit(SIDE, type, 32 + k * 16, 96);
+        assert(last >= 0);
+    }
+    assert(race_owner_supply(SIDE) == cap && b[producer].queue_count == 0);
+    assert(!race_queue_unit(SIDE, producer, type) && race_refusal == 2 && minerals == 1000);
+    u[last].alive = 0;
+    assert(race_queue_unit(SIDE, producer, type));
+    assert(race_training_progress(&b[producer]) == 0);
+    assert(!race_queue_unit(SIDE, other, type) && race_refusal == 2);
+    assert(!b[other].queue_count && minerals == 1000 - unit_cost(type));
+    race_tick_buildings();
+    assert(b[producer].queue_progress == 1);
+    assert(race_supply_ledger_reserved(
+        race_owner_supply_ledger_for_queue(SIDE, faction, 0)) == cap);
+    assert(race_queue_unit(SIDE, producer, type));
+    assert(b[producer].queue_count == 2 && minerals == 1000 - 2 * unit_cost(type));
+    int frames = (sc64_race_unit_rule(type)->build_frames * 5 + 3) / 4;
+    for (int k = 1; k < frames; ++k)
+        race_tick_buildings();
+    assert(race_owner_supply(SIDE) == cap && b[producer].queue_count == 1);
+    for (int k = 0; k < 8; ++k) race_tick_buildings();
+    assert(b[producer].queue_progress == 0);
+    assert(race_supply_ledger_reserved(
+        race_owner_supply_ledger_for_queue(SIDE, faction, 0)) == cap);
+    assert(race_queue_unit(SIDE, producer, type) && b[producer].queue_count == 2);
+    cancel_queue(producer);
+    assert(b[producer].queue_count == 1 && minerals == 1000 - 2 * unit_cost(type));
+    int provider = spawn_build(SIDE, faction == R_TER ? B_DEPOT : B_PYLON, 200, 96, 0);
+    assert(provider >= 0);
+    race_tick_buildings();
+    assert(b[producer].queue_progress == 1);
+    b[provider].alive = 0;
+    race_tick_buildings();
+    assert(b[producer].queue_progress == 2);
+}
+
 int main(int argc, char **argv) {
     gba_init();
     if (argc == 2 && !strcmp(argv[1], "--stock-supply")) {
@@ -203,7 +262,11 @@ int main(int argc, char **argv) {
             for (int faction = R_TER; faction <= R_PROTOSS; ++faction)
                 for (int i = 0; i < (custom ? 4 : 2); ++i)
                     stock_supply_boundary(faction, owners[i], custom);
-        puts("Stock supply: Terran, Zerg and Protoss campaign/skirmish caps, HUD and reservations pass.");
+        for (int custom = 0; custom < 2; ++custom) {
+            waiting_supply_boundary(R_TER, custom);
+            waiting_supply_boundary(R_PROTOSS, custom);
+        }
+        puts("Stock supply: hard cap, idle admission, paid waiting, cancellation and recovery pass.");
         return 0;
     }
     if (argc == 2 && !strcmp(argv[1], "--mixed-supply")) {

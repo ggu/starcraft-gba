@@ -1044,8 +1044,28 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
-    if (!sc64_supply_allows(race_supply_ledger_reserved(supply), r->supply * count,
-                            supply.provided)) { race_refusal = 2; return 0; }
+    /* A facility may take payment for a waiting job at the local limit.
+     * Immediate Zerg production still requires local supply at admission.
+     * Keep the separate global reservation ceiling for all production. */
+    int deferred = race_supply_deferred_facility(r->race);
+    int required = r->supply * count;
+    int committed = race_supply_ledger_reserved(supply);
+    if (!sc64_supply_allows(committed, required,
+                            deferred ? SC64_SUPPLY_LIMIT : supply.provided)) {
+        race_refusal = 2;
+        return 0;
+    }
+    /* An idle facility must have room to begin its first order. Other
+     * facilities' waiting orders do not consume its current supply. */
+    if (deferred && !b[producer].queue_count &&
+        !sc64_supply_allows(committed, required, supply.provided)) {
+        Sc64RaceSupplyLedger active = race_owner_supply_ledger_for_queue(owner, r->race, 0);
+        if (!sc64_supply_allows(race_supply_ledger_reserved(active), required,
+                                active.provided)) {
+            race_refusal = 2;
+            return 0;
+        }
+    }
 #ifdef SC64_EGG_RUNTIME
     if (egg_job) {
         int free_slots = 0;
@@ -1090,6 +1110,8 @@ static int race_queue_unit(int owner, int producer, int type)
 #endif
     tail = (b[producer].queue_head + b[producer].queue_count) % 5;
     b[producer].queue[tail] = type;
+    if (deferred && required && !b[producer].queue_count)
+        b[producer].queue_progress = SC64_QUEUE_ADMITTED;
     ++b[producer].queue_count;
     return 1;
 }
@@ -1665,6 +1687,8 @@ static int sc64_p3_find_production_exit(int producer, int type,
 
 static void race_tick_buildings(void)
 {
+    int available_supply[5][2];
+    unsigned known_supply = 0;
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
 #ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
@@ -1708,6 +1732,7 @@ static void race_tick_buildings(void)
             if (br && (br->race == R_ZERG || br->race == R_PROTOSS) && b[i].build_progress >= 0 && ++b[i].build_progress >= (br->build_frames * 5 + 3) / 4)
                 race_complete_building(i);
 #endif
+            if (!b[i].under_construction) known_supply = 0;
             if (!(race_mode && sc64_race_is_zerg_townhall(b[i].type) &&
                   b[i].type != B_HATCHERY)) continue;
         }
@@ -1733,10 +1758,44 @@ static void race_tick_buildings(void)
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(type);
             if (!ur) continue;
             const Sc64RaceBuildingRule *pr = sc64_race_building_rule(b[i].type);
+            int admitted = b[i].queue_progress == SC64_QUEUE_ADMITTED;
             frames = (ur->build_frames * 5 + 3) / 4;
             if (pr && ((pr->flags & SC_RACE_F_REQUIRES_POWER) ||
                 (race_mode && race_skirmish_power_required(b[i].type))) &&
-                !race_site_powered(owner, b[i].x, b[i].y)) continue;
+                !race_site_powered(owner, b[i].x, b[i].y)) {
+                if (admitted) {
+                    /* Without power the job has not begun. Release today's
+                     * admission reservation and retry from the paid queue. */
+                    b[i].queue_progress = 0;
+                    known_supply = 0;
+                }
+                continue;
+            }
+            if (admitted) b[i].queue_progress = 0;
+            else if (!b[i].queue_progress && ur->supply &&
+                race_supply_deferred_facility(ur->race)) {
+                unsigned seat = (unsigned)owner;
+                if (seat >= 5) continue;
+                unsigned race_index = ur->race == R_PROTOSS;
+                unsigned bit = 1u << (seat * 2 + race_index);
+                int *available = &available_supply[seat][race_index];
+                if (!(known_supply & bit)) {
+                    Sc64RaceSupplyLedger live =
+                        race_owner_supply_ledger_for_queue(owner, ur->race, 0);
+                    *available = sc64_supply_limit(live.provided) -
+                                 race_supply_ledger_reserved(live);
+                    known_supply |= bit;
+                }
+                int required = ur->supply * sc64_race_product_count(type);
+                if (required > *available) {
+                    if (owner == SIDE && selected_building == i &&
+                        (!toast_timer || toast_id == 4)) toast(2);
+                    continue;
+                }
+                /* Completion replaces the active order's supply with its
+                 * unit. Reserve a starting order before checking the next. */
+                *available -= required;
+            }
         }
         if (++b[i].queue_progress < frames) continue;
 #ifdef SC64_P4_RUNTIME
