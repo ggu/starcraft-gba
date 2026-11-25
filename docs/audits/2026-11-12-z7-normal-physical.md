@@ -209,3 +209,24 @@ Full actor arrays and a fresh reload of the victory are outside this run.
 | Padded-journal Z10 ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
 | Matching ELF | `da20e5abc0457b5d60b6476fbdb4d9a06bf2f9756cb271963de63c908b1f14f9` |
 | Full physical-button win receipt | `115a0db4473784c8b10927c20acd0f58dda1dae1972d365c9f04135b03f7a33f` |
+
+### November 25 vitals release replay
+
+The exact Z10 image from [#853](https://github.com/ggu/starcraft-gba/pull/853)
+replays the same tape with physical buttons from a fresh HOME. All 206
+named mission, economy and entity-count checkpoints match. It wins at
+game frame 267,585 after 270,585 guest update calls. The result screen
+reports victory, seven enemy units, zero enemy buildings and zero
+adapter faults. This run observes counts and mission fields. A full
+actor array comparison and a fresh reload of the victory remain separate.
+
+Mean loop cost is 1,312,171 guest cycles, or 12.79 emulated updates/s
+including UI and presentation waits. This rate covers the complete tape
+on the vitals build. Hardware and the [subsequent renderer build](https://github.com/ggu/starcraft-gba/pull/854)
+still need their own end-to-end observation.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Z10 ROM | `08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16` |
+| Matching ELF | `fdfcfa7a83fb7eb3e47153dcfc229d37e9cc67df184d5f78119c2a106fce0b56` |
+| Full physical-button win receipt | `441e02d324ebe378571134408e89bc7269279719614069ec361e7b918d1bd3d3` |
