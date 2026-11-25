@@ -75,13 +75,10 @@ static inline void sc64_gas_save_publish(const Geyser *rows, Geyser *out, u16 *u
         out[i].y = (int)sc64_gas_save_coordinate(rows[i].y);
     }
 }
+#define SC64_GAS_SAVE_BAD_COUNT(word) (!sc64_gas_save_count_valid(word))
 #else
-static inline int sc64_gas_save_count(int word) { return word; }
-static inline int sc64_gas_save_count_valid(int word)
-{ return word >= 0 && word <= MAX_RACE_GEYSERS; }
-static inline int sc64_gas_save_coordinate(int word)
-{
-    return word;
-}
+#define sc64_gas_save_count(word) (word)
+#define sc64_gas_save_coordinate(word) (word)
+#define SC64_GAS_SAVE_BAD_COUNT(word) ((word) < 0 || (word) > MAX_RACE_GEYSERS)
 #endif
 #endif
