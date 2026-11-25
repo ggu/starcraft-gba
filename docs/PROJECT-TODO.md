@@ -42,16 +42,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the restart shortcut at input tick 20,403. A P7 continuation stays
   active past the old tape's late input boundary with the three
   heroes alive and the enemy Nexus standing.
-  T5's ordinary air route reduces the enemy to 11 structures with
-  eight Wraiths at fresh-HOME frame 84,547. The selection release
-  also replays an ordinary retreat and Depot completion, reaching
-  60/80 supply with four Wraiths and both heroes at fresh-HOME
-  frame 88,779. Continue from the protected base. The recovered P7
-  suffix rebuilds 64 Dragoons, destroys the Nexus, and reaches
-  a fresh-load-verified victory at frame 80,828.
-  Use the retained ordinary-input tapes to qualify the rest of the
-  combined Terran, Zerg and Protoss package.
-  Continue native parity and GBA SP timing.
+  The [T5 air continuation](audits/2026-11-25-visible-drawing-and-campaigns.md#combined-supply-and-paired-outline-qualification)
+  goes from an ordinary frame-88,779 pause to a fresh-load-verified
+  victory at frame 143,281, with both heroes alive. It matches all 13
+  stage journals on the supply and paired-outline builds. Advancing to
+  T6 on the supply build also produces a byte-identical frame-101
+  pause and HOME reload. Rebuild a continuous T5 input route from the
+  opening to the late checkpoint on the combined release.
+  The recovered P7 assault on the paired-outline build wins at frame
+  80,828. Z8 also repeats the full HOME replay to frame 86,969 and Z10
+  wins from the late frame-60,123 pause. All three restore the victory
+  journal byte for byte through fresh HOME.
+  Re-qualify the remaining missions on the combined Terran, Zerg and
+  Protoss package. Continue native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
@@ -63,16 +66,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
   and movement takes 161,711 within orders. The fogged viewport
-  reduces tracer drawing to 20,305. Focus on the orders path in
-  this cut and capture a separate visible three-CPU fight before
-  choosing a tracer change.
+  reduces tracer drawing to 20,305. A separate verified visible
+  three-CPU Terran Blood Bath cut spends about 235,488 cycles per
+  update in `move_toward`, 9,885 in automatic targeting, and 12,406
+  in tracer drawing on matched frames. Prioritize movement there
+  and keep targeting as a separate priority for Outpost.
   [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
   lowers the visible P7 and Z9 frame means by about 0.9–1.0%
-  with matching pixels. Keep profiling larger draw and order
-  costs in the dense matches.
-  The [November 25 selection-ring builds](audits/2026-11-21-current-skirmish-matrix.md#november-25-selection-ring-release)
-  pass 54 physical-button Custom Game starts, pause saves, and fresh
-  continuations. Full-match and hardware measurements remain open.
+  with matching pixels. [Pairing opposite rows on the supply release](audits/2026-11-25-visible-drawing-and-campaigns.md#combined-supply-and-paired-outline-qualification)
+  saves a further 1.51–1.54% in selected-army samples. Fixed P10 and
+  panned Z10 Custom Game samples are unchanged. Keep profiling the
+  larger draw and order costs in dense matches.
+  The paired-outline race builds pass 144 physical-button Custom Game
+  starts, pause saves, and fresh continuations. The tested cases cover
+  every occupied CPU-slot pattern and repeated computer races.
+  Full-match and hardware measurements remain open.
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
