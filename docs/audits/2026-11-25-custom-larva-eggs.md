@@ -128,7 +128,8 @@ opponents' median peak army supply is 43 against 42.
 `make check-sc64-custom-full-matches` authors each lobby of `QUALIFIED`
 (`tools/sc64_custom_full_match.py`) with the HOST player and replays it on the
 cartridge with physical buttons. Base `737c0caa` qualifies 18 lobbies with
-finite gas ([gas audit](2026-11-26-n64-gas-pickup.md#custom-matches-with-finite-reserves-enabled)).
+finite gas ([gas audit](2026-11-26-n64-gas-pickup.md#custom-matches-with-finite-reserves-enabled));
+all 18 also win and replay here on the base cartridges.
 With Larva and Eggs the Zerg opponents are stronger and 9 of those 18 plans
 fail on HOST: six lose, Protoss on Outpost against three computers reaches the
 update limit, and both Zerg Outpost lobbies with two or three computers win
