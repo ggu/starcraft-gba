@@ -53,6 +53,7 @@ linked with the option enabled. P10 has the smallest remaining space below
 the existing EWRAM safety boundary, 2,672 bytes. The branch does not enable
 the probe in release builds. Run `make test-sc64-wide-point-memo` for
 the scalar direction, discovery count, buffer boundary and grid-edit checks.
-Before promotion, qualify longer ordinary-input campaign runs, sustained
-wide-map skirmishes, route scratch lifetime and the remaining memory budget.
+Before promotion, qualify longer ordinary-input wide-map campaign runs and the remaining
+memory budget. Both current Custom Game maps are 64×64, outside this
+cache. Keep their ordinary game and save paths in the product checks.
 Physical GBA pacing remains unmeasured.

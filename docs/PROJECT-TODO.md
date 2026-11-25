@@ -607,8 +607,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   update including lookup and invalidation costs.
   A [bounded cache of complete movement fields](audits/2026-11-25-wide-point-reuse.md)
   reduced Z7 guest cycles by 7.80% on that window after #885, reaching
-  8.98 emulated updates/s. Sustained wide-map skirmishes, full campaign
-  continuations and EWRAM headroom remain the promotion priorities.
+  8.98 emulated updates/s. Full wide-map campaign continuations and
+  EWRAM headroom remain the promotion priorities.
   Physical GBA timing remains open.
   [Linking the hottest ROM functions into the unused IWRAM stack
   reserve](audits/2026-11-25-iwram-hot-placement.md) saves 6.87–8.46%
