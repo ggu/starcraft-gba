@@ -17,18 +17,41 @@ def summarize(rows):
     starts, intervals = {}, []
     peak = Counter()
     frames = 0
+    previous_frame = previous_cycles = None
     for frame, cycles, workers in rows:
+        if previous_frame is not None:
+            if frame <= previous_frame or cycles <= previous_cycles:
+                raise ValueError("non-monotone frame or cycle count")
+            if frame != previous_frame + 1:
+                starts.clear()
+        previous_frame, previous_cycles = frame, cycles
+        if len({w[0] for w in workers}) != len(workers):
+            raise ValueError("duplicate worker slot")
         frames += 1
         sites = Counter()
-        for slot, _, owner, site, timer, carry in workers:
+        seen = set()
+        for slot, kind, owner, site, timer, carry in workers:
+            seen.add(slot)
             if timer > 0 and carry == 0:
                 sites[site] += 1
-            if timer == 59 and carry == 0:
-                starts[slot] = (frame, cycles, site)
-            elif timer == 0 and carry > 0 and slot in starts:
-                start, begin, initial_site = starts.pop(slot)
-                if initial_site == site:
+            identity = (kind, owner, site)
+            previous = starts.get(slot)
+            if previous is not None:
+                start, begin, prior_identity, prior_timer = previous
+                valid = (identity == prior_identity and
+                         ((carry == 0 and timer == prior_timer - 1 and timer > 0) or
+                          (carry > 0 and timer == 0 and prior_timer == 1)))
+                if valid and carry > 0:
                     intervals.append((frame - start, (cycles - begin) / 16777216))
+                    del starts[slot]
+                elif valid:
+                    starts[slot] = (start, begin, identity, timer)
+                else:
+                    del starts[slot]
+            if timer == 59 and carry == 0:
+                starts[slot] = (frame, cycles, identity, timer)
+        for slot in set(starts) - seen:
+            del starts[slot]
         for site, count in sites.items():
             peak[site] = max(peak[site], count)
     return {'frames': frames, 'intervals': len(intervals),

@@ -15,7 +15,8 @@ an observed grant does not bypass an earlier observed waiter. It accepts private
 JSONL observations as `[field, guest_tick, [[worker_id, raw_order, site_id], …]]`;
 82 is waiting and 83 is service. IDs can be opaque. It rejects a grant whose
 wait was not sampled; use the optional tick window to exclude preexisting jobs.
-Repeated samples within one guest tick remain separate fields, since updates
+The optional window scopes grants, exclusivity checks and peak waiting counts;
+observations before it establish waiting age. Repeated samples within one guest tick remain separate fields, since updates
 and VI boundaries need not coincide. Its tests exercise FIFO, cancellation by
 absence, site independence, occupancy and unresolved arrival ties. This is an
 observation checker and executable specification, not a test of current gameplay.
@@ -40,7 +41,9 @@ intervals ran from timer 59 to cargo in 59 updates. Median elapsed emulated
 GBA time was 3.068 seconds, calculated from CPU cycles at 16,777,216 Hz.
 There were simultaneously up to 2, 3 and 3 empty workers counting down at the
 three sampled sites. `tools/sc64_gas_gba_clock.py "$private_clock"` computes
-these figures from 400 captured rows. This is not a direct conversion from
+these figures from 400 captured rows, requiring increasing frames and cycles
+and an uninterrupted, one-per-frame countdown with stable worker identity,
+owner and target. This is not a direct conversion from
 N64 guest-counter increments to wall time, and neither measurement alone fixes
 the duration for an implementation.
 

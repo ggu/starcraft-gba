@@ -13,6 +13,8 @@ from pathlib import Path
 
 
 def analyze(rows, first_tick=None, last_tick=None):
+    if first_tick is not None and last_tick is not None and first_tick > last_tick:
+        raise ValueError("invalid tick window")
     waiting = {}  # (worker, site) -> first observed field
     prior_active = set()
     grants = []
@@ -29,7 +31,8 @@ def analyze(rows, first_tick=None, last_tick=None):
         sites = defaultdict(int)
         for _, site in active:
             sites[site] += 1
-        if any(n > 1 for n in sites.values()):
+        in_window = (first_tick is None or tick >= first_tick) and (last_tick is None or tick <= last_tick)
+        if in_window and any(n > 1 for n in sites.values()):
             raise ValueError(f'multiple active workers at field {field}')
         for key in current:
             waiting.setdefault(key, field)
@@ -46,9 +49,11 @@ def analyze(rows, first_tick=None, last_tick=None):
             if waiting[key] != oldest:
                 raise ValueError(f'older waiter bypassed at field {field}')
             grants.append(tick)
-        peak = max(peak, max((sum(1 for _, s in current if s == site)
-                              for site in {s for _, s in current}), default=0))
-        waiting = {k: v for k, v in waiting.items() if k in current or k in active}
+        if in_window:
+            peak = max(peak, max((sum(1 for _, s in current if s == site)
+                                  for site in {s for _, s in current}), default=0))
+        # Service ends this wait. A direct return to 82 is a new arrival.
+        waiting = {k: v for k, v in waiting.items() if k in current}
         prior_active = active
     return {'grants': grants, 'peak_waiters': peak}
 

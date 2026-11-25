@@ -28,6 +28,20 @@ class GasFifoObservation(unittest.TestCase):
                 (2, 2, [(2, 82, 0)]), (3, 3, [(2, 83, 0)])]
         self.assertEqual(analyze(rows)["grants"], [3])
 
+    def test_service_then_rejoin_is_new_arrival(self):
+        rows = [(0, 0, [(1, 82, 0)]), (1, 1, [(1, 83, 0), (2, 82, 0)]),
+                (2, 2, [(1, 82, 0), (2, 82, 0)]), (3, 3, [(1, 83, 0), (2, 82, 0)])]
+        with self.assertRaisesRegex(ValueError, "older waiter"):
+            analyze(rows)
+
+    def test_window_scopes_peak_and_occupancy(self):
+        rows = [(0, 0, [(1, 82, 0), (2, 82, 0), (3, 82, 0)]),
+                (1, 1, [(1, 82, 0)]), (2, 2, [(1, 83, 0)])]
+        result = analyze(rows, 1, 2)
+        self.assertEqual(result, {"grants": [2], "peak_waiters": 1})
+        with self.assertRaisesRegex(ValueError, "invalid tick window"):
+            analyze(rows, 2, 1)
+
     def test_unobserved_wait_is_not_counted_as_proof(self):
         with self.assertRaisesRegex(ValueError, 'without observed wait'):
             analyze([(0, 0, [(1, 83, 0)])])
