@@ -130,6 +130,12 @@ attributes most of the reduction to movement orders: their mean fell from
 1,212,133 to 1,052,743 cycles and p95 from 3,158,061 to 2,918,886.
 Drawing averaged 426,205 versus 426,193 cycles. Whole-loop p95 fell from
 3,877,437 to 3,624,023 cycles.
+An instruction-level profile of the single slowest orders tick in each
+of six equal intervals attributes 37.75% of all guest cycles on those six
+ticks to point BFS expansion (37 calls), 19.80% to facility route fill
+(5 calls), and 8.30% to point-direction packing. Facility fill had no
+calls on the six midpoint ticks; these figures characterize spikes, not
+the full-run cost mix.
 
 Both matched the recorded start and end observations. At 72 sampled cuts,
 semantic summaries, both framebuffer page hashes, palette, display-page
