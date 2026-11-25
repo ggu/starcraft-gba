@@ -2,7 +2,12 @@
 
 The opt-in build renders the same three source frames using the existing
 word-packed sprite drawing code. The Zerg cartridge already uses packed
-versions of all three. The three-AI Protoss Blood Bath profile motivated
+versions of all three. In a prepared checkout, build the normal P10 ROM with
+`make CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1 build/StarCraft-Protoss-P10-Transport1-GBA.gba`.
+The same setting applies to the normal Terran and Showcase targets. Omit the
+option to use the default bank.
+
+The three-AI Protoss Blood Bath profile motivated
 the experiment. Across 16 sampled updates on the FIFO trial, calls from
 the completed-building renderer into the byte sprite renderer averaged
 78,989 emulated cycles per sample (5.5 calls).
