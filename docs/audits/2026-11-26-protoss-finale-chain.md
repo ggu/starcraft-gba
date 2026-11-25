@@ -23,6 +23,14 @@ cartridge's settings; it did not cause the recovered win.
 | P10 input tape | `f6b955d6c51f92512a6a8efd370343d2e23c9be40799dce42b51a43c0f7393b6` |
 | P10 result | `020cde76c8fd953851c7eb1ec2282cad9d0990486079b68aebee9a82565e9e86` |
 
+The shared mission observers matched all 43 P9 checkpoint records and all
+22 P10 records (the last two P10 records sample the same victory call).
+These checks include both Cerebrates and the P9 trigger switches, the
+P10 Overmind, the mission heroes, population counts and resource banks.
+The completion mask advanced to `0x1fc0000c` on P9 and `0x3fc0000c` on P10,
+preserving the previous Protoss mission credits. Both normal HOME controller
+commands below independently regenerated the input files listed above.
+
 ## Repeat the linked check
 
 With the prepared campaign inputs, generate normal HOME tapes in a private
