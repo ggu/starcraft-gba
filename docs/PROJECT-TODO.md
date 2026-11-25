@@ -26,8 +26,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   through all 206 named checkpoints and repeats the full Z8 route and
   late Z10 suffix with identical victory journals. The [selection-ring
   release](audits/2026-11-12-z7-normal-physical.md#november-25-selection-ring-release-replay)
-  repeats all 206 Z7 checkpoints through victory. Complete the replay
-  matrix on the combined Terran, Zerg and Protoss package, and continue
+  repeats all 206 Z7 checkpoints through victory. The combined collision
+  and production build repeats the full Z8 win and confirms a byte-identical
+  victory re-export from fresh HOME. Complete the replay matrix on the
+  combined Terran, Zerg and Protoss package, and continue
   native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)

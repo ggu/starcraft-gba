@@ -1579,6 +1579,14 @@ It exports the identical victory journal. The vitals ROM SHA-256 is
 the run receipt SHA-256 is
 `5d82f90fe1721e3e908e8ce2ca888db0040cee57894deee5166017507242ed0d`.
 
+The combined collision and production build repeats all 36 checkpoints
+through victory at frame 86,969. Kerrigan has 392 HP and neither enemy
+Nexus remains. It exports the same SRAM image. A fresh process opens the
+victory through HOME and re-exports the exact image. The combined ROM
+SHA-256 is `d1ab308ffb1d4fd28a0140889e36473794d0c31043cd1240bbcf841be18184b8`.
+The input replay log has the same hash as the vitals run, and the combined
+fresh HOME receipt is `3e5f10effcbb1150ed8d69fdf60f12205fd126123d56ef8f23bf3f94ba71281a`.
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source
