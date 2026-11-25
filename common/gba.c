@@ -1125,6 +1125,69 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
         if(left)*dst=(*dst&0xff00)|color;
     }
 }
+/* Three two-pixel stores repeat a three-pixel cell without a divider test
+ * for each pixel. The phase is measured from the unclipped meter origin. */
+static inline void gfx_meter_span(volatile u16 *row, int origin, int left, int right,
+                                  u8 divider, u8 shade)
+{
+    if (left >= right) return;
+    unsigned phase = (unsigned)(left - origin) % 3u;
+    volatile u16 *dst = row + (left >> 1);
+    if (left & 1) {
+        u8 pixel = phase ? shade : divider;
+        *dst = (*dst & 255u) | ((u16)pixel << 8);
+        ++dst;
+        ++left;
+        phase = phase == 2 ? 0 : phase + 1;
+    }
+    const u16 pairs[3] = {
+        divider | ((u16)shade << 8),
+        shade | ((u16)shade << 8),
+        shade | ((u16)divider << 8),
+    };
+    u16 first = pairs[phase];
+    u16 second = pairs[phase == 0 ? 2 : phase - 1];
+    u16 third = pairs[phase == 2 ? 0 : phase + 1];
+    for (; left + 6 <= right; left += 6) {
+        dst[0] = first;
+        dst[1] = second;
+        dst[2] = third;
+        dst += 3;
+    }
+    if (left + 2 <= right) {
+        *dst++ = first;
+        left += 2;
+        first = second;
+        second = third;
+    }
+    if (left + 2 <= right) {
+        *dst++ = first;
+        left += 2;
+        first = second;
+    }
+    if (left < right) *dst = (*dst & 0xff00u) | (u8)first;
+}
+
+void gfx_meter_row(int x,int y,int width,int fill,u8 filled,u8 empty)
+{
+    if (width <= 0 || x >= 240 || x + width <= 0) return;
+#ifdef GBA_SCENE_CLIP
+    if (y < gfx_clip_top || y >= gfx_clip_bottom) return;
+#else
+    if ((unsigned)y >= 160) return;
+#endif
+    int left = x < 0 ? 0 : x;
+    int right = x + width > 240 ? 240 : x + width;
+    int middle = x + fill;
+    if (middle < left) middle = left;
+    if (middle > right) middle = right;
+    GFX_TILE_TOUCH(left, y, right, y + 1);
+    volatile u16 *row = pixels + y * 120;
+    const u8 divider = GFX_TILE_COLOR(C_BLACK);
+    gfx_meter_span(row, x, left, middle, divider, GFX_TILE_COLOR(filled));
+    gfx_meter_span(row, x, middle, right, divider, GFX_TILE_COLOR(empty));
+}
+
 void gfx_fill_rows(int y, int height, u8 color)
 {
 #if defined(GBA_HOST)

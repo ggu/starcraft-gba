@@ -1047,6 +1047,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mean loop time by 2.20%, with unchanged video-page bytes and RAM
   guard endpoints. The window remains above the two-VBlank budget.
   Continue profiling actor and effect drawing in dense battles.
+  [Vital meter rows](audits/2026-11-22-dense-release-attribution.md#drawing-filled-vital-cells-in-one-pass)
+  cut the selected-actor bar cost by 46.9% and mean Z9 loop time by
+  another 2.25%. The two changes together save 4.40% in that window.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -2047,22 +2050,25 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   checkpoint is available.
   The [regenerated Z7 winning input tape](audits/2026-11-12-z7-normal-physical.md#november-25-rendered-controller-recovery)
   wins on the padded-journal ARM build at frame 267,585 after
-  matching all 206 named checks from empty HOME. This brings recent
-  normal build coverage to 28 of 30. Verify the latest combined package
-  and the two remaining Z8 and Z10 routes.
+  matching all 206 named checks from empty HOME. With the verified Z10
+  result below, recent normal build coverage is 29 of 30. Verify the
+  remaining Z8 route and qualify the latest combined package.
   The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
   preserve the economy at frame 87,554 and hold the Pool with four
   Hydralisks through frame 89,195. Protect the forward detector before
   pushing the Nexus. The [staged eastern attack](audits/2026-11-12-z8-normal-physical.md#stage-the-eastern-formation-together)
   destroys a Pylon and lowers the Nexus to 170 shields before losing
-  the assault force. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
+  the assault force. On HOST, [moving the southern guard forward at frame 32,000](audits/2026-11-12-z8-normal-physical.md#rendered-controller-interception-before-the-southern-escape)
+  stops the earlier escape. Keeping Kerrigan at her retreat destination
+  lets the controller destroy both Nexuses and win on HOST at frame
+  86,969. Qualify that same route on ARM. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
   verifies three Hydralisks and a new mining Drone at frame 35,958.
   Establish the defense earlier from frame 34,723 to survive the raid.
-  The [new Z10 controller replay](audits/2026-11-21-z10-current-full-circle.md#november-25-controller-replay-on-the-padded-journal-build)
-  wins on HOST. Rendering every HOST input produces a new winning
-  tape and takes the padded ARM build past the first mismatch. The
-  rendered route now first differs at call 63,553 and ARM frame
-  61,207. Diagnose that late interval before qualifying the victory.
+  The [Z10 dialogue-aware replay](audits/2026-11-21-z10-current-full-circle.md#victory-after-acknowledging-the-late-dialogue)
+  advances the dialogue that froze the mission at frame 60,149, delivers
+  the crystal and wins on the padded ARM build at frame 63,523.
+  The crystal checkpoint and victory journal both fresh-load and
+  re-export byte for byte.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second

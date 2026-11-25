@@ -11148,10 +11148,10 @@ vital_fill(int value,int maximum,int width)
 static void
 vital_strip(int left,int top,int width,int fill,u8 light,u8 dark)
 {
-    vital_rect(left,top,fill,1,light);
-    vital_rect(left,top+1,fill,1,dark);
-    vital_rect(left+fill,top,width-fill,1,C_STONE);
-    vital_rect(left+fill,top+1,width-fill,1,C_UI);
+    if (top >= 12 && top < 120)
+        gfx_meter_row(left, top, width, fill, light, C_STONE);
+    if (top + 1 >= 12 && top + 1 < 120)
+        gfx_meter_row(left, top + 1, width, fill, dark, C_UI);
 }
 
 static void __attribute__((noinline))
@@ -11174,10 +11174,6 @@ draw_actor_vitals(int x,int top,int width,int hp,int maxhp,
         vital_rect(left,bottom+1,width,4,C_BLACK);
         vital_strip(left,bottom+2,width,vital_fill(energy,maxenergy,width),
                     C_PURPLE,C_ZERG);
-    }
-    for (int dx=0;dx<width;dx+=3) {
-        vital_rect(left+dx,top+1,1,bottom-top-2,C_BLACK);
-        if (maxenergy>0) vital_rect(left+dx,bottom+2,1,2,C_BLACK);
     }
 }
 

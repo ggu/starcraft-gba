@@ -101,6 +101,8 @@ void gfx_pixel(int x,int y,u8 color);
 void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif
 void gfx_rect(int x,int y,int w,int h,u8 color);
+/* Opaque meter row with a black divider at the first pixel of each cell. */
+void gfx_meter_row(int x,int y,int width,int fill,u8 filled,u8 empty);
 void gfx_fill_rows(int y, int height, u8 color);
 #if defined(GBA_SHAPES_ROM_ARM) && !defined(GBA_HOST)
 #define GBA_SHAPE_ENTRY __attribute__((long_call,target("arm")))

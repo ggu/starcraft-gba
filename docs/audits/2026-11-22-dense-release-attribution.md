@@ -466,6 +466,44 @@ link with identical EWRAM and IWRAM endpoints.
 | Seven paired campaign and Custom Game windows | `1243a7791393637a81a6befc3f3f4ea61b6b974af053d76d31f0b66e16983378` |
 | Five Showcase readbacks | `71e5a1d38203f9576193473fc348785b59c032af855761c3463cd6b9aa5e9b3b` |
 
+## Drawing filled vital cells in one pass
+
+On the same eight Z9 frames, the post-ring build spends 79,190 mean
+cycles in selected-actor vitals, with 14 calls per frame. The shared
+renderer writes each filled or empty strip row with its dividers already
+in place. The black frame and the gap above an energy bar keep their
+original extent. The strip clips from the original cell origin so
+screen-edge clipping preserves divider alignment and both color shades.
+
+Mean inclusive vitals time falls to 42,060 cycles per frame, a 46.9%
+reduction, and mean `game_render` time falls from 695,296 to 658,159
+cycles. Each sampled update improves by 30,966–43,238 guest cycles.
+The selected world summaries and both framebuffer pages agree.
+
+In the longer 160-update Z9 window, mean loop time falls from 1,682,476
+to 1,644,635 cycles and p95 falls from 1,833,454 to 1,797,304. This is
+a further 2.25% improvement in mean time and 4.40% in total since
+before the selection-ring change. All 160 updates remain over the
+two-VBlank budget. The six Custom Game controls are cycle-identical.
+Across all seven windows the observed worlds, palette, framebuffer
+pages, presentation state, pause SRAM and fresh continuations agree.
+
+Mean loop time improves 0.87–1.84% across five Showcase scenes. Both
+framebuffer pages agree across all 600 pairs. The displayed page
+differs once and agrees on the following update. All four regular ARM
+links retain their IWRAM and EWRAM endpoints.
+
+The existing whole-frame vital-bar oracle passes all 6,240 cases. A
+separate 4,200-case tile-backend oracle compares black palette aliasing,
+pixels, clipping and dirty masks against the rectangle path. The P10
+and Z10 prepared HOST shield fixtures also pass.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Matched meter-row profiler | `353cf8d8a7e5ac925396df8b86ed031249019beba6f0b77ae4b0fd7c59a46bd2` |
+| Seven paired campaign and Custom Game windows | `903f1328730359b58683f5c4e4091ab4648f4cb0d5c0d259f9540c18e6cb8a23` |
+| Five Showcase scene pairs | `287563ac1df684fdf02212af5a1d7ff0409b6f09fabb3497317c7ed6aa68c5f5` |
+
 ## Generated bounds for offscreen animation checks
 
 The regular asset preparation commands now emit anchor radii alongside

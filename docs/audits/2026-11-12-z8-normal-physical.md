@@ -1518,6 +1518,36 @@ the stronger objective damage recorded in this audit.
 | Evacuation journal and input receipt | `2c3fe6c0911644bfdd4b91ce6ccb6ff428e4abae361f491fd2b2bdad7357b1f9` / `b0e4565f8d0d3ddd17b5ffdbe1b3d4129613cb8e0e3cba93c3998d64e748f75c` |
 | HOME load and three-Hydralisk attack | `89a4122ec6107d774a59811b8fa0e1f51468e5da23748a77e037c8a769598b9f` |
 
+### Rendered controller interception before the southern escape
+
+On HOST with rendering after every normal input, the southern Dark
+Templar enters the defeat region with 8 HP at frame 34,840. Both Nexuses
+are intact and Kerrigan is at full health. The game observes the escape
+and reaches defeat without an adapter fault.
+
+A separate controller input tape moves the southern guard and Overlord
+forward at frame 32,000. The Dark Templar falls by frame 34,680 and the
+mission continues past the escape. This route destroys one Nexus.
+Kerrigan eventually dies at frame 79,934 with the second Nexus intact.
+Moving the guard forward at the very start loses to an earlier escape.
+The delayed interception is the verified HOST branch to retain while
+working on Kerrigan's survival and the second assault. Neither HOST tape
+establishes a new ARM victory.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Rendered HOST defeat trace | `8a9d63ff9cb7da5577d9a627ca4a8b783eb6b4068bc054e1808591ca54f6dc64` |
+| Escape and outcome diagnosis | `6118c47b40338e2dfc1b664b884be2d9e899098c53468c68cc0fc6106fb0dedf` |
+| Delayed-guard input tape | `32e57b5b5816f62b4a007075f9e9f12c185aef9ed54de305b18c25074a280bea` |
+
+In the next HOST run, Kerrigan withdraws before the Dragoons arrive and
+the controller keeps her at the safer destination instead of returning
+her to the front line. The southern interception still succeeds. The
+controller destroys both Nexuses and reaches victory at frame 86,969
+after 87,997 input calls, with Kerrigan at 392 HP and zero faults. This
+tape has SHA-256 `2a96ab60f75bc24365942051508ccc5039143453a839ec7654e7482dcb389330`.
+The ordinary ARM playback still needs to complete its victory check.
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

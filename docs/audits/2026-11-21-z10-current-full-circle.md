@@ -53,6 +53,33 @@ controller and modal or pause inputs before that checkpoint.
 | Rendered HOST winning tape | `7ed5ef9774299acc9efb4b01986938fe1af30db3088094fc389b595b516fd7b0` |
 | Rendered tape ARM checkpoints and late mismatch | `66fd8fa1f49792a7afe339d4bc159403547353f0557fdcd15425e470afb18099` |
 
+### Victory after acknowledging the late dialogue
+
+An ordinary physical-button replay from empty HOME matches the rendered
+tape at call 62,029, game frame 60,122, and exports a pause save. A fresh
+HOME re-export is byte-identical. After 26 advancing updates from the
+loaded checkpoint, a two-page box freezes gameplay at frame 60,149.
+Two ordinary A press-and-release pairs clear it while the mission frame
+stays fixed. This accounts for the first 183-frame divergence in the
+unmodified physical input tape.
+
+The continuation acknowledges each later queued box with ordinary A
+inputs and tracks the tape by logical gameplay frames. A second pause
+save at frame 60,567 fresh-loads with the crystal present and re-exports
+byte-identically. The route brings the crystal to (712, 490) and reaches
+the result screen at frame 63,523, with `won=1`, `lost=0`, and zero scheduler
+faults. An independent repeat of the suffix exports the same victory SRAM.
+Another fresh HOME loads that result with mission 21's completion bit set
+and re-exports the victory journal byte for byte.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Padded-journal ARM ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
+| Frame 60,122 pause journal | `56cbbc8f6c6c5f63eacc6e8d8b6ffa088dc05ca912a7ac1d64fb574bcdefa52f` |
+| Crystal checkpoint journal | `5b70bf7eddcbd74d20aef91c190fff9a320f010806bc3b80fc199dffc870a924` |
+| Ordinary-button suffix receipt | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
+| Victory journal and fresh HOME re-export | `eb5b2035d88174f17aa617f59f3bb3290b3deed72ecbdf00559cff6638414a37` |
+
 ## All three current finales
 
 Ordinary controller tapes also completed the finales on the exact T10 and
