@@ -44,6 +44,9 @@ race_nuke_apply_blast(int x, int y, int owner, int missile_slot)
 #else
         hp_loss = sc64_siege_resolve(target, packet, &shield_loss);
         *shield -= shield_loss;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+        SC64_SHIELD_DEBIT(target, shield_loss, *shield);
+#endif
         if (hp_loss)
             hit_target_impl_ex(target, hp_loss, -1, owner, SC64_STOCK_DMG_EXPLOSIVE,
                 SC64_HIT_PRECOMPUTED_HP | SC64_HIT_ALLOW_SPLASH_BURROW |
