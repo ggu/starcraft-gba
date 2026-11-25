@@ -46,7 +46,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   occupying each gas site at a time. The packaged GBA Blood Bath game showed
   up to three workers counting down concurrently at one building. Qualify
   single occupancy, wait order, cancellation, destruction, saved trips and
-  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building).
+  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
