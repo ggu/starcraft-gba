@@ -39,26 +39,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory journal (`6122561e55f2ab688b55a6217f09b22188b53fe826113860bdfff04bd90992eb`).
   Advancing to Z2, saving and reloading preserves the Z1 bit at frame 101.
 
-  Starting at a genuine Z4 victory on the
-  packaged Zerg ROM, A enters Z5. The 14 recorded input segments clear
-  Z5 at frame 18,974 and fresh HOME restores the result. All 14 release
-  saves match the historical stage bytes, including the victory SRAM
-  `9ec9117fab1dd841230701bbfb9dbb7441069dc8881cadc6695592a350ea9b45`.
-  The separate HOME recording remains active at its end and after 3,000
-  additional neutral inputs.
+  Continuing that Z1 save, Z2 delivers the Chrysalis at frame 10,209.
+  Z3 uses 32 controller segments and wins at frame 68,639 with the
+  first three completion bits (16,387). The Z3 victory journal SHA-256
+  is `277b5e01e2e8293b7c5c719d7ea84e24f9f71a508c8bdd13b3cfbd985ab8534d`.
+  From this result, Z4 rebuilds the Spawning Pool, upgrades to Lair,
+  produces 20 Mutalisks and destroys the final Command Center at frame
+  64,147. Z5 follows on the same save and wins at frame 18,974 with
+  all five completion bits (114,691). Each chapter victory re-exports
+  byte for byte after loading it in a fresh emulator.
 
-  Z4 also wins from HOME on this package. At the old tape endpoint, the
-  player rebuilds a Spawning Pool, upgrades the Hatchery to a Lair, builds
-  a Spire and produces 20 Mutalisks to destroy the remaining Command
-  Center. Fresh HOME restores victory at frame 64,147. Starting the same
-  Z5 input chain from this new Z4 result wins at frame 18,974 with both
-  completion bits set (98,304). Fresh readback SHA-256:
-  `bd4510087ba2ad7b109ed11194fe93faf602d08a1b17b48dc81d8f0e2aa7aba3`.
-  From this Z5 save, 52 controller segments complete Z6 at frame 177,044.
-  Each segment loads the preceding save from this run. Fresh HOME restores
-  all three completion bits (229,376) and re-exports the same victory SRAM
-  (`58fe25565dfcda760b1d8af07c8d938f77354b22abd8e2bf0874ac3b6702b0e6`).
-  Advancing into Z7 and reloading at frame 101 preserves all three bits.
+  The earlier Z4–Z6 run independently reaches Z6 victory at frame
+  177,044 and reloads Z7 at frame 101 with those three completion bits.
+  The separate Z5 HOME recording remains active after 3,000 additional
+  neutral inputs beyond the end of its tape.
 
   Independently, Z7 wins from HOME on this ROM at frame 267,585 with all
   206 checkpoints matching. The fresh-loaded victory advances to Z8.
