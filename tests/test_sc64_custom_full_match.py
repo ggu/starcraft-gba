@@ -197,6 +197,24 @@ class Continuation(unittest.TestCase):
 
 
 class Observation(unittest.TestCase):
+    def test_bitmap_counts_displayed_colors_on_the_selected_page(self):
+        palette = bytearray(512)
+        memory = {0x04000000: b"\x04\x04", 0x05000000: palette,
+                  0x06000000: bytes(240 * 160), 0x0600A000: bytes([1]) * (240 * 160)}
+        game = SimpleNamespace(rsp=SimpleNamespace(read=lambda address, size: bytes(memory[address][:size])))
+        black = match.displayed_bitmap(game)
+        # Page two uses index one. Both indices initially resolve to black.
+        memory[0x04000000] = b"\x14\x04"
+        palette[4] = 31
+        palette[3] = 128
+        self.assertEqual(black, match.displayed_bitmap(game))
+        palette[2] = 31
+        self.assertNotEqual(black, match.displayed_bitmap(game))
+        for control in (b"\x84\x04", b"\x04\x00"):
+            memory[0x04000000] = control
+            with self.assertRaises(match.MatchError):
+                match.displayed_bitmap(game)
+
     def test_world_hash_matches_the_author(self):
         # FNV-1a over 32-bit words, as world_hash() in tests/sc64_custom_full_match.c.
         state = {"units": [(3, 0, 1, 100, -2, 40, 9, 9)], "buildings": [(0, 4, 2, 64, 72, 500, 1)],

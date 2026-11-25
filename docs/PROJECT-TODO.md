@@ -19,6 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Busy three-opponent performance.** The release's six recorded battle
+  windows measured 11.29–16.73 loop updates/s. The original controls and
+  camera are reproducible from the match traces. Prioritize ground orders
+  and depth-sorted actor drawing in the slow Zerg windows, then measure the
+  other races on both maps. Compare total guest cycles, actual bitmap
+  changes, save continuation and on-device pacing. See the
+  [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
+
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
   regenerated from `d39bd015` use 56 source patches (styles 176/177/178:
