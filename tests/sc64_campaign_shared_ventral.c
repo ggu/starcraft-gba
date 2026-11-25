@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 #ifndef SC64_SHARED_TRANSPORT
 #error "campaign Ventral Sacs test requires shared transport"
 #endif
@@ -91,6 +92,31 @@ int main(void)
     assert(race_save_game() && race_load_game());
     assert(race_skirmish_transport_tech.owner[0].researched);
     assert(u[passenger].order == ORDER_TRANSPORTED && u[passenger].target == overlord);
+    /* Validators must use detached candidate research, not the live state.
+     * A loaded Overlord cannot borrow live research or accept malformed jobs. */
+    assert(race_sk_transport_candidate_valid(&race_data));
+    assert(race_skirmish_saved_transport(&race_data, &u[overlord]));
+    Sc64SkTransportTech valid_candidate = race_skirmish_transport_candidate;
+    race_skirmish_transport_candidate.owner[0].researched = 0;
+    assert(!race_skirmish_saved_transport(&race_data, &u[overlord]));
+    race_skirmish_transport_candidate = valid_candidate;
+    race_skirmish_transport_candidate.owner[0].researched = 2;
+    assert(!race_sk_transport_candidate_valid(&race_data));
+    race_skirmish_transport_candidate = valid_candidate;
+    race_skirmish_transport_candidate.owner[1].researched = 1;
+    assert(!race_sk_transport_candidate_valid(&race_data));
+    race_skirmish_transport_candidate = valid_candidate;
+    int invalid_producer = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].type != B_LAIR && b[i].type != B_HIVE) {
+            invalid_producer = i; break;
+        }
+    assert(invalid_producer >= 0);
+    race_skirmish_transport_candidate.owner[0].researched = 0;
+    race_skirmish_transport_candidate.owner[0].remaining = 1;
+    race_skirmish_transport_candidate.owner[0].producer_plus_one = invalid_producer + 1;
+    assert(!race_sk_transport_candidate_valid(&race_data));
+    race_skirmish_transport_candidate = valid_candidate;
     /* Older Z4-created actors can carry the unassigned source-owner marker. */
     if (TEST_CAMPAIGN_MISSION == 15) {
         u[overlord].raw_owner = -1;
@@ -99,6 +125,19 @@ int main(void)
         assert(u[overlord].raw_owner == -1 &&
                u[passenger].order == ORDER_TRANSPORTED && u[passenger].target == overlord);
     }
+    /* Reject a checksum-valid candidate whose loaded Overlord has no
+     * candidate research. The live game must remain unchanged. */
+    static RaceSave loaded_candidate;
+    fixture_capture_save(&loaded_candidate);
+    assert(race_skirmish_transport_save_valid(&race_data, race_cols, race_rows));
+    Unit passenger_before = u[passenger], carrier_before = u[overlord];
+    Sc64SkTransportTech live_tech_before = race_skirmish_transport_tech;
+    race_skirmish_transport_candidate.owner[0].researched = 0;
+    write_candidate_record(&loaded_candidate);
+    assert(!race_load_game());
+    assert(!memcmp(&u[passenger], &passenger_before, sizeof(Unit)) &&
+           !memcmp(&u[overlord], &carrier_before, sizeof(Unit)) &&
+           !memcmp(&race_skirmish_transport_tech, &live_tech_before, sizeof(live_tech_before)));
     puts("campaign Ventral Sacs research/boarding/save: ok");
     return 0;
 }
