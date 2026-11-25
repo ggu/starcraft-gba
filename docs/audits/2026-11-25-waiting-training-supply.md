@@ -98,8 +98,113 @@ display selection and fresh save continuation match.
 ## Native Protoss follow-up
 
 An ordinary N64 Challenger Custom Game starts Protoss at 4/9 supply.
-The Nexus accepts successive Probe orders and reaches 7/9 with one
-Probe active and one waiting. The Custom Game Load/Save screen
-shows Save This Game disabled. Renderer capture fails before the
-9/9 transition. Verify Protoss cap admission and recovery from a
-native campaign checkpoint or a working continuous capture.
+The initial observer ends with a generic snapshot failure. The interactive
+observer's error also covered its bounded input log. Raising that limit
+in the isolated v148 build permits the paired runs to finish at step
+13,370, with nine frame captures and GPU ready in both runs.
+
+One schedule reaches 9/9 with an active production panel, a blank
+progress bar, and empty visible waiting positions. An A pulse at
+step 13,000 places a Probe in queue position 2 by step 13,020. A
+second A pulse fills queue position 3 by step 13,170. Supply stays
+at 9/9 and the progress bar stays blank. The mineral counter
+animates between captures. In the matched comparison, the idle and
+blocked banks are 267 and 217 at step 13,000, 276 and 176 at step
+13,130, and 312 and 162 at step 13,370. The difference grows by 50
+for each of the two late waiting orders.
+
+Omit the earlier Probe pulse at step 11,530 to leave the Nexus idle
+at 9/9. The same two late A pulses now display `NOT ENOUGH PSI`
+without opening the production panel or filling a queue position.
+The visible minerals rise from 267 at step 13,000 to 272 at step
+13,040 and 288 at step 13,170. Native Pylon completion and resumption
+remain open. The native Custom Game save command is disabled.
+
+The packaged GBA Protoss ROM repeats the idle and blocked cases
+through its ordinary controls. An idle 9/9 Nexus denies the first
+order and keeps its 1,416 minerals. With a blocked order at the
+head, the Nexus takes 50 minerals and adds a second waiting Probe.
+Both paid orders retain zero progress after fresh HOME and an
+identical pause journal re-export. A Probe places a Pylon at
+(216, 168). Supply stays at 9/9 during warp-in, becomes 9/17 at
+frame 3,697 and starts the first Probe on the following update.
+That Probe completes at frame 4,072. The internal supply fields
+store twice the displayed units.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native interactive observer executable | `abcc1ac5876de2310391dbef90aae9b3f5cded7554c1028ecdd6986d506d7697` |
+| Blocked-head route command log | `0e4b7ac02ea243c6c389d830177eea27bae89fa9099e5d8d36a3959d52738bd9` |
+| Blocked-head route second waiting icon | `4ed07b08daa85d60ae29f69c67bc815f2fe66888246727cea40ee1db13d21f43` |
+| Idle route command log | `a396a01eaa7b8eec6fc8970edb91687f101a1858e02797b5e9fe4b75378cb3f8` |
+| Idle Nexus warning after first attempted order | `8a6731ebd878d5068df06186dd420c3de6442546599e7ba7652a2a219bd4170f` |
+| GBA idle, waiting, and fresh-load receipt | `adf2b815ebcc0722aa87288c6741fd422b2c3a4329d9ee12feeab334b2f4b9c9` |
+| GBA Pylon construction and Probe resumption | `573ecd0fc0fdf6680c681fc42c65ea1e807a3bac12a44fc369ba8a377d9741d5` |
+
+### Close the native Nexus command card at the supply limit
+
+A paired native Challenger run starts from the same queued Nexus at
+9/9. The interactive observer exposes B as mask 512, using the mapping
+already shared with the actor observer. One run holds B for ten steps
+after step 13,370, then releases it. The control uses neutral input
+throughout that interval. Both observers reach step 13,470 with GPU
+ready and four captured frames. The pre-press images match byte for
+byte. Five B polls are pressed in the intervention, zero in the control.
+
+In the final control image the command card is open with Probe selected.
+In the B image it has closed and the field BUILD hint is visible. The
+selected Nexus, two waiting Probe icons, 162 minerals and 9/9 supply
+remain visible in both. Use an explicit cancel command for a future
+native refund comparison. The final raw image hashes are
+`75063a640617bb1d63068dd772b58a7f5bed9766eeedf79dc7043d6110384b2e`
+(control) and `ee672ffc29051f9c421b5fe0f26bc97f4a8ff7bcb58fc95b2fd96b8620f70661`
+(B).
+
+### Select a Probe while the Nexus is waiting
+
+On native Challenger, close the Nexus card and move the field cursor upward
+with three five-step analog pulses (Y = −24,000), releasing for five steps
+between pulses. Select the worker with A. The final image identifies the
+Probe, shows 20 shields and 20 HP, and displays the Build, BuildAdv and Move
+field commands. Supply is still 9/9. This gives the next test a verified
+starting point for opening the build menu with C-left. Two later observer
+runs stopped before that input, leaving placement and queue recovery open.
+
+The observer SHA-256 was
+`2b9ebe9365e0a7a57f6d0899520a694d37084b368e2f89876f0364363aeb8dd9`.
+The input tape hashes to
+`14316a2354fa09ffffac562d64c16cc4f03b4bcbe9dcd2797228c97ff7feac48`
+and the decoded image to
+`e41bfba1f8b2ffb3faf97714d8445500e41d09840ce4e9b81c1515a4a8dc75ad`.
+
+### Restore native supply with a Pylon
+
+On Challenger, the selected Probe opens the basic building card with C-left.
+The highlighted Pylon costs 100 minerals. A opens a green placement preview.
+In one run, two short rightward analog pulses move the preview over the geyser.
+It turns red and A produces the “You can't build there” message. Supply stays
+at 9/9. In a second run A confirms the original green preview. The Probe's
+field commands reappear, then a blue warp-in appears at the placement site.
+
+| Native observer step | What the HUD and field show |
+| --- | --- |
+| 13,590 | Green Pylon preview with the Probe selected |
+| 13,630 | Warp-in begins, supply 9/9 |
+| 14,330 | Bright blue warp-in, supply 9/9 |
+| 15,330 | Pylon body visible, supply 9/9 |
+| 16,330 | Supply 10/17 |
+| 17,330 | Supply 11/17 |
+
+The input log records neutral input after the placement confirmation. Together
+with the initial two paid Probe icons, the two increases in used supply show
+that waiting production resumes without reissuing the orders. The ROM comparison
+above verifies that behavior on the GBA. Observer steps bound the changes
+between captured frames and do not measure their precise simulation ticks.
+
+The accepted-route tape SHA-256 is
+`2a60ec3eb71673f84188060232ee2a8ec787d1eca0ef6ccaf28d85ce63a1ada4`.
+The observer uses the same guest and controller mapping with larger bounded
+capture and wall-time budgets. Its SHA-256 is
+`fb09bc1844f954318a9a2143049471beca4e224c274c4136c97696fb7f3f03ff`.
+The 11/17 raw frame hashes to
+`6d036e1443b038d72f4a4c513e4eae45b4c644dd1fd9b319bb8916a725dba4ad`.

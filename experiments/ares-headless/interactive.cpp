@@ -28,7 +28,7 @@ namespace ares::Nintendo64 {
 
 struct Probe final : ares::Platform {
   std::shared_ptr<mia::Pak> systemPak, gamePak;
-  ares::Node::Input::Button a, start, down, cLeft, cRight, cUp, cDown, right, r;
+  ares::Node::Input::Button a, b, start, down, cLeft, cRight, cUp, cDown, right, r;
   ares::Node::Input::Axis xAxis, yAxis;
   std::atomic<int> axisX{0}, axisY{0};
   std::atomic<unsigned> mask{0};
@@ -71,13 +71,13 @@ struct Probe final : ares::Platform {
       if(button==start) { ++startPolls; if(m&2) ++startPressedPolls; }
       unsigned id=button==a?1u:button==start?2u:button==down?4u:
           button==cLeft?32u:button==right?64u:button==r?128u:
-          button==cRight?256u:button==cUp?512u:button==cDown?1024u:0u;
+          button==cRight?256u:button==cUp?512u:button==cDown?1024u:button==b?2048u:0u;
       bool pressed=sc64_button_pressed(id,m);
-      if(id) { std::lock_guard lock(mutex); if(inputEvents.size()>=131072) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),id,pressed?1:0}); }
+      if(id) { std::lock_guard lock(mutex); if(inputEvents.size()>=262144) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),id,pressed?1:0}); }
       button->setValue(pressed);
     } else if(auto axis=node->cast<ares::Node::Input::Axis>()) {
       int value=axis==xAxis?axisX.load():(axis==yAxis?axisY.load():0);
-      if(axis==xAxis || axis==yAxis) { std::lock_guard lock(mutex); if(inputEvents.size()>=131072) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),axis==xAxis?8u:16u,value}); }
+      if(axis==xAxis || axis==yAxis) { std::lock_guard lock(mutex); if(inputEvents.size()>=262144) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),axis==xAxis?8u:16u,value}); }
       axis->setValue(value);
     }
   }
@@ -151,6 +151,7 @@ int main(int argc,char** argv) {
   auto pad=port->allocate("Gamepad"); if(!pad) return 4; port->connect();
   for(auto button:pad->find<ares::Node::Input::Button>()) {
     if(button->name()=="A") p.a=button;
+    if(button->name()=="B") p.b=button;
     if(button->name()=="Start") p.start=button;
     if(button->name()=="Down") p.down=button;
     if(button->name()=="C-Left") p.cLeft=button;
@@ -164,7 +165,7 @@ int main(int argc,char** argv) {
     if(axis->name()=="X-Axis") p.xAxis=axis;
     if(axis->name()=="Y-Axis") p.yAxis=axis;
   }
-  if(!p.a || !p.start || !p.down || !p.cLeft || !p.cRight || !p.cUp || !p.cDown || !p.right || !p.r || !p.xAxis || !p.yAxis) return 4;
+  if(!p.a || !p.b || !p.start || !p.down || !p.cLeft || !p.cRight || !p.cUp || !p.cDown || !p.right || !p.r || !p.xAxis || !p.yAxis) return 4;
   root->power();
   std::ofstream meta(out/"frames.csv",std::ios::binary), steps(out/"steps.csv",std::ios::binary);
   if(!meta || !steps) return 5;
@@ -187,14 +188,14 @@ int main(int argc,char** argv) {
     }
     if(line.empty() || line.size()>=128 || std::chrono::steady_clock::now()>=commandDeadline || totalIdle>=60000) break;
     std::istringstream in(line); int count,mask,x,y,capture; std::string extra;
-    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || mask<0 || (mask & ~511) || x < -32767 || x>32767 || y < -32767 || y>32767 || capture<0 || capture>1) { std::cerr<<"invalid command\n"; return 7; }
+    if(!(in>>count>>mask>>x>>y>>capture) || (in>>extra) || count<1 || count>1000 || completed+count>frames || mask<0 || (mask & ~1023) || x < -32767 || x>32767 || y < -32767 || y>32767 || capture<0 || capture>1) { std::cerr<<"invalid command\n"; return 7; }
     commands<<completed<<','<<count<<','<<mask<<','<<x<<','<<y<<','<<capture<<'\n'; commands.flush();
     unsigned previous; {std::lock_guard lock(p.mutex); previous=p.frames.size();}
     for(int i=0;i<count;++i) { p.mask=mask; p.axisX=x; p.axisY=y; p.step=completed; if(capture && i==count-1) p.forceCapture=true; root->run(); ++completed; }
     if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);
     p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.frames.size()>previous;});
-    if(p.failed || p.frames.size()>previous+1) { std::cerr<<"snapshot failure\n"; return 6; }
+    if(p.failed || p.frames.size()>previous+1) { std::cerr<<"snapshot failure: "<<p.failure<<"\n"; return 6; }
     if(p.frames.size()==previous) { p.forceCapture=false; std::cout<<"NOFRAME "<<completed<<std::endl; continue; }
     auto &f=p.frames.back(); auto bytes=f.pixels.size()*sizeof(std::uint32_t);
     char name[32]; std::snprintf(name,sizeof(name),"live-%03zu.argb",p.frames.size()-1);
