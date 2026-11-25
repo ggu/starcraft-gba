@@ -43,8 +43,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   active past the old tape's late input boundary with the three
   heroes alive and the enemy Nexus standing.
   T5's ordinary air route reduces the enemy to 11 structures with
-  eight Wraiths at fresh-HOME frame 84,547. Continue from this
-  checkpoint and retain both heroes. The recovered P7
+  eight Wraiths at fresh-HOME frame 84,547. The selection release
+  also replays an ordinary retreat and Depot completion, reaching
+  60/80 supply with four Wraiths and both heroes at fresh-HOME
+  frame 88,779. Continue from the protected base. The recovered P7
   suffix rebuilds 64 Dragoons, destroys the Nexus, and reaches
   a fresh-load-verified victory at frame 80,828.
   Use the retained ordinary-input tapes to qualify the rest of the
@@ -2232,7 +2234,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms both games reject an order under 50 minerals with a
   free slot and remaining supply.
   The [paired local-cap replay](audits/2026-11-25-waiting-training-supply.md)
-  verifies idle refusal, paid waiting and Depot recovery on N64. The GBA candidate
+  verifies idle refusal, paid waiting and Depot recovery on N64. The GBA build
   accepts a waiting order, stalls its head at 18/18, reloads that
   state and resumes from a completed Depot. Expand the native
   checks to Protoss, multi-facility start priority and the global 200

@@ -75,3 +75,22 @@ assault repeats its victory at frame 80,828 and fresh result load.
 | Wasteland | `21e6e26c309bcde56f99d9cd78378b35f71f3b9ee99644b255b7eda8e563a30c` |
 | Zerg 2 | `1de85ded0493783be910cb36dc31fc71e831ffdc975da4d207bef0701429bd29` |
 | Protoss 7 assault | `600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf` |
+
+## Final combined build
+
+The supply implementation combined with the selection rendering
+release passes the source boundary, toolchain doctor, default
+ARM build, and complete asset-free suite. The Python batch runs
+1,183 cases with 35 skips. All four production ROMs link within
+the same memory guards. The four 96-update P10 and Z10 busy
+comparisons add 0.008–0.039% to mean cycles versus the selection
+release. Every paired world, both framebuffer pages, palette,
+display selection and fresh save continuation match.
+
+| Combined-build check | Receipt SHA-256 |
+| --- | --- |
+| 54 ordinary Custom Game openings and fresh loads | `ba93e9c141ffe48c78d04f98b7cf553e898a66a26ba1211c1a0d8451303450a2` |
+| Ordinary paid waiting and fresh blocked head | `3d7460bc56fd7cd577d93fc4bfdd4ca58c93a2f7f833a56fb5e515479748a754` |
+| Wasteland through victory | `c5800bfd69336926e6a540665fc8d4fb564a4419d35214a3e8845a2f21aaef29` |
+| Zerg 2 through fresh HOME result | `4aac302030605d3d7de2d47d6d4f34aa3aef3f19ea792c7f83b2e9887e311a9e` |
+| P7 repeated assault, victory and fresh HOME result | `600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf` |
