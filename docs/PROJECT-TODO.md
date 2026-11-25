@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-24. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-25. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -114,9 +114,45 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   both maps. Orders consume 45–56% of total cycles. Profile movement
   and depot/route work across the three cartridges first. The eight
   instruction-attributed updates per case put 51–129k cycles in
-  uncached contact masks. Terran Blood Bath also spends about 81k
-  direct cycles in the monotone route probe. Pair those workloads
-  separately and keep both maps in the actor and effect draw tests.
+  uncached contact masks. [Reusing the query origin and dimensions](https://github.com/ggu/starcraft-gba/pull/828)
+  matches 450 observed masks and saves 5.96–6.06% in the paired
+  IWRAM kernel fixture. The [full-frame pairs](audits/2026-11-24-kodak-package-checks.md#reusing-contact-scan-coordinates-in-complete-frames)
+  are flat on canonical P10 and within 0.02% on the unpacked
+  Terran and Showcase variants. Prioritize larger measured
+  reductions. Terran Blood
+  Bath also spends about 81k direct cycles in the monotone route
+  probe. Pair those workloads separately and keep both maps in
+  the actor and effect draw tests.
+  The [Terran witness-table pairs](audits/2026-11-24-kodak-package-checks.md#monotone-route-witnesses-on-two-current-terran-saves)
+  are flat in two-CPU Outpost and cut 1.56% of mean frame
+  cycles in three-CPU Blood Bath. Both save continuations
+  match. Measure witness hits and repeat with active orders
+  before enabling the cache.
+  The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
+  finds only seven redundant crops across 48 updates. On Outpost the
+  base projectile pass takes 39.6–64.7k cycles per update across the
+  three race cartridges. No sampled tracer draw has a ground depth layer.
+  Profile motion and raster work with the merged FOLLOW viewport
+  cull in the fixed-camera cut and a visible holdout. Retain the
+  current ground-trail picker until a measured workload exercises it.
+  The [Outpost camera holdout](audits/2026-11-24-kodak-package-checks.md#pan-from-the-base-to-the-outpost-fight)
+  moves the same battle into view. Zerg and Protoss now use 325–391k
+  tracer cycles per update, roughly half of those inside the watched
+  raster entry. The [tile-row trial](audits/2026-11-24-kodak-package-checks.md#reusing-effect-visibility-for-each-tile-row)
+  improves the panned P10 loop mean by 8.16% with matching pixels
+  and world, while the fixed mean is flat and its p95 rises 0.45%.
+  [The shared renderer](https://github.com/ggu/starcraft-gba/pull/823)
+  passes authored ARM and Mode 0 host differentials. The retained
+  P10 [Blood Bath and save holdouts](audits/2026-11-24-kodak-package-checks.md#blood-bath-holdout-and-late-skirmish-journals)
+  are flat on timing, match the selected scanout, and reproduce both
+  maps' late saves and 180-update continuations. The retained pair also
+  [wins Protoss 7 from a campaign save](audits/2026-11-24-kodak-package-checks.md#protoss-7-victory-from-a-saved-campaign)
+  with matching sampled state and scanout and byte-identical victory
+  journals. The full replay timing is flat. The [four canonical profiles](audits/2026-11-24-kodak-package-checks.md#canonical-renderer-qualification-on-all-four-profiles)
+  qualify the merged renderer. Panned three-CPU Outpost
+  gains are 8.45% on P10 and 7.23% on Z10. The fixed
+  views are flat and the panned fights still exceed the
+  two-VBlank budget.
   [The route-call census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes)
   finds that all 280 late Terran and Protoss calls succeed within
   the existing budget. Terran Blood Bath averages 88.8k probe cycles
@@ -131,8 +167,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   resumes the same search after the clear cells. It saves 3.38%
   across the captured late Terran route calls and reduces frame
   budget misses from 18 to 13 in the authored 280-update test.
-  Keep it opt-in until the intended race profiles pass busy
-  frame, save and memory checks.
+  The [four late Terran and Protoss probe replays](audits/2026-11-24-monotone-clear-prefix.md#exact-package-route-call-coverage)
+  match every route result and save 204–2,413 probe cycles per
+  sampled update. Both Z10 far-read call sites are unused in the
+  four matched Z10 cuts. Keep the option disabled until a linked
+  release passes frame, save and memory checks. Prioritize recurring
+  movement/contact and actor drawing for the larger frame-budget gap.
   The eight-entry exact
   endpoint cache simulation covers at most 0.20% of loop cycles in
   the expanded Terran Blood Bath window, before cache overhead.
@@ -538,6 +578,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   continuation checks matching. A third fresh HOME process reads
   the [victory journal](audits/2026-11-22-z7-route-observer-purity.md#full-normal-victory-on-the-steering-release)
   and re-exports identical SRAM.
+  [November 24 intercepts](audits/2026-11-24-kodak-package-checks.md#intercept-the-northern-and-eastern-approaches)
+  preserve the Hatchery at 730 HP through fresh HOME frame
+  12,492. [East, west and north Sunkens](audits/2026-11-24-kodak-package-checks.md#sunken-coverage-on-three-approaches)
+  fresh-load with the Hatchery at full health. Three
+  static defenses still lose the base. Split mobile defenders
+  between the approaches and sustain gas production.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages
@@ -967,8 +1013,46 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   keeps the RAM guards and repeats the campaign and skirmish
   startup and save checks, including the single-CPU active Terran
   win. Confirm local release integration, hardware pacing and
-  active multi-CPU results. The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
+  active multi-CPU results. The [current P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
+  rejects nine impacts and keeps the earlier journal intact.
+  The [Z10 campaign journal](IMPACT-EVENTS.md#z10-campaign-with-the-carrier-cartridge-layout)
+  saves the exact Z3 12-impact burst and restores all 32
+  rows in the maximum fixture. The [P10 layout prototype](IMPACT-EVENTS.md#typed-p10-layout)
+  fits both shots, transport and research in the same slot.
+  Integrate and qualify P10's typed journal and real replay.
+  The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
+  restores Terran recovery in three cases across the race
+  profiles. Qualify busy ARM matches and address the six
+  remaining host failures, including one new mineral-float
+  failure in the mixed Zerg-profile match.
+  The [late Melee samples](audits/2026-11-22-native-custom-game-lobby.md#instructions-in-late-three-cpu-melee)
   place the largest costs in orders and depth-ordered drawing.
+  The [current one- and two-CPU budget](audits/2026-11-24-kodak-package-checks.md#late-frame-budget-with-one-or-two-cpus)
+  measures the extra order cost at 66–73% of the Outpost
+  increase. Its instruction cuts place 61–81% of the extra
+  order cost in movement. Target contact work first for Outpost.
+  The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
+  favor the guarded early axis check in the placed ROM kernel
+  fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
+  covers both ROM kernels. The [canonical pairs](audits/2026-11-24-contact-axis-bias.md#canonical-terran-and-z10-whole-frame-pairs)
+  measure 1.55–4.81% reductions on Z10 and byte-identical
+  P10 and Showcase links. Terran one-CPU Outpost averages
+  within the budget while 52 individual updates still miss it.
+  The [combined renderer and collision pair](audits/2026-11-24-kodak-package-checks.md#compose-the-renderer-and-rom-collision-option)
+  saves another 1.03% of mean time in the panned Z10 fight
+  with a higher p95. Keep the collision option off by default.
+  The [current contact and movement census](audits/2026-11-24-contact-axis-bias.md#current-paired-frames-and-contact-attribution)
+  measures 1.05–2.70% gains in four busy changed-ROM
+  windows. Three-CPU frames remain above budget and
+  individual slower frames occur. Both pages and paired
+  worlds agree. Confirm GBA SP frame delivery before
+  enabling it by default. P10 spends 131,466 cycles per
+  sampled update in direct nearest-target queries and
+  36,473 in rebuilding the target index. [Per-row occupancy trials](audits/2026-11-24-contact-axis-bias.md#per-row-target-mask-trials)
+  raise both costs. Reuse facts from the existing index
+  when testing further pruning, and retain stable entity ties.
+  Keep a one-CPU Blood Bath tail check, where a near-budget
+  mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
   video pages. Trials in raster fog lookup, audio decoding and a
   single-direction contact bound did not improve these samples.
@@ -1150,8 +1234,108 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   increases the force to eleven Hydralisks at fresh HOME frame
   64,983. Attacking the Pylon first leaves seven for the Nexus.
   A direct bypass splits the force and leaves the Nexus at full
-  health and shields. Stage the eleven together near one approach
-  before issuing the objective attack.
+  health and shields. The [single-approach staging replay](audits/2026-11-12-z8-normal-physical.md#stage-the-eastern-formation-together)
+  fresh-loads all eleven at frame 65,165 with Kerrigan separate
+  at 400 HP. An attack from the same approach removes 48 Nexus
+  shields and costs ten Hydralisks. A [reinforced assault](audits/2026-11-12-z8-normal-physical.md#reinforce-and-destroy-the-eastern-nexus)
+  fields sixteen and destroys the eastern Nexus at frame 70,971.
+  Fresh HOME retains the result and Kerrigan at full health.
+  A separate defensive branch removes three attackers and
+  fresh-loads the southern Hatchery, Pool and both Dens. Its
+  second defense keeps the new Den and Kerrigan, with the Hatchery
+  at 359 HP. A paid worker recovery restores a miner, a queued
+  Drone and a replacement Pool under construction at frame
+  75,299. A [separate same-chain recovery](audits/2026-11-12-z8-normal-physical.md#rebuild-after-the-eastern-nexus-falls)
+  continues directly after destroying the eastern Nexus and
+  fresh-loads a full-health Hatchery and Pool at frame 77,041.
+  An earlier direct Move to the Reaver's approach leaves
+  Kerrigan at her starting position. The [connected approach](audits/2026-11-12-z8-normal-physical.md#intercept-the-reaver-from-the-connected-approach)
+  reaches the Reaver through six ordinary waypoints and
+  defeats it. Fresh HOME at frame 77,066 preserves Kerrigan
+  at 204 HP and the Hatchery at full health. A [later Pool](audits/2026-11-12-z8-normal-physical.md#pool-completion-under-the-next-attack)
+  completes with Kerrigan still at 204 HP, but both buildings
+  take damage before the first reinforcements hatch. Five
+  Hydralisks reach the first connected waypoint with three
+  injured. Both tested follow-up paths lose two. Test an
+  earlier ground intercept. The [worker evacuation](audits/2026-11-12-z8-normal-physical.md#evacuate-workers-before-the-eastern-reaver-reaches-the-base)
+  preserves all five Drones, 19 Hydralisks and Kerrigan at
+  fresh HOME frame 72,755. The [replacement base](audits/2026-11-12-z8-normal-physical.md#found-a-replacement-base-without-moving-the-whole-refuge)
+  completes with four surviving Drones, then produces
+  a fifth that brings in 72 minerals. Fresh HOME at frame
+  76,885 retains the miner and both enemy Nexuses. A follow-up
+  Pool spends a Drone and the miner disappears. [Two guards and
+  a second Pool](audits/2026-11-12-z8-normal-physical.md#two-defenses-restore-the-pool-and-expose-the-next-defeat)
+  restore mineral deliveries and fresh-load at frame 80,708.
+  Trigger 17 makes the southern Dark Templar invincible
+  on entry and declares defeat at 80,798 after dialogue.
+  An earlier guard defeats the Templar by 80,636. Fresh
+  HOME at 80,900 retains 16 Hydralisks, five Overlords
+  and full-health Kerrigan. With no workers or buildings,
+  the force damages the eastern Nexus and fresh-loads at
+  frame 82,525 before losing on the neutral continuation.
+  A [second guarded interception](audits/2026-11-12-z8-normal-physical.md#intercept-the-second-southern-raid)
+  fresh-loads at frame 82,409 with Kerrigan and 12 Hydralisks.
+  The eastern group falls on the continued attack. An
+  [alternate route with the economy intact](audits/2026-11-12-z8-normal-physical.md#keep-the-replacement-economy-through-both-southern-raids)
+  kills both Templars and fresh-loads at the same frame with
+  full-health Hatchery and Kerrigan, the Pool and one Drone.
+  Use the preserved production to assemble the next assault.
+  The native
+  scenario permits Ventral Sacs for the alternate transport
+  route. Qualify human Z8 research, boarding and fresh SRAM
+  as one path. A builder can wait indefinitely at a disconnected
+  footprint. The pending order charges resources only on arrival.
+  A shared reachability check must distinguish an exhausted
+  search from budget-limited work before cancelling that order.
+  [Zerg 9 on the installed cartridge](audits/2026-11-13-z9-normal-physical.md#november-24-installed-cartridge-opening-and-air-production)
+  fresh-loads an Extractor, Lair, Den, Spire and three full-health
+  paid Mutalisks at frame 8,925. At frame 12,531, a fresh HOME
+  load restores all five full-health Mutalisks at the first
+  rally and three gas workers. The next fresh save has eight
+  full-health Mutalisks. A successful interception keeps the
+  full-health Extractor and all three workers. Fresh HOME at
+  frame 26,691 restores fourteen full-health Mutalisks. The
+  combined air group destroys the first road Cannon. A fresh
+  frame-27,561 load keeps all fourteen and the gas line.
+  The [road assault and crystal return](audits/2026-11-13-z9-normal-physical.md#road-assault-crystal-return-and-victory)
+  clear four more Cannons, start the 600-second countdown and
+  return the crystal at 27 HP. Z9 declares victory at frame
+  57,089 and restores RESULT and byte-identical SRAM from HOME.
+  A advances into Z10, whose opening save also restores from HOME.
+  The [first Z10 raid](audits/2026-11-21-z10-current-full-circle.md#november-24-cartridge-opening-and-first-raid)
+  leaves the eastern Sunken at 28 HP with the mining line still
+  active. The [earlier defense](audits/2026-11-21-z10-current-full-circle.md#earlier-defense-and-reaver-pursuit)
+  brings paid Hydralisks out before the raid. The mobile flank
+  loses the mining line. The [four-Sunken branch](audits/2026-11-21-z10-current-full-circle.md#four-sunkens-before-the-raid)
+  preserves both miners. After a focused attack the Reaver
+  disappears, four Hydralisks survive and the Den falls.
+  The [recovery](audits/2026-11-21-z10-current-full-circle.md#rebuild-after-the-first-raid)
+  rebuilds the Den, puts four Drones on minerals and starts a
+  second Hatchery. Fresh HOME at frame 15,812 has six
+  Hydralisks and the new hall at 714 HP. A two-sided raid
+  destroys both halls. [Relocated workers](audits/2026-11-21-z10-current-full-circle.md#relocate-workers-and-restore-mineral-income)
+  establish a full-health Hatchery and resume mineral
+  deliveries at fresh HOME frame 24,934. The next Reavers
+  destroy the hall during passive play. A [second relocation](audits/2026-11-21-z10-current-full-circle.md#second-relocation-and-worker-recovery)
+  restores the Hatchery and Pool, then adds an Overlord and
+  three paid Drones. Fresh HOME at frame 34,571 preserves
+  four Drones and 801 minerals. The attack arrives around
+  35,300. A [separate production branch](audits/2026-11-21-z10-current-full-circle.md#hydralisks-before-the-raid)
+  trains an Overlord and three Hydralisks before the raid,
+  with fresh HOME at 34,723. The first mobile intercept
+  loses all three. Test a closer defense with reinforcement.
+  [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
+  average 19.15–20.46 emulated updates per second. A sparse-aware
+  Pylon row grouping trial roughly halves the authored dense
+  power-check cost. [Canonical ROM pairs](audits/2026-11-24-kodak-package-checks.md#pylon-lookup-in-dense-missions-and-panned-skirmishes)
+  save 1.02–1.95% with 69 completed Pylons and under 0.1%
+  with nine in panned Outpost. Every measured frame exceeds
+  budget. P10 tail latency increases, and three samples stop
+  with different display pages. Keep this trial off pending the
+  stack and presentation checks. The P10 and Z10 panned
+  samples spend about 860,000 and 668,000 cycles on the
+  update respectively. Prioritize current measurements
+  of orders and movement within that shared cost.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -1755,16 +1939,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z3 wins after a paid economy and independently replayed assaults,
   bringing the exact-package victory count to 22 of 30. P4 also
   passes fresh field and victory save reloads.
-  An ordinary T5 retreat keeps Raynor at full health through
+  An ordinary T5 retreat keeps Kerrigan at full health through
   frame 129,658. Local box
   selection moves Marines with both heroes excluded. An explicit
-  Move near input call 22,000 stalls. Redirecting Kerrigan around
-  call 12,000 takes her to (856,398). A separate empty-ground order
-  moves Raynor away from his previous target. Both retain 294 and 250 HP
+  Move near input call 22,000 stalls. Redirecting Raynor around
+  call 12,000 takes him to (856,398). A separate empty-ground order
+  moves Kerrigan away from her previous target. Both retain 294 and 250 HP
   respectively through frame 19,288. The branch has only the two
   heroes and still needs a full win. A direct approach also enters
-  the recruitment zone, where Kerrigan dies before reinforcement.
-  Preserve enough of the allied force for a protected approach.
+  the recruitment zone with Raynor, who dies there. Recruitment
+  requires Kerrigan to enter.
+  An earlier checkpoint and three short escort waypoints preserve both
+  heroes and seven Marines at full health through frame 13,603. The
+  fresh [escort journal](audits/2026-11-24-kodak-package-checks.md#terran-chapter-5-input-divergence)
+  advances eight of the nine units. Advance the escort through
+  additional short waypoints and verify recruitment at the rebel base.
   The same audit records fresh N64 reset replays of the two-slot
   Challenger and four-slot Blood Bath Melee lobbies, plus the
   Wasteland opening bank and five-Marine R selection on both systems.
@@ -1800,16 +1989,107 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   64,486 as a 12-impact volley against the eight-impact journal
   limit. Qualify combat saves beyond that limit without losing
   pending projectile outcomes or older journals.
-  Wider campaign wins, deeper load checkpoints and GBA SP timing
-  remain open for this package.
+  [Z4's installed-ROM replay](audits/2026-11-24-kodak-package-checks.md#zerg-4-victory-and-zerg-5-deployment)
+  hatches the Chrysalis, completes paid air production and wins at
+  frame 47,951 with Kerrigan alive. The victory loads byte for byte
+  and Z5 deploys from HOME.
+  [Z5's fourteen-stage replay](audits/2026-11-24-kodak-package-checks.md#zerg-5-victory-and-zerg-6-deployment)
+  advances the terminal pause and wins with Kerrigan alive. The
+  victory loads byte for byte and Z6 deploys. Z6 restores a paid Lair
+  and Extractor
+  after the first gas delivery at frame 3,519. Paid Ventral Sacs
+  completes, Kerrigan boards an Overlord, and fresh HOME restores
+  the cargo. The [Z6 ferry and assault replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-ferry-and-mainland-assault)
+  unloads her on the island at full health. A later fresh save
+  retains 25 Hydralisks near region 4. Reinforced attacks clear
+  the region by frame 63,540 with Kerrigan at full health. The
+  [region 5 replay](audits/2026-11-24-kodak-package-checks.md#region-5-storm-attacks-and-evacuation)
+  cuts the defending army from 67 to 30 with paid Storm casts
+  and evacuates Kerrigan. A fresh continuation rebuilds a
+  30-Hydralisk force. After another ferry and two more Storms,
+  the fresh frame-130,610 checkpoint keeps Kerrigan on the island
+  at 400 HP and all 30 Hydralisks, with 26 defenders and 14
+  buildings left in region 5. A further ferry and coordinated advance
+  clear both Force 2 regions. The [Z6 victory replay](audits/2026-11-24-kodak-package-checks.md#zerg-6-victory-and-zerg-7-deployment)
+  moves Kerrigan across the island trigger and wins at frame 177,044
+  with 400 HP. The victory reload is byte-identical and Z7 deploys
+  through HOME. With Z9, the installed package has 27 of 30
+  verified wins.
+  The [Z7 guarded opening](audits/2026-11-24-kodak-package-checks.md#zerg-7-guarded-opening-and-production)
+  completes a full-health Hatchery, then the Pool, Lair, Den
+  and Sunken Colony. A paid defense save at frame 10,885
+  restores eight Hydralisks, three Mutalisks and four Drones.
+  After a northern interception, two watched Guardian slots
+  hold Zerglings and three Guardians remain at fresh HOME.
+  The ground push destroys the Pool. A combined defense with
+  a distant attack order also loses the Hydralisks and Drones.
+  Try a closer ground hold before sending the intercept north.
+  The T5 escort
+  regroups through the south corridor and fresh-loads at frame
+  21,884 with both heroes and seven full-health Marines. A second
+  verified save at frame 22,304 has cleared a Vulture. At frame
+  27,001 the six Marines and both full-health heroes reload at
+  the south approach. Two focused attacks clear the first two
+  bunkers. Both heroes are at full health and five Marines
+  survive in the fresh frame-27,771 save. Kerrigan enters through
+  the east corridor and recruits the rebel base. Fresh HOME
+  restores 27 units and 19 buildings with both heroes alive.
+  The captured Factory and Starport complete paid Vulture and
+  Wraith orders. Two miners establish minerals and gas. The air
+  force destroys the eastern Command Center and Refinery.
+  Frame 57,882 fresh-loads seven Wraiths and both heroes. The
+  next western attack removes a Missile Turret. Fresh HOME at
+  frame 64,503 retains nine Wraiths, both heroes and 20 enemy
+  buildings. Seven hostile Wraiths remain. A [separate reinforcement branch](audits/2026-11-24-kodak-package-checks.md#expand-supply-and-reinforce-before-the-western-assault)
+  pays for a Depot and a tenth Wraith. Fresh HOME at frame
+  68,291 has room for more at 44/50 supply, with both heroes
+  and the gas worker alive. The reinforced wing destroys two
+  western turrets, the Starport and two northern Missile
+  Turrets. At frame 96,735, fresh HOME keeps eight Wraiths,
+  both heroes and 1,092 gas. The hostile Wraith count is zero
+  and 16 buildings remain. A new harvest order restores
+  mineral income and is retained at fresh HOME frame 97,618.
+  The [Terran 5 victory run](audits/2026-11-24-kodak-package-checks.md#terran-5-victory-and-fresh-home)
+  reinforces, removes the remaining production and clears the
+  last depots at frame 170,041. Fresh HOME restores RESULT
+  and identical victory SRAM. A advances into Terran 6.
+  Finish Z7, Z8 and Z10 on this package and qualify GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
   retains the earlier crossing. The next native save fresh-loads
   a 60-health SCV moved to the rocky pass. A subsequent run
-  reselects it and moves it farther south. Reach the mineral
-  field with it, verify mining, a Barracks and Marine production,
-  and qualify the native win and mission unlock.
+  reselects it and moves it farther south. The cursor over a
+  mineral patch shows B Harvest. The [harvest comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-mineral-collection)
+  confirms native deposits from 40 to 72. A fresh first-slot
+  load from a separate save continues mining with no new order
+  and identical FlashRAM. The installed GBA cartridge also completes
+  two full-health SCV deliveries and resumes mining from a fresh HOME
+  load with matching SRAM. The [Barracks comparison](audits/2026-11-24-kodak-package-checks.md#wasteland-barracks-construction)
+  observes the 150-mineral charge on both systems. The native
+  construction resumes after a fresh load. The infantry advisor
+  activates the five-of-ten Marine counter. A new B Harvest
+  order raises the native bank from 10 to 34. A later native
+  run trains a Marine for the displayed price of 50. After fresh
+  load, a second paid Marine completes. A fresh seven-Marine
+  load then adds a third paid Marine and the objective reaches
+  eight of ten. Three further native saves and continuations
+  carry mining and paid infantry through ten of ten and victory.
+  Accepting the result opens Backwater Station. A fresh process
+  retains the unlock, opens its briefing and deploys to the playable
+  map at Raynor's first dialogue. The [Backwater comparison](audits/2026-11-24-kodak-package-checks.md#backwater-station-opening)
+  matches the starting bank and roster. N64 shows 5/26 and
+  starts the SCV gathering, while GBA shows 6/26 and the worker
+  starts idle. The native checkpoint fresh-loads and resumes
+  mining. [Both Backwater Barracks](audits/2026-11-24-kodak-package-checks.md#backwater-marine-production)
+  train a Marine for 50 minerals through ordinary controls.
+  The N64 unit table gives both Raynor variants zero
+  supply. [PR #837](https://github.com/ggu/starcraft-gba/pull/837)
+  applies it in the shared rule. All four product links
+  pass. Existing Wasteland and Backwater journals display
+  one fewer supply with their prior actors intact, and
+  Backwater trains a Marine for 50 minerals. Trace the
+  native SCV's first target and order separately.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
@@ -2083,6 +2363,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
+  The [adaptive Cannon power draft](https://github.com/ggu/starcraft-gba/pull/834)
+  cuts the dense lookup fixture from 80,203 to 41,838 cycles.
+  Compare whole frames, stack and fresh saves on all four products
+  before enabling it.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.

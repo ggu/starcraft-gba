@@ -120,9 +120,8 @@ static void fog_paths_match_the_oracle(void)
         if (!pattern) assert(call_count == r.height); /* reversed rows, one call each */
     }
 
-    /* A hidden tile suppresses a whole tile span, not one lookup per pixel.
-     * Keep the pixel oracle active so this also checks that no hidden source
-     * bytes are written while the scan advances to the next tile boundary. */
+    /* This 20-pixel crop crosses two tile rows. Each row can touch at
+     * most three tiles, plus the first check in the whole-frame path. */
     r.mirror_pixels = 0;
     camx = camy = 0;
     for (int ty = 0; ty < MAP_ROWS; ++ty)
@@ -130,7 +129,7 @@ static void fog_paths_match_the_oracle(void)
     visibility_query_count = 0;
     check_fogged_raster(&r, 128, 64, 0);
     assert(call_count == 0);
-    assert(visibility_query_count <= r.height * 3 + 1);
+    assert(visibility_query_count <= 7);
 
     /* The same tile skips must preserve mapped source strength and dark-mask
      * LUT dispatch, including mirrored rows and mixed visible/hidden tiles. */
@@ -161,6 +160,22 @@ static void fog_paths_match_the_oracle(void)
     assert(call_count == 1 && calls[0].mapped && calls[0].w == r.width &&
            calls[0].h == r.height && calls[0].rows == 1 && calls[0].src == frame);
 
+    /* The widest supported crop spans alternating runs and is clipped
+     * independently against both the screen and the world bounds. */
+    static uint8_t wide[256 * 39];
+    for (unsigned i = 0; i < sizeof(wide); ++i)
+        wide[i] = (uint8_t)(1 + (i * 3) % 251);
+    for (int ty = 0; ty < MAP_ROWS; ++ty)
+        for (int tx = 0; tx < MAP_COLS; ++tx)
+            visible_tiles[ty][tx] = (unsigned char)((tx + ty) & 1);
+    r = (Sc64WeaponSourceVfxRaster){
+        .pixels = wide, .width = 256, .height = 39,
+        .canvas_w = 256, .canvas_h = 39
+    };
+    camx = 3; camy = 9;
+    check_fogged_raster(&r, 124, 8, 0);
+    camx = 292; camy = 454;
+    check_fogged_raster(&r, 426, 501, 1);
     fog_mode = 0; camx = camy = 0;
 }
 

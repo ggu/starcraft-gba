@@ -54,6 +54,20 @@ three images permits an all-Closed lobby and keeps it on the setup
 screen on A at Launch. Reopening the third row as Zerg allows play.
 The Outpost result covers the authored GBA map.
 
+A fresh ares replay of the Melee route finishes 6,310
+steps. The three setup captures match the retained hashes,
+including the two sides of the Right press. The launch
+capture differs from the prior run. The current contact
+candidates independently repeat the lobby route on all
+three GBA race ROMs. Each keeps CPU mask 4 and resolves
+the opponent to Zerg, then advances from frame 1 to 9.
+The lobby check covers this transition and the launch.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native replay status and captured frames | `baaebfa6aa69b582ae8de6cbabfc0f66e8f5d93bf1cec9319d8ee98c20607709` / `d52874e6555e515d5acfde4cc0956b675c565a17ca019ddbeb88cac6637c15af` |
+| Current three-cartridge ordinary lobby | `40c23b07f415d8101f329d5d1183922ed65171226621cd87b92fb56f105682fb` |
+
 Separate reset replays extend the same sequence in the reverse
 direction. The N64 first shows Random, then D-pad Right changes the
 last open row to Zerg, and D-pad Left returns it to Random while the
@@ -99,6 +113,14 @@ The final SRAM readback matches the victory save byte for byte.
 
 The timing includes briefing, pauses and presentation, and comes
 from the GBA guest clock.
+
+The [Terran chapter 5 victory](#terran-5-victory-and-fresh-home)
+adds the last Terran chapter through a staged controller replay. The
+[Zerg chapter 9 victory](2026-11-13-z9-normal-physical.md#road-assault-crystal-return-and-victory)
+delivers the crystal through a cleared road and restores RESULT from HOME.
+Victories with fresh SRAM readback on the installed package now cover
+27 of 30 chapters, including all ten Terran, all ten Protoss, Zerg 1
+through 6 and Zerg 9.
 
 ### Protoss and Zerg victories
 
@@ -475,6 +497,305 @@ the victory and the 32 KiB autosave byte for byte. Fresh HOME
 load restores the same result. Ordinary menu input then opens
 the Z4 briefing and deploys the next mission.
 
+### Zerg 4 victory and Zerg 5 deployment
+
+Ordinary input from the Z3 victory opens and deploys Z4 on the exact
+installed Z10 image. Drones build the Pool, gather minerals and gas,
+and complete the Lair and Spire. The Chrysalis hatches at frame 18,111.
+Kerrigan has 400 HP and the mission reports no unsupported actions.
+
+The frame-43,789 pause save restores 20 paid Mutalisks, five Drones,
+and the Lair, Pool, Spire and Extractor in a fresh HOME process. A
+direct advance loses most of the air force. The east-edge flank takes
+18 Mutalisks to the Command Center. Ordinary attack orders destroy it,
+and the objective sequence reaches victory at frame 47,951 with
+Kerrigan still at 400 HP.
+
+An independent replay repeats all ten ordinary-input segments from
+the Z3 victory, matching each world fingerprint and SRAM export.
+Fresh HOME Load restores the frozen victory with completion mask
+`0xc000` and re-exports the same 32 KiB. Returning to HOME and pressing
+A, Right, A and Start with releases opens the Z5 briefing and deploys
+the first field frame.
+
+### Zerg 5 victory and Zerg 6 deployment
+
+The independent Z5 replay starts from that Z4 victory and uses
+24,349 controller updates across 14 fresh-HOME segments. Every
+segment matches the retained world fingerprint and 32 KiB SRAM.
+Recalling the Zerglings clears Kerrigan's route at the early gates.
+With cloak active she reaches gate 25 by frame 5,599. She withdraws
+to recover to 400 HP and at least 225 energy before the final approach.
+
+The terminal Bring condition fires at frame 17,286. The later source
+pause advances on an ordinary A press, and the mission wins at
+frame 18,974 with Kerrigan at 241 HP and zero unsupported actions.
+Fresh HOME Load restores the result, completion mask `0x1c000`, and
+the byte-identical SRAM. From the result, B, A, Down, A and Start
+with releases opens Z6 and deploys the first field frame. On a
+separate continuation, the starting Hatchery pays for and finishes
+a Lair by frame 1,981 and an Extractor by frame 3,005. Assigning a
+Drone brings the first gas delivery by frame 3,519. A fresh load
+restores the bank at 158 gas, both buildings, and Kerrigan at full
+health. All four opening stages independently match their world and
+SRAM. A further continuation pays 200 minerals and 200 gas for
+Ventral Sacs. The research is complete by frame 10,163. Ordinary
+selection and targeting then board the full-health Kerrigan into an
+Overlord by frame 11,111. Fresh HOME restores both the completed
+research and boarded state with a byte-identical SRAM export. Separate
+controller replays reproduce each field and journal.
+
+### Zerg 6 ferry and mainland assault
+
+The loaded Overlord reaches the island and unloads Kerrigan through
+the ordinary command menu by frame 14,950. She has 400 HP and the
+carrier has 200 HP. A fresh HOME load restores both units and the
+completed transport research with identical SRAM.
+
+With Kerrigan on the island, ordinary production brings the
+mainland force to 20 Hydralisks. The first concentrated strike
+destroys five hostile buildings. Fourteen Hydralisks survive at
+the frame-34,450 checkpoint. A follow-up destroys two more
+structures and leaves three Hydralisks. The fresh frame-35,103
+state has eight Force 2 buildings in region 4, and 67 Force 2 units
+and 19 buildings in region 5. Five independent replay stages from
+the boarded save match every world fingerprint and SRAM export.
+
+Another continuation from frame 34,450 sends 12 paid reinforcements
+to the existing force. The fresh frame-55,229 checkpoint retains 25
+Hydralisks near region 4 and Kerrigan at full health. Eight Force 2
+structures remain in region 4 at that checkpoint. The next
+concentrated attack brings region 4 down to one Photon Cannon and
+no Force 2 units. Fresh HOME restores that frame-57,403 checkpoint
+with two surviving Hydralisks, Kerrigan at 400 HP and identical SRAM.
+Region 5 retains 67 Force 2 units and 19 structures. All three
+reinforcement stages independently match their world and journal.
+
+Four more paid Hydralisks join the surviving air units and destroy
+the final Photon Cannon. The fresh frame-63,540 save has zero Force 2
+units or buildings in region 4, and Kerrigan still has 400 HP. The
+region 5 census remains at 67 Force 2 units and 19 buildings. Its
+clearance and the victory journal remain open.
+An independent replay matches both final controller segments and their
+SRAM journals.
+
+#### Region 5 Storm attacks and evacuation
+
+After region 4 clears, paid production stages 21 Hydralisks. The
+surviving advance reduces region 5 from 19 structures to 14.
+The Overlord ferries Kerrigan back to the cleared mainland, where
+she cloaks and casts Psionic Storm. Three pairs of paid casts across
+three sorties reduce region 5 from 67 living units to 30 by frame
+109,548, including reinforcements during the last recharge. Kerrigan
+retains 400 HP through the attacks.
+
+The Overlord then evacuates Kerrigan to the island at full health.
+At frame 113,206 the fresh save has 32 hostile units and 14 buildings
+in region 5. Protected production rebuilds the force to 30 paid
+Hydralisks by frame 121,460. That save reloads through HOME with
+Kerrigan at 400 HP, region 4 still clear, and 37 hostile units and
+14 buildings in region 5. A separate controller replay from frame
+63,540 matches the world fingerprint and SRAM bytes of all 12
+checkpoints. The terminal journal also exports byte for byte after
+an independent HOME load.
+
+A further ferry and two paid Storms reduce the region 5 army
+from 37 to 24. Two reinforcements arrive during the evacuation.
+The frame-130,610 journal restores Kerrigan on the island at
+400 HP, all 30 Hydralisks, and 26 hostile units and 14 buildings
+in region 5. Six more independent controller stages match their
+worlds and SRAM. The final HOME load also exports identical SRAM.
+
+Another ferry, Storm pair and evacuation reduce region 5 to
+17 hostile units and 14 buildings by frame 147,057, with Kerrigan
+at 400 HP on the island and 30 Hydralisks ready. All seven
+independent controller stages reproduce their world and SRAM.
+Fresh HOME also exports the final journal byte for byte.
+
+A separate push from frame 147,057 takes region 5 to nine units
+and 12 buildings but leaves only nine Hydralisks. Returning to
+the 30-Hydralisk checkpoint and sending Kerrigan on one more
+sortie reduces the defenders to nine units with the force
+intact. The subsequent Hydralisk advance destroys all 14
+structures and the last two Probes. Kerrigan has 400 HP and does
+not join the ground assault. The ten-stage sortie and attack
+replay matches each world and SRAM.
+
+#### Zerg 6 victory and Zerg 7 deployment
+
+The cleared regions satisfy the Force 2 conditions, but the
+island position at (959,1020) stays inside the smaller location
+used by the next trigger. With Kerrigan alive and unloaded,
+ordinary movement takes her to (1025,1004), inside the island
+and past that smaller rectangle. The authored sequence completes
+at frame 177,044. The first terminal screen shows victory with
+Kerrigan at 400 HP and the Z6 completion bit set. Two independent
+controller segments reproduce the region clearance, the final
+world and the victory journal.
+
+Fresh HOME Load restores the victory and exports identical SRAM.
+Ordinary buttons reach the Zerg 7 briefing and deploy mission 18
+at frame 1 with zero unsupported-mission faults. This brings the
+installed package to 25 of 30 verified wins.
+
+### Zerg 7 guarded opening and production
+
+Starting with the independently verified Z6 victory journal, ordinary
+HOME inputs deploy Z7 and save at frame 11. In one branch, a paid
+Hatchery at (1120,1680) finishes with 161 HP under attack. A separate
+branch places the same Hatchery, then selects the opening 12 fighters
+with R and orders them to defend near (1080,1688). The Hatchery
+finishes at 1,250 HP by frame 2,696.
+
+Training more Drones raises the live worker count to six by frame
+4,405. The full-health Hatchery and its eight Hydralisks and four
+Mutalisks survive. One Drone collects minerals and the bank reads
+372 minerals and 200 gas. Three independent ordinary-input stages
+match the world fingerprint and SRAM. Fresh HOME restores the
+worker roster and bank with byte-identical SRAM.
+
+The next paid construction and morph sequence completes a Spawning
+Pool, Lair and Hydralisk Den. The fresh frame-9,640 checkpoint
+retains eight Hydralisks, four Mutalisks and five Drones. The Lair
+has 1,800 HP, the Den 850 and the Pool 750. The bank is 242 minerals
+and 50 gas. All three technology stages also match their world and
+SRAM in an independent replay. A nearby gas supply is the next
+milestone for sustained production and the approach to the objective.
+
+From that journal, a paid Creep Colony completes and morphs into
+a Sunken Colony at (1008,1632). A separate air order intercepts
+the first hostile Mutalisk. At frame 10,885 the Lair has 1,792 HP
+and the Sunken 400. Eight Hydralisks, three Mutalisks and four
+Drones remain, with 197 minerals and 50 gas. All three ordinary
+input stages independently reproduce the checkpoint fingerprints
+and exact SRAM. Fresh HOME confirms the final roster and bank.
+The longer defense against the Guardian raid still needs an
+economy that can keep producing units through the attack.
+
+An alternate branch builds an early Evolution Chamber and places
+a Spore Colony behind the frontline at (1176,1632). The eastern
+ground rush and northern Guardian attack leave the Spore at 12 HP,
+the Lair at 926 HP and one surviving Drone by frame 12,316. This
+branch has yet to sustain mining or deliver gas through the raid.
+
+In a continuation from frame 10,885, the three Mutalisks fly
+north toward the approaching Guardians. Two watched Guardian
+slots disappear from the local scan. A separate read-only
+fresh HOME census at frame 12,926 finds those slots reused by
+Zerglings and three other live Guardians. The Lair and Den
+remain at 1,155 and 78 HP. The ground force destroys the Pool,
+and the bank reaches 261 minerals with gas at 50. The saved
+defense establishes an air interception under ground pressure.
+Pair the north interception with a ground defense before
+committing to the Extractor.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Northern interception | `c75a0a80763b2b6336dfb5360096199a4d179d82d62267ad341defda7aa10112` |
+| Fresh HOME global census and identical SRAM | `8fad131038f4ad5f2a2f701cc0f6866730ce5ea8495b634c8505e9b80e2f3904` |
+
+A combined air and ground branch from frame 10,885 selects all
+eight Hydralisks and issues a distant eastern attack order.
+The cursor travel and repeated retargeting leave time for the
+ground attack to reach the base. At frame 11,764, five
+Hydralisks remain and the Extractor has 58 HP. All Hydralisks
+and Drones fall by frame 13,451, and only three Mutalisks
+survive after the Pool and Lair fall. The original frame-10,885
+save remains the continuation point. Test a closer defensive
+position before sending the Mutalisks north. Receipt SHA-256
+`bf195f978d97a4f4d61d1e2cc20598903ca602967ec7ecd0fd0e0678af24cb63`.
+
+A separate branch from frame 6,410 builds two full-health
+Sunkens on the western side. Fresh HOME at frame 9,891
+matches the export and retains the starting eight Hydralisks
+and four Mutalisks. A paid Den completes in the follow-up.
+The closer attack order at (1008, 1640) preserves that mobile
+force through frame 12,430 while the Hatchery, Pool and Den
+fall. Both Sunkens remain at full health. A second hold at
+(1144, 1624) also loses the base. Correct the defensive
+placement against the actual attacker route before relying
+on the two-Sunken opening.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Two-Sunken checkpoint SRAM and fresh readback | `7c7cd992ba56528086db8be96ef176702c3e74f5a4d8d9e0cc51d795a1409802` |
+| Completed Den and first close hold | `c887d92734fc97a789178eec0eb1092f3bef299f207f40a806418b1737f299f9` |
+| Second close hold | `dc905a5ba02f37334a18cc1a3bb342e62f2e901cc5cf551b9a5daa3b9e85309c` |
+
+#### Intercept the northern and eastern approaches
+
+From the two-Sunken save, issuing an eastern attack-move
+to (1240, 1672) leaves the Hatchery at 818 HP. Fresh HOME
+at frame 11,526 retains both Sunkens, six Hydralisks, four
+Mutalisks and three Drones. Continuing the attack-move
+leaves the Hatchery exposed to a separate approach. A
+closer direct intercept at (1130, 1640) extends the hold.
+Fresh HOME at frame 12,492 retains the Hatchery at 730 HP
+and ten friendly units. With the same order held, the
+Hatchery falls at frame 13,184. The earlier November 13
+victory used a different sequence of ordinary inputs.
+These routes cannot isolate a change in engine behavior.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Eastern attack-move SRAM and fresh HOME | `b38dad35b64d8443b59efb3865303196d0fd49009212d573ea000129448e7ef8` |
+| Closer intercept inputs | `7f612c63e5b5098ec9190a5b970097473eebd3e2a57d927627e4f4ef848b4732` |
+| Closer intercept SRAM and fresh HOME | `023e457d3c81b98928ac611cbe2bd1c44ced7a2446f1938b2dcfd3568ca41b5e` / `51de3267559c8f325254de06ba7d679fdd46baa319509807797794e37d01906e` |
+
+#### Sunken coverage on three approaches
+
+The alternate frame-8,851 opening grows a second Sunken
+on the east at (1240, 1696), paired with the western
+Sunken at (1008, 1632). Fresh HOME at frame 9,886
+restores both at 400 HP and the Hatchery at 1,250 HP.
+The eastern colony falls by frame 12,086 and the
+Hatchery by 13,386. Moving all defenders east leaves
+the west exposed and ends the hold by frame 12,394.
+
+A follow-up builds and morphs a third Sunken north at
+(1192, 1616). Fresh HOME at frame 10,892 preserves
+it at 278 HP, the two earlier Sunkens at 400 HP each
+and the Hatchery at 1,250 HP. The three-Sunken hold
+without further orders loses the Hatchery by 13,292.
+Both branches retain 200 gas with no active gas source.
+Split the mobile defense and qualify mining through the
+raid before committing to further static defenses.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| East and west Sunken SRAM and inputs | `bbd8e26eeaae481a8d646495c2281d4457623d4aaef27f0b70283e066074868c` / `1f60e3cfe69ffe95022346372ef3a08a0c11e1445b2b326480dc3d66fc9794e3` |
+| Three Sunken SRAM and fresh HOME hold | `bb10d558b61d96eb0fa668dcc482a9fe016a03b2cf64b5175942449ebba7fdda` / `cfbc2a19f2fefb0a84cd9787b20cbec405bcc2fee2afa2bcdf77151127c40632` |
+
+### Pending impacts can reject an ordinary Protoss pause save
+
+The current P10 ROM loads the Outpost three-CPU journal
+at frame 11,001. After a normal camera pan and neutral
+updates, a B save from the pause screen at frame 11,334
+returns failure in the pending-impact guard. The queue has
+nine events and the record admits eight. The original
+journal stays byte-identical and fresh HOME falls back to
+frame 11,001. Saves at frames 11,332, 11,333 and 11,335
+have eight events and succeed. Paired P10 ROMs built with
+both collision settings are byte-identical and reproduce
+the same condition.
+
+The exact current Z10 Carrier-profile build rejects the
+[proposed padded codec](https://github.com/ggu/starcraft-gba/pull/818)
+at its compatibility guard. The codec also excludes P10's
+typed building rows and research journal. Its synthetic
+32-impact qualification does not establish either product
+path. P10's typed building rows expose 100 padding bytes,
+with 12 occupied by the research levels. Those rows alone
+cannot contain 192 event bytes. Treat layout, journal
+authentication and recovery of the last valid slot together.
+Preserve active projectiles, research, Yamato and transport
+state when extending the relevant record formats.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Exact P10 pause return, queue count and unchanged SRAM | `7286a0975b84e83922fc3ad61f2ca190bc0f31c5d68c0e48f82363bc6be88b4c` |
+| Prior and adjacent journal fresh HOME plus 60 updates | `f0267b6fe1256b2b5dedd9185d4c5658f4acc2f71918d2d34c1c70cbea6cd8bb` |
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -549,10 +870,220 @@ order at the base followed by a verified increase in minerals.
 A fresh continuation reselects the same SCV and issues another
 C-Right Move to the south. The original field HUD shows Build,
 Repair, Move and the ground-context B Attack label. The bank
-still has 40 minerals. A prepared follow-up aims the selected
-SCV at the mineral field. The wrapper stops that new launch
-before emulation when the disk falls below its 5 GiB reserve.
-The contextual gathering input remains to be observed.
+still has 40 minerals. The next guarded replay positions the cursor
+over a mineral patch while the SCV is selected. The native prompt
+switches to **B Harvest**. Pressing A selects the patch. The bank
+still reads 40 after that input.
+
+#### Wasteland mineral collection
+
+An isolated ares v148 replay uses the same starting FlashRAM.
+The scratch bridge exposes the ordinary B button alongside the
+existing mapped controls. The receipts pin the compiled binary
+and its actual source separately from the wrapper's tracked
+source entries. With the SCV selected and the cursor on the
+patch, the HUD shows **B Harvest** and 40 minerals at step 9,890.
+A B press and neutral updates raise the bank to 48 by step 10,900,
+64 by 11,900 and 72 by 12,900. These three HUD captures precede
+a later snapshot failure in that observer. A separate guarded run
+repeats the first delivery, writes the first save slot through the
+ordinary menu, and exits successfully with a changed FlashRAM hash.
+The frame after saving still shows 48 minerals. A fresh ares
+process selects the updated first slot, `Terr01 08:31`. It advances
+800 neutral steps after confirming the load and shows 64 minerals
+at step 5,120. The exported FlashRAM is byte-identical to the file
+created by the save run.
+
+A later native checkpoint saves at 120 minerals. Reloading it
+and letting the same worker continue brings the bank to 152.
+The explored base and mineral line remain visible. Barracks
+placement and paid production are still open in the native
+replay.
+
+On the exact KODAK Terran ROM, A on an unrevealed patch destination
+issues Move. The selected SCV reaches the location, idles, and
+keeps the bank at 40 without collecting by proximity. Contextual A
+on a visible neighboring patch at (272,472) issues Mine by frame
+1,661. At frame 1,861 the SCV is carrying eight minerals. The worker
+dies on its return path before delivery, and the bank stays at 40
+through frame 2,061.
+
+A separate ordinary-input Wasteland playthrough on the same installed
+ROM reaches victory at frame 10,120. Its frame-6,214 pause journal
+matches the retained win replay byte for byte. A fresh branch from
+that earlier journal observes two 60-HP SCVs carrying eight minerals
+each with the bank at 439. After 60 neutral updates both SCVs still
+have 60 HP, their cargo is empty, and the bank is 455. A regular
+pause save at frame 6,274 loads through HOME with the same frame,
+bank and five worker records. The fresh export is byte-identical.
+The bank rises to 463 after 60 more neutral updates.
+
+#### Wasteland Barracks construction
+
+The N64 SCV opens a three-by-three Build grid with C-Left. A left
+stick input highlights the Barracks at 150 minerals. The selected
+SCV can place a green footprint near the mineral line. After A
+confirms the site, the bank drops from 160 to 10 and a foundation
+appears by emulator step 8,535. The frame at 11,035 shows additional
+building sections and an active progress bar. The run exits with
+the original FlashRAM intact. A second ordinary run saves the
+active construction into the first slot and exits successfully with
+a changed FlashRAM export. The final frame still shows the foundation
+and its SCV at 10 minerals. A fresh first-slot load restores that
+construction and advances with neutral inputs. By step 8,120,
+the Barracks is complete and the advisor calls for ten Marines.
+The dialogue holds the field through the step-9,120 capture.
+The fresh FlashRAM export matches the construction
+checkpoint byte for byte.
+
+Continuing the native advisor sequence with A activates the
+Marine counter. The next field capture shows five of ten
+Marines with 10 minerals. A fresh attempt reselects the same
+60-HP SCV near the completed Barracks and moves the cursor onto
+the minerals. The field shows B Harvest. Pressing B at emulator
+step 9,680 raises the bank from 10 to 26 by step 10,680 and to
+34 by step 11,680.
+
+A later native run opens the completed Barracks menu with 66
+minerals. The Marine option shows a price of 50. A starts
+production, and the next capture shows the active progress bar
+and 11/18 supply. Mining continues through the payment, with
+24 minerals at the first post-order capture. By emulator step
+9,035 in this run, the objective counter reads six of ten
+Marines. Full native victory and the next mission unlock
+remain open.
+
+A fresh process loads the first slot at six Marines. Mining
+continues to 56 minerals. The ordinary Barracks menu again shows
+50 for a Marine. A queues the second paid Marine, dropping the bank
+from 56 to 6 and raising supply to 12/18. The new Marine finishes
+with the counter at seven of ten. The FlashRAM export matches the
+six-Marine input image byte for byte for this unsaved continuation.
+
+The seven-Marine position is saved to the first slot and loaded
+in a fresh process. The export stays byte-identical. Mining
+raises the bank to 54. A third 50-mineral order leaves four
+minerals and queues at 13/18 supply. The resulting field capture
+shows eight of ten Marines. This continuation ends before a
+new save.
+
+The eight-Marine state is then saved and reloads in a fresh
+process. Mining funds the ninth Marine, and a new first-slot
+save holds nine Marines and 74 minerals. After another fresh
+load, the tenth paid Marine produces the native victory
+screen. Accepting the result changes FlashRAM and transitions
+to Backwater Station, including the briefing. A separate native
+process loads the resulting FlashRAM and lists Backwater Station
+as available while Desperate Alliance remains locked. Its
+FlashRAM export matches byte for byte. Selecting Backwater
+Station through the ordinary menu reaches briefing page six
+with the two mission objectives. Advancing past the final
+briefing opens the playable map and Raynor's opening dialogue
+in a fresh-process replay. The FlashRAM export still matches
+the post-victory journal.
+
+A separate fresh native replay from the nine-Marine save reproduces
+the final victory frame byte for byte. Thirteen of fifteen captured
+frames agree across the two runs. This replay ends on the result
+screen with the input and output FlashRAM identical. The local
+manifest has SHA-256 `9ff9b0386480d3b6f8376375066139798bfa6b04ba830e746ae6fc4349735296`.
+
+A read-only replay of the full GBA Wasteland input tape observes
+the matching 150-mineral charge, from 463 to 313, when the
+Barracks first appears at frame 6,367. It completes with 1,000 HP
+by frame 7,866. Five ordinary orders queue Marines at 50 minerals
+each. The first completes at frame 8,319 and the fifth at 10,119.
+The replay still wins at frame 10,120. These checkpoints follow
+each platform's ordinary controls and use separate clock units.
+
+### Backwater Station opening
+
+The N64 replay opens Backwater Station through the campaign menu
+after Wasteland victory. The playable field shows 200 minerals,
+200 gas and 5/26 supply. The opening roster visible at the base
+is four Marines, Raynor's Vulture and an SCV, with a Command
+Center, a Barracks and two Supply Depots. The SCV gathers without
+a new order from the player. Minerals rise to 216, then 232.
+The ordinary Save Screen writes a first-slot checkpoint. A fresh
+process loads that slot and resumes play with 248 minerals, 200
+gas and 5/26 supply. Its FlashRAM export is byte-identical.
+
+On the installed Terran ROM, ordinary controller inputs open
+the same mission and the read-only observer sees those six units
+and four buildings, 200 minerals, 200 gas and 6/26 supply. The
+human units report idle orders. In a separate replay, after
+600 neutral updates the SCV is still idle and the bank is
+still 200/200. Its N64 counterpart is seen beside the mineral
+patch and then on the way back to the Command Center. The
+controller tape has neutral steps and A taps between these cuts.
+
+The authenticated USA cartridge's unit table has 2 half-units
+of required supply for Marine (raw 0) and SCV (raw 7), and
+0 for both Raynor units (raw 19 and 20). The human slot starts
+with four Marines and an SCV, for 5 supply. The CHK places
+Raynor in a separate slot. The opening counter alone leaves
+his transfer timing open. The source rule for the GBA's
+Raynor alias charges two half-units.
+
+The Backwater CHK contains 15 triggers and zero Order or
+Run AI Script actions. The starting SCV is a preplaced unit.
+This constrains the worker-order comparison to the opening
+engine behavior. The N64 render snapshots establish gathering
+and a changing bank, while the exact internal order and the
+initial mineral target require a separate trace.
+The [OpenBW units.dat loader](https://github.com/OpenBW/openbw/blob/master/data_loading.h#L1433-L1443)
+identifies the supply columns in the cartridge table.
+
+A further controller-only load sees minerals rise from 248
+to 256 while gas and 5/26 supply hold. An A press aimed at
+the vehicle yields no visible selection panel or ring. That
+capture leaves its ownership and the hit test unresolved.
+
+#### Backwater Marine production
+
+A separate fresh N64 process loads the first slot and uses
+the stick and A to select the Barracks. Its panel shows
+1,000 HP. C-Right opens Build and the ordinary stick
+selection highlights a Marine for 50 minerals and one
+supply. A confirms the order. The next cut has a queued
+portrait and progress bar, 206 minerals from the prior
+256, and 6/26 supply from 5/26. With neutral input, the
+queue clears and another Marine is visible beside the
+Barracks. Mining continues. The input and output FlashRAM
+match byte for byte.
+
+A separate selection attempt snaps the cursor to Raynor's
+Vulture, then A produces no unit panel. That distinguishes
+cursor snap from a confirmed player selection in this position.
+
+On the exact KODAK Terran ROM, ordinary opening controls
+select the preplaced Barracks and queue one Marine.
+Minerals fall from 200 to 150. The queue contains one
+active unit while current supply remains at 6/26. The
+Marine completes during neutral updates and current supply
+rises to 7/26. The observations cover the paid production
+path on both systems. N64 displays the extra supply at
+queue time. These GBA observations read actual used supply.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |
+| N64 first-slot save | `bbb280c07d827e96135ee6ee17b3268bec83d20a20681e18662a4e40b08306f6` |
+| N64 fresh-process reload | `2c9d3141c995bf315e72a9e500aa91601b60c507af72631d02d2f6c6b07ebab4` |
+| GBA opening and neutral updates | `c23236098c12c013370634bb91fda62357c34a4273d9420be5d62243e3904cd6` |
+| GBA independent opening and 600 neutral updates | `4fa9651e09dccc7efc4770cdd8a633823e7c7863722ed1c6f55218aeefbc099f` |
+| N64 unit supply table inspection | `18cf32940064e50f2a6872388622061cb6360a04f27ea5e0183d0d2edad89751` |
+| N64 Backwater starting roster and action counts | `7ac41e6b4fab6762aca295fed9b07792ae277aa329b72d1d716e755524328f2b` |
+| N64 follow-up harvesting and selection probe | `161e81ca5e295a135ee7a21855f6a4e9181db425ff0e7248921b9777b85d37a5` |
+| N64 Backwater Marine payment, queue and completion | `23e8f1bd1493d4b378b20afaa32dd775d4bd1d1279e0f6eb13d1f6cbc21740f0` |
+| N64 field cursor snap and selection attempt | `7fe3baa1973ccc388c2970e53c80bec68c7d10ede87f3cff671001fde6af3a8a` |
+| Exact-KODAK Backwater Marine payment, queue and completion | `29fe8339b66cf3f39d56ec0f0b399ca6213a26b5ad4d44a420bc38095f8b513a` |
+
+A further native controller attempt from the first-slot save
+leaves the Marines stationary after A and the attempted move.
+No unit panel appears. This run completes with unchanged
+FlashRAM and does not establish hero acquisition. Its manifest
+has SHA-256 `45c854ba51cc6c54a74eaa4c6a55ff4327a1d13b8167d658b48985f15d21a670`.
 
 ### Terran chapter 5 input divergence
 
@@ -568,60 +1099,284 @@ at call 57,747, game frame 56,506, with Raynor dead and Kerrigan
 alive. The runtime records defeat and zero trigger faults.
 The current cartridge still needs a winning route.
 
-An ordinary move order after input call 22,000 takes Raynor to the
-northeast edge. He reaches it by game frame 24,775 and stays at
+An ordinary move order after input call 22,000 takes Kerrigan to the
+northeast edge. She reaches it by game frame 24,775 and stays at
 full health through frame 129,658 in the neutral continuation.
 The mission is still active with all 21 hostile buildings and
 four friendly buildings remaining.
 
-Applying the old suffix after that retreat recalls Raynor through
+Applying the old suffix after that retreat recalls Kerrigan through
 the global combat-group selection and later orders. That variant
 loses at frame 108,946 with all 21 hostile buildings still standing.
 
 A fresh retreat test uses an ordinary L-drag box to select two
 nearby Marines. A ground order moves both with formation
-offsets. Kerrigan retains her idle target, and Raynor retains
-his retreat target and idles on arrival. This verifies local
+offsets. Raynor retains his idle target, and Kerrigan retains
+her retreat target and idles on arrival. This verifies local
 command of an assault group with both heroes excluded.
 
-The explicit Move test selects Kerrigan and uses B, Up and A to
+The explicit Move test selects Raynor and uses B, Up and A to
 choose Move from the command menu. Placing the cursor at (1379,203)
-sets her movement order and destination. She remains around
-(1319,203–205) at 45 HP for 2,000 updates. Raynor reaches (1528,7)
+sets his movement order and destination. He remains around
+(1319,203–205) at 45 HP for 2,000 updates. Kerrigan reaches (1528,7)
 at 250 HP. This establishes command acceptance and isolates the
 remaining route problem to reaching that waypoint. A previous
 contextual A click on nearby ground selected another actor.
 
-The retained route puts Kerrigan at the stalled location by input
-call 20,000. A new branch at call 18,000 verifies selection of her
-slot and issues Move toward (1448,398). She moves from (1352,290)
+The retained route puts Raynor at the stalled location by input
+call 20,000. A new branch at call 18,000 verifies selection of his
+slot and issues Move toward (1448,398). He moves from (1352,290)
 to (1456,383) by 200 updates and stays there through update 500.
-She keeps 45 HP and Raynor keeps 250 HP. The test establishes an
+He keeps 45 HP and Kerrigan keeps 250 HP. The test establishes an
 earlier route that clears the original position. This waypoint is
 short of its target, and the mission outcome is still open.
 
-An earlier branch at call 12,000 redirects Kerrigan from (945,397)
-to a staging area near (856,398). She reaches it within 100 updates
-of the Move order and keeps 294 HP through game frame 19,160. Raynor
-follows his prior order and falls to 23 HP. A later attempt selects
-his verified slot at frame 13,229 while he still has 250 HP. That
+An earlier branch at call 12,000 redirects Raynor from (945,397)
+to a staging area near (856,398). He reaches it within 100 updates
+of the Move order and keeps 294 HP through game frame 19,160. Kerrigan
+follows her prior order and falls to 23 HP. A later attempt selects
+her verified slot at frame 13,229 while she still has 250 HP. That
 attempt ends before issuing an order because the menu sequence does
 not enter Move mode.
 
-A second early branch selects Raynor at frame 13,229 and uses an
-ordinary A click on empty ground at (702,538). This replaces his
-old attack order with Move. At frame 19,288 Kerrigan remains at
-(856,398) with 294 HP and Raynor is at (702,527) with 250 HP. They
+A second early branch selects Kerrigan at frame 13,229 and uses an
+ordinary A click on empty ground at (702,538). This replaces her
+old attack order with Move. At frame 19,288 Raynor remains at
+(856,398) with 294 HP and Kerrigan is at (702,527) with 250 HP. They
 are the two remaining player units. The mission is still active
 and this branch has yet to produce a victory.
 
-The direct recruitment attempt moves the rescued Kerrigan alone
-toward the rebel base. At frame 12,814 her position is (1348,257),
-inside the base-entry rectangle, and she has 118 of her earlier
-294 HP. She dies by frame 13,306 and the mission is lost before
-any observed recruitment. The existing fixture allows up to 2,400
-updates for its delayed sequence. This attempt did not establish
-a safe approach or dwell window for it.
+One direct approach moves Raynor alone toward the rebel base.
+At frame 12,814 his position is (1348,257), inside the base-entry
+rectangle, and he has 118 of his earlier 294 HP. He dies by
+frame 13,306. The mission's recruitment trigger checks for
+Kerrigan's raw identity, so this branch only tests the approach.
+
+An earlier branch at input call 8,000 preserves seven Marines and both
+heroes at full health at frame 10,093. A long group order to (200,700)
+stalls through 1,000 updates. Ordinary L-box selection and three shorter
+ground orders to (110,590), (180,540) and (260,500) advance the escort.
+At frame 13,603 six Marines and both heroes are between (229,496)
+and (255,516). One Marine stalls at (190,534). All seven Marines
+retain 40 HP, Raynor 300 HP and Kerrigan 250 HP. The bank stays
+at 300 minerals and 300 gas. Independent HOME reload restores the
+frame, every observed friendly actor field and the exact SRAM bytes.
+Recruitment and victory are open.
+
+Another branch from frame 13,603 sends the selected eight-unit
+escort north to (250,450). The independent frame-14,692 HOME
+reload restores their positions around the waypoint, all seven
+Marines at 40 HP, Raynor at 300 HP and Kerrigan at 250 HP. One
+Marine remains at (190,534). The bank retains 300 minerals and
+300 gas, and the SRAM export is byte-identical. Two alternative
+longer moves stall or expose units to a hostile detour. The
+northern waypoint is the start of a five-order continuation through
+(215,400), (185,330), (230,280), (280,232) and (344,200). At frame
+16,671 six Marines have reached the final position with Raynor
+at 300 HP and Kerrigan at 250 HP. The seventh Marine stays at
+(190,534), and all seven retain 40 HP. A separate HOME process
+restores the observed friendly roster, positions, health and
+300/300 bank with byte-identical SRAM.
+
+The escort doubles back and takes the south corridor. The
+previously separated Marine rejoins the group. At frame 21,884
+all nine actors reach the area around (480,836) at full health.
+The fresh HOME readback matches the frame, roster, positions,
+300/300 bank and SRAM. In the first onward branch toward
+(552,824), one Marine dies by frame 22,279. Both heroes keep
+full health. The earlier save preserves the full escort.
+
+A separate ordinary Attack Move order toward (600,790) defeats the
+nearby Vulture and loses the same Marine. At frame 22,304 Kerrigan,
+Raynor and the six surviving Marines are at full health. Fresh HOME
+restores their positions, the 300/300 bank and byte-identical SRAM.
+The Vulture is absent after reload. Recruitment and victory remain open.
+
+Short ordinary orders continue past the Wraith area and along the
+southern approach. A fresh HOME process restores frame 27,001
+around (1070,440) with both heroes at full health. All six
+remaining Marines survive, four wounded. The bank remains 300/300,
+and the SRAM export matches exactly. A farther branch reaches
+the (1289,434) area at frame 28,190 but loses two Marines and
+leaves Raynor at 134 HP. Recruitment is unobserved in that
+branch. The full-escort journal remains available.
+
+Focused attack orders clear two bunkers on a separate branch.
+The first falls at (1160,400) with all six Marines and both
+heroes alive. The independent replay matches the full result
+and exact SRAM at frame 27,325. A second engagement clears
+the bunker at (1272,384) and costs one wounded Marine.
+At frame 27,771, Kerrigan and Raynor retain full health, with
+five surviving Marines. Fresh HOME restores the observed
+positions and health and the exact SRAM. A third bunker and
+hostile units remain near the east corridor into the base.
+
+Raynor takes the east corridor into the base-entry rectangle and
+survives there. A fresh replay of the follow-up identifies Kerrigan
+by raw identity 16 and uses the explicit Move command to send her
+to (1376,240). At frame 30,681 the player roster grows from four to
+27 units and from zero to 19 buildings. The neutral unit count drops
+from 20 to zero. Kerrigan has 250 HP and Raynor 269 HP. Fresh HOME
+restores both heroes and the recruited roster with identical SRAM.
+An independent replay from the post-bunker save reproduces each
+of the four checkpoints and its SRAM.
+
+The recruited Factory accepts a paid Vulture order for 75
+minerals. The bank falls from 300 to 225. The unit finishes by
+frame 31,349 at 80 HP. Fresh HOME at frame 31,549 restores the
+unit, both heroes and the bank with byte-identical SRAM.
+
+The captured Starport at (1184,72) then queues a Wraith for
+150 minerals and 100 gas. The bank moves from 225/300 to 75/200.
+The new Wraith finishes with 120 HP by frame 32,826. The
+original recruited Wraith is still present. Fresh HOME
+restores both Wraiths, both heroes and the exact SRAM.
+The mission still needs a winning attack on the hostile base.
+
+Two recruited SCVs collect minerals and later split between
+minerals and the captured Refinery. A fresh frame-39,237 save
+retains both 60-HP workers, the 471/72 bank and four surviving
+Wraiths. Four Wraiths knock out three hostile Wraiths while
+advancing south. The two heroes remain at the recruited base.
+
+Reinforcing to six Wraiths opens an eastern approach around
+the western Missile Turrets. The eastern Command Center's
+Goliaths repel the first small assault. Three more paid
+Wraiths join the formation. The nine-aircraft attack destroys
+the eastern Command Center at (1040,1496) by frame 56,984.
+Seven Wraiths survive with 20–120 HP. Both heroes remain alive
+and the fresh HOME export exactly matches the attack save.
+Twenty-two hostile buildings remain, including a western
+Command Center and the Missile Turret line. A further attack
+destroys the eastern Refinery at (1376,1296). At frame 57,882
+all seven Wraiths and both heroes survive. An independent fresh
+HOME process verifies both eastern structures are gone, the
+21 remaining hostile buildings, and byte-identical SRAM.
+
+A western staging run pays for two more Wraiths and reaches
+42/42 displayed supply (84/84 half-units). A nine-Wraith attack
+removes the northern Missile Turret at (528,1344). Fresh HOME at frame 64,503 restores all
+nine aircraft, both heroes and byte-identical SRAM. The hostile
+census contains seven turrets, eight depots and five other
+buildings. Six of the seven remaining enemy Wraiths are clustered
+by the western Starport. They engage the force after reload.
+A second turret attack from that position loses five Wraiths
+without damaging the target. Use the earlier staging save for a
+new approach that separates enemy aircraft from the turret line.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Earlier staging SRAM | `3049d226fa3b9f60c32d70b15ed0376a08a763edb2ccc68c96b4ced097d85cf0` |
+| Western Missile Turret attack | `0587019f430cec3382e80b5ee6030bd763ad3c8274c3bbb3d076218c4656f89d` |
+| Western Missile Turret fresh HOME | `94ef81c771f372d71a38eea6d6857fefc2e57b0f0292a070b1ca21e89cd41596` |
+| Second turret attack | `f784de0e78d93711283e484fe308de0f9da740755ca9039450512897b2213a1f` |
+
+#### Expand supply and reinforce before the western assault
+
+An ordinary construction order from the earlier staging
+save pays 100 minerals to build a Supply Depot at (1104,200).
+It completes by frame 65,724 and raises displayed supply
+capacity from 42 to 50. The captured Starport takes a paid
+150-mineral, 100-gas Wraith order at frame 65,790. The
+tenth Wraith completes by frame 66,990.
+
+Fresh HOME restores the force at 44/50 supply and the bank
+at 812 minerals and 448 gas. Raynor has 269 HP and Kerrigan
+250 HP. The SCV at the captured Refinery is still harvesting.
+During the attempt, an A input moved the original nine
+Wraiths back near the recruited base. This branch prepares a
+larger force at home. The earlier western turret-kill save
+holds the forward position. A second run of the same ordinary
+inputs reproduces the checkpoint observations and save byte
+for byte.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Depot and paid Wraith continuation | `6d52271de7406614aaeef881a77047bc20a9f86792f017aa2c67c8ba53a758ea` |
+| Fresh HOME observations | `226f101271cbeaa22ae94cf789d94ebf105eeae74886be8b80044ba87987de9c` |
+| Reinforced home force SRAM | `5443aa0f97ff386c2a7c8932fa964cf873e8e79001245431c6370b1384583e61` |
+
+From the reinforced home save, three more paid Wraiths
+complete. Fresh HOME at frame 75,800 has thirteen Wraiths
+at 50/50 supply and both heroes at 269 and 250 HP. An
+approaching hostile Wraith disappears before the assault.
+The larger wing attacks from the northeast and removes the
+turret at (528,1344) in this branch. Fresh HOME after the
+withdrawal restores ten friendly Wraiths, two hostile
+Wraiths and 20 hostile buildings at frame 84,749.
+
+Another two paid Wraiths reinforce the attack on the turret at
+(432,1280). It falls. Both remaining hostile Wraiths are absent
+from the full fresh HOME census. The Starport takes incidental
+damage and remains at 929 HP. Two friendly Wraiths are lost.
+At frame 92,815 the ten remaining aircraft and both heroes
+fresh-load with 932 gas.
+
+A follow-up attack removes the western Starport. All ten
+friendly Wraiths retreat, including three below 20 HP.
+Fresh HOME at frame 94,976 restores both heroes at 269 and
+250 HP, 1,020 gas and 44/50 supply. The census finds zero
+hostile Wraiths and 18 hostile buildings, including the
+western Command Center and six Missile Turrets. An independent
+controller replay reproduces the attack checkpoints and SRAM
+byte for byte.
+
+The next sortie removes the northern Missile Turrets at
+(400,944) and (336,944) and loses two Wraiths. Fresh HOME at
+frame 96,735 restores eight Wraiths, both heroes, 1,092 gas
+and 62 minerals. The hostile census has 16 buildings,
+including four Missile Turrets, and zero Wraiths. An
+independent replay reproduces the sortie and save.
+
+The mineral worker is idle beside the recruited base and its
+prior field is empty. An ordinary Harvest order to an adjacent
+nonempty field returns eight minerals, lifting the bank from
+62 to 70. Fresh HOME preserves the two workers' mineral and
+gas orders, both heroes and all eight Wraiths. The order that
+preceded the interruption still needs a replay from before
+depletion to test automatic handoff.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Thirteen-Wraith fresh HOME | `d73a5ad034ea834c924683ce1711e88adf6e73bb7ffb06f226d5aef5bd8f7a7a` |
+| Northeast turret attack and withdrawal | `9690aff56cb652598e3d4c290408290a40e8798ed9ec79c6932e3aadc1822b9e` |
+| Fresh HOME with two hostile Wraiths | `1cd4a36633bd25ef67923955634514d8f661b3ae59d5cd81ef55772ae871d783` |
+| Fresh save after the second turret falls | `964f9224e27b0f7832d09fd88c32b5b083af1f023038cfae2dfa58caaa46c3a1` |
+| Western Starport assault | `1e89975fc608e0665f6e2f3bcff26947df8775a50d1eebc7176d530ab6d4a874` |
+| Fresh HOME after Starport destruction | `3a5ef357c5fa7f930b4583829ae73a227f69e8de2a4c67e58a1797e1f76ad808` |
+| Post-Starport SRAM | `012672dc8f05301c04183180285cb31b2574f0273da9e804026d41ef175a4591` |
+| Two northern Missile Turrets removed | `34692b8b1155f99ba0730a8193a5ab8b153bd7b3644d8ac70e136de27e71ecb9` |
+| Fresh HOME after the northern sortie | `b4e91d5b2e67c13b01faed8ba20aa1251ce12444a5e61484558c068922f0ab4a` |
+| Mineral worker reassignment and deposit | `8dee86c45e2031215bd43f51ccd585e428b5bc15fd05f0dd57395811f39d7592` |
+| Fresh HOME with resumed mineral income | `b21dfea87a4aa5177b2ba0305c05b0263223cc7f1ac7e653a6eaa0c4d30fffed` |
+
+#### Terran 5 victory and fresh HOME
+
+The recovered mineral and gas orders fund five more Wraiths.
+The first air attack removes a Missile Turret at (304,1264).
+The next removes the western Factory and four other buildings,
+including a second turret. Fresh HOME at frame 135,584
+preserves eleven Wraiths, both heroes, 1,128 minerals, and
+ten hostile buildings. The exported SRAM is byte-identical.
+
+The next stages remove the Barracks, both remaining turrets
+and western Command Center. Twelve Wraiths attack the final
+four Supply Depots. At frame 170,041, the game reaches the
+victory screen with both heroes alive. A fresh HOME load
+restores RESULT, the Terran 5 completion bit and the same
+victory SRAM. All orders use normal controls on the exact
+installed Terran image. A second controller replay of the
+final attack produces the same checkpoints and victory SRAM.
+From a separately loaded victory save, A advances into the
+playable Terran 6 field and retains the Terran 5 completion bit.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| West Factory SRAM | `8f4e43561641363f17c1d72453f65bbdd6a3f26d4e68847532921f0d78e74e71` |
+| West Factory fresh HOME | `958e327a17647a47d8e5f8d140804652571b928b62f1053c66cddd3a2b9246da` |
+| Final depot attack | `e20dff44342515903f644ae77ce0060afdeef06ce392fc15c1c003ac73f4e71b` |
+| Victory SRAM | `ae43a22a259d651ff4e975449b993209b53e72d147cd893bdf6d30752261f876` |
+| Fresh HOME and Terran 6 deployment | `5addd6b63f37eb6153d1f4c80cbd4dfbc2ac5e0e8e57c7dd703114a953f16908` |
 
 ## Custom Game saves
 
@@ -708,6 +1463,98 @@ its higher mean rate. Blood Bath resolves different start locations
 across lineups, so these are full-match observations for the stated
 configurations. They measure guest cycles in mGBA.
 
+### Late frame budget with one or two CPUs
+
+A second set of 12 ordinary-button runs samples 120 consecutive
+updates at launch and after updates 9,000 and 11,000 in each
+configuration. All 4,320 total-cycle samples and resolved
+seats match the corresponding portions of the retained pacing
+replays. The component counters also pass the nesting checks.
+The player gives no orders, with the starting camera fixed.
+
+| Race ROM and map | One CPU total | One CPU orders | One CPU draw | Two CPUs total | Two CPUs orders | Two CPUs draw |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Terran Outpost | 592 | 251 | 272 | 842 | 424 | 299 |
+| Terran Blood Bath | 561 | 191 | 222 | 669 | 334 | 223 |
+| Zerg Outpost | 641 | 251 | 308 | 902 | 441 | 329 |
+| Zerg Blood Bath | 561 | 198 | 263 | 681 | 295 | 265 |
+| Protoss Outpost | 641 | 252 | 300 | 852 | 392 | 320 |
+| Protoss Blood Bath | 567 | 230 | 247 | 712 | 328 | 252 |
+
+Values are mean thousands of guest cycles after update 11,000.
+Outpost needs a 5.2–12.4% reduction in total mean cost with
+one CPU and 33.2–37.7% with two. On Outpost the extra order cost
+is 66–73% of the increase from one to two CPUs. In the one-CPU
+Blood Bath cuts, the mean is near budget but 25–77 of 120 frames
+still exceed two VBlanks. With two CPUs, every complete frame
+exceeds the budget across both maps. Simulation alone exceeds
+budget on 12–63 of 120 two-CPU Outpost samples. Keep a one-CPU
+Blood Bath tail check and prioritize savings in orders for
+Outpost, then measure those savings together with drawing.
+
+The detailed local receipt has SHA-256
+`161b4ffa9d460ac48acb701817d9a1d47e543b5c8f21ad36ec848ae988bf761a`.
+
+Eight read-only instruction cuts per Outpost configuration
+match separate uninstrumented runs on elapsed cycles, both
+framebuffer pages, main world state, palette and camera.
+Adding the second CPU increases inclusive movement cost from
+178 to 334k cycles on Terran, 195 to 338k on Zerg, and 116
+to 193k on Protoss. Movement accounts for 61–81% of the
+additional order cycles in these cuts. Uncached contact
+masks account for 68–203k of the two-CPU updates; point route
+lookup accounts for 10–13k. Those routines can be nested
+inside movement. Target contact work before expanding the
+point-route cache for this measured workload.
+
+The instruction receipt has SHA-256
+`6f0adcd8555466213ebc464a7a3ac065489e07cf4a9df0066000d0d78f6bc0ff`.
+
+#### Contact queries in those Outpost windows
+
+Read-only entry and return observations record 1,299 contact
+queries across the same six eight-update Outpost cuts. Each
+cut matches the uninstrumented run on elapsed cycles, cycle
+counters, both video pages, palette, display, camera and
+world state. The installed Terran and Zerg kernels run in
+Thumb ROM. Protoss uses ARM in IWRAM.
+
+Author-created ARM fixtures replay the captured bucket inputs
+at the corresponding placements. All masks match their
+observed cartridge values. Keeping the query origin and map
+dimensions in locals saves 0.11–0.19% of the Terran and Zerg
+fixture kernel cost and 6.50–7.03% on Protoss. The Protoss
+fixture explicitly keeps the kernel out of line and checks
+its IWRAM address. Trials with
+incremental bucket row addresses or a prepared geometry
+table offset make the busiest Thumb cases slightly slower.
+
+The early axis check already used in the IWRAM kernel saves
+more when enabled in the speed-optimized ROM fixture.
+
+| Case | Original kernel cycles | Early check cycles | Reduction |
+| --- | ---: | ---: | ---: |
+| Terran, one CPU | 841,775 | 627,127 | 25.5% |
+| Terran, two CPUs | 1,394,919 | 1,088,709 | 22.0% |
+| Zerg, one CPU | 945,323 | 690,035 | 27.0% |
+| Zerg, two CPUs | 1,555,013 | 1,213,921 | 21.9% |
+
+The kernel gains equal approximately 4.9–5.2% of two-CPU
+loop cycles if the fixture rates carry to the measured
+contact costs. The trial adds 92 bytes to each fixture
+kernel and changes the linked BSS endpoint by zero or four
+bytes. Whole-ROM timing, stack, RAM and save checks still
+need a paired run. Use the ROM early-axis trial first for
+busy Terran and Zerg Outpost qualification.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Verified Outpost query census | `835855435a5343bbbaf28187f24febce13960f95cbd9d026f0ea337a6fa13a86` |
+| Thumb local variables and incremental row addresses | `adf2bcdd19826bd73eba8360b4cc8a17fbf5c738ad34228531f0833d283742b8` |
+| Protoss IWRAM fixture with placement verified | `4acf4b134893ac7020cd593f0c7865c7473c81add398df6461f6493e5b7c4d2d` |
+| Prepared geometry offset | `96fc97d65e95a7eb099dbff5f46a0ddd962632bfc1a8ac7f0c8e295b72cbaad7` |
+| ROM early-axis matching masks, timing and memory | `32218fb7d46a7a91778cc2b27dbb88e760b875e56bd7678a9c8556cdcd594d9e` |
+
 ### Late camera movement
 
 The six three-CPU match configurations also run a 360-update
@@ -762,6 +1609,11 @@ and effects account for 35–62% of drawing, compared with 43–52k
 cycles for the measured terrain background stage. The launch
 windows average 29.72–29.99 emulated updates per second and the
 late windows average 13.16–19.73.
+
+A later independent pair repeats these six launches and
+all 2,160 cycle observations twice with byte-identical
+receipts. The repeated census has SHA-256
+`faa11662f1f3d880a5e8c8a7efc66e9c16aeb831a6132f63ea2badc170f769b0`.
 
 The profiling intervals charge interrupt work to the phase in
 which it occurs. The simulation interval also includes input reads.
@@ -884,6 +1736,138 @@ occurs at most once within a sampled update. The late cut also
 draws 164 packed sprites across 3,251 rows. These counts provide
 workload sizes for synthetic renderer and collision tests.
 
+### Sprite crop and projectile draw calls
+
+Read-only call/return traces cover frames 11,002–11,009 on each
+race cartridge and map. The 48 fixed-camera cuts match the
+ordinary runs on world, both framebuffer pages,
+palette, camera, display, phase counters and elapsed cycles.
+
+The renderer makes 18 exact unit crop calls. Seven are repeated
+successful checks on the same unit between painter admission and
+body drawing. The repeats cost 11,028 cycles across the 48 cuts,
+with six of the seven on Zerg 10 Blood Bath. A separate eight-update
+Protoss 7 cut after frame 48,426 makes zero exact crop calls. That
+run matches the retained frame-48,426 world and video and the
+frame-55,892 victory state and video. It covers one camera position.
+A cache for repeated exact crops has little payoff in these cuts.
+
+| Cartridge | Outpost tracer calls/update | Outpost tracer cycles/update | Blood Bath tracer cycles/update |
+| --- | ---: | ---: | ---: |
+| Terran 10 | 55.6 | 50,801 | 0 |
+| Zerg 10 | 62.3 | 78,069 | 3,059 |
+| Protoss 10 | 57.8 | 55,215 | 6,408 |
+
+The base projectile-only pass accounts for 39,563–64,678 cycles
+per Outpost update. It spends more cycles than the attacker-image
+calls or the split trail passes on each race cartridge. None of
+these calls collects sorted ground-trail picks. A separate readback
+of each sampled draw slot finds only layers 5 and 19, above the
+ground-layer world-Y projection. Both proposed reuse paths have
+zero covered draws here. This package predates the [FOLLOW
+viewport change](https://github.com/ggu/starcraft-gba/pull/782).
+Profile the current source's base projectile motion and raster
+work at this fixed camera position and after an ordinary-input
+pan to the visible fight. These are mGBA guest-cycle observations.
+
+#### Pan from the base to the Outpost fight
+
+Across three exact race-ROM runs, an ordinary R and D-pad hold
+moves the Outpost camera from (40,106) to (520,790) before frames
+11,002–11,009. Both views match the world and route counters. The
+traced pan matches a second uninstrumented pan across both video
+pages, display, palette, counters, and elapsed cycles.
+
+| Cartridge | Fixed tracer cycles/update | Panned tracer cycles/update | Panned cycles/update in the watched raster function |
+| --- | ---: | ---: | ---: |
+| Terran 10 | 50,801 | 85,317 | 9,713 |
+| Zerg 10 | 78,069 | 390,611 | 204,004 |
+| Protoss 10 | 55,215 | 324,503 | 155,848 |
+
+The watched function is the raster entry on Terran and Protoss
+and the resolved image-frame entry on Zerg, where the raster is
+inlined. Those costs are inclusive and are part of the tracer
+costs. The panned Zerg and Protoss cuts spend about half of their
+tracer cost inside that function.
+
+All 272 split trail draws across both camera cuts use bullet type
+0. The merged FOLLOW viewport rule therefore does not need to
+expand to those split draws for this workload. The fixed camera
+places every sampled cached launch and target envelope outside
+the viewport using the conservative 66- and 61-pixel radii. These bounds
+exclude none after the pan. Compare the offscreen rejection and
+visible raster work separately. This measures the installed build,
+which predates the merged FOLLOW change.
+
+#### Reusing effect visibility for each tile row
+
+A paired 120-update P10 Outpost replay uses the installed image
+and a retained build from its source revision with the tile-row
+renderer trial. It starts at frame 11,002 and tests both views.
+All 240 frame pairs match the world, camera, both framebuffer pages,
+palette, display and route counters. Both links have the same
+IWRAM and EWRAM static endpoints.
+
+| Camera | Mean loop cycles, original → trial | Mean draw cycles, original → trial | p95 loop cycles, original → trial |
+| --- | ---: | ---: | ---: |
+| Fixed | 1,268,499 → 1,268,401 | 469,200 → 468,820 | 1,485,000 → 1,491,629 |
+| Panned | 1,456,009 → 1,337,136 | 597,250 → 476,840 | 1,696,269 → 1,572,520 |
+
+At the fight, mean loop cycles fall 8.16%, mean drawing falls
+20.16% and p95 falls 7.30%. The fixed-camera mean is flat and
+its p95 rises 0.45%. All 120 updates in each case remain above
+the two-VBlank budget. These measurements apply to the retained
+P10 pair. Qualify the current combined source against the other
+cartridges, campaign and Showcase, including save continuation,
+before promoting the renderer to the release builds.
+
+#### Blood Bath holdout and late skirmish journals
+
+The same P10 pair completes 120 Blood Bath Melee updates in each
+of two camera positions from frame 11,385. Each pair matches world
+state, route counters, both framebuffer pages, palette and the
+selected scanout. In one panned frame, 11,386, the display registers
+differ by the single Mode 4 page bit. The raw bytes prove the two
+pages are identical within and across builds at that boundary.
+All remaining display register readings match exactly.
+
+| Blood Bath camera | Mean loop cycles, original → trial | Mean draw cycles, original → trial |
+| --- | ---: | ---: |
+| (24,850) | 1,394,509 → 1,394,508 | 677,980 → 678,255 |
+| (512,594) | 955,730 → 955,579 | 279,836 → 279,581 |
+
+The effect on mean frame time in this holdout is under 0.02% at
+both views. Every measured update still misses the two-VBlank
+deadline.
+
+Two separate P10 runs save the mixed three-CPU matches at frame
+11,001 on Outpost and Blood Bath. Ordinary fresh HOME loads each
+saved lobby and continues 180 updates. Both saves and both exports
+match the original byte for byte. Lobby settings, resolved seats,
+starting positions, world and continuation checks also match.
+
+The current source also passes a 5,000-case asset-free Mode 0
+differential under ASan and UBSan. The baseline and candidate
+digest the same tile pixels, dirty, drawn and art masks, and
+HUD flags. This is host renderer evidence. The current combined
+race and Showcase cartridge matrix remains open.
+
+#### Protoss 7 victory from a saved campaign
+
+Both builds in the retained P10 tile-row pair load the same frame-8,845
+Protoss 7 journal and replays 48,540 recorded controller updates.
+All 47 sampled checkpoints match the world, visible and explored
+tiles, impacts, mission state, raw framebuffer pages, palette
+and selected scanout. Both runs win at frame 55,892. Their victory
+SRAM matches the original recorded run byte for byte, and a
+fresh HOME process per build restores the victory result.
+
+The original uses 84,448,954,675 cycles and the trial uses
+84,447,543,282 cycles across the replay, a 0.0017% reduction.
+This extends gameplay and save coverage for the retained pair.
+The latest combined source still needs equivalent production
+cartridge checks.
+
 ### Paired ARM replay of observed route queries
 
 A repeat of the 96-update Terran Blood Bath cut records the ordered
@@ -926,6 +1910,164 @@ continuation table. The request clock is pinned to an eligible
 value. Qualification with the full dispatcher must cover existing
 route hits, age boundaries, earlier cache history and topology
 changes. The fixture adds 360 bytes of linked BSS.
+
+### Projectile fog spans on current Terran and Showcase
+
+[PR #823](https://github.com/ggu/starcraft-gba/pull/823) was
+linked with prepared inputs on the source release at `ba2541bd`.
+The tested merge tree is `048c4022`. The initial Terran and
+Showcase links use the unpacked shared sight path. The Terran runs
+load the same late skirmish journals. Eight 120-update
+windows cover two and three CPU opponents, both maps and
+fixed and panned views. Worlds, camera, palette, both
+framebuffer pages and every save continuation agree. The
+six two-CPU and Outpost cases match all cycle samples. The
+three-CPU Blood Bath means improve by less than 0.01%.
+
+Five Showcase scenes start through the ordinary menu and
+compare 120 updates per scene. Worlds, palette and both
+pages agree. Carrier Approach and Protoss Crossfire mean
+frame costs fall 0.37% and 0.29%. The other three means
+change by less than 0.03%. Both product pairs have identical
+linked working RAM and IWRAM endpoints.
+
+The selected page differs at one Terran and one Showcase
+stop. At both stops, the candidate has already completed one
+more VBlank flip and has no pending page. The control still
+has a queued page. Cumulative flip counts and selected
+page agree again at the next input boundary, with both pages
+matching throughout. This comparison does not measure
+physical display duration. The current samples show modest
+or flat timing, and the earlier stronger panned Protoss
+result is covered by the canonical comparisons below.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Late Terran pair summaries and per-window hashes | `bcbf5aca52f33fb33b051c2c7958f0edb65fb4470fd15eca12740b9ed87e5a5e` |
+| Five paired Showcase scenes | `ebb6721eb8869ffffb11a0eea85d65afe787d2f6fc14a8b2b1e19b835431f2f0` |
+| Selected page, pending flip and cumulative flip checks | `5314da82da885fedd5fd7ebaf70f2a8432fdd2e45c7c56d83f24fa448df18b5f` |
+
+#### Canonical renderer qualification on all four profiles
+
+The corrected Terran and Showcase links include the normal
+packed and sparse shared sight flags. Z10 and P10 use their
+normal sight configurations. All four links pass the existing
+RAM reserve guards. The three-CPU Terran samples match in both
+views on both maps, including both pages, selected scanout
+and fresh HOME saves. Mean timing is effectively flat.
+The two Showcase scene pairs match selections and pixels
+and improve mean timing by about 0.2–0.25%.
+
+Canonical P10 and Z10 each measure 120 ordinary updates
+after panning to (520, 790) in a three-CPU Outpost fight.
+Both pairs match world, both framebuffer pages, palette
+and selected display at the observed input boundaries.
+The regular pause journal and 60-update fresh continuation
+also agree. Z10's presentation interval counts differ, so
+matching boundary images do not establish equal flip times.
+
+| Product | Panned mean cycles, control → renderer | Reduction |
+| --- | ---: | ---: |
+| Protoss P10 | 1,474,500 → 1,349,855 | 8.45% |
+| Zerg Z10 | 1,279,205 → 1,186,722 | 7.23% |
+
+The fixed P10 holdout and both default-camera Z10 runs
+match timing. Every sampled update in the two panned fights
+still exceeds the two-VBlank budget. The renderer merged
+in [#823](https://github.com/ggu/starcraft-gba/pull/823).
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Canonical Terran four skirmish pairs | `35086baa1b95424274c69df70992e3b39f42f8c09d0c46aa1da686bfb6329f19` |
+| Canonical Showcase scene pairs | `d5397043aab33cc2f777d8e90a506380d2848d96bd73887fce57ea6f486e91a3` |
+| Canonical P10 fixed and panned Outpost | `e8cf4c1185ef2046d72681ed3065218d68b4206f95b41c93d0133e0e8ddfd5c4` |
+| Canonical Z10 fixed Outpost | `70bbc2cda6f6725dfc031339f22fb4680ad91758bd46746c5d4524568b703abd` |
+| Canonical Z10 panned Outpost | `611fc257aa9b6079dfc858ab4bd2caa16fa1f66abef8cf5cf6d43003fae9db3d` |
+
+#### Compose the renderer and ROM collision option
+
+The combined Z10 merge tree `992670ca` builds with the
+collision option off and on. The off build reproduces the
+renderer-only ROM byte for byte. The same panned Outpost
+replay saves 1.03% in mean whole-step cycles when enabling
+the option, from 1,186,722 to 1,174,526. The p95 rises
+from 1,527,386 to 1,536,482. All 120 samples remain over
+budget. The observed world, both framebuffer pages, selected
+display, pause save and fresh continuation match. The resumed
+presentation histogram differs. The flag stays off by default.
+The local receipt has SHA-256
+`8ba2f573608a1ff263362cbbef0e5bfa5bda9c8293f82b1963e5ef419736e6ff`.
+
+### Reusing contact scan coordinates in complete frames
+
+The [query-coordinate trial](https://github.com/ggu/starcraft-gba/pull/828)
+matches observed worlds, both framebuffer pages and save
+continuations in 12 Terran skirmish pairs with unpacked
+sight. All mean timing changes are within 0.02%. Two stops
+select different display pages. Five Showcase scene pairs
+with the same sight configuration match frames and cycles.
+A canonical current P10 pair from the late three-CPU Outpost
+journal gives exactly the same fixed and panned loop-cycle
+samples and matches the display and journals. The kernel
+fixture improvement does not carry over to these samples.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Terran skirmish pairs | `4dd8cabf52bcf62bb97ebce46f61d641bcdef38b81a46176180ed1fc105b8338` |
+| Showcase scene pairs | `2e4265c793d5aac9a144bc1044f6aca39df1a7d4ea4c340f05d6d8b7b21a363a` |
+| Canonical P10 fixed and panned pairs | `4388e7b4e96ea461d641234cffdfa0a6738d68404ebb39da01960b4cbafaa46e` |
+
+### Monotone route witnesses on two current Terran saves
+
+The [witness trial](https://github.com/ggu/starcraft-gba/pull/805)
+uses merged tree `b79233fd`. Both links enable the existing
+clear-prefix path. Only the candidate enables the witness
+table. Each pair loads the same late Terran journal and
+compares 120 fixed-camera updates. Two-CPU Outpost mean
+cost is flat at about 868,840 cycles. Three-CPU Blood Bath
+falls from 849,265 to 836,050 mean frame cycles, a 1.56%
+reduction. Every measured frame remains over budget.
+
+Worlds, palette, camera, both framebuffer pages and saves
+agree. One Blood Bath input boundary selects a different page.
+The trial does not observe live witness-hit counts. Extend
+the pair to active orders and profile the cache before
+changing the default.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Outpost stock / witness | `835e54c19a185059dbc188f28308e340b57e6cc7cb3b8e38a86c05cbb9b80bb4` / `1ddef2d373f6e25e4dbff3137add25478c81494c2f90369cd8c6dd2cac259db6` |
+| Blood Bath stock / witness | `c4f3e288b41471ef0ffba990bdb9da632da13295d2ac786a01d1a385aa46e716` / `ddc65b9d89773734f09343c63d6d04708e767137edd040effd244d85791f2ca8` |
+
+### Pylon lookup in dense missions and panned skirmishes
+
+The [Pylon grouping trial](https://github.com/ggu/starcraft-gba/pull/834)
+links canonical Z10 and P10 from prospective merge tree
+`c7cb9cc2` with the probe off and on. The off images match
+the canonical renderer build exactly. Each ordinary HOME
+load runs 160 measured updates. The skirmish camera pans
+to (520, 790) before measurement. The grouped path
+is exercised at 69 completed Pylons and the short-list
+path at nine.
+
+| Workload | Complete Pylons | Mean cycles off → on | Reduction |
+| --- | ---: | ---: | ---: |
+| Z9 opening technology, frame 8,925 | 69 | 865,254 → 848,370 | 1.95% |
+| Z9 first road assault, frame 27,560 | 69 | 1,725,547 → 1,707,993 | 1.02% |
+| P10 Outpost with three CPUs | 9 | 1,351,530 → 1,351,102 | 0.03% |
+| Z10 Outpost with three CPUs | 9 | 1,179,049 → 1,178,436 | 0.05% |
+
+The world and entity observations, palette, both VRAM
+pages, fresh HOME and 60 resumed updates agree. The
+four journal pairs are byte-identical. One Z9 and two
+Z10 samples stop with different displayed pages. The
+P10 skirmish 95th percentile increases from 1,568,384
+to 1,594,906 cycles. All 640 frames per build configuration
+exceed the 561,792-cycle target. The grouping trial stays
+off while whole-frame, stack and display timing proofs
+are incomplete. Local receipt SHA-256
+`3596e376bc4d8fef988bf62ebe4517a7bec3d371dcfdf5e9aa5d4a5f1e407774`.
+
 
 ## ROM space available for cutscenes
 
@@ -992,6 +2134,17 @@ quality on the GBA SP.
 | Late camera movement across both maps | `130911b38530064b0e3f846fa32585752a276030565a8949a1479184dbc9a075` |
 | Three-race frame-budget breakdown | `336e4cfc4cf66286f99b97ec10166c29bdb38c3b6e6cf6861396dd166e372bbe` |
 | Three-race order and drawing instruction attribution | `fae6f5e019544c8bd74587010652717b685c93afbbc05f5bb31babea211e9874` |
+| Late three-race exact crop calls | `71c00f4b93bd65b4f32f7ad80db1a516ec7fc8487b25bf24bc50ef50b7a9c207` |
+| Protoss 7 late exact crop calls and victory | `1a716f7f8c938d9b8a1945c068c94a9d8c0bcaeeb059cd294028ca07a9d9e18f` |
+| P10 tile-row paired Protoss 7 continuation, victory and fresh HOME | `ae8f7da97bb90b6d687cd7ec00b20d9e1767180924aa568149973f2b6a445b4d` |
+| Late three-race tracer draw calls and timings | `e3ec7ca92ca312e0417034da49f19079826ce2faa992b3e0581621601b275ad6` |
+| Late three-race Outpost pan and nested tracer/raster attribution | `367528075a2cffa35f0c45de9fc89215731a243305e3f3e310dfdfb361c2a50e` |
+| P10 Blood Bath tile-row holdout and selected scanout proof | `f706a49a4dab2d4d429c10ab392cb93c29d3e2eb5b63dab0e0604fa852f03ec0` |
+| P10 tile-row late mixed-lobby saves, both maps | `89348bccc7c827a9adc51218f835b076ed49a8e5125c3f3b4b4efc8455ba15a4` |
+| Authored Mode 0 fog raster differential fixture | `1f6cf26092f226fea8e3b360140e298876f9f9dfda25d5f1a1a89601494e20bd` |
+| P10 paired fixed and panned tile-row effect bench | `7e8d95ce4175b2befa682238ef2c02551265cecf25489522540a43c4011cf843` |
+| Current-source asset-free Mode 4 ARM differential | `66b15e3234ecf39ebe02a087b5ba8d8d7c7fda447fa602f468c2598131fd2d34` |
+| Late three-race tracer depth readback | `90963fb5bb184ef515bf078de40366c193d459e6fdf1437dff11754a4d67f9eb` |
 | Monotone point-route search outcomes | `f301862e71f5c4b52fba25cf93bc89f95b4ef769cd5952fa43553fc1db6fc43e` |
 | Terran Blood Bath exact endpoint repeats | `36e893debf67f5f26106a8fdbbc97af360742faabe3ff995e65e99af19773067` |
 | Terran Blood Bath calls that continue an earlier route | `1544bbbd940e70a3d4d964ffc0d6a28a715ed8c2e70da36f1f76d20da643676c` |
@@ -1008,14 +2161,32 @@ quality on the GBA SP.
 | Terran chapter 5 screen transitions | `91317b3116e15d7d9b92626a37fd52af05cc6009a30a697319c490c9b30e2e17` |
 | Terran chapter 5 pause-corrected divergence | `19133241bc024bc6096a698611de030155e3c341679fb26105ea012e843835ab` |
 | Terran chapter 5 pause-corrected defeat | `5045cef4db7af2cd8c214745ef1761e011972a1266df7490112d6e5fe6606aea` |
-| Terran chapter 5 Raynor retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
+| Terran chapter 5 Kerrigan retreat and survival | `742686095642b17d6c7b92d4d80566fd3a61e245954e404b7238d06f3fcaa78b` |
 | Terran chapter 5 retreat with the older suffix | `99ecca6a4f17266c65ccafbf47d41b93cd5e6830adaa7ce71aaf1325b2ed3cad` |
 | Terran chapter 5 hero-safe local selection and order | `1848f80e7fe00f9d303bb853b661dd32add344459f56f878facaf4474a833698` |
 | Terran chapter 5 explicit Move with stalled hero waypoint | `b0a318d3447b14132d09f800c2602ff5ba28b7682100c973dc89a8f2fee06fb0` |
-| Terran chapter 5 earlier Kerrigan route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
-| Terran chapter 5 Kerrigan staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
+| Terran chapter 5 earlier Raynor route | `0248569ec88a421a65c06afa37a0429bab5c98b470a05344c134c2b1f2290f9c` |
+| Terran chapter 5 Raynor staging through frame 19,160 | `2f2f3d191678933c7fdbfb7161d7af993922228e403f3d59a3a515bd5f5bd437` |
 | Terran chapter 5 both heroes healthy at frame 19,288 | `abd770a652624759162b89b7f73a5f5b07fd1723991baa5a8f7e5dda366dfee5` |
-| Terran chapter 5 direct recruitment approach | `c3dc75496ad1a132b8167009000f52b0a81e11f7306ba9c4921b2a66d24862bb` |
+| Terran chapter 5 Raynor entry-area approach | `c3dc75496ad1a132b8167009000f52b0a81e11f7306ba9c4921b2a66d24862bb` |
+| Terran chapter 5 seven-Marine early checkpoint | `11bb068c5d26f5dd67c45b311099e5bdf8a27b2601c68ddb6d03bfaab4c8786c` |
+| Terran chapter 5 short escort waypoints, frame 13,603 | `ecdfc1cbd05edfd866f9206329846f730980b5556da8cc62136c32b6ffe078e4` |
+| Terran chapter 5 escort fresh HOME reload and SRAM readback | `c4c78410820830d55d0de4e9d35dbeef53a41246f471612e8cbcd8fd8cad2336` |
+| Terran chapter 5 northern escort waypoint and fresh HOME reload | `c5899c4509f6ae8620bda41c2f3f33ad51b5130813d34c230cda11a69a26c3c2` |
+| Terran chapter 5 five-order escort continuation and fresh HOME | `9a2a67c8895b07b99c6a8f3836675564fcf35ca1c050d7a82de246dee858fc6a` / `1bb601fef43f7b7cc99b1a4a5f7560f6b5ab03ca1cb3d7a441c636439adf2693` |
+| Terran chapter 5 south corridor continuation and fresh HOME | `dc814b7a03aa182c456fd1a53fda79271db261317b0a224c6164e0a20bc76a6a` / `5acc65e12322e807a3db8ef4742c2dbabb8615b52592db4ffa3761a8e7544d1e` |
+| Terran chapter 5 Vulture engagement and independent fresh HOME check | `cf09d3654cd0dc8991838856dc9370fa61ac8cfdebbabde9b14066de32663bfc` / `4c89607b5dca55c9d371970eb6ea03664784b9df0c791bdc460524e8943643c3` |
+| Terran chapter 5 south approach at frame 27,001 and fresh HOME | `eb7aef2e8afd2f9b36b4d0c741f0cf6003cce7ff19d13f833655e45d07765c69` / `b4e25c4f7ae7cd7993f1f635bc68e4ac594a836eecb08a42618ff8c6345c2998` |
+| Terran chapter 5 first bunker removal and fresh HOME | `8fa035f4d3b9eebe6c0c19099bc04a05f3caebab347dcfe97115fcbe37af255b` / `7a7fc9af1e06d8cb12f87d56ba552846a48b716be59b1cc702a4f593d76c2b61` |
+| Terran chapter 5 second bunker removal and fresh HOME | `f93a0deae5f9008a92097b6a32ac1b8581979df58b4ca56a2c120d7a8ee4ac1a` / `e254169bc8482e3aadce0e6f1a1022bcc7ae4cc0fe300979f50b526f4535fe21` |
+| Terran chapter 5 recruitment and fresh HOME actor and building checks | `6a23eddb9a52ff2c035670638a2aa669e4bffc16b6941c3e177a7abf3593ecd8` / `a3d5c5ff57357af597720ea42ffad5a80660f5460a3f91d5bb5efb537b7c88d6` |
+| Terran chapter 5 independent four-stage recruitment and fresh HOME | `31968bfc272f8faa187e28eddf086873bfd249ff5cdc22744bf8d362cb296b72` |
+| Terran chapter 5 paid Vulture and fresh HOME | `1da0fa927fc9f7f556b7a93ab54de12f3a8d5db7e51555e9cc585a37b8c44cbb` / `a2d875fc61f9563eab413c6988deeb93e888dfa3d6743f1c09784e1f1f9a08f8` |
+| Terran chapter 5 paid Wraith and fresh HOME | `98aa3f1d508177d0f03482756e63c36da1900df782dd1c5cc06253d7fd6aee4b` / `48a6f3878187a272f89e640c0471ca6ae554aa235b94ec1f6f42516d88ee4b30` |
+| Terran chapter 5 mineral and gas SCVs and fresh HOME | `8cc5bfab0ad27d665cd4fc8d562f15ec3e3c5e7fa16ad8d86c67c1fd26476af4` / `3b3ad3bf54e55dac8388a5b550f7c79370e6bd7ed2281001f2dcc2035494079a` |
+| Terran chapter 5 eastern Command Center destruction and fresh HOME | `c7cda989d7dd11ed4b2ad05c153b59d9b10c451b6ae2963ebfa881df828d1424` / `24458b5b15b48aaf6e74eabfe2557f78822655875427d0e822d7e862e08fc2ac` |
+| Terran chapter 5 independent Command Center endpoint and hostile census | `b7f1769ff2f6e2fd9575e801724bcd1324937f5b8f234a2669ccb87a09503844` |
+| Terran chapter 5 eastern Refinery and independent fresh HOME | `567159f9cd73903650f2ac8287455c3ad73ba7584d9e8be928ec9b4f5e037dcb` / `f37cfcdb13e075a453419d5f8f46dab401c8522b68fc607270de22600e90fe40` |
 | Terran chapter 6 full run and fresh loads | `ff878c6135aee07caf12a4e3f26cd9f9e9b8a8943d4c0a2e90f7471d00ae91ee` |
 | Terran chapter 7 full run and fresh loads | `79c457980d4e9e3346e4ccba496c44dbc4a1e09433588f2d3c00ca11fc149736` |
 | Terran chapter 8 full run and fresh loads | `053b93180ce502b3ec281bf308ad34357a50a16321ce8f747a62d3faa811fac1` |
@@ -1052,6 +2223,38 @@ quality on the GBA SP.
 | Zerg chapter 3 rejected pause save with 12 pending impacts | `dda019fe449f93ef34b3c922cd683d6a6305b536a574d06ad428d53e4cf35f51` |
 | Zerg chapter 3 coordinated ground and air checkpoint | `ba1377b8ac2fdb5bce7f7513206820f03a1848c1fa0bf38eb4cfe1c3a522765a` |
 | Zerg chapter 3 victory, exact autosave reload and Zerg chapter 4 deployment | `4fdf64e727696beabe40bf58d4c61fb2df92e78d75a9400a3937a27e14a087c6` |
+| Zerg chapter 4 fresh air-production save | `d1fe57cc5a21e1d44ff004d583b5ac4e71eaf6ebcafc72345542a31c766d4e0e` |
+| Zerg chapter 4 independent ten-stage victory replay | `5870e567b34e5d044deb4313cbb84229347a6a987c8f1975a2ed719ccb5a29a8` |
+| Zerg chapter 4 victory readback and Zerg chapter 5 deployment | `43529b8ca8065c56258378257bd92bca46f119e2728293a8b0e829406cff7232` |
+| Zerg chapter 5 independent fourteen-stage victory replay | `09d7b8bedd7217ff2b5d921f43877cfd55be3891206983f0db2efa68a7c5890c` |
+| Zerg chapter 5 victory readback and Zerg chapter 6 deployment | `f3411d20910da9f646bf692ad390db1ef8908a6fb65b4bbadb0475a0b30cfdcd` |
+| Zerg chapter 6 paid Lair and fresh readback | `11cd5eff2a143bb1919d47f31791250182e73b14e5c3a6a03ac2350470686c1b` |
+| Zerg chapter 6 paid Extractor, first gas and fresh readback | `4a60c576ac69a5bcbee6fe2782063b74963e006a82d0ca792087987533c6ef86` |
+| Zerg chapter 6 independently replayed region 5 buildup, Storm and evacuation | `0552fb2ccd653f7af25f6f7f530c6ea18e7629d2b88136364a0974c92a02a931` |
+| Zerg chapter 6 second ferry, further Storms and safe return, six-stage independent replay | `14923c08c5e52518cbfa7c33cf2e49eef3f2953bdd1424b9f74d05cf93cba298` |
+| Zerg chapter 6 final sorties and structure clearance, ten-stage replay | `e49ba9d8bff12a103c3a3e53d607c1e400b4a80673d0ef4517081159838769d6` |
+| Zerg chapter 6 final defenders, victory and Zerg 7, independent replay | `edfd65ace98a422cec802aea684fee66ee1c82372251c031c46c9f924aa572f5` |
+| Zerg chapter 7 independent opening, Hatchery defense and economy replay | `a70f9adddee6d48ba68ef13285deb01d10dda0103287b35d92f68c749b634613` |
+| Zerg chapter 7 three-stage independent Pool, Lair and Den replay | `570877a52262e4ac222e19f62e44121c33dd5e0496c3b9e11963bcc366038e81` |
+| Zerg chapter 7 fresh completed Pool, Lair and Den census | `f19e2d5b56cedf317753eb739ed7c21c94b3ae913a8d30aef59f8d55a6a1d636` |
+| Zerg chapter 7 three-stage independent Sunken Colony and air defense replay | `ceb9061a7d9056893ff96b96bee8435c197390034e7ae3386ee0feed1e2d85b0` |
+| Zerg chapter 7 early Spore Colony raid comparison | `4932c66f978c8496e5663ecb4792a4f4f4a1ea770bd41cd2532aabccee0036ab` |
+| Zerg chapter 6 fresh victory load and Zerg 7 deployment | `13d4cb35f525874774cb9bb5ae808f134483d31e0577432d6e0b1ca3731f01a3` |
+| Zerg chapter 6 seven-stage third-sortie replay, safe evacuation and fresh load | `a24ec13fcb7a82d06b2d11236a51f0194c9772986aa145386499198b4b350b06` |
+| Zerg chapter 6 frame-147,057 fresh force and hero census | `032ffeb493f4c87d1a072c4851f935c530711bc322f772a5c0ccbc74433cf5cf` |
+| Zerg chapter 6 frame-130,610 fresh terminal census | `32f8f2944e2b88118473bb5b21c4ee48df4ebb37a5872bd718a011b9c837b156` |
+| Zerg chapter 6 fresh terminal region 5 and army census | `5229b39b62dbe14eff9dd34b8a007659f05983bf58af9831831859439d9017e3` |
+| Zerg chapter 6 independent four-stage opening replay | `94edc6c57c802767d1dbe0ba180efc349829947e60d9bbb606decb683051b7d4` |
+| Zerg chapter 6 paid Ventral Sacs and fresh readback | `04ffdd063ccf3d5b3176de0bb24ae2f3c8839d08c988a32c06132182a5e24a0d` |
+| Zerg chapter 6 ordinary boarding and fresh readback | `0f995723b88ab792ed1b3a50929ed2c19574d016026bfffb47689aca07ed3a6c` |
+| Zerg chapter 6 independent research and boarding replays | `af7a0420ab248b560d4d342b805d3432f0b9c818b837387354530765fa8e5d9d` / `31ccd1d2128474c5f77c90d59826df89c49647bb7a197f0896d29a54e5fcb3c6` |
+| Zerg chapter 6 ferry unload and fresh readback | `d3f796f9254cc971986f2b286557d9c36655a77a61406ccb17fa0e095169c0aa` |
+| Zerg chapter 6 independent five-stage ferry and assault replay | `3fb1c91697ff0f5226a18d5ff5cad8c425e31c8f1bf18b69c5c6cdfe5930ed15` |
+| Zerg chapter 6 fresh region 4 and 5 census | `45d96017ef85d4803d30b3aa107f0ed4b5d884f7c0229dbd43bae00abf659ca6` |
+| Zerg chapter 6 reinforced attack and fresh one-cannon census | `d35d5dcba88744bb1a867d765e63a3418187bf32d370483268ef08345c1b4c75` |
+| Zerg chapter 6 independent three-stage reinforcement replay | `1a24cf08c260312e0b6b32ae3005ea3ce1cc0bbbe291dac3e901442ad463b9e4` |
+| Zerg chapter 6 complete region 4 clearance and fresh readback | `20fb9761e797f750a54099086ea1f8b8be9fa4438bd10fcbf3418b292023dba0` |
+| Zerg chapter 6 independent region 4 clearance replay | `e14fa4d1f5b0352e5601cd7fe7b3f28474192a6bfc17c59ffc99c12f651d502e` |
 | N64 Zerg chapter 1 numeric victory record | `188c9ad4bd8221c31b971c724b0211b1592d96353db2b242928a58db567b0e17` |
 | N64 Wasteland fresh ordinary-input continuation manifest | `ab23626bc8b0db67555455514119b22fd0cfa6c9707d8c2038bb5a4ebb3be80c` |
 | N64 Wasteland ordinary group selection and movement manifest | `4b85737a0b876efbc6ab541b8c64693f1eb3e4e0fa8007a363b2848e75218066` |
@@ -1064,6 +2267,34 @@ quality on the GBA SP.
 | N64 Wasteland base save and fresh title-load manifests | `f62e7af3a55ffce8f08db891617ccdc65c5fb62a5d90aac5d12d65b7dfd84b96` / `a2dd3465ae47ab3f73eca7f875f598eec2e96ad306f7cd572e179a8c38a9e2dc` |
 | N64 Wasteland ordinary SCV selection, movement, save and reload | `f5b1a943c39b5a5a4b64684ae0216ac533d4d999ad52307ecc9e89a62f575198` / `2d31726e8ffada29493e690cf45dbe355b4559f3454853c3103e33a291a10000` / `a55eac283971c6c0421fde5364bcd4df02a11de86e222cd2aabf61629fb7cc8d` / `53d4ac078bb01e005b5739e53a95797896b830b5ff48ede37c36c0d98bb344ec` |
 | N64 Wasteland SCV reselection and southward move | `d634dc26e7a39a6cb21b1939c929db6de2612e9d0c4a79ea251a08f032fe899e` |
+| N64 Wasteland B-enabled scratch bridge source | `2bcb6ce41b28950fdbc5abb891e263a8a28ff74c255ea3093905d189ea2ff0b6` |
+| N64 Wasteland B-enabled scratch bridge binary | `52ca094d2fbc0d723305546b0e6cef7f0b0a19a7a436de09dfab30950b05a3da` |
+| N64 Wasteland B Harvest deliveries before the observer failure | `cd7844c9cb1cf4acc307d3c40a158d7c7011a084d07374b291375535f00137e2` |
+| N64 Wasteland first mineral delivery and ordinary FlashRAM save | `6625cd459e1e46a7cf95d6259e6e462db23cdc90a752d0224952608d354cb577` |
+| N64 Wasteland 120-mineral save checkpoint | `85b3c46e143e6e74ec9a5930278fff04918b52e8fc5412d94ec7d0128f529563` |
+| N64 Wasteland bank checkpoint reload and 152 minerals | `d9c4111ea52ca8b9ad0669c2ac8e7092307cd8f42e613d5f89bb6c45ed7f75fb` |
+| N64 Wasteland first slot fresh reload, continued mining and FlashRAM readback | `7106dfa869740ea0d859dfb9882b815e61655b470bcec19e93ee19e6bac61299` |
+| Exact KODAK Wasteland fresh start, matching pause journal and victory | `46368011e850ec911ce585edb1c8a64747a7fe14a2a08ba9d6a676e0adbd7b1f` |
+| Exact KODAK Wasteland two SCV deposits and independent fresh HOME continuation | `568c075b6d633c88b85975fa2979ce3910c0dc163efd22c88dfddd02353616e0` |
+| KODAK Wasteland contextual Mine, eight-mineral cargo and return-path loss | `ac949cbde3012f37ff65a20296c9cfc0b4ba5fc8327856bb73c96df18c7dab21` |
+| N64 Wasteland Barracks placement, payment and construction | `45ba6eb34972427f2dabf51588937f2c81ef48319ef84bd131c72eeb96453b1d` |
+| N64 Wasteland first-slot save during paid Barracks construction | `521410b9a16e3f610efdc9ac41e2db268dfc15fea88f04f18be80d62b3365ec8` |
+| N64 Wasteland fresh Barracks load and construction completion | `b7eaee824b6d675614eec4f3ab08c5f74f35688b348a7a6b1854793d14dc99ed` |
+| N64 Wasteland advisor activates five-of-ten Marine counter | `8f320c0688a82e90b457a56f4e991e43b3d85d919f5fea46abb27841c8367f76` |
+| N64 Wasteland reselects SCV after the Barracks completes | `0c3b4daaf35c04fad8835cc94115ae5b1d8665fe2ec92cbda115ed7b565bce99` |
+| N64 Wasteland mining resumes after the Barracks completes | `f0e9024b73022e629dd8e05dfd80f00c2276bb6ff69daa869b8c00927d51917f` |
+| N64 Wasteland first paid Marine and six-of-ten count | `c31ad1788d22f742d33233fcca8de0fa39e64843b3d6b0057d8d65deb9757c72` |
+| N64 Wasteland fresh six-Marine load and second paid Marine | `203a609a90089d60376da24517dd40cadfdb5679efb443ff0fc3af511c8be8c4` |
+| N64 Wasteland fresh seven-Marine load and third paid Marine | `f2785703c13676c42af8dbf3afad3cce84de4256b30085723b283617c039f309` |
+| N64 Wasteland eight-Marine save | `cc8ae1cbf59f686bc70bb14ad46aae9ff4d6554948130e4c0a10489118c73878` |
+| N64 Wasteland ninth Marine and new first-slot save | `e2be9ce7aa63ec7af1769d41c663ace9737e0271dff7f781a30e9b6f1460ca3a` |
+| N64 Wasteland tenth Marine and victory | `29d8eb7046ba393b37b369885e813f5aafa399dab35f9829942062853b5fd7cb` |
+| N64 Wasteland result acceptance and Backwater Station briefing | `e4f9495cd5285b8f5ab33246e3145397e7addfc51ee08ff6d429eec8478d528e` |
+| N64 Backwater Station unlock retained after fresh load | `e175a0e7c2b4ba90d783ae2c19a5657bac34f86ba82618f2211fa565486249fb` |
+| N64 Backwater Station selection and briefing after fresh load | `6c65e723b9bc00dea2e1d010ab25f5fddfcff4616ce7a838e74636e872a926e2` |
+| N64 Backwater Station deployment after fresh load | `7b2e77e2db1cacceab60cc18214a252c366c3934b70391776b6296458f0721d5` |
+| Exact KODAK Wasteland Barracks payment, completion and Marine queue | `a4ea776e6036165fa886abc96e0be45dff38b78a70dba3a0e845010f31af90b4` |
+| N64 Wasteland SCV over the mineral patch with B Harvest prompt | `3b16c2cf6a181705d6adb76e365ef6cee5553f1708483f2bedc72fdbfe44d8a8` |
 | Zerg chapter 2 full run and victory readback | `a1234c2bb542e1527b263bc8b7c4bc65b6e3d1ea6a8e3c6163108212507bc208` |
 | Zerg chapter 2 fresh pause continuation | `df6b1fa2d25f8c0151f4a3aa84a0c9340a011e6c8ca155157183479f88bfc8dd` |
 | Protoss chapter 1 full run and victory journal | `6176b76aa5daae99ca5f32871a90f5e756ac671a8d77173bee0964d467d17547` |

@@ -181,11 +181,89 @@ impact queue. The paired read-only mGBA receipt SHA-256 is
 `7a63b538ba32108ec9d5c79c2f2bf281afa3743636d2fa62d9217b100f896140`.
 The previous ROM also loads the fixed ROM's completed journal.
 All four production HOST vectors also pass win and loss cases with a full
-32-row live queue. Z10 and P10 continue to reject an oversized active save.
+32-row live queue. The original Z10 and P10 journals reject an oversized
+active save.
 
-Real play stays well under these limits. In the T10 replay and in neutral
-three-bot skirmishes, at most 4–6 impacts were pending at once; only the
-constructed 48-unit stress battle reaches 29–30.
+The T10 replay and neutral three-bot skirmishes had at most four to six
+pending impacts. The 48-unit stress battle reaches 29–30. The November 24
+Z10 chapter 3 replay also [reached 12 during normal play](audits/2026-11-24-kodak-package-checks.md#zerg-3-early-economy),
+which exceeded the installed cartridge's eight-row active save limit.
+
+### Full-queue journal candidate
+
+The `SC64_BUILDING_PAD_IMPACT_SAVE` codec targets the standard
+16,296-byte packed worker and transport layout. Records with zero to
+eight impacts keep the existing encoding. For nine to 32, the first
+140 bytes of the ordered impact body occupy the seven unused high bits
+in each of 160 packed building rows. The tail before the existing
+16-byte transport trailer holds the three-byte `IPB` marker, an event
+count, and any remaining body bytes. At 32 events the tail is 56 bytes,
+and the record payload is exactly 16,368 bytes.
+
+The reader checks the current version, count, exact record length and
+zero padding outside the body. It decodes the ordinary event rows and
+clears the building padding before world validation. An older reader
+can still use an intact earlier record that it understands. It cannot
+read the new packed record.
+
+`make test-sc64-padded-impact-save` checks every count from nine to 32,
+exact event order and building-field preservation, and rejects malformed
+records under ASan and UBSan.
+
+### Z10 campaign with the Carrier cartridge layout
+
+The normal Z10 Carrier build uses the expanded campaign journal.
+Campaign saves use the distinct `0x54` namespace for nine to 32 events.
+Set `CANONICAL_Z10_PADDED_IMPACTS=0` for a legacy comparison build.
+The loader binds that namespace to the current inner version and campaign
+mode. It checks and removes the impact bits before validating packed
+buildings. Smaller campaign saves use their original format. Custom games
+use their separate compact Carrier journal.
+
+The exact Z10 links pass the IWRAM and EWRAM guards with the same endpoints.
+The original chapter 3 controller tape reaches frame 64,486 with 12 pending
+impacts on both links. The expanded link commits the journal by ordinary
+pause and B. Fresh HOME restores all 12 rows in order, and the next
+120 updates match uninterrupted play. A subsequent smaller save reopens on
+both links. Five checksum-valid malformed records fall back to the intact
+predecessor. A synthetic maximum queue loads 32 events, saves through the
+same routine at 16,368 bytes, and fresh-loads the exact ordered queue.
+An older ROM opens the previous legacy record while a compatible slot
+still exists. Repeated expanded saves can occupy both slots.
+
+Z7, Z8 and Z10 campaign saves with at most eight pending events give
+identical fresh worlds, 60-update continuations and new journals on both
+links. In Z9 the same normal continuation reaches nine events at frame
+27,620. The expanded journal fresh-loads all nine and advances another
+60 updates.
+
+An independent custom matrix checks both maps with two and three CPUs.
+A fresh load, 60 neutral updates and a pause save match the original link
+in every world observation and complete 32 KiB journal. A fresh mixed
+Blood Bath pair reaches the same defeat at frame 11,629. Two 120-update
+late skirmish timing windows give essentially the same mean and p95, with
+every sample still above the two-VBlank budget. Terran, P10 and Showcase
+relink byte for byte.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Genuine 12-impact pause export | `c0c533eafa573c06123cea4084337c625b98e08665ebcb4afedb620b1e228b43` |
+| Fresh HOME, fallback, maximum queue and continuation | `03a10f2228ee35c282879a197ce4e288052aed2c62e29ad331f1ba73e6e5638f` |
+| Independent custom matrix | `378733414a68a6895ed4bed8e5f3b9c26b20fd9ff0506873403ece9b66a4da06` |
+| Z7–Z10 normal campaign continuation matrix | `3c8c5502aaf1c623a0c1c1a3db665f725f92a7d6ff72abd48797b401a367f8ce` |
+| Z9 nine-event fresh continuation | `bc2396f4d45bbe94fbb2bb57b1cda8b835136dc6926406d65923f015200175f8` |
+| Fresh mixed skirmish defeat and late timing | `7109f89ffa4763fb80dc04d9e59a9d60e11d8b87f205aae6cb727bfa728d8f7f` / `d165bd512083755eebec65fdc4f9bbcefcbf09f32d4a0e4b62319b1f509aef64` |
+
+### Typed P10 layout
+
+The P10 journal still has an eight-event active-save limit. A standalone
+row-repacking prototype fits a 32-event record within 16,368 bytes with
+both Yamato shots, the transport trailer and the existing research bits.
+The bounded mixed-radix encodings reclaim 60 bytes from 240 unit rows and
+40 from 160 building rows. The unused building padding contributes another
+88 bytes after research. The prototype passes sanitizer-enabled row and
+whole-envelope round trips. Link, joint tag and journal preflight, and
+the genuine frame-11,334 pause replay remain open.
 
 ## Memory
 

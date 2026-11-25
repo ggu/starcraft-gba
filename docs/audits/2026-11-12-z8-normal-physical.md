@@ -1097,6 +1097,383 @@ approach before committing it.
 | Direct bypass trace | `f8e9f1c8861ca940edb5e8bfb3abb72cf506582800d38a952c45946631b6a139` |
 | Frame-66,877 HOME SRAM | `2e5671fb9b0a38abee46de8e3bf675344d09a55d6ac654e2d10a9254b2a7f35a` |
 
+### Stage the eastern formation together
+
+The installed Zerg cartridge loads the retained formation
+journal and moves the eleven Hydralisks near (1848,1400)
+through the ordinary command menu. At frame 65,165 all eleven
+are within x1836–1868 and y1401–1417. Kerrigan stays near
+(1350,1865) at 400 HP. An independent replay matches the
+world fingerprint, followed by a fresh HOME load with the
+same friendly roster and byte-identical SRAM.
+
+Moving this group to (1880,1320) and then issuing Attack Move
+toward (1768,1264) reaches firing range. The Nexus remains
+at 750 HP with 702 shields at frame 66,866. Ten of the
+eleven Hydralisks die, and Kerrigan keeps 400 HP. Fresh HOME
+restores the assault result and exact SRAM. The intact
+formation remains available, with a 9,067-mineral and 409-gas
+bank. Reinforce at that position before committing the next
+attack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent eleven-Hydralisk staging replay and fresh HOME | `8403e3e4258222774f468cee87c5f75c518bf7d12cc76cb564f284e1abaa90bb` |
+| Eastern staging SRAM | `cc444b662f6de1ee57859a7357e5d7b4465f73be425c7ac4d4c04faed9565264` |
+| Staged Nexus attack | `c5cd2592000ad471e1e022d5983120466ca1cf17e4374ec1962067b5396d7eee` |
+| Assault fresh HOME | `6cffd5bbf2b6659436836d8c9a1968a2dc72f04125be17c352e1d3bde5c2e94e` |
+
+### Reinforce and destroy the eastern Nexus
+
+Five paid Hydralisks from the southern Hatchery join the eleven
+at the eastern staging point. The completed sixteen-unit group
+and two Overlords fresh-load at frame 69,098. The bank is 8,617
+minerals and 259 gas.
+
+An ordinary Attack Move order takes down the Pylon and then the
+eastern Nexus. At frame 70,971 the eastern Nexus is gone, two of the
+attacking Hydralisks survive and Kerrigan retains 400 HP. Independent
+replays of the production, staging and assault each match the sampled
+world and SRAM. Fresh HOME confirms the result. The western Nexus at
+(400,1704) retains 750 HP and 750 shields, and the mission is active.
+At this save the southern Hatchery is also under attack and the Den
+is gone. Preserve the base and rebuild production for the western
+attack.
+
+A separate branch at the reinforcement checkpoint keeps the
+original eastern force in place. The five paid Hydralisks
+intercept a Reaver and two Dragoons approaching the southern
+base. All three attackers are gone at frame 69,399, with the
+Hatchery at 1,250 HP, the Pool at 750 HP, the Den at 356 HP and
+Kerrigan at 400 HP. The independent replay and fresh HOME
+match SRAM exactly. The eastern Nexus remains on this branch.
+Protect production and Kerrigan through the next wave before
+combining defense with the objective attack.
+
+The defensive branch moves Kerrigan to (1216,1984) and pays
+for a second Den at (1856,1904). Both Dens remain on the
+fresh frame-71,099 save, with the new Den at 850 HP and the
+Hatchery and Kerrigan at full health. The eleven eastern
+Hydralisks remain staged. Both Nexuses persist on this branch.
+
+Six more paid Hydralisks stop the second Reaver wave by frame
+74,254. The replacement Den stays at 850 HP and Kerrigan at
+400 HP. The Hatchery falls to 359 HP and the branch loses its
+Pool and workers. Fresh HOME restores the surviving buildings
+and the exact SRAM. Worker recovery is the next test on this
+branch.
+
+Two paid Drones hatch by frame 75,130. One starts a replacement
+Pool at (1792,1800), and the other resumes mining. Fresh HOME
+at frame 75,299 restores the unfinished Pool, the remaining
+40-HP Drone, a queued Drone and Kerrigan at 400 HP. SRAM is
+byte-identical. A later passive continuation loses the workers
+and leaves Kerrigan at 204 HP with the Pool still unfinished.
+The saved recovery still needs active defense before it can
+sustain production.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent production, staging and eastern attack replay | `f93f73071a2371c917d3c986cbedf905b5105999c632fcd8d54b3355ac89cb58` |
+| Eastern Nexus destruction SRAM | `fe7f4dd2fc1a9b8901dec10aa30640c4369dd0b7d151d9b0495b0d464bf921ed` |
+| Eastern Nexus destruction fresh HOME | `a3d1a7ee3432e632862a8303f02871dfb511bd7b5412bd8938b72521c88b4215` |
+| Separate southern defense, independent replay and fresh HOME | `e9ddfb4fbe70ad677701c4302ce2ae00f5ed99bc932b8d6d9ce7cae107bbdb66` |
+| Paid replacement Den and fresh HOME | `0795ee44ac206154e8f8c66199d083c2d225f1bef32a33d980a19a98178adfb1` / `c0bdc284519aa4258c8e605dd0662f8106de6fbe78e366a1b2224c0a5277af5b` |
+| Second Reaver wave and fresh HOME | `ab2620100cf6b32887b4374f00297f1195c59ce97321f43d22618faf18b934e3` / `f9fb9a51dc12e56c744be87fe1d45adabbcbc344086e8e89abb48a2e1dabd492` |
+| Worker recovery and replacement Pool fresh HOME | `756e85581be9f42c917bc51b2739e60bee9845e7c98b0bdf97ba0ff6d5b30967` / `e9435467f708ae3521ab362d2cc4d90cbad0c14b599f9dbefe4761b7e4fad8e0` |
+
+### Rebuild after the eastern Nexus falls
+
+Continue from the verified frame-70,971 eastern victory over
+the first Nexus. Acknowledge the authored text, then move Kerrigan
+south and evacuate all three Drones east ahead of the Reaver.
+At frame 71,985 Kerrigan has 400 HP at (1205,2000), and the
+Drones survive with 32, 32 and 12 HP. One Drone pays 300
+minerals for a Hatchery at (1952,1664). It completes with 1,250
+HP at frame 74,303. The original buildings have fallen and the
+eastern Nexus stays destroyed.
+
+Three more paid Drones hatch during the next continuation.
+The recovered base finishes a Pool at (2000,1664) with 750 HP
+by frame 77,041. Fresh HOME restores the full-health Hatchery,
+the Pool, three Drones, Kerrigan at 400 HP and the 8,959/259
+bank. The western Nexus still stands. Independent replays of
+the evacuation, Hatchery, paid Drones and Pool reproduce all
+five checkpoints and their SRAM.
+
+The next Den order is paid but a Reaver damages the new Hatchery
+before the nearest Hydralisks can reinforce it. Two miners die
+before the Den finishes. Preserve the frame-77,041 save and
+prepare a defense before extending the base.
+
+A separate trial from frame 74,303 sends Kerrigan from
+(1205,2000) toward (1860,1700) using the ordinary Move command.
+At frame 77,160 she remains at the starting position, at 400 HP,
+with the order and destination retained. The Reaver reaches
+(1808,1640) and reduces the Hatchery from 1,250 to 953 HP.
+This establishes that giving the direct order earlier does not
+protect the Hatchery. Check intermediate waypoints or stage the
+defenders on the eastern side before the evacuation.
+
+#### Intercept the Reaver from the connected approach
+
+The read-only walk grid at frame 74,304 puts the earlier
+destination (1860,1700) in a different connected region
+from Kerrigan. The Reaver's approach at (1808,1640) is
+reachable. Six ordinary move orders through (1400,2008),
+(1512,1928), (1576,1800), (1592,1624), (1768,1608) and
+(1816,1640) take Kerrigan to (1812,1640) by frame 75,525.
+Fresh HOME restores her at 400 HP and the Hatchery at
+1,250 HP with byte-identical SRAM.
+
+Continuing from that save, an attack order toward (1684,1640)
+kills the incoming Reaver by frame 76,966. Fresh HOME at
+77,066 restores Kerrigan at 204 HP, the Hatchery at 1,250 HP
+and identical SRAM. The eastern Nexus is still gone and the
+western Nexus still has 750 HP and 750 shields. A longer
+continuation takes further damage from another assault.
+An independent replay of both recorded controller sequences
+matches the two saved states and their SRAM byte for byte.
+Recover workers and prepare a second defense from this checkpoint.
+
+#### Pool completion under the next attack
+
+Starting from the post-Reaver save, move Kerrigan west before
+ordering the first Pool. At frame 78,803 she retains 204 HP
+at (1405,1600). The Hatchery has 1,085 HP and the completed
+Pool has 636 HP. Fresh HOME re-exports identical SRAM and
+confirms that the western Nexus still stands. The eastern
+Nexus remains absent.
+
+An ordinary queue order adds three Zerglings. Before any
+hatch, the attackers reduce Kerrigan to 141 HP, the Hatchery
+to 714 and the Pool to 370. Retain the post-Reaver checkpoint
+as the starting point to move in existing Hydralisks before
+spending time on production.
+
+One test moves the five reserve Hydralisks from the northwest.
+The read-only walk grid gives a 184-cell connected route to
+the previously verified Kerrigan corridor. All five arrive
+near the first order at (392,500), and three lose 20 HP during
+that first leg. Fresh HOME at frame 77,713 retains all five,
+Kerrigan at 204 HP and the Hatchery at 1,250 HP. Hostile units
+hold the approach ahead, so a route through the terrain needs
+separate combat coverage.
+
+Two further transfers start from the same fresh HOME, with all
+five Hydralisks already selected. One orders them toward the
+next southern waypoint and the other withdraws west. Both lose
+two Hydralisks in about 150 updates. Kerrigan and the Hatchery
+retain 204 and 1,250 HP. A Dragoon and two Zealots hold the
+southern approach. Continue from the five-Hydralisk save while
+testing an earlier intercept or an independently qualified
+transport policy.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Independent post-Nexus evacuation and Hatchery | `050ed6fa7278eb19a8b89709da4181999011c2bcc4e504658bf48852b33559b5` |
+| Independent paid Drones, Pool construction and fresh HOME | `ebe2ed0edb5bd9745e7aa4f9c45494509df26bc6d385cf4a5387bffc32fe24fe` |
+| Recovered base SRAM | `7d4644978c21f581b8f026931ba79dcaa61297647142d3cbb246466e46dd46c9` |
+| Earlier Kerrigan move order and Reaver arrival | `6919601987baf63e20bf4dbfe1141ba0b3bab9523a0baf31eefb5207ac5f3d74` |
+| Connected approach and waypoint orders | `f9c5b455cabd969241cce5ff4f2caf8a27d01ca7862d577ff9a24b2a1159ce47` |
+| Fresh HOME before the Reaver arrives | `9b2f51a46f1dbdfa4e66d129562de5269f7f72f8c2b3c79ac4bcbed9f468039a` |
+| Reaver interception | `c5c7a7124d1b56e041ea7cd2ec5dd559fc1ea05cd0e184c92f359cda09b9f214` |
+| Fresh HOME after the interception | `3bcce9106cdc40b817a93ec9c47afc23b3f7f67e86b73f4d96a81723656e2a5a` |
+| Independent replay of both controller sequences | `fef400e34cae62e698496d4d7ff1a598c936c034c718b01c4a9bd8581df15e0c` |
+| Post-Reaver SRAM | `4c8f492030fb634fbee9a244924fbc0a896e6c478b95daa7d748eca6cedff9a8` |
+| Follow-up Pool construction | `25c8563db1ae473b6f9a7c558d3dd0779a3364c6c4fab44478bb1014ea67b88a` |
+| Byte-identical fresh HOME for the new Pool | `5a8703885bc9e356a4099ee7073ca50eea9e037fc7580c4a4b5538d318a41ec3` |
+| Zergling queue during the following attack | `c74a00c5a14f396e4c7a210d5fddf24d9421818f492e9f95506ce5de628c0664` |
+| Hydralisk movement and first damage checkpoint | `70e8152c86bc073afc922148e4536eb44150685a87f273f4bc3ecfe88209679e` |
+| Fresh HOME for the Hydralisk waypoint | `b7e07a0cb5d3f400cf687afceac85a85884c66725bd1b8b54dca689e94282464` |
+| Southern transfer under ground attack | `f028a0303b694a168dd3a879e590b4b0349434f5c0631d3caefaa4e98f573660` |
+| Western withdrawal under ground attack | `236b081e6aaba4d7420426962918e866f63f83e7a45f349c3d0422151b6a1634` |
+
+### Evacuate workers before the eastern Reaver reaches the base
+
+An earlier branch from frame 71,099 moves five Drones away
+from the raid and pays for replacement Hydralisks. Fresh HOME
+at frame 72,755 restores all five Drones, Kerrigan at 400 HP,
+a full-health Hatchery, the new Den and 19 Hydralisks, including
+11 staged to the east. Both remaining Nexuses and the approaching
+Reaver are visible in the read-only actor census. The three
+nearby Hydralisks lose their follow-up interception while
+all five evacuated workers survive. An earlier attempt to
+bring the large eastern force directly back through the contested
+corridor also loses most of its Hydralisks. Retain the evacuation
+save and combine the worker move with an earlier local defense
+or a second production base.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Worker evacuation and paid Hydralisk inputs | `772c6a78ab490c0d23ae499aa1607fb26fb120f8b3aa212be83bb2514b52c3e1` |
+| Evacuation checkpoint SRAM and readback | `71888030a6470bd692bf626be7edd148c1792bb9f82b8736dc68d38a50d33619` |
+| Evacuation fresh HOME verification | `22db8614a82d6a89173455dc23bfae950e2637dd737724a67ec055389614e161` |
+
+#### Found a replacement base without moving the whole refuge
+
+Moving the five workers north lets one start a Hatchery
+and puts the rest in range of a second hostile actor.
+All workers are lost before the new hall completes.
+Moving one Drone instead preserves the group. A pending
+order at (1952, 1760) stalls without payment. The closest
+reachable cell center in the observed walk grid is about
+61 pixels from the target, outside the 36-pixel build
+commit radius.
+
+A closer footprint at (2016, 1696) commits. Fresh HOME
+at frame 75,235 restores a completed 1,250-HP Hatchery,
+Kerrigan at 400 HP and the four other Drones. The previous
+Hatchery and Den have fallen. The new base and workers
+provide a path to restore production.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Completed base and remaining workers | `88e4cddea129617a8bf6a2b24a8e1a25a27e6220cdbad4898b77f53ba242c20e` |
+| Fresh HOME and completed base | `38f811960df62dac91e547df23e8281d83d8cdefb0ae05f73b79f4d552e29825` |
+| Replacement Hatchery SRAM and fresh readback | `bc1c53c5c5ee53dc9dc3039e1973b1b4964a27a0f358d76ebb09dbed4f563fb5` |
+
+The new Hatchery trains a Drone that brings in 72 minerals
+over 1,200 observed updates. Fresh HOME at frame 76,885
+preserves five Drones, the full-health Hatchery and Kerrigan
+at 400 HP. Both objective Nexuses are still at 750 HP and
+750 shields. A follow-up Pool starts, but the miner disappears
+within 100 updates of construction. Retain the verified mining
+position to stage another defense before spending a worker.
+One continuation intercepts the northern hostile and starts
+a Pool, then loses the remaining workers. A different Pool
+order at the disconnected south location stays pending while
+the builder remains at its initial position. The worker
+recovery save remains the usable continuation.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paid Drone and mineral deliveries | `779a5c925bf49e0811624749a9ca45d0b6cf8f94e5bb35aa0459e5865bb5cf28` |
+| Mining and both Nexus observations after fresh HOME | `867aad7c999f458d6d939e72caaf14bcea0a3383405762032b7fadedd0462811` |
+| Mining SRAM and fresh readback | `9616b9168521570c1a8b7c2cee389f571272c98d9eccd1348b08b8fa6367ce38` |
+
+#### Two defenses restore the Pool and expose the next defeat
+
+On the November 24 Z10 cartridge, eleven Hydralisks move
+from the mining save toward (1900, 1570) and attack the
+southern approach. The two tracked hostile slots disappear
+and ten Hydralisks remain. Fresh HOME at frame 77,928
+preserves the Hatchery and full-health Kerrigan. A further
+fight on the western approach leaves three Hydralisks and
+two Drones. The replacement Spawning Pool completes at
+674 HP. Two eight-mineral deliveries bring the bank to
+7,838. Fresh HOME at frame 80,708 also retains both
+enemy Nexuses.
+
+A neutral continuation pauses for dialogue at frame 80,782.
+One A press advances the dialogue. The game displays defeat
+16 updates later at frame 80,798, with Kerrigan still at
+400 HP and both friendly buildings intact. The installed
+ROM's trigger 17 requires a player-1 hero Dark Templar
+(raw type 74) in source location 18. The scheduler marks
+that trigger active at dialogue and done at defeat. In
+GBA coordinates its rectangle is (1184, 1952) to
+(1440, 2048). A subsequent A press restarts the mission.
+Stop the controller at RESULT so it records the defeat
+before issuing another action.
+
+An Overlord repositioned from frame 79,089 arrives too
+late. Starting the guard from frame 76,885 provides time
+to position the detector and Kerrigan. At frame 80,689
+the explicit B-menu attack acquires the revealed Templar.
+Its shields drop from 80 to 31. A second run places
+the Overlords at (1305, 1868) and (1309, 1916). The
+Templar stays revealed when Kerrigan drops the order.
+The first action of trigger 17 makes the Templar
+invincible on entry while the camera and dialogue run.
+The neutral trace confirms its invincibility from
+frame 80,780. The guard needs earlier damage on the
+approach before the invincibility action.
+
+An earlier interception from the same frame-76,885 save
+positions an Overlord at (1293, 1620) and Kerrigan at
+(1320, 1623). Her ordinary B-menu attack acquires the
+Templar at frame 80,586. The Templar loses its shields
+and dies by frame 80,636, before entering the rectangle.
+The game runs through the old defeat frame and pauses
+at 80,900. Fresh HOME restores 16 Hydralisks, five
+Overlords, Kerrigan at 400 HP and 8,022 minerals. The
+continuation has no workers or friendly buildings.
+Both objectives remain. An ordered eastern assault
+from this save lowers the Nexus shields to 740. Fresh
+HOME at frame 82,525 retains 11 Hydralisks and Kerrigan
+at 400 HP. An unassisted continuation lowers the
+shields to 601 by frame 82,610, loses four more
+Hydralisks and subsequently reaches defeat. Use the
+earlier interception save to stage a separate guard
+before committing the attack.
+
+The prior [native emulator audit](2026-11-04-n64-parity/README.md)
+also observed an idle defeat from a Dark Templar entering
+the objective and an Advisor box pausing the clocks.
+That run did not identify the active trigger or capture
+its modifier transition.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First defense and fresh HOME | `533bdefba0f2fe2522569883330c6a649da948ee4e4d81a1c3e0e1aeb5248450` / `d2e3cc87d3b1cac777bc5d241bd4872e9c784ccf689c3f458ad668649b4d175f` |
+| Second defense and Pool | `bb431a2176cac682c5d71bd2d87a12c3c640832dfe5d42f1b4c77ff0794c37ac` |
+| Frame 80,708 SRAM and fresh HOME | `60f3d41ea681db1f2b109403e6fbd102c68dcbfdfb9440fd798bf70c3c8a2ce0` / `31cded6f3ed3c12c600b1238ac6892fadfb8735d50859c85d3a02ac390b91f59` |
+| Dialogue, RESULT and restart | `9f287289b1266d41cf0d787644fcd8ca3f400e0d969d0c09b6585befc40c12c0` |
+| Dark Templar approach | `13c69aa6537857f7b00813b1ba4ee2584a5f7bc7071ba10c02f79df0009fc930` |
+| Installed trigger 17 and scheduler transitions | `6dae40ba234f9a02cbc47c542f7c684211b30b53dd210c2339bbaba380ec57ad` |
+| Revealed Templar at order drop | `0ba8d93669031265506314663c4d525b916caf0e38c3ed00700e08d8ebae4804` |
+| Trigger 17 with invincibility transition | `73b8d135c0e7857bed88aa72fdb5bda7d2c2097ab4383a5d2dfee93a0e097c88` |
+| Successful early interception trace | `14556c77f94a9d158a297c0a130a9d97315f5bb6a3d6b545a492eb3a239f434c` |
+| Frame 80,900 SRAM and fresh HOME | `7ce37160254ba79d9138a2ace0dd76f385c1bb54aa06e2ecff48236998a1e9bc` / `0d18303a860d089194ad54ee4c29d94e252dc94f63cfa5d6c31af5aac61ca0ec` |
+| Eastern Nexus damage SRAM and fresh HOME | `7d5ceeddddcc3a899a3ece7ad34a0448d3b168726408d592d5d5e1660ded454c` / `8250a2b61fe483bca7151668f977f84d6ccf6e39b5abdaba376500803f66582a` |
+
+#### Intercept the second southern raid
+
+The frame-80,900 save positions detectors at (1448, 1620)
+and (1448, 1770), with Kerrigan near (1428, 1688). An
+explicit attack kills the second hero Dark Templar. Fresh
+HOME at 82,409 restores Kerrigan at 400 HP, seven eastern
+Hydralisks and five remote Hydralisks. Both Nexuses still
+have full health and shields. There are no workers or
+friendly buildings.
+
+A continuation survives through frame 82,750, past the
+second raid. The eastern force reduces shields to 653,
+then loses all seven attackers. An attempt to recall them
+from the interception save reaches an empty selection box.
+The force is already moving and all seven die by 82,597.
+Recall or redirect them earlier in the interception route
+and keep the remote force away from the next raid.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Second interception SRAM and input trace | `414f59b93bdc2a3ee58726a0b71f947389418e4ab529a809093195499b6497e5` / `5e34029068edea79d4fcf255f323744fa432400a5c3d95937f108401e95e1e67` |
+| Fresh HOME continuation | `b5e408227077d6081213f0c1835263037b427d13a183cf6309f8d63ef654fc39` |
+
+#### Keep the replacement economy through both southern raids
+
+An alternate continuation from frame 78,389 keeps the two
+Hydralisk defenses while moving live Overlords to (1293, 1620)
+and (1304, 1916). Kerrigan's explicit attack kills the first
+Templar. Fresh HOME at 80,910 restores a full-health Hatchery,
+a 674-HP Pool, a 16-HP Drone and full-health Kerrigan.
+
+The same branch moves its two Overlords and Kerrigan to the
+previously verified second interception position. Waiting for
+Kerrigan to reach that position makes the later attack order
+reach the revealed Templar. Fresh HOME at 82,409 retains the
+Hatchery, Pool, Drone, full-health Kerrigan and both 200-HP
+Overlords. No Templar remains in the active field. The SRAM
+readback is byte-identical. This keeps production available
+while preparing the Nexus attack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First interception with workers, SRAM and fresh HOME | `fd0e0059756d6d3ffe7d8d715f031c1bc71a8873dcae71df84002727ace8a83c` / `34e76bc4a76e7f8a831332103317d9edaeca5df61972211b44a3f040473dabf1` |
+| Second interception inputs | `b130dc853943bcfc1881b5767a9d73c7361243d88b0a6d59b31d45b30015728b` |
+| Second interception SRAM and fresh HOME | `95c1f34dd3dcb92a67437b9d83dbfd8060b75466b595dfed10c23629d6edce8f` / `005ee812924030550a655c0692d120d07f7857a3fa6d7182016f88e57016d442` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

@@ -74,3 +74,180 @@ updates/s including the UI and presentation waits.
 - Physical observer: `4f65560119fa9e29df216f24efce6da417572304e2c39f02447023159435a549`.
 - Replay harness: `5c57f0a65c1af8f9f216cd664050125aaea602dc42a8cdd1b06e0dc3ad03bba6`.
 - Full KODAK receipt: `556cf4dd17b91d6705c101b4b6920712b70ec21fd632fe274144baf6bd394e89`.
+
+## November 24 installed cartridge opening and air production
+
+On the November 24 Z10 image, ordinary HOME controls open Z9,
+acknowledge the opening and save at frame 11. Fresh HOME matches
+the initial world and SRAM. The army starts with six Zerglings
+and two Hydralisks, four Drones, three Overlords and a 750/750 bank.
+
+Two Drones begin mining. The Hatchery queues three paid Drones,
+and a worker builds an Extractor at (416,240) that finishes by
+frame 1,112. The next orders assign a gas worker and finish the
+Hydralisk Den and a full-health Lair by frame 4,058. The Spire
+finishes by frame 6,554. Three paid Mutalisks hatch at full health
+by frame 8,925. The Lair has 1,548 HP and the gas worker has 8 HP
+after pressure at the base. The bank is 1,020 minerals and 398 gas.
+All three stages replay independently with matching state and
+SRAM. Fresh HOME restores the force, buildings and bank. Build
+more air and secure the gas line before attempting the crystal.
+
+Two more paid Mutalisks hatch and two new Drones work the gas
+line. An ordinary move order brings all five full-health air
+units to the first rally of the earlier winning route. Fresh
+HOME at frame 12,531 restores them near (560,250), three gas
+Drones and the 822/486 bank with identical SRAM. The objective
+countdown is still at zero. The earlier winning tape gathers
+fourteen Mutalisks before clearing the road.
+
+The next paid orders bring the group to eight full-health
+Mutalisks and fill available supply. Fresh HOME at frame
+19,211 keeps the three gas workers, a mineral worker and
+an 866/874 bank with identical SRAM. Three paid Overlords
+in a later branch allow further Mutalisk production. In
+that branch, an approaching Reaver reaches the gas line
+before the air group stops it, and the Extractor and gas
+workers are gone by frame 24,041. Continue from frame
+19,211 and target that Reaver before committing the air
+group to the crystal road.
+
+On a separate branch from frame 19,211, the eight Mutalisks
+attack-move into the Reaver's approach. The Reaver is gone
+from the base area in later observations. Fresh HOME at
+frame 23,282 gives nine full-health Mutalisks, two more
+queued, three surviving gas workers and a full-health Extractor.
+The next paid orders raise the group to fourteen full-health
+Mutalisks by game frame 26,691. Fresh HOME keeps both groups
+and the 442/1,018 bank with identical SRAM. The eight
+forward fighters and six near the Hatchery still need to
+assemble for the crystal route.
+
+The combined group destroys the first Photon Cannon on the
+road at (992,304). Fresh HOME at frame 27,561 restores all
+fourteen Mutalisks. Twelve have 120 HP and two have 100 HP.
+The gas line survives and the Extractor retains 750 HP.
+The bank is 490/1,106 and the countdown remains at zero.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Paid air units and gas workers | `90cb4bc3dbdc2b12b2c28c54108be3cd401d849377ab954e2139cbf21b1447fd` |
+| Air rally and fresh HOME | `679241e68bc02b3d997abdec94b2ac6a9d04392764ec0c4e951a7ba0ca4e33b1` |
+| Rally SRAM | `4e499a8d708913fdc1c9d3755925ed56e0c6610fda6e68565d9faf4a9405999c` |
+| Eight Mutalisks with gas workers and fresh HOME | `6da811f52de1caab0785e426fcea3c0b8aa42339e50b16d2ae58115a3d46e4d3` |
+| Reinforced SRAM | `c4d4911f41e0b30d8f5093489f423bc8cd10c155501021c1d24ba1e82600ae27` |
+| Reaver interception and protected gas | `5c9a4eabe96c3291d1229999cda87ae4bc36c8308bfb35bc6c6087ea2e008c7f` |
+| Fourteen paid Mutalisks and fresh HOME | `2594f3ed328f1f2bbf4034423acfab02f959e8bde74a37f184e484a963a505d3` |
+| Fourteen-Mutalisk SRAM | `92bc86d2702d6c8969a4ac80190c1b6aedad85dc2303f2e1950d5171d912c1ae` |
+| First road Cannon attack | `53394856447841e82b979826b04771490834e05732f8f94ef58f020daf3084f6` |
+| Road attack fresh HOME and matching SRAM | `c53b63e53bada5cd317a0c9aaa1419527d4dda58b55d8a0e1663ebe3f1c4326e` |
+
+### Road assault, crystal return and victory
+
+The next road assault destroys four more Photon Cannons and
+retains all fourteen Mutalisks. Fresh HOME restores the force
+at frame 29,511 with matching SRAM. A full-health Drone moves
+to the approach through the connected ground path. Fresh HOME
+at frame 34,920 retains the Drone, all fourteen Mutalisks and
+the 610/1,834 resource bank.
+
+The formation removes the entering Drone and opens a dialogue.
+Acknowledging the sequence through the controller starts the
+600-second countdown at frame 37,497. The air force stays near
+the formation while the enemy overruns the starting base. At
+frame 49,543 the countdown expires and a new 40-HP Drone
+appears with the crystal. A fresh HOME process restores both
+at the formation with byte-identical SRAM.
+
+On the winning return, the air group follows the cleared
+road waypoints and attacks ahead of the carrier. The air
+force is lost, and the carrier reaches the return location
+at frame 56,952 with 27 HP and the crystal. A fresh HOME load
+from that checkpoint reaches the victory result at frame
+57,089 with the chapter completion bit, zero scheduler fault
+bytes and zero unsupported events. A separate fresh HOME load
+restores the victory result and exports byte-identical SRAM.
+A advances to live Z10. An ordinary pause save at frame 11
+restores Z10 and the Z9 completion bit in a new process,
+with another matching SRAM export. The replay uses the exact
+November 24 Z10 ROM, SHA-256 `86f25892cb127bcd325c954e02d9ae5aa3122635901c167a74b85ff569109105`.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Four road Cannons and fresh HOME | `f64908f8d2f4ac9e524dcf5ea3332dc42d166b1871c224c4f5cd6e5b195ce04a` |
+| Drone approach and fresh HOME | `4cf7d91095111c1a5328e0569c70f7b7c6eea19b738945b70ee2cc75374044ed` |
+| Formation dialogue and active countdown | `b32608e1bae794bdab80641345395ba6cdbfc7b40174414fee2061db9d0271a6` |
+| Countdown expiry and crystal appearance | `d86914c1c6b44abf7ecd1a3cf32e295cdf02076f536478e7d55e20ec907303c8` |
+| Crystal appearance SRAM and fresh readback | `3bb1ce0c14757203879b6d6064987564ead7246d7ed45c62cfb8eb4744bd9b71` |
+| Road escort and crystal return | `80e29168104811bd7ed1208aebc7e8ae243ae386709a9f717aacd9c9c216bd83` |
+| Victory SRAM and fresh readback | `a7c026b062dfa0a3db2f0de09d04b3bdb4073970663cca1159fc4530652cfc68` |
+| Victory, next mission and fresh HOME | `5753d84fc7dba773bce47c83269982463ccdabb003076ab27f6be53f89e6980d` |
+| Z10 live SRAM and fresh readback | `7ca9c39810ed6171def425da2d225ccbfafd9e8fa9d93b842d992c42287c1eb8` |
+
+### Opening frame cost
+
+Three independent 120-update windows use neutral buttons after
+each fresh HOME load. All 360 measured updates exceed the
+561,792-cycle two-VBlank budget. The totals are mGBA guest cycles.
+
+| Starting save | Mean loop cycles | Mean simulation | Mean drawing | Updates/s |
+| --- | ---: | ---: | ---: | ---: |
+| Opening, frame 11 | 820,131 | 479,915 | 339,830 | 20.46 |
+| Lair, frame 4,058 | 865,060 | 498,827 | 365,846 | 19.39 |
+| Three Mutalisks, frame 8,925 | 875,885 | 492,239 | 383,260 | 19.15 |
+
+Eight instruction-attributed updates from each window match
+ordinary controls on both framebuffer pages, palette, camera,
+world, phase counters and elapsed cycles. The static defense pass
+uses 97–98k inclusive cycles per update. Thirty power queries
+together spend roughly 44k exclusive cycles, including the lazy
+Pylon roster setup. The target index's owner-list setup uses
+60–61k exclusive cycles in the same cuts. These measurements
+identify present costs in this dense campaign opening.
+
+Read-only breakpoints separate the lazy roster setup and
+lookup in one update per window. Each sees 69 completed enemy
+Pylons and checks 30 Cannons. The first call reaches the
+completed roster after roughly 7.5k cycles. The lookup portions
+use roughly 38.6k cycles across 902 actual candidates. An
+offline model grouping the same owner list by 128-pixel Y
+bands reproduces all 90 power results and visits 172 candidates
+per update. Its visit reduction excludes indexing and probing
+cost.
+
+An authored ARM fixture tests the eight-bin layout with exact
+power masks and the same ROM wait setting in each pair. The
+dense single-owner scenario uses 69 Pylons and 30 queries.
+Its `-O2` pass drops from 80,203 to 39,349 cycles. Its
+`-Os` pass drops from 106,011 to 48,997 cycles. The sparse
+three-Pylon/two-query case grows from 6,658 to 7,158 cycles
+at `-O2`. The four-query case with no Pylons grows from 6,404
+to 7,414. The fixture reports an extra 40 bytes across the
+caller and lookup stack frames. Seven sparse, dense, mixed
+owner and negative-coordinate holdouts plus the main dense
+case return identical masks.
+
+A second trial keeps owner lists below 24 completed Pylons
+and groups them by Y once the count reaches 24. The main
+dense case takes 41,838 cycles at `-O2` and 52,561 at `-Os`.
+The three-Pylon case takes 5,360 and 9,601 cycles respectively.
+The no-Pylon case takes 5,272 and 9,359. The nine-Pylon
+holdout uses 858 additional cycles at `-Os`. All eight
+authored guest masks match the scalar reference. Separately,
+ASan and UBSan compare 153,600 queries across counts around
+the transition and across negative coordinates, incomplete
+Pylons and unsupported owners. This is a local source
+experiment. Verify stack, full-frame cost and saves across
+low- and high-Pylon production workloads before adoption.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Opening launch and fresh HOME | `6e76e7e22d0a4f5cdcfb0070d750df11b5973a92a6487bfa37ea3ff4aabbc4be` |
+| Independent paid economy, tech and air route | `5f2113b311a2e507f84f93729155a3a7d3e2249a12b8f92bbde81e6d81c1349a` |
+| Opening and Lair phase windows | `a5d834a4b77b3b07de6dda0563ae2831ae4ba03e4d22cea4bf4bebab7e9a9b4a` |
+| Paid air phase window | `d83c652f165e193d228b4dfefdbf202caa244c070057247d359449d151db274d` |
+| Paired instruction attribution | `b7bffd3d4d7bb8fdaa1a6906fc7749c18d6c38aa4eb6860e6d8c2ae7987fe714` |
+| Power scope split and modeled candidate bands | `6d30464f2c62388a31c064c18abec3ac7106cec1a4e6fe4bce39afed1dac3f48` |
+| Authored paired power-bucket timing | `65374ac4e3f78acdf8c979d3aa21751ed43751d648ba4a929d7c0844b794a971` |
+| Authored paired adaptive power-bucket timing | `c08867d3ba536ce6bf1f02422f9248be4076e726e1ade947270e6e34801885a1` |
+| Adaptive power-bucket sanitizer result | `e054e695d0dbe8d87f4d5d60bbac30309a6507a1607714154162e04ba2c070b2` |
