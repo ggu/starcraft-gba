@@ -20,8 +20,8 @@ passed every trace checkpoint and matched the control's endpoint fingerprint.
 At every boundary, including the start (513 per case), both bitmap pages and
 the palette matched byte for byte. The active page sometimes differed at
 the input boundary because the VBlank interrupt flips asynchronously. Of
-the 11 different displayed bitmaps, seven showed the page most recently
-written one update earlier on the indexed build and four on the control.
+the 11 differing samples, the indexed build displayed the newer page in
+seven and the control displayed it in four. Each pair was one update apart.
 
 | Map | CPU seats | Control flips/s | Indexed flips/s | Cycles saved | Different displayed bitmaps |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -41,3 +41,26 @@ pages contain identical art. Physical GBA SP timing remains open.
 All ten retained Zerg chapter victory saves loaded, advanced or retried the
 finale on the normal candidate, and reloaded the resulting pause save in
 a fresh emulator with matching state and save bytes.
+
+## Checks outside the battle window
+
+For every 16-bit image ID and every 8-bit animation ID, the generated
+indexed resolver returned the same row or null as the original resolver on
+the actual prepared bank (151 images, 425 animations). All 14 original
+arrays in the two headers had identical definition hashes.
+
+In the 4,901-input Zerg 7 campaign cut, cycles fell from 9,327,831,341 to
+9,325,062,555. At all 41 samples the mission state, depleted-site counters,
+both framebuffer pages, palette and displayed selection matched.
+
+At the end of each 512-input skirmish window, pressing START and saving
+produced the same SRAM on both builds. Every such save restored its battle
+fingerprint. In another 36 matched trials, a read-only emulator observer
+timed the interval from sampling START until the VBlank handler selected
+the first completed pause page. The six offsets per lineup were 16, 64,
+128, 256, 384 and 512 updates past the resume checkpoint, followed by one
+neutral update before START. Mean latency was 72.04 ms on the control and
+70.86 ms with the index. Maximum observed latency was 97.03 and 96.35 ms,
+respectively. Individual pairs ranged from 14.36 ms faster to 9.91 ms
+slower, depending on VBlank phase. This measures guest time at a sampled
+button edge; it excludes physical button scanning and LCD response.
