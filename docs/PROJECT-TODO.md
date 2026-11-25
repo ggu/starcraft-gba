@@ -66,9 +66,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the trial extracted 280 gas in 2,048 updates from a site that supplied 528
   on release. Compare paid production, native service cadence, and light
   versus busy scenes before changing the timer. P9 won on the trial from
-  a retained P8 victory and reloaded its result. The old P10 tape first
-  diverged at controller update 19,591. Re-author and qualify P10 and Z10
-  under the new economy before enabling shared refinery service.
+  a retained P8 victory, and P10 won from that actual result with a 40-unit
+  first assault. Both fresh victory reloads passed. The old Z10 plan lost on
+  the trial; qualify a revised ordinary-input Z10 route. Gas service already
+  took 1.98 emulated seconds in the lighter Z1 sample, versus 3.09 in busy
+  P10. Prioritize busy-frame pacing before tuning the shared timer.
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged

@@ -125,3 +125,29 @@ The Z10 cartridge admitted the retained Z9 victory; its old finale inputs
 first disagreed with the measured release gas bank at input 13,374 (668 gas
 on the trial versus 996 on release). A result-transition pass alone does
 not establish either finale win from a playable start.
+
+Using the existing `P10_ATTACK_ARMY` control setting, an ordinary first
+assault at 40 combat units cleared the Overmind on the FIFO build at frame
+46,025 (input 47,257). The normal host recipe reproduced the tape byte
+for byte. In mGBA, the cartridge started from the new P9 result above,
+matched all 19 recorded checkpoints, kept the heroes alive and restored
+the P10 victory from fresh SRAM. The controller's attack threshold changes
+the test player's strategy; the mission and AI rules are shared by both
+runs. Reproduce the controller with:
+
+```sh
+make build/test-sc64-p10-gas-service-home
+./build/test-sc64-p10-gas-service-home /tmp/p10-gas-service.jsonl
+```
+
+Pass that trace as `--p10-trace` to `tools/sc64_protoss_linked_replay.py`
+with the trial ROM, P8 victory and qualified P9 trace. Winning FIFO P10 trace
+SHA-256: `708a85076ab45427618db6b234b68cdd13f4d13d62b5e2021dde380c5f7ba246`.
+
+Additional Zerg cartridge cuts used 512 neutral updates from retained play.
+In Z1 (49 live units), two complete 59-to-cargo intervals took a median
+1.98 emulated seconds. On one-AI Outpost (50–60 live units), 15 such
+intervals took 2.60 seconds; on one-AI Blood Bath (31–49 units), nine took
+2.48 seconds. For the busy three-AI P10 cut above, 16 complete intervals
+took 3.09 seconds. This variability with the same timer supports improving
+busy-frame pacing before shortening the service interval globally.
