@@ -67,8 +67,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   on release. Compare paid production, native service cadence, and light
   versus busy scenes before changing the timer. P9 won on the trial from
   a retained P8 victory, and P10 won from that actual result with a 40-unit
-  first assault. Both fresh victory reloads passed. The old Z10 plan lost on
-  the trial; qualify a revised ordinary-input Z10 route. Gas service already
+  first assault. Both fresh victory reloads passed. On Z10 a revised plan
+  cleared the finale from a retained Z9 victory at frame 58,485, matched all
+  25 cartridge checkpoints and reloaded the victory with byte-identical SRAM.
+  [Z10 route and verification](audits/2026-11-26-z10-fifo-normal.md). Gas service already
   took 1.98 emulated seconds in the lighter Z1 sample, versus 3.09 in busy
   P10. All 18 fully observed native visits lasted 37 guest ticks, including
   three starting with zero other waiters. Prioritize busy-frame pacing before
