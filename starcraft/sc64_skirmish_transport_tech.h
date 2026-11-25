@@ -20,6 +20,26 @@ typedef struct { Sc64SkTransportJob owner[SC64_SK_TRANSPORT_OWNERS]; } Sc64SkTra
 _Static_assert(sizeof(Sc64SkTransportJob) == 4, "transport job wire budget");
 _Static_assert(sizeof(Sc64SkTransportTech) == 16, "transport tech wire budget");
 
+/* Authenticated CHK Ventral Sacs permission for the human Zerg source
+ * owner. Z6 retains its original mission-specific journal and adapter.
+ * Z1-Z3 and Z5 explicitly deny this upgrade. Source restriction and
+ * precedence evidence: docs/audits/2026-11-25-zerg-ventral/README.md. */
+static inline int sc64_campaign_transport_allowed(int mission)
+{
+    return mission == 15 || (mission >= 18 && mission <= 21);
+}
+/* Z4-created actors predate source-owner propagation and use the legacy
+ * unassigned marker. Imported source actors retain owner 3. */
+static inline int sc64_campaign_transport_source_owner_valid(int mission, int raw_owner)
+{
+    return raw_owner == 3 || (mission == 15 && raw_owner == -1);
+}
+static inline int sc64_campaign_transport_producer_allowed(int mission, int raw)
+{
+    return sc64_campaign_transport_allowed(mission) &&
+        (raw == 132 || raw == 133);
+}
+
 /* Custom-game owner IDs deliberately omit the neutral slot. */
 static inline int sc64_sk_transport_owner_index(int owner)
 {

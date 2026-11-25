@@ -87,7 +87,8 @@ with (the Terran, Zerg Z9/Z10 and Protoss P10 release vectors among them).
 Results go to `release-check.json` and `release-check.md` (default
 `build/release-check/<rev8>/`, ignored by Git) with per-step PASS/FAIL/SKIPPED,
 durations, make commands, log paths, ROM sha256, length and game code, linker RAM
-margins (`__iwram_end` and `__bss_end` against the limits in `common/gba.ld`),
+margins (`__iwram_end` and `__bss_end` against the limits in `common/gba.ld`, or
+against the ROM's own `__iwram_hot_limit` when it is linked with `common/gba_hot.ld`),
 the full source revision, a dirty flag for modified tracked files, and tool
 versions. It exits non-zero if any step FAILED.
 
@@ -1516,6 +1517,40 @@ mapping gaps and pool requirements rather than truncating source rows. Z4
 still needs gameplay mappings, larger building/mineral pools, its countdown
 and hatch sequence, victory/defeat behavior, persistence and controller/ARM
 qualification. Source staging alone does not establish a playable mission.
+
+### Race cartridge IWRAM placement
+
+The Terran, Zerg 10 and Protoss 10 cartridges link with `common/gba_hot.ld`.
+It runs the functions listed in `config/iwram-hot/<cartridge>.txt` from IWRAM,
+in the part of the old 11 KiB stack reserve that the stack cannot reach. The
+functions are ordinary Thumb code; only their address changes. After the link,
+`tools/gba_iwram_hot.py check` bounds the program's stack depth from the ELF's
+call-frame information and branches and from GCC's call graph and address-taken
+record, and fails the ROM unless the stack fits above the IWRAM code with a
+512-byte margin. The cartridges are already built with `-g`, which it needs. The report is
+`build/iwram-hot/<cartridge>/stack.json`; the GCC dumps beside it take about
+80 MB per cartridge.
+
+```sh
+make terran                    # relinked, stack-checked
+make terran SC64_IWRAM_HOT=0   # previous link, for matched comparisons
+make terran TERRAN_CARRIER_RELEASE=0   # stock comparison build: previous link too
+make test-sc64-iwram-hot       # asset-free tool and linker-script checks
+```
+
+When the check fails after a code change, either a listed function grew or a
+stack frame did. The message gives the highest address the IWRAM code may
+reach: lower `limit` in the list and drop functions from its end until the
+link fits. A new call cycle, or a change to a declared one, also fails the
+check. The message prints the `recursion` or `callback-cycle` line with the
+cycle's new fingerprint. Read the code first: the count on that line is how
+many activations of the cycle's functions can be live at once, and the check
+trusts it. `tools/sc64_setup_profile_build.py`, `sc64_render_profile_build.py`
+and `sc64_timing_profile_build.py` replay the cartridge link with a probe in
+place of `main`; their ELFs use the same placement but are not stack-checked
+and are for emulator measurement only. Add a function only with a paired cycle measurement; short
+functions that call back into ROM get slower. Method, measurements and limits
+are in [the placement audit](audits/2026-11-25-iwram-hot-placement.md).
 
 ### Canonical Zerg and Protoss builds
 

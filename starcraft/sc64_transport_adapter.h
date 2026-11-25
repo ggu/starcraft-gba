@@ -43,7 +43,10 @@ static int race_transport_carrier_type(const Unit *q)
         int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
         if (sc64_transport_unconditional_carrier_raw((unsigned)raw) &&
             sc64_race_unit_from_raw(raw) == q->type) return 1;
-        if (race_mode && raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
+        if ((race_mode || (sc64_campaign_transport_allowed(race_selected_mission) &&
+             race_human == R_ZERG && q->owner == SIDE &&
+             sc64_campaign_transport_source_owner_valid(race_selected_mission, q->raw_owner))) &&
+            raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
             int owner = sc64_sk_transport_owner_index(q->owner);
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
             if (q->owner == NEUTRAL && q->raw_owner == 11)

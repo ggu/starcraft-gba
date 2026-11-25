@@ -1169,6 +1169,7 @@ int main(int argc, char **argv)
     int next_templar_follow = 0;
     int next_solo_hero_order = 0;
     int next_probe_queue_frame = 0;
+    int next_gas_attempt = 0;
     int heroes_final_advance = 0;
     while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost) {
         int tassadar = source_unit(SC64_P4_RAW_TASSADAR);
@@ -1296,9 +1297,10 @@ int main(int argc, char **argv)
                     (controller_buildup_pool_blocked_since >= 0 &&
                      frame - controller_buildup_pool_blocked_since >= 2700))) {
                     controller_buildup_done = 1;
-                } else if (!controller_buildup_done && side_gas_worker_count() < 2 &&
+                } else if (!controller_buildup_done && side_gas_worker_count() < 2 && frame >= next_gas_attempt &&
                            source_building(157, SIDE) >= 0) {
                     issued = assign_probe_to_gas();
+                    next_gas_attempt = frame + 1200;
                 } else if (!controller_buildup_done && side_probe_count() < 8 &&
                            frame >= next_probe_queue_frame && minerals >= 50 &&
                            source_pool_slack() > 0 &&
@@ -1391,14 +1393,18 @@ int main(int argc, char **argv)
                  * waypoint. A drag box can include a hero stacked beside a
                  * rescued escort and was being rejected as an unsafe group. */
                 int army_only = 1;
-                issued = issue_group_order(tx, ty, army_only, 0);
+                issued = issue_group_order(tx, ty, army_only, 1);
                 if (issued) escape_group_ordered = 1;
                 }
             } else if (rescued && heroes_released && escort_combat_count() >= 2) {
                 int army_x, army_y;
                 escort_army_center(escape_x, escape_y, &army_x, &army_y);
+                int exit_hostiles = 0;
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    if (u[i].alive && owners_hostile(SIDE, u[i].owner) &&
+                        dist2(u[i].x, u[i].y, escape_x, escape_y) < 400 * 400) ++exit_hostiles;
                 if (dist2(army_x, army_y, escape_x, escape_y) <= 360 * 360 &&
-                    frame >= next_solo_hero_order) {
+                    !exit_hostiles && frame >= next_solo_hero_order) {
                     int force = !heroes_final_advance;
                     heroes_final_advance = 1;
                     int moved_t = issue_hero_escape_segment(tassadar, force);
@@ -1409,11 +1415,11 @@ int main(int argc, char **argv)
                     (void)issue_group_order(escape_x + 120, escape_y + 16, 1, 0);
                     issued = moved_t || moved_r;
                     next_solo_hero_order = frame + 1200;
-                } else if (dist2(army_x, army_y, escape_x, escape_y) > 200 * 200) {
+                } else if (exit_hostiles || dist2(army_x, army_y, escape_x, escape_y) > 200 * 200) {
                     int tx = escape_x, ty = escape_y;
                     (void)safe_escape_waypoint(army_x, army_y, escape_x, escape_y,
                                                &tx, &ty);
-                    issued = issue_group_order(tx, ty, 1, 0);
+                    issued = issue_group_order(tx, ty, 1, 1);
                 }
             } else if (rescued && heroes_released && escort_combat_count() <= 1 &&
                        rebuild_waves < 6 && minerals >= 800 && side_gateway_count() > 0 &&

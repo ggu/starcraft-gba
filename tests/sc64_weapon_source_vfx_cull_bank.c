@@ -185,7 +185,15 @@ static void prepared_profiles_keep_pixel_output(void)
     uint16_t radius_x, radius_y;
     uint32_t bounds = sc64_weapon_source_vfx_cached_bounds();
     assert(sc64_weapon_source_vfx_bounds_unpack(bounds, &radius_x, &radius_y));
+    /* Shield LO kind 5 adds a 26-pixel horizontal child offset; the
+     * previous bank's maximum was 15. The largest frame radius remains
+     * 51x40, and the vertical child maximum remains 21. */
+#ifdef SC64_WEAPON_SOURCE_SHIELD_OVERLAY
+    assert(radius_x == 77u && radius_y == 61u);
+#else
     assert(radius_x == 66u && radius_y == 61u);
+#endif
+    assert(bounds == sc64_weapon_source_vfx_scan_bounds());
     static const int screen_endpoints[][4] = {
         {-180, 58, -125, 62}, {365, 58, 420, 62},
         {60, -150, 64, -110}, {60, 260, 64, 300},
