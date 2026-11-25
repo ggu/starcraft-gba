@@ -38,7 +38,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves match the historical stage bytes, including the victory SRAM
   `9ec9117fab1dd841230701bbfb9dbb7441069dc8881cadc6695592a350ea9b45`.
   The separate HOME recording remains active at its end and after 3,000
-  additional neutral inputs. Keep these routes distinct in future checks.
+  additional neutral inputs.
+
+  Z4 also wins from HOME on this package. At the old tape endpoint, the
+  player rebuilds a Spawning Pool, upgrades the Hatchery to a Lair, builds
+  a Spire and produces 20 Mutalisks to destroy the remaining Command
+  Center. Fresh HOME restores victory at frame 64,147. Starting the same
+  Z5 input chain from this new Z4 result wins at frame 18,974 with both
+  completion bits set (98,304). Fresh readback SHA-256:
+  `bd4510087ba2ad7b109ed11194fe93faf602d08a1b17b48dc81d8f0e2aa7aba3`.
+  Carry this save forward through Z6.
 
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
