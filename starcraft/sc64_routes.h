@@ -467,6 +467,9 @@ static void sc64_facility_frontiers_reset(void)
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Rebind field bases after map-shape changes. Return false for invalid or
  * oversized geometry before any route-grid access can use these fields. */
+#ifdef SC64_WIDE_POINT_MEMO_PROBE
+static void sc64_wide_memo_reset(void);
+#endif
 static int sc64_route_configure(void)
 {
     int cols = MAP_COLS, rows = MAP_ROWS;
@@ -697,6 +700,9 @@ sc64_routes_reset(void)
 /* The donors' bytes are only good for the grid they were flooded on. */
 static void sc64_routes_forget_donors(void)
 {
+#ifdef SC64_WIDE_POINT_MEMO_PROBE
+    sc64_wide_memo_reset();
+#endif
     SC64_ROUTE_DONORS_CLEAR();
 #ifdef SC64_ROUTE_KEEP_FIELDS
     sc64_route_grid_copied = 0;
@@ -805,6 +811,9 @@ static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 /* Called by build_path_grid before it rewrites the grid. */
 static void __attribute__((noinline, unused)) sc64_routes_grid_begin(void)
 {
+#ifdef SC64_WIDE_POINT_MEMO_PROBE
+    sc64_wide_memo_reset();
+#endif
     sc64_route_grid_copied = 0;
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     sc64_route_point_saved = -1;
@@ -2409,6 +2418,9 @@ sc64_route_fill_linear(u8 *field, int goal)
 #endif
 
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
+#ifdef SC64_WIDE_POINT_MEMO_PROBE
+#include "sc64_route_wide_memo.h"
+#endif
 /* Flood the whole field of a goal into a slot on the current grid. Returns the
  * number of queued cells (for diagnostics). */
 static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
@@ -2426,7 +2438,11 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
 #ifdef SC64_ROUTE_LINEAR_FLOOD_PROBE
     if ((MAP_COLS == SC64_LINEAR_COLS || MAP_COLS == SC64_LINEAR_WIDE_COLS) &&
         MAP_ROWS > 0 && MAP_ROWS <= SC64_LINEAR_MAX_ROWS) {
+#ifdef SC64_WIDE_POINT_MEMO_PROBE
+        tail = sc64_route_fill_wide_cached(sc64_route_field[slot], goal);
+#else
         tail = sc64_route_fill_linear(sc64_route_field[slot], goal);
+#endif
         if (tail >= 0) goto fill_finished;
         tail = 0;
     }
