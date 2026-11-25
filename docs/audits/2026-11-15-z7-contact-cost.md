@@ -189,3 +189,34 @@ the same Drone construction fix on both sides.
 - Four corrected Blood Bath comparisons SHA-256: `68491c988acee4fc70786fa0111fef9bda5609c179b75cc7daea0d4b6667200e`.
 - Full corrected Protoss 10 comparison SHA-256: `b6b82f0e79832546473998ccc83f18f86f29474eb8b3d19ce074758c4c2a14c7`.
 - Current Zerg 9 comparison SHA-256: `589641091c2082cd0253c51df284e42d71a28e0114a3f8bd463617022daded72`.
+
+#### Column bounds in the current replay windows
+
+The November 25 trial replaces the two flattened row endpoints with four
+one-byte bounds in the same 16-byte cache entries. It checks both old and
+new actor cells. The ASan/UBSan fixture checks movement within a cell, into
+and out of the rectangle, and 10,000 actor mutations with 29,790 strict
+placement comparisons.
+
+Each of three ordinary ARM continuations compares 480 advancing updates
+from the same SRAM in the row and rectangle builds. The sampled world,
+pending impacts, and full subsequent pause exports are identical. Cycle
+counts come from separate builds without the diagnostic counters.
+
+| Replay and logical frames | Row mean loop cycles | Rectangle mean loop cycles | Row / rectangle p95 |
+| --- | ---: | ---: | ---: |
+| Z7 campaign, 10,884–11,364 | 886,465 | 886,484 | 969,631 / 969,839 |
+| Z9 campaign, 27,560–28,040 | 1,474,996 | 1,475,014 | 1,879,068 / 1,879,081 |
+| P10 three-CPU Outpost, 11,001–11,481 | 1,277,913 | 1,279,245 | 1,599,990 / 1,611,142 |
+
+The counters see zero memo hits in every window, including both versions
+of the Outpost fight. Its movement evictions fall from 717 to 664, but the
+retained entries produce no reuse and increase unsuccessful lookups. The
+Z7 and Z9 samples have no movement evictions or memo lookups. All 480
+updates in each case exceed the two-VBlank budget. These are current
+checkpoint windows distinct from the older dense Z7 fixture above.
+Keep the row-local implementation and prioritize time spent actually
+computing contact results and drawing actors in these windows.
+
+The local comparison receipt SHA-256 is
+`8254c579634b18325b732c78ab5216580ecd8c09488d4fd73e266fdf0204e206`.

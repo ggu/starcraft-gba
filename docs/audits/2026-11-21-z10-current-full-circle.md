@@ -266,3 +266,10 @@ to place defenders or reposition workers before the attackers arrive.
 | --- | --- |
 | Frame 35,958 inputs | `4c1fd9baf8569077b67e3558db8dbc9db857c15b3efe3a65be666a2890b97d25` |
 | Frame 35,958 SRAM and fresh HOME | `dd4cae3b8320fdc9261ba63473e0a8eb6ed911e54dcacc8f79ae876523d39627` / `d00cb96ed2f8be2d462c496c70e5eb4d36f77a28538f735da1c421466e93b349` |
+
+A closer position around (300, 1080) from the earlier frame-34,723
+checkpoint also loses the three Hydralisks and the Overlord by frame
+36,418. The Hatchery is down to 89 HP at frame 36,818 and falls shortly
+afterward. The next defensive attempt needs more production or an
+alternate route ahead of those three Hydralisks. Exact inputs have
+SHA-256 `5c9fe849dc7ff54431440beb5a2cfbc4a44ba2ea977d2a87f5903ca005aac86a`.

@@ -757,6 +757,17 @@ A follow-up builds and morphs a third Sunken north at
 it at 278 HP, the two earlier Sunkens at 400 HP each
 and the Hatchery at 1,250 HP. The three-Sunken hold
 without further orders loses the Hatchery by 13,292.
+
+Two further fresh HOME loads reproduce the same frame-10,892
+world fingerprint and byte-identical SRAM. A coordinated order
+sends all 12 available fighters to (1350, 1500) by frame 10,977.
+At frame 13,177 the final friendly building has fallen, all 54
+enemy buildings remain, and the GBA mission stays active with
+16 friendly mobile units. Z7's campaign defeat predicate counts
+both buildings and mobile units. The equivalent native N64 state
+has yet to be observed. The readback and attack-input receipts have
+SHA-256 `a563b60e44bb0030fe7637a3852cebe888bc6261527519b11771f33119e403d1`
+and `c609f292712c3fd1d02c1f154f593935a7adc05e9963bc6dce32fccf531b9e1c`.
 Both branches retain 200 gas with no active gas source.
 Split the mobile defense and qualify mining through the
 raid before committing to further static defenses.
@@ -1820,6 +1831,27 @@ the two-VBlank budget. These measurements apply to the retained
 P10 pair. Qualify the current combined source against the other
 cartridges, campaign and Showcase, including save continuation,
 before promoting the renderer to the release builds.
+
+#### Screen-edge visibility in the whole-raster path
+
+The November 25 trial limits the whole-raster fog check to horizontally
+visible pixels while keeping the blitter's original source coordinates and
+stride. The sanitizer raster oracle confirms identical pixels at the left
+map edge and the right screen edge with hidden offscreen tiles. The four
+prepared ARM links retain their static memory endpoints.
+
+Seven 160-update pairs cover panned three-CPU Outpost for every race,
+three Blood Bath variations and an active Z9 campaign checkpoint. The
+sampled worlds, both video pages, palette, camera, pause SRAM and fresh
+continuation agree in all pairs. Seven sampled display-phase states differ.
+Mean loop time is flat or rises by up to 0.12%. The panned Outpost drawing
+means increase by 0.06–0.63%. The Z9 p95 improves from 1,877,834 to
+1,868,710 cycles while its mean loop time rises 0.05%. Budget overruns stay
+constant in all seven windows. Keep the current raster and use traces of
+the visible fight to identify a larger remaining cost.
+
+The local comparison receipt SHA-256 is
+`99b8ddef059b6d8ab32b9d66ac083c05c4e1b66da9a04df3a82fdacc9e27df96`.
 
 #### Blood Bath holdout and late skirmish journals
 
