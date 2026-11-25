@@ -97,5 +97,9 @@ per update. All 72 sampled worlds, both framebuffer pages, selected visible
 pixels, palettes and menus matched. A 1,024-byte store averaged 1,958,789.
 A 2,048-byte store averaged 1,867,956, with a different visible page at two
 samples. The host oracle forces a packet wrap over a live descriptor and
-compares subsequent requests to scalar BFS. It also checks that a change
+compares subsequent requests to scalar BFS. The four final ARM builds all
+linked. They leave 4,192 bytes on Protoss, 6,844 on Terran, 10,528 on Zerg
+and 14,324 on Showcase below the existing EWRAM guard. The final Z7 ARM
+build repeated the 1,867,971-cycle mean and 72 matched samples. The
+fixture also checks that a change
 of grid dimensions and invalid dimensions each clear a populated cache.
