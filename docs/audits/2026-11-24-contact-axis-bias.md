@@ -289,3 +289,47 @@ respectively.
 | P10 target-cell census | `0f237210eddeba86255432f476531d5cd4b457ae59852efa7211416b289e337d` |
 | Global plus per-row masks | `3f8e13ad863e84e45d5792b64de933547dcbb9e0e097e46e431f4249e799a6fc` |
 | Per-row column masks | `66149a1a3c5e9c504ef9847b5c64b3bab5705d6bbaa190e003088ffa770ae55e` |
+
+## Default on with the selection-ring renderer
+
+The normal recipes now enable `CANONICAL_CONTACT_ROM_AXIS`. It takes
+effect in the speed-optimized ROM collision kernels for Terran and Z10.
+P10 and Showcase reproduce their preceding ROM hashes exactly. The
+four pairs link at their previous EWRAM and IWRAM endpoints.
+
+| Current paired window | Mean cycles off → on | p95 off → on |
+| --- | ---: | ---: |
+| Terran Outpost, three CPUs, panned | 1,029,640 → 1,016,068 | 1,292,755 → 1,268,368 |
+| Z10 Outpost, three CPUs, panned | 1,177,966 → 1,165,539 | 1,404,280 → 1,396,701 |
+| Terran Blood Bath, three CPUs | 841,712 → 831,322 | 1,003,329 → 995,178 |
+| Z10 Blood Bath, three CPUs | 944,371 → 918,853 | 1,170,413 → 1,141,962 |
+| Terran Blood Bath, one CPU | 560,883 → 560,977 | 604,463 → 591,448 |
+| Dense Z9 campaign | 1,634,448 → 1,634,562 | 1,778,232 → 1,778,331 |
+
+The four faster busy matches save 1.05–2.70% mean cycles. The
+one-CPU window still exceeds the two-VBlank budget on 72 of 160
+updates. Every sampled three-CPU update exceeds it. Across seven
+160-update pairs, including the byte-identical P10 control, the
+observed world, entity banks, palette, camera, both framebuffer
+pages, pause SRAM and fresh continuation agree. Four individual
+updates have a different display register or pending flip state.
+Five Showcase replay windows match timings and pixels.
+
+The three race ROMs also pass 54 normal Custom Game opening and
+fresh continuation cases covering both maps, every human race and
+one to three CPUs. Every pause journal survives a fresh HOME load
+and re-exports byte for byte.
+
+The ordinary Wasteland tape wins at frame 10,120 and restores both
+its mid-mission and victory journals through fresh HOME sessions.
+The ordinary Z10 suffix resumes the prepared late save and wins at
+frame 63,523 with byte-identical victory SRAM. Hardware frame delivery
+remains open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Seven campaign and skirmish pairs | `3b77a81e3775e92a4898cfbfa1f77ea453fc0591288cce9689238e6bd481391b` |
+| Five Showcase pairs | `8dbe71c9360f33ec1edae0492175f2f11e7fbbc13808469e6d3e38204f903c10` |
+| Three-cartridge Custom Game matrix | `2d673a40f632ddf09faad7305fe6d59d4ba02819901c36a13528bcd3749c9b20` |
+| Wasteland victory and journal readbacks | `876cba82a516e1baf81c0adc468090bd1dec5a6c5579fa0f4382afd2bc68f7a4` |
+| Z10 victory input and save receipt | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
