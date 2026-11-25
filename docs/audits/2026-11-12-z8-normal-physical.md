@@ -1352,6 +1352,82 @@ recovery save remains the usable continuation.
 | Mining and both Nexus observations after fresh HOME | `867aad7c999f458d6d939e72caaf14bcea0a3383405762032b7fadedd0462811` |
 | Mining SRAM and fresh readback | `9616b9168521570c1a8b7c2cee389f571272c98d9eccd1348b08b8fa6367ce38` |
 
+#### Two defenses restore the Pool and expose the next defeat
+
+On the November 24 Z10 cartridge, eleven Hydralisks move
+from the mining save toward (1900, 1570) and attack the
+southern approach. The two tracked hostile slots disappear
+and ten Hydralisks remain. Fresh HOME at frame 77,928
+preserves the Hatchery and full-health Kerrigan. A further
+fight on the western approach leaves three Hydralisks and
+two Drones. The replacement Spawning Pool completes at
+674 HP. Two eight-mineral deliveries bring the bank to
+7,838. Fresh HOME at frame 80,708 also retains both
+enemy Nexuses.
+
+A neutral continuation pauses for dialogue at frame 80,782.
+One A press advances the dialogue. The game displays defeat
+16 updates later at frame 80,798, with Kerrigan still at
+400 HP and both friendly buildings intact. The installed
+ROM's trigger 17 requires a player-1 hero Dark Templar
+(raw type 74) in source location 18. The scheduler marks
+that trigger active at dialogue and done at defeat. In
+GBA coordinates its rectangle is (1184, 1952) to
+(1440, 2048). A subsequent A press restarts the mission.
+Stop the controller at RESULT so it records the defeat
+before issuing another action.
+
+An Overlord repositioned from frame 79,089 arrives too
+late. Starting the guard from frame 76,885 provides time
+to position the detector and Kerrigan. At frame 80,689
+the explicit B-menu attack acquires the revealed Templar.
+Its shields drop from 80 to 31. A second run places
+the Overlords at (1305, 1868) and (1309, 1916). The
+Templar stays revealed when Kerrigan drops the order.
+The first action of trigger 17 makes the Templar
+invincible on entry while the camera and dialogue run.
+The neutral trace confirms its invincibility from
+frame 80,780. The guard needs earlier damage on the
+approach before the invincibility action.
+
+An earlier interception from the same frame-76,885 save
+positions an Overlord at (1293, 1620) and Kerrigan at
+(1320, 1623). Her ordinary B-menu attack acquires the
+Templar at frame 80,586. The Templar loses its shields
+and dies by frame 80,636, before entering the rectangle.
+The game runs through the old defeat frame and pauses
+at 80,900. Fresh HOME restores 16 Hydralisks, five
+Overlords, Kerrigan at 400 HP and 8,022 minerals. The
+continuation has no workers or friendly buildings.
+Both objectives remain. An ordered eastern assault
+from this save lowers the Nexus shields to 740. Fresh
+HOME at frame 82,525 retains 11 Hydralisks and Kerrigan
+at 400 HP. An unassisted continuation lowers the
+shields to 601 by frame 82,610, loses four more
+Hydralisks and subsequently reaches defeat. Use the
+earlier interception save to stage a separate guard
+before committing the attack.
+
+The prior [native emulator audit](2026-11-04-n64-parity/README.md)
+also observed an idle defeat from a Dark Templar entering
+the objective and an Advisor box pausing the clocks.
+That run did not identify the active trigger or capture
+its modifier transition.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First defense and fresh HOME | `533bdefba0f2fe2522569883330c6a649da948ee4e4d81a1c3e0e1aeb5248450` / `d2e3cc87d3b1cac777bc5d241bd4872e9c784ccf689c3f458ad668649b4d175f` |
+| Second defense and Pool | `bb431a2176cac682c5d71bd2d87a12c3c640832dfe5d42f1b4c77ff0794c37ac` |
+| Frame 80,708 SRAM and fresh HOME | `60f3d41ea681db1f2b109403e6fbd102c68dcbfdfb9440fd798bf70c3c8a2ce0` / `31cded6f3ed3c12c600b1238ac6892fadfb8735d50859c85d3a02ac390b91f59` |
+| Dialogue, RESULT and restart | `9f287289b1266d41cf0d787644fcd8ca3f400e0d969d0c09b6585befc40c12c0` |
+| Dark Templar approach | `13c69aa6537857f7b00813b1ba4ee2584a5f7bc7071ba10c02f79df0009fc930` |
+| Installed trigger 17 and scheduler transitions | `6dae40ba234f9a02cbc47c542f7c684211b30b53dd210c2339bbaba380ec57ad` |
+| Revealed Templar at order drop | `0ba8d93669031265506314663c4d525b916caf0e38c3ed00700e08d8ebae4804` |
+| Trigger 17 with invincibility transition | `73b8d135c0e7857bed88aa72fdb5bda7d2c2097ab4383a5d2dfee93a0e097c88` |
+| Successful early interception trace | `14556c77f94a9d158a297c0a130a9d97315f5bb6a3d6b545a492eb3a239f434c` |
+| Frame 80,900 SRAM and fresh HOME | `7ce37160254ba79d9138a2ace0dd76f385c1bb54aa06e2ecff48236998a1e9bc` / `0d18303a860d089194ad54ee4c29d94e252dc94f63cfa5d6c31af5aac61ca0ec` |
+| Eastern Nexus damage SRAM and fresh HOME | `7d5ceeddddcc3a899a3ece7ad34a0448d3b168726408d592d5d5e1660ded454c` / `8250a2b61fe483bca7151668f977f84d6ccf6e39b5abdaba376500803f66582a` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

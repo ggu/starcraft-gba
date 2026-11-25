@@ -206,3 +206,28 @@ while the new hall is still healthy.
 | Relocated Hatchery fresh HOME | `1a98e3251b17b6247bd3a5249a43afd39290d441e548498f8965117d47e1a43a` |
 | Relocated mining checkpoint SRAM | `8427260cbcb3679fc950cde346ccdb5175778a7d4fab847bea2eb02a80092f10` |
 | Relocated mining fresh HOME | `afb9589f1ad22e74f3cbbb9867b25e8963d6cff371fbad0ae34ed413ca220599` |
+
+### Second relocation and worker recovery
+
+Two Sunkens weaken the next raid, which still destroys the
+first relocated Hatchery. A surviving Drone starts a
+second relocated Hatchery at (240, 1040). Fresh HOME at
+frame 31,944 restores the completed 1,250-HP Hatchery,
+a 462-HP Spawning Pool, one miner and a bank of 539 minerals
+and 725 gas. The independent readback re-exports the same SRAM.
+
+From this checkpoint a paid Overlord frees enough supply
+to train three more Drones. Frame 34,571 fresh HOME retains
+four Drones, the Overlord, the full-health Hatchery, the
+Pool at 462 HP and a bank of 801 minerals and 725 gas.
+A passive continuation sees hostile units arrive around
+frame 35,300. A subsequent colony defense misses the morph
+and the attackers kill the colony and workers by frame
+36,004. Preserve the earlier economy and issue the defense
+from a position that can complete its morph before arrival.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Second relocated Hatchery SRAM and fresh HOME | `29f835ea78a9c8e4c633f00543fe1a56f8dfb4a349a01d8716bccb01077b5bba` / `bdcb0f1ff2d09aaef2af76e577c3d8aadc03885b1204459da4bc06edc078fe7d` |
+| Frame 34,571 economy input | `00f468c48da9b3a1140034b3b6d8ecd5f6e59b99228a711636c593a4933a7d42` |
+| Frame 34,571 SRAM and fresh HOME | `cf6e16e7dafbc46e7a1f26f031d2c8f0edaf9202af7d726274cbbf9554c2d9f9` / `00d6d4d1391c77116d2abd5a41fc17d69aa6a1b1ea49a0935b8ca92aa49b77ff` |

@@ -708,6 +708,26 @@ on the two-Sunken opening.
 | Completed Den and first close hold | `c887d92734fc97a789178eec0eb1092f3bef299f207f40a806418b1737f299f9` |
 | Second close hold | `dc905a5ba02f37334a18cc1a3bb342e62f2e901cc5cf551b9a5daa3b9e85309c` |
 
+#### Intercept the northern and eastern approaches
+
+From the two-Sunken save, issuing an eastern attack-move
+to (1240, 1672) leaves the Hatchery at 818 HP. Fresh HOME
+at frame 11,526 retains both Sunkens, six Hydralisks, four
+Mutalisks and three Drones. Continuing the attack-move
+leaves the Hatchery exposed to a separate approach. A
+closer direct intercept at (1130, 1640) extends the hold.
+Fresh HOME at frame 12,492 retains the Hatchery at 730 HP
+and ten friendly units. With the same order held, the
+Hatchery falls at frame 13,184. The earlier November 13
+victory used a different sequence of ordinary inputs.
+These routes cannot isolate a change in engine behavior.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Eastern attack-move SRAM and fresh HOME | `b38dad35b64d8443b59efb3865303196d0fd49009212d573ea000129448e7ef8` |
+| Closer intercept inputs | `7f612c63e5b5098ec9190a5b970097473eebd3e2a57d927627e4f4ef848b4732` |
+| Closer intercept SRAM and fresh HOME | `023e457d3c81b98928ac611cbe2bd1c44ced7a2446f1938b2dcfd3568ca41b5e` / `51de3267559c8f325254de06ba7d679fdd46baa319509807797794e37d01906e` |
+
 ### Wasteland opening on N64 and KODAK
 
 A new ares v148 reset uses the retained Wasteland opening and
@@ -1950,6 +1970,36 @@ changing the default.
 | --- | --- |
 | Outpost stock / witness | `835e54c19a185059dbc188f28308e340b57e6cc7cb3b8e38a86c05cbb9b80bb4` / `1ddef2d373f6e25e4dbff3137add25478c81494c2f90369cd8c6dd2cac259db6` |
 | Blood Bath stock / witness | `c4f3e288b41471ef0ffba990bdb9da632da13295d2ac786a01d1a385aa46e716` / `ddc65b9d89773734f09343c63d6d04708e767137edd040effd244d85791f2ca8` |
+
+### Pylon lookup in dense missions and panned skirmishes
+
+The [Pylon grouping trial](https://github.com/ggu/starcraft-gba/pull/834)
+links canonical Z10 and P10 from prospective merge tree
+`c7cb9cc2` with the probe off and on. The off images match
+the canonical renderer build exactly. Each ordinary HOME
+load runs 160 measured updates. The skirmish camera pans
+to (520, 790) before measurement. The grouped path
+is exercised at 69 completed Pylons and the short-list
+path at nine.
+
+| Workload | Complete Pylons | Mean cycles off → on | Reduction |
+| --- | ---: | ---: | ---: |
+| Z9 opening technology, frame 8,925 | 69 | 865,254 → 848,370 | 1.95% |
+| Z9 first road assault, frame 27,560 | 69 | 1,725,547 → 1,707,993 | 1.02% |
+| P10 Outpost with three CPUs | 9 | 1,351,530 → 1,351,102 | 0.03% |
+| Z10 Outpost with three CPUs | 9 | 1,179,049 → 1,178,436 | 0.05% |
+
+The world and entity observations, palette, both VRAM
+pages, fresh HOME and 60 resumed updates agree. The
+four journal pairs are byte-identical. One Z9 and two
+Z10 samples stop with different displayed pages. The
+P10 skirmish 95th percentile increases from 1,568,384
+to 1,594,906 cycles. All 640 frames per build configuration
+exceed the 561,792-cycle target. The grouping trial stays
+off while whole-frame, stack and display timing proofs
+are incomplete. Local receipt SHA-256
+`3596e376bc4d8fef988bf62ebe4517a7bec3d371dcfdf5e9aa5d4a5f1e407774`.
+
 
 ## ROM space available for cutscenes
 
