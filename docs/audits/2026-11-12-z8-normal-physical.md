@@ -1492,6 +1492,19 @@ before continuing toward the Nexus.
 | Frame 87,554 reconstructed Den journal | `3b4e301fb15e39bf19c2622ec8e45fc84cd85700127b4aa1be442e1c6ccc48a5` |
 | Fortified Pool journal and input receipt | `e52f53eb481c7cfe75aa426fe302431f20228e3b7b9b22b44ec1926a3b7c45bc` / `5702780ac6c3cf759b4aff4edf62cd8976079299e2b853cbb1c88d6c9ede4851` |
 
+A new input sequence from the Den checkpoint evacuates Kerrigan and an
+Overlord. At frame 90,107, the pause save retains Kerrigan at 400 HP and
+the detector at 200 HP in the south. The next session loads it from HOME
+and attempts an attack with the three surviving local Hydralisks. The
+Nexus is still at 750 HP and 750 shields at frame 92,192. The southern
+evacuation preserves both key units, and the earlier eastern route has
+the stronger objective damage recorded in this audit.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Evacuation journal and input receipt | `2c3fe6c0911644bfdd4b91ce6ccb6ff428e4abae361f491fd2b2bdad7357b1f9` / `b0e4565f8d0d3ddd17b5ffdbe1b3d4129613cb8e0e3cba93c3998d64e748f75c` |
+| HOME load and three-Hydralisk attack | `89a4122ec6107d774a59811b8fa0e1f51468e5da23748a77e037c8a769598b9f` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

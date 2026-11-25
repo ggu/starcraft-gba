@@ -1033,6 +1033,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   measures the extra order cost at 66–73% of the Outpost
   increase. Its instruction cuts place 61–81% of the extra
   order cost in movement. Target contact work first for Outpost.
+  The [rectangular memo trial](audits/2026-11-15-z7-contact-cost.md#column-bounds-in-the-current-replay-windows)
+  retains more cache entries in the late three-CPU Outpost fight
+  but records zero hits and raises p95. Z7 and Z9 checkpoint windows
+  also record zero hits. Keep the current row memo and prioritize
+  the uncached scan and visible actor drawing.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -2026,6 +2031,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The ground push destroys the Pool. A combined defense with
   a distant attack order also loses the Hydralisks and Drones.
   Try a closer ground hold before sending the intercept north.
+  Two fresh loads agree on the three-Sunken checkpoint. Ordering
+  all 12 fighters east loses the whole base. The campaign stays
+  active with 16 surviving actors under its zero-total-actors loss
+  rule. Verify the equivalent state on N64 when a matching campaign
+  checkpoint is available.
   The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
   preserve the economy at frame 87,554 and hold the Pool with four
   Hydralisks through frame 89,195. Protect the forward detector before
