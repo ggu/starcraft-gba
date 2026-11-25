@@ -21,9 +21,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
-  finish on the padded-journal Z10 build. Repeat the replay matrix on the
-  latest combined Terran, Zerg and Protoss package, and continue native
-  parity and GBA SP timing checks.
+  finish on the padded-journal Z10 build. On the latest vitals build,
+  Z8 repeats the full route and Z10 repeats the late suffix with identical
+  victory journals. Complete the replay matrix on the combined Terran,
+  Zerg and Protoss package, and continue native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases

@@ -1571,6 +1571,14 @@ it byte for byte.
 | Independent terminal replay and fresh HOME | `b917e40c99b32a49cf2dc2e15324617ef16be507440a11be0619c74f46030cae` |
 | Victory journal and fresh re-export | `f0946a81d56cf77f0f034d735544cc130217051b4531eabf6714bf3d5882f2f9` |
 
+The latest vitals build repeats the whole path from empty HOME. All 36
+sampled checkpoints match, seven ordinary A inputs acknowledge dialogue,
+and its terminal Nexus, Kerrigan and completion observations agree.
+It exports the identical victory journal. The vitals ROM SHA-256 is
+`08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16`, and
+the run receipt SHA-256 is
+`5d82f90fe1721e3e908e8ce2ca888db0040cee57894deee5166017507242ed0d`.
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source
