@@ -418,7 +418,7 @@ setup_depth_profile(int human_race)
     race_skirmish_map = 0;
     race_skirmish_init();
     memset(m, 0, sizeof(m));
-    geyser_count = 0;
+    field_geyser_count = 0;
     cx = 120;
     cy = 54;
     screen = SCREEN_PLAY;
