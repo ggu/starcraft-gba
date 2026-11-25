@@ -611,8 +611,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reached victory and reloaded its identical terminal SRAM in fresh
   processes on the initial cache implementation. Sharing 1,536 bytes
   of packet storage trimmed the cache from 9,272 to 7,756 bytes, with
-  1,867,971 cycles/update on the same 4,901-update replay. Repeat the
-  terminal save check on the revised cache. Additional wide-map campaigns and EWRAM headroom remain the
+  1,867,971 cycles/update on the same 4,901-update replay. The revised
+  cache also matched all 45 remaining Z7 checkpoints, won and restored
+  the same terminal SRAM. Whole-campaign timing and EWRAM headroom remain the
   promotion priorities; the two current Custom Game maps are 64×64 and do
   not exercise this cache.
   Physical GBA timing remains open.
