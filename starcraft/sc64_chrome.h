@@ -121,6 +121,13 @@ static inline void sc64_chrome_draw_notice(const char *title, const char *messag
     sc64_font_text((240 - width) / 2, 113, 196, message, C_SILVER);
 }
 
+static inline void sc64_chrome_world_pixel(int x, int y, int sx, int sy)
+{
+    u8 strength = sc64_chrome_world_panel_pixels[sy * SC64_CHROME_WORLD_PANEL_WIDTH + sx];
+    if (strength && (unsigned)x < 240 && (unsigned)y < 160)
+        gfx_pixel(x, y, sc64_chrome_world_panel_colors[strength - 1]);
+}
+
 /* Transparent original 006/033 rails are mapped to the current raw world
  * palette. The source panel's flat glass color is omitted, exposing the map. */
 static inline void sc64_chrome_panel_world(int x, int y, int width, int height)
@@ -128,28 +135,49 @@ static inline void sc64_chrome_panel_world(int x, int y, int width, int height)
     enum { BORDER_X = 6, BORDER_Y = 5 };
     if (width <= 2 * BORDER_X + 1 || height <= 2 * BORDER_Y + 1 || x >= 240 || y >= 160 ||
         x + width <= 0 || y + height <= 0) return;
-    for (int dy = 0; dy < height; ++dy) {
-        int sy = dy < BORDER_Y ? dy : dy >= height - BORDER_Y ?
-            SC64_CHROME_WORLD_PANEL_HEIGHT - (height - dy) :
-            BORDER_Y + (dy - BORDER_Y) *
-                (SC64_CHROME_WORLD_PANEL_HEIGHT - 2 * BORDER_Y - 1) /
-                (height - 2 * BORDER_Y - 1);
-        int py = y + dy;
-        if (py < 0 || py >= 160) continue;
-        for (int dx = 0; dx < width; ++dx) {
-            if (dx >= BORDER_X && dx < width - BORDER_X &&
-                dy >= BORDER_Y && dy < height - BORDER_Y) continue;
-            int sx = dx < BORDER_X ? dx : dx >= width - BORDER_X ?
-                SC64_CHROME_WORLD_PANEL_WIDTH - (width - dx) :
-                BORDER_X + (dx - BORDER_X) *
-                    (SC64_CHROME_WORLD_PANEL_WIDTH - 2 * BORDER_X - 1) /
-                    (width - 2 * BORDER_X - 1);
-            u8 strength = sc64_chrome_world_panel_pixels[
-                sy * SC64_CHROME_WORLD_PANEL_WIDTH + sx];
-            int px = x + dx;
-            if (strength && px >= 0 && px < 240)
-                gfx_pixel(px, py,
-                          sc64_chrome_world_panel_colors[strength - 1]);
+
+    /* The top and bottom rails use the same source column. Visit both
+     * together, scaling once per column. The corners retain their source size. */
+    int span_x = width - 2 * BORDER_X - 1;
+    int source_x = BORDER_X, error_x = 0;
+    int step_x = (SC64_CHROME_WORLD_PANEL_WIDTH - 2 * BORDER_X - 1) / span_x;
+    int remainder_x = (SC64_CHROME_WORLD_PANEL_WIDTH - 2 * BORDER_X - 1) % span_x;
+    for (int dx = 0; dx < width; ++dx) {
+        int sx;
+        if (dx < BORDER_X) sx = dx;
+        else if (dx >= width - BORDER_X) sx = SC64_CHROME_WORLD_PANEL_WIDTH - (width - dx);
+        else {
+            sx = source_x;
+            source_x += step_x;
+            error_x += remainder_x;
+            if (error_x >= span_x) {
+                error_x -= span_x;
+                ++source_x;
+            }
+        }
+        for (int dy = 0; dy < BORDER_Y; ++dy) {
+            sc64_chrome_world_pixel(x + dx, y + dy, sx, dy);
+            sc64_chrome_world_pixel(x + dx, y + height - BORDER_Y + dy,
+                                    sx, SC64_CHROME_WORLD_PANEL_HEIGHT - BORDER_Y + dy);
+        }
+    }
+
+    /* Only the two vertical borders contain visible pixels on these rows. */
+    int span_y = height - 2 * BORDER_Y - 1;
+    int sy = BORDER_Y, error_y = 0;
+    int step_y = (SC64_CHROME_WORLD_PANEL_HEIGHT - 2 * BORDER_Y - 1) / span_y;
+    int remainder_y = (SC64_CHROME_WORLD_PANEL_HEIGHT - 2 * BORDER_Y - 1) % span_y;
+    for (int dy = BORDER_Y; dy < height - BORDER_Y; ++dy) {
+        for (int dx = 0; dx < BORDER_X; ++dx) {
+            sc64_chrome_world_pixel(x + dx, y + dy, dx, sy);
+            sc64_chrome_world_pixel(x + width - BORDER_X + dx, y + dy,
+                                    SC64_CHROME_WORLD_PANEL_WIDTH - BORDER_X + dx, sy);
+        }
+        sy += step_y;
+        error_y += remainder_y;
+        if (error_y >= span_y) {
+            error_y -= span_y;
+            ++sy;
         }
     }
 }

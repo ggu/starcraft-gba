@@ -392,6 +392,7 @@ test-sc64-icons: build/test-sc64-icons build/test-sc64-icon-scaling
 	./build/test-sc64-icons
 	./build/test-sc64-icon-scaling
 test-starcraft: test-sc64-font test-sc64-icons
+include mk/world-panel/Makefile
 
 .PHONY: sc64-briefings test-sc64-briefing
 sc64-briefings:
