@@ -58,6 +58,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. Prioritize those paths for
   the race cartridges.
+  On the sprite-row release's paired three-CPU P10 Outpost cut,
+  automatic targeting takes 131,032 inclusive cycles per update
+  and movement takes 161,711 within orders. The fogged viewport
+  reduces tracer drawing to 20,305. Focus on the orders path in
+  this cut and capture a separate visible three-CPU fight before
+  choosing a tracer change.
   The [November 25 selection-ring builds](audits/2026-11-21-current-skirmish-matrix.md#november-25-selection-ring-release)
   pass 54 physical-button Custom Game starts, pause saves, and fresh
   continuations. Full-match and hardware measurements remain open.
@@ -2222,7 +2228,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms both games reject an order under 50 minerals with a
   free slot and remaining supply.
   The [paired local-cap replay](audits/2026-11-25-waiting-training-supply.md)
-  verifies idle refusal and paid waiting on N64. The GBA candidate
+  verifies idle refusal, paid waiting and Depot recovery on N64. The GBA candidate
   accepts a waiting order, stalls its head at 18/18, reloads that
   state and resumes from a completed Depot. Expand the native
   checks to Protoss, multi-facility start priority and the global 200

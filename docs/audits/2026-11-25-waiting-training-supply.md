@@ -10,10 +10,17 @@ first SCV completes, the waiting SCV becomes the head and holds an
 empty progress bar at 18/18. Further ordinary input charges for an
 additional order while that head is stalled.
 
+A separate fresh load restores the blocked SCV at 18/18. A worker
+places a Depot with the ordinary N64 build menu. Supply remains
+18/18 during construction. After it completes, the HUD shows 19/26
+and the previously blocked SCV has a progressing training bar.
+With neutral inputs the SCV finishes and the queue empties.
+
 | Native input tape | SHA-256 |
 | --- | --- |
 | Idle refusal | `49c0b71c7de872017c266b844062c323956e3937dd916a94adeb995b848078ab` |
 | Paid waiting, stalled head and additional order | `a7ffb21f14d8ff29af91e4468ab0ac0cd9c0647d47bf287164b1d591f2b019f6` |
+| Fresh load, Depot and resumed order | `ce96bcb316f09f53ecb11ec8545b3d622ff4cabc91863e3b4a260da20b0810a9` |
 
 ## GBA comparison
 
