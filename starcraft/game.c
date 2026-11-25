@@ -1538,6 +1538,64 @@ static int target_hostile_masks_valid;
 #include "sc64_targets.h"
 #endif
 static Mineral m[MAX_MINERALS];
+#define SC64_MINERAL_MEMORY_BYTES ((MAX_MINERALS + 7u) / 8u)
+static u8 sc64_mineral_memory[SC64_MINERAL_MEMORY_BYTES];
+#ifdef SC64_IMPORTED_MISSION
+static u8 sc64_mineral_observation_pending;
+#endif
+enum { SC64_MINERAL_HIDDEN, SC64_MINERAL_LIVE, SC64_MINERAL_REMEMBERED };
+
+static int currently_visible(int x, int y);
+
+static inline int
+sc64_mineral_memory_present(unsigned slot)
+{
+    return (sc64_mineral_memory[slot >> 3] >> (slot & 7u)) & 1u;
+}
+
+static inline void
+sc64_collect_minerals(unsigned slot, int amount)
+{
+    m[slot].amount -= amount;
+#ifdef SC64_IMPORTED_MISSION
+    if (m[slot].amount == 0 && sc64_mineral_memory_present(slot))
+        sc64_mineral_observation_pending = 1;
+#endif
+}
+
+static void
+sc64_observe_minerals(void)
+{
+    /* Only the completed visibility pass can change what the player knows. */
+    for (unsigned base = 0; base < MAX_MINERALS; base += 8) {
+        unsigned byte = base >> 3;
+        unsigned known = sc64_mineral_memory[byte];
+        unsigned observed = known;
+        unsigned mask = 1;
+        for (unsigned i = base; i < base + 8 && i < MAX_MINERALS; ++i, mask <<= 1) {
+            int present = m[i].amount > 0;
+            if (present == ((known & mask) != 0)) continue;
+            if ((unsigned)m[i].x >= (unsigned)WORLD_W ||
+                (unsigned)m[i].y >= (unsigned)WORLD_H ||
+                !currently_visible(m[i].x, m[i].y)) continue;
+            observed ^= mask;
+        }
+        if (observed != known) sc64_mineral_memory[byte] = (u8)observed;
+    }
+}
+
+static int
+sc64_mineral_draw_state(unsigned slot)
+{
+    const Mineral *patch = &m[slot];
+    int remembered = sc64_mineral_memory_present(slot);
+    if ((patch->amount <= 0 && !remembered) ||
+        (unsigned)patch->x >= (unsigned)WORLD_W ||
+        (unsigned)patch->y >= (unsigned)WORLD_H) return SC64_MINERAL_HIDDEN;
+    if (currently_visible(patch->x, patch->y))
+        return patch->amount > 0 ? SC64_MINERAL_LIVE : SC64_MINERAL_HIDDEN;
+    return remembered ? SC64_MINERAL_REMEMBERED : SC64_MINERAL_HIDDEN;
+}
 #if defined(SC64_MINERAL_FIFO) && defined(SC64_PACKED_MINERAL_FIFO)
 #error "Mineral FIFO profiles are mutually exclusive"
 #endif
@@ -5622,6 +5680,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    memset(sc64_mineral_memory, 0, sizeof(sc64_mineral_memory));
 #if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     memset(&mineral_fifo, 0, sizeof(mineral_fifo));
     mineral_fifo_enabled = 1;
@@ -8203,7 +8262,7 @@ race_update_resource_worker(Unit *q)
         int collected = m[q->target].amount < 8 ? m[q->target].amount : 8;
         if (collected > 0) {
             q->carry = collected;
-            m[q->target].amount -= collected;
+            sc64_collect_minerals((unsigned)q->target, collected);
 #ifdef SC64_WORKER_CARGO_KIND
             if (IS_WORKER(q->type)) {
                 sc64_worker_cargo_clear(q);
@@ -8215,7 +8274,7 @@ race_update_resource_worker(Unit *q)
         if (collected <= 0) q->order = ORDER_IDLE;
 #else
         q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
-        m[q->target].amount -= q->carry;
+        sc64_collect_minerals((unsigned)q->target, q->carry);
         if (q->carry > 0) q->build = -1;
         if (q->carry <= 0) q->order = ORDER_IDLE;
 #endif
@@ -9420,7 +9479,7 @@ target_lists_unavailable:
                 continue;
 	    } else if (q->order == ORDER_MINE) {
 		q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
-		m[q->target].amount -= q->carry;
+		sc64_collect_minerals((unsigned)q->target, q->carry);
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
 #endif
@@ -9831,7 +9890,9 @@ static void GBA_HOT
 update_exploration(void)
 {
 #ifdef SC64_IMPORTED_MISSION
-    sc64_update_exploration();
+    /* With unchanged sight, only depletion can invalidate an observation. */
+    if (!sc64_update_exploration() && !sc64_mineral_observation_pending) return;
+    sc64_mineral_observation_pending = 0;
 #else
 #ifdef SC_ORIGINAL_SKIRMISH
     frontier_clear_visible();
@@ -9858,6 +9919,7 @@ update_exploration(void)
             mark_visible_circle(q->x, q->y, 112, 8);
     }
 #endif
+    sc64_observe_minerals();
 }
 
 static void
@@ -11711,6 +11773,24 @@ draw_minimap(void)
         }
     }
 #endif
+    for (i = 0; i < MAX_MINERALS; ++i) {
+        if (!sc64_mineral_memory_present((unsigned)i) ||
+            (unsigned)m[i].x >= (unsigned)WORLD_W ||
+            (unsigned)m[i].y >= (unsigned)WORLD_H) continue;
+#if defined(SC64_IMPORTED_MISSION) || defined(SC_ORIGINAL_SKIRMISH)
+#ifdef SC64_RACES
+        x = map_x + sc64_minimap_pixel(m[i].x, MAP_COLS);
+        y = map_y + sc64_minimap_pixel(m[i].y, MAP_ROWS);
+#else
+        x = map_x + m[i].x * map_size / WORLD_W;
+        y = map_y + m[i].y * map_size / WORLD_H;
+#endif
+#else
+        x = 185 + m[i].x / 8;
+        y = 126 + m[i].y / 8;
+#endif
+        sc64_minimap_dot(x, y, C_CYAN);
+    }
     for (i = 0; i < MAX_BUILDINGS; i++) {
 	if (!b[i].alive) continue;
 	if (b[i].owner != SIDE &&
@@ -12196,7 +12276,7 @@ draw_building_overlay(Building *q)
 static unsigned
 sc64_static_objects_key(void)
 {
-    enum { FIELDS = MAX_MINERALS * 5 + MAX_RACE_GEYSERS * 3 + 1 + MAX_BUILDINGS *
+    enum { FIELDS = MAX_MINERALS * 4 + MAX_RACE_GEYSERS * 3 + 1 + MAX_BUILDINGS *
 #ifdef SC64_T4_SCENARIO_RUNTIME
                     7
 #else
@@ -12218,12 +12298,11 @@ sc64_static_objects_key(void)
     for (i = 0; i < MAX_MINERALS; i++) {
         int x = m[i].x - camx;
         int y = m[i].y - camy + 12;
-        int in_bounds = m[i].amount > 0 && x > -6 && x < 245 && y > 7 && y < 123;
-        values[n++] = m[i].amount > 0;
+        int in_bounds = x > -6 && x < 245 && y > 7 && y < 123;
+        values[n++] = in_bounds ? sc64_mineral_draw_state((unsigned)i) : SC64_MINERAL_HIDDEN;
         values[n++] = m[i].x;
         values[n++] = m[i].y;
         values[n++] = m[i].style;
-        values[n++] = in_bounds && currently_visible(m[i].x, m[i].y);
     }
     values[n++] = geyser_count;
     for (i = 0; i < MAX_RACE_GEYSERS; i++) {

@@ -7,6 +7,9 @@
  * The caller must authenticate the outer SRAM header and run the existing
  * complete game preflight on the reconstructed ordinary payload. */
 #include "sc64_interceptor_pool_codec.h"
+#ifdef SC64_MINERAL_MEMORY_BYTES
+#include "sc64_mineral_memory_marker.h"
+#endif
 
 enum {
     SC64_TC_PREFIX = offsetof(RaceSave,invincible_units),
@@ -44,9 +47,14 @@ static void sc64_tc_put16(u8 *b,unsigned n)
 static int sc64_tc_prefix_valid(const u8 *base)
 {
     const u32 version=SAVE_VERSION;
-    const int custom=1;
-    return !memcmp(base+offsetof(RaceSave,version),&version,sizeof(version)) &&
-           !memcmp(base+offsetof(RaceSave,state),&custom,sizeof(custom));
+    u32 mode;
+    memcpy(&mode,base+offsetof(RaceSave,state),sizeof(mode));
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    u32 human;
+    memcpy(&human,base+offsetof(RaceSave,state)+sizeof(int),sizeof(human));
+    if ((human & 0xffff0000u) == SC64_MINERAL_MEMORY_MAGIC) mode &= 1u;
+#endif
+    return !memcmp(base+offsetof(RaceSave,version),&version,sizeof(version)) && mode == 1u;
 }
 
 /* Base and out may be identical; packet must be disjoint. */

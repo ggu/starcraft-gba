@@ -1,3 +1,6 @@
+#ifdef SC64_MINERAL_MEMORY_BYTES
+#include "sc64_mineral_memory_wire.h"
+#endif
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
@@ -2525,6 +2528,9 @@ static int race_save_game(void) {
 #endif
         };
     memcpy(race_data.state,state,sizeof(state));
+#if defined(SC64_MINERAL_MEMORY_BYTES) && !defined(SC64_IMPORTED_SKIRMISH)
+    race_data.state[20]=0;
+#endif
 #ifdef SC64_IMPORTED_SKIRMISH
 #ifdef SC64_NATIVE_MELEE_STARTS
     if(race_mode && race_skirmish_melee && !race_skirmish_start_order)return 0;
@@ -3149,6 +3155,9 @@ static int race_save_game(void) {
 #ifdef SC64_NUKE_ACTIVE_JOURNAL
     if (!race_nuke_save_write_strikes(&nuke_writer_auth)) return 0;
 #endif
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    if (sc64_mineral_memory_wire(race_data.state, sc64_mineral_memory, 1) != 1) return 0;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
     if (!race_impact_save_write(cargo_have_previous ? &cargo_previous : 0
 #ifdef SC64_NUKE_SILO_JOURNAL
@@ -3163,15 +3172,24 @@ static int race_save_game(void) {
 #elif defined(SC64_SHARED_TRANSPORT)
     {
         u8 trailer[16];
+#ifdef SC64_MINERAL_MEMORY_BYTES
+        if (sc64_mineral_memory_wire(race_data.state, sc64_mineral_memory, 1) != 1) return 0;
+#endif
         race_sk_transport_wire_encode(trailer);
         if (!save_write_parts(&race_data, sizeof(race_data), trailer, sizeof(trailer),
                               SC64_TRANSPORT_SAVE_VERSION)) return 0;
     }
 #elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    if (sc64_mineral_memory_wire(race_data.state, sc64_mineral_memory, 1) != 1) return 0;
+#endif
     save_write_migrating_feature(&race_data,sizeof(race_data),SAVE_VERSION,
                          SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
                          0xffff0000u, 0x42450000u);
 #else
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    if (sc64_mineral_memory_wire(race_data.state, sc64_mineral_memory, 1) != 1) return 0;
+#endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);
 #endif
 #ifdef SC64_RANGE_WORK
@@ -3194,6 +3212,10 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    u8 mineral_memory[SC64_MINERAL_MEMORY_BYTES];
+    int mineral_memory_present;
+#endif
 #ifdef SC64_PACKED_MINERAL_FIFO
     Sc64StageSaveAuth mineral_fifo_auth;
 #endif
@@ -4815,6 +4837,11 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
 #endif
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    if (len < offsetof(RaceSave,state)+sizeof(race_data.state)) return 0;
+    plan->mineral_memory_present=sc64_mineral_memory_wire(race_data.state,plan->mineral_memory,0);
+    if (plan->mineral_memory_present<0) return 0;
+#endif
 #ifdef SC64_PACKED_MINERAL_FIFO
     if (tag == SC64_FIFO_BASE_TAG
 #ifdef SC64_FIFO_CUSTOM_TAG
@@ -5061,6 +5088,10 @@ static int race_zc_prepare(const void *raw,u32 len,u32 tag,void *context)
     race_zc_size=(u16)size;
     memcpy(race_zc_packet,SC64_ZC_SCRATCH+SC64_ZC_PACKET_WORK,size);
     memset(plan,0,sizeof(*plan));
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    plan->mineral_memory_present=sc64_mineral_memory_wire(race_data.state,plan->mineral_memory,0);
+    if (plan->mineral_memory_present<0) return 0;
+#endif
 #ifdef SC64_PACKED_MINERAL_FIFO
     if (tag == SC64_FIFO_CUSTOM_TAG &&
         !race_mineral_fifo_authenticate(&plan->mineral_fifo_auth, &race_data, tag, len)) return 0;
@@ -5194,6 +5225,11 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
     tag = SC64_SCARAB_SAVE_VERSION;
 #endif
     race_scarab_stage_wire=(tag==SC64_SCARAB_SAVE_VERSION);
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    if (len < offsetof(RaceSave,state)+sizeof(race_data.state)) return 0;
+    plan->mineral_memory_present=sc64_mineral_memory_wire(race_data.state,plan->mineral_memory,0);
+    if (plan->mineral_memory_present<0) return 0;
+#endif
     int map=race_data.state[20], width=64, height=64;
     if (race_data.state[0]!=1 || map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
     if (map) { width=sc64_skirmish_maps[map-1].width; height=sc64_skirmish_maps[map-1].height; }
@@ -5334,6 +5370,10 @@ static int race_load_game(void) {
     }
 #else
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
+#endif
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    plan.mineral_memory_present=sc64_mineral_memory_wire(race_data.state,plan.mineral_memory,0);
+    if (plan.mineral_memory_present<0) return 0;
 #endif
     if (!race_load_preflight(&plan)) return 0;
 #endif
@@ -5749,6 +5789,13 @@ static int race_load_game(void) {
             u[i].build=-1;
 #else
     invalidate_path_grid();
+#endif
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    if (plan.mineral_memory_present)
+        memcpy(sc64_mineral_memory,plan.mineral_memory,SC64_MINERAL_MEMORY_BYTES);
+    else {
+        memset(sc64_mineral_memory,0,SC64_MINERAL_MEMORY_BYTES);
+    }
 #endif
     sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_capacity(SIDE);

@@ -72,6 +72,21 @@ currently_visible(int x, int y)
     return SC64_GRID_GET(visible, col + row * MAP_COLS);
 }
 
+/* Model remembered slots from explored fog so the differential test covers
+ * live, remembered (including depleted), and hidden cache-key states. */
+enum { SC64_MINERAL_HIDDEN, SC64_MINERAL_LIVE, SC64_MINERAL_REMEMBERED };
+static int
+sc64_mineral_draw_state(unsigned slot)
+{
+    const Mineral *field = &m[slot];
+    if (field->x < 0 || field->y < 0 || field->x >= WORLD_W || field->y >= WORLD_H)
+        return SC64_MINERAL_HIDDEN;
+    if (currently_visible(field->x, field->y))
+        return field->amount > 0 ? SC64_MINERAL_LIVE : SC64_MINERAL_HIDDEN;
+    return SC64_GRID_GET(explored, field->x / 16 + (field->y / 16) * MAP_COLS)
+        ? SC64_MINERAL_REMEMBERED : SC64_MINERAL_HIDDEN;
+}
+
 static int
 geyser_in_view(int x, int y)
 {

@@ -1,5 +1,42 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Shared save and load entry points, included by game.c. */
+#if defined(SC64_MINERAL_MEMORY_BYTES) && !defined(SC64_RACES)
+/* Standalone profiles have at most sixteen patches. Store their remembered
+ * presence in the otherwise unused bits of the selection word, without
+ * changing the alternating SRAM record or its existing version tags. */
+_Static_assert(MAX_MINERALS <= 16, "standalone mineral memory capacity");
+_Static_assert(MAX_BUILDINGS <= 63, "standalone selection capacity");
+#define SC64_STANDALONE_MEMORY_MARKER 0x5a000000u
+static int
+sc64_standalone_memory_pack(int selection, const u8 *memory)
+{
+    u32 bits = 0;
+    if (selection < -1 || selection >= MAX_BUILDINGS) selection = -1;
+    for (unsigned i = 0; i < MAX_MINERALS; ++i)
+        bits |= (u32)((memory[i >> 3] >> (i & 7)) & 1u) << i;
+    return (int)(SC64_STANDALONE_MEMORY_MARKER | (bits << 6) | (u32)(selection + 1));
+}
+
+/* Return zero for a legacy selection and negative for a malformed tagged
+ * word. Keep decoded memory local until the entire candidate is validated. */
+static int
+sc64_standalone_memory_unpack(int packed, int *selection, u8 *memory)
+{
+    u32 word;
+    memcpy(&word, &packed, sizeof(word));
+    memset(memory, 0, SC64_MINERAL_MEMORY_BYTES);
+    if ((word & 0xff000000u) != SC64_STANDALONE_MEMORY_MARKER) {
+        *selection = packed;
+        return 0;
+    }
+    if ((word & 0x00c00000u) || (word & 63u) > MAX_BUILDINGS ||
+        (MAX_MINERALS < 16 && ((word >> 6) & 0xffffu) >> MAX_MINERALS)) return -1;
+    *selection = (int)(word & 63u) - 1;
+    for (unsigned i = 0; i < MAX_MINERALS; ++i)
+        memory[i >> 3] |= (u8)(((word >> (6 + i)) & 1u) << (i & 7));
+    return 1;
+}
+#endif
 static int
 save_game(void)
 {
@@ -50,6 +87,9 @@ save_game(void)
     data.armor_research = armor_research;
     data.train_type = train_type;
     data.selected_building = selected_building;
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    data.selected_building = sc64_standalone_memory_pack(selected_building, sc64_mineral_memory);
+#endif
     data.seed = seed;
 #ifdef SC64_IMPORTED_MISSION
     data.mission_objective_stage = mission_objective_stage;
@@ -139,6 +179,14 @@ raw_game_save_apply(int apply)
     if (!save_read(&data, sizeof(data), SAVE_VERSION) || data.version != SAVE_VERSION)
 	return 0;
 #endif
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    u8 saved_mineral_memory[SC64_MINERAL_MEMORY_BYTES];
+    int saved_selection;
+    if (sc64_standalone_memory_unpack(data.selected_building, &saved_selection,
+                                      saved_mineral_memory) < 0) return 0;
+#else
+    int saved_selection = data.selected_building;
+#endif
     int i, j, computed_supply = 0, computed_cap =
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
         0;
@@ -211,6 +259,9 @@ raw_game_save_apply(int apply)
 #ifdef SC64_MINERAL_FIFO
     if (!apply) return 1;
 #endif
+#ifdef SC64_MINERAL_MEMORY_BYTES
+    memcpy(sc64_mineral_memory, saved_mineral_memory, sizeof(saved_mineral_memory));
+#endif
     memcpy(u, data.units, sizeof(u));
     /* Older non-race saves recorded the current upgrade in newly spawned
      * units. Armor is derived from type and the live upgrade is applied on
@@ -282,7 +333,7 @@ raw_game_save_apply(int apply)
 #endif
     mode = MODE_NORMAL;
     menu_open = 0;
-    selected_building = data.selected_building >= 0 && data.selected_building < MAX_BUILDINGS && b[data.selected_building].alive ? data.selected_building : -1;
+    selected_building = saved_selection >= 0 && saved_selection < MAX_BUILDINGS && b[saved_selection].alive ? saved_selection : -1;
     screen = SCREEN_PLAY;
     won = lost = 0;
     reset_selection_gestures();

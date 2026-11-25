@@ -8,20 +8,26 @@
 #endif
 
 static inline int
-mineral_in_view(const Mineral *mineral, int x, int y)
+mineral_in_view(const Mineral *mineral, int x, int y, int state)
 {
 #if defined(SC64_WORLD_DEPTH) && defined(SC64_HAS_SPRITES)
-    const Sc64SpriteFrame *sprite = mission_mineral_sprite(mineral->style);
+    const Sc64SpriteFrame *sprite = state == SC64_MINERAL_LIVE ?
+                                    mission_mineral_sprite(mineral->style) : 0;
     if (sprite) return resource_sprite_in_view(sprite, x, y);
 #else
     (void)mineral;
+    (void)state;
 #endif
     return x > -6 && x < 245 && y > 7 && y < 123;
 }
 
 static inline void
-draw_map_mineral_art(int i, int x, int y)
+draw_map_mineral_art(int i, int x, int y, int state)
 {
+    if (state == SC64_MINERAL_REMEMBERED) {
+        gfx_diamond(x, y, 7, 4, C_BLUE);
+        return;
+    }
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
     if (sprite) {
@@ -35,13 +41,27 @@ draw_map_mineral_art(int i, int x, int y)
     gfx_pixel(x, y, C_WHITE);
 }
 
+static inline int
+mineral_draw_state_in_view(unsigned slot, int x, int y)
+{
+    if (m[slot].amount <= 0 && !sc64_mineral_memory_present(slot))
+        return SC64_MINERAL_HIDDEN;
+    int live_in_view = mineral_in_view(&m[slot], x, y, SC64_MINERAL_LIVE);
+    int memory_in_view = mineral_in_view(&m[slot], x, y, SC64_MINERAL_REMEMBERED);
+    if (!live_in_view && !memory_in_view) return SC64_MINERAL_HIDDEN;
+    int state = sc64_mineral_draw_state(slot);
+    if ((state == SC64_MINERAL_LIVE && live_in_view) ||
+        (state == SC64_MINERAL_REMEMBERED && memory_in_view))
+        return state;
+    return SC64_MINERAL_HIDDEN;
+}
+
 static inline void
 draw_map_mineral(int i)
 {
-    if (m[i].amount <= 0) return;
     int x = m[i].x - camx, y = m[i].y - camy + 12;
-    if (mineral_in_view(&m[i], x, y) && currently_visible(m[i].x, m[i].y))
-        draw_map_mineral_art(i, x, y);
+    int state = mineral_draw_state_in_view((unsigned)i, x, y);
+    if (state != SC64_MINERAL_HIDDEN) draw_map_mineral_art(i, x, y, state);
 }
 
 static inline void
@@ -183,23 +203,29 @@ draw_map(void)
         if (refresh || sc64_tile_art_overflow) {
             /* The same static-object code as the mode-4 background below. */
             if (refresh) gfx_tile_art_capture(1);
-            for (i = 0; i < MAX_MINERALS; i++)
-                if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
-                    x = m[i].x - camx;
-                    y = m[i].y - camy + 12;
-                    if (x > -6 && x < 245 && y > 7 && y < 123) {
+            for (i = 0; i < MAX_MINERALS; i++) {
+                x = m[i].x - camx;
+                y = m[i].y - camy + 12;
+                if (x > -6 && x < 245 && y > 7 && y < 123) {
+                    int state = sc64_mineral_draw_state((unsigned)i);
+                    if (state != SC64_MINERAL_HIDDEN) {
+                        if (state == SC64_MINERAL_REMEMBERED) {
+                            gfx_diamond(x, y, 7, 4, C_BLUE);
+                        } else {
 #ifdef SC64_HAS_SPRITES
-                        const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
-                        if (sprite) draw_mission_sprite(sprite, x, y);
-                        else {
+                            const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
+                            if (sprite) draw_mission_sprite(sprite, x, y);
+                            else {
 #endif
-                        gfx_diamond(x, y, 7, 4, C_CYAN);
-                        gfx_pixel(x, y, C_WHITE);
+                                gfx_diamond(x, y, 7, 4, C_CYAN);
+                                gfx_pixel(x, y, C_WHITE);
 #ifdef SC64_HAS_SPRITES
+                            }
+#endif
                         }
-#endif
                     }
                 }
+            }
             for (i = 0; i < geyser_count; i++)
                 if (currently_visible(geysers[i].x, geysers[i].y)) {
                     x = geysers[i].x - camx;

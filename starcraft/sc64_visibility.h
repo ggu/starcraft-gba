@@ -1192,10 +1192,10 @@ sc64_adjust_building_visibility(int x, int y, int type, int delta)
             }
 }
 
-static void GBA_HOT
+static int GBA_HOT
 sc64_update_exploration(void)
 {
-    int i;
+    int i, changed = 0;
     for (i = 0; i < MAX_UNITS; i++) {
         Sc64VisibilitySnapshot *old = &sc64_unit_visibility[i];
         int active = u[i].alive && u[i].owner == SIDE &&
@@ -1208,6 +1208,7 @@ sc64_update_exploration(void)
         int type = active ? u[i].type : 0;
         if (sc64_visibility_same(old, active, x, y, type))
             continue;
+        changed = 1;
 #ifndef SC64_SOURCE_SIGHT_ALL_RACES
         if (old->active && active && old->type == type &&
             old->x / 16 == x / 16 && old->y / 16 == y / 16) {
@@ -1246,6 +1247,7 @@ sc64_update_exploration(void)
         if (sc64_visibility_same(old, active, x, y, type))
 #endif
             continue;
+        changed = 1;
         if (old->active)
             sc64_adjust_building_visibility(old->x, old->y, old->type, -1);
         if (active) {
@@ -1272,6 +1274,7 @@ sc64_update_exploration(void)
 #endif
         }
     }
+    return changed;
 }
 
 #ifdef SC64_VISIBILITY_LOCAL_GRID_ACCESS

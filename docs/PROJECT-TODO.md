@@ -3228,9 +3228,12 @@ merges do not update an already copied ROM.
   The [remote mineral replay](audits/2026-11-07-native-fog-memory/README.md#remote-mineral-patches)
   then shows dim crystals and a persistent cyan minimap mark after
   the group leaves. GBA currently hides the world art and has no resource
-  minimap overlay. Track the last observed presence of discovered patches
-  in the shared engine and saves so unseen depletion cannot erase a mark.
-  Geyser memory and a matched GBA display comparison remain open.
+  minimap overlay on the source release. The [remembered-mineral branch](audits/2026-11-24-remembered-minerals.md)
+  retains observations through fog and the existing SRAM formats. The
+  host skirmish witnesses cover Terran, P6, Z10, P10 and Showcase
+  save/reload and depletion. Replay the release cartridges, including
+  campaign saves and busy-map pacing. Geyser memory and a matched GBA
+  display comparison remain open.
 - **Read-only native discovery:** the separate
   [observer branch](https://github.com/ggu/starcraft-gba/tree/codex/n64-actor-readonly-observer-20261107)
   records one bounded Terran custom attempt at runtime `d03052c2`: two 8 MiB

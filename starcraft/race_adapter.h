@@ -1972,6 +1972,7 @@ static void race_skirmish_init(void)
     }
 #endif
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b)); memset(m, 0, sizeof(m));
+    memset(sc64_mineral_memory, 0, sizeof(sc64_mineral_memory));
     memset(race_player, 0xff, sizeof(race_player));
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
     race_skirmish_geometry();

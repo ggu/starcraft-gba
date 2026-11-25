@@ -152,6 +152,8 @@ test-sc64-minimap-terrain: build/test-sc64-minimap-terrain-scalar build/test-sc6
 	./build/test-sc64-minimap-terrain-words
 test: test-sc64-minimap-terrain
 
+include mk/mineral-memory/Makefile
+
 # Asset-free Interceptor order decisions; no gameplay integration is enabled.
 .PHONY: test-sc64-interceptor-orders
 build/test-sc64-interceptor-orders: tests/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.h | build
