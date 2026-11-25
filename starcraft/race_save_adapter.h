@@ -3347,7 +3347,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         construction_save_marker != SC64_CONSTRUCTION_SAVE_MARKER) return 0;
 #endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
-       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||SC64_GAS_SAVE_BAD_COUNT(v[16]))return 0;
+       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||
+#ifdef SC64_SOURCE_GAS
+       !sc64_gas_save_count_valid(v[16]))return 0;
+#else
+       v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
+#endif
 #ifdef SC64_CAMPAIGN_RACE
     if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE)
 #ifdef SC64_T4_RUNTIME
