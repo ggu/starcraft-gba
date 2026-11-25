@@ -347,10 +347,13 @@ ordinary pause save and a fresh HOME load agree at frame 101. The
 T5 receipt covers the late checkpoint through victory. Replaying
 its physical buttons in the 13 recorded fresh-HOME stages on the
 paired-outline build produces all 13 identical journals and the
-same fresh victory readback. For T3 the older October trace differs
-in enemy minerals at input tick 993 on the released supply build
-and in unit counts by tick 16,993 on the paired-outline build. The
-newer pinned T3 trace still needs a current build replay.
+same fresh victory readback. The older October T3 tape first differs
+in enemy minerals at input tick 993 on the released supply build.
+On the paired-outline build, replay its unchanged ordinary inputs
+from HOME, save and load at frame 26,993, and win at frame 54,000.
+Mission and objective checkpoints agree, and the victory journal
+re-exports byte for byte. Enemy minerals, actor counts and raid
+counts differ from the October observations at 53 checkpoints.
 
 On the paired-outline build, the full Z8 HOME replay wins at frame
 86,969. The late Z10 route from the retained frame-60,123 pause wins
@@ -369,6 +372,8 @@ their terminal state and re-export identical victory SRAM.
 | T5 victory journal | `88888faa6e886d23d31c777584c591c06f0c99a71ef32c43bf446eb489a792b1` |
 | Candidate T5 13-stage ordinary replay and fresh readback | `6576785904adf125f8971166fe3214b38caf6f66f38d23dad250b97304d47fb2` |
 | T6 pause and fresh HOME journal | `adc89cbe03df68f46c6dd7b33e9c7d4c10690b8f7ad02b479f71ae3ae0b288cc` |
+| Candidate T3 HOME replay, pause and victory readback | `8d64b25b17863fa83800e7f5ed0573562e573bf743d73a570a56883728c94ef1` |
+| T3 historical battle-stat differences | `7c233fa3de3e4ed65071760e55755cfe1e565232cb8124eeba27eafb6720d412` |
 | Z8 victory journal | `f0946a81d56cf77f0f034d735544cc130217051b4531eabf6714bf3d5882f2f9` |
 | Z10 victory input receipt | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
 | P7 victory input receipt | `600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf` |
@@ -398,6 +403,14 @@ keeps all 32 sampled worlds and video outputs. On this cut, the
 uncached mask costs 320 more cycles per update and the whole frame
 costs 327 more. Leave the source change out of the released builds.
 
+Adding the draft [monotone route witness](https://github.com/ggu/starcraft-gba/pull/805)
+to the same release increases linked BSS by 352 bytes. The 32 visible
+updates match their sampled world and video outputs. Mean frame
+cost falls from 807,142 to 788,972 cycles (2.25%). The largest
+individual cost increase is 30,062 cycles. All 32 still exceed the
+budget. A read-only replay counts 63 witness hits in 124 monotone
+queries. Keep this result scoped to the visible Terran workload.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | 32 matched visible combat updates | `25ad0aa1996e75ae4c7f1fc33db9cc3371884e3e560ca0b27d09163e400f7777` |
@@ -406,3 +419,5 @@ costs 327 more. Leave the source change out of the released builds.
 | Tracer attribution | `0f957a5c39827e07536c3ba2228011e6d23aacceca0162ab612dc41c3bbfb7f9` |
 | Uncached contact mask attribution | `b5f73869b67b6ba3fe6b89aab81d3a7279373131efadfcf022849a4649a7d021` |
 | Monotone route attribution | `29c69f0f452168193bf40b57063a130fcac200b709f1ac907e956cc92b99d6a8` |
+| Contact reuse candidate, 32 visible updates | `4091d35d8c47039fbcdfb4249e0eaa7dc80556bfda97bdca55aa585e3f5473d4` |
+| Monotone witness candidate, 32 visible updates | `6f97555edf180785c0569ff1ef7921004b663ab90ce672d06f66a951cb59f52d` |

@@ -49,10 +49,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T6 on the supply build also produces a byte-identical frame-101
   pause and HOME reload. Rebuild a continuous T5 input route from the
   opening to the late checkpoint on the combined release.
-  The recovered P7 assault on the paired-outline build wins at frame
-  80,828. Z8 also repeats the full HOME replay to frame 86,969 and Z10
-  wins from the late frame-60,123 pause. All three restore the victory
-  journal byte for byte through fresh HOME.
+  The paired-outline build replays T3 from HOME to victory at frame
+  54,000, including a pause restore. The recovered P7 assault wins
+  at frame 80,828. Z8 repeats the full HOME replay to frame 86,969 and
+  Z10 wins from the late frame-60,123 pause. All four restore the
+  victory journal byte for byte through fresh HOME.
   Re-qualify the remaining missions on the combined Terran, Zerg and
   Protoss package. Continue native parity and GBA SP timing.
 
@@ -69,8 +70,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reduces tracer drawing to 20,305. A separate verified visible
   three-CPU Terran Blood Bath cut spends about 235,488 cycles per
   update in `move_toward`, 9,885 in automatic targeting, and 12,406
-  in tracer drawing on matched frames. Prioritize movement there
-  and keep targeting as a separate priority for Outpost.
+  in tracer drawing on matched frames. Prioritize movement there.
+  The draft monotone route witness lowers mean frame cycles by 2.25%
+  on this cut and needs broader race build, pacing and save checks.
+  Keep targeting as a separate priority for Outpost.
   [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
   lowers the visible P7 and Z9 frame means by about 0.9–1.0%
   with matching pixels. [Pairing opposite rows on the supply release](audits/2026-11-25-visible-drawing-and-campaigns.md#combined-supply-and-paired-outline-qualification)
