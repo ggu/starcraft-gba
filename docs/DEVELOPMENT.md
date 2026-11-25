@@ -896,8 +896,12 @@ With the private bank prepared, three more checks cover the real streams:
   against their C references: every frame of every stream of the bank,
   taking the ten output layouts in rotation, 400 pseudo-random bit streams,
   and 3,000 tables through the voice sum.
-  Run it in mGBA with `-l 7`; it ends in `audio arm probe: PASS`, and its
-  decoder sum must equal the one `make test-audio-bank` prints.
+  `make check-audio-arm-probe AUDIO_ARM_RUNNER=<sc64-headless-replay>` runs
+  it in the headless mGBA runner and compares its decoder sum with the
+  host's. Without the runner, run the ROM in mGBA with `-l 7`: it ends in
+  `audio arm probe: PASS`, and its decoder sum must equal the one
+  `make test-audio-bank` prints. Run this check after any change to either
+  routine; `./dev test` runs only their C references.
 - `build/test-audio-bank-timeline` (`tests/audio_bank_timeline.c`) replays a
   request timeline, one line per VBlank, and writes the bytes the interrupt
   leaves in the two DMA buffers, for comparison with a capture of VRAM

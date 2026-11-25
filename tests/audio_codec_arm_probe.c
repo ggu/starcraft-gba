@@ -8,9 +8,10 @@
  *
  * - Every stream of the linked bank is decoded twice, frame by frame as the
  *   mixer does, by the hand-written routine and by the C reference. Each
- *   frame uses the next of the ten output layouts in rotation: packed, and
- *   each column of 2, 3 and 4 wide tables. The whole tables and the decoder
- *   states must be equal after every frame.
+ *   frame uses the next of the ten output layouts in rotation (packed, and
+ *   each column of 2, 3 and 4 wide tables), so a stream of ten frames or
+ *   more is seen in all of them. The whole tables and the decoder states
+ *   must be equal after every frame.
  * - A two-word running sum of the decoded samples (clips in index order,
  *   then tracks in index order) is printed; `make test-audio-bank` prints
  *   the same sum from the host decode that reproduces the manifest hash.
@@ -85,7 +86,7 @@ static u32 rng(void)
 /* A breakpoint target for debuggers; the result is final here. */
 __attribute__((noinline)) void audio_probe_done(void) { __asm__ volatile(""); }
 
-static u32 sum_low, sum_high, decoder_bad, samples_done;
+static u32 sum_low, sum_high, decoder_bad, samples_done, layouts_used;
 
 /* Both decoders over one stream, frame by frame. */
 static void decode_stream(u32 stream, const u8 *start, u32 samples)
@@ -95,7 +96,9 @@ static void decode_stream(u32 stream, const u8 *start, u32 samples)
     audio_decoder_start(&r, start);
     for (u32 at = 0, frame = 0; at < samples; at += FRAME, ++frame) {
         u32 n = samples - at < FRAME ? samples - at : FRAME;
-        u32 columns = 1u + (stream + frame) % 4u, column = frame % columns;
+        /* The ten layouts in turn: packed, then each column of each table. */
+        static const u8 layout[10][2] = { { 1, 0 }, { 2, 0 }, { 2, 1 }, { 3, 0 }, { 3, 1 }, { 3, 2 }, { 4, 0 }, { 4, 1 }, { 4, 2 }, { 4, 3 } };
+        u32 turn = layouts_used++ % 10u, columns = layout[turn][0], column = layout[turn][1];
         audio_decoder_linear(&a, (volatile u16 *)(table_asm + column), n, columns);
         audio_decoder_linear_reference(&r, (volatile u16 *)(table_ref + column), n, columns);
         u32 bad = a.next != r.next || a.acc != r.acc || a.state != r.state || a.x != r.x;

@@ -4,7 +4,7 @@ The VBlank interrupt that decodes and mixes the StarCraft 64 sound bank
 runs on every video frame in every mode. On `7316734e` it took 5,700 to
 6,500 CPU cycles per VBlank with only music playing and up to 26,700 in
 late three-computer Custom Games, where an update spans three to four
-VBlanks. This change brings that to 3,100–3,400 and at most 14,900
+VBlanks. This change brings that to 3,000–3,400 and at most 14,800
 cycles, with the same bytes written to the two Direct Sound buffers.
 
 All figures are from mGBA with an instruction-level cycle profiler in a
@@ -69,22 +69,22 @@ After:
 
 | Window | Voices | Interrupt | Music decode | Effect decode | Mix | Rest | ROM counter | Peak |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Terran, Outpost late | 3.00 | 14,856 | 2,583 | 7,745 | 2,929 | 1,599 | 14,595 | 17,574 |
-| Terran, Blood Bath late | 1.35 | 7,512 | 2,363 | 3,173 | 885 | 1,091 | 7,252 | 11,215 |
-| Zerg, Outpost late | 0.00 | 3,131 | 2,325 | 0 | 0 | 806 | 2,880 | 3,221 |
-| Zerg, Blood Bath late | 2.37 | 12,249 | 2,540 | 5,990 | 2,358 | 1,362 | 11,995 | 16,573 |
-| Protoss, Outpost late | 2.93 | 14,714 | 2,608 | 7,620 | 2,900 | 1,586 | 14,460 | 17,197 |
-| Protoss, Blood Bath late | 0.32 | 4,174 | 2,478 | 797 | 39 | 860 | 3,920 | 11,105 |
-| Terran, early match | 0.00 | 3,114 | 2,288 | 0 | 0 | 826 | 2,840 | 3,108 |
-| Zerg, early match | 0.00 | 3,061 | 2,235 | 0 | 0 | 826 | 2,787 | 3,109 |
-| Protoss, early match | 0.00 | 3,325 | 2,499 | 0 | 0 | 826 | 3,050 | 3,276 |
-| Terran, title | 0.00 | 3,397 | 2,570 | 0 | 0 | 827 | 3,122 | 3,394 |
-| Zerg, title | 0.00 | 3,423 | 2,595 | 0 | 0 | 827 | 3,147 | 3,419 |
-| Protoss, title | 0.00 | 3,397 | 2,570 | 0 | 0 | 827 | 3,122 | 3,394 |
+| Terran, Outpost late | 3.00 | 14,776 | 2,583 | 7,732 | 2,863 | 1,598 | 14,514 | 16,885 |
+| Terran, Blood Bath late | 1.35 | 7,495 | 2,363 | 3,173 | 885 | 1,075 | 7,235 | 11,203 |
+| Zerg, Outpost late | 0.00 | 3,117 | 2,325 | 0 | 0 | 792 | 2,866 | 3,207 |
+| Zerg, Blood Bath late | 2.37 | 12,177 | 2,540 | 5,990 | 2,291 | 1,357 | 11,922 | 16,084 |
+| Protoss, Outpost late | 2.93 | 14,657 | 2,609 | 7,622 | 2,840 | 1,585 | 14,402 | 16,763 |
+| Protoss, Blood Bath late | 0.32 | 4,157 | 2,478 | 796 | 39 | 844 | 3,903 | 11,093 |
+| Terran, early match | 0.00 | 3,100 | 2,288 | 0 | 0 | 812 | 2,826 | 3,094 |
+| Zerg, early match | 0.00 | 3,047 | 2,235 | 0 | 0 | 812 | 2,773 | 3,096 |
+| Protoss, early match | 0.00 | 3,311 | 2,499 | 0 | 0 | 812 | 3,036 | 3,262 |
+| Terran, title | 0.00 | 3,383 | 2,570 | 0 | 0 | 813 | 3,108 | 3,380 |
+| Zerg, title | 0.00 | 3,409 | 2,595 | 0 | 0 | 813 | 3,133 | 3,406 |
+| Protoss, title | 0.00 | 3,383 | 2,570 | 0 | 0 | 813 | 3,108 | 3,380 |
 
 The interrupt costs 40–48% less in every window, and its largest single
-run falls from 29,793 to 17,574 cycles. Decoding costs 12.7–14.8 cycles
-per sample, down from 22.3–27.1. The sum costs 5.6–6.6 cycles per voice
+run falls from 29,793 to 16,885 cycles. Decoding costs 12.7–14.8 cycles
+per sample, down from 22.3–27.1. The sum costs 5.4–6.6 cycles per voice
 sample from ROM, down from 8.8–11.6.
 
 ## Cycles per update
@@ -97,12 +97,12 @@ in the saved image.
 
 | Save | Before | After | Change | Updates per second |
 | --- | ---: | ---: | ---: | --- |
-| Terran, Outpost | 773,910 | 742,207 | −4.10% | 21.68 → 22.60 |
-| Terran, Blood Bath | 870,175 | 848,390 | −2.50% | 19.28 → 19.78 |
-| Zerg, Outpost | 1,057,283 | 1,046,883 | −0.98% | 15.87 → 16.03 |
-| Zerg, Blood Bath | 1,021,878 | 985,089 | −3.60% | 16.42 → 17.03 |
-| Protoss, Outpost | 973,020 | 929,271 | −4.50% | 17.24 → 18.05 |
-| Protoss, Blood Bath | 1,002,396 | 988,721 | −1.36% | 16.74 → 16.97 |
+| Terran, Outpost | 773,910 | 742,009 | −4.12% | 21.68 → 22.61 |
+| Terran, Blood Bath | 870,175 | 848,327 | −2.51% | 19.28 → 19.78 |
+| Zerg, Outpost | 1,057,283 | 1,046,833 | −0.99% | 15.87 → 16.03 |
+| Zerg, Blood Bath | 1,021,878 | 984,767 | −3.63% | 16.42 → 17.04 |
+| Protoss, Outpost | 973,020 | 929,075 | −4.52% | 17.24 → 18.06 |
+| Protoss, Blood Bath | 1,002,396 | 988,653 | −1.37% | 16.74 → 16.97 |
 
 Every update in these windows is still over the 561,792-cycle budget.
 
@@ -117,14 +117,17 @@ Every update in these windows is still over the 561,792-cycle budget.
   format's description and adds samples one at a time. The same test
   built against the previous headers prints the same digest of all
   frames, `e4cc15217e3746a7`.
-- **ARM, whole bank.** `make audio-arm-probe` builds a ROM that runs
-  each hand-written routine against its C reference on the ARM7TDMI.
-  All 534 streams agree after every frame, in packed output and in
-  every column of 2, 3 and 4 wide tables, as do the decoder states. Its
-  running sum of the decoded samples, `c18b8cd4 bb236693`, equals the
-  one the host test prints. The voice sum agrees on 3,000 tables, in
-  which 115,288 words hold a clamped sample. A deliberately broken
-  clamp and a broken refill both fail the probe.
+- **ARM, whole bank.** `make check-audio-arm-probe` builds a ROM that
+  runs each hand-written routine against its C reference on the
+  ARM7TDMI and judges its result. All 534 streams agree after every
+  frame, as do the decoder states; each frame takes the next of ten
+  output layouts (packed, and each column of 2, 3 and 4 wide tables).
+  Its running sum of the decoded samples, `c18b8cd4 bb236693`, equals
+  the one the host test prints. 400 pseudo-random bit streams (704,000
+  samples) agree as well; they reach reserved width codes and other
+  input the pack tool never writes. The voice sum agrees on 3,000
+  tables, in which 115,514 words hold a sample at either limit. A
+  deliberately broken clamp and a broken refill both fail the probe.
 - **ARM, the twelve windows.** A capture records, at every VBlank since
   reset, the requests waiting in the queue and the 832 bytes of both
   DMA double buffers after the handler returns.
@@ -152,7 +155,7 @@ always named, instead of 11,776.
 | Main stack bound | 7,808 | 6,076 | 5,940 |
 | Lowest stack address touched in the two late windows | `0x0300670C` | `0x030067C8` | `0x030068A8` |
 | ROM text bytes, before | 30,714,840 | 31,511,620 | 31,513,276 |
-| ROM text bytes, after | 30,710,600 | 31,507,380 | 31,509,028 |
+| ROM text bytes, after | 30,710,544 | 31,507,324 | 31,508,972 |
 
 The stack bound is the one `tools/gba_iwram_hot.py check` computes on
 the unmerged `claude/iwram-stack-reclaim` branch, run here on these
@@ -161,9 +164,9 @@ bytes. The lowest address touched is the same before and after.
 
 The interrupt has its own 416-byte stack. Its deepest chain was 264
 bytes of compiler frames (`audio_irq`, `audio_vblank`,
-`audio_decoder_run`, `audio_decoder_run_p1`). It is now 216, through
-the third predictor's state machine, and 160 with the bank's own
-streams. The same check reports 256 of 416 bytes, where it reported 296.
+`audio_decoder_run`, `audio_decoder_run_p1`). It is now 224, through
+the third predictor's state machine, and 168 with the bank's own
+streams. The same check reports 264 of 416 bytes, where it reported 296.
 
 Three replay probes paint the unused stack from the old guard address
 and one verifier checks against it. They now use `0x03005200`:
@@ -177,25 +180,26 @@ the same stack use.
 `claude/iwram-stack-reclaim` links listed ROM functions into IWRAM and
 checks the stack of the result. A private link of this change with that
 branch's linker script and unchanged lists passes its check on all
-three ROMs and leaves 264 (Terran), 364 (Zerg) and 796 (Protoss) bytes
+three ROMs and leaves 296 (Terran), 364 (Zerg) and 828 (Protoss) bytes
 spare. Its Terran and Protoss lists already name `audio_mixer_sum` and
 pick up the new function.
 
 | Window | Lists only | Lists and this change |
 | --- | ---: | ---: |
-| Terran, Outpost late | 24,567 | 13,903 |
-| Terran, Blood Bath late | 13,439 | 7,599 |
-| Zerg, Outpost late | 5,861 | 3,111 |
-| Zerg, Blood Bath late | 21,973 | 12,580 |
-| Protoss, Outpost late | 24,491 | 13,837 |
-| Protoss, Blood Bath late | 7,559 | 4,193 |
+| Terran, Outpost late | 24,567 | 13,853 |
+| Terran, Blood Bath late | 13,439 | 7,584 |
+| Zerg, Outpost late | 5,861 | 3,097 |
+| Zerg, Blood Bath late | 21,973 | 12,516 |
+| Protoss, Outpost late | 24,491 | 13,797 |
+| Protoss, Blood Bath late | 7,559 | 4,173 |
 
 Paired 300-update runs of those two links from the six saves match in
-world state, pixels and saves, and the mean update is 0.98–4.01%
-shorter. From IWRAM the sum costs 3.6–4.1 cycles per voice sample.
-Adding `audio_mixer_sum` (300 bytes) to the Zerg list as well takes the
-Zerg Blood Bath window from 12,580 to 11,759 cycles per VBlank and
-leaves 52 bytes spare. That list is not part of this change.
+world state, pixels and saves, and the mean update is 0.99–4.03%
+shorter. From IWRAM the sum costs 3.5–4.1 cycles per voice sample.
+Adding `audio_mixer_sum` (272 bytes) to the Zerg list as well takes the
+Zerg Blood Bath window from 12,516 to 11,706 cycles per VBlank, passes
+the check and leaves 76 bytes spare. That list is not part of this
+change.
 
 ## Tried and rejected
 
@@ -221,6 +225,9 @@ leaves 52 bytes spare. That list is not part of this change.
   stack check on `claude/iwram-stack-reclaim` needs the compiler's frame
   record for every linked function. The bodies are now inline assembly
   in C functions, which costs 24 bytes of IWRAM and passes that check.
+- **A C helper for clipping words.** Calling one from the middle of the
+  assembly left the stack 4 bytes off the 8-byte alignment a C function
+  may assume. The helper is assembly with no stack use.
 - **A case for width 0.** A silent first-order block was a four-store
   fill. The general block handles it correctly, and removing the test
   saved 36 bytes and two cycles in every other block. Silent blocks
