@@ -228,6 +228,18 @@ class DiffTest(unittest.TestCase):
         self.assertEqual(cells['ground_range'], (0, 288))
         self.assertNotIn('ground_cooldown', cells)
 
+    def test_dedicated_handler_exemption_needs_the_handler(self):
+        rom = pt.parse_rom_tables(synthetic_tables(
+            units={'ground_weapon': {i: (54 if i == 50 else pt.NONE_WEAPON) for i in range(pt.UNIT_COUNT)},
+                   'ground_hits': {50: 1},
+                   'subunit1': {i: pt.NONE_UNIT for i in range(pt.UNIT_COUNT)}},
+            weapons={'damage': {54: 500}}))
+        unarmed = rule(50, 'U_INFESTED', ground={'stock': 0, 'damage': 0, 'cooldown': 0, 'range': 0, 'hits': 0})
+        diffs, _ = pt.diff_rules(rom, {
+            'with': {'units': [unarmed], 'buildings': [], 'defines': {'SC64_P6_COMBAT_ENABLED'}},
+            'without': {'units': [unarmed], 'buildings': [], 'defines': set()}}, {})
+        self.assertEqual([(d['column'], d['profiles']) for d in diffs], [('ground_attack', ['without'])])
+
     def test_launched_weapon_compares_damage_only(self):
         rom = pt.parse_rom_tables(synthetic_tables(
             units={'ground_weapon': {i: (82 if i == 85 else pt.NONE_WEAPON) for i in range(pt.UNIT_COUNT)},
@@ -298,6 +310,11 @@ class EngineSourceTest(unittest.TestCase):
             (repo / 'tracked.c').write_text('keep\n')
             (repo / 'private').mkdir()
             (repo / 'private' / 'rom-table-diff.json').symlink_to(repo / 'tracked.c')
+            (repo / 'private' / 'other.json').write_text('x\n')
+            (repo / 'private' / 'link.json').symlink_to(repo / 'private' / 'other.json')
+            with self.assertRaises(ValueError):  # any symlink destination: refused
+                pt.write_private(repo, repo / 'private' / 'link.json', 'derived\n')
+            self.assertTrue((repo / 'private' / 'link.json').is_symlink())
             with self.assertRaises(ValueError):  # link into a tracked file: refused
                 pt.write_private(repo, repo / 'private' / 'rom-table-diff.json', 'derived\n')
             self.assertEqual((repo / 'tracked.c').read_text(), 'keep\n')
@@ -356,7 +373,8 @@ class RomTablesTest(unittest.TestCase):
             fields = [x.strip() for x in body.split(',')]
             return dict(zip(('minerals', 'gas', 'build_frames', 'hp', 'shields'),
                             map(int, fields[4:9])))
-        engine = {65: rule_row('U_ZEALOT'), 66: rule_row('U_DRAGOON'), 70: rule_row('U_SCOUT')}
+        engine = {65: rule_row('U_ZEALOT'), 66: rule_row('U_DRAGOON'), 70: rule_row('U_SCOUT'),
+                  12: rule_row('U_BATTLECRUISER')}
         rule_rows = {(d['row'], d['column']): d for d in document['diffs'] if d['table'] == 'units.rules'}
         for (raw, column), value in expected.items():
             engine_column = 'build_frames' if column == 'build_time' else column

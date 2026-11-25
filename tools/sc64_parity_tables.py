@@ -307,10 +307,16 @@ GAMEPLAY, POLICY = 'gameplay', 'policy'
 COST_COLUMNS = ('minerals', 'gas', 'build_frames', 'supply')
 # Units whose attack lives on the unit they launch (weapon on the launched row).
 LAUNCHED_WEAPON = {83: 85, 81: 85}  # Reaver, Warbringer -> Scarab
-# Raw units whose attack a dedicated handler fires instead of the race rules;
-# their weapon values are compared in weapons.engine (ENGINE_CONSTANTS).
-DEDICATED_ATTACK = {13: 'sc64_t5_mine_adapter.h', 50: 'sc64_p6_combat_adapter.h',
-                    73: 'sc64_p7_projectile_adapter.h', 85: 'sc64_paid_scarab.h'}
+# Raw units whose attack a dedicated handler fires instead of the race rules,
+# with the defines that compile the handler in (any one suffices). Their weapon
+# values are compared in weapons.engine; a profile without the handler is
+# checked like any other unit.
+DEDICATED_ATTACK = {
+    13: ('sc64_t5_mine_adapter.h', ('SC64_T5_RUNTIME',)),
+    50: ('sc64_p6_combat_adapter.h', ('SC64_P6_COMBAT_ENABLED',)),
+    73: ('sc64_p7_projectile_adapter.h', ('SC64_P7_BATTERY_ENABLED', 'SC64_CUSTOM_CARRIER_PROBE')),
+    85: ('sc64_paid_scarab.h', ('SC64_PAID_SCARAB',)),
+}
 
 
 def cell(table, row, name, column, rom, engine, source, profiles=None, note=None, cls=GAMEPLAY):
@@ -457,7 +463,7 @@ def diff_rules(rom: dict, profiles: dict, unit_names: dict) -> tuple[list, set]:
                     # No attack of this class in the engine. Report a ROM
                     # weapon it drops; dedicated handlers are compared in
                     # weapons.engine instead.
-                    if raw in DEDICATED_ATTACK:
+                    if raw in DEDICATED_ATTACK and set(DEDICATED_ATTACK[raw][1]) & data.get('defines', set()):
                         continue
                     wid = r[key + '_weapon']
                     if raw in LAUNCHED_WEAPON and wid >= WEAPON_COUNT:
@@ -774,6 +780,7 @@ def read_engine(root: Path, work: Path) -> dict:
         enum_names_header(root, flags, names)
         lines = compile_and_run(root, work, name, ['-DPARITY_RULES', f'-DPARITY_NAMES="{names}"', *flags])
         profiles[name] = parse_rule_lines(lines)
+        profiles[name]['defines'] = {x[2:].split('=', 1)[0] for x in flags}
         profiles[name]['flags_sha256'] = hashlib.sha256(' '.join(flags).encode()).hexdigest()
     constants = read_constants(root)
     research = engine_research(stock, root, constants)
@@ -835,8 +842,14 @@ def write_private(root: Path, path: Path, text: str) -> None:
 
     os.replace swaps the directory entry, so an existing symlink or hard link
     at the destination is replaced rather than written through."""
-    check_private(root, path.parent)
-    check_private(root, path.parent / path.name)
+    parent = path.parent.resolve()
+    entry = parent / path.name
+    if entry.is_symlink():
+        raise ValueError(f'{entry} is a symlink; refusing to replace it')
+    check_private(root, parent)
+    # The unresolved entry is what os.replace overwrites; git check-ignore
+    # never reports a tracked entry as ignored, so a tracked one is refused.
+    check_private(root, entry)
     with tempfile.NamedTemporaryFile('w', dir=path.parent, prefix='.' + path.name + '.',
                                      delete=False) as f:
         f.write(text)
@@ -939,6 +952,8 @@ def run(args) -> int:
         'not_covered': ['per-mission CHK opening censuses', 'iscript animation and sound sequences'],
         **result,
     }
+    for name in engine['profiles']:
+        engine['profiles'][name].pop('defines', None)
     write_private(root, out_dir / 'rom-table-diff.json', json.dumps(document, indent=1) + '\n')
     write_private(root, out_dir / 'rom-table-diff.txt', '\n'.join(lines) + '\n')
     print(f'wrote {out_dir / "rom-table-diff.json"}', file=sys.stderr)
