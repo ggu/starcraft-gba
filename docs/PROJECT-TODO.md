@@ -854,6 +854,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The 8,192-pop cutoff alone reaches the shared scratch limit after
   4,412 pops. Compare in-place queue compaction on the exact tape and
   measure later reads and queue evictions.
+  A [render-side live-entity roster](audits/2026-11-26-live-entity-census.md)
+  costs 10–16k more guest cycles per late update than it saves; not merged.
+  [Skipping the repeated can-attack test and gating campaign predicates](audits/2026-11-26-can-attack-chain.md)
+  saves 23.5k (Terran), 12.3k (Zerg) and 23.9k (Protoss) guest cycles per
+  Outpost update with bit-identical paired runs.
 
 - **World depth and sprite lifetime.** The [shared collapse ordering fix](audits/2026-11-21-attached-death-continuity.md)
   keeps attached images in their actor's draw position, including after
