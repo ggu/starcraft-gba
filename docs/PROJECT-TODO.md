@@ -42,6 +42,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   deliver a whole-frame gain while preserving every direction, secondary
   query, topology invalidation and memory guard.
 
+- **Gas refinery service.** Per-field N64 observations found one tracked worker
+  occupying each gas site at a time. The packaged GBA Blood Bath game showed
+  up to three workers counting down concurrently at one building. Qualify
+  single occupancy, wait order, cancellation, destruction, saved trips and
+  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building).
+
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
   regenerated from `d39bd015` use 56 source patches (styles 176/177/178:
