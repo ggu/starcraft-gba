@@ -247,3 +247,18 @@ physical GBA SP timing remain open.
 | Z10 ROM | `a061a9bd503522b79019f71bc4d766a5985ef4d9455afc9792e6d1d246a57980` |
 | Matching ELF | `49980741d66e993a7732864cf5f7c3ea17825463a05baf1420bc2a773849b10e` |
 | Full physical-button win receipt | `f1743c62926265ace2eb9c7dfc4a36b4c7a61c5f2c040dadc924a77c8c802ca0` |
+
+### November 25 combined supply and outline release replay
+
+The packaged Z10 ROM at `5f758095` repeats the full physical-button
+replay from HOME. All 206 named checkpoints match and the mission
+wins at frame 267,585 with zero adapter faults. Across 270,585 guest
+calls, the mean corresponds to 12.83 emulated main-loop updates per
+second, including UI and presentation waits. The test covers an
+uninterrupted win. A full-tape pause and fresh victory readback on
+this exact release remain open.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Packaged Z10 ROM | `b954fde5512b949b9afeab93fc947cc56931b1be17f9c433f793dafd93fd56d5` |
+| Full ordinary-button victory receipt | `554e608cb4039a38ddd8e6a1fb7af39b40cd510df8c7e395224997b26954c555` |
