@@ -365,7 +365,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A [bounded cache of complete movement fields](audits/2026-11-25-wide-point-reuse.md)
   reduced Z7 guest cycles by 8.27% on the current `81e76943` Z10
   trial, reaching 9.61 emulated updates/s with 72 matching sampled
-  state and display cuts. The earlier after-#885 trial reduced cycles by
+  state and display cuts. Per-update counters put the saving in movement
+  orders (1,212,133 to 1,052,743 mean cycles); drawing was unchanged.
+  The earlier after-#885 trial reduced cycles by
   7.80%, reaching
   8.98 emulated updates/s. A paired ordinary-input Z7 continuation also
   reached victory and reloaded its identical terminal SRAM in fresh
