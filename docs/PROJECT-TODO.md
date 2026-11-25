@@ -19,6 +19,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Blood Bath resource layout.** Repacking the verified N64 map restores
+  56 mineral patches, with 32 containing 1,500 minerals and 24 containing
+  3,000. The original pack stopped after assigning eight patches per
+  starting site. The first 32 indices retain their previous coordinates
+  and amounts. New games on all three race ROMs and Showcase matched
+  the source coordinates, amounts and three mineral sprite types in mGBA.
+  Fresh loads restored mined amounts and continued play. Old 32-patch
+  saves re-exported byte for byte on all four ROMs and matched the
+  original builds for 512 further updates. Measure later expansion and
+  resource contention now that all the map's minerals are available.
+  Regenerate the private skirmish header with
+  `tools/sc64_skirmish_pack.py` before building. Use `--cover` for
+  cover-enabled profiles and their existing generated output path.
+
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
   `1779e2ef70d4858a599cce2a32249fcaff9fc129e80e30a26fad425879975960`).
@@ -33,7 +47,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and 8,911. The T5 opening reloaded at frame 19,419 with the four
   completion flags (0xf0). That run cleared T5 at frame 145,471 with
   both heroes alive and all enemy buildings destroyed. Fresh SRAM
-  re-exported byte for byte with all five bits (0x1f0). Continue T6.
+  re-exported byte for byte with all five bits (0x1f0). The same save
+  cleared T6 at frame 23,536, T7 at 3,931 and T8 at 139,216. Each
+  victory reloaded and re-exported byte for byte. T8 retains all eight
+  flags (0xff0). Continue T9 and T10 from the cumulative save.
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
