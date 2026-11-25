@@ -19,6 +19,45 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Blood Bath resource layout.** Repacking the verified N64 map restores
+  56 mineral patches, with 32 containing 1,500 minerals and 24 containing
+  3,000. The original pack stopped after assigning eight patches per
+  starting site. The first 32 indices retain their previous coordinates
+  and amounts. New games on all three race ROMs and Showcase matched
+  the source coordinates, amounts and three mineral sprite types in mGBA.
+  Fresh loads restored mined amounts and continued play. Old 32-patch
+  saves re-exported byte for byte on all four ROMs and matched the
+  original builds for 512 further updates. In three-CPU matches with each
+  human race, workers mined a restored patch within 4,500–6,500 updates.
+  All three matches ran for 12,000 updates. Over the final 500 updates,
+  mGBA guest cycles corresponded to 24.55 updates/s on Terran, 17.99 on
+  Zerg and 19.60 on Protoss. These are different battle states. Continue
+  profiling late matches and verify frame cadence on hardware. All 72 lobby
+  launches across the four cartridges, both maps, three human races and
+  one to three independently chosen CPU seats reached gameplay. The
+  running matches retained the chosen races and occupied seats.
+  Regenerate the private skirmish header with
+  `tools/sc64_skirmish_pack.py` before building. Use `--cover` for
+  cover-enabled profiles and their existing generated output path.
+
+- **Next four-player N64 map.** Power Lines (008/055) has four connected
+  starts under the importer’s ground-walkability test, 74 mineral patches
+  and ten geysers on a 128×96 map. Its 361,216 bytes of deduplicated
+  terrain, tile indices and walk flags fit all four current ROMs. Before
+  enabling it, extend the Terran four-geyser limit and the Zerg custom
+  save format’s ten-bit coordinates and 64×64 fog. Check all four starts
+  with ground units and AI expansion in mGBA. Spaced Out (008/050)
+  fails the ground-connectivity test and needs transport-capable opponents.
+
+- **Gas depletion.** The owned Blood Bath scenario assigns 10,000 gas to
+  each of its four geysers. In the N64 emulator, selecting a geyser in a
+  fresh Blood Bath game showed 10,000 gas. Selecting a nearby mineral
+  field after workers started harvesting showed 1,492 minerals. The
+  current GBA map descriptor keeps geyser coordinates
+  only, and the worker code gives eight gas per normal trip. Capture the
+  N64 depleted-trip yield, then implement remaining gas per map site and
+  preserve it through refinery destruction, rebuilding and save/load.
+
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
   `1779e2ef70d4858a599cce2a32249fcaff9fc129e80e30a26fad425879975960`).
@@ -29,8 +68,23 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Every chapter's victory journal re-exports byte for byte. The private
   ten-mission receipt index hashes to
   `c632a63424a53882bb092bc01911a3ff2ebb0d7ec3dc8e9ec8542c29856a2937`.
-  Continue the exact-package Zerg and Protoss campaigns and physical
-  cartridge timing.
+  On a continuous save, T2, T3 and T4 win at frames 29,366, 54,000
+  and 8,911. The T5 opening reloaded at frame 19,419 with the four
+  completion flags (0xf0). That run cleared T5 at frame 145,471 with
+  both heroes alive and all enemy buildings destroyed. Fresh SRAM
+  re-exported byte for byte with all five bits (0x1f0). The same save
+  cleared T6 at frame 23,536, T7 at 3,931 and T8 at 139,216. Each
+  victory reloaded and re-exported byte for byte. T8 retains all eight
+  flags (0xff0). Starting with that T8 victory journal, T9 matched the
+  packaged physical reference through victory at frame 47,266. T10 then
+  matched all six checkpoints and won at frame 3,361. A fresh load
+  retained all ten Terran bits (0x3ff0) and reproduced the final SRAM
+  (SHA-256 `49c9e531cd692502487592025127543b57d6d7c2d692f69b648a7bc25865ce6a`).
+  Pressing A retried T10, and a frame-61 pause save reloaded with all ten
+  bits. This completes the continuous ten-mission runs on all three race
+  cartridges in package `5f758095`. T9 averaged 17.74 emulated updates/s
+  and T10 averaged 18.52, including presentation waits and menu input.
+  Late-campaign speed and hardware frame pacing remain priorities.
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
@@ -39,34 +93,135 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory journal (`6122561e55f2ab688b55a6217f09b22188b53fe826113860bdfff04bd90992eb`).
   Advancing to Z2, saving and reloading preserves the Z1 bit at frame 101.
 
-  Starting at a genuine Z4 victory on the
-  packaged Zerg ROM, A enters Z5. The 14 recorded input segments clear
-  Z5 at frame 18,974 and fresh HOME restores the result. All 14 release
-  saves match the historical stage bytes, including the victory SRAM
-  `9ec9117fab1dd841230701bbfb9dbb7441069dc8881cadc6695592a350ea9b45`.
-  The separate HOME recording remains active at its end and after 3,000
-  additional neutral inputs.
+  Continuing that Z1 save, Z2 delivers the Chrysalis at frame 10,209.
+  Z3 uses 32 controller segments and wins at frame 68,639 with the
+  first three completion bits (16,387). The Z3 victory journal SHA-256
+  is `277b5e01e2e8293b7c5c719d7ea84e24f9f71a508c8bdd13b3cfbd985ab8534d`.
+  From this result, Z4 rebuilds the Spawning Pool, upgrades to Lair,
+  produces 20 Mutalisks and destroys the final Command Center at frame
+  64,147. Z5 follows on the same save and wins at frame 18,974 with
+  all five completion bits (114,691). Each chapter victory re-exports
+  byte for byte after loading it in a fresh emulator.
 
-  Z4 also wins from HOME on this package. At the old tape endpoint, the
-  player rebuilds a Spawning Pool, upgrades the Hatchery to a Lair, builds
-  a Spire and produces 20 Mutalisks to destroy the remaining Command
-  Center. Fresh HOME restores victory at frame 64,147. Starting the same
-  Z5 input chain from this new Z4 result wins at frame 18,974 with both
-  completion bits set (98,304). Fresh readback SHA-256:
-  `bd4510087ba2ad7b109ed11194fe93faf602d08a1b17b48dc81d8f0e2aa7aba3`.
-  From this Z5 save, 52 controller segments complete Z6 at frame 177,044.
-  Each segment loads the preceding save from this run. Fresh HOME restores
-  all three completion bits (229,376) and re-exports the same victory SRAM
-  (`58fe25565dfcda760b1d8af07c8d938f77354b22abd8e2bf0874ac3b6702b0e6`).
-  Advancing into Z7 and reloading at frame 101 preserves all three bits.
+  The same save clears all 52 Z6 controller segments and wins at
+  frame 177,044. After a fresh load, Z1–Z6 remain marked complete
+  (245,763) and the re-exported SRAM hashes to
+  `f64dd51818b990c66e9c45d077d2ae89ee51049eea8af1f01045b9b21fc1f288`.
+  The separate Z5 HOME recording remains active after 3,000 additional
+  neutral inputs beyond the end of its tape.
+
+  From the six-chapter save, Z7 also wins at frame 267,585 with all
+  206 observations matching. A fresh load preserves all seven chapter
+  flags (507,907) and reproduces the victory SRAM byte for byte. The
+  same save then clears Z8 at frame 86,969, matching 36 checkpoints.
+  A fresh load preserves all eight completion flags (1,032,195) and
+  re-exports SRAM with SHA-256
+  `2b9cbe6a24cb73e26ebd42bf3da87b8b7c14f3f05bd6366a699ec698bcc88497`.
 
   Independently, Z7 wins from HOME on this ROM at frame 267,585 with all
   206 checkpoints matching. The fresh-loaded victory advances to Z8.
   The Z8 field save restores at frame 107 with the Z7 completion bit and
-  re-exports byte for byte. Z9 is the remaining intermediate Zerg handoff.
-  The current Z9 recovery produces a crystal and a full-health carrier on
-  the southern approach, but defenders kill it before delivery. The next
-  run should clear the delivery area before committing the carrier.
+  re-exports byte for byte. Z9 now wins from the crystal-spawn save on
+  the packaged ROM. A Mutalisk diversion north of the return location
+  let the Drone deliver the crystal from the south. Loading victory at
+  frame 59,957 advances to Z10. The Z10 frame-101 pause save restores the
+  Z9 completion flag and re-exports byte for byte. Starting at that
+  Z9 victory, Full Circle plays through all 28 checkpoints to victory
+  at frame 63,523, with both final chapter flags (3,145,728) and zero
+  unsupported events. A fresh process restores the campaign and world,
+  re-exporting the same SRAM. A on the finale result retries Z10 and
+  keeps both flags through a pause save and fresh load.
+
+  The continuous Z1–Z8 save now clears Z9. The crystal spawned at
+  frame 46,365 and a Drone delivered it at frame 57,787. The victory
+  journal re-exported byte for byte (SHA-256
+  `71e4d60f9e6a6f99c84ce3a7fb00d31a77c0fa6e8eba7e3af252c52e150e4b97`).
+  Z10 resumed at frame 101 with all nine prior flags (2,080,771).
+  Full Circle then won at frame 63,523 with all 28 checkpoints matched,
+  zero unsupported events and all ten flags (4,177,923). A fresh load
+  restored the victory state and re-exported identical SRAM. Pressing A
+  retried Z10. Its frame-101 pause save reloaded with all ten flags.
+  This verifies the complete continuous Zerg campaign on the November
+  25 package in mGBA. Recheck affected chapters on later engine builds.
+  The authenticated Z9 scenario allows player 3 to research Ventral
+  Sacs. On the newer source merged in #874, Z9 passed paid research,
+  mid-job reload, boarding, loaded-cargo reload and unloading in mGBA.
+  The continuous campaign run above used the earlier package and a
+  ground delivery.
+
+- **Packaged Protoss campaign.** P2 now wins from HOME on the packaged
+  Protoss10 ROM with regenerated controller inputs. The 38,435-input run
+  reaches victory at frame 36,388 with zero unsupported actions. A fresh
+  HOME load restores the victory world and completion flag and re-exports
+  the same SRAM bytes.
+
+  P6 wins at frame 92,986 after all 105
+  checkpoints, six briefing pages and 17 dialogue pages match the
+  regenerated route. The full run averages 16.81 emulated updates/s.
+  It saves and reloads during play, and the victory SRAM re-exports
+  byte for byte after fresh HOME
+  (`b01855f7314bdc8f5eb017caefa434f6821cc488e8df54bc30832b818bcef031`).
+  From that P6 victory, P7 completes at frame 56,695 with all three
+  heroes alive and both objective Nexuses destroyed. The same route
+  also wins from HOME. Advancing the linked run to P8 and reloading
+  its frame-43 save preserves both P6 and P7 completion bits.
+  Separately, the P1 save clears P2 and P3, with matching checkpoint
+  observations and byte-identical victory readbacks. Its P4 frame-101
+  field save restores the first three completion flags (4,194,316).
+  The same save then clears P4 at frame 81,129, P5 at frame 5,057
+  and P6 at frame 92,986. All three victory saves restore and re-export
+  byte for byte, carrying all previously completed chapters. The P6
+  readback SHA-256 is
+  `e3622fdc9c1796b205a5b44e1a4c4a6d72ecd1233d7e0427cabf0e11a8f46be1`.
+  The continuous P1 save then clears P7 and P8. After P8 at frame
+  98,849, fresh SRAM retains all eight flags (264,241,164), SHA-256
+  `dd39755042242391d0a78f825565e6fe9409d1872c741d57e683801aa41fd121`.
+  This journal cleared P9 at frame 134,481, then P10 at frame 53,225
+  with all ten bits (1,069,547,532). Each of the ten victory journals
+  was independently opened from HOME again on the packaged ROM. Every
+  mission number and cumulative flag matched, and every SRAM re-export
+  matched its input byte for byte. Final victory SRAM SHA-256 is
+  `bad33ae45804fd192f1dfdf439cb52a1e9eb064fa7fb30f9e1b88a010a42cb32`.
+  Retrying P10 and reloading its frame-11 pause preserved all ten flags.
+  The separate P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
+  victory retains all three completion bits (234,881,024). Continuing
+  into P9 reproduces all 57 checkpoint observations and wins at frame
+  134,481. A fresh process restores P6–P9 complete.
+
+  A regenerated P8 controller tape
+  plays The Trial of Tassadar from HOME to victory on the packaged
+  Protoss10 ROM. After 100,630 inputs the stasis cell is gone, all three
+  trigger runners are free of faults, and victory registers at frame
+  98,849. Fresh HOME restores the result and re-exports identical SRAM
+  (`b8624a22d8e77fccd3942ef7f647c67d41c5dd9f16e29d49d418e0bec2445ef4`).
+  Advancing to P9 and saving and loading at frame 101 preserves the
+  P8 completion bit. The tape SHA-256 is
+  `8cd63fc978c64ca7e639cd89432f88c439d1de5bc655be1792b431cdfd1c04d0`.
+  Continuing from that P8 victory save, P9 wins at frame 134,481 and P10
+  at frame 53,225. Both played through the normal chapter advance with
+  controller input on package `5f758095`. All 57 P9 and 22 P10 checkpoint
+  observations matched the recorded frame and result state. Each victory
+  restored its world fingerprint, mission runtime and completion flags
+  in a fresh mGBA process and re-exported byte-identical SRAM. The final
+  mask is `0x38000000` (P8–P10). P3 also wins from HOME at frame 47,661
+  and preserves its completion bit through a fresh-process save reload.
+
+  P4 also wins from HOME on this package at frame 81,129 after a
+  regenerated normal-input controller builds an escort and clears the
+  extraction area. Both required heroes survive. A fresh process restores
+  the victory and re-exports identical SRAM
+  (`2ee0921b6ed24c222ffaa55113ff65fb04f9a4908c80c11d5f5ec16c73814304`).
+  The earlier tape diverged by 100 minerals at input 18,000.
+
+  P10 completes from HOME on the same Protoss10 package with a
+  regenerated controller. The old tape first differs by 100 minerals at
+  input 7,095. The new run matches all 22 checkpoints, reads ten briefing
+  pages and 14 dialogue pages, and reloads its in-game save at frame
+  31,156. The Overmind is destroyed at frame 53,225 with zero unsupported
+  actions. The victory remains stable for eight neutral inputs after a
+  fresh HOME load and re-exports byte for byte
+  (`4bb1ae15b1eb691cfaf1d09e7c10fe17510b5ffe6975a67bb75fd54ce6a3dc49`).
+  The 54,493-input run averages 12.91 emulated main-loop updates/s.
 
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
@@ -117,7 +272,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Native Protoss supply](audits/2026-11-25-waiting-training-supply.md#native-protoss-follow-up)
   now has paired idle refusal and paid waiting at 9/9. The packaged
   P10 build repeats idle refusal, fresh-load queue persistence and
-  resumption after Pylon completion. Verify native Pylon recovery.
+  resumption after Pylon completion. On native Challenger, selecting a
+  Probe at 9/9 exposes its Build command. C-left opens the build card
+  with a 100-mineral Pylon selected. A enters placement. Moving the
+  green preview toward the geyser turns it red. Confirming there shows
+  “You can’t build there” and keeps supply at 9/9. Confirming the green
+  preview on a second run starts a blue warp-in. The HUD still shows 9/9
+  at step 14,330 and reads 10/17 by step 16,330 with no further orders.
+  This agrees with the GBA check that paid waiting production resumes
+  on Pylon completion. At step 17,330 the native HUD reads 11/17 after
+  the second waiting order. See the [native placement and recovery
+  observations](audits/2026-11-25-waiting-training-supply.md#restore-native-supply-with-a-pylon).
 
   The packaged Terran ROM at `5f758095` restores a retained pause and
   victory save from earlier builds for each of T1–T10 (20 fresh emulator
@@ -148,7 +313,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fresh emulator process. All nine intermediate Protoss chapter transitions
   also reach the expected next mission on this package. Each following
   mission saves and reloads with the same frame and completion mask.
-  Z1–Z8 pass the corresponding transitions. The three finales retry
+  Z1–Z9 pass the corresponding transitions. The three finales retry
   the final chapter with A and preserve its completion bit through a new
   pause save. The new T5 victory also advances into T6 and reloads at
   frame 101. On T9 the strict historical comparison first diverges at
@@ -169,8 +334,41 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. The full packaged Z7 replay
   averages 12.83 emulated main-loop updates/s over 270,585 inputs,
-  including presentation waits and UI. Physical GBA timing remains open. Prioritize those paths for
-  the race cartridges.
+  including presentation waits and UI. For a reproducible campaign
+  performance target, use input ticks 136,697–141,598. Both endpoints
+  are in play and the simulation advances on 4,866 of 4,901 updates.
+  Mean cost is 2,106,169 guest cycles/update (7.97 updates/s); the
+  player's unit count stays at 69 and the observed enemy count falls
+  from 158 to 157. This is the slowest adjacent checkpoint pair with
+  at least 1,000 updates and at least 98% simulation advancement.
+  A fresh SRAM restore of this interval identified repeated integer division
+  while drawing the command panel border. Sampling its border incrementally
+  reduced mean guest cycles from 1,963,913 to 1,113,925 on the four open-menu
+  updates in the first 64. The other 60 averaged 1,606,884 before and 1,609,231
+  after. Over all 4,901 updates the improvement was 0.22% (8.221 to 8.240
+  emulated updates/s). Both builds reached the same endpoint and matched at
+  all 72 sampled world and video checkpoints. Paired pause screens matched
+  across all four products, as did victory screens on the three race builds.
+  In a read-only census on the menu-renderer build, the route-build
+  counter advanced on 3,681 of 4,866 advancing updates. Orders averaged
+  1,578,347 cycles on those updates versus 552,404 on the other 1,185.
+  On the same interval, a read-only instruction trace counted 3,024
+  calls to the linear field builder for 32 distinct destination cells.
+  All calls saw the same 2,048 walkability bytes. Two destinations
+  accounted for 347 calls each. Guest clocks, world and both display
+  pages matched the uninstrumented control. These fills consumed
+  2,240,666,503 guest cycles, 22.45% of the window. For the two
+  most frequent destinations a fill averaged about 735,000–737,000
+  cycles. Investigate exact reuse on an unchanged grid, preserving
+  the existing cache eviction and path decisions. Measure the entire
+  update including lookup and invalidation costs.
+  Physical GBA timing remains open.
+  [Linking the hottest ROM functions into the unused IWRAM stack
+  reserve](audits/2026-11-25-iwram-hot-placement.md) saves 6.87–8.46%
+  in five late three-CPU pairs and 2.95% in Protoss Blood Bath, with
+  matching state, pixels and saves. Each ROM's stack bound is checked
+  at build time. Late updates still exceed two VBlanks. Measure the
+  relinked ROMs on hardware and in full campaign replays.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
   and movement takes 161,711 within orders. The fogged viewport
@@ -1298,7 +1496,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   path. The [contact census](audits/2026-11-22-native-custom-game-lobby.md#terrain-filtering-in-the-contact-scan)
   finds at most two new early exits in 80 Terran queries. The
   [ARM decoder trial](audits/2026-11-22-native-custom-game-lobby.md#first-order-audio-on-arm)
-  increases late Protoss Melee cycles by 2.33%. Reusing
+  increases late Protoss Melee cycles by 2.33%. A compact
+  [IWRAM decoder and voice sum](audits/2026-11-25-audio-interrupt-cost.md)
+  later cut the audio interrupt by 40–48%. DMA captures on all three
+  race cartridges also match the previous mixer with four voices active.
+  On the relinked cartridges, orders alone averaged 332k–430k guest
+  cycles in three late skirmish windows. Prioritize orders in these saves
+  and actor drawing on Zerg and Terran. Keep the 561,792-cycle whole-loop
+  budget as the performance gate. Physical GBA timing remains open. Reusing
   [unit admission checks](audits/2026-11-22-native-custom-game-lobby.md#reusing-actor-admission-during-the-draw)
   reduces the late 600-update mean by 0.20%, while p95 rises
   0.46%. Late orders and drawing still need work to reach the

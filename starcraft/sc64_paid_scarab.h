@@ -452,6 +452,9 @@ static void race_paid_scarab_explode(int px, int py, int owner, int primary)
         hp_damage = sc64_psc_resolve(target, packet, &shield_loss);
         if (target < MAX_UNITS) u[target].shield -= shield_loss;
         else b[target - MAX_UNITS].shield -= shield_loss;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+        SC64_SHIELD_DEBIT(target, shield_loss, target < MAX_UNITS ? u[target].shield : b[target - MAX_UNITS].shield);
+#endif
         hit_target_impl_ex(target, hp_damage, U_REAVER, owner, -1, flags);
 #endif
     }

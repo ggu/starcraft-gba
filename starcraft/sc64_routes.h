@@ -1959,13 +1959,13 @@ sc64_route_pack_linear_words(u8 *field, const u8 *dense,
         for (int x = 0; x < cols; x += 32) {
             u32 a = sc64_dense_pack8(in + x);
             u32 b = sc64_dense_pack8(in + x + 8);
-            u32 c = sc64_dense_pack8(in + x + 16);
-            u32 d = sc64_dense_pack8(in + x + 24);
             u32 low = a | b << 24;
-            u32 mid = b >> 8 | c << 16;
-            u32 high = c >> 16 | d << 8;
             __builtin_memcpy(__builtin_assume_aligned(field, 4), &low, 4);
+            u32 c = sc64_dense_pack8(in + x + 16);
+            u32 mid = b >> 8 | c << 16;
             __builtin_memcpy(__builtin_assume_aligned(field + 4, 4), &mid, 4);
+            u32 d = sc64_dense_pack8(in + x + 24);
+            u32 high = c >> 16 | d << 8;
             __builtin_memcpy(__builtin_assume_aligned(field + 8, 4), &high, 4);
             field += 12;
         }

@@ -151,6 +151,27 @@ int main(int argc, char **argv)
         samples += streams[i].samples;
         free(exact);
     }
+    /* The running sum tests/audio_codec_arm_probe.c prints from the ROM's
+     * decoder: PCM words of the clips in index order, then of the tracks in
+     * index order. */
+    u32 sum_low = 0, sum_high = 0, linear = 0;
+    unsigned long long linear_samples = 0;
+    for (u32 i = 0; i < SC64_AUDIO_SAMPLE_COUNT + SC64_AUDIO_MUSIC_TRACKS; ++i) {
+        u32 clip = i < SC64_AUDIO_SAMPLE_COUNT, t = i - SC64_AUDIO_SAMPLE_COUNT;
+        u32 length = clip ? sc64_audio_sample_length[i] & ~(AUDIO_CODEC_BLOCK - 1u) : sc64_audio_music_frames[t] * FRAME;
+        u32 offset = clip ? sc64_audio_sample_offset[i] : sc64_audio_music_offset[t];
+        if (!length || (blob[offset] & 3u) >= 2u) continue;
+        ++linear;
+        linear_samples += length;
+        AudioDecoder d;
+        audio_decoder_start(&d, blob + offset);
+        for (u32 at = 0; at < length; at += FRAME) {
+            u32 n = length - at < FRAME ? length - at : FRAME;
+            audio_decoder_run(&d, (volatile u16 *)out, n);
+            for (u32 j = 0; j < n / 4u; ++j) { sum_low += (u32)out[2u * j] | (u32)out[2u * j + 1u] << 16; sum_high += sum_low; }
+        }
+    }
+    printf("audio bank: linear-predictor sample sum %08x %08x over %u streams, %llu samples\n", sum_low, sum_high, linear, linear_samples);
     char got[65];
     sha256_hex(&sha, got);
     printf("audio bank: %u SFX + %u music streams, %llu samples from %u bytes; pcm_sha256 %s\n",

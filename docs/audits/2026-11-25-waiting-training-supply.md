@@ -159,3 +159,52 @@ native refund comparison. The final raw image hashes are
 `75063a640617bb1d63068dd772b58a7f5bed9766eeedf79dc7043d6110384b2e`
 (control) and `ee672ffc29051f9c421b5fe0f26bc97f4a8ff7bcb58fc95b2fd96b8620f70661`
 (B).
+
+### Select a Probe while the Nexus is waiting
+
+On native Challenger, close the Nexus card and move the field cursor upward
+with three five-step analog pulses (Y = −24,000), releasing for five steps
+between pulses. Select the worker with A. The final image identifies the
+Probe, shows 20 shields and 20 HP, and displays the Build, BuildAdv and Move
+field commands. Supply is still 9/9. This gives the next test a verified
+starting point for opening the build menu with C-left. Two later observer
+runs stopped before that input, leaving placement and queue recovery open.
+
+The observer SHA-256 was
+`2b9ebe9365e0a7a57f6d0899520a694d37084b368e2f89876f0364363aeb8dd9`.
+The input tape hashes to
+`14316a2354fa09ffffac562d64c16cc4f03b4bcbe9dcd2797228c97ff7feac48`
+and the decoded image to
+`e41bfba1f8b2ffb3faf97714d8445500e41d09840ce4e9b81c1515a4a8dc75ad`.
+
+### Restore native supply with a Pylon
+
+On Challenger, the selected Probe opens the basic building card with C-left.
+The highlighted Pylon costs 100 minerals. A opens a green placement preview.
+In one run, two short rightward analog pulses move the preview over the geyser.
+It turns red and A produces the “You can't build there” message. Supply stays
+at 9/9. In a second run A confirms the original green preview. The Probe's
+field commands reappear, then a blue warp-in appears at the placement site.
+
+| Native observer step | What the HUD and field show |
+| --- | --- |
+| 13,590 | Green Pylon preview with the Probe selected |
+| 13,630 | Warp-in begins, supply 9/9 |
+| 14,330 | Bright blue warp-in, supply 9/9 |
+| 15,330 | Pylon body visible, supply 9/9 |
+| 16,330 | Supply 10/17 |
+| 17,330 | Supply 11/17 |
+
+The input log records neutral input after the placement confirmation. Together
+with the initial two paid Probe icons, the two increases in used supply show
+that waiting production resumes without reissuing the orders. The ROM comparison
+above verifies that behavior on the GBA. Observer steps bound the changes
+between captured frames and do not measure their precise simulation ticks.
+
+The accepted-route tape SHA-256 is
+`2a60ec3eb71673f84188060232ee2a8ec787d1eca0ef6ccaf28d85ce63a1ada4`.
+The observer uses the same guest and controller mapping with larger bounded
+capture and wall-time budgets. Its SHA-256 is
+`fb09bc1844f954318a9a2143049471beca4e224c274c4136c97696fb7f3f03ff`.
+The 11/17 raw frame hashes to
+`6d036e1443b038d72f4a4c513e4eae45b4c644dd1fd9b319bb8916a725dba4ad`.

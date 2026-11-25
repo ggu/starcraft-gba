@@ -49,6 +49,8 @@ ATTACK_POSE_HEADER = (
 WEAPON_SOURCE_HEADER = (
     '#define SC64_WEAPON_SOURCE_BANK_VERSION 1\n'
     '#define SC64_WEAPON_SOURCE_SPROLUSELO_LO 1\n'
+    '#define SC64_WEAPON_SOURCE_SHIELD_OVERLAY 1\n'
+    '#define SC64_WEAPON_SOURCE_SHIELD_ACTOR_COUNT 1\n'
     '#define SC64_WEAPON_SOURCE_METADATA 1\n'
     '#define SC64_WEAPON_SOURCE_PROFILE_COUNT 1\n'
     '#define SC64_WEAPON_SOURCE_IMAGE_COUNT 1\n'
@@ -291,6 +293,8 @@ class OnboardingTests(unittest.TestCase):
             self.assertFalse(dev.weapon_source_input_ready(header))
             invalid = (
                 WEAPON_SOURCE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 2'),
+                WEAPON_SOURCE_HEADER.replace('SHIELD_OVERLAY 1', 'MISSING_OVERLAY 1'),
+                WEAPON_SOURCE_HEADER.replace('SHIELD_ACTOR_COUNT 1', 'SHIELD_ACTOR_COUNT 0'),
                 WEAPON_SOURCE_HEADER.replace('SOURCE_METADATA 1', 'SOURCE_METADATA 0'),
                 WEAPON_SOURCE_HEADER.replace('source_profile_lookup(', 'missing_profile('),
                 WEAPON_SOURCE_HEADER.replace('source_image_lookup(', 'missing_image('),

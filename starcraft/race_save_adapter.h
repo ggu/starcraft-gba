@@ -764,7 +764,9 @@ static int race_sk_transport_candidate_valid(const RaceSave *candidate)
 #endif
     for (int i = 0; i < SC64_SK_TRANSPORT_OWNERS; ++i) {
         const Sc64SkTransportJob *job = &race_skirmish_transport_candidate.owner[i];
-        int active = candidate->state[0] && (i == 0 || i <= candidate->state[4]);
+        int active = candidate->state[0] ? (i == 0 || i <= candidate->state[4]) :
+            (i == 0 && candidate->state[1] == R_ZERG &&
+             sc64_campaign_transport_allowed(candidate->state[2]));
         if (!sc64_sk_transport_job_valid(job, MAX_BUILDINGS)) return 0;
         if ((!active || candidate->players[owners[i]] != R_ZERG) &&
             (job->researched || job->remaining || job->producer_plus_one)) return 0;
@@ -774,7 +776,11 @@ static int race_sk_transport_candidate_valid(const RaceSave *candidate)
             if (!race_save_decode_building(candidate, (unsigned)slot, &q) ||
                 !q.alive || q.hp <= 0 || q.under_construction || q.owner != owners[i] ||
                 (q.type != B_LAIR && q.type != B_HIVE) ||
-                (q.raw_type >= 0 && q.raw_type != sc64_race_raw_building(q.type))) return 0;
+                (q.raw_type >= 0 && q.raw_type != sc64_race_raw_building(q.type)) ||
+                (!candidate->state[0] &&
+                 (!sc64_campaign_transport_source_owner_valid(candidate->state[2], q.raw_owner) ||
+                  !sc64_campaign_transport_producer_allowed(candidate->state[2],
+                      q.raw_type < 0 ? sc64_race_raw_building(q.type) : q.raw_type)))) return 0;
             for (int k = 0; k < i; ++k)
                 if (race_skirmish_transport_candidate.owner[k].producer_plus_one ==
                     job->producer_plus_one) return 0;
@@ -1815,6 +1821,11 @@ static int race_skirmish_saved_transport(const RaceSave *candidate, const Unit *
 #endif
             return owner >= 0 && race_skirmish_transport_candidate.owner[owner].researched;
         }
+        if (candidate->state[1] == R_ZERG &&
+            sc64_campaign_transport_allowed(candidate->state[2]) &&
+            ship->owner == SIDE &&
+            sc64_campaign_transport_source_owner_valid(candidate->state[2], ship->raw_owner))
+            return race_skirmish_transport_candidate.owner[0].researched;
 #ifdef SC64_Z6_TRANSPORT_ENABLED
         return candidate->state[2] == SC64_Z6_GLOBAL_ID &&
             candidate->z6.transport.researched && ship->owner == SIDE && ship->raw_owner == 3;
@@ -2651,7 +2662,9 @@ static int race_save_game(void) {
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
     race_skirmish_neutral_ventral_candidate = race_mode ? race_skirmish_neutral_ventral : 0;
 #endif
-    if (race_mode) race_skirmish_transport_candidate = race_skirmish_transport_tech;
+    if (race_mode || (race_human == R_ZERG &&
+        sc64_campaign_transport_allowed(race_selected_mission)))
+        race_skirmish_transport_candidate = race_skirmish_transport_tech;
     else memset(&race_skirmish_transport_candidate, 0, sizeof(race_skirmish_transport_candidate));
     if (!race_sk_transport_candidate_valid(&race_data)) return 0;
 #endif

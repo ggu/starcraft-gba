@@ -213,6 +213,11 @@ def _runtime_images(report: dict) -> set[int]:
     attack_names = {"GndAttkInit", "AirAttkInit", "GndAttkRpt", "AirAttkRpt",
                     "GndAttkToIdle", "AirAttkToIdle"}
     result = set(projectiles)
+    # The engine-created shield hit overlay (see the audit's shield_overlay).
+    shield = report.get("shield_overlay") or {}
+    if isinstance(shield.get("image_id"), int):
+        projectiles.add(shield["image_id"])
+        result.add(shield["image_id"])
     queue = list(projectiles)
 
     def children(image_id: int, names: set[str]):
@@ -319,10 +324,19 @@ def _collect_lo_tables(get, image_data: bytes, report: dict):
                 args = child.get("args", [])
                 if int(child.get("opcode", -1)) in (13, 14, 21) and len(args) >= 2:
                     requested.add((parent_image, _first_int(args[1])))
+    # Shield hit positions (OpenBW create_shield_damage_effect: LO kind 5 of the
+    # target's main image). Only actors whose images.dat row names a shield
+    # table are kept; units without one never show the overlay.
+    shield_images = set()
+    for actor in (report.get("shield_overlay") or {}).get("candidate_actors", []):
+        image_id = int(actor["image"])
+        if struct.unpack_from("<I", image_data, starts["shield"] + image_id * 4)[0]:
+            requested.add((image_id, 5)); shield_images.add(image_id)
     records, offsets, hashes = [], [], {}
+    shared_first: dict[str, int] = {}
     for image_id, lo_kind in sorted(requested):
         image_key = str(image_id)
-        if image_key not in referenced_images or not 0 <= lo_kind < len(kinds):
+        if (image_key not in referenced_images and image_id not in shield_images) or not 0 <= lo_kind < len(kinds):
             raise ValueError(f"LO script reference has invalid parent/category: {image_id}/{lo_kind}")
         for expected_kind, column in kinds:
             if expected_kind != lo_kind:
@@ -339,7 +353,12 @@ def _collect_lo_tables(get, image_data: bytes, report: dict):
             directory_end = 8 + frame_count * 4
             if not frame_count or not offset_count or directory_end > len(raw):
                 raise ValueError(f"LO table {path} has invalid dimensions")
-            first = len(offsets)
+            if path in shared_first:      # identical source table: share its rows
+                records.append({"image_id": image_id, "lo_kind": lo_kind,
+                                "frame_count": frame_count, "offset_count": offset_count,
+                                "offset_first": shared_first[path], "gfi": gfi, "bolt_path": path})
+                continue
+            first = len(offsets); shared_first[path] = first
             for frame in range(frame_count):
                 pos = struct.unpack_from("<I", raw, 8 + frame * 4)[0]
                 end = pos + offset_count * 2
@@ -637,6 +656,12 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
     raster_metadata = {key:value for key,value in images.items() if int(key) in raster_images}
     luts, lutbytes, table_hashes = _project_luts(get, palette_json, raster_metadata)
     lo_tables, lo_offsets, lo_hashes = _collect_lo_tables(get, get("00C/000"), report)
+    shield_lo_images = {t["image_id"] for t in lo_tables if t["lo_kind"] == 5}
+    shield_actor_rows = sorted(({"raw_unit": int(a["raw_unit"]), "image_id": int(a["image"]),
+                                 "directional": 1 if a.get("directional") else 0}
+        for a in (report.get("shield_overlay") or {}).get("candidate_actors", [])
+        if int(a["image"]) in shield_lo_images and 0 <= int(a["raw_unit"]) < 255),
+        key=lambda r: (r["raw_unit"], r["image_id"]))
     frames, pixel_data, frame_index = [], bytearray(), {}
     pixel_blob_offsets: dict[bytes, int] = {}
     unshared_pixel_bytes = 0
@@ -734,6 +759,9 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
              "#include <stdint.h>", "#define SC64_WEAPON_SOURCE_BANK_VERSION 1",
              "#define SC64_WEAPON_SOURCE_METADATA 1",
              "#define SC64_WEAPON_SOURCE_SPROLUSELO_LO 1",
+             "#define SC64_WEAPON_SOURCE_SHIELD_OVERLAY 1",
+             "#define SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE " + str(int((report.get("shield_overlay") or {}).get("image_id", 0))) + "u",
+             "#define SC64_WEAPON_SOURCE_SHIELD_ACTOR_COUNT " + str(max(1, len(shield_actor_rows))),
              "#define SC64_WEAPON_SOURCE_PROFILE_COUNT " + str(len(profiles)),
              "#define SC64_WEAPON_SOURCE_IMAGE_COUNT " + str(len(image_rows)),
              "#define SC64_WEAPON_SOURCE_FRAME_COUNT " + str(len(frames)),
@@ -800,6 +828,9 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
         ["image_id","frame_count","offset_count","lo_kind","flags","offset_first"])
     struct_rows("sc64_weapon_source_lo_offsets", "Sc64WeaponSourceLoOffset", lo_offsets,
         ["x","y"])
+    lines.append("typedef struct { uint8_t raw_unit; uint16_t image_id; uint8_t directional; } Sc64WeaponSourceShieldActor;")
+    struct_rows("sc64_weapon_source_shield_actors", "Sc64WeaponSourceShieldActor",
+        shield_actor_rows or [{"raw_unit":255,"image_id":0,"directional":0}], ["raw_unit","image_id","directional"])
     lines.append("static const uint8_t sc64_weapon_source_pixels[%d] = {" % max(1,len(pixel_data)))
     for i in range(0,len(pixel_data),16): lines.append("    "+", ".join(str(x) for x in pixel_data[i:i+16])+",")
     if not pixel_data: lines.append("    0,")

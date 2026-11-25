@@ -87,7 +87,8 @@ with (the Terran, Zerg Z9/Z10 and Protoss P10 release vectors among them).
 Results go to `release-check.json` and `release-check.md` (default
 `build/release-check/<rev8>/`, ignored by Git) with per-step PASS/FAIL/SKIPPED,
 durations, make commands, log paths, ROM sha256, length and game code, linker RAM
-margins (`__iwram_end` and `__bss_end` against the limits in `common/gba.ld`),
+margins (`__iwram_end` and `__bss_end` against the limits in `common/gba.ld`, or
+against the ROM's own `__iwram_hot_limit` when it is linked with `common/gba_hot.ld`),
 the full source revision, a dirty flag for modified tracked files, and tool
 versions. It exits non-zero if any step FAILED.
 
@@ -680,11 +681,17 @@ decodes; `SC64_AUDIO_FORMAT` in the generated header must equal
   prediction wrapped to eight bits, so decoding is exact: the pack tool decodes
   every stream again before writing the bank and records the PCM hash in the
   manifest. Clips are padded with silence to a multiple of eight samples.
-- Bits are packed least-significant first into little-endian halfwords, so the
-  decoder refills its accumulator with one ROM halfword load and extracts a
-  residual with a mask: constant work per sample, no tables, no per-sample
-  variable-length loops. Measured sizes and decode costs are in
-  [Validation](VALIDATION.md#compressed-audio-bank-2026-10-27).
+- Bits are packed least-significant first into little-endian halfwords, and
+  streams are word aligned, so the decoder refills its accumulator a ROM word
+  at a time, only when the next field needs one of its bits: constant work
+  per sample, no tables, no per-sample variable-length loops. Streams with a
+  linear predictor (the first two, all the default bank has) decode in
+  `audio_decoder_linear`, one 460-byte ARM loop for every width that runs
+  from IWRAM (a hand-written body beside its C reference in
+  `common/audio_codec.h`); the third predictor keeps a Thumb state machine in
+  ROM. Measured sizes and decode costs are in
+  [Validation](VALIDATION.md#compressed-audio-bank-2026-10-27) and the
+  [interrupt cost audit](audits/2026-11-25-audio-interrupt-cost.md).
 
 What is imported:
 
@@ -730,18 +737,24 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   DMA3 blit) the FIFO reads a few samples of silence instead of unrelated
   memory. The music buffer stays zero while no track plays.
 - A VBlank interrupt drains an 8-entry request ring, assigns requests to four
-  fixed voices, decodes one frame of each active voice into its own 176-byte
-  scratch slot, mixes 176 samples with saturation and decodes the next music
-  frame. Voice 0 is reserved for unit responses, which interrupt each other as
+  fixed voices, decodes one frame of each active voice, mixes 176 samples
+  with saturation and decodes the next music frame. A lone voice decodes
+  straight into the mix buffer. Two to four voices decode into the columns of
+  a table in the scratch area that interleaves them word by word, each sample
+  with its top bit flipped, so the sum reads them with one pointer; a voice
+  that ends inside the frame is padded with silence. A frame without voices
+  is written once per buffer half and then left alone. Voice 0 is reserved for unit responses, which interrupt each other as
   in StarCraft; effects take a free voice or steal a lower-priority, older
   one, and the same effect is not retriggered within four frames. An advisor
   line takes an effect voice above every effect's priority, so neither
   combat nor unit responses cut it off, and while one plays further advisor
   requests are refused: a repeated refusal is heard again once the line has
-  ended, never restarted or overlapped. The mixer
-  reads four decoded samples per word and adds them in two 16-bit lanes,
-  clamping only lanes that overflow. Decoder and mixer run as Thumb code from
-  ROM: IWRAM has no room for them.
+  ended, never restarted or overlapped. The sum
+  (`audio_mixer_sum`) reads four decoded samples per word and adds them in two
+  16-bit lanes, clamping only lanes that overflow. It is Thumb code in its
+  own `.text` section, and the handler around it is Thumb code in ROM; only
+  the linear stream decoder runs from IWRAM, which is why `common/gba.ld`
+  keeps IWRAM code below `0x03005200` and reserves 11 KiB for the main stack.
 - The mix and music buffers, the voice scratch, the five stream decoder
   states and the event snapshot live in the unused VRAM gap between the two
   mode-4 pages (`0x06009600`-`0x06009FFF`), so EWRAM holds only the mixer's
@@ -870,6 +883,30 @@ above are not measured on hardware.
 Check the engine with `make test-audio` (asset-free, part of `./dev test`) and
 `make test-game-audio-unified` (part of `make test-unified`). Measured costs
 and limits are in [Validation](VALIDATION.md#sampled-audio-2026-10-25).
+
+With the private bank prepared, three more checks cover the real streams:
+
+- `make test-audio-bank` decodes every stream with the C decoder against the
+  manifest hash, then plays the whole bank through the mixer
+  (`tests/audio_bank_mix.c`): every clip to its end with one to four voices,
+  every track, then 30,000 frames of random requests, each frame compared
+  with a plain bit-by-bit model.
+- `make audio-arm-probe` builds `build/StarCraft-Audio-Probe-GBA.gba`
+  (`tests/audio_codec_arm_probe.c`). On the ARM7TDMI it runs the two
+  hand-written routines (`audio_decoder_linear` and `audio_mixer_sum`)
+  against their C references: every frame of every stream of the bank,
+  taking the ten output layouts in rotation, 400 pseudo-random bit streams,
+  and 3,000 tables through the voice sum.
+  `make check-audio-arm-probe AUDIO_ARM_RUNNER=<sc64-headless-replay>` runs
+  it in the headless mGBA runner and compares its decoder sum with the
+  host's. Without the runner, run the ROM in mGBA with `-l 7`: it ends in
+  `audio arm probe: PASS`, and its decoder sum must equal the one
+  `make test-audio-bank` prints. Run this check after any change to either
+  routine; `./dev test` runs only their C references.
+- `build/test-audio-bank-timeline` (`tests/audio_bank_timeline.c`) replays a
+  request timeline, one line per VBlank, and writes the bytes the interrupt
+  leaves in the two DMA buffers, for comparison with a capture of VRAM
+  `0x06009600`-`0x0600993F` from an emulator run of the same timeline.
 
 ## T4 internal actor/world checks
 
@@ -1516,6 +1553,40 @@ mapping gaps and pool requirements rather than truncating source rows. Z4
 still needs gameplay mappings, larger building/mineral pools, its countdown
 and hatch sequence, victory/defeat behavior, persistence and controller/ARM
 qualification. Source staging alone does not establish a playable mission.
+
+### Race cartridge IWRAM placement
+
+The Terran, Zerg 10 and Protoss 10 cartridges link with `common/gba_hot.ld`.
+It runs the functions listed in `config/iwram-hot/<cartridge>.txt` from IWRAM,
+in the part of the old 11 KiB stack reserve that the stack cannot reach. The
+functions are ordinary Thumb code; only their address changes. After the link,
+`tools/gba_iwram_hot.py check` bounds the program's stack depth from the ELF's
+call-frame information and branches and from GCC's call graph and address-taken
+record, and fails the ROM unless the stack fits above the IWRAM code with a
+512-byte margin. The cartridges are already built with `-g`, which it needs. The report is
+`build/iwram-hot/<cartridge>/stack.json`; the GCC dumps beside it take about
+80 MB per cartridge.
+
+```sh
+make terran                    # relinked, stack-checked
+make terran SC64_IWRAM_HOT=0   # previous link, for matched comparisons
+make terran TERRAN_CARRIER_RELEASE=0   # stock comparison build: previous link too
+make test-sc64-iwram-hot       # asset-free tool and linker-script checks
+```
+
+When the check fails after a code change, either a listed function grew or a
+stack frame did. The message gives the highest address the IWRAM code may
+reach: lower `limit` in the list and drop functions from its end until the
+link fits. A new call cycle, or a change to a declared one, also fails the
+check. The message prints the `recursion` or `callback-cycle` line with the
+cycle's new fingerprint. Read the code first: the count on that line is how
+many activations of the cycle's functions can be live at once, and the check
+trusts it. `tools/sc64_setup_profile_build.py`, `sc64_render_profile_build.py`
+and `sc64_timing_profile_build.py` replay the cartridge link with a probe in
+place of `main`; their ELFs use the same placement but are not stack-checked
+and are for emulator measurement only. Add a function only with a paired cycle measurement; short
+functions that call back into ROM get slower. Method, measurements and limits
+are in [the placement audit](audits/2026-11-25-iwram-hot-placement.md).
 
 ### Canonical Zerg and Protoss builds
 

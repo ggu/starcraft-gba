@@ -392,6 +392,7 @@ test-sc64-icons: build/test-sc64-icons build/test-sc64-icon-scaling
 	./build/test-sc64-icons
 	./build/test-sc64-icon-scaling
 test-starcraft: test-sc64-font test-sc64-icons
+include mk/world-panel/Makefile
 
 .PHONY: sc64-briefings test-sc64-briefing
 sc64-briefings:
@@ -806,12 +807,6 @@ build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wil
 .PHONY: test-sc64-weapon-vfx-game
 test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
 	./build/test-sc64-weapon-vfx-game
-
-build/test-sc64-shield-bars: tests/sc64_shield_bars_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
-.PHONY: test-sc64-shield-bars
-test-sc64-shield-bars: build/test-sc64-shield-bars
-	./build/test-sc64-shield-bars
 
 build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/skirmish_ai.c -o $@
@@ -6181,3 +6176,4 @@ include mk/native-melee-starts/Makefile
 include mk/skirmish-controller/Makefile
 include mk/monotone-clear-prefix/Makefile
 include mk/padded-impact-save/Makefile
+include mk/shield-flash/Makefile

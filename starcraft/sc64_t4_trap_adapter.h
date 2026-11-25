@@ -98,6 +98,9 @@ race_t4_trap_apply_hit(int target, int damage, int damage_type)
     if (*shield > 0) {
         int absorbed = *shield < damage ? *shield : damage;
         *shield -= absorbed;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+        SC64_SHIELD_DEBIT(target, absorbed, *shield);
+#endif
         damage -= absorbed;
     }
     if (damage <= 0) return;

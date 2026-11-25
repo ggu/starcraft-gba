@@ -109,7 +109,7 @@ void sc64_diagnostic_save_validate(unsigned layer,int slot,u32 cycles,
 
 #ifndef GBA_HOST
 /* Untouched-stack high-water mark: paint the unused IWRAM stack once. */
-enum { STACK_LOW = 0x03005000u, STACK_LIMIT = 0x03007e00u, STACK_GAP = 256u };
+enum { STACK_LOW = 0x03005200u, STACK_LIMIT = 0x03007e00u, STACK_GAP = 256u };
 #define STACK_PATTERN 0xa55a3cc3u
 static u32 stack_paint_end;
 static void stack_paint(void)

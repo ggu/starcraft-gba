@@ -25,7 +25,7 @@ def ram_ends(text):
     if set(ends) != {'__bss_end', '__iwram_end'}:
         raise ValueError('missing RAM end symbol')
     if (not 0x02000000 <= ends['__bss_end'] < 0x0203e000 or
-            not 0x03000000 <= ends['__iwram_end'] < 0x03005000):
+            not 0x03000000 <= ends['__iwram_end'] < 0x03005200):
         raise ValueError('GBA RAM reserve exhausted')
     return ends
 

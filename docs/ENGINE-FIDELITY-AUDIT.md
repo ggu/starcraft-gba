@@ -37,11 +37,26 @@ and [Validation](VALIDATION.md) for provenance and existing limits.
   13658–13714](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13658-L13714)).
   Test repeated weak hits, shield armor, shield overflow, and each size class;
   fractional storage and save compatibility need design before changing this.
-- **Shield impact visuals:** The race damage path reduces shields without a
-  directional shield impact overlay. OpenBW creates one for qualifying shield
-  hits ([pinned `bwgame.h` lines 13650–13655 and 13710–13714](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13650-L13655)).
-  The existing blue shield bar is distinct. Verify N64 art, direction and
-  lifetime before implementing; test clipping and bounded effect capacity.
+- **Shield impact visuals, implemented in race builds with source weapon
+  effects:** a hit that takes shield points and leaves some shield standing
+  shows the StarCraft 64 shield overlay, as OpenBW's
+  `create_shield_damage_effect` does ([pinned `bwgame.h` lines 13650–13655 and
+  13710–13714](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13650-L13655)).
+  The art and timing come from the authenticated USA ROM: images.dat row 424
+  (GRP `00E/0BE`, 68 frames, remapped blue modifier 9), whose Init stream plays
+  frames 0, 17, 34 and 51 for one source tick each and ends. The position is
+  LO kind 5 of the target's main image (Zealot, Dragoon, Probe and Archon share
+  `00D/084`: 17 facing frames of 32 offsets), indexed by the hit direction as
+  `(heading - 124) / 8 mod 32`, so the overlay appears on the side facing the
+  attacker and follows the unit's facing and mirroring. `starcraft/sc64_shield_flash.h`
+  holds the bounded presentation state (eight overlays, a sixteen-entry launch
+  direction ring for queued impacts); nothing is saved or read by the
+  simulation. Hits without a known attacker position (spells, splash, an
+  impact restored from a save) use the target's own facing.
+  `make test-sc64-shield-flash-game` checks the start rule, attacker side,
+  queued direction, slot reuse, expiry and painted pixels. Native N64 overlay
+  ordering against other overlays, and the exact blend, are not traced; the
+  modifier-9 projection is the existing inferred lookup.
 - **Default armor initialization and legacy load, fixed:** The
   non-race profile now stores base armor at spawn and applies the current SIDE
   upgrade once in the hit path. `tests/sc64_default_armor_game.c` compares old

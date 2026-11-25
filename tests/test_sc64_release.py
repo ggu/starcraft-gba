@@ -101,6 +101,24 @@ class ErrorLineTests(unittest.TestCase):
             self.assertEqual(rel.first_error_line(log), "last words")
 
 
+class RamMarginTests(unittest.TestCase):
+    LIMITS = {"__iwram_end": 0x03005000, "__bss_end": 0x0203E000}
+
+    def test_margins_use_the_linker_limits(self):
+        ram = rel.ram_margins_from_symbols("0203a6fc B __bss_end\n03004b78 T __iwram_end\n", self.LIMITS)
+        self.assertEqual(ram["__iwram_end"], {"end": 0x03004B78, "limit": 0x03005000, "margin_bytes": 0x488})
+        self.assertEqual(ram["__bss_end"]["margin_bytes"], 0x0203E000 - 0x0203A6FC)
+
+    def test_hot_rom_is_measured_against_its_own_iwram_limit(self):
+        symbols = "0203a6fc B __bss_end\n03005ae0 T __iwram_end\n03005dc0 A __iwram_hot_limit\n"
+        ram = rel.ram_margins_from_symbols(symbols, self.LIMITS)
+        self.assertEqual(ram["__iwram_end"], {"end": 0x03005AE0, "limit": 0x03005DC0, "margin_bytes": 0x2E0})
+        self.assertEqual(self.LIMITS["__iwram_end"], 0x03005000)
+
+    def test_missing_symbol_gives_no_margins(self):
+        self.assertIsNone(rel.ram_margins_from_symbols("03004b78 T __iwram_end\n", self.LIMITS))
+
+
 class MissingInputTests(unittest.TestCase):
     DATABASE = """\
 # Variables

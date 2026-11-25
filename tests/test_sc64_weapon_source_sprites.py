@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import tempfile
 import struct
 import unittest
 from tools.sc64_construction_sprites import decode_instruction
@@ -23,6 +25,22 @@ AUDIT_SPEC.loader.exec_module(audit)
 
 
 class WeaponSourceSpriteTests(unittest.TestCase):
+    @unittest.skipUnless(source.DEFAULT_ROM.is_file() and
+                         (ROOT / "references/sc64-maps/extract_sc64_maps.py").is_file(),
+                         "requires the private ROM and map extractor")
+    def test_weapon_columns_in_generated_audit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = audit.generate(source.DEFAULT_ROM, Path(directory))
+            report = json.loads(Path(result["out"]).read_text())
+        expected = {name for name, _ in audit.WEAPON_FIELDS}
+        for category in ("units", "buildings"):
+            weapons = [weapon for actor in report[category] for weapon in actor["weapons"]]
+            self.assertTrue(weapons, category)
+            for weapon in weapons:
+                self.assertEqual(set(weapon["weapon_fields"]), expected)
+        reaver = next(actor for actor in report["units"] if actor["raw_unit"] == 83)
+        self.assertEqual(set(reaver["launched_unit_visual"]["weapon_fields"]), expected)
+
     def test_iscript_signal_ordinals_timing_and_call_boundary(self):
         # playframe 0; wait 1; setspawnframe 7; sigorder 1; wait 3;
         # setfldirect 4; call 0x1234.  A call ends this bounded report.
