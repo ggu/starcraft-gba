@@ -1112,7 +1112,9 @@ A fresh N64 Backwater replay queues two Marines and highlights
 `CANCEL LAST` with the first still in production. A removes the
 waiting Marine and leaves the first progress bar and 6/26 supply.
 The mineral counter settles from 156 to 206 before the next mining
-delivery. Both FlashRAM copies agree.
+delivery. Both FlashRAM copies agree. A second fresh run cancels
+the sole active Marine and returns the display to 5/26. An SCV
+delivery overlaps that refund, so the bank cannot isolate it.
 
 On the GBA release, a tap of L while the Barracks is selected refunds
 50 minerals and restarts progress on the remaining Marine. In the
@@ -1124,15 +1126,38 @@ The first Marine completes, and the fresh HOME re-export matches
 the input journal byte for byte. All regular ARM products link with
 their prior EWRAM and IWRAM endpoints.
 
+The combined collision and production changes repeat that result.
+Canceling the sole active Marine on the combined GBA image returns
+the display to 5/26, clears progress, and restores the 200-mineral
+starting bank. Both maps, each player race, and 1–3 CPU seats pass
+54 ordinary Custom Game opening and fresh continuation cases across
+the three products. Wasteland finishes at frame 10,120 and both its
+mid-mission and result journals survive fresh HOME. The Z10 late
+suffix wins at frame 63,523 with the same victory SRAM.
+
+Seven matched 160-update windows compare the combined build with
+the collision release. The captured worlds, camera, entity banks,
+palette, both framebuffers, pause SRAM and reload continuations
+agree throughout. Five isolated update boundaries differ in
+displayed page or pending flip. The Backwater replay separately
+verifies the displayed supply with a waiting order.
+
 The HUD includes the active training order from each producer. The
 admission ledger still includes all paid orders, the 200-supply cap,
-and existing special reservations. Near-cap admission and cancellation
-of the sole active order still need separate native checks.
+and existing special reservations. Near-cap admission still needs
+a separate native check.
 
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 cancellation and settled refund | `66d7bd3869a7700579f834cc3fdfd1bb96dafb2d563fa3e49263e27c0d4bc93a` |
 | GBA ordinary input, HUD and fresh load | `91cf28a95d5239edfea25618cfda67357015ca5d881b32e95cf86fd1bcf80c47` |
+| N64 sole active cancellation | `084ab0772f73cd01930e6330d5c7045e12cce44ab96bcdde04bf68ca2f1165a3` |
+| Combined GBA waiting cancellation | `a7b2e762ca8af2e9c1ad603d7842ed9e88e3063dbebbeca2199baf345181914d` |
+| Combined GBA sole active cancellation | `1fb17b88bec266989cd394ed8d1b77ce22c334309442ddb35c223dc867b30dee` |
+| Combined three-cartridge Custom Game matrix | `7dca9e278514f30bb2c46baa55ddb4169f6ed3f9d693d6c76c0d26c2eb4b11f3` |
+| Combined Wasteland victory and fresh loads | `e67b093d8a4f7b716d9267e325feea733f2ff35c414f795831962e42e8fd7397` |
+| Combined Z10 saved-game suffix victory | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
+| Combined 160-update campaign and skirmish pairs | `8ffb65b96ed79c3fe730f4002fc82e3304e262d38a5406dfcc245aad73a7cc11` |
 
 | Local receipt | SHA-256 |
 | --- | --- |
