@@ -1074,8 +1074,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   69-Pylon Z9 windows. Both framebuffer pages, state and save continuation
   match. The sparse pairs change which page is presented on isolated
   updates. All four links retain their RAM endpoints. The Z10/P10
-  defense-call path uses 56 more static stack bytes. Keep activation
-  pending the composed validation and stack measurement.
+  defense-call path uses 56 more static stack bytes. In eight paired
+  dense Z9 updates, minimum lookup entry SP is 0x030076f8 in the
+  control and 0x030076d8 with the option, leaving 9,944 bytes above
+  the code boundary at the sampled entries. Receipt SHA-256
+  `0ef41b44c8c2004a4503a453751b19f09f3fc9e5677cdf1c760f891f4be9a71e`.
+  Finish the composed check and broader peak stack sampling.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -1085,13 +1089,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   within the budget while 52 individual updates still miss it.
   The [combined renderer and collision pair](audits/2026-11-24-kodak-package-checks.md#compose-the-renderer-and-rom-collision-option)
   saves another 1.03% of mean time in the panned Z10 fight
-  with a higher p95. Keep the collision option off by default.
+  with a higher p95 in that earlier sample.
   The [current contact and movement census](audits/2026-11-24-contact-axis-bias.md#current-paired-frames-and-contact-attribution)
   measures 1.05–2.70% gains in four busy changed-ROM
   windows. Three-CPU frames remain above budget and
-  individual slower frames occur. Both pages and paired
-  worlds agree. Confirm GBA SP frame delivery before
-  enabling it by default. P10 spends 131,466 cycles per
+  individual slower frames occur. The [default-on pairs with the row renderer](audits/2026-11-24-contact-axis-bias.md#default-on-with-the-selection-ring-renderer)
+  match gameplay, both framebuffer pages, all seven pause journals,
+  and fresh continuation. The Wasteland win and the late Z10 victory
+  also replay on the new ROMs. Measure physical GBA SP frame delivery.
+  P10 spends 131,466 cycles per
   sampled update in direct nearest-target queries and
   36,473 in rebuilding the target index. [Per-row occupancy trials](audits/2026-11-24-contact-axis-bias.md#per-row-target-mask-trials)
   raise both costs. Reuse facts from the existing index

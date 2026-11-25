@@ -86,8 +86,9 @@ endif
 CANONICAL_TARGET_POLICY_FLAGS = $(if $(filter 1,$(CANONICAL_TARGET_POLICY)),-DSC64_TARGET_POLICY_PROBE) \
 	$(if $(filter 1,$(CANONICAL_ARMED_TYPE_TABLE)),-DSC64_Z7_ARMED_TABLE_PROBE)
 
-# Compare the early collision bound in speed-optimized ROM kernels.
-CANONICAL_CONTACT_ROM_AXIS ?= 0
+# Use the proven early collision bound in speed-optimized ROM kernels.
+# Set to 0 for matched comparisons on the same prepared inputs.
+CANONICAL_CONTACT_ROM_AXIS ?= 1
 ifneq ($(CANONICAL_CONTACT_ROM_AXIS),0)
 ifneq ($(CANONICAL_CONTACT_ROM_AXIS),1)
 $(error CANONICAL_CONTACT_ROM_AXIS must be 0 or 1)
