@@ -150,11 +150,44 @@ The default original-art ROM is byte-identical with and without this
 change (SHA-256 `cc7340a7…5aed177cda`).
 
 The tables above are from `7316734e` with this change. The branch was
-then merged with `codex/source-release` at `9f6efc04`. On the three
-ROMs built from the merge the twelve captures were repeated: every byte
-again equals the replay through the previous mixer and decoder, the
-three title captures equal those of the `7316734e` ROMs, and each
-window's mean is within 3 cycles of the table.
+then merged with `codex/source-release`, which by then included the
+IWRAM placement lists. The three race ROMs built from that merge link
+through `common/gba_hot.ld`, pass its stack check (304, 592 and 828
+bytes spare; IRQ stack 264 of 416 bytes) and were captured again in the
+six late windows: every byte equals the replay through the previous
+mixer and decoder, and the means are within 40 cycles of the table in
+[With the IWRAM placement lists](#with-the-iwram-placement-lists).
+
+Every other ROM that links the bank was linked from the merge:
+backwater, skirmish, races, Zerg 3, 4, 6, 7 and 8, Protoss 3, 6, 7, 8
+and 9 and the Showcase. Five of them now end IWRAM above the old
+`0x03005000`, so their stack reserve is below the old 11,776 bytes. For
+those five, the placement checker was run on a link through
+`common/gba_hot.ld` with an empty list:
+
+| ROM | IWRAM ends at | Stack bound | Spare below the new reserve |
+| --- | ---: | ---: | ---: |
+| Zerg 6 | `0x03005120` | 5,496 | 5,480 |
+| Zerg 8 | `0x03005030` | 5,424 | 5,792 |
+| Protoss 6 | `0x03005048` | 5,440 | 5,752 |
+| Protoss 9 | `0x03005018` | 5,904 | 5,336 |
+| Showcase | `0x03005078` | 5,504 | 5,640 |
+
+The checker needs the live activations of each call cycle declared.
+Every cycle in these five ROMs is one that the three shipping lists
+declare, or part of one: the building/add-on recursion (fingerprint
+`c1c7a2ed`, 2), the Nydus recursion (`c6a68339`, 2) and the trigger and
+count-cache dispatcher cycles (1). They were declared with those
+counts. That carries the lists' reading of the code over; it was not
+read again for these ROMs.
+
+Not built here because their private inputs are absent from this
+worktree: `verify-sc64` (Wasteland mission data) and `verify-campaign`
+(campaign header).
+
+`make test-unified` on the first merge stopped in `test-unified-hud`,
+which `codex/source-release` fixed in `53cfd74a`. On the current merge
+it passes.
 
 ## IWRAM and the stack
 
@@ -173,9 +206,8 @@ always named, instead of 11,776.
 | ROM text bytes, before | 30,714,840 | 31,511,620 | 31,513,276 |
 | ROM text bytes, after | 30,710,544 | 31,507,324 | 31,508,972 |
 
-The stack bound is the one `tools/gba_iwram_hot.py check` computes on
-the unmerged `claude/iwram-stack-reclaim` branch, run here on these
-ROMs' objects. With its 512-byte margin the tightest ROM needs 8,320
+The stack bound is the one `tools/gba_iwram_hot.py check` computes,
+run on these ROMs' objects. With its 512-byte margin the tightest ROM needs 8,320
 bytes. The lowest address touched is the same before and after.
 
 The interrupt has its own 416-byte stack. Its deepest chain was 264
@@ -193,12 +225,17 @@ the same stack use.
 
 ### With the IWRAM placement lists
 
-`claude/iwram-stack-reclaim` links listed ROM functions into IWRAM and
-checks the stack of the result. A private link of this change with that
-branch's linker script and unchanged lists passes its check on all
-three ROMs and leaves 296 (Terran), 364 (Zerg) and 828 (Protoss) bytes
-spare. Its Terran and Protoss lists already name `audio_mixer_sum` and
-pick up the new function.
+The race cartridges now link listed ROM functions into IWRAM through
+`common/gba_hot.ld` and check the stack of the result
+([placement audit](2026-11-25-iwram-hot-placement.md)). That work was
+still on its own branch when these measurements were taken; a private
+link of this change with its linker script, tool and lists, which
+merged unchanged, passes the check on all three ROMs and leaves 296
+(Terran), 364 (Zerg) and 828 (Protoss) bytes spare. The Terran and
+Protoss lists already name `audio_mixer_sum` and pick up the new
+function. With that link the 0x03005200 guard in `gba.ld` no longer
+applies to these three cartridges; it applies to every other ROM that
+links the bank, and to the `SC64_IWRAM_HOT=0` comparison builds.
 
 | Window | Lists only | Lists and this change |
 | --- | ---: | ---: |
@@ -238,7 +275,7 @@ change.
   replaces.
 - **A separate assembly file.** The first working version kept both
   routines in `common/audio_bank.S`. It measured the same, but the
-  stack check on `claude/iwram-stack-reclaim` needs the compiler's frame
+  placement stack check (`tools/gba_iwram_hot.py`) needs the compiler's frame
   record for every linked function. The bodies are now inline assembly
   in C functions, which costs 24 bytes of IWRAM and passes that check.
 - **A C helper for clipping words.** Calling one from the middle of the
