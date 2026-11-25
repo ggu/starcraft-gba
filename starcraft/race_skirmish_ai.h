@@ -1169,10 +1169,12 @@ static int race_ai_hall(RaceAiCensus *c, int count)
 }
 
 /* Whether holding a hall's price can ever fund it. A Zerg owner with Larva
- * and no ore near any of its halls gains minerals only from the ore its
- * Drones still carry back, so it holds the price only when that cargo and
- * its bank reach it; otherwise it spends what it has and goes all in. Every
- * other owner keeps an income and may always hold. */
+ * and no ore near any of its halls is treated as out of income, as the
+ * all-in rule treats it: it holds the price only when the ore its Drones
+ * already carry back and its unreserved bank reach it; otherwise it spends
+ * what it has and goes all in. Trips to a distant field are not counted:
+ * holding for them would keep the bank above the all-in limit while they
+ * trickle in. Every other owner keeps an income and may always hold. */
 static int race_ai_hall_fundable(const RaceAiCensus *c, int price)
 {
     int bank;
@@ -1182,12 +1184,13 @@ static int race_ai_hall_fundable(const RaceAiCensus *c, int price)
 #else
     return 1;
 #endif
-    bank = race_owner_minerals(c->owner);
+    bank = race_owner_minerals(c->owner) - c->reserve_minerals;
     for (int i = 0; i < MAX_UNITS && bank < price; ++i) {
         const Unit *q = &u[i];
-        /* A Drone walking to a site spends its cargo on the structure. */
-        if (!q->alive || q->owner != c->owner || !sc64_race_is_worker(q->type) || q->carry <= 0 ||
-            q->order == ORDER_BUILD) continue;
+        if (!q->alive || q->owner != c->owner || !sc64_race_is_worker(q->type)) continue;
+        /* A Drone walking to a site spends its cargo on the structure, and
+         * gas or migrated unknown cargo never becomes minerals. */
+        if (q->carry <= 0 || SC64_BUILD_WORKER_ORDER(q->order) || sc64_worker_cargo_is_unknown(q)) continue;
 #ifdef SC64_WORKER_CARGO_KIND
         if (sc64_worker_cargo_is_gas(q)) continue;
 #else
