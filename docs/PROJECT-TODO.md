@@ -36,6 +36,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [fogged-viewport build](audits/2026-11-25-fogged-tracer-viewport.md)
   repeats Terran 1–4, Protoss 1 and 5, and Zerg 2 and 8 from HOME,
   with fresh victory readbacks on all eight runs.
+  [Terran 6–10](audits/2026-11-25-visible-drawing-and-campaigns.md#exact-campaign-checks)
+  also pass with fresh pause and result loads, bringing Terran to nine
+  exact wins on that ROM. The archived T5 route opens pause and hits
+  the restart shortcut at input tick 20,403. A P7 continuation stays active past the
+  old tape's late input boundary with all three Nexuses standing.
+  Update both routes from their last reproducible gameplay states.
   Use the retained ordinary-input tapes to qualify the rest of the
   combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.
@@ -173,6 +179,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The camera sweep into and out of fog matches both pages and tracer
   state on every update. Visible battles remain above budget. Profile
   tracer preparation and packed walk frames while units are in view.
+  The [visible Showcase fight and P7 army](audits/2026-11-25-visible-drawing-and-campaigns.md)
+  put generic sprite drawing at 18.1% of the Showcase sample and
+  about 191k cycles per P7 update. The shared ARM quad and pair trial
+  improves P7 by 1.78% and three Showcase scenes by 1.91–3.95%.
+  Carry it through source and product checks. Profile the remaining
+  body raster and selected-unit ellipse work. P7's Arbiter tick also
+  takes about 182k self cycles per update. The first owner-mask cache
+  increases total loop cost. Pursue cheaper optical list preparation
+  and aura traversal with the existing refresh schedule.
   The [Outpost camera holdout](audits/2026-11-24-kodak-package-checks.md#pan-from-the-base-to-the-outpost-fight)
   moves the same battle into view. Zerg and Protoss now use 325–391k
   tracer cycles per update, roughly half of those inside the watched
