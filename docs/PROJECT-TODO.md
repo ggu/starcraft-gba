@@ -40,6 +40,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   `tools/sc64_skirmish_pack.py` before building. Use `--cover` for
   cover-enabled profiles and their existing generated output path.
 
+- **Next four-player N64 map.** Power Lines (008/055) has four connected
+  starts under the importer’s ground-walkability test, 74 mineral patches
+  and ten geysers on a 128×96 map. Its 361,216 bytes of deduplicated
+  terrain, tile indices and walk flags fit all four current ROMs. Before
+  enabling it, extend the Terran four-geyser limit and the Zerg custom
+  save format’s ten-bit coordinates and 64×64 fog. Check all four starts
+  with ground units and AI expansion in mGBA. Spaced Out (008/050)
+  fails the ground-connectivity test and needs transport-capable opponents.
+
+- **Gas depletion.** The owned Blood Bath scenario assigns 10,000 gas to
+  each of its four geysers. The current map descriptor keeps coordinates
+  only, and the worker code gives eight gas per normal trip. Capture the
+  N64 depleted-trip yield, then implement remaining gas per map site and
+  preserve it through refinery destruction, rebuilding and save/load.
+
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
   `1779e2ef70d4858a599cce2a32249fcaff9fc129e80e30a26fad425879975960`).
