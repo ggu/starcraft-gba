@@ -56,13 +56,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The separate Z5 HOME recording remains active after 3,000 additional
   neutral inputs beyond the end of its tape.
 
+  From the six-chapter save, Z7 also wins at frame 267,585 with all
+  206 observations matching. A fresh load preserves all seven chapter
+  flags (507,907) and reproduces the victory SRAM byte for byte.
+
   Independently, Z7 wins from HOME on this ROM at frame 267,585 with all
   206 checkpoints matching. The fresh-loaded victory advances to Z8.
   The Z8 field save restores at frame 107 with the Z7 completion bit and
-  re-exports byte for byte. Z9 is the remaining intermediate Zerg handoff.
-  The current Z9 recovery produces a crystal and a full-health carrier on
-  the southern approach, but defenders kill it before delivery. The next
-  run should clear the delivery area before committing the carrier.
+  re-exports byte for byte. Z9 now wins from the crystal-spawn save on
+  the packaged ROM. A Mutalisk diversion north of the return location
+  let the Drone deliver the crystal from the south. Loading victory at
+  frame 59,957 advances to Z10. The Z10 frame-101 pause save restores the
+  Z9 completion flag and re-exports byte for byte. Reproduce the Z9
+  opening and delivery on the continuous campaign save.
   Also qualify campaign Overlord transport. The authenticated Z9 scenario
   allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
   default costs). The release exposes that research only in Z6 and
@@ -85,8 +91,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   heroes alive and both objective Nexuses destroyed. The same route
   also wins from HOME. Advancing the linked run to P8 and reloading
   its frame-43 save preserves both P6 and P7 completion bits.
-  Separately, continuing P1's victory into P2 reproduces the P2 win
-  with both completion bits and a byte-identical fresh save readback.
+  Separately, the P1 save clears P2 and P3, with matching checkpoint
+  observations and byte-identical victory readbacks. Its P4 frame-101
+  field save restores the first three completion flags (4,194,316).
 
   A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
