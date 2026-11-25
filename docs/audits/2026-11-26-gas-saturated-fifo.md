@@ -238,3 +238,9 @@ samples per window. The displayed page differed at two Blood Bath and four
 Outpost samples. The stack guard passed with 1,680 bytes spare beyond its
 margin. The baseline Blood Bath pace of 11.84 updates/s rose to 11.97.
 A larger gain requires reducing work beyond fetching these values.
+
+The six-field P10 cartridge also completed both full matches from HOME.
+Outpost won at frame 35,394 (259 checkpoints and 172 after a fresh pause
+load). Blood Bath won at frame 44,163 (499 checkpoints and 345 after a
+fresh pause load). The pause saves and victory saves for both were
+byte-identical to the original trial. Both victories reloaded.

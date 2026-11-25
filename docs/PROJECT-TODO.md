@@ -62,7 +62,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   passed their ARM stack checks (spare bytes after the 512-byte margin:
   Terran 240, Zerg 432, Protoss 816). Measure full-match outcomes and frame
   timing before activation. On the trial all 30 retained result transitions
-  passed, and T10 won from a carried T9 result. In a separate T9 replay
+  passed. The Terran cartridge carried the actual victory save through
+  T7→T8→T9→T10. All 467/53/6 checkpoints and three fresh result reloads
+  matched. [Trial campaign receipt](audits/2026-11-26-fifo-terran-campaign.md). In a separate T9 replay
   the trial extracted 280 gas in 2,048 updates from a site that supplied 528
   on release. Compare paid production, native service cadence, and light
   versus busy scenes before changing the timer. P9 won on the trial from
@@ -85,6 +87,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles on an uninstrumented candidate. Caching six static weapon fields
   saved 1.13% on Blood Bath and 0.33% on Outpost in P10. Prioritize reducing
   the number of target candidates examined and the cost of drawing actors.
+  Of the 12 one- and two-AI cells, 11 have wins with fresh pause and
+  victory reloads. Qualify Protoss Outpost against one Terran with ordinary
+  inputs. [Small-lobby matrix](audits/2026-11-26-gas-fifo-small-skirmishes.md).
   [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
