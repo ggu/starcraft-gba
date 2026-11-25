@@ -323,61 +323,55 @@ PACE_COUNTERS = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", 
 TWO_VBLANK_CYCLES = 2 * 280896
 
 
-def disjoint_pace_budget(rows):
-    """Mean non-overlapping guest-cycle stages, only for advancing world ticks.
-
-    Update and draw timers are inclusive; their children must not be summed
-    twice. Present wait is part of the residual, not independently measured.
-    """
-    if any(type(row.get("world_advanced")) is not bool for row in rows):
-        raise MatchError("pacing sample missing or invalid world_advanced")
-    active = [row for row in rows if row["world_advanced"]]
-    if not active:
-        raise MatchError("the pacing window contains no simulation updates")
-    stages = []
-    for row in active:
-        missing = [key for key in ("cycles", *PACE_COUNTERS) if key not in row]
-        if missing:
-            raise MatchError(f"pacing sample missing counters: {', '.join(missing)}")
-        if any(type(row[key]) is not int or row[key] < 0 for key in ("cycles", *PACE_COUNTERS)):
-            raise MatchError("pacing sample has invalid cycle counters")
-        total, update, draw = (row[k] for k in ("cycles", "demo_update_cycles", "gfx_draw_cycles"))
-        orders, sight, other = (row[k] for k in ("sc64_orders_cycles", "sc64_sight_cycles", "sc64_other_cycles"))
-        background, actors, hud = (row[k] for k in ("sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles"))
-        stage = dict(orders=orders, sight=sight, other_simulation=other,
-                     remaining_simulation=update-orders-sight-other,
-                     map_background=background, actors=actors, hud=hud,
-                     remaining_render=draw-background-actors-hud,
-                     interval_less_update_and_draw=total-update-draw)
-        if any(value < 0 for value in stage.values()):
-            raise MatchError(f"pacing sample has inconsistent nested counters at {row.get('host_tick', '?')}")
-        stages.append(stage)
-    means = {key: statistics.mean(stage[key] for stage in stages) for key in stages[0]}
-    return dict(denominator="advancing world updates", samples=len(active),
-                mean_total_cycles=statistics.mean(row["cycles"] for row in active),
-                nominal_30_fps_cycles=GBA_HZ / 30,
-                two_vblank_cycles=TWO_VBLANK_CYCLES,
-                mean_deficit_to_nominal_30_fps=statistics.mean(row["cycles"] for row in active) - GBA_HZ / 30,
-                mean_disjoint_cycles=means,
-                residual_note="interval less inclusive update and draw; timing boundaries may differ; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
-
-
 def pace_budget_report(rows):
-    """Keep raw pacing usable when a stage breakdown cannot be reconciled."""
-    errors = []
+    """Validate each active sample once; preserve raw results if any disagree."""
+    stages, totals, errors = [], [], []
     for row in rows:
-        if row.get("world_advanced") is False:
-            continue
         try:
-            disjoint_pace_budget([row])
+            if type(row.get("world_advanced")) is not bool:
+                raise MatchError("pacing sample missing or invalid world_advanced")
+            if not row["world_advanced"]:
+                continue
+            missing = [key for key in ("cycles", *PACE_COUNTERS) if key not in row]
+            if missing:
+                raise MatchError(f"pacing sample missing counters: {', '.join(missing)}")
+            if any(type(row[key]) is not int or row[key] < 0 for key in ("cycles", *PACE_COUNTERS)):
+                raise MatchError("pacing sample has invalid cycle counters")
+            total, update, draw = (row[k] for k in ("cycles", "demo_update_cycles", "gfx_draw_cycles"))
+            orders, sight, other = (row[k] for k in ("sc64_orders_cycles", "sc64_sight_cycles", "sc64_other_cycles"))
+            background, actors, hud = (row[k] for k in ("sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles"))
+            stage = dict(orders=orders, sight=sight, other_simulation=other,
+                         remaining_simulation=update-orders-sight-other,
+                         map_background=background, actors=actors, hud=hud,
+                         remaining_render=draw-background-actors-hud,
+                         interval_less_update_and_draw=total-update-draw)
+            if any(value < 0 for value in stage.values()):
+                raise MatchError("pacing sample has inconsistent nested counters")
+            stages.append(stage)
+            totals.append(total)
         except MatchError as exc:
             errors.append(dict(host_tick=row.get("host_tick"), reason=str(exc)))
     if errors:
         return dict(available=False, invalid_samples=len(errors), offending_samples=errors)
-    try:
-        return dict(available=True, **disjoint_pace_budget(rows))
-    except MatchError as exc:
-        return dict(available=False, invalid_samples=0, reason=str(exc))
+    if not stages:
+        return dict(available=False, invalid_samples=0, reason="the pacing window contains no simulation updates")
+    means = {key: statistics.mean(stage[key] for stage in stages) for key in stages[0]}
+    mean_total = statistics.mean(totals)
+    return dict(available=True, denominator="advancing world updates", samples=len(stages),
+                mean_total_cycles=mean_total, nominal_30_fps_cycles=GBA_HZ / 30,
+                two_vblank_cycles=TWO_VBLANK_CYCLES,
+                mean_deficit_to_nominal_30_fps=mean_total - GBA_HZ / 30,
+                mean_disjoint_cycles=means,
+                residual_note="interval less inclusive update and draw; timing boundaries may differ; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
+
+
+def disjoint_pace_budget(rows):
+    """Strict variant for callers that require a reconciled breakdown."""
+    report = pace_budget_report(rows)
+    if not report["available"]:
+        reason = report.get("reason") or report["offending_samples"][0]["reason"]
+        raise MatchError(reason)
+    return report
 
 
 def pace(args) -> dict:
