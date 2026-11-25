@@ -81,6 +81,33 @@ def dependency_paths(dep_file: Path) -> list[Path]:
     return paths
 
 
+_SYSTEM_DIRS: dict[str, list[Path]] = {}
+
+
+def compiler_system_dirs(compiler: str) -> list[Path]:
+    """The compiler's own header search directories (SDK, toolchain), from
+    `clang -E -v`, plus its resource directory. Only files under these count as
+    system inputs."""
+    if compiler not in _SYSTEM_DIRS:
+        result = subprocess.run([compiler, "-E", "-x", "c", "-v", "-"], input="", capture_output=True, text=True)
+        dirs, inside = [], False
+        for line in result.stderr.splitlines():
+            if line.startswith("#include <...> search starts here"):
+                inside = True
+            elif line.startswith("End of search list"):
+                inside = False
+            elif inside:
+                dirs.append(Path(os.path.normpath(line.strip().split(" (")[0])))
+        if not dirs:
+            raise SystemExit(f"could not read the system header directories of {compiler}")
+        # Sanitizer ignore lists and other toolchain data live in the resource dir.
+        resource = subprocess.run([compiler, "-print-resource-dir"], capture_output=True, text=True).stdout.strip()
+        if resource:
+            dirs.append(Path(os.path.normpath(resource)))
+        _SYSTEM_DIRS[compiler] = dirs
+    return _SYSTEM_DIRS[compiler]
+
+
 def include_dirs(command: str) -> list[Path]:
     """The -isystem and -idirafter directories a compile command names. Headers
     found there are left out of -MM output even when generated."""
@@ -106,6 +133,7 @@ def generated_inputs(dep_file: Path, user_deps: Path, command: str = "") -> dict
     file that is missing is an error, never an omission."""
     user = {os.path.normpath(t if os.path.isabs(t) else ROOT / t) for t in dependency_tokens(user_deps)}
     explicit = include_dirs(command)
+    system = compiler_system_dirs(shlex.split(command)[0]) if command else []
     generated: dict[str, str] = {}
     sources: dict[str, str] = {}
     for token in dict.fromkeys(dependency_tokens(dep_file)):
@@ -117,7 +145,11 @@ def generated_inputs(dep_file: Path, user_deps: Path, command: str = "") -> dict
                 target = sources
         except ValueError:
             key = str(named)
-            if key not in user and not any(named.is_relative_to(d) for d in explicit):
+            # Outside the tree, only the compiler's own directories hold system
+            # headers; anything else (an -isystem bank, a sibling it includes)
+            # is hashed as generated.
+            if key not in user and not any(named.is_relative_to(d) for d in explicit) and \
+                    any(named.is_relative_to(d) for d in system):
                 continue
         if not named.is_file():
             raise SystemExit(f"{dep_file}: input {named} is missing; rebuild with make")
@@ -193,6 +225,13 @@ def provenance(binary: Path) -> dict:
     command = record.get("compile_command", "")
     if not command or sidecars[".flags"].read_text().strip() != command:
         raise SystemExit(f"{binary}: its .flags file does not match the command recorded at build; rebuild")
+    # Rediscover dependencies with the recorded command: a header added to an
+    # earlier include directory can shadow a recorded one without touching it.
+    target = str(binary.relative_to(ROOT)) if binary.is_relative_to(ROOT) else str(binary)  # as make named it
+    fresh = subprocess.run(["sh", "-c", f'{command} -M -MP -MT "$1"', "sh", target],
+                           cwd=ROOT, capture_output=True, text=True)
+    if fresh.returncode or fresh.stdout != sidecars[".d"].read_text():
+        raise SystemExit(f"{binary}: its dependencies resolve differently now; rebuild with make")
     now = generated_inputs(sidecars[".d"], sidecars[".mmd"], command)
     if record["inputs"] != now:
         old = {**record["inputs"]["generated"], **record["inputs"]["sources"]}
@@ -318,7 +357,7 @@ def check_trace_complete(trace: Path, report: dict, verify_body: bool = True) ->
                     sequential = False
                 group_frames[line[:2]] = b" ".join(line.split(b" ")[1:3])
                 keyframes.add(line[:2])
-            elif line.startswith(b"F ") and len(keyframes) != 2:
+            elif line.startswith(b"F ") and (len(keyframes) != 2 or group is None):
                 sequential = False
             tag = line.split(b" ", 1)[0].decode("ascii", "replace")
             if tag in counts:
