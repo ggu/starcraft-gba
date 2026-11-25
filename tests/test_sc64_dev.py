@@ -198,6 +198,24 @@ original_prepare = dev.prepare
 original_status = dev.status
 
 class OnboardingTests(unittest.TestCase):
+    def test_bc_readiness_rejects_stale_skirmish_pack(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(dev, 'ROOT', root):
+                for name, marker in dev.BC_MARKERS.items():
+                    path = root / dev.BC_DIR / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(f'#define {marker} 1\n')
+                for path, content in ((dev.BC_BODY_HEADER, '#define SC64_BC_BODY_ART_FORMAT_VERSION 1u\nsc64_race_sprite_science_facility_frame_0_pixels sc64_race_sprite_physics_lab_frame_0_pixels'),
+                                      (dev.BC_YAMATO_HEADER, 'SC64_YAMATO_FRAME_COUNT sc64_yamato_pixels sc64_yamato_light_lut')):
+                    full = root / path
+                    full.parent.mkdir(parents=True, exist_ok=True)
+                    full.write_text(content)
+                self.assertFalse(dev.bc_inputs_ready())
+                with (root / dev.BC_DIR / 'sc64_skirmish_generated.h').open('a') as pack:
+                    pack.write('#define SC64_SKIRMISH_PACK_REVISION 2\n')
+                self.assertTrue(dev.bc_inputs_ready())
+
     def test_construction_readiness_requires_glow_version_and_payload(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'construction.h'
