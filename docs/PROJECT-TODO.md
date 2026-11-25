@@ -19,6 +19,45 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Blood Bath resource layout.** Repacking the verified N64 map restores
+  56 mineral patches, with 32 containing 1,500 minerals and 24 containing
+  3,000. The original pack stopped after assigning eight patches per
+  starting site. The first 32 indices retain their previous coordinates
+  and amounts. New games on all three race ROMs and Showcase matched
+  the source coordinates, amounts and three mineral sprite types in mGBA.
+  Fresh loads restored mined amounts and continued play. Old 32-patch
+  saves re-exported byte for byte on all four ROMs and matched the
+  original builds for 512 further updates. In three-CPU matches with each
+  human race, workers mined a restored patch within 4,500–6,500 updates.
+  All three matches ran for 12,000 updates. Over the final 500 updates,
+  mGBA guest cycles corresponded to 24.55 updates/s on Terran, 17.99 on
+  Zerg and 19.60 on Protoss. These are different battle states. Continue
+  profiling late matches and verify frame cadence on hardware. All 72 lobby
+  launches across the four cartridges, both maps, three human races and
+  one to three independently chosen CPU seats reached gameplay. The
+  running matches retained the chosen races and occupied seats.
+  Regenerate the private skirmish header with
+  `tools/sc64_skirmish_pack.py` before building. Use `--cover` for
+  cover-enabled profiles and their existing generated output path.
+
+- **Next four-player N64 map.** Power Lines (008/055) has four connected
+  starts under the importer’s ground-walkability test, 74 mineral patches
+  and ten geysers on a 128×96 map. Its 361,216 bytes of deduplicated
+  terrain, tile indices and walk flags fit all four current ROMs. Before
+  enabling it, extend the Terran four-geyser limit and the Zerg custom
+  save format’s ten-bit coordinates and 64×64 fog. Check all four starts
+  with ground units and AI expansion in mGBA. Spaced Out (008/050)
+  fails the ground-connectivity test and needs transport-capable opponents.
+
+- **Gas depletion.** The owned Blood Bath scenario assigns 10,000 gas to
+  each of its four geysers. In the N64 emulator, selecting a geyser in a
+  fresh Blood Bath game showed 10,000 gas. Selecting a nearby mineral
+  field after workers started harvesting showed 1,492 minerals. The
+  current GBA map descriptor keeps geyser coordinates
+  only, and the worker code gives eight gas per normal trip. Capture the
+  N64 depleted-trip yield, then implement remaining gas per map site and
+  preserve it through refinery destruction, rebuilding and save/load.
+
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
   `1779e2ef70d4858a599cce2a32249fcaff9fc129e80e30a26fad425879975960`).
@@ -33,7 +72,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and 8,911. The T5 opening reloaded at frame 19,419 with the four
   completion flags (0xf0). That run cleared T5 at frame 145,471 with
   both heroes alive and all enemy buildings destroyed. Fresh SRAM
-  re-exported byte for byte with all five bits (0x1f0). Continue T6.
+  re-exported byte for byte with all five bits (0x1f0). The same save
+  cleared T6 at frame 23,536, T7 at 3,931 and T8 at 139,216. Each
+  victory reloaded and re-exported byte for byte. T8 retains all eight
+  flags (0xff0). Starting with that T8 victory journal, T9 matched the
+  packaged physical reference through victory at frame 47,266. T10 then
+  matched all six checkpoints and won at frame 3,361. A fresh load
+  retained all ten Terran bits (0x3ff0) and reproduced the final SRAM
+  (SHA-256 `49c9e531cd692502487592025127543b57d6d7c2d692f69b648a7bc25865ce6a`).
+  Pressing A retried T10, and a frame-61 pause save reloaded with all ten
+  bits. This completes the continuous ten-mission runs on all three race
+  cartridges in package `5f758095`. T9 averaged 17.74 emulated updates/s
+  and T10 averaged 18.52, including presentation waits and menu input.
+  Late-campaign speed and hardware frame pacing remain priorities.
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
