@@ -125,6 +125,12 @@ on both ROMs. The control used 9,325,541,168 guest cycles (1,902,783 per
 update); the cache used 8,554,350,089 (1,745,430 per update), an 8.27%
 reduction. These are 8.82 and 9.61 emulated main-loop updates per second,
 including presentation waits and UI, not physical-device frame rates.
+An independent per-update counter breakdown over all 4,901 updates
+attributes most of the reduction to movement orders: their mean fell from
+1,212,133 to 1,052,743 cycles and p95 from 3,158,061 to 2,918,886.
+Drawing averaged 426,205 versus 426,193 cycles. Whole-loop p95 fell from
+3,877,437 to 3,624,023 cycles.
+
 Both matched the recorded start and end observations. At 72 sampled cuts,
 semantic summaries, both framebuffer page hashes, palette, display-page
 selection and menu state matched. These samples do not prove all transient
