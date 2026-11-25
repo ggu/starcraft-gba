@@ -367,6 +367,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   trial, reaching 9.61 emulated updates/s with 72 matching sampled
   state and display cuts. Per-update counters put the saving in movement
   orders (1,212,133 to 1,052,743 mean cycles); drawing was unchanged.
+  A Z9 ordinary-input flank continuation also matched 86 state and
+  display cuts and byte-identical pause and fresh-reload SRAM on this
+  Z10 pair; it showed no meaningful timing change.
   The earlier after-#885 trial reduced cycles by
   7.80%, reaching
   8.98 emulated updates/s. A paired ordinary-input Z7 continuation also
