@@ -39,13 +39,20 @@ _Static_assert(sizeof(RaceSave) == 16348 && MAX_BUILDINGS == 160 &&
                "P6 impact envelope must preserve the legacy save and building fields");
 #endif
 
+#if defined(SC64_BUILDING_PAD_IMPACT_SAVE) && defined(SC64_ZERG_CARRIER_PROBE)
+#define SC64_Z10_PADDED_IMPACT_SAVE 1
+#if defined(SC64_PACKED_MINERAL_FIFO)
+#error "Z10 campaign impact padding requires a separate packed FIFO record"
+#endif
+#endif
+
 #ifdef SC64_BUILDING_PAD_IMPACT_SAVE
 #if !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || \
     !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_WORKER_CARGO_KIND) || \
     defined(SC64_Z7_DERIVED_SAVE) || defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
     defined(SC64_P6_PACKED_IMPACT_SAVE) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
     defined(SC64_SCARAB_WEAPON_PROBE) || defined(SC64_SCARAB_NAMESPACE_STAGE) || \
-    defined(SC64_ZERG_CARRIER_PROBE) || defined(SC64_TERRAN_CARRIER_PROBE) || \
+    defined(SC64_TERRAN_CARRIER_PROBE) || \
     defined(SC64_SHOWCASE_CARRIER_PROBE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
     defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || \
     defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || defined(SC64_Q8_FLASH_HOST_STAGE) || \

@@ -531,6 +531,9 @@ race_impact_save_write(void)
 #ifdef SC64_ZERG_CARRIER_PROBE
     ,SC64_ZERG_CARRIER_TAG
 #endif
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+    ,SC64_Z10_IMPACTS_TAG
+#endif
 #ifdef SC64_NUKE_SILO_JOURNAL
     ,SC64_NUKE_SILO_TRANSPORT_TAG
 #endif
@@ -566,15 +569,25 @@ race_impact_save_write(void)
     (void)previous; (void)tags;
     if (!race_q8_flash_write(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
 #else
-    int saved = previous ?
-        save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                            SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG),previous,tags,sizeof(tags)/sizeof(tags[0])) :
-        save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
-                         SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG));
 #ifdef SC64_BUILDING_PAD_IMPACT_SAVE
-    if (padded_impacts) sc64_padded_impact_clear(&race_data);
+    u32 write_tag=SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG);
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+    if (padded_impacts) write_tag=SC64_Z10_IMPACTS_TAG;
 #endif
+    const u32 record_bytes=(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES;
+    int saved=previous ?
+        save_write_selected(&race_impact_record,record_bytes,write_tag,
+                            previous,tags,sizeof(tags)/sizeof(tags[0])) :
+        save_write_first(&race_impact_record,record_bytes,write_tag);
+    if (padded_impacts) sc64_padded_impact_clear(&race_data);
     if (!saved) return 0;
+#else
+    if (previous) {
+        if (!save_write_selected(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
+                                 SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG),previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+    } else if (!save_write_first(&race_impact_record,(u32)sizeof(RaceSave)+bytes+SC64_TRANSPORT_TRAILER_BYTES,
+                                  SC64_FIFO_WRITE_TAG(SC64_SILO_COMMIT_TAG))) return 0;
+#endif
 #endif
 #else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes + SC64_TRANSPORT_TRAILER_BYTES,
@@ -629,7 +642,15 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #endif
 #ifdef SC64_SHARED_TRANSPORT
 #if defined(SC64_WORKER_CARGO_KIND)
-    if ((selected_tag != SC64_TRANSPORT_SAVE_VERSION && selected_tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION) || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+    const int padded_z10=selected_tag==SC64_Z10_IMPACTS_TAG;
+#endif
+    if ((selected_tag != SC64_TRANSPORT_SAVE_VERSION &&
+         selected_tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+         && !padded_z10
+#endif
+        ) || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
     if (selected_tag != SC64_SCARAB_TRANSPORT_SAVE_VERSION || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
 #else
@@ -706,12 +727,22 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #else
     (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
-    if (len == sizeof(RaceSave)) return 1;
+    if (len == sizeof(RaceSave)) {
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+        if (padded_z10) return 0;
+#endif
+        return 1;
+    }
 #ifdef SC64_BUILDING_PAD_IMPACT_SAVE
     unsigned tail_bytes = len - (u32)sizeof(RaceSave);
+#ifdef SC64_Z10_PADDED_IMPACT_SAVE
+    if (padded_z10) {
+        if (race_data.state[0] != 0) return 0;
+#else
     if (tail_bytes >= SC64_BUILDING_PAD_IMPACT_META_BYTES &&
         !memcmp(race_impact_record.impacts, sc64_padded_impact_marker,
                 sizeof(sc64_padded_impact_marker))) {
+#endif
         if (selected_tag != SAVE_VERSION || race_data.version != SAVE_VERSION) return 0;
         rows = sc64_padded_impact_decode(&race_data, race_impact_record.impacts,
                                         tail_bytes, candidate);
