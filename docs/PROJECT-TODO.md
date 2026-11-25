@@ -1057,6 +1057,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Vital meter rows](audits/2026-11-22-dense-release-attribution.md#drawing-filled-vital-cells-in-one-pass)
   cut the selected-actor bar cost by 46.9% and mean Z9 loop time by
   another 2.25%. The two changes together save 4.40% in that window.
+  [Rasterizing complete rings by row](audits/2026-11-22-dense-release-attribution.md#rasterizing-unobstructed-selection-rings-by-row)
+  saves a further 0.62% in Z9 and 0.26–0.72% in five Showcase scenes.
+  Prioritize movement and targeting setup in the dense Custom Game
+  samples. Those core simulation costs are larger and apply throughout
+  a battle.
   The meter-build profile still spends 46,596 cycles per frame in
   Pylon power queries on the dense Z9 sample. Requalify the existing
   [adaptive Pylon buckets](https://github.com/ggu/starcraft-gba/pull/834)
@@ -2148,7 +2153,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pass. Existing Wasteland and Backwater journals display
   one fewer supply with their prior actors intact, and
   Backwater trains a Marine for 50 minerals. Trace the
-  native SCV's first target and order separately.
+  native SCV's first target and order separately. The fresh N64
+  purchase shows 6/26 as soon as the Marine queues, while the current
+  GBA shows 6/26 once the unit finishes. Verify how later queue slots
+  reserve supply before changing the shared HUD and admission rule.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

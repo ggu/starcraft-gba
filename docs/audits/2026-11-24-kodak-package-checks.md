@@ -1076,6 +1076,23 @@ rises to 7/26. The observations cover the paid production
 path on both systems. N64 displays the extra supply at
 queue time. These GBA observations read actual used supply.
 
+A fresh N64 process repeats the saved-game input sequence. Its first
+two frame hashes match the previous run, it renders the 50-mineral
+purchase and the immediate 5/26 to 6/26 supply change, and it shows
+the queue clear after the Marine appears. The SCV's subsequent trips
+lift the post-purchase bank from 206 to 246 with only neutral input.
+Input and output FlashRAM match. The current Terran release and the
+selection-ring candidate agree across four controller-only checkpoints.
+They start at 5/26 supply and 200 minerals, deduct 50 minerals at
+frame 69, and reach 6/26 supply and seven human units with the queue
+clear by frame 569. The bank stays at 150 over that interval. The
+native and GBA pre-purchase banks reflect different mining histories.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Fresh N64 purchase and completion | `c230e0cff5fe4a97fa91ed1250e6fb4a4ef8df4cae7dfdf4cd16e033ecb09654` |
+| Current GBA and renderer candidate checkpoints | `365ce8456c5b5aac9fea1dfcd89320845b53e50402395361dc06139f46230d6e` |
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |

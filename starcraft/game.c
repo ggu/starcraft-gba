@@ -11103,7 +11103,10 @@ draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int parts,
         row_limit -= row_step;
         row_step += 8 * rx_squared;
     }
-    half[ry+1] = 0;
+    if (parts == SELECTION_RING && !cover) {
+        gfx_ellipse_outline_rows(x, y, half, ry, 12, 120, color);
+        return;
+    }
     /* Each row joins its edge to the next row's so the outline has no gaps. */
     for (int dy = 0; dy <= ry; ++dy) {
         int hi = half[dy], lo = dy == ry ? 0 : half[dy+1] + 1;
