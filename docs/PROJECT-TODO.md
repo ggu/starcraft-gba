@@ -67,7 +67,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   custom games. Verify mission permissions, paid research, cargo, and
   SRAM continuation before relying on an airlift for this objective.
 
-- **Packaged Protoss campaign.** A regenerated P8 controller tape
+- **Packaged Protoss campaign.** P6 wins at frame 92,986 after all 105
+  checkpoints, six briefing pages and 17 dialogue pages match the
+  regenerated route. The full run averages 16.81 emulated updates/s.
+  It saves and reloads during play, and the victory SRAM re-exports
+  byte for byte after fresh HOME
+  (`b01855f7314bdc8f5eb017caefa434f6821cc488e8df54bc30832b818bcef031`).
+  P7 then saves and reloads at frame 13 with the P6 completion bit.
+
+  A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
   Protoss10 ROM. After 100,630 inputs the stasis cell is gone, all three
   trigger runners are free of faults, and victory registers at frame
