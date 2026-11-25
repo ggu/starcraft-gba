@@ -2013,6 +2013,9 @@ static void race_skirmish_init(void)
         for(i=0;i<geyser_count;i++){geysers[i].x=map->geysers[i].x;geysers[i].y=map->geysers[i].y;}
     }
 #endif
+#ifdef SC64_SOURCE_GAS
+    sc64_gas_start();
+#endif
     for (i = 0; i < race_bots && i < 3; ++i)
         race_player[race_bot_owner_ids[i]] =
 #ifdef SC64_IMPORTED_SKIRMISH

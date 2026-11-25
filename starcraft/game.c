@@ -8150,6 +8150,9 @@ add_owner_resources(int owner, int ore, int vespene)
 }
 #endif
 
+#ifdef SC64_SOURCE_GAS
+#include "sc64_source_gas.h"
+#endif
 #include "sc64_worker_minerals.h"
 
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
@@ -8280,7 +8283,11 @@ race_update_resource_worker(Unit *q)
         if (q->carry <= 0) q->order = ORDER_IDLE;
 #endif
     } else {
+#ifdef SC64_SOURCE_GAS
+        q->carry = sc64_gas_harvest(tx, ty);
+#else
         q->carry = 8;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
         if (IS_WORKER(q->type)) q->flags = (q->flags & ~SC64_WORKER_CARGO_MASK) | SC64_WORKER_CARGO_GAS;
 #endif
@@ -9499,7 +9506,9 @@ target_lists_unavailable:
 	    } else {
 		/* OpenBW bwgame.h gather_resource: a normal gas trip carries 8,
 		 * like minerals; depleted geysers (not yet modelled here) yield 2. */
-		#ifdef SC64_RACES
+		#ifdef SC64_SOURCE_GAS
+		q->carry = sc64_gas_harvest(tx, ty);
+		#elif defined(SC64_RACES)
 		q->carry = 8;
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
