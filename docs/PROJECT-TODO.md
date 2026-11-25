@@ -101,7 +101,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mission saves and reloads with the same frame and completion mask.
   Z1–Z6 and Z8 pass the corresponding transitions. The three finales retry
   the final chapter with A and preserve its completion bit through a new
-  pause save. Repeat these checks from retained victory SRAM with
+  pause save. The new T5 victory also advances into T6 and reloads at
+  frame 101. On T9 the strict historical comparison first diverges at
+  input 15,000 (198 minerals and 70 gas versus 498 and 270). The same
+  buttons still finish the mission at frame 47,266 with a fresh pause
+  reload during play and a byte-identical victory readback. The diagnostic
+  replay recorded the differing checkpoints and kept the terminal objective
+  and save checks active. Repeat these checks from retained victory SRAM with
   `python3 tools/sc64_chapter_transition.py --help` for the required paths.
   Continue Z7 and Z9 transitions and full campaign runs. Recorded P2, Z4
   and Z5 inputs currently leave the mission active, and the historical Z3
