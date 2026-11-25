@@ -82,7 +82,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   11.84–18.52 updates/s. In Protoss Blood Bath, the instrumented orders
   averaged 206k cycles in nearest-enemy queries, 138k in movement and
   113k in setup. Prioritize these with actor drawing and measure total
-  cycles on an uninstrumented candidate.
+  cycles on an uninstrumented candidate. Caching six static weapon fields
+  saved 1.13% on Blood Bath and 0.33% on Outpost in P10. Prioritize reducing
+  the number of target candidates examined and the cost of drawing actors.
   [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 

@@ -215,3 +215,26 @@ samples 55, 58 and 66 both raw bitmap pages and the palette were identical;
 the builds displayed opposite pages at the debugger sampling instant.
 `tools/sc64_custom_full_match.py pace` now emits these optional order
 counters in the per-update rows when the ELF contains them.
+
+### Static weapon profiles on P10
+
+Two private builds of the same trial cartridge precomputed values by calling
+the existing stock rules with the P10 build's feature flags for every one of
+its 54 unit types. The first cached whether either weapon can deal damage.
+The second cached base damage, ground and air damage, range, cooldown and
+air eligibility for valid types. Values included 500 damage and 384 range,
+so the six-field trial used 16-bit entries. Out-of-range types continued
+through their original helpers. These experiments left release rules alone.
+
+| 512-call window | Baseline guest cycles | Armed lookup | Six-field profile | Baseline / six-field p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Protoss Blood Bath | 725,496,513 | 722,222,057 | 717,328,451 | 1,929,050 / 1,900,056 |
+| Protoss Outpost | 600,506,691 | 598,809,994 | 598,533,931 | 1,422,463 / 1,417,389 |
+
+The six-field build saved 1.13% and 0.33% of elapsed cycles respectively.
+It passed all eight and three replay checkpoints, with matching final world
+fingerprints and matching raw bitmap pages and palette at every one of 513
+samples per window. The displayed page differed at two Blood Bath and four
+Outpost samples. The stack guard passed with 1,680 bytes spare beyond its
+margin. The baseline Blood Bath pace of 11.84 updates/s rose to 11.97.
+A larger gain requires reducing work beyond fetching these values.
