@@ -19,10 +19,20 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Zealot native vitals.** The shared ordinary Zealot uses 80 HP and 80
-  shields. Campaign CHKs use defaults and a retained native CUnit confirms
-  the values; broader native runtime and gameplay comparisons remain to run.
-  Old-save migration moves HP over 80 into available shields.
+- **Zealot native vitals.** All 30 original campaign maps select the
+  ordinary Zealot defaults. Two completed Zealots in retained native
+  Blood Bath states had 80 HP and 80 shields. The shared rule uses
+  80/80 for raw 65. Older saves transfer HP above 80 into shields.
+  On the integrated race cartridges, fresh mGBA loads restored 51
+  Zealots across two Terran 9 saves, 30 in a Zerg 10 save, and 47
+  across three Protoss saves. All eight tested saves, including two
+  without Zealots, could be saved and reloaded again. The 72 skirmish
+  lobby combinations launched with the expected map, race and seats.
+  The retained Protoss 7 late assault won at frame 80,810 and its
+  victory save survived a fresh load. In Zerg 10, the old controller
+  tape first differed at frame 8,354 and later restarted the mission.
+  Verify the full campaign route using inputs chosen for the new
+  battle state before promoting the change.
 
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
@@ -1939,8 +1949,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored
   current HP of older colonies and complete an older pending morph at
-  400 HP. Qualify Zealot HP and shields (80 each) against profile
-  overrides and the existing unit save representations.
+  400 HP. Zealot save compatibility and remaining campaign replay work
+  are tracked under current integration priorities.
   [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
   [Protoss opening Battery audit](audits/2026-11-20-protoss-battery-opening.md)
   [Native Cannon census](audits/2026-11-19-n64-skirmish-ai.md#protoss-cannon-opening)
