@@ -72,7 +72,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   update in `move_toward`, 9,885 in automatic targeting, and 12,406
   in tracer drawing on matched frames. Prioritize movement there.
   The draft monotone route witness lowers mean frame cycles by 2.25%
-  on this cut and needs broader race build, pacing and save checks.
+  here and 0.58% in a separate P10 Outpost cut. The Z10 release has
+  no active monotone probe. Keep the witness in draft while checking
+  Z10 integration, long-run pacing and saves.
   Keep targeting as a separate priority for Outpost.
   [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
   lowers the visible P7 and Z9 frame means by about 0.9–1.0%

@@ -316,8 +316,10 @@ tile renderer's dirty, draw and art masks.
 
 The control is the released supply build at `2ea65bcd`. Recovered
 and retained build inputs reproduce all four control ROMs byte for
-byte. All four candidate links retain their IWRAM and EWRAM endpoints
-and pass the existing memory guards. The three race candidates pass
+byte. The toolchain doctor, default build and full asset-free suite
+pass on the combined code. The Python batch runs 1,183 tests with
+35 skips. All four candidate links retain their IWRAM and EWRAM
+endpoints and pass the existing memory guards. The three race candidates pass
 144 ordinary Custom Game opening, pause and fresh continuation
 cases across both maps, each human race and one to three opponents.
 The additional 90 cases cover the four occupied seat patterns absent
@@ -409,7 +411,11 @@ updates match their sampled world and video outputs. Mean frame
 cost falls from 807,142 to 788,972 cycles (2.25%). The largest
 individual cost increase is 30,062 cycles. All 32 still exceed the
 budget. A read-only replay counts 63 witness hits in 124 monotone
-queries. Keep this result scoped to the visible Terran workload.
+queries. A separate 96-update P10 Outpost pair lowers mean cycles
+from 1,063,343 to 1,057,178 (0.58%) with matching worlds, video and
+byte-identical fresh save continuation. The Z10 release does not
+build the monotone probe. Adding only the witness flag there
+reproduces the original Z10 ROM byte for byte.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -421,3 +427,4 @@ queries. Keep this result scoped to the visible Terran workload.
 | Monotone route attribution | `29c69f0f452168193bf40b57063a130fcac200b709f1ac907e956cc92b99d6a8` |
 | Contact reuse candidate, 32 visible updates | `4091d35d8c47039fbcdfb4249e0eaa7dc80556bfda97bdca55aa585e3f5473d4` |
 | Monotone witness candidate, 32 visible updates | `6f97555edf180785c0569ff1ef7921004b663ab90ce672d06f66a951cb59f52d` |
+| Monotone witness P10 Outpost, 96 updates and fresh save | `bd602673f9df39cbb7fe220b13ddeecb2b31bf53a397520a83309e2f04292538` |
