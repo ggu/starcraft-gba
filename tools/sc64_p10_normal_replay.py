@@ -11,12 +11,13 @@ import resource
 import shutil
 import struct
 
+from sc64_protoss_observe import observe_p10
 import sc64_p8_arm_replay as px
 from sc64_carrier_release_physical import slot
 from sc64_p8_physical_save import P10_CARGO_TAGS, SLOT_SIZE
 from sc64_p10_tape_save import join_timing, save_window
 from sc64_races_profile import dwarf_struct_layout
-from sc64_skirmish_sram_continuation import BUILDING_FIELDS, UNIT_FIELDS, KEY_L, PhysicalGame
+from sc64_skirmish_sram_continuation import KEY_L, PhysicalGame
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 def main():
@@ -32,7 +33,8 @@ def main():
     if args.fresh_save:
         resource.setrlimit(resource.RLIMIT_FSIZE, (16 * 1024**2, 16 * 1024**2))
     files = (args.trace, args.rom, args.elf, args.runner, Path(__file__),
-             Path(__file__).with_name('sc64_p10_tape_save.py'))
+             Path(__file__).with_name('sc64_p10_tape_save.py'),
+             Path(__file__).with_name('sc64_protoss_observe.py'))
     pins = input_hashes(files)
     px.MISSION, px.PREFIX = 29, 'P10'
     plan = px.load_trace(args.trace)
@@ -64,8 +66,6 @@ def main():
                 checks[tick + 2].append(dict(row, kind='modal_released'))
     print('Validated', plan['stop'], 'ordinary calls and', len(keys), 'held-key changes', flush=True)
 
-    u = {k: i + 1 for i, k in enumerate(UNIT_FIELDS)}
-    b = {k: i + 1 for i, k in enumerate(BUILDING_FIELDS)}
     campaign = dwarf_struct_layout(args.elf, 'Sc64RaceCampaignState')[1]
     runtime = dwarf_struct_layout(args.elf, 'Sc64P10PersistentState')[1]
     runner_size, runner = dwarf_struct_layout(args.elf, 'Sc64P10Runner')
@@ -114,18 +114,7 @@ def main():
         return struct.unpack('<4H', r.read(0x06013FE0, 8))
 
     def observe():
-        s = g.state()
-        units, buildings = s['units'], s['buildings']
-        def hero(raw):
-            return next(([x[u['owner']], x[u['hp']]] for x in units if x[u['raw_type']] == raw), [-1, -1])
-        return dict(frame=s['frame'], screen=s['screen'], won=n('won'), lost=n('lost'),
-                    side_units=sum(x[u['owner']]==0 for x in units),
-                    scvs=sum(x[u['owner']]==0 and x[u['raw_type']]==7 for x in units),
-                    enemy_units=sum(x[u['owner']]==1 for x in units),
-                    enemy_buildings=sum(x[b['owner']]==1 for x in buildings),
-                    overmind_hp=next((x[b['hp']] for x in buildings if x[b['raw_type']]==147), -1),
-                    zeratul=hero(75), gantrithor=hero(82), hyperion=hero(28),
-                    bank=[s['minerals'], s['gas']], cursor=[n('cx'), n('cy')])
+        return observe_p10(g, n)
 
     briefing, pages, observations = [], [], []
     try:
