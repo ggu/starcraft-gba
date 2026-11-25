@@ -254,3 +254,13 @@ release still loaded frame 10,257 from the older journal bank. After a
 second ordinary trial save, the previous release stayed on HOME when L was
 pressed. Both banks then used the trial format. For rollback, restore the
 original backup alongside the previous ROM.
+
+## Integration with the packed-building option
+
+At `6a5da57e` (including release PR #915), rebuilding with the gas trial
+off produced byte-identical regular P10, Z10, Terran and Showcase release
+ROMs. With the gas trial on and packed Protoss base buildings at their
+default setting, all four ROMs matched the trial hashes above. Three race
+stack guards, their service fixtures and the malformed-journal fixture
+passed. This supports merging the opt-in implementation. Changing the
+default economy remains a separate gameplay decision.
