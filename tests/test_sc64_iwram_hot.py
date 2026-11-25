@@ -35,6 +35,27 @@ def cycles(result, key):
     return [(c["kind"], c["functions"]) for c in result[key]]
 
 
+ASM_STATEMENT = re.compile(r"\b(?:__asm__|asm)\s*(?:volatile\s*)?\(")
+ASM_FORBIDDEN = re.compile(r"(?i)\b(sp|r13|pc|r15)\b|\b(push|pop|swi|svc|blx)\b|\bbx\b(?!\s+lr\b)")
+
+
+def asm_violations(text):
+    """(asm blocks with instructions, offending bodies) in C source text."""
+    blocks, bad = 0, []
+    for match in ASM_STATEMENT.finditer(text):
+        depth, end = 1, match.end()
+        while depth and end < len(text):
+            depth += {"(": 1, ")": -1}.get(text[end], 0)
+            end += 1
+        body = " ".join(re.findall(r'"((?:[^"\\]|\\.)*)"', text[match.end():end]))
+        if not body.strip() or re.fullmatch(r"\w+", body.strip()):
+            continue        # an empty barrier, or a register name in `register ... asm("r1")`
+        blocks += 1
+        if ASM_FORBIDDEN.search(body):
+            bad.append(body[:80])
+    return blocks, bad
+
+
 def symtab(rows):
     """`readelf -s -W` text from (address, size, type, bind, name) rows."""
     head = "   Num:    Value  Size Type    Bind   Vis      Ndx Name\n"
@@ -629,27 +650,30 @@ class LinkerScriptTest(unittest.TestCase):
                              len(re.findall(r"0x03007ffc\s*=\s*\(u32\)\s*\w+", text, flags=re.I)), path)
         self.assertEqual(stored, set(hot.IRQ_HANDLERS))
 
-    def test_inline_assembly_leaves_the_stack_and_control_flow_alone(self):
-        """Stack moved or calls made inside an asm statement have no frame or
-        call-graph record, so the stack bound cannot see them."""
+    def test_inline_assembly_never_moves_the_stack_pointer(self):
+        """Stack moved inside an asm statement or a naked function has no
+        frame record, and a call through a register made there has no
+        call-graph record, so the stack bound cannot see either. A direct
+        `bl label` is fine: the check reads it from the ELF."""
         blocks = 0
         for path in [*(ROOT / "common").glob("*.[ch]"), *(ROOT / "starcraft").glob("*.[ch]")]:
-            text = path.read_text(errors="replace")
-            self.assertNotRegex(text, r"__attribute__\s*\(\(\s*naked", path)
-            for match in re.finditer(r"\b(?:__asm__|asm)\s*(?:volatile\s*)?\(", text):
-                depth, end = 1, match.end()
-                while depth and end < len(text):
-                    depth += {"(": 1, ")": -1}.get(text[end], 0)
-                    end += 1
-                body = " ".join(re.findall(r'"((?:[^"\\]|\\.)*)"', text[match.end():end]))
-                if not body.strip():
-                    continue        # an empty barrier such as asm("" ::: "memory")
-                blocks += 1
-                # No stack, link or program-counter register, no push/pop, no call, no software interrupt.
-                self.assertNotRegex(
-                    body, r"(?i)\b(sp|r13|lr|r14|pc|r15)\b|\b(push|pop|blx?|bx|swi|svc)\b|"
-                          r"\bbl(eq|ne|cs|hs|cc|mi|pl|vs|vc|hi|ge|gt|al)\b", f"{path}: {body[:80]}")
+            found = asm_violations(path.read_text(errors="replace"))
+            blocks += found[0]
+            self.assertEqual(found[1], [], path)
         self.assertGreater(blocks, 0)
+
+    def test_the_assembly_lint_catches_what_it_must(self):
+        ok = '''register u32 step __asm__("lr") = 4;
+            __asm__ volatile("1: ldmia %[src]!, {r2, r3}\\n bl helper\\n subs r1, r1, #1\\n bne 1b"
+                             : : : "r2", "r3", "lr", "cc", "memory");
+            static void __attribute__((naked)) clip(void) { __asm__("cmp r0, r1\\n bx lr\\n"); }
+            __asm__ volatile("" ::: "memory");'''
+        self.assertEqual(asm_violations(ok), (2, []))
+        for bad in ('__asm__("push {r4, lr}\\n pop {r4, pc}");', '__asm__("sub sp, sp, #256");',
+                    '__asm__("stmfd r13!, {r4-r11}");', '__asm__("mov lr, pc\\n bx r3");', '__asm__("blx r2");',
+                    '__asm__("swi 0x60000");', '__asm__("ldr pc, [r0]");', '__asm__("str r0, [sp, #-4]!");',
+                    '__asm__("bx      r3");'):
+            self.assertTrue(asm_violations(bad)[1], bad)
 
     def test_stack_pointers_match_the_reset_code(self):
         start = (ROOT / "common" / "start.s").read_text()
