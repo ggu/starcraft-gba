@@ -2,6 +2,8 @@
 
 Six paired three-AI HOST authors used the canonical Custom Game controller and the same settings within each pair, with ordinary gas assignment enabled. Stock uses the existing multi-worker gas timing; the candidate enables `SC64_GAS_SERVICE_TRIAL`. The candidate was built from `528d9082`; its differences from the requested `b10ae9cf` concern journal handling and tests, not normal simulation. The paired runs are separate evolving matches: once behavior differs, neither resource balances nor match outcomes isolate a single causal mechanism.
 
+The authored settings match within each pair, but Blood Bath draws its start order from guest timing. The actual ROM-probed start orders differ between stock and FIFO despite identical lobby waits: Terran 54 → 57, Zerg 114 → 120, and Protoss 114 → 120. Outpost has no randomized order (0 in both builds). Consequently the Blood Bath outcomes and resource totals are also confounded by different spawn assignments and do not isolate the gas rule.
+
 Both maps and all three human races were covered. All 12 original authors produced positive human gas-bank checkpoints. Eleven original traces reached and replayed real ARM results; the twelfth stalled. Two additional alternate-plan traces also reached and replayed real ARM results. At the nearest checkpoint before frame 12,000, an independent ordinary-input ARM run matched each author's full worker rows, refinery rows, site coordinates and depletion, and all four owners' ore/gas banks, after 99–140 matching prior checkpoints. These cuts are not a full unit-state comparison at every update. Raw inputs and captures remain local; no game assets are included here.
 
 | Human / map / opponents | Stock outcome, frame | FIFO outcome, frame | Total site depletion stock → FIFO near frame 12,000 |
@@ -47,6 +49,25 @@ The following SHA-256 values pin each authored input tape (stock / FIFO). The tw
 | Protoss / Outpost | `42ea51caa73faed29258cdb9427388a662e87487b9926dca9e0b061444939e69` | `35f918e15d84dee61a54a8ecc98bc4bee951b8d56f3f06e72a46a6205db6861f` |
 | Protoss / Blood Bath | `480271d09d10155232cfbffbce42a26a207911fae677f50344a723a4820145f0` | `978306da9d59398b09694730578c1d13de79b9898693472bb613c46fa3ecca78` |
 | Protoss / Outpost / alternate | `7859e9348318dd27d75e15b3160d53586da2e0722019e2719666a369056131a2` | `b8fa8b2480c6fa7ef081dfb8de8f9dc943fa06c4d46b68fe611598c4ec35a716` |
+
+## Updated FIFO controller routes
+
+These ordinary-input HOST controller settings were selected after the preceding FIFO losses. Each also passed a strict physical-input ARM replay, a fresh pause-save continuation, and a fresh victory-result reload with unchanged victory SRAM. Each has positive gas-bank checkpoints; the gas policy itself was not disabled. These wins qualify the individual routes, not balance across starts or plans.
+
+| Human / map / opponents | FIFO start order | Result frame | Full / fresh-load checks | Plan |
+| --- | ---: | ---: | ---: | --- |
+| Zerg / Outpost / TZP | 0 | 28,301 | 243 / 53 | `LINE=38,WORKERS=12,FIRST_ATTACK=4500` |
+| Terran / Blood Bath / ZPT | 57 | 24,758 | 289 / 141 | `LOBBY_WAIT=8,FIRST_ATTACK=3500,PRODUCERS=3,WORKERS=10,EARLY_WORKERS=14,TECH_AFTER=2,LAB_AFTER=12,ATTACK_MIN=10,ATTACK_RATIO=2,ATTACK_MARGIN=2,SUPPORT_RATIO=3,GROW_FRAME=2000` |
+| Protoss / Blood Bath / TZP | 201 | 44,163 | 499 / 345 | `LINE=66,TECH_FRAME=8000,LOBBY_WAIT=13` |
+
+Zerg Outpost is fixed-start and the Terran route keeps the original FIFO Blood Bath order 57. The Protoss route uses order 201 rather than the original FIFO order 120: its lobby wait changed from 18 to 13. For the original order 120, 360 randomized HOST controller variants lost; the search is not exhaustive and is not ARM evidence for those variants. The prior Protoss loss and the other original-plan outcomes remain valid observations.
+
+The tuned input tape SHA-256 values, in table order, are:
+- Zerg / Outpost / TZP: `8874deec01a90f2c0b76d37193bdb9d48bfd4033706c9ff948790222847d42db`.
+- Terran / Blood Bath / ZPT: `aedfd89f34eceabdd48e451be2aa222f6ff2634a5159a606f83bf90a13d33688`.
+- Protoss / Blood Bath / TZP: `86903f0f4a84f2e51064b278c9413b30b3c44ac0be6b32960a02f1aae59b2e09`.
+
+The local replay receipts, selected HOST plans, search logs and tapes remain under `/private/tmp/sc64-gas-economy-artifacts/tuned`.
 
 ## Scope and follow-up
 
