@@ -74,3 +74,17 @@ The local replay receipts, selected HOST plans, search logs and tapes remain und
 A win replay uses the canonical physical-button tool: it checks recorded world/owner/bank observations throughout, exports the battle pause, continues from that save in a fresh process, compares the later checks and victory SRAM, and reloads the victory result. Loss traces use the same physical input and checkpoint comparator through the actual loss RESULT; the win-only canonical replay does not test loss save continuation. A low gas bank can reflect real spending, while an observed site-depletion difference can reflect different worker assignments, destruction or ownership after the games diverge. These matches alone are not proof of native fidelity or a balanced change.
 
 Follow up with native N64 measurements at a lightly staffed site and a busy saturated site: track arrival order, concurrent occupant/timers, cargo delivery, site depletion, and paid tech/army benefits using comparable starting states. Separately extend FIFO and stock cartridge qualification across additional plans, human races and maps, with exact frame and save-continuation evidence; retain the full input tapes and per-check snapshots.
+
+## Blood Bath matched starts
+
+The original Blood Bath pairs above used the same lobby configuration and controller plans, but the stock and FIFO lobby start orders differed (Terran 54 versus 57; Protoss and Zerg 114 versus 120). To control that difference, new FIFO traces adjusted only the initial lobby wait until the stock start order, player and bot owner/race assignments matched. The human controllers use the same plan as their stock counterparts; their later inputs respond to their independently evolving worlds. This is an additional controlled-start comparison, not an identical-input or balanced-game proof.
+
+| Human / opponents | Matched order | Stock ARM result | Original FIFO ARM result, different order | Matched FIFO ARM result | Matched FIFO checks |
+| --- | ---: | --- | --- | --- | ---: |
+| Terran / ZPT | 54 | Win, 26,861 | Loss, 41,190 | Loss, 21,283 | 255 |
+| Protoss / TZP | 114 | Win, 39,650 | Loss, 14,857 | Loss, 21,076 | 207 |
+| Zerg / ZZZ | 114 | Win, 68,369 | Win, 81,312 | Loss, 63,923 | 673 |
+
+The matched results replayed the HOST-generated physical buttons on the FIFO ARM cartridges from HOME, matching each recorded checkpoint and the actual loss RESULT screen. The loss verifier does not claim save continuation or result reload. The stock wins are the fully qualified original results described above. The trial cartridge is from `528d9082`; lobby waits differ across the pair to match start order. Each result remains one controller plan and one starting arrangement, and changed outcomes do not by themselves isolate the cause of later match divergence.
+
+Matched FIFO trace SHA-256: Terran `52305dfb2f21a8d3bf29c4e5773cc303bc72cc0c22fa1731fea7131de72c5cf0`; Protoss `894e553ecf4b12c9d905d1eadd5bc76c6d9f6debb8c12490f2cb669c755738aa`; Zerg `ded1da2f1cb6ceeb7a66f488afc34ce8c0d7b79fd6333973412948283f8dffce`. The pinned products, input traces and replay receipts are retained locally; no cartridge assets are committed.
