@@ -96,6 +96,15 @@ int main(void)
      * A loaded Overlord cannot borrow live research or accept malformed jobs. */
     assert(race_sk_transport_candidate_valid(&race_data));
     assert(race_skirmish_saved_transport(&race_data, &u[overlord]));
+    /* Source denies this upgrade to the human in Z1-Z3 and Z5. */
+    const int denied_missions[] = { 0, 1, 14, 16 };
+    int saved_mission = race_data.state[2];
+    for (unsigned i = 0; i < sizeof(denied_missions) / sizeof(denied_missions[0]); ++i) {
+        race_data.state[2] = denied_missions[i];
+        assert(!race_sk_transport_candidate_valid(&race_data));
+        assert(!race_skirmish_saved_transport(&race_data, &u[overlord]));
+    }
+    race_data.state[2] = saved_mission;
     Sc64SkTransportTech valid_candidate = race_skirmish_transport_candidate;
     race_skirmish_transport_candidate.owner[0].researched = 0;
     assert(!race_skirmish_saved_transport(&race_data, &u[overlord]));
