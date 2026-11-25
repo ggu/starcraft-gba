@@ -73,11 +73,11 @@ struct Probe final : ares::Platform {
           button==cLeft?32u:button==right?64u:button==r?128u:
           button==cRight?256u:button==cUp?512u:button==cDown?1024u:0u;
       bool pressed=sc64_button_pressed(id,m);
-      if(id) { std::lock_guard lock(mutex); if(inputEvents.size()>=131072) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),id,pressed?1:0}); }
+      if(id) { std::lock_guard lock(mutex); if(inputEvents.size()>=262144) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),id,pressed?1:0}); }
       button->setValue(pressed);
     } else if(auto axis=node->cast<ares::Node::Input::Axis>()) {
       int value=axis==xAxis?axisX.load():(axis==yAxis?axisY.load():0);
-      if(axis==xAxis || axis==yAxis) { std::lock_guard lock(mutex); if(inputEvents.size()>=131072) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),axis==xAxis?8u:16u,value}); }
+      if(axis==xAxis || axis==yAxis) { std::lock_guard lock(mutex); if(inputEvents.size()>=262144) { failed=true; failure="input event budget exceeded"; } else inputEvents.push_back({step.load(),axis==xAxis?8u:16u,value}); }
       axis->setValue(value);
     }
   }
@@ -194,7 +194,7 @@ int main(int argc,char** argv) {
     if(!capture) { std::cout<<"OK "<<completed<<std::endl; continue; }
     std::unique_lock lock(p.mutex);
     p.cv.wait_for(lock,std::chrono::seconds(5),[&]{return p.failed || p.frames.size()>previous;});
-    if(p.failed || p.frames.size()>previous+1) { std::cerr<<"snapshot failure\n"; return 6; }
+    if(p.failed || p.frames.size()>previous+1) { std::cerr<<"snapshot failure: "<<p.failure<<"\n"; return 6; }
     if(p.frames.size()==previous) { p.forceCapture=false; std::cout<<"NOFRAME "<<completed<<std::endl; continue; }
     auto &f=p.frames.back(); auto bytes=f.pixels.size()*sizeof(std::uint32_t);
     char name[32]; std::snprintf(name,sizeof(name),"live-%03zu.argb",p.frames.size()-1);

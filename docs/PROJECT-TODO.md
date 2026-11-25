@@ -58,6 +58,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory journal byte for byte through fresh HOME.
   Re-qualify the remaining missions on the combined Terran, Zerg and
   Protoss package. Continue native parity and GBA SP timing.
+  [Native Protoss supply](audits/2026-11-25-waiting-training-supply.md#native-protoss-follow-up)
+  now has paired idle refusal and paid waiting at 9/9. The packaged
+  P10 build repeats idle refusal, fresh-load queue persistence and
+  resumption after Pylon completion. Verify native Pylon recovery.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
@@ -76,7 +80,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The draft monotone route witness lowers mean frame cycles by 2.25%
   here and 0.58% in a separate P10 Outpost cut. The Z10 release has
   no active monotone probe. Keep the witness in draft while checking
-  Z10 integration, long-run pacing and saves.
+  Z10 integration, long-run pacing and saves. Enabling the monotone
+  probe alone on Z10 adds 56 IWRAM bytes and exceeds the stack guard
+  by 8 bytes. It also bypasses point-field cache insertion on successful
+  probe misses. Review the resulting route behavior before enabling it.
   Keep targeting as a separate priority for Outpost.
   [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
   lowers the visible P7 and Z9 frame means by about 0.9–1.0%
@@ -87,7 +94,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The paired-outline race builds pass 144 physical-button Custom Game
   starts, pause saves, and fresh continuations. The tested cases cover
   every occupied CPU-slot pattern and repeated computer races.
-  Full-match and hardware measurements remain open.
+  [One-CPU Blood Bath](audits/2026-11-22-blood-bath-melee-victory.md#november-25-packaged-terran-verification)
+  now wins on the packaged Terran ROM after an ordinary mid-match
+  save and fresh continuation. The victory itself reloads byte for
+  byte. Repeat full matches on Outpost and with two or three CPUs.
+  Continue hardware timing.
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
