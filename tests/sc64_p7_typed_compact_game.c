@@ -146,7 +146,7 @@ static void test_skirmish_profile_save_load_matrix(void)
 
 static void test_protoss_campaign_map_save_loads(void)
 {
-    unsigned cases=0;
+    unsigned cases=0, migrated=0;
     static const int missions[]={2,3,SC64_P3_GLOBAL_ID,SC64_P4_GLOBAL_ID,
                                  SC64_P5_GLOBAL_ID,SC64_P6_GLOBAL_ID,
                                  SC64_P7_GLOBAL_ID};
@@ -161,9 +161,36 @@ static void test_protoss_campaign_map_save_loads(void)
         RaceSave saved=race_data;
         assert(race_load_game() && race_save_game());
         assert(memcmp(&saved,&race_data,sizeof(saved))==0);
+        /* Old compact rows store current HP, while max HP is reconstructed.
+           Encode an old healthy Zealot row and load it through the full path. */
+        int zealot=-1;
+        for (int i=0; i<MAX_UNITS; ++i)
+            if (u[i].alive && sc64_native_zealot(u[i].type,u[i].raw_type)) { zealot=i; break; }
+        if (zealot>=0) {
+            u[zealot].hp=100; u[zealot].maxhp=80; u[zealot].shield=60;
+            u[zealot].shield_remainder=0;
+            assert(race_save_game());
+            assert(race_load_game());
+            assert(u[zealot].hp==80 && u[zealot].maxhp==80 && u[zealot].shield==80);
+            Unit invalid;
+            u[zealot].hp=101; u[zealot].shield=60;
+            assert(sc64_p7_typed_unit_encode(&race_data.units[zealot],&u[zealot],
+                   (unsigned)(race_cols*16),(unsigned)(race_rows*16)));
+            assert(!race_save_decode_unit(&race_data,(unsigned)zealot,
+                   (unsigned)(race_cols*16),(unsigned)(race_rows*16),&invalid));
+            u[zealot].hp=90; u[zealot].shield=61;
+            assert(sc64_p7_typed_unit_encode(&race_data.units[zealot],&u[zealot],
+                   (unsigned)(race_cols*16),(unsigned)(race_rows*16)));
+            assert(!race_save_decode_unit(&race_data,(unsigned)zealot,
+                   (unsigned)(race_cols*16),(unsigned)(race_rows*16),&invalid));
+            u[zealot].hp=70; u[zealot].shield=75;
+            assert(race_save_game() && race_load_game());
+            assert(u[zealot].hp==70 && u[zealot].shield==75);
+            ++migrated;
+        }
         ++cases;
     }
-    assert(cases==7u);
+    assert(cases==7u && migrated>0);
 }
 
 int main(void)

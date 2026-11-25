@@ -571,6 +571,14 @@ int main(int argc, char **argv)
 #else
     puts("Immediate damage without source projectiles: PASS");
 #endif
+    setup();
+    {
+        int z = add_unit(SIDE, U_ZEALOT, 100, 100);
+        assert(u[z].hp == 80 && u[z].maxhp == 80 && u[z].shield == 80);
+        assert(sc64_actor_max_shields(U_ZEALOT, 0) == 80);
+        assert(sc64_stock_unit_profile(65)->hp == 100);
+        assert(sc64_stock_unit_profile(65)->shields == 60);
+    }
     test_immediate_weapons();
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     test_melee_approaches_bounded_structures();

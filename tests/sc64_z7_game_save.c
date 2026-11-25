@@ -1045,6 +1045,9 @@ int main(void)
 {
     test_z7_candidate_and_live_roundtrip();
 #ifdef SC64_Z7_DERIVED_SAVE
+    assert(sc64_derived_unit_hp_for_raw(U_ZEALOT,65)==80);
+    assert(sc64_derived_unit_hp_for_raw(U_ZEALOT,-1)==80);
+    assert(sc64_derived_unit_hp_for_raw(U_FENIX,77)==240);
     test_prefix_and_skirmish_save_layout();
 #endif
     return 0;

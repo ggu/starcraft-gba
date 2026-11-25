@@ -252,15 +252,20 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
     if (out->alive && sc64_race_raw_unit(out->type)==12 &&
         ((unsigned)candidate->state[27] & 0xffff0000u)==0x42450000u)
         out->carry=(u16)candidate->units[slot][offsetof(Unit,carry)/sizeof(int)];
+    if (out->alive && sc64_native_zealot(out->type,out->raw_type))
+        if (!sc64_native_zealot_restore(&out->hp,&out->maxhp,&out->shield,out->shield_remainder)) return 0;
     return 1;
 #elif defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_SCARAB_NAMESPACE_STAGE) && !defined(SC64_GUARDIAN_COCOON_STAGE)
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
-    return sc64_p7_typed_unit_decode(out, &candidate->units[slot], world_width, world_height);
+    if (!sc64_p7_typed_unit_decode(out, &candidate->units[slot], world_width, world_height)) return 0;
 #elif defined(SC64_Z7_DERIVED_SAVE)
-    return sc64_derived_unit_decode(out, &candidate->units[slot], world_width, world_height);
+    if (!sc64_derived_unit_decode(out, &candidate->units[slot], world_width, world_height)) return 0;
 #else
-    return sc64_zp_unit_save_decode(out, &candidate->units[slot], world_width, world_height);
+    if (!sc64_zp_unit_save_decode(out, &candidate->units[slot], world_width, world_height)) return 0;
 #endif
+    if (out->alive && sc64_native_zealot(out->type,out->raw_type))
+        if (!sc64_native_zealot_restore(&out->hp,&out->maxhp,&out->shield,out->shield_remainder)) return 0;
+    return 1;
 #else
     Unit wire;
 #ifdef SC64_ZP_FULL_STORAGE
@@ -274,6 +279,8 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 #else
     if (!sc64_unit_save_decode(&wire, &candidate->units[slot], world_width, world_height)) return 0;
 #endif
+    if (wire.alive && sc64_native_zealot(wire.type,wire.raw_type))
+        if (!sc64_native_zealot_restore(&wire.hp,&wire.maxhp,&wire.shield,wire.shield_remainder)) return 0;
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     if (wire.type==U_SCARAB || wire.raw_type==85) {
         if (!race_scarab_stage_wire || !sc64_scarab_flight_from_wire(&wire,out,1,0) ||
@@ -5436,6 +5443,13 @@ static int race_load_game(void) {
 #endif
         memcpy((u8*)&u[i]+j*sizeof(int),&n,sizeof(n));
     }
+#endif
+#ifdef SC64_RACES
+    /* Move legacy HP above the native cap into available shield capacity.
+       This preserves total vitals for old saves within the former caps. */
+    for (int i=0; i<MAX_UNITS; ++i)
+        if (u[i].alive && sc64_native_zealot(u[i].type, u[i].raw_type))
+            if (!sc64_native_zealot_restore(&u[i].hp, &u[i].maxhp, &u[i].shield,u[i].shield_remainder)) return 0;
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_BUILDINGS;i++) {
