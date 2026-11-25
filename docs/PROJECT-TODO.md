@@ -1186,6 +1186,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [follow-on Blood Bath cut](audits/2026-11-21-native-blood-bath-lurker.md#follow-on-egg-observation)
   narrows a likely Zergling pair hatch to 33 native updates. The ordinary
   GBA counterpart verifies a queued pair and fresh HOME continuation.
+  Prioritize a matched-clock, paid same-Hatchery multi-Larva trial: a
+  [native witness](audits/2026-11-21-native-blood-bath-lurker.md#concurrent-hydralisk-eggs-at-two-structures)
+  sees two overlapping Hydralisk Eggs near separate structures, each
+  raw-Egg-to-Hydralisk in 438 guest-counter increments. It does not settle
+  same-Hatchery parallelism, payment, or conversion to GBA updates.
   The [normal CPU Drone comparison](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
   follows a native Larva, Egg and Drone in the same slot, and a
   current GBA Hatchery debit, queue and new-slot Drone through

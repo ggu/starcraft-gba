@@ -199,3 +199,48 @@ worst-case payload leaves 83 bytes inside its slot. Check the real
 maximum across every envelope and add a predecessor-reader test before
 changing the format. The next native cut should isolate a completed
 Lurker's burrow and spine attack with multiple targets along its path.
+
+## Concurrent Hydralisk Eggs at two structures
+
+Two fresh, independent ares headless continuations of a retained ordinary USA
+Blood Bath state started at guest counter 27,563 and advanced 2,500 video
+fields with neutral controller input. The state had a completed same-owner
+Hatchery (raw 131, slot 81, at 1440,1872) and Lair (raw 132, slot 75, at
+1760,1808). The read-only cache-aware observer sampled their nearby actor
+slots every field. It saw no Larvae in those slots initially, then the
+following in-place transitions; a completed flag is the high bit of the
+actor status field.
+
+| Slot and nearby structure | Larva raw 35 first seen | Egg raw 36 first seen | Hydralisk raw 38 first seen | Hydralisk completion bit first seen |
+| --- | ---: | ---: | ---: | ---: |
+| 596 / Lair | 27,626 | 27,627 | 28,065 | 28,080 |
+| 595 / Hatchery | 27,613 | 27,659 | 28,097 | 28,112 |
+
+Both Eggs were present concurrently. Each raw-36-to-raw-38 interval spans
+438 guest-counter increments, followed by 15 increments until the completion
+bit was first observed. Both full 2,501-row field records were byte-identical
+on repeat. Some state fields can change between video-field observations
+with the same counter, so these are observed counter boundaries rather than
+proof of sub-update event ordering. Structure association is inferred from
+proximity, owner and fixed coordinates; no parent pointer, player-issued
+command, resource debit, or independent hatchery timer was observed.
+
+This supports overlapping production near separate structures in this scene.
+It does **not** establish parallel Eggs from the same Hatchery, an exact
+Larva regeneration interval, the role of a player versus AI command, or a
+wall-clock conversion. The merged Custom Game Egg implementation derives a
+Hydralisk's 525 GBA updates from its 420 source-catalog build frames and a
+5/4 conversion; the 438 native-counter observation is a reason to measure
+matched starts and clocks, not evidence that those quantities are directly
+interchangeable.
+
+The retained source state SHA-256 is
+`f7edbc21c1dcb271a38a8ad9f89d614addd0dc6241dbbeec9319c89a0322afb1`;
+the private per-field observation SHA-256 is
+`dd95421392cf3bcee2bd9c9b60a2f374452ba60bb24f0ae4fd5ae0156dd98a40`.
+The observer frontend SHA-256 is
+`b6264bc9cded5438cffe734fae35bd56028001e9a8a9b8b4bedf6e67cf36a791`.
+The two private state and observation files and the retail ROM are not
+included in the source tree. The probe used the ordinary neutral-input
+command `1 0 0 0` for each field and read the native clock and four actor
+records; it did not write guest memory.
