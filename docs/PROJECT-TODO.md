@@ -48,6 +48,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   single occupancy, wait order, cancellation, destruction, saved trips and
   economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building).
 
+- **Campaign save continuity on the finite-gas cartridges.** The packaged
+  Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
+  saves after both. The older P9 tape diverges on both sides of the gas
+  change. [Route, SRAM hashes and repeatable check](audits/2026-11-26-protoss-finale-chain.md).
+  Terran cleared T9 and T10 from a retained T8 victory. Requalify T8 from T7:
+  its historical route first differs in the resource banks at frame 117,534.
+
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
   regenerated from `d39bd015` use 56 source patches (styles 176/177/178:

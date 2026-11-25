@@ -158,9 +158,19 @@ test-sc64-p10-p7-normal-home: build/test-sc64-p10-p7-normal-home
 	mkdir -p "$(dir $(P10_P7_NORMAL_TRACE))"
 	./build/test-sc64-p10-p7-normal-home "$(P10_P7_NORMAL_TRACE)"
 
-# Carried P9 normal cartridge route with authored briefing and modal input.
-build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P9_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL -DP9_CONTROLLER_PROFILE=\"PROTOSS_P10_FLAGS\" $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+# Carried P9 uses the shipped product settings also used by its match author.
+# Track the effective flags independently of the ARM toolchain so a host-only
+# build is rebuilt when a command-line product setting changes.
+P10_P9_CONTROLLER_FLAGS = $(filter -D% -U% -I%,$(CFLAGS)) $(CUSTOM_FULL_MATCH_FLAGS_protoss) \
+    $(if $(filter 1,$(SC64_STATIC_MINERAL_WORDS)),-DSC64_STATIC_MINERAL_WORDS -Ibuild/generated) \
+    $(if $(filter 1,$(CANONICAL_TERRAIN_DIRTY_CAPTURE)),-DSC64_TERRAIN_DIRTY_CAPTURE)
+.PHONY: force-p10-p9-controller-config
+build/p10-p9-controller-config: force-p10-p9-controller-config | build
+	@printf '%s\n' '$(subst ','"'"',$(P8_HOST_FLAGS) $(P10_P9_CONTROLLER_FLAGS))' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+# The controller includes common/gba.c itself.
+build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_CONFIG) $(P10_BUILDING_WORD_HEADER) build/p10-p9-controller-config common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile mk/custom-full-match/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(P10_P9_CONTROLLER_FLAGS) -DSC64_P9_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL -DP9_CONTROLLER_PROFILE=\"PROTOSS_P10_FLAGS\" $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 
 # P10 ordinary-input qualification, built like the P8 and P9 ones.
 P10_ARM_DIR := build/p10-arm
