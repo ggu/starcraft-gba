@@ -361,6 +361,12 @@ race_impact_save_write(void)
     memcpy(shots, race_data.battlecruiser_shots, sizeof(shots));
     for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
         if (shots[i].state) { mask |= 1u << i; offset += sizeof(shots[i]); }
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+    const int packed_p10 = impact_count > RACE_IMPACT_RAW_SAVE_CAPACITY;
+    if (packed_p10)
+        bytes = SC64_P10_PI_TAIL;
+    else
+#endif
     if (impact_count) bytes = sc64_impact_save_bytes(impact_count);
     if (offset + bytes + SC64_TRANSPORT_TRAILER_BYTES > RACE_IMPACT_RECORD_MAX) return 0;
     race_data.state[28] = (race_data.state[28] & ~24u) | (mask << 3);
@@ -370,6 +376,13 @@ race_impact_save_write(void)
             memcpy((u8 *)&race_impact_record + offset, &shots[i], sizeof(shots[i]));
             offset += sizeof(shots[i]);
         }
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+    if (packed_p10) {
+        if (race_data.state[0] != 0 && race_data.state[0] != 1) return 0;
+        if (!sc64_p10_pi_encode(&race_data, (u8 *)&race_impact_record + offset,
+                                race_impact_rows, impact_count)) return 0;
+    } else
+#endif
     if (impact_count)
         sc64_impact_encode(race_impact_rows, impact_count,
                            (u8 *)&race_impact_record + offset);
@@ -391,6 +404,8 @@ race_impact_save_write(void)
 #else
 #ifdef SC64_PACKED_MINERAL_FIFO
 #define tags race_fifo_tags
+#elif defined(SC64_P10_PADDED_IMPACT_SAVE)
+#define tags race_p10_impact_tags
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
@@ -452,6 +467,15 @@ race_impact_save_write(void)
 #if defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE)
     (void)previous; (void)tags;
     if (!race_q8_flash_write(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES)) return 0;
+#elif defined(SC64_P10_PADDED_IMPACT_SAVE)
+    const u32 write_tag = packed_p10 ? SC64_P10_IMPACTS_TAG : SC64_SILO_COMMIT_TAG;
+    const u32 record_bytes = offset + bytes + SC64_TRANSPORT_TRAILER_BYTES;
+    const int saved = previous ?
+        save_write_selected(&race_impact_record, record_bytes, write_tag,
+                            previous, tags, sizeof(tags) / sizeof(tags[0])) :
+        save_write_first(&race_impact_record, record_bytes, write_tag);
+    if (packed_p10 && !sc64_p10_pi_normalize_rows(&race_data)) return 0;
+    if (!saved) return 0;
 #else
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
@@ -611,7 +635,7 @@ race_impact_save_write(void)
 #endif
 #endif
 #undef SC64_SILO_COMMIT_TAG
-#if defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE) || defined(SC64_PACKED_MINERAL_FIFO)
+#if defined(SC64_P10_RESEARCH_EGG_SRAM_PROBE) || defined(SC64_PACKED_MINERAL_FIFO) || defined(SC64_P10_PADDED_IMPACT_SAVE)
 #undef tags
 #endif
 #undef SC64_FIFO_WRITE_TAG
@@ -645,10 +669,16 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
 #ifdef SC64_Z10_PADDED_IMPACT_SAVE
     const int padded_z10=selected_tag==SC64_Z10_IMPACTS_TAG;
 #endif
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+    const int packed_p10 = selected_tag == SC64_P10_IMPACTS_TAG;
+#endif
     if ((selected_tag != SC64_TRANSPORT_SAVE_VERSION &&
          selected_tag != SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION
 #ifdef SC64_Z10_PADDED_IMPACT_SAVE
          && !padded_z10
+#endif
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+         && !packed_p10
 #endif
         ) || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
@@ -715,9 +745,24 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
         memset(race_data.interceptor_projectiles,0,sizeof(race_data.interceptor_projectiles));
     }
 #endif
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+    if (packed_p10) {
+        if (race_data.state[0] != 0 && race_data.state[0] != 1) return 0;
+        if (!sc64_p10_pi_decode(&race_data, race_impact_record.impacts,
+                                impact_bytes, candidate, &rows) ||
+            rows <= RACE_IMPACT_RAW_SAVE_CAPACITY) return 0;
+        *count = rows;
+        return 1;
+    }
+#endif
     if (!impact_bytes) return 1;
     rows = sc64_impact_decode(race_impact_record.impacts, impact_bytes,
-                              RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+                              RACE_IMPACT_RAW_SAVE_CAPACITY,
+#else
+                              RACE_IMPACT_SAVE_CAPACITY,
+#endif
+                              MAX_UNITS + MAX_BUILDINGS, 5u,
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
                               predecessor ? U_P7_INTERCEPTOR : SC_RU_COUNT,
 #else

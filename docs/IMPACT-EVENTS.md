@@ -256,14 +256,43 @@ relink byte for byte.
 
 ### Typed P10 layout
 
-The P10 journal still has an eight-event active-save limit. A standalone
-row-repacking prototype fits a 32-event record within 16,368 bytes with
-both Yamato shots, the transport trailer and the existing research bits.
-The bounded mixed-radix encodings reclaim 60 bytes from 240 unit rows and
-40 from 160 building rows. The unused building padding contributes another
-88 bytes after research. The prototype passes sanitizer-enabled row and
-whole-envelope round trips. Link, joint tag and journal preflight, and
-the genuine frame-11,334 pause replay remain open.
+The normal P10 cartridge uses a distinct journal tag for 9–32 pending
+impacts in campaign and Custom Game. Saves with up to eight events keep
+the existing format. The bounded mixed-radix encodings reclaim 60 bytes
+from 240 unit rows and 40 from 160 building rows. Another 88 bytes come
+from building padding beyond the research fields. With two Yamato shots
+and the transport trailer present, the maximum payload fits in 16,368 bytes.
+
+On the prepared ARM build, a live three-CPU Outpost match has eight events
+at frame 11,333. The original and updated ROMs export identical SRAM.
+At frame 11,334 the match has nine events. The updated ROM saves, restores
+the exact ordered queue through HOME, and matches 120 uninterrupted
+updates. The original ROM refuses that pause save and keeps the previous
+slot. At the nine-event checkpoint, the updated pause save takes about
+48.8 million emulated cycles. The nearby eight-event save takes about
+31.7 million. The RAM guard endpoints are identical. Disabling the option
+reproduces the original P10 ROM. Terran, Z10 and Showcase also relink
+byte for byte against their corresponding reference builds.
+
+A separate real campaign checkpoint accepts a constructed nine-event
+queue, saves it by normal controls, and matches 100 uninterrupted updates
+after a fresh load. A constructed Custom Game with 32 impacts, two
+engine-launched Yamato shots, active Forge research, and a loaded Shuttle
+writes a second 16,368-byte slot on ARM. It fresh-loads the same queue,
+shots, research and cargo, then matches 120 uninterrupted updates. The
+host sanitizer run also compares every pending impact and both shots
+through fresh-process continuation. On ARM, unknown tags, malformed
+impact markers, inconsistent counts and nonzero unused padding all fall
+back to the older valid slot. A legacy ROM can also fall back while a
+compatible predecessor still exists. Preserve a compatible save before
+rolling back after both slots have been replaced with the expanded format.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Live nine-impact save and fresh continuation | `59bed7d099572ff1e45c7a3cf54028d62484023c7dcf8867d03db26d7e47bbbd` |
+| Constructed campaign continuation | `9e82e6e8431b0673aa643063bbb59b06446914d1dfc741b046ece3425ad5ed9d` |
+| Maximum ARM pause save and fallback cases | `bc8f832c6f70fdd36d7da590eab540a51852d4250e7fe095b461ccebf30faa9c` |
+| Maximum save with Yamato, research and transport continuation | `ef4c2e8f6e04e3e915dddd9b48343de07b081c0792816588d10bb9a1ad931988` |
 
 ## Memory
 

@@ -1474,6 +1474,24 @@ while preparing the Nexus attack.
 | Second interception inputs | `b130dc853943bcfc1881b5767a9d73c7361243d88b0a6d59b31d45b30015728b` |
 | Second interception SRAM and fresh HOME | `95c1f34dd3dcb92a67437b9d83dbfd8060b75466b595dfed10c23629d6edce8f` / `005ee812924030550a655c0692d120d07f7857a3fa6d7182016f88e57016d442` |
 
+### Rebuilt Den and a defensive checkpoint
+
+The former interception checkpoint restores both detectors and a surviving
+economy. A paid Den completes. At frame 87,554, fresh HOME restores the
+Den, three mining Drones, 8,340 minerals, 84 gas, and full-health Kerrigan
+and Hatchery. An immediate Hydra production attempt loses a detector and
+leaves the Pool at 43 HP. A second input sequence eliminates two attackers
+and keeps four Hydralisks and both Overlords. Fresh HOME at frame 89,195
+retains the Pool at 674 HP. The forward detector is down to 256 HP and
+still under pressure. An idle continuation loses around frame 90,000.
+Use the earlier intact checkpoint to reposition the detector or reinforce
+before continuing toward the Nexus.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Frame 87,554 reconstructed Den journal | `3b4e301fb15e39bf19c2622ec8e45fc84cd85700127b4aa1be442e1c6ccc48a5` |
+| Fortified Pool journal and input receipt | `e52f53eb481c7cfe75aa426fe302431f20228e3b7b9b22b44ec1926a3b7c45bc` / `5702780ac6c3cf759b4aff4edf62cd8976079299e2b853cbb1c88d6c9ede4851` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

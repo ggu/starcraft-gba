@@ -101,7 +101,15 @@ ifneq ($(CANONICAL_Z10_PADDED_IMPACTS),1)
 $(error CANONICAL_Z10_PADDED_IMPACTS must be 0 or 1)
 endif
 endif
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):batch-dirty$(if $(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS)),:z10-padded-impacts)
+# Expanded typed journals use the same full queue as the combat engine.
+CANONICAL_P10_PADDED_IMPACTS ?= 1
+ifneq ($(CANONICAL_P10_PADDED_IMPACTS),0)
+ifneq ($(CANONICAL_P10_PADDED_IMPACTS),1)
+$(error CANONICAL_P10_PADDED_IMPACTS must be 0 or 1)
+endif
+endif
+P10_PADDED_IMPACT_FLAGS = $(if $(filter 1,$(CANONICAL_P10_PADDED_IMPACTS)),-DSC64_P10_PADDED_IMPACT_SAVE)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):batch-dirty$(if $(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS)),:z10-padded-impacts)$(if $(filter 1,$(CANONICAL_P10_PADDED_IMPACTS)),:p10-padded-impacts)
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:
