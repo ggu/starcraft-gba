@@ -85,6 +85,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   heroes alive and both objective Nexuses destroyed. The same route
   also wins from HOME. Advancing the linked run to P8 and reloading
   its frame-43 save preserves both P6 and P7 completion bits.
+  Separately, continuing P1's victory into P2 reproduces the P2 win
+  with both completion bits and a byte-identical fresh save readback.
 
   A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
@@ -168,8 +170,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now has paired idle refusal and paid waiting at 9/9. The packaged
   P10 build repeats idle refusal, fresh-load queue persistence and
   resumption after Pylon completion. On native Challenger, selecting a
-  Probe at 9/9 exposes its Build command. Verify Pylon placement and
-  recovery from this state.
+  Probe at 9/9 exposes its Build command. C-left opens the build card
+  with a 100-mineral Pylon selected. A enters placement. Moving the
+  green preview toward the geyser turns it red. Confirming there shows
+  “You can’t build there” and keeps supply at 9/9. Verify accepted
+  placement and queue recovery on the native version.
 
   The packaged Terran ROM at `5f758095` restores a retained pause and
   victory save from earlier builds for each of T1–T10 (20 fresh emulator
