@@ -152,8 +152,13 @@ both the pause reload and fresh victory readback.
 The archived T5 route opens pause with Select at tick 20,401 when
 the selection is empty. R+Down+Right triggers the pause-menu
 restart shortcut at tick 20,403 and resets frame 20,073 to zero.
-A current ordinary-input route must carry the mission through
-victory. Reset receipt SHA-256
+An ordinary-input trial skips five empty-selection Select presses
+and continues without restarting. At tick 22,000 it has 27 friendly
+units and 200 minerals, compared with 35 and 512 in the recorded
+route. Unit slot 3 is selected at tick 20,200 in the unmodified run
+and the selection is empty by 20,300. Capture a clean resume point
+at or before the last matched unit order at tick 19,907 and
+re-establish group selection there. Reset receipt SHA-256
 `4375e63fb25ced0f086f200ce43c3f8d33f751d0a2203681d51172cb51b481c6`.
 
 The P7 suffix from frame 8,845 matches the old world-state fingerprint
