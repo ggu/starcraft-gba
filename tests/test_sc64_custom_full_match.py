@@ -121,7 +121,7 @@ class Matrix(unittest.TestCase):
 
     def test_default_matrix_covers_each_race_map_and_opponent_count(self):
         expected = {(product, map_id, count) for product in match.PRODUCTS
-                    for map_id in match.MAP_NAMES for count in (2, 3)}
+                    for map_id in match.MAP_NAMES for count in (1, 2, 3)}
         covered = set()
         for case in match.QUALIFIED:
             product, map_id, cpus, *plan = case.split(":")
