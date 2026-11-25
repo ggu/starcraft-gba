@@ -446,7 +446,7 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_DRONE]     = { R_ZERG, SC_RACE_F_WORKER | SC_RACE_F_LARVA, B_HATCHERY, 2, 50, 0, 300, 40, 0, 0 },
     [U_OVERLORD]  = { R_ZERG, SC_RACE_F_LARVA | SC_RACE_F_PROVIDES_SUPPLY, B_HATCHERY, 0, 100, 0, 600, 200, 0, 0 },
     [U_PROBE]     = { R_PROTOSS, SC_RACE_F_WORKER, B_NEXUS, 2, 50, 0, 300, 20, 20, 0 },
-    [U_ZEALOT]    = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 100, 0, 600, 100, 60, SC_PR_GATEWAY },
+    [U_ZEALOT]    = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 100, 0, 600, 80, 80, SC_PR_GATEWAY },
     [U_DRAGOON]   = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 125, 50, 750, 100, 80, SC_PR_CYBERNETICS_CORE },
     [U_SCOUT]     = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 6, 275, 125, 1200, 150, 100, 0 },
     [U_TASSADAR]  = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 100, 300, 1500, 80, 300, 0 },
@@ -871,6 +871,29 @@ static inline int sc64_race_ordinary_ghost(int type)
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
 { return type >= 0 && type < SC_RU_COUNT ? &sc64_race_unit_rules[type] : 0; }
+/* Native Zealot vitals differ from the pinned PC reference. Only raw 65
+ * (or an actor without a source identity) uses this gameplay override. */
+static inline int sc64_native_zealot(int type, int raw)
+{ return type == U_ZEALOT && (raw == -1 || raw == 65); }
+static inline int sc64_native_zealot_restore(int *hp, int *maxhp, int *shield, int phase)
+{
+    const Sc64RaceUnitRule *r = sc64_race_unit_rule(U_ZEALOT);
+    /* Compact rows omit max HP, so old 100/60 and new 80/80 rows overlap.
+     * Only excess HP within the former legal caps is a legacy migration. */
+    if ((*maxhp != r->hp && *maxhp != 100) || *hp < 0 || *hp > 100 ||
+        *shield < 0 || *shield > r->shields || phase < 0 || phase >= 1280 ||
+        (*shield == r->shields && phase) ||
+        ((*maxhp == 100 || *hp > r->hp) &&
+         (*shield > 60 || (*shield == 60 && phase)))) return 0;
+    if (*hp > r->hp) {
+        int excess = *hp - r->hp;
+        int room = r->shields - *shield;
+        *shield += excess < room ? excess : room;
+        *hp = r->hp;
+    }
+    *maxhp = r->hp;
+    return 1;
+}
 static inline const Sc64RaceBuildingRule *sc64_race_building_rule(int type)
 { return type >= 0 && type < SC_RB_COUNT ? &sc64_race_building_rules[type] : 0; }
 static inline int sc64_race_is_worker(int type)

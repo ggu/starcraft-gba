@@ -82,6 +82,10 @@ int main(int argc,char **argv)
          * evidence that the AI's decision loop requests research itself. */
         int payer=first_proto_bot(bots);
         if(payer>=0) {
+            unsigned shield_q8;
+            int zealot=spawn_unit(payer,U_ZEALOT,340,340);
+            assert(zealot>=0 && sc64_pr_q8_actor_shield(zealot,&shield_q8));
+            assert(shield_q8==80u*256u);
             race_minerals[payer]=race_gas[payer]=500;
             int pylon=spawn_build(payer,B_PYLON,400,400,0);
             int forge=spawn_build(payer,B_FORGE,440,400,0);

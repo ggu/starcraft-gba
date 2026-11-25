@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-25. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-26. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -18,6 +18,37 @@ does not establish ordinary-input gameplay, native parity or hardware speed.
 Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
+
+- **Zealot native vitals.** All 30 original campaign maps select the
+  ordinary Zealot defaults. Two completed Zealots in retained native
+  Blood Bath states had 80 HP and 80 shields. The shared rule uses
+  80/80 for raw 65. Older saves transfer HP above 80 into shields.
+  On the integrated race cartridges, fresh mGBA loads restored 51
+  Zealots across two Terran 9 saves, 30 in a Zerg 10 save, and 47
+  across three Protoss saves. All eight tested saves, including two
+  without Zealots, could be saved and reloaded again. The 72 skirmish
+  lobby combinations launched with the expected map, race and seats.
+  The retained Protoss 7 late assault won at frame 80,810 and its
+  victory save survived a fresh load. Terran 9 matched all 51 prior
+  checkpoints from the Terran 8 victory handoff, won at frame 47,266
+  and reloaded its victory save byte for byte. Zerg 10 won from an old
+  frame-60,123 save on the cartridge in mGBA. Its old full-mission tape
+  first differed at frame 8,354 and later restarted the mission. A new
+  host controller played a replacement route. From HOME in mGBA, the
+  Zerg cartridge replayed its 202,274 button updates, matched all 97
+  checkpoints, delivered the crystal and won at frame 198,954. A fresh
+  HOME load restored the victory and re-exported identical SRAM. The
+  same route from a retained Zerg 9 victory matched all 97 checkpoints,
+  retained all ten Zerg completion bits and reloaded byte for byte.
+  Separately, all 30 retained campaign victories advanced to the next
+  chapter or retried their finale. Each resulting pause save reloaded
+  in a fresh mGBA process with the same state and SRAM bytes.
+  With the combat optimization from #893 included, all 30 transitions
+  and 72 lobby launches passed again. On two busy Zerg skirmish saves,
+  1,024 further updates matched both display pages, actors and world
+  state at all 129 samples per map. Pause saves matched byte for byte.
+  Whole-update guest cycles fell 0.50% on Outpost and 0.12% on Blood Bath.
+  These short fixed-camera windows do not establish 30 fps on hardware.
 
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
@@ -1942,8 +1973,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Native morph completion and the GBA campaign and custom fixtures
   preserve damage. Fresh ARM loads on all four profiles keep the stored
   current HP of older colonies and complete an older pending morph at
-  400 HP. Qualify Zealot HP and shields (80 each) against profile
-  overrides and the existing unit save representations.
+  400 HP. Zealot save compatibility and remaining campaign replay work
+  are tracked under current integration priorities.
   [Zerg opening defense audit](audits/2026-11-20-zerg-opening-defense.md)
   [Protoss opening Battery audit](audits/2026-11-20-protoss-battery-opening.md)
   [Native Cannon census](audits/2026-11-19-n64-skirmish-ai.md#protoss-cannon-opening)
