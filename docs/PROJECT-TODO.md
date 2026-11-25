@@ -42,11 +42,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the restart shortcut at input tick 20,403. A P7 continuation stays
   active past the old tape's late input boundary with the three
   heroes alive and the enemy Nexus standing.
-  Retape from the new fresh-HOME checkpoints at frame 19,419 for T5
-  and frame 55,252 for P7. T5 now has a productive five-SCV
-  checkpoint and a later fresh load with three Wraiths.
-  P7 can rebuild 45 Dragoons but still needs a route
-  through the enemy defenses.
+  Retape T5 from the fresh-HOME checkpoint with seven Wraiths,
+  three gas workers and both heroes alive. The recovered P7
+  suffix rebuilds 64 Dragoons, destroys the Nexus, and reaches
+  a fresh-load-verified victory at frame 80,828.
   Use the retained ordinary-input tapes to qualify the rest of the
   combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.
@@ -2221,8 +2220,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [paired affordability check](audits/2026-11-25-visible-drawing-and-campaigns.md#backwater-marine-affordability)
   confirms both games reject an order under 50 minerals with a
   free slot and remaining supply.
-  Verify admission near the local and global supply limits separately.
-  The GBA reserves all paid training slots for admission.
+  In the [native local-cap replay](audits/2026-11-25-visible-drawing-and-campaigns.md#native-waiting-order-at-the-local-supply-limit),
+  the N64 pays for a waiting SCV with an active SCV and 18/18
+  supply. The GBA reserves supply for all paid slots at admission.
+  Verify native activation and cancellation at the local limit,
+  then implement the corresponding GBA queue and save behavior.
+  Verify the global 200 limit separately.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

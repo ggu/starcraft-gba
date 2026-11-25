@@ -182,6 +182,10 @@ The existing Starport adds a Control Tower for 50 minerals and
 100 gas each. Fresh HOME restores three Wraiths, both heroes,
 and the mining economy at frame 28,666. Receipt SHA-256
 `91556e279e65127da4469c6a811711cae80347b1f66531516c882f9c0c84fb45`.
+Three workers gather gas and seven Wraiths are available in a
+fresh-load checkpoint at frame 40,567, with both heroes alive.
+Receipt SHA-256
+`bde27d5b3b6ba27ec8f3f38e91246df30a4852069f308d884ce7e8dc18030aa3`.
 
 The P7 suffix from frame 8,845 matches the old world-state fingerprint
 through sampled call 40,000, with framebuffer differences in earlier
@@ -196,10 +200,22 @@ A new ordinary pause at call 56,961, frame 55,252, restores the
 units, buildings and mission state through fresh HOME with a
 byte-identical SRAM re-export. Checkpoint receipt SHA-256
 `e7437658a274cbb544437567381ad22794f6c51fbd2c594b3de1693baef13b28`.
-Ordinary Gateway production rebuilds the army to 45 Dragoons and
-creates a pre-assault save at frame 71,324. The front assault
-loses that army and leaves the enemy Nexus at 750 HP and 750
-shields. The next route needs a different approach.
+Ordinary Gateway production rebuilds the army. A 45-Dragoon
+assault fails against the enemy defenses. The next attempt starts
+from a fresh ordinary save with 64 Dragoons, destroys the enemy
+Nexus at frame 80,193, and reaches victory at frame 80,828 after
+advancing the dialogue. All three required heroes survive and
+the mission fault flag stays clear. A fresh HOME result load
+preserves the named mission state through eight neutral updates
+and re-exports byte-identical SRAM. Victory receipt SHA-256
+`600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf`;
+winning SRAM SHA-256
+`ad66dc354fd3db879d9d7cce788ee01e96e3dbbbeda2ae6ed6f60ae66f8cfa78`.
+This qualifies the recovered suffix from the ordinary frame-8,845
+seed through victory on the release.
+The candidate separately replays the 64-Dragoon assault from
+the same pre-assault normal save. Its recorded inputs and observations,
+terminal journal, and fresh HOME re-export match byte for byte.
 
 ## Backwater Marine affordability
 
@@ -223,3 +239,16 @@ admission remain separate checks. The GBA candidate and release
 receipt SHA-256 values are
 `f31757950cd78dd71de3fc9862e77724a48cf23bfb3674a940eeb56cd39d1b22`
 and `6ceed541ff39308b089c4e286dfdf66c3314123229f5ae3486560f3ae6cac794`.
+
+## Native waiting order at the local supply limit
+
+An ordinary Wasteland continuation starts with nine Marines.
+At native step 12,830 it shows 17/18 supply, 139 minerals and an
+empty Command Center queue. A fourth SCV order fills the active
+slot. At step 12,940 it shows 18/18 supply and 97 minerals. Another
+ordinary A press adds a waiting SCV, charges 50 minerals and
+leaves the display at 18/18.
+Input tape SHA-256
+`1de47b5e4a163ee86686864d145bce50322768ab28a2de6c4be6496140eab205`.
+This observes payment and waiting admission. Check waiting-order
+activation at the local limit separately from the global 200 limit.
