@@ -84,7 +84,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   journal re-exported byte for byte (SHA-256
   `71e4d60f9e6a6f99c84ce3a7fb00d31a77c0fa6e8eba7e3af252c52e150e4b97`).
   Z10 resumed at frame 101 with all nine prior flags (2,080,771).
-  Finish Z10 with those flags and verify finale retry.
+  Full Circle then won at frame 63,523 with all 28 checkpoints matched,
+  zero unsupported events and all ten flags (4,177,923). A fresh load
+  restored the victory state and re-exported identical SRAM. Pressing A
+  retried Z10. Its frame-101 pause save reloaded with all ten flags.
+  This verifies the complete continuous Zerg campaign on the November
+  25 package in mGBA. Recheck affected chapters on later engine builds.
   The authenticated Z9 scenario allows player 3 to research Ventral
   Sacs. On the newer source merged in #874, Z9 passed paid research,
   mid-job reload, boarding, loaded-cargo reload and unloading in mGBA.
@@ -288,7 +293,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   In a read-only census on the menu-renderer build, the route-build
   counter advanced on 3,681 of 4,866 advancing updates. Orders averaged
   1,578,347 cycles on those updates versus 552,404 on the other 1,185.
-  Trace which goals cause repeated field builds before changing path selection.
+  On the same interval, a read-only instruction trace counted 3,024
+  calls to the linear field builder for 32 distinct destination cells.
+  All calls saw the same 2,048 walkability bytes. Two destinations
+  accounted for 347 calls each. Guest clocks, world and both display
+  pages matched the uninstrumented control. Measure time in the
+  individual fills before choosing a reuse strategy.
   Physical GBA timing remains open.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
