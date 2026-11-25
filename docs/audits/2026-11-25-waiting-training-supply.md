@@ -98,8 +98,45 @@ display selection and fresh save continuation match.
 ## Native Protoss follow-up
 
 An ordinary N64 Challenger Custom Game starts Protoss at 4/9 supply.
-The Nexus accepts successive Probe orders and reaches 7/9 with one
-Probe active and one waiting. The Custom Game Load/Save screen
-shows Save This Game disabled. Renderer capture fails before the
-9/9 transition. Verify Protoss cap admission and recovery from a
-native campaign checkpoint or a working continuous capture.
+The initial observer ends with a generic snapshot failure. The interactive
+observer's error also covered its bounded input log. Raising that limit
+in the isolated v148 build permits the paired runs to finish at step
+13,370, with nine frame captures and GPU ready in both runs.
+
+One schedule reaches 9/9 with an active production panel, a blank
+progress bar, and empty visible waiting positions. An A pulse at
+step 13,000 places a Probe in queue position 2 by step 13,020. A
+second A pulse fills queue position 3 by step 13,170. Supply stays
+at 9/9 and the progress bar stays blank. The mineral counter
+animates between captures. In the matched comparison, the idle and
+blocked banks are 267 and 217 at step 13,000, 276 and 176 at step
+13,130, and 312 and 162 at step 13,370. The difference grows by 50
+for each of the two late waiting orders.
+
+Omit the earlier Probe pulse at step 11,530 to leave the Nexus idle
+at 9/9. The same two late A pulses now display `NOT ENOUGH PSI`
+without opening the production panel or filling a queue position.
+The visible minerals rise from 267 at step 13,000 to 272 at step
+13,040 and 288 at step 13,170. Native Pylon completion and resumption
+remain open. The native Custom Game save command is disabled.
+
+The packaged GBA Protoss ROM repeats the idle and blocked cases
+through its ordinary controls. An idle 9/9 Nexus denies the first
+order and keeps its 1,416 minerals. With a blocked order at the
+head, the Nexus takes 50 minerals and adds a second waiting Probe.
+Both paid orders retain zero progress after fresh HOME and an
+identical pause journal re-export. A Probe places a Pylon at
+(216, 168). Supply stays at 9/9 during warp-in, becomes 9/17 at
+frame 3,697 and starts the first Probe on the following update.
+That Probe completes at frame 4,072. The internal supply fields
+store twice the displayed units.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native interactive observer executable | `abcc1ac5876de2310391dbef90aae9b3f5cded7554c1028ecdd6986d506d7697` |
+| Blocked-head route command log | `0e4b7ac02ea243c6c389d830177eea27bae89fa9099e5d8d36a3959d52738bd9` |
+| Blocked-head route second waiting icon | `4ed07b08daa85d60ae29f69c67bc815f2fe66888246727cea40ee1db13d21f43` |
+| Idle route command log | `a396a01eaa7b8eec6fc8970edb91687f101a1858e02797b5e9fe4b75378cb3f8` |
+| Idle Nexus warning after first attempted order | `8a6731ebd878d5068df06186dd420c3de6442546599e7ba7652a2a219bd4170f` |
+| GBA idle, waiting, and fresh-load receipt | `adf2b815ebcc0722aa87288c6741fd422b2c3a4329d9ee12feeab334b2f4b9c9` |
+| GBA Pylon construction and Probe resumption | `573ecd0fc0fdf6680c681fc42c65ea1e807a3bac12a44fc369ba8a377d9741d5` |

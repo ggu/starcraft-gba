@@ -121,3 +121,27 @@ Its ROM SHA-256 is
 | Dual-flag ordinary defeat and survivor transfer | `4cd6524a6c9e6d4ba8794cfd74f5549ce7050fc54b00edab442273acbb28ab62` |
 | Dual-flag staged enemy survivor and fresh victory | `5004d70f682a115d3e7b227cce7c19a9104d466031c095ae166a25481f8de6f6` |
 | Dual-flag ordinary Melee victory | `90b7b8fb28e8a873567581cb60486b3cc6b6c238bb6bb2c9a1d4a0f37d768a61` |
+
+## November 25 packaged Terran verification
+
+The packaged Terran ROM at `5f758095` wins Blood Bath Melee
+against one Zerg CPU. A 13-sample neutral wait before confirming
+Start reproduces the retained lobby's packed start order 11. The
+retained field inputs and neutral continuation reach frame 50,667
+with 35 Terran units and two Zerg buildings left. An ordinary
+Start/B pause save restores that position in a fresh process.
+
+From HOME, load the pause, use the army selection control, and
+issue ordinary Attack Move commands to the remaining buildings.
+At frame 52,110 the result has 35 Terran units, 13 Terran buildings
+and no Zerg actors. Fresh HOME restores the victory and re-exports
+its journal byte for byte. Outpost and human wins with two or three
+CPUs on this release remain open.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Packaged Terran ROM | `1779e2ef70d4858a599cce2a32249fcaff9fc129e80e30a26fad425879975960` |
+| Ordinary two-building pause journal | `ad3a517f0475152bde23383ed7aeb1a6fff1569ae859948af72ce9072c80fa6e` |
+| First terminal observation | `d4bdfde53ba45da9d3822d00e026bd4e8f858af54fbeea778bab1c5598c5b6ad` |
+| Victory journal | `5ecfcdae6791f48d120bf8af107a6b552ae445911be348ef07e4ceb1d73ab956` |
+| Fresh HOME verification | `be6c2d4c529ee668adfa067cdbc4cf5a828004d2b9297be3e9e5a97d9552de93` |
