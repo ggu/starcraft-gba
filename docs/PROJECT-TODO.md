@@ -54,54 +54,29 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   deliver a whole-frame gain while preserving every direction, secondary
   query, topology invalidation and memory guard.
 
-- **Gas refinery service.** Per-field N64 observations found one tracked worker
-  occupying each gas site at a time. The packaged GBA Blood Bath game showed
-  up to three workers counting down concurrently at one building. Qualify
-  single occupancy, wait order, cancellation, destruction, saved trips and
-  economy impact across products. In the shared queue trial, a P10 replay of
-  Blood Bath frames 10,257–10,656 reduced simultaneous advancing gas workers
-  at three buildings from 2/3/3 to 1/1/1. Separate sites worked in parallel
-  on all 399 measured transitions. The 16 complete timer intervals (release:
-  24) show why campaign economy and paid production need fresh replays.
-  All four trial cartridges preserved the exact worker queues on a fresh boot
-  from frame 10,274 and through 128 subsequent updates. The three race ROMs
-  passed their ARM stack checks (spare bytes after the 512-byte margin:
-  Terran 240, Zerg 432, Protoss 816). Measure full-match outcomes and frame
-  timing before activation. On the trial all 30 retained result transitions
-  passed. The Terran cartridge carried the actual victory save through
-  T7→T8→T9→T10. All 467/53/6 checkpoints and three fresh result reloads
-  matched. A new campaign separately cleared T1 and T2; carry its own
-  victory forward through T3–T7 to join the late campaign chain.
-  [Trial campaign receipt](audits/2026-11-26-fifo-terran-campaign.md). In a separate T9 replay
-  the trial extracted 280 gas in 2,048 updates from a site that supplied 528
-  on release. Compare paid production, native service cadence, and light
-  versus busy scenes before changing the timer. P9 won on the trial from
-  a retained P8 victory, and P10 won from that actual result with a 40-unit
-  first assault. Both fresh victory reloads passed. On Z10 a revised plan
-  cleared the finale from a retained Z9 victory at frame 58,485, matched all
-  25 cartridge checkpoints and reloaded the victory with byte-identical SRAM.
-  [Z10 route and verification](audits/2026-11-26-z10-fifo-normal.md). Gas service already
-  took 1.98 emulated seconds in the lighter Z1 sample, versus 3.09 in busy
-  P10. All 18 fully observed native visits lasted 37 guest ticks, including
-  three starting with zero other waiters. Prioritize busy-frame pacing before
-  tuning the shared timer.
-  All six three-AI race/map cells now have cartridge wins with fresh pause
-  continuation and result reload. Keep paired losses as baselines and compare
-  identical starting positions: Blood Bath can draw different positions on
-  the two builds with the same lobby wait. Winning battle cuts still run at
-  11.84–18.52 updates/s. In Protoss Blood Bath, the instrumented orders
-  averaged 206k cycles in nearest-enemy queries, 138k in movement and
-  113k in setup. Prioritize these with actor drawing and measure total
-  cycles on an uninstrumented candidate. Caching six static weapon fields
-  saved 1.13% on Blood Bath and 0.33% on Outpost in P10. Prioritize reducing
-  the number of target candidates examined and the cost of drawing actors.
-  All 12 one- and two-AI cells also have wins with fresh pause and victory
-  reloads. The last was Protoss Outpost against one Terran: an earlier
-  Zealot assault won at frame 23,732 with 73 fresh-continuation checks. [Small-lobby matrix](audits/2026-11-26-gas-fifo-small-skirmishes.md).
-  Preserve a pretrial SRAM copy before testing a release upgrade. After two
-  trial saves, the previous release stayed on HOME on all four cartridges.
-  [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
-  [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
+- **Refinery economy and native timing.** The opt-in FIFO service admits one
+  worker per site, serves separate sites concurrently and restores queue order
+  from SRAM on all four products. All 18 race/map/opponent-count cells have
+  ordinary-input cartridge wins with fresh pause continuations and result
+  reloads. With identical starting positions and controller strategies, all
+  three release Blood Bath wins became losses on the trial. Native service
+  lasted 37 guest ticks across 18 fully observed visits. The GBA timer took
+  1.98 emulated seconds in a light Z1 sample and 3.09 in busy P10. Improve
+  busy-frame pacing and compare native elapsed time before enabling the
+  change by default. Back up pretrial SRAM for rollback. [Native and GBA
+  timings](audits/2026-11-26-gas-saturated-fifo.md), [three-opponent
+  battles](audits/2026-11-26-gas-fifo-skirmishes.md), [one- and two-opponent
+  battles](audits/2026-11-26-gas-fifo-small-skirmishes.md).
+
+- **Campaign playthroughs with the trial economy.** All 30 retained victories
+  advanced or restarted their finales and reloaded new pause saves. A blank
+  Terran campaign cleared T1–T2. Carry that actual save through T3–T7 to
+  connect it to the separately verified T7-victory→T8→T9→T10 segment.
+  P9→P10 and Z10 also cleared from retained predecessor victories. Track
+  first sustained divergences from the release plans as the earlier missions
+  are played. [Terran](audits/2026-11-26-fifo-terran-campaign.md),
+  [Protoss](audits/2026-11-26-gas-saturated-fifo.md),
+  [Zerg](audits/2026-11-26-z10-fifo-normal.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
