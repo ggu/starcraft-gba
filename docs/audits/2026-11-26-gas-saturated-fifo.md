@@ -160,3 +160,14 @@ waiter at that site (128–140 VI fields, median 140). Fifteen started with
 waiters (121–151 VI fields, median 130). Visits already active at the
 window start or still active at its end are excluded. This measures one
 native battle; an empty queue at entry does not imply a lightly loaded map.
+
+After integrating release commit `defa320c`, all four trial ROMs rebuilt
+byte-identically to the products used in the campaign and skirmish replays.
+The ARM stack checks passed on each of the three race cartridges.
+
+| Trial ROM | Integrated SHA-256 |
+| --- | --- |
+| Terran | `be85a92d3554db7aaac0b2418cd4561c7f35e5af75d7304722bd37ef88a9a54d` |
+| Zerg Z10 | `0b9f5f766cab83c8a7032ae999e7ab14a8b159e1c9b2e713bba001df0bbb4972` |
+| Protoss P10 | `64b0d722b9eb7bc61af8c819bf4c4912cf723916b1bda6fc20b8e13fd7c75ffb` |
+| Showcase | `4ecd1e614a176ce8119b66f4c163247743640be417b65136e03e550674e8fb8a` |
