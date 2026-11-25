@@ -265,3 +265,27 @@ order and rebuild cost alongside whole frames.
 | Contact entry stack pointers | `42b40f8ab603f9327faa3d8821029a0225143020a5f2e97347f4016a998d444b` |
 | Movement attribution versus matching ordinary frames | `1638228bc22134cc473f65f3069e26e2e264c1060502679dd923c26dc8e759ba` |
 | Matched full orders call-stack cuts | `f205053de6244a9fefcd9a5e7c9020c639051fba4286d508ee35a61211daa82d` |
+
+### Per-row target-mask trials
+
+In the eight latest Protoss Outpost cuts, 520 nearest
+queries visit 1,513 owner rows and read 2,332 cell heads.
+Of these reads, 1,196 find an empty cell. The conservative
+index can retain set bits when actors leave, so this is an
+upper bound on avoided reads.
+
+Two local links preserve the sampled worlds, entity data
+and display output. Adding per-row masks alongside the
+global column mask increases nearest-query cost from
+131,466 to 133,988 cycles per update and rebuild cost from
+36,473 to 46,625. Replacing the global columns with per-row
+masks raises those costs to 132,318 and 45,399. Total orders
+stay essentially flat in the second trial, with different
+interrupt timing. The trials add 640 and 620 EWRAM bytes
+respectively.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P10 target-cell census | `0f237210eddeba86255432f476531d5cd4b457ae59852efa7211416b289e337d` |
+| Global plus per-row masks | `3f8e13ad863e84e45d5792b64de933547dcbb9e0e097e46e431f4249e799a6fc` |
+| Per-row column masks | `66149a1a3c5e9c504ef9847b5c64b3bab5705d6bbaa190e003088ffa770ae55e` |
