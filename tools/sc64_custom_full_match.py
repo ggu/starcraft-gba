@@ -326,25 +326,30 @@ TWO_VBLANK_CYCLES = 2 * 280896
 def pace_budget_report(rows):
     """Validate each active sample once; preserve raw results if any disagree."""
     stages, totals, errors = [], [], []
+    # Older receipts only captured the debugger-to-debugger interval.
+    guest_timer = any("demo_last_cycles" in row for row in rows if row.get("world_advanced"))
+    total_key = "demo_last_cycles" if guest_timer else "cycles"
+    required = ("cycles", *PACE_COUNTERS) + (("demo_last_cycles",) if guest_timer else ())
+    residual_key = "loop_less_update_and_draw" if guest_timer else "interval_less_update_and_draw"
     for row in rows:
         try:
             if type(row.get("world_advanced")) is not bool:
                 raise MatchError("pacing sample missing or invalid world_advanced")
             if not row["world_advanced"]:
                 continue
-            missing = [key for key in ("cycles", *PACE_COUNTERS) if key not in row]
+            missing = [key for key in required if key not in row]
             if missing:
                 raise MatchError(f"pacing sample missing counters: {', '.join(missing)}")
-            if any(type(row[key]) is not int or row[key] < 0 for key in ("cycles", *PACE_COUNTERS)):
+            if any(type(row[key]) is not int or row[key] < 0 for key in required):
                 raise MatchError("pacing sample has invalid cycle counters")
-            total, update, draw = (row[k] for k in ("cycles", "demo_update_cycles", "gfx_draw_cycles"))
+            total, update, draw = (row[k] for k in (total_key, "demo_update_cycles", "gfx_draw_cycles"))
             orders, sight, other = (row[k] for k in ("sc64_orders_cycles", "sc64_sight_cycles", "sc64_other_cycles"))
             background, actors, hud = (row[k] for k in ("sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles"))
             stage = dict(orders=orders, sight=sight, other_simulation=other,
                          remaining_simulation=update-orders-sight-other,
                          map_background=background, actors=actors, hud=hud,
-                         remaining_render=draw-background-actors-hud,
-                         interval_less_update_and_draw=total-update-draw)
+                         remaining_render=draw-background-actors-hud)
+            stage[residual_key] = total - update - draw
             if any(value < 0 for value in stage.values()):
                 raise MatchError("pacing sample has inconsistent nested counters")
             stages.append(stage)
@@ -357,12 +362,12 @@ def pace_budget_report(rows):
         return dict(available=False, invalid_samples=0, reason="the pacing window contains no simulation updates")
     means = {key: statistics.mean(stage[key] for stage in stages) for key in stages[0]}
     mean_total = statistics.mean(totals)
-    return dict(available=True, denominator="advancing world updates", samples=len(stages),
+    return dict(available=True, denominator="advancing world updates", total_counter=total_key, samples=len(stages),
                 mean_total_cycles=mean_total, nominal_30_fps_cycles=GBA_HZ / 30,
                 two_vblank_cycles=TWO_VBLANK_CYCLES,
                 mean_deficit_to_nominal_30_fps=mean_total - GBA_HZ / 30,
                 mean_disjoint_cycles=means,
-                residual_note="interval less inclusive update and draw; timing boundaries may differ; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
+                residual_note="total counter less inclusive update and draw; older receipts use the debugger interval; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
 
 
 def disjoint_pace_budget(rows):
@@ -387,7 +392,7 @@ def pace(args) -> dict:
     if not any(first < tick <= last for tick in trace["checks"]):
         raise MatchError("pacing window contains no recorded gameplay checkpoint")
     shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
-    counters = PACE_COUNTERS
+    counters = (*PACE_COUNTERS, "demo_last_cycles")
     if args.output.exists():
         raise MatchError(f"{args.output} already exists")
     args.output.mkdir(parents=True, exist_ok=False)

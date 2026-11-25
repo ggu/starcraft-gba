@@ -27,6 +27,16 @@ class BudgetTest(unittest.TestCase):
         self.assertEqual(TWO_VBLANK_CYCLES, 561792)
         self.assertAlmostEqual(b['nominal_30_fps_cycles'], 16777216/30)
 
+    def test_guest_loop_bounds_stages_when_debugger_interval_is_shorter(self):
+        sample = row(cycles=792283, demo_last_cycles=798183,
+                     demo_update_cycles=377730, gfx_draw_cycles=420067)
+        result = disjoint_pace_budget([sample])
+        self.assertEqual(result["total_counter"], "demo_last_cycles")
+        self.assertEqual(result["mean_disjoint_cycles"]["loop_less_update_and_draw"], 386)
+        self.assertEqual(sum(result["mean_disjoint_cycles"].values()), 798183)
+        self.assertFalse(pace_budget_report([sample, row()])["available"])
+        self.assertFalse(pace_budget_report([row(demo_last_cycles=899)])["available"])
+
     def test_paused_sample_does_not_use_stale_counters(self):
         b = disjoint_pace_budget([row(), row(world_advanced=False, cycles=1)])
         self.assertEqual(b['samples'], 1)
