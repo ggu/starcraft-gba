@@ -398,7 +398,7 @@ def generate(rom_path: Path, out_path: Path) -> dict:
                             script_for(wi, "GndAttkInit"), script_for(wi, "AirAttkInit")]
             weapon_rows.append({"mode": mode, "weapon_id": wid, "weapon_owner_role": owner_role,
                 "weapon_owner_raw": owner_unit_raw,
-                "weapon_fields": {name: wv(name, wid) for name, _ in weapon_specs},
+                "weapon_fields": {name: wv(name, wid) for name, _ in WEAPON_FIELDS},
                 "weapon_graphic_status": "present" if chain else "weapons.dat flingy is zero; no projectile graphic chain",
                 "weapon_graphic_chain": chain, "weapon_image_metadata": (
                     {k: image_col[k][wi] for k in image_col} if 0 <= wi < IMAGE_COUNT else None),
@@ -418,7 +418,7 @@ def generate(rom_path: Path, out_path: Path) -> dict:
             row["launched_unit_visual"] = {"raw_unit": 85,
                 "actor_image": chain_flingy(unit_flingy[85])["image"],
                 "ground_weapon_id": scarab_weapon,
-                "weapon_fields": {name: wv(name, scarab_weapon) for name, _ in weapon_specs},
+                "weapon_fields": {name: wv(name, scarab_weapon) for name, _ in WEAPON_FIELDS},
                 "weapon_graphic_chain": chain_flingy(weapon_flingy[scarab_weapon])
                     if scarab_weapon < WEAPON_COUNT and 0 < weapon_flingy[scarab_weapon] < FLINGY_COUNT else None}
             row["note"] = "Reaver attack is represented by launched Scarab raw unit 85; its source weapons.dat ground weapon is separate from the Reaver raw83 row."
@@ -454,7 +454,7 @@ def generate(rom_path: Path, out_path: Path) -> dict:
             chain = chain_flingy(graphic_flingy) if 0 < graphic_flingy < FLINGY_COUNT else None
             wi = chain["image"] if chain else -1
             row["weapons"].append({"mode": mode, "weapon_id": wid, "weapon_owner_raw": raw,
-                "weapon_fields": {name: wv(name, wid) for name, _ in weapon_specs},
+                "weapon_fields": {name: wv(name, wid) for name, _ in WEAPON_FIELDS},
                 "weapon_graphic_status": "present" if chain else "weapons.dat flingy is zero; no projectile graphic chain",
                 "weapon_graphic_chain": chain,
                 "projectile_animations": [script_for(wi, anim) for anim in ("Init", "Death", "GndAttkInit", "AirAttkInit")]})

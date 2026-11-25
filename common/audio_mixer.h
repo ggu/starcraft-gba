@@ -179,26 +179,191 @@ static inline s32 audio_clip8(s32 s)
     return s;
 }
 
-/* Sum n voices four samples at a time. Each source word is biased to
- * unsigned bytes and split into two 16-bit lanes (bytes 0/2 and 1/3), so one
- * ROM word read and four ALU operations add four samples; lanes cannot carry
+/* Sum n (2 to 4) voices four samples at a time. src interleaves them word by
+ * word (word j of voice i at src[n * j + i]) as unsigned bytes, the sample
+ * with its top bit flipped, which is how audio_decoder_run_column() writes
+ * them. Each word is split into two 16-bit lanes (bytes 0/2 and 1/3), so one
+ * load and four ALU operations add four samples; lanes cannot carry
  * (4 * 255 < 65536). Unclipped words repack in a few operations; only a
- * word with a clipping lane is clamped lane by lane. */
-static inline void audio_mixer_sum(volatile u32 *dst, const u32 *const *src, u32 n, u32 words)
+ * word with a clipping lane is clamped lane by lane.
+ *
+ * ROMs that link the bank run a hand-written Thumb body with one loop per n
+ * and every constant in a register; the compiler's version of the C below
+ * reloaded three constants from ROM for each word. It is an ordinary
+ * function in its own .text section, so a link may place it in ROM or in
+ * IWRAM. The C function is the reference and runs in host builds;
+ * tests/audio_codec_arm_probe.c compares the two. */
+#ifdef AUDIO_CODEC_HAND_WRITTEN
+/* The rare word with a clipping lane, kept out of the loop's section. It is
+ * part of audio_mixer_sum, with that loop's registers and no stack, not a C
+ * function. In: r2, r3 the rebiased lanes, r10 and r11 as below. Out: r2
+ * the finished word. Uses r3, r4, r5 and r7. Each lane is clamped to 0..255
+ * from its exact sum, since a lane below zero has borrowed from its
+ * neighbour. */
+#define AUDIO_SUM_ASM_CLAMP                                                     \
+    "    sub     r4, r5\n"                                                      \
+    "    cmp     r4, #255\n"                                                    \
+    "    bls     1f\n"                                                          \
+    "    asr     r4, #31\n"                     /* below 0: 0; above 255: 255 */ \
+    "    mvn     r4, r4\n"                                                      \
+    "    lsl     r4, #24\n"                                                     \
+    "    lsr     r4, #24\n"                                                     \
+    "1:\n"
+static void __attribute__((naked, noinline, noclone, used, target("thumb"))) audio_mixer_clip(void)
 {
-    const u32 *a = src[0], *b = src[1], *c = n > 2 ? src[2] : 0, *d = n > 3 ? src[3] : 0;
+    __asm__ (
+        "    add     r2, r11\n"                 /* the lane sums again */
+        "    add     r3, r11\n"
+        "    mov     r5, r11\n"
+        "    lsl     r5, #16\n"
+        "    lsr     r5, #16\n"                 /* 128 * (n - 1) */
+        "    lsr     r4, r3, #16\n"             /* byte 3 */
+        AUDIO_SUM_ASM_CLAMP
+        "    lsl     r7, r4, #24\n"
+        "    lsr     r4, r2, #16\n"             /* byte 2 */
+        AUDIO_SUM_ASM_CLAMP
+        "    lsl     r4, #16\n"
+        "    orr     r7, r4\n"
+        "    lsl     r4, r3, #16\n"             /* byte 1 */
+        "    lsr     r4, #16\n"
+        AUDIO_SUM_ASM_CLAMP
+        "    lsl     r4, #8\n"
+        "    orr     r7, r4\n"
+        "    lsl     r4, r2, #16\n"             /* byte 0 */
+        "    lsr     r4, #16\n"
+        AUDIO_SUM_ASM_CLAMP
+        "    orr     r7, r4\n"
+        "    mov     r2, r10\n"
+        "    eor     r2, r7\n"
+        "    bx      lr\n");
+}
+#undef AUDIO_SUM_ASM_CLAMP
+/*   r0 dst   r2 even lanes   r6 0x00ff00ff    r9  end of src
+ *   r1 src   r3 odd lanes    r8 -rebias       r10 0x80808080
+ *            r4, r5, r7 voices and scratch    r11 rebias
+ *
+ * A voice adds (word >> 8) & mask to the odd lanes and word & mask to the
+ * even ones. The tail rebiases both to one byte per lane; a lane outside
+ * 0..255 sets a bit above its byte. Otherwise the four bytes are packed
+ * and their top bits flipped back. */
+#define AUDIO_SUM_ASM_VOICE(w, t)                                               \
+    "    lsr     " t ", " w ", #8\n"                                            \
+    "    and     " t ", r6\n"                                                   \
+    "    add     r3, " t "\n"                                                   \
+    "    and     " w ", r6\n"                                                   \
+    "    add     r2, " w "\n"
+#define AUDIO_SUM_ASM_TAIL(n)                                                   \
+    "    add     r2, r8\n"                                                      \
+    "    add     r3, r8\n"                                                      \
+    "    mov     r4, r2\n"                                                      \
+    "    orr     r4, r3\n"                                                      \
+    "    bic     r4, r6\n"                                                      \
+    "    bne     .Laudio_sum_clip" n "\n"                                       \
+    "    lsl     r3, #8\n"                                                      \
+    "    orr     r2, r3\n"                                                      \
+    "    mov     r4, r10\n"                                                     \
+    "    eor     r2, r4\n"                                                      \
+    ".Laudio_sum_store" n ":\n"                                                 \
+    "    stmia   r0!, {r2}\n"                                                   \
+    "    cmp     r1, r9\n"                                                      \
+    "    bne     .Laudio_sum" n "\n"                                            \
+    "    b       .Laudio_summed\n"                                              \
+    ".Laudio_sum_clip" n ":\n"                                                  \
+    "    bl      audio_mixer_clip\n"                                            \
+    "    b       .Laudio_sum_store" n "\n"
+static void __attribute__((noinline, noclone, unused, target("thumb")))
+audio_mixer_sum(volatile u32 *dst, const u32 *src, u32 n, u32 words)
+{
+    if (!words) return;
+    register volatile u32 *d __asm__("r0") = dst;
+    register const u32 *s __asm__("r1") = src;
+    register u32 voices __asm__("r2") = n;
+    register u32 count __asm__("r3") = words;
+    __asm__ volatile (
+        "    mul     r3, r2\n"
+        "    lsl     r3, #2\n"
+        "    add     r3, r1\n"
+        "    mov     r9, r3\n"
+        "    mov     r6, #255\n"                /* 0x00ff00ff */
+        "    lsl     r4, r6, #16\n"
+        "    orr     r6, r4\n"
+        "    mov     r7, #128\n"                /* 0x80808080 */
+        "    lsl     r4, r7, #8\n"
+        "    orr     r7, r4\n"
+        "    lsl     r4, r7, #16\n"
+        "    orr     r7, r4\n"
+        "    mov     r10, r7\n"
+        "    sub     r3, r2, #1\n"
+        "    lsl     r3, #7\n"                  /* 128 * (n - 1), in both lanes */
+        "    lsl     r4, r3, #16\n"
+        "    orr     r3, r4\n"
+        "    mov     r11, r3\n"
+        "    neg     r3, r3\n"
+        "    mov     r8, r3\n"
+        "    cmp     r2, #3\n"
+        "    beq     .Laudio_sum3\n"
+        "    bhi     .Laudio_sum4\n"
+        ".Laudio_sum2:\n"
+        "    ldmia   r1!, {r2, r4}\n"
+        "    lsr     r3, r2, #8\n"
+        "    and     r3, r6\n"
+        "    and     r2, r6\n"
+        AUDIO_SUM_ASM_VOICE("r4", "r5")
+        AUDIO_SUM_ASM_TAIL("2")
+        ".Laudio_sum3:\n"
+        "    ldmia   r1!, {r2, r4, r5}\n"
+        "    lsr     r3, r2, #8\n"
+        "    and     r3, r6\n"
+        "    and     r2, r6\n"
+        AUDIO_SUM_ASM_VOICE("r4", "r7")
+        AUDIO_SUM_ASM_VOICE("r5", "r7")
+        AUDIO_SUM_ASM_TAIL("3")
+        ".Laudio_sum4:\n"
+        "    ldmia   r1!, {r2, r4, r5, r7}\n"
+        "    lsr     r3, r2, #8\n"
+        "    and     r3, r6\n"
+        "    and     r2, r6\n"
+        "    mov     r12, r4\n"                 /* no register is free yet */
+        "    and     r4, r6\n"
+        "    add     r2, r4\n"
+        "    mov     r4, r12\n"
+        "    lsr     r4, #8\n"
+        "    and     r4, r6\n"
+        "    add     r3, r4\n"
+        AUDIO_SUM_ASM_VOICE("r5", "r4")
+        AUDIO_SUM_ASM_VOICE("r7", "r4")
+        AUDIO_SUM_ASM_TAIL("4")
+        ".Laudio_summed:\n"
+        : "+l"(d), "+l"(s), "+l"(voices), "+l"(count)
+        :
+        : "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "lr", "cc", "memory");
+}
+#undef AUDIO_SUM_ASM_TAIL
+#undef AUDIO_SUM_ASM_VOICE
+#endif
+#if !defined(AUDIO_CODEC_HAND_WRITTEN) || defined(AUDIO_CODEC_REFERENCE)
+#ifdef AUDIO_CODEC_HAND_WRITTEN
+#define AUDIO_MIXER_SUM audio_mixer_sum_reference
+#else
+#define AUDIO_MIXER_SUM audio_mixer_sum
+#endif
+static __attribute__((noinline, unused)) void AUDIO_MIXER_SUM(volatile u32 *dst, const u32 *src, u32 n, u32 words)
+{
+    const u32 mask = 0x00ff00ffu;
     const s32 bias = (s32)(128u * n);
     const u32 rebias = 128u * (n - 1u) * 0x00010001u;
     for (u32 k = 0; k < words; ++k) {
-        u32 w = a[k] ^ 0x80808080u, even = w & 0x00ff00ffu, odd = (w >> 8) & 0x00ff00ffu;
-        w = b[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu;
-        if (n > 2) { w = c[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu; }
-        if (n > 3) { w = d[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu; }
+        u32 even = 0, odd = 0;
+        for (u32 i = 0; i < n; ++i) {
+            u32 w = *src++;
+            even += w & mask;
+            odd += (w >> 8) & mask;
+        }
         /* Rebias every lane to one unsigned byte at once. A lane outside
          * 0..255 sets bits 8-15 or 24-31 (an underflowing low lane does so
          * too, before its borrow reaches the high lane). */
         u32 e = even - rebias, o = odd - rebias;
-        if (!((e | o) & 0xff00ff00u)) {
+        if (!((e | o) & ~mask)) {
             dst[k] = (e | o << 8) ^ 0x80808080u;
             continue;
         }
@@ -207,70 +372,58 @@ static inline void audio_mixer_sum(volatile u32 *dst, const u32 *const *src, u32
         dst[k] = (u32)(u8)s0 | (u32)(u8)s1 << 8 | (u32)(u8)s2 << 16 | (u32)(u8)s3 << 24;
     }
 }
+#undef AUDIO_MIXER_SUM
+#endif
 
 /* Mix one frame into out with word stores (VRAM accepts them). A lone voice
- * decodes straight into out. Otherwise each voice decodes its part of the
- * frame into its own AUDIO_FRAME_SAMPLES-byte slot of scratch (halfword
- * stores, word-aligned slots) and the slots are summed span by span. Lengths
- * are multiples of eight, so every span is a whole number of words. */
-static inline void audio_mixer_mix(AudioMixer *m, volatile u16 *out, volatile u16 *scratch)
+ * decodes straight into out. Otherwise the n active voices decode into the
+ * columns of an n-wide table in scratch (AUDIO_VOICES * AUDIO_FRAME_SAMPLES
+ * bytes, word aligned), a voice that ends inside the frame is padded with
+ * silence, and the table is summed in one pass. Lengths are multiples of
+ * eight, so every part is a whole number of words.
+ *
+ * *silent says whether out already holds a whole frame of silence: then a
+ * frame without voices writes nothing. It is updated to say whether out
+ * holds silence now. A caller with several output buffers keeps one flag
+ * for each. */
+static inline void audio_mixer_mix(AudioMixer *m, volatile u16 *out, volatile u16 *scratch, u8 *silent)
 {
-    const u32 *src[AUDIO_VOICES];
-    u32 count = 0, pos = 0;
-    u32 lone = 0;
+    u32 count = 0, lone = 0;
     for (u32 i = 0; i < AUDIO_VOICES; ++i) {
         AudioVoice *v = &m->voice[i];
         if (v->age != 0xff) ++v->age;
         if (v->remaining) { ++count; lone = i; }
     }
-    if (count == 1) {
-        AudioVoice *v = &m->voice[lone];
-        u32 n = v->remaining < AUDIO_FRAME_SAMPLES ? v->remaining : AUDIO_FRAME_SAMPLES;
-        audio_decoder_run(&m->dec[lone], out, n);
-        v->remaining -= n;
-        volatile u32 *dst = (volatile u32 *)(volatile void *)out;
+    volatile u32 *dst = (volatile u32 *)(volatile void *)out;
+    if (count < 2) {
+        u32 n = 0;
+        if (count) {
+            AudioVoice *v = &m->voice[lone];
+            n = v->remaining < AUDIO_FRAME_SAMPLES ? v->remaining : AUDIO_FRAME_SAMPLES;
+            audio_decoder_run(&m->dec[lone], out, n);
+            v->remaining -= n;
+        } else if (*silent) {
+            return;
+        }
         for (u32 k = n / 4u; k < AUDIO_FRAME_SAMPLES / 4u; ++k) dst[k] = 0;
+        *silent = !count;
         return;
     }
+    u32 column = 0;
     for (u32 i = 0; i < AUDIO_VOICES; ++i) {
         AudioVoice *v = &m->voice[i];
         if (!v->remaining) continue;
         u32 n = v->remaining < AUDIO_FRAME_SAMPLES ? v->remaining : AUDIO_FRAME_SAMPLES;
-        audio_decoder_run(&m->dec[i], scratch + i * (AUDIO_FRAME_SAMPLES / 2u), n);
+        volatile u16 *slot = scratch + 2u * column++;
+        audio_decoder_run_column(&m->dec[i], slot, n, count);
+        v->remaining -= n;
+        volatile u32 *pad = (volatile u32 *)(volatile void *)slot;
+        for (u32 k = n / 4u; k < AUDIO_FRAME_SAMPLES / 4u; ++k) pad[count * k] = 0x80808080u;
     }
-    /* The slots are read back below as words. */
+    /* The table is read back below as words. */
     __asm__ volatile ("" ::: "memory");
-    while (pos < AUDIO_FRAME_SAMPLES) {
-        /* Mix the span where the active set is constant, then retire. */
-        u32 span = AUDIO_FRAME_SAMPLES - pos;
-        count = 0;
-        for (u32 i = 0; i < AUDIO_VOICES; ++i) {
-            AudioVoice *v = &m->voice[i];
-            if (!v->remaining) continue;
-            src[count++] = (const u32 *)(const void *)(scratch + i * (AUDIO_FRAME_SAMPLES / 2u) + pos / 2u);
-            if (v->remaining < span) span = v->remaining;
-        }
-        volatile u32 *dst = (volatile u32 *)(volatile void *)(out + pos / 2u);
-        u32 words = span / 4u;
-        switch (count) {
-        case 0:
-            for (u32 k = 0; k < words; ++k) dst[k] = 0;
-            break;
-        case 1: {
-            const u32 *a = src[0];
-            for (u32 k = 0; k < words; ++k) dst[k] = a[k];
-            break;
-        }
-        case 2: audio_mixer_sum(dst, src, 2, words); break;
-        case 3: audio_mixer_sum(dst, src, 3, words); break;
-        default: audio_mixer_sum(dst, src, 4, words); break;
-        }
-        for (u32 i = 0; i < AUDIO_VOICES; ++i) {
-            AudioVoice *v = &m->voice[i];
-            if (v->remaining) v->remaining -= span;
-        }
-        pos += span;
-    }
+    audio_mixer_sum(dst, (const u32 *)(const void *)scratch, count, AUDIO_FRAME_SAMPLES / 4u);
+    *silent = 0;
 }
 
 /* Advance music by one frame and decode it: whenever a track is playing
@@ -320,12 +473,13 @@ static inline int audio_mixer_music_step(AudioMixer *m, const AudioBank *bank, v
 
 /* One video frame of interrupt work: out receives the mix, scratch is the
  * AUDIO_VOICES * AUDIO_FRAME_SAMPLES-byte decode area, music_out the music
- * frame. Returns the music step outcome. */
+ * frame; mix_silent is out's flag for audio_mixer_mix(). Returns the music
+ * step outcome. */
 static inline int audio_mixer_frame(AudioMixer *m, const AudioBank *bank, volatile u16 *out,
-                                    volatile u16 *scratch, volatile u16 *music_out)
+                                    volatile u16 *scratch, volatile u16 *music_out, u8 *mix_silent)
 {
     audio_mixer_service(m, bank);
-    audio_mixer_mix(m, out, scratch);
+    audio_mixer_mix(m, out, scratch, mix_silent);
     ++m->frames;
     return audio_mixer_music_step(m, bank, music_out);
 }
