@@ -202,7 +202,13 @@ static int race_p6_storm_tick(int user_paused)
             if(!sc64_pr_q8_storm_commit(i,hp_q8,shields_q8))return 0;
 #else
             u[i].hp = hp_q8 / SC64_STORM_ENERGY_ONE;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            { int shield_before = u[i].shield;
+              u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+              SC64_SHIELD_DEBIT(i, shield_before - u[i].shield, u[i].shield); }
+#else
             u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+#endif
 #endif
             if (u[i].hp <= 0) {
                 /* P6 source-death accounting must run while source identity is intact. */
@@ -239,7 +245,13 @@ static int race_p6_storm_tick(int user_paused)
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
             if(!sc64_pr_q8_storm_commit(MAX_UNITS+i,hp_q8,shield_q8))return 0;
 #else
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            { int shield_before=q->shield;
+              q->hp=hp_q8/SC64_STORM_ENERGY_ONE; q->shield=shield_q8/SC64_STORM_ENERGY_ONE;
+              SC64_SHIELD_DEBIT(MAX_UNITS+i,shield_before-q->shield,q->shield); }
+#else
             q->hp=hp_q8/SC64_STORM_ENERGY_ONE; q->shield=shield_q8/SC64_STORM_ENERGY_ONE;
+#endif
 #endif
             if (q->hp<=0) {
                 race_p6_note_building_death(q); q->hp=0; q->alive=0;

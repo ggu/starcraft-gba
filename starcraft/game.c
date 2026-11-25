@@ -140,10 +140,36 @@ static Sc64ProtossResearchLevels sc64_experimental_research_levels;
 /* The generated bank is const, so per-profile ticks may be computed once. */
 #define SC64_WEAPON_SOURCE_TICKS_CACHE 1
 #include "sc64_weapon_source_runtime.h"
+#if defined(SC64_RACES) && defined(SC64_UNIT_FACING) && defined(SC64_WEAPON_SOURCE_VFX) && \
+    !defined(SC64_SHIELD_FLASH_DISABLED)
+/* Protoss shield hit overlay; see sc64_shield_flash.h. */
+#define SC64_SHIELD_FLASH_ENABLED 1
+#define SC64_SHIELD_DIR_NONE 0xffu
+/* Presentation-only hit directions (32-way), never read by the simulation. */
+static u8 sc64_shield_hit_dir = SC64_SHIELD_DIR_NONE, sc64_shield_launch_dir = SC64_SHIELD_DIR_NONE;
+static void sc64_shield_flash_reset(void);
+static void sc64_shield_flash_hit(int,int,int);
+static void sc64_shield_flash_clear_actor(int);
+static void sc64_shield_mark_drawn(int);
+static inline void sc64_shield_flash_note_launch(int,int,int);
+static inline void sc64_shield_hit_from(int,int,int);
+static inline void sc64_shield_hit_done(void);
+#define SC64_SHIELD_HIT_FROM(x,y,t) sc64_shield_hit_from((x),(y),(t))
+#define SC64_SHIELD_HIT_DONE() sc64_shield_hit_done()
+#define SC64_SHIELD_NOTE_LAUNCH(t,x,y) sc64_shield_flash_note_launch((t),(x),(y))
+/* A shield debit made outside hit_target_impl_ex (splash, nukes, traps). */
+#define SC64_SHIELD_DEBIT(t,loss,left) sc64_shield_flash_hit((t),(loss),(left))
+#endif
 #ifndef SC64_IMPACT_EVENTS_DISABLED
 /* Ordinary moving projectiles deal damage at their source impact frame. */
 #define SC64_IMPACT_EVENTS 1
 #endif
+#endif
+#ifndef SC64_SHIELD_FLASH_ENABLED
+#define SC64_SHIELD_HIT_FROM(x,y,t) ((void)0)
+#define SC64_SHIELD_HIT_DONE() ((void)0)
+#define SC64_SHIELD_NOTE_LAUNCH(t,x,y) ((void)0)
+#define SC64_SHIELD_DEBIT(t,loss,left) ((void)0)
 #endif
 #ifdef SC64_TANK_SOURCE_VFX
 #include "sc64_tank_source_vfx.h"
@@ -1639,6 +1665,9 @@ static inline void clear_tracers(void)
 #ifdef SC64_IMPACT_EVENTS
     race_impact_reset();
 #endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_flash_reset();
+#endif
 }
 #ifndef SC64_DEATH_VFX_DISABLED
 /* Presentation-only death effects. The pool and the alive shadow are never
@@ -3128,6 +3157,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(i);
 #endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_flash_clear_actor(i);
+#endif
 #ifdef SC64_PROJECTILE_DEPTH
     sc64_trace_forget_ref(i);
 #endif
@@ -3363,6 +3395,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_clear_target(MAX_UNITS + i);
+#endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_flash_clear_actor(MAX_UNITS + i);
 #endif
 #ifdef SC64_PROJECTILE_DEPTH
     sc64_trace_forget_ref(MAX_UNITS + i);
@@ -5315,6 +5350,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
         if (*shield>0) damage=sc64_pr_stage_shield_reduce(target,damage);
 #endif
         int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+        sc64_shield_flash_hit(target,absorbed,*shield);
+#endif
     }
     if(!damage)return;
 #endif
@@ -5490,14 +5528,17 @@ hit_stock_building_target(const Building *source,int target,int damage)
     unsigned steps=race_impact_building_steps(source,target,flying);
     if (steps) {
         if (race_impact_full()) return 0;
+        SC64_SHIELD_NOTE_LAUNCH(target,source->x,source->y);
         race_impact_launch(target,damage,1,source->owner,
                            stock?attack.weapon->damage_class:-1,U_MARINE,steps);
         return 1;
     }
 #endif
+    SC64_SHIELD_HIT_FROM(source->x,source->y,target);
     if (stock)
         hit_target_impl(target,damage,U_MARINE,source->owner,attack.weapon->damage_class);
     else hit_target(target,damage,U_MARINE,source->owner);
+    SC64_SHIELD_HIT_DONE();
     return 1;
 }
 #endif
@@ -8962,19 +9003,24 @@ tick_combat(Unit * q, int target)
                               sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_IMPACT_EVENTS
         /* Nonzero only for a packet that can deal damage (see above). */
-        if (impact_steps)
+        if (impact_steps) {
+            SC64_SHIELD_NOTE_LAUNCH(target,q->x,q->y);
             race_impact_launch(target,damage,hits,q->owner,
                                stock_weapon?stock_attack.weapon->damage_class:-1,
                                q->type,impact_steps);
-        else
+        } else
 #endif
 #ifdef SC64_Z6_RUNTIME
         if (race_z6_hallucination_can_deal_damage((int)(q-u)))
 #endif
+        {
+        SC64_SHIELD_HIT_FROM(q->x,q->y,target);
         for(int hit=0;hit<hits&&target_alive(target);hit++) {
             if (stock_weapon) hit_target_impl(target,damage,q->type,q->owner,
                                              stock_attack.weapon->damage_class);
             else hit_target(target,damage,q->type,q->owner);
+        }
+        SC64_SHIELD_HIT_DONE();
         }
         }
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
@@ -11374,6 +11420,9 @@ draw_unit_with_images(Unit *q, int selection_pass, unsigned first, const u8 *nex
         return;
     }
 #endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    if (!selection_pass) sc64_shield_mark_drawn((int)(q - u));
+#endif
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
@@ -11585,6 +11634,9 @@ draw_unit(Unit * q)
 }
 
 #include "sc64_tracer_draw.h"
+#ifdef SC64_SHIELD_FLASH_ENABLED
+#include "sc64_shield_flash.h"
+#endif
 
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx_render.h"
@@ -13591,7 +13643,7 @@ static void race_scarab_probe_hit(int target,unsigned packet_q8,int owner) {
     packet_q8=packet_q8>armor_q8?packet_q8-armor_q8:0;
     if(!absorbed && packet_q8<128u)packet_q8=128u;
     hp_loss=(int)(packet_q8/256u);
-    if(shield_loss)*shield-=shield_loss;
+    if(shield_loss){*shield-=shield_loss;SC64_SHIELD_DEBIT(target,shield_loss,*shield);}
     if(hp_loss)hit_target_impl_ex(target,hp_loss,U_REAVER,owner,SC64_STOCK_DMG_NORMAL,
                                  SC64_HIT_PRECOMPUTED_HP|SC64_HIT_ALLOW_SPLASH_BURROW);
 #endif

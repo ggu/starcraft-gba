@@ -476,6 +476,9 @@ sc64_tile_background_done:
 #ifdef SC64_TRACER_EMPTY_VIEW
     sc64_tracer_view = SC64_TRACER_VIEW_MAY_DRAW;
 #endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_flash_draw();
+#endif
 #if defined(SC64_SHARED_NUKE_PROBE) && !defined(SC64_WORLD_DEPTH)
     race_nuke_draw();
 #endif
