@@ -56,26 +56,46 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The separate Z5 HOME recording remains active after 3,000 additional
   neutral inputs beyond the end of its tape.
 
+  From the six-chapter save, Z7 also wins at frame 267,585 with all
+  206 observations matching. A fresh load preserves all seven chapter
+  flags (507,907) and reproduces the victory SRAM byte for byte.
+
   Independently, Z7 wins from HOME on this ROM at frame 267,585 with all
   206 checkpoints matching. The fresh-loaded victory advances to Z8.
   The Z8 field save restores at frame 107 with the Z7 completion bit and
-  re-exports byte for byte. Z9 is the remaining intermediate Zerg handoff.
-  The current Z9 recovery produces a crystal and a full-health carrier on
-  the southern approach, but defenders kill it before delivery. The next
-  run should clear the delivery area before committing the carrier.
+  re-exports byte for byte. Z9 now wins from the crystal-spawn save on
+  the packaged ROM. A Mutalisk diversion north of the return location
+  let the Drone deliver the crystal from the south. Loading victory at
+  frame 59,957 advances to Z10. The Z10 frame-101 pause save restores the
+  Z9 completion flag and re-exports byte for byte. Reproduce the Z9
+  opening and delivery on the continuous campaign save.
   Also qualify campaign Overlord transport. The authenticated Z9 scenario
   allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
   default costs). The release exposes that research only in Z6 and
   custom games. Verify mission permissions, paid research, cargo, and
   SRAM continuation before relying on an airlift for this objective.
 
-- **Packaged Protoss campaign.** P6 wins at frame 92,986 after all 105
+- **Packaged Protoss campaign.** P2 now wins from HOME on the packaged
+  Protoss10 ROM with regenerated controller inputs. The 38,435-input run
+  reaches victory at frame 36,388 with zero unsupported actions. A fresh
+  HOME load restores the victory world and completion flag and re-exports
+  the same SRAM bytes.
+
+  P6 wins at frame 92,986 after all 105
   checkpoints, six briefing pages and 17 dialogue pages match the
   regenerated route. The full run averages 16.81 emulated updates/s.
   It saves and reloads during play, and the victory SRAM re-exports
   byte for byte after fresh HOME
   (`b01855f7314bdc8f5eb017caefa434f6821cc488e8df54bc30832b818bcef031`).
-  P7 then saves and reloads at frame 13 with the P6 completion bit.
+  From that P6 victory, P7 completes at frame 56,695 with all three
+  heroes alive and both objective Nexuses destroyed. The same route
+  also wins from HOME. Advancing the linked run to P8 and reloading
+  its frame-43 save preserves both P6 and P7 completion bits.
+  Separately, the P1 save clears P2 and P3, with matching checkpoint
+  observations and byte-identical victory readbacks. Its P4 frame-101
+  field save restores the first three completion flags (4,194,316).
+  The P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
+  victory retains all three completion bits (234,881,024).
 
   A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
@@ -159,8 +179,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   now has paired idle refusal and paid waiting at 9/9. The packaged
   P10 build repeats idle refusal, fresh-load queue persistence and
   resumption after Pylon completion. On native Challenger, selecting a
-  Probe at 9/9 exposes its Build command. Verify Pylon placement and
-  recovery from this state.
+  Probe at 9/9 exposes its Build command. C-left opens the build card
+  with a 100-mineral Pylon selected. A enters placement. Moving the
+  green preview toward the geyser turns it red. Confirming there shows
+  “You can’t build there” and keeps supply at 9/9. Confirming the green
+  preview on a second run starts a blue warp-in. The HUD still shows 9/9
+  at step 14,330 and reads 10/17 by step 16,330 with no further orders.
+  This agrees with the GBA check that paid waiting production resumes
+  on Pylon completion. Check the remaining queued Probe on native.
 
   The packaged Terran ROM at `5f758095` restores a retained pause and
   victory save from earlier builds for each of T1–T10 (20 fresh emulator
