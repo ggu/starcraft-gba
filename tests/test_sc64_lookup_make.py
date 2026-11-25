@@ -49,8 +49,11 @@ class LookupMakeTest(unittest.TestCase):
         flags = re.compile(r'TERRAN_ROM_FLAGS|ZERG_ROM_FLAGS|PROTOSS_(?:ROM_FLAGS|P7_CANONICAL_FLAGS)|'
                            r'SHOWCASE_FLAGS|SC64_WEAPON_SOURCE_BANK_HEADER|'
                            r'CONSTRUCTION_ARRIVAL_FLAGS_(?:terran|zerg-z6|protoss-p7)')
+        # Pack stamps preprocess only the selected skirmish header; they do
+        # not compile the game or consume the weapon lookup bank.
         consumers = [target for target, rule in rules.items()
-                     if any(flags.search(recipe) for recipe in rule['recipes'])]
+                     if any(flags.search(recipe) and '-include starcraft/sc64_skirmish_pack_gate.h' not in recipe
+                            for recipe in rule['recipes'])]
         self.assertGreater(len(consumers), 4)
         for target in consumers:
             with self.subTest(target=target):
