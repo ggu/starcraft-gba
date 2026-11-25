@@ -196,6 +196,6 @@ buildings. The tape SHA-256 is
 `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`,
 matching the November 22 corrected tape. The current padded Z10 ARM ROM
 then starts the same tape from empty HOME with ordinary buttons. The
-first 146 named observations through call 78,020, frame 76,568, match.
+first 166 named observations through call 156,197, frame 154,166, match.
 The ARM replay still needs to reach the victory before it can count
 toward current-cartridge coverage.

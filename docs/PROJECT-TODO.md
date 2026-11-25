@@ -2046,7 +2046,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rule. Verify the equivalent state on N64 when a matching campaign
   checkpoint is available.
   The [regenerated Z7 winning input tape](audits/2026-11-12-z7-normal-physical.md#november-25-rendered-controller-recovery)
-  wins on the prepared HOST build and matches the first 146 checks on
+  wins on the prepared HOST build and matches the first 166 checks on
   the current Z10 ARM build. Verify the remaining normal replay.
   The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
   preserve the economy at frame 87,554 and hold the Pool with four
@@ -2056,6 +2056,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the assault force. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
   verifies three Hydralisks and a new mining Drone at frame 35,958.
   Establish the defense earlier from frame 34,723 to survive the raid.
+  The [new Z10 controller replay](audits/2026-11-21-z10-current-full-circle.md#november-25-controller-replay-on-the-padded-journal-build)
+  wins on HOST. The ARM continuation first differs at frame 8,518.
+  Inspect the controller's macro inputs between frames 6,021 and 8,518.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second
