@@ -16,60 +16,100 @@ _Static_assert(sizeof(((RaceSave *)0)->units[0])==28 &&
                sizeof(((RaceSave *)0)->buildings[0])==25,"P10 typed rows");
 _Static_assert(sizeof(Sc64ImpactEvent)==6 && sizeof(Sc64ImpactSaveHeader)==8,
                "P10 impact packet layout");
-static inline unsigned sc64_p10_pi_get(const uint8_t *p,unsigned at,unsigned n) { unsigned x=0; for(unsigned i=0;i<n;i++) x|=((p[(at+i)/8]>>((at+i)%8))&1u)<<i; return x; }
-static inline void sc64_p10_pi_put(uint8_t *p,unsigned at,unsigned n,unsigned x) { for(unsigned i=0;i<n;i++) { unsigned k=at+i; p[k/8]=(uint8_t)((p[k/8]&~(1u<<(k%8)))|(((x>>i)&1u)<<(k%8))); } }
-/* Sideband bits: unit 222..223; building 193..194. Research 195..199 unchanged. */
-static inline int sc64_p10_pi_unit(uint8_t out[28],const uint8_t in[28],int encode) {
- uint8_t t[28]={0}; unsigned o,tm,rt,rem,v, a=0,b=0;
- if(encode) {
-  o=sc64_p10_pi_get(in,40,3);tm=sc64_p10_pi_get(in,146,5);rt=sc64_p10_pi_get(in,151,4);rem=sc64_p10_pi_get(in,212,11);
-  if(o>=5||tm>=25||rt>=13||rem>=1280)return 0;
-  v=(((o*25+tm)*13+rt)*1280+rem);
-  for(a=0;a<224;) {
-   if(a==40){sc64_p10_pi_put(t,b,21,v);b+=21;a+=3;}
-   else if(a==146)a+=5; else if(a==151)a+=4; else if(a==212)a+=11;
-   else {sc64_p10_pi_put(t,b++,1,sc64_p10_pi_get(in,a++,1));}
-  }
-  if (b!=222) return 0;
- } else {
-  v=sc64_p10_pi_get(in,40,21);if(v>=2080000)return 0;
-  rem=v%1280;v/=1280;rt=v%13;v/=13;tm=v%25;v/=25;o=v;
-  for(a=0;a<224;) {
-   if(a==40){sc64_p10_pi_put(t,a,3,o);a+=3;b+=21;}
-   else if(a==146){sc64_p10_pi_put(t,a,5,tm);a+=5;} else if(a==151){sc64_p10_pi_put(t,a,4,rt);a+=4;} else if(a==212){sc64_p10_pi_put(t,a,11,rem);a+=11;}
-   else {sc64_p10_pi_put(t,a++,1,sc64_p10_pi_get(in,b++,1));}
-  }
-  if (b!=222) return 0;
- }
- memcpy(out,t,28);return 1;
+static inline unsigned sc64_p10_pi_get(const uint8_t *p, unsigned at, unsigned n)
+{
+    unsigned value = 0;
+    for (unsigned i = 0; i < n; ++i)
+        value |= ((p[(at + i) / 8] >> ((at + i) % 8)) & 1u) << i;
+    return value;
 }
-static inline int sc64_p10_pi_building(uint8_t out[25],const uint8_t in[25],int encode) {
- uint8_t t[25]={0};unsigned o,rem,head,count,v,w,a=0,b=0;
- if(encode) {
-  o=sc64_p10_pi_get(in,40,3);rem=sc64_p10_pi_get(in,182,11);head=sc64_p10_pi_get(in,80,3);count=sc64_p10_pi_get(in,83,3);
-  if(o>=5||rem>=1280||head>=5||count>=6)return 0;
-  v=o*1280+rem;w=head*6+count;
-  for(a=0;a<195;) {
-   if(a==40){sc64_p10_pi_put(t,b,13,v);b+=13;a+=3;}
-   else if(a==80){sc64_p10_pi_put(t,b,5,w);b+=5;a+=3;}
-   else if(a==83)a+=3;else if(a==182)a+=11;
-   else {sc64_p10_pi_put(t,b++,1,sc64_p10_pi_get(in,a++,1));}
-  }
-  if (b!=193) return 0;
- } else {
-  v=sc64_p10_pi_get(in,40,13);w=sc64_p10_pi_get(in,90,5);if(v>=6400||w>=30)return 0;
-  o=v/1280;rem=v%1280;head=w/6;count=w%6;
-  for(a=0;a<195;) {
-   if(a==40){sc64_p10_pi_put(t,a,3,o);a+=3;b+=13;}
-   else if(a==80){sc64_p10_pi_put(t,a,3,head);a+=3;b+=5;}
-   else if(a==83){sc64_p10_pi_put(t,a,3,count);a+=3;}
-   else if(a==182){sc64_p10_pi_put(t,a,11,rem);a+=11;}
-   else {sc64_p10_pi_put(t,a++,1,sc64_p10_pi_get(in,b++,1));}
-  }
-  if (b!=193) return 0;
- }
- sc64_p10_pi_put(t,195,5,sc64_p10_pi_get(in,195,5));memcpy(out,t,25);return 1;
+
+static inline void sc64_p10_pi_put(uint8_t *p, unsigned at, unsigned n, unsigned value)
+{
+    for (unsigned i = 0; i < n; ++i) {
+        unsigned bit = at + i;
+        unsigned mask = 1u << (bit % 8);
+        p[bit / 8] = (uint8_t)((p[bit / 8] & ~mask) |
+                               (((value >> i) & 1u) * mask));
+    }
 }
+
+static inline void sc64_p10_pi_copy(uint8_t *out, unsigned to,
+                                    const uint8_t *in, unsigned from, unsigned n)
+{
+    for (unsigned i = 0; i < n; ++i)
+        sc64_p10_pi_put(out, to + i, 1, sc64_p10_pi_get(in, from + i, 1));
+}
+
+/* The unchanged prefix has five complete bytes in both layouts. Unit
+ * padding occupies bits 222 and 223 of the expanded journal row. */
+static inline int sc64_p10_pi_unit(uint8_t out[28], const uint8_t in[28], int encode)
+{
+    uint8_t row[28] = {0};
+    memcpy(row, in, 5);
+    if (encode) {
+        unsigned owner = sc64_p10_pi_get(in, 40, 3);
+        unsigned path_timer = sc64_p10_pi_get(in, 146, 5);
+        unsigned path_retry = sc64_p10_pi_get(in, 151, 4);
+        unsigned shield_remainder = sc64_p10_pi_get(in, 212, 11);
+        if (owner >= 5 || path_timer >= 25 || path_retry >= 13 ||
+            shield_remainder >= 1280) return 0;
+        unsigned path = (owner * 25 + path_timer) * 13 + path_retry;
+        sc64_p10_pi_put(row, 40, 21, path * 1280 + shield_remainder);
+        sc64_p10_pi_copy(row, 61, in, 43, 103);
+        sc64_p10_pi_copy(row, 164, in, 155, 57);
+        sc64_p10_pi_copy(row, 221, in, 223, 1);
+    } else {
+        unsigned packed = sc64_p10_pi_get(in, 40, 21);
+        if (packed >= 5u * 25u * 13u * 1280u) return 0;
+        unsigned path = packed / 1280;
+        sc64_p10_pi_put(row, 40, 3, path / (25 * 13));
+        sc64_p10_pi_copy(row, 43, in, 61, 103);
+        sc64_p10_pi_put(row, 146, 5, (path / 13) % 25);
+        sc64_p10_pi_put(row, 151, 4, path % 13);
+        sc64_p10_pi_copy(row, 155, in, 164, 57);
+        sc64_p10_pi_put(row, 212, 11, packed % 1280);
+        sc64_p10_pi_copy(row, 223, in, 221, 1);
+    }
+    memcpy(out, row, sizeof(row));
+    return 1;
+}
+
+/* Building padding occupies bits 193 and 194 of the expanded journal row.
+ * The research padding keeps its original positions at bits 195 to 199. */
+static inline int sc64_p10_pi_building(uint8_t out[25], const uint8_t in[25], int encode)
+{
+    uint8_t row[25] = {0};
+    memcpy(row, in, 5);
+    if (encode) {
+        unsigned owner = sc64_p10_pi_get(in, 40, 3);
+        unsigned shield_remainder = sc64_p10_pi_get(in, 182, 11);
+        unsigned queue_head = sc64_p10_pi_get(in, 80, 3);
+        unsigned queue_count = sc64_p10_pi_get(in, 83, 3);
+        if (owner >= 5 || shield_remainder >= 1280 ||
+            queue_head >= 5 || queue_count >= 6) return 0;
+        sc64_p10_pi_put(row, 40, 13, owner * 1280 + shield_remainder);
+        sc64_p10_pi_copy(row, 53, in, 43, 37);
+        sc64_p10_pi_put(row, 90, 5, queue_head * 6 + queue_count);
+        sc64_p10_pi_copy(row, 95, in, 86, 96);
+        sc64_p10_pi_copy(row, 191, in, 193, 2);
+    } else {
+        unsigned packed_shields = sc64_p10_pi_get(in, 40, 13);
+        unsigned packed_queue = sc64_p10_pi_get(in, 90, 5);
+        if (packed_shields >= 5u * 1280u || packed_queue >= 5u * 6u) return 0;
+        sc64_p10_pi_put(row, 40, 3, packed_shields / 1280);
+        sc64_p10_pi_copy(row, 43, in, 53, 37);
+        sc64_p10_pi_put(row, 80, 3, packed_queue / 6);
+        sc64_p10_pi_put(row, 83, 3, packed_queue % 6);
+        sc64_p10_pi_copy(row, 86, in, 95, 96);
+        sc64_p10_pi_put(row, 182, 11, packed_shields % 1280);
+        sc64_p10_pi_copy(row, 193, in, 191, 2);
+    }
+    sc64_p10_pi_copy(row, 195, in, 195, 5);
+    memcpy(out, row, sizeof(row));
+    return 1;
+}
+
 /* First 96 of the 800 building padding bits belong to research. */
 static inline uint8_t *sc64_p10_pi_side(RaceSave *save,unsigned n,unsigned *bit)
 {
@@ -85,25 +125,27 @@ static inline uint8_t *sc64_p10_pi_side(RaceSave *save,unsigned n,unsigned *bit)
 static inline int sc64_p10_pi_encode(RaceSave *save,uint8_t tail[SC64_P10_PI_TAIL],
                                       const Sc64ImpactEvent *rows,unsigned count)
 {
-    uint8_t packet[SC64_P10_PI_PACKET]={0}, tmp[28]; unsigned bit;
+    uint8_t packet[SC64_P10_PI_PACKET] = {0};
+    uint8_t row[28];
+    unsigned bit;
     if (!save || !tail || !rows || !count || count>SC64_P10_PI_ROWS) return 0;
     for (unsigned i=0;i<count;i++)
         if (!sc64_impact_event_valid(&rows[i],MAX_UNITS+MAX_BUILDINGS,5,SC_RU_COUNT)) return 0;
     for (unsigned i=0;i<MAX_UNITS;i++)
-        if (!sc64_p10_pi_unit(tmp,save->units[i].bytes,1)) return 0;
+        if (!sc64_p10_pi_unit(row,save->units[i].bytes,1)) return 0;
     for (unsigned i=0;i<MAX_BUILDINGS;i++) {
-        if (!sc64_p10_pi_building(tmp,save->buildings[i].bytes,1)) return 0;
+        if (!sc64_p10_pi_building(row,save->buildings[i].bytes,1)) return 0;
         for (unsigned j=0;j<5;j++)
             if (i*5+j>=96 && sc64_p10_pi_get(save->buildings[i].bytes,195+j,1)) return 0;
     }
     sc64_impact_encode(rows,count,packet);
     for (unsigned i=0;i<MAX_UNITS;i++) {
-        if (!sc64_p10_pi_unit(tmp,save->units[i].bytes,1)) return 0;
-        memcpy(save->units[i].bytes,tmp,28);
+        if (!sc64_p10_pi_unit(row,save->units[i].bytes,1)) return 0;
+        memcpy(save->units[i].bytes,row,28);
     }
     for (unsigned i=0;i<MAX_BUILDINGS;i++) {
-        if (!sc64_p10_pi_building(tmp,save->buildings[i].bytes,1)) return 0;
-        memcpy(save->buildings[i].bytes,tmp,25);
+        if (!sc64_p10_pi_building(row,save->buildings[i].bytes,1)) return 0;
+        memcpy(save->buildings[i].bytes,row,25);
     }
     for (unsigned n=0;n<SC64_P10_PI_EMBED*8;n++) {
         uint8_t *p=sc64_p10_pi_side(save,n,&bit);
@@ -117,19 +159,20 @@ static inline int sc64_p10_pi_encode(RaceSave *save,uint8_t tail[SC64_P10_PI_TAI
  * pass a fully encoded detached save; failure may mutate that save. */
 static inline int sc64_p10_pi_normalize_rows(RaceSave *save)
 {
-    uint8_t tmp[28]; unsigned bit;
+    uint8_t row[28];
+    unsigned bit;
     if (!save) return 0;
     for (unsigned n=0;n<SC64_P10_PI_BITS;n++) {
         uint8_t *p=sc64_p10_pi_side(save,n,&bit);
         sc64_p10_pi_put(p,bit,1,0);
     }
     for (unsigned i=0;i<MAX_UNITS;i++) {
-        if (!sc64_p10_pi_unit(tmp,save->units[i].bytes,0)) return 0;
-        memcpy(save->units[i].bytes,tmp,28);
+        if (!sc64_p10_pi_unit(row,save->units[i].bytes,0)) return 0;
+        memcpy(save->units[i].bytes,row,28);
     }
     for (unsigned i=0;i<MAX_BUILDINGS;i++) {
-        if (!sc64_p10_pi_building(tmp,save->buildings[i].bytes,0)) return 0;
-        memcpy(save->buildings[i].bytes,tmp,25);
+        if (!sc64_p10_pi_building(row,save->buildings[i].bytes,0)) return 0;
+        memcpy(save->buildings[i].bytes,row,25);
     }
     return 1;
 }
@@ -139,7 +182,8 @@ static inline int sc64_p10_pi_normalize_rows(RaceSave *save)
 static inline int sc64_p10_pi_decode(RaceSave *save,const uint8_t *tail,unsigned tail_len,
                                       Sc64ImpactEvent *candidate,int *count)
 {
-    uint8_t packet[SC64_P10_PI_PACKET]={0}; unsigned bit;
+    uint8_t packet[SC64_P10_PI_PACKET] = {0};
+    unsigned bit;
     if (!save || !tail || tail_len!=SC64_P10_PI_TAIL || !candidate || !count) return 0;
     for (unsigned n=0;n<SC64_P10_PI_BITS;n++) {
         uint8_t *p=sc64_p10_pi_side(save,n,&bit);
@@ -156,6 +200,7 @@ static inline int sc64_p10_pi_decode(RaceSave *save,const uint8_t *tail,unsigned
                                    MAX_UNITS+MAX_BUILDINGS,5,SC_RU_COUNT,candidate);
     if (decoded<0) return 0;
     if (!sc64_p10_pi_normalize_rows(save)) return 0;
-    *count=decoded; return 1;
+    *count = decoded;
+    return 1;
 }
 #endif
