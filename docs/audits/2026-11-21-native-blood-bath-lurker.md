@@ -244,3 +244,42 @@ The two private state and observation files and the retail ROM are not
 included in the source tree. The probe used the ordinary neutral-input
 command `1 0 0 0` for each field and read the native clock and four actor
 records; it did not write guest memory.
+
+## Concurrent Eggs referencing one Hatchery
+
+A later retained ordinary Blood Bath state starts at guest counter 38,433.
+It contains a completed owner-0 Hatchery in slot 81 at (1440,1872), two
+owner-0 Larvae in slots 765 and 776 nearby, and an existing Egg in slot 772.
+Each of the three actor records holds `0x802daaf8` at offset `+0x80`, the
+aligned address of the live slot-81 Hatchery in this capture. The field
+remains that value through the observed transitions; its exact semantic name
+has not been independently established.
+
+Two separate ares runs restored the state and advanced 3,600 video fields
+with neutral controller input. Their 3,601 per-field records were byte-for-byte
+identical. The observer read the guest clock and four live actor rows without
+writing guest memory:
+
+| Actor | Initial state at 38,433 | Egg raw 36 first seen | Hydralisk raw 38 first seen | Completion bit first seen |
+| --- | --- | ---: | ---: | ---: |
+| 765 | Larva | 38,514 | 38,952 | 38,967 |
+| 776 | Larva | 38,725 | 39,163 | 39,178 |
+| 772 | Egg | already present | 38,661 | 38,676 |
+
+Both new Eggs had the same owner and Hatchery pointer, and overlapped from
+the first observation at 38,725 until actor 765 first appeared as raw 38 at
+38,952: 227 guest-counter increments. Each observed Egg-to-Hydralisk interval
+was 438 increments, followed by 15 until its completion bit was seen. This
+is strong evidence for concurrently developing Eggs associated with one
+Hatchery in this scene. Proximity and an aligned shared pointer identify the
+association; they do not by themselves prove the field's purpose, the issuing
+controller, payment timing, or a direct conversion to GBA updates. The prior
+Egg was already present at the start, so its full incubation time was not
+measured. As above, reads can fall within a counter update.
+
+The retained state SHA-256 is
+`e8aebd4af8660191fec15b2c0b7988eb7fb194a2a6a3eef272bde6d920327305`;
+the two identical private per-field captures each have SHA-256
+`472f35d8f31a5ab2ec111afc1e3bc4429abb6bb1d79257745a67eb697f81e44d`.
+The same frontend and neutral input method as the preceding observation were
+used. State files, capture rows and retail inputs remain private.
