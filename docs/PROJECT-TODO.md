@@ -22,7 +22,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Packed mineral presentation.** The staged default saves 0.65–1.87% in
   eight paired three-computer emulator cuts. Both stored pages match in all
   samples, but one Protoss Blood Bath boundary displays different pages and
-  pause-open cost rises in four cuts. Investigate presentation timing and GBA
+  pause-open cost rises in five cuts. Investigate presentation timing and GBA
   hardware pacing before treating those as qualified. See the
   [paired audit](audits/2026-11-26-static-mineral-release.md).
 

@@ -38,7 +38,7 @@ except once in Protoss Blood Bath: at update 480 the byte build displays page
 boundary, but the displayed images differ. Every update from 451 through 550
 was sampled in a second pass; update 480 was the only display-selection
 difference. This is a presentation qualification gap, not exact displayed-frame
-parity. Menu opening also costs more in four rows above; these short samples do
+parity. Menu opening also costs more in five rows above; these short samples do
 not explain the timing or bound the tails. Hardware pacing remains open.
 
 ROM images remain 32 MiB. Across the four paired gas-enabled builds the linked
