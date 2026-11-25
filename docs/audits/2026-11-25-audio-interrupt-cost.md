@@ -284,6 +284,28 @@ The three build-time IRQ stack bounds fell from 304 to 264 bytes of
 the two ROMs. The mean over 300 VBlanks after warmup fell from 6,505
 to 3,410 cycles.
 
+### Whole-game cost on the relinked candidate
+
+After ten warmup updates, the next 300 neutral updates from a late
+three-CPU save on each race cartridge gave the following guest cycles.
+The orders counter is part of the update cost. These are different
+battles and the counters include interrupts.
+
+| Race | Mean whole update and render | 95th percentile whole update and render | Mean orders | Mean draw |
+| --- | ---: | ---: | ---: | ---: |
+| Terran | 795,178 | 938,620 | 331,967 | 343,500 |
+| Zerg | 970,496 | 1,230,420 | 430,019 | 378,323 |
+| Protoss | 790,667 | 959,557 | 392,932 | 238,257 |
+
+The two-VBlank budget is 561,792 guest cycles. All three battle windows
+exceeded it on average. Across the longer 1,024-update comparisons on
+these saves, the audio change reduced total cycles by 1.82%, 0.99% and
+2.02%, respectively. Both framebuffer pages, the palette, sampled world
+and camera state, and the exported pause save matched each control.
+Showcase also matched in an early battle. In the Zerg 7 campaign's
+4,901-input battle window, all 72 sampled world and video checkpoints
+matched; throughput rose from 8.72 to 8.82 updates/s.
+
 ## Limits
 
 - Emulator measurements only. mGBA charges no extra time for CPU access

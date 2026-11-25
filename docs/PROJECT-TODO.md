@@ -1500,7 +1500,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [IWRAM decoder and voice sum](audits/2026-11-25-audio-interrupt-cost.md)
   later cut the audio interrupt by 40–48%. DMA captures on all three
   race cartridges also match the previous mixer with four voices active.
-  Physical GBA timing remains open. Reusing
+  On the relinked cartridges, orders alone averaged 332k–430k guest
+  cycles in three late skirmish windows. Prioritize orders in these saves
+  and actor drawing on Zerg and Terran. Keep the 561,792-cycle whole-loop
+  budget as the performance gate. Physical GBA timing remains open. Reusing
   [unit admission checks](audits/2026-11-22-native-custom-game-lobby.md#reusing-actor-admission-during-the-draw)
   reduces the late 600-update mean by 0.20%, while p95 rises
   0.46%. Late orders and drawing still need work to reach the
