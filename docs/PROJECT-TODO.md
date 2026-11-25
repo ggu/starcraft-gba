@@ -90,6 +90,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   first diverge by 100 minerals at input 18,000, and the regenerated
   host controller loses at frame 111,670.
 
+  P10 completes from HOME on the same Protoss10 package with a
+  regenerated controller. The old tape first differs by 100 minerals at
+  input 7,095. The new run matches all 22 checkpoints, reads ten briefing
+  pages and 14 dialogue pages, and reloads its in-game save at frame
+  31,156. The Overmind is destroyed at frame 53,225 with zero unsupported
+  actions. The victory remains stable for eight neutral inputs after a
+  fresh HOME load and re-exports byte for byte
+  (`4bb1ae15b1eb691cfaf1d09e7c10fe17510b5ffe6975a67bb75fd54ce6a3dc49`).
+  The 54,493-input run averages 12.91 emulated main-loop updates/s.
+
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
   finish on the padded-journal Z10 build. The vitals build repeats the
