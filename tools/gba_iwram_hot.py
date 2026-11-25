@@ -37,6 +37,14 @@ The rules for what neither says:
 - Every function linked into the ROM must have a frame record, so a missing
   or partial dump fails the check. The exceptions are linker veneers, which
   use no stack, and libgcc's arithmetic helpers, which count LIBGCC_BYTES.
+- Every linked function must be reachable from the entry point or an
+  interrupt handler. One that is not is called from code with no record
+  (the reset code, a libgcc hook such as __aeabi_idiv0 written in C, a call
+  made in inline assembly), and the check fails instead of leaving its
+  chain out.
+- Stack moved inside an inline `asm` statement or a naked function has no
+  frame information at all. The sources have three asm blocks, none of
+  which touches the stack or calls; tests/test_sc64_iwram_hot.py keeps it so.
 - GCC's Thumb switch helpers (__gnu_thumb1_case_*) are not call-graph edges;
   they push two words at the bottom of a chain, which HELPER_BYTES adds.
 - A call cycle has no bound of its own. Each cycle the program can reach must
@@ -218,16 +226,19 @@ def parse_address_taken(lines) -> tuple[set[str], set[str]]:
     `Address is taken`, assembler names of every function it defines)."""
     taken: set[str] = set()
     defined: set[str] = set()
-    name, function = None, False
+    name, function, weakref = None, False, False
     for line in lines:
         if not line.startswith(" "):
             match = SYMBOL.match(line)
-            name, function = (match.group(1) if match else None), False
+            name, function, weakref = (match.group(1) if match else None), False, False
         elif line.startswith("  Type: function"):
             function = True
+            weakref = "weakref" in line
             if name and "definition" in line:
                 defined.add(name)
         elif line.startswith("  Address is taken") and function and name:
+            if weakref:
+                raise HotError(f"{name} is a weakref whose address is taken; its target cannot be resolved")
             taken.add(name)
     return taken, defined
 
@@ -393,7 +404,7 @@ def stack_bound(frames: dict[str, int], edges: dict[str, set[str]], taken: set[s
                       "functions": [{"name": symbol_of(m), "bytes": cost(m)} for m in members]})
         i = below[i]
     return {"bytes": depth[owner[root]] + HELPER_BYTES, "chain": chain, "cycles": cycles,
-            "undeclared": undeclared, "changed": changed}
+            "undeclared": undeclared, "changed": changed, "reachable": nodes}
 
 
 # --------------------------------------------------------------------------
@@ -594,7 +605,11 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
         if to is None:
             continue
         # The body may be listed under a merged twin's name: use every name at its address.
-        for title in sorted({t for name in names_at[source[0]] for t in titles.get(name, ())}):
+        callers = sorted({t for name in names_at[source[0]] for t in titles.get(name, ())})
+        if not callers and to in frames:
+            raise HotError(f"{source[2]} has no frame record but branches into {symbol_of(to)}; "
+                           "a chain through it cannot be bounded")
+        for title in callers:
             if to not in edges.setdefault(title, set()):
                 edges[title].add(to)
                 added += 1
@@ -615,7 +630,8 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
             if not found:       # merged into an identical function: use the frame at its address
                 found = {t for start in addresses.get(name, ()) for other in names_at[start]
                          for t in titles.get(other, ())}
-            if not found and name in addresses:
+            if not found and name.lstrip("*") in values:
+                # Any defined symbol counts: an assembly routine without .size is one too.
                 raise HotError(f"{name} has its address taken and is linked into {elf}, "
                                "but no frame record resolves it")
             taken |= found
@@ -648,7 +664,8 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
             continue
         for title in titles[name]:
             result = stack_bound(frames, edges, taken, title, **options)
-            irq.append({"name": name, "bytes": result["bytes"], "cycles": result["cycles"]})
+            irq.append({"name": name, "bytes": result["bytes"], "cycles": result["cycles"],
+                        "reachable": result["reachable"]})
             undeclared += [c for c in result["undeclared"] if c not in undeclared]
             changed += [c for c in result["changed"] if c not in changed]
     # A ROM without sampled audio or the VBlank counter installs no handler.
@@ -661,7 +678,8 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
               "limit": config["limit"], "chain": main["chain"], "cycles": main["cycles"],
               "address_taken": sorted(symbol_of(t) for t in taken), "aliases": len(aliases),
               "frames_raised_from_elf": adjusted, "edges_added_from_elf": added,
-              "irq_stack_bytes": irq_bytes, "irq_stack_room": IRQ_STACK_TOP - STACK_TOP, "irq_handlers": irq,
+              "irq_stack_bytes": irq_bytes, "irq_stack_room": IRQ_STACK_TOP - STACK_TOP,
+              "irq_handlers": [{"name": row["name"], "bytes": row["bytes"]} for row in irq],
               "hot_bytes": end - hot_start,
               "hot_functions": sum(1 for name in placed if any(matches(name, p) for p in config["names"])),
               "errors": [], "warnings": []}
@@ -677,6 +695,25 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
         names = ", ".join(cycle["functions"][:6]) + (" ..." if len(cycle["functions"]) > 6 else "")
         errors.append(f"undeclared call cycle ({names}); add `{cycle['kind']} {cycle['functions'][0]} COUNT "
                       f"{cycle['fingerprint']}` to {config_path} once its nesting is known")
+    # Everything linked must hang off the entry point or an interrupt handler.
+    # A function nothing reaches is called from code this check cannot see
+    # (the reset code, a libgcc hook, inline assembly), so its chain is not
+    # in the bound.
+    reachable = set(main["reachable"]).union(*(row["reachable"] for row in irq))
+    hidden = sorted(name for start, _, name in functions if name in titles
+                    and not any(t in reachable for other in names_at[start] for t in titles.get(other, ())))
+    if hidden:
+        errors.append(f"{len(hidden)} linked functions are reached from no call the check can see "
+                      f"(first: {', '.join(hidden[:6])})")
+    hooks = sorted(name for _, _, name in functions if name in titles and LIBGCC.match(name))
+    if hooks:
+        errors.append(f"{', '.join(hooks)} replaces a libgcc routine in C; libgcc calls it from code "
+                      "that has no call-graph record")
+    # A direct callee the linker replaced (--wrap, --defsym) is not the function in the dump.
+    gone = sorted({symbol_of(t) for node in reachable for t in edges.get(node, ())
+                   if t != INDIRECT and t in frames and symbol_of(t) not in values})
+    if gone:
+        errors.append(f"direct callees not in {elf}: {', '.join(gone[:6])}")
     seen_cycles = main["cycles"] + [c for row in irq for c in row.get("cycles", ())]
     for kind in CYCLE_KINDS:
         for pattern in config[kind]:

@@ -129,6 +129,15 @@ class BoundTest(unittest.TestCase):
         # A function nobody calls and whose address nobody takes is unreachable.
         self.assertEqual(bound(frames, calls)["bytes"], 10 + 20 + hot.HELPER_BYTES)
 
+    def test_new_plain_member_in_a_callback_cycle_changes_its_fingerprint(self):
+        frames = {"main": 10, "dispatch": 100, "callback": 200, "helper": 50, "extra": 30}
+        calls = [("main", "dispatch"), ("dispatch", hot.INDIRECT), ("callback", "helper"), ("helper", hot.INDIRECT)]
+        seen = bound(frames, calls, taken={"callback"})["cycles"][0]["fingerprint"]
+        longer = [("main", "dispatch"), ("dispatch", hot.INDIRECT), ("callback", "extra"), ("extra", "helper"),
+                  ("helper", hot.INDIRECT)]
+        result = bound(frames, longer, taken={"callback"}, callback_cycles={"callback": (1, seen)})
+        self.assertEqual(len(result["changed"]), 1)
+
     def test_callback_cycle_must_be_declared(self):
         # save -> (pointer) -> callback -> validate -> (pointer) -> callback ...
         frames = {"main": 10, "save": 100, "callback": 200, "validate": 50, "tail": 7}
@@ -487,6 +496,49 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(self.run_check(), 0)
         self.assertEqual(self.report()["stack_bound_bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
 
+    def test_linked_function_that_nothing_reaches_fails(self):
+        # compiled, linked, has a frame, but only the reset code or a libgcc hook calls it
+        self.frames["file.c:panic"] = 1200
+        self.symbols.append((0x08000601, 64, "FUNC", "LOCAL", "panic"))
+        self.measured[0x08000600] = 1200
+        self.cgraph += "panic/5 (panic)\n  Type: function definition analyzed\n"
+        self.assertEqual(self.run_check(), 1)
+        self.assertIn("reached from no call the check can see (first: panic)", self.report()["errors"][0])
+
+    def test_libgcc_hook_written_in_c_fails(self):
+        self.frames["__aeabi_idiv0"] = 16
+        self.calls.append(("file.c:leaf", "__aeabi_idiv0"))
+        self.symbols.append((0x08000601, 64, "FUNC", "GLOBAL", "__aeabi_idiv0"))
+        self.measured[0x08000600] = 16
+        self.cgraph += "__aeabi_idiv0/5 (__aeabi_idiv0)\n  Type: function definition analyzed\n"
+        self.assertEqual(self.run_check(), 1)
+        self.assertTrue(any("replaces a libgcc routine" in e for e in self.report()["errors"]))
+
+    def test_branch_from_code_without_a_record_into_the_program_fails(self):
+        self.symbols.append((0x08000701, 32, "FUNC", "GLOBAL", "__divsi3"))
+        self.branches.append((0x08000708, self.LEAF))
+        self.assertEqual(self.run_check(), 2)
+
+    def test_address_taken_assembly_routine_without_a_size_fails(self):
+        self.symbols.append((0x08000801, 0, "NOTYPE", "GLOBAL", "fast_fill"))
+        self.cgraph += "fast_fill/9 (fast_fill)\n  Type: function\n  Address is taken.\n"
+        self.assertEqual(self.run_check(), 2)
+
+    def test_address_taken_name_that_is_not_linked_is_ignored(self):
+        self.cgraph += "gone_callback/9 (gone_callback)\n  Type: function definition analyzed\n  Address is taken.\n"
+        self.assertEqual(self.run_check(), 0)
+
+    def test_weakref_with_its_address_taken_fails(self):
+        self.cgraph += "wr/9 (wr)\n  Type: function weakref\n  Address is taken.\n"
+        self.assertEqual(self.run_check(), 2)
+
+    def test_direct_callee_replaced_at_link_time_fails(self):
+        self.frames["file.c:wrapped"] = 8
+        self.calls.append(("file.c:leaf", "file.c:wrapped"))
+        self.cgraph += "wrapped/5 (wrapped)\n  Type: function definition analyzed\n"
+        self.assertEqual(self.run_check(), 1)
+        self.assertTrue(any("direct callees not in" in e for e in self.report()["errors"]))
+
     def test_declared_cycle_that_is_not_there_fails(self):
         self.config = "limit 0x03004200\nrecursion leaf 2 0123abcd\nhot\n"
         self.assertEqual(self.run_check(), 1)
@@ -562,6 +614,28 @@ class LinkerScriptTest(unittest.TestCase):
             self.assertEqual(len(re.findall(r"0x03007ffc\s*=", text, flags=re.I)),
                              len(re.findall(r"0x03007ffc\s*=\s*\(u32\)\s*\w+", text, flags=re.I)), path)
         self.assertEqual(stored, set(hot.IRQ_HANDLERS))
+
+    def test_inline_assembly_leaves_the_stack_and_control_flow_alone(self):
+        """Stack moved or calls made inside an asm statement have no frame or
+        call-graph record, so the stack bound cannot see them."""
+        blocks = 0
+        for path in [*(ROOT / "common").glob("*.[ch]"), *(ROOT / "starcraft").glob("*.[ch]")]:
+            text = path.read_text(errors="replace")
+            self.assertNotRegex(text, r"__attribute__\s*\(\(\s*naked", path)
+            for match in re.finditer(r"\b(?:__asm__|asm)\s*(?:volatile\s*)?\(", text):
+                depth, end = 1, match.end()
+                while depth and end < len(text):
+                    depth += {"(": 1, ")": -1}.get(text[end], 0)
+                    end += 1
+                body = " ".join(re.findall(r'"((?:[^"\\]|\\.)*)"', text[match.end():end]))
+                if not body.strip():
+                    continue        # an empty barrier such as asm("" ::: "memory")
+                blocks += 1
+                # No stack, link or program-counter register, no push/pop, no call, no software interrupt.
+                self.assertNotRegex(
+                    body, r"(?i)\b(sp|r13|lr|r14|pc|r15)\b|\b(push|pop|blx?|bx|swi|svc)\b|"
+                          r"\bbl(eq|ne|cs|hs|cc|mi|pl|vs|vc|hi|ge|gt|al)\b", f"{path}: {body[:80]}")
+        self.assertGreater(blocks, 0)
 
     def test_stack_pointers_match_the_reset_code(self):
         start = (ROOT / "common" / "start.s").read_text()

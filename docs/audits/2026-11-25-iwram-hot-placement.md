@@ -30,7 +30,7 @@ ELF and completed from it.
   This adds 91 to 110 edges per ROM that the graph leaves out, almost
   all to GCC's switch and division helpers.
 
-The graph and the ELF leave five things open, and the check has a rule
+The graph and the ELF leave seven things open, and the check has a rule
 for each.
 
 - A call through a pointer may reach any function that GCC's
@@ -63,6 +63,17 @@ for each.
   site counts) or have their address taken. An undeclared cycle fails
   the check. So does a declared one whose fingerprint no longer
   matches, and a declaration that matches no cycle.
+
+- Every linked function must be reachable from `main` or an interrupt
+  handler. One that is not is called from code with no record: the
+  reset code, a libgcc hook such as `__aeabi_idiv0` written in C, or a
+  call made in inline assembly. The check fails instead of leaving its
+  chain out. It also fails on an address-taken symbol that has no frame
+  record (an assembly routine used as a callback) and on a direct
+  callee that the linker replaced.
+- Stack moved inside an inline `asm` statement or a naked function has
+  no frame information. The sources have three `asm` blocks and none
+  touches the stack or calls; a unit test keeps it so.
 
 The build fails unless `__iwram_end` plus the bound plus a 512-byte
 margin stays at or below the stack top.
