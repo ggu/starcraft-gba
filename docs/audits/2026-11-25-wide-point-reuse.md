@@ -150,3 +150,22 @@ need current-release qualification before promotion.
 | Candidate Z10 ROM | `1d3f8f098900371404523bc4d591f7ac568dddf4325cf9a4190e8c76526c38f6` |
 | Z7 battle save | `2879841d6fbe26a27c35ea1316302419d0271abbcc395177393c8f1723be9bf5` |
 | Recorded input trace | `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1` |
+
+## Z9 ordinary-input flank continuation on the current trial
+
+From a retained Z9 crystal-spawn save, the same ordinary-button tape moved
+the camera and units toward the northern flank for 8,851 input updates,
+then paused and saved. Control and cache matched at 70 cuts during that
+route and 16 further cuts over 256 updates after a fresh-process reload:
+semantic world summaries, actor and building array hashes, camera, both
+framebuffer pages, palette, visible page and display control all matched.
+Both exports were byte-identical after reload. The pause SRAM was identical
+between builds (SHA-256
+`28395f85eb499cdb4311ae4b7df7946a35dbe586364015a851d0da4af306c5cb`).
+The control took 7,322,034,084 guest cycles and the candidate 7,322,236,536
+(+0.0028%); this route supplies a regression check, not a Z9 speedup.
+The starting SRAM SHA-256 was
+`d612c753633572eaef6e16f1bf4d6155164ceb8c87fe260d7ba3f43d0895a1b2`,
+and the input tape SHA-256 was
+`9a3144f9e9ba9863d9306546c2d6ec18813f6d6016f290653a8bea02550f0c9e`.
+These periodic observations do not assert equality at every update.
