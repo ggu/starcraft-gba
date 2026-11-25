@@ -4097,6 +4097,102 @@ qualification. With the gate off, the six-gate ARM ROM is byte-identical to
 `bed9feb7…9bc2f`.
 
 
+### Custom Game Larva and Eggs
+
+Checked on 2026-11-25 against base `7316734e`, with the same prepared inputs
+in both runs. See [Custom Game Larva and Eggs](DEVELOPMENT.md#custom-game-larva-and-eggs)
+for the rules and their references.
+
+**Host lifecycle.** `make test-custom-larva-eggs` builds
+`tests/sc64_custom_larva_eggs.c` under ASan and UBSan with the flags of the
+Terran, Z10, P10 and Showcase ROMs and of the canonical Z7 and P7 profiles. In
+each it plays a Custom Game with a Zerg human and a Zerg computer opponent
+through the controls and checks: three Larva at the start; three Drone orders
+from one Hatchery are three Eggs, each charged its price, a Larva and its
+supply at the order; with no Larva nothing is charged; all three count down
+together and each hatches on the update its own timer ends, where a ground
+unit can walk away; one more Larva every 428 updates up to three; a Zergling
+and a Scourge Egg each hatch two, holding both units' supply from the order;
+**CANCEL EGG** refunds minerals and gas and releases supply; a killed Egg
+refunds nothing and hatches nothing; at the supply cap an order is refused
+without charge while an Overlord is still accepted; a Hatchery finished during
+the match starts with one Larva; a save after a cancel and a death is written,
+and the same Egg rows marked as a campaign record are refused; the computer
+opponent holds up to five or six Eggs at once and never a queue entry. In the
+Terran, Showcase and P7 profiles the test also marks the loaded record as a
+campaign record and checks that its Egg rows are refused; in Z7, Z10 and P10
+the loader leaves `race_data` transformed after a load, so that direct check
+is skipped there.
+
+**Saves.** In every profile a pause save with three human Eggs and two or
+three computer Eggs, a Larva timer running and no queue entry, is written to a
+32 KiB SRAM image, a fresh process loads it through HOME, and the world digest
+(every live unit and building field, banks, Larva and timers) is identical at
+the save and 900 updates later. The same check passes on Blood Bath against
+three Zerg opponents. An earlier serial-queue record loads: in the Zerg
+profiles it is written by the same sources built without the capability (the
+SRAM image is byte-identical to the one the base sources write), its queued
+orders complete and a new order is an Egg; that build also refuses the record
+with Eggs and stays on HOME. Products that append the Egg cannot be built
+without it, so their earlier record is placed by the test.
+
+**ARM.** `tools/sc64_custom_larva_eggs_arm.py` on the final Z10 ROM
+(`6dfa950d…049a`), port-free mGBA runner, physical buttons only, blank save,
+Outpost, Zerg against one Zerg opponent: at update 272 the human orders three
+Drones with the opponent holding two Eggs; Eggs at three places with timers
+369, 371 and 373, no Larva left; pause save at update 309 with three Eggs on
+each side; a fresh process loads the SRAM (`5cea47ac…f3dc`), the restored
+fingerprint equals the saved one, and after 900 updates both processes have
+the same fingerprint. The load leaves the SRAM unchanged. The same run on the
+earlier build `f08977b6…0b78`, which differs only in the load-time Egg row
+checks, wrote byte-identical SRAM.
+
+**Opponents.** The AI matrix (607 cases, four profiles) passes 600 cases,
+as the base does. Two raid recoveries that failed in the base now pass
+(Outpost, Protoss human against a Terran opponent, Protoss and Showcase). Two
+now fail: Blood Bath, mirrored Zerg against a Zerg opponent whose main and
+workers are destroyed, in the Protoss and Showcase profiles. The opponent
+recovers, both armies destroy each other, and the world ends with one Drone
+that alternates between gas and minerals without delivering, so the fixture's
+required winner never comes; the Terran and Zerg profiles finish the same case.
+Across the 28 full matches with a Zerg opponent, the median match length is
+0.92 of the base, the mean 29,085 updates against 47,147, and 7 change winner;
+the 46 without a Zerg opponent keep their median length, and 2 of them,
+with a mirrored Zerg human, change winner. The Zerg opponents'
+peak army supply has median 51 against 46.
+
+**Performance.** On `f08977b6…0b78` (the final build differs only in
+load-time checks), emulated cycles per update over updates 6,000–9,000 of a
+passive Zerg human on Blood Bath, the same inputs for both ROMs: against three
+Zerg opponents 652,285 against 604,445 (+7.9%), against Terran, Zerg and
+Protoss 619,871 against 596,797 (+3.9%). These worlds differ: with Eggs the
+Zerg opponents have more units (136 against 109 at the end of the first
+window). With no Zerg player (Terran against Terran, Protoss and Terran) both
+ROMs play the identical match, and the difference is −0.009%.
+
+**Memory.** Every delivered ROM links and verifies. Z10 is unchanged
+(`__bss_end` 0x02039890, `__iwram_end` 0x03004fd0). Terran gains 4 bytes of
+BSS and 160 of IWRAM code (0x03004c18), P10 4 and 168 (0x03004fb0). In the
+products without campaign actor tables the Custom Game Egg keeps the default
+actor flags and the six-pixel collision radius, so the hot movement loops are
+unchanged; the growth is the Egg branch of the order loop and the Egg priority
+in target selection.
+
+**A defect found on the way.** When a pair hatches, the second unit is born
+inside the order loop after the target index was built, and `spawn_unit`
+reconciles only the collision buckets. If its slot came later in the loop and
+it moved, the index unlinked it through the stale links of the slot's previous
+occupant. A dropped head first made late saves continue differently after a
+load (5 of 32 save points from update 12,051 to 16,551 of one Blood Bath
+lobby; 9 with the earlier opt-in preview, which has the same pair birth) and
+later a cell's list became a cycle and hung a match. The Custom Game hatch
+now links that unit, and all 32 save points continue identically. Z7's
+mission Eggs use the same pair spawn and are unchanged here.
+
+**Not established.** Real hardware; campaign adoption (missions keep their
+production; see the Zerg profile test result in the pull request); native
+Larva positions, Egg animation and birth timing.
+
 ### Experimental independent Z7 Egg production
 
 The default-off `SC64_Z7_EGG_PRODUCTION` path creates a real raw-36 Egg in an

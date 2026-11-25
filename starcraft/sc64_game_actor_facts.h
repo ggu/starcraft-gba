@@ -30,7 +30,9 @@ static unsigned
 #endif
 sc64_game_unit_actor_flags(int type)
 {
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+#ifdef SC64_EGG_ID_STAGED
+    /* The Custom Game Egg keeps the default (no flags: every role allowed),
+     * which leaves this lookup a tail call in the hot movement loops. */
     if (type == U_SHARED_EGG_STAGE)
         return SC64_GAME_ACTOR_SELECTABLE | SC64_GAME_ACTOR_COLLIDABLE |
                SC64_GAME_ACTOR_DRAWABLE | SC64_GAME_ACTOR_MEN;
@@ -73,7 +75,7 @@ static int sc64_game_unit_selectable(int type)
 { unsigned f=sc64_game_unit_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
 static int sc64_game_building_selectable(int type)
 { unsigned f=sc64_game_building_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_EGG_COLLISION_RADIUS) || defined(SC64_GUARDIAN_COCOON_STAGE)
 /* Unit broad-phase overlap used by the simple mover is a radius in GBA
  * pixels. The source box is in StarCraft pixels; half its widest axis gives
  * the actor's half-extent at the renderer's 2:1 scale. Keep the historical
@@ -81,7 +83,7 @@ static int sc64_game_building_selectable(int type)
 static int
 sc64_game_unit_collision_radius(int type)
 {
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+#ifdef SC64_EGG_COLLISION_RADIUS
     if (type == U_SHARED_EGG_STAGE) return 8;
 #endif
 #ifdef SC64_GUARDIAN_COCOON_STAGE

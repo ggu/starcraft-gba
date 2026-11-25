@@ -129,6 +129,17 @@ class RunValidation(unittest.TestCase):
         early = [recs[0]]
         self.assertIsNone(ai.progression(early)[1]["ok"])
 
+    def test_an_egg_is_not_an_army_type(self):
+        bot = owner(1, 1, workers=12, mining=9, gas_workers=3, army=8, army_supply=14,
+                    unit_raw={"41": 12, "37": 8, str(ai.EGG): 4},
+                    building_raw={"131": [1, 0], "142": [1, 0], "135": [1, 0], "132": [1, 0]}, buildings=4, complete=4)
+        recs = [json.loads(snapshot("tick", f, [owner(0, 0), bot])) for f in (9000, 10800)]
+        recs = [{**r, "owners": [ai.validate_owner(r["owners"][0], 0, 0), ai.validate_owner(r["owners"][1], 1, 1)]} for r in recs]
+        prog = ai.progression(recs)[1]
+        # Zerglings and Eggs alone are one army type, however many Eggs stand.
+        self.assertEqual(prog["army_types"], [37])
+        self.assertFalse(prog["ok"], prog)
+
 
 class ResumeAndRecovery(unittest.TestCase):
     def resume(self, **kw):
@@ -152,6 +163,20 @@ class ResumeAndRecovery(unittest.TestCase):
         with self.assertRaisesRegex(ai.RecordError, "integer"):
             ai.validate_resume(self.resume(saved_frame="15000"))
         self.assertEqual(ai.validate_resume(self.resume(resumed="1234abce", match=0))["match"], 0)
+
+    def test_ended_before_load_is_not_a_refused_load(self):
+        ended = '{"kind":"reference","frame":18285,"won":0,"lost":1}\n{"kind":"ended-before-load"}\n'
+        refused = '{"kind":"reference","frame":18285,"won":0,"lost":1}\n{"kind":"load-failed"}\n'
+        # The match ended before the load could be tried.
+        self.assertTrue(ai.ended_before_load(7, ended))
+        self.assertTrue(ai.ended_before_load(4, '{"kind":"ended-before-save","frame":9000}\n'))
+        # A load that was attempted and refused, or that differed, is a result,
+        # whatever the reference match did.
+        self.assertFalse(ai.ended_before_load(5, refused))
+        self.assertFalse(ai.ended_before_load(5, '{"kind":"load-failed"}\n'))
+        self.assertFalse(ai.ended_before_load(6, ended))
+        self.assertFalse(ai.ended_before_load(0, ended))
+        self.assertGreaterEqual(ai.RESUME_STEP, 300)
 
     def test_evaluate_resume_exit_must_agree(self):
         case = ("resume", "terran", 1, 0, "zpt", 15000)

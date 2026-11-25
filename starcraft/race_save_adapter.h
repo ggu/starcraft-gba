@@ -230,7 +230,7 @@ static int race_scarab_stage_wire;
 #include "sc64_stage_save_auth.h"
 #define race_save_decode_unit race_save_decode_unit_raw_stage
 #endif
-#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_CUSTOM_EGGS_ACTIVE)
 #include "sc64_shared_egg_wire_host.h"
 #endif
 /* Decode a candidate unit without touching the live world. The compact
@@ -326,7 +326,7 @@ static int race_save_decode_unit(const RaceSave *candidate,unsigned slot,
 {
     Unit decoded;
     if (!out || !race_save_decode_unit_raw_stage(candidate,slot,width,height,&decoded)) return 0;
-#ifndef SC64_Z7_EGG_PRODUCTION
+#if !defined(SC64_Z7_EGG_PRODUCTION) && !defined(SC64_CUSTOM_EGGS_ACTIVE)
     if (decoded.type==U_SHARED_EGG_STAGE) return 0;
 #endif
     *out=decoded;return 1;
@@ -843,6 +843,59 @@ static int race_combined_egg_candidate_valid(const RaceSave *candidate,unsigned 
         }
     }
     return committed<=free_slots;
+}
+#endif
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
+/* A Custom Game Egg belongs to a Zerg seat of that record and has no source
+ * owner. Seats and lobby words are validated by the ordinary preflight. */
+static int race_custom_egg_owner(int owner,int raw_owner,void *context)
+{
+    const RaceSave *candidate=context;
+    return candidate && raw_owner==-1 && owner>=0 && owner<5 &&
+           candidate->players[owner]==R_ZERG;
+}
+/* A Custom Game record may hold Eggs; a campaign record may not, except the
+ * Z7 mission's own. Every live Egg row must be an Egg of a Zerg seat with a
+ * product the Custom Game catalog trains from Larva and a timer within that
+ * product's build time. Only Egg rows, and the Egg identity in a production
+ * queue, are judged: a record without them is left to the rules
+ * it was written under, so every earlier save loads as before. A pair needs no slot guarantee here, because an Egg waits for one
+ * (race_z7_egg_tick_unit). */
+static int race_custom_egg_rows_valid(const RaceSave *candidate,unsigned width,unsigned height)
+{
+    if (!candidate) return 0;
+    for (unsigned i=0;i<MAX_UNITS;i++) {
+        Unit q;
+        int raw,admitted=0;
+        if (!race_save_decode_unit(candidate,i,width,height,&q)) return 0;
+        if (q.type!=SC64_SHARED_EGG_TYPE) continue;
+#ifdef SC64_Z7_EGG_PRODUCTION
+        /* The Z7 mission's Eggs keep their own validator (sc64_z7_save.h). */
+        if (!candidate->state[0] && candidate->state[2]==SC64_Z7_GLOBAL_ID) return 1;
+#endif
+        /* A dead row is a free slot. Writers that use the appended identity
+         * clear it; the Z7 identity is a legacy row and may stay. */
+        if (!q.alive) continue;
+        if (candidate->state[0]!=1 ||
+            !sc64_shared_egg_wire_valid(&q,1,race_custom_egg_owner,(void *)candidate)) return 0;
+        raw=sc64_race_raw_unit(q.target);
+        if (raw<0 || sc64_race_unit_from_raw(raw)!=q.target) return 0;
+        for (unsigned j=0;j<SC64_SKIRMISH_UNIT_COUNT;j++) {
+            const Sc64SkirmishRecord *product=&sc64_skirmish_unit_catalog[j];
+            if (product->raw_id==raw && product->kind==SC64_SK_TRAIN && product->race==R_ZERG) admitted=1;
+        }
+        if (!admitted) return 0;
+    }
+    /* The Egg is an actor, never a product: no live production queue may
+     * hold it, in any record. Queues of real products load as before. */
+    for (unsigned i=0;i<MAX_BUILDINGS;i++) {
+        Building q;
+        if (!race_save_decode_building(candidate,i,&q)) return 0;
+        if (!q.alive) continue;
+        for (int j=0;j<q.queue_count && j<5;j++)
+            if (q.queue[(q.queue_head+j)%5]==SC64_SHARED_EGG_TYPE) return 0;
+    }
+    return 1;
 }
 #endif
 
@@ -2359,9 +2412,10 @@ static int race_save_game(void) {
 #endif
 #endif
     }
-#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_CUSTOM_EGGS_ACTIVE)
     for (int i=0;i<MAX_UNITS;i++) {
         Unit wire=u[i];
+        /* A dead Egg is a free slot, not an identity to carry in the record. */
         if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
         if (!sc64_p7_typed_unit_encode_for(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16),race_mode)) return 0;
@@ -2435,7 +2489,7 @@ static int race_save_game(void) {
         if (!sc64_unit_save_encode(&race_data.units[i],&wire,(unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #endif
     }
-#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
+#elif defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_CUSTOM_EGGS_ACTIVE)
     {
         Unit wire=u[i];
         if (race_mode && wire.type==SC64_SHARED_EGG_TYPE && !wire.alive) memset(&wire,0,sizeof(wire));
@@ -3108,6 +3162,10 @@ static int race_save_game(void) {
     if (race_mode && !race_combined_egg_candidate_valid(&race_data,
             (unsigned)race_cols*16u,(unsigned)race_rows*16u SC64_GCTX_ARG)) return 0;
 #endif
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
+    if (race_mode && !race_custom_egg_rows_valid(&race_data,
+            (unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
+#endif
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #ifdef SC64_RESEARCH_SRAM_PRODUCT
     if (race_mode==1) {
@@ -3550,6 +3608,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #if defined(SC64_SHARED_EGG_JOURNAL_HOST_STAGE) || defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE)
             if (!sc64_stage_save_auth_matches(&plan->egg_auth,&race_data,
                                      race_data.version,SC64_STAGE_SAVE_EGG)) return 0;
+#elif defined(SC64_CUSTOM_EGGS_ACTIVE)
+            /* Custom Game Eggs are checked as a whole below; a later
+             * campaign mission still has none. */
+            if (!v[0]) return 0;
 #elif defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE)
             if (!sc64_stage_save_auth_matches(&plan->guardian_auth,&race_data,
                                      race_data.version,SC64_STAGE_SAVE_EGG)) return 0;
@@ -3879,6 +3941,9 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE
     if ((plan->guardian_auth.features & SC64_STAGE_SAVE_EGG) &&
         !race_combined_egg_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u SC64_GCTX_ARG)) return 0;
+#endif
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
+    if (!race_custom_egg_rows_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u)) return 0;
 #endif
 #ifdef SC64_SHARED_BUNKER
     if (!race_bunker_save_world_valid(&race_data, width, height SC64_GCTX_ARG)) return 0;

@@ -29,7 +29,7 @@ separate original-art/Backwater engine has identical building-construction or
 Siege Tank semantics. Compare those products before describing the contract as
 parity across every engine implementation.
 
-The compile-time flag contract covers three mechanics. Building burn is
+The compile-time flag contract covers these mechanics. Building burn is
 also unconditional in the shared race engine; its common presentation and
 save rules are documented in [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md):
 
@@ -38,10 +38,15 @@ save rules are documented in [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md):
 | Construction HP | New buildings start with partial health and accumulate the remaining HP/shields over construction; morph completion adjusts HP against the new maximum. | [`sc64_construction_hp.h`](../starcraft/sc64_construction_hp.h), used by the shared race adapter. |
 | Siege splash | Siege Tank weapon impacts apply the shared splash tiers and damage rules to eligible nearby actors. | [`sc64_siege_splash.h`](../starcraft/sc64_siege_splash.h) and its authored source bounds table. |
 | Shield Battery | Mapped Batteries provide paid construction, psi power, command-driven shield transfer, regeneration, cleanup and persisted recharge state. P7's authenticated source properties remain mission-specific. | [`sc64_battery_adapter.h`](../starcraft/sc64_battery_adapter.h), the common race adapter and candidate-only save validation. |
+| Custom Game Larva and Eggs | In a Custom Game on every delivered cartridge and Showcase, every Zerg owner, human or computer, produces through Larva and Eggs: each Hatchery, Lair and Hive holds up to three Larva and spawns one about every 14 seconds, each order takes a Larva and becomes its own Egg with its own timer, and Eggs from one hall morph at once. There is no serial Hatchery queue. See [Custom Game Larva and Eggs](DEVELOPMENT.md#custom-game-larva-and-eggs). | [`sc64_custom_larva_eggs.h`](../starcraft/sc64_custom_larva_eggs.h), the shared Egg producer in the race adapter, and the planner in `race_skirmish_ai.h`. |
 
 `SC64_SHARED_ENGINE_FLAGS` supplies these mechanics through `RACES_FLAGS`. The
 required `SC64_ENGINE_CORE_REQUIRED` marker makes `game.c` reject a race-engine
-build that omits any of them. The old `SHOWCASE_SIEGE_FLAGS` override is
+build that omits any of them. The Larva and Egg flag is required of every such
+build and takes effect in each one with Custom Games in the shared transport
+save envelope. The older chapter profiles have Custom Games in raw word
+records without that envelope and keep the serial Hatchery queue; carrying
+Eggs there is unfinished storage work, recorded below. The old `SHOWCASE_SIEGE_FLAGS` override is
 retired and Make fails if a caller still supplies it. Thus Showcase, generic
 race/unified builds, and the chapter products inheriting `RACES_FLAGS` receive
 the same initial mechanic set. The compile contract is in
@@ -70,7 +75,7 @@ leaving completed buildings permanently below their intended health.
 | P7 and chapter services | Battery recharge is shared for mapped actors. Observer/detection, Carrier and other later services still have P7/chapter actor and runtime dependencies. | Continue separating those services from mission-only objectives and actors. Keep campaign triggers scoped to their missions; make ordinary service behavior mode-independent where the same actor capability is supported. |
 | Repair | Repair order handling is called from the T6/Terran-late runtime path; the specialized repair adapter validates Terran mechanical targets, SCV ownership, costs and persisted work state. | Keep Terran repair rules, but factor common order/state handling so the engine contract does not depend on a particular Terran chapter being active. Validate saved repair work across applicable modes. |
 | Transport | The transport runtime is compiled from T5, P5 Shuttle, or Z6 transport flags. Boarding, loaded-actor filtering, and cargo persistence use that runtime state. | Provide one shared transport service for every applicable product and mode; account for actor layout and every save codec. Do not enable cargo display or a carrier identity without a working cargo lifecycle. |
-| Zerg eggs and morphs | Independent egg production is gated by the Z7 egg-production feature and has dedicated actor/save validation. Other products use the older sequential Hatchery queue. | Share the lifecycle and persistence contract where independent eggs are promised, including cancel, death, completion and reload behavior. Keep mission-specific Z7 content and objectives separate. |
+| Zerg eggs and morphs | Custom Games produce through Larva and Eggs in every product (the contract above). Campaign missions keep their recorded production: Z7 has its mission Eggs and every other mission keeps the sequential Hatchery queue, because the missions are qualified by recorded input replays. Larva are a count on the town hall, not actors: they cannot be selected or killed one by one, and an Egg has no link to its hall, so a hatched unit does not follow a rally point. | Decide campaign adoption mission by mission with new replays. Give the older chapter profiles' raw word records an Egg admission if they are to have Larva and Eggs too. Larva as actors, Guardian and Lurker morphs, Cocoons and Egg animation remain. The opt-in `custom-egg-preview` and `late-egg-preview` builds predate this and can be retired. |
 | Building fire and burn-down | Shared race-engine burn, death cleanup, fractional save state and source damage overlays are implemented; see [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md). | Native N64 burn-handler tracing, random overlay history, source blending and alternate-pose attachment offsets remain unqualified. |
 | Shield bars | Shield/HP vitals already use the shared race renderer for selected units and buildings (`game.c`, `draw_unit` and `draw_building_overlay`). There is no separate profile flag for the bars. | Preserve this shared behavior; distinguish it from asset-bank parity and from always-visible battlefield status bars. |
 

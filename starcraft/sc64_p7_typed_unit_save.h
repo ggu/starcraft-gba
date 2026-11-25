@@ -233,14 +233,17 @@ static int SC64_TYPED_WIRE_DECODE(Unit *out,
 #undef SC64_TYPED_READ
 
 #ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#ifndef SC64_EGG_ROWS_DEFAULT
+#define SC64_EGG_ROWS_DEFAULT 0
+#endif
 static int sc64_p7_typed_unit_canonical(int t,int *hp,int *a,int *sh)
-{ return sc64_p7_typed_unit_canonical_for(t,hp,a,sh,0); }
+{ return sc64_p7_typed_unit_canonical_for(t,hp,a,sh,SC64_EGG_ROWS_DEFAULT); }
 static int sc64_p7_typed_unit_fields_valid(const Unit *q,unsigned w,unsigned h)
-{ return sc64_p7_typed_unit_fields_valid_for(q,w,h,0); }
+{ return sc64_p7_typed_unit_fields_valid_for(q,w,h,SC64_EGG_ROWS_DEFAULT); }
 static int sc64_p7_typed_unit_encode(Sc64P7TypedUnitSave *r,const Unit *q,unsigned w,unsigned h)
-{ return sc64_p7_typed_unit_encode_for(r,q,w,h,0); }
+{ return sc64_p7_typed_unit_encode_for(r,q,w,h,SC64_EGG_ROWS_DEFAULT); }
 static int sc64_p7_typed_unit_decode(Unit *q,const Sc64P7TypedUnitSave *r,unsigned w,unsigned h)
-{ return sc64_p7_typed_unit_decode_for(q,r,w,h,0); }
+{ return sc64_p7_typed_unit_decode_for(q,r,w,h,SC64_EGG_ROWS_DEFAULT); }
 
 #endif /* SC64_SHARED_EGG_WIRE_HOST_STAGE */
 #undef SC64_TYPED_WIRE_CANONICAL

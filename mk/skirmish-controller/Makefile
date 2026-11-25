@@ -8,3 +8,6 @@ $(addprefix build/test-sc64-skirmish-buttons-,$(SKIRMISH_CONTROLLER_PROFILES)) \
 $(addprefix build/test-sc64-depot-approach-,$(DEPOT_APPROACH_CASES)) \
 $(addprefix build/test-native-melee-start-,terran z10 p10 showcase) \
 build/test-sc64-p7-campaign-skirmish build/test-sc64-protoss-skirmish-pylons: $(SKIRMISH_CONTROLLER_DEPS)
+
+# Custom Game Larva and Eggs share the controller fixture.
+include mk/custom-larva-eggs/Makefile

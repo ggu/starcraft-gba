@@ -42,6 +42,9 @@ OWNER_MAPS = ("unit_raw", "building_raw", "first_made", "first_complete")
 # Structures beyond the first producer and supply that show tech progress.
 TECH = {0: {112, 113, 114, 120, 122, 123}, 1: {132, 135, 139, 141, 144, 146}, 2: {155, 162, 164, 166, 167, 169, 171}}
 WORKERS = {0: 7, 1: 41, 2: 64}
+# A Zerg Egg (raw 36) is an order in progress: it is counted as a unit of its
+# owner, and is neither a worker nor an army type.
+EGG = 36
 # The update before which each race starts no offensive, and the army supply
 # it gathers first (RACE_AI_FIRST_WAVE_* and RACE_AI_WAVE_SUPPLY in
 # starcraft/race_skirmish_ai.h). The offensive window opens with the earliest.
@@ -313,7 +316,7 @@ def progression(records, criteria="development", first=1):
             p["max_depots"] = max(p["max_depots"], row["depots"])
             if p["first_gas"] is None and row["gas_workers"]:
                 p["first_gas"] = r["frame"]
-            p["army_types"] |= {raw for raw in row["unit_raw"] if raw not in (WORKERS[row["race"]], 42)}
+            p["army_types"] |= {raw for raw in row["unit_raw"] if raw not in (WORKERS[row["race"]], 42, EGG)}
             p["tech"] |= {raw for raw, (done, _) in row["building_raw"].items() if done and raw in TECH[row["race"]]}
             if r["frame"] >= OFFENSIVE_FRAME and row["depots"] and not p["alive_at_offensive"]:
                 p["alive_at_offensive"] = True
@@ -1030,6 +1033,23 @@ def sanitizer_report(stderr):
     return ""
 
 
+# How far a resume case's save point steps back when the match ended before
+# the load could be attempted.
+RESUME_STEP = 600
+
+
+def ended_before_load(returncode, stdout):
+    """True when the saving run's match ended before the load could be tried.
+
+    The harness then reports "ended-before-save" (exit 4) or, when the match
+    ended in the continuation window, "ended-before-load" (exit 7) and never
+    attempts the load. A load that was attempted and refused is "load-failed"
+    (exit 5) and is always a result.
+    """
+    return ((returncode == 4 and '"kind":"ended-before-save"' in stdout) or
+            (returncode == 7 and '"kind":"ended-before-load"' in stdout))
+
+
 def run_case(build: Path, case, every):
     kind, profile, map_id, human, bots, arg = case
     binary = build / f"test-sc64-skirmish-ai-progress-{profile}"
@@ -1043,9 +1063,21 @@ def run_case(build: Path, case, every):
         final = [json.loads(t) for t in probe.stdout.splitlines() if t.startswith('{"kind":"final"')]
         end = final[-1]["frame"] if probe.returncode == 0 and len(final) == 1 else 0
         arg = min(arg, end - 2400)
-        if arg < (9000 if kind == "resume-late" else 6000):
+        floor = 9000 if kind == "resume-late" else 6000
+        if arg < floor:
             return case, argv, 9, "", f"match ends at {end}; no save point"
-        argv += ["--resume-at", str(arg), "--resume-len", "1800"]
+        # The pause that saves is itself input, so the saving run can differ
+        # from the probe and end inside the continuation window; then no load
+        # is attempted. Step the save point back, as far as the floor, until
+        # the passive human outlives the window. A refused or differing load
+        # is never retried: it is the result.
+        while True:
+            attempt = argv + ["--resume-at", str(arg), "--resume-len", "1800"]
+            p = subprocess.run(attempt, capture_output=True, text=True, timeout=900)
+            if (sanitizer_report(p.stderr) or not ended_before_load(p.returncode, p.stdout) or
+                    arg - RESUME_STEP < floor):
+                return case, attempt, p.returncode, p.stdout, sanitizer_report(p.stderr) + p.stderr[-2000:]
+            arg -= RESUME_STEP
     elif kind == "resume-morph":
         # Mirrored, so the human owner is still standing when the first
         # Sunken Colony morph starts (about update 18,500) and for the
@@ -1168,10 +1200,12 @@ def evaluate(case, returncode, stdout, every, criteria="development"):
             raise RecordError(f"exit code and {kind} record disagree")
         return {"ok": bool(r["ok"]), kind: r}
     if kind in ("resume", "resume-late", "resume-morph"):
-        if returncode in (4, 9) and not any(r["kind"] == "resume" for r in _records(lines)):
-            # The match ended (or no save point existed) before the save:
+        if returncode in (4, 7, 9) and not any(r["kind"] == "resume" for r in _records(lines)):
+            # The match ended (or no save point existed) before the save, or
+            # before the load could be tried after every step back:
             # classified, and never counted as a successful save.
-            raise RecordError(f"no save: {classify_end(lines) if returncode == 4 else 'no-save-point'}")
+            reason = {4: classify_end(lines), 7: "ended-before-load", 9: "no-save-point"}[returncode]
+            raise RecordError(f"no save: {reason}")
         r = validate_resume(lines)
         if returncode not in (0, 4, 6):
             raise RecordError(f"harness exit {returncode}")

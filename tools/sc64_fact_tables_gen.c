@@ -73,7 +73,8 @@
     X(SC64_SHARED_NUKE_PROBE) X(SC64_NUKE_SILO_JOURNAL) X(SC64_NUKE_ACTIVE_JOURNAL) \
     X(SC64_NUKE_FALLBACK_GHOST) X(SC64_NUKE_FALLBACK_ADDONS) X(SC64_NUKE_FALLBACK_SCIENCE_FACILITY) \
     X(SC64_SCARAB_RUNTIME) X(SC64_PAID_SCARAB) X(SC64_SHARED_TRANSPORT) X(SC64_Z9_RUNTIME) \
-    X(SC64_Z10_RUNTIME) SC64_FACT_EGG_WIRE_GATE(X) SC64_FACT_GUARDIAN_GATE(X) SC64_FACT_GUARDIAN_DISTINCT_GATE(X)
+    X(SC64_Z10_RUNTIME) SC64_FACT_EGG_WIRE_GATE(X) SC64_FACT_GUARDIAN_GATE(X) SC64_FACT_GUARDIAN_DISTINCT_GATE(X) \
+    X(SC64_CUSTOM_EGGS_ACTIVE) X(SC64_EGG_ID_APPENDED) X(SC64_EGG_ID_STAGED) X(SC64_EGG_COLLISION_RADIUS)
 
 #define SC64_FACT_STR(x) #x
 #define SC64_FACT_XSTR(x) SC64_FACT_STR(x)
@@ -121,8 +122,9 @@ int main(void)
          "SC64_FACT_FEATURE_P7_RECT | "
 #endif
          "0u)");
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_COCOON_STAGE)
-    /* Staged actors are outside the generated legacy fact table. */
+#if (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_EGG_ID_APPENDED)) || defined(SC64_GUARDIAN_COCOON_STAGE)
+    /* Staged actors are outside the generated legacy fact table. The Custom
+     * Game Egg is an ordinary appended identity, so it stays in the table. */
     printf("#define SC64_FACT_UNIT_COUNT %du\n", (int)SC_RU_LEGACY_COUNT);
     printf("#define SC64_FACT_BUILDING_COUNT %du\n", (int)SC_RB_COUNT);
     printf("_Static_assert(SC_RU_LEGACY_COUNT == %d && SC_RB_COUNT == %d,\n"

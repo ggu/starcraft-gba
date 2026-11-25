@@ -35,8 +35,9 @@ different updates, so no update runs more than one plan.
   A large gas surplus moves workers back to minerals, and so does falling
   below eight workers: the last worker never stays on gas.
 - Supply is built ahead of need, with a margin that grows with the number of
-  producers. Zerg queue Overlords from larva. Up to two supply builds run at
-  once after the first few.
+  producers. Zerg order Overlords from Larva. Up to two supply builds run at
+  once after the first few. A Zerg owner whose unit share is full orders no
+  further Overlords beyond the supply its wanted Drones need.
 - Pending construction is paid on arrival, so the planner reserves the price of
   every walking builder, and the price of the next affordable tech step, before
   training army units. A gas reservation only holds back purchases that need
@@ -68,6 +69,24 @@ different updates, so no update runs more than one plan.
 - When the home mineral field drops below 3,000, the owner builds a depot at
   the nearest free start location that still has minerals. Zerg also build
   extra Hatcheries at home as larva sources.
+- Zerg order through Larva and Eggs, with no queue behind the scenes. Each
+  planning pass orders one unit for every Larva a hall holds: Drones first, up
+  to the worker target, then the army pick for each further Larva. Drones
+  still in their Eggs count toward the worker target, except two, because
+  Zerg structures are made of Drones. An order counts every unit it will
+  hatch against the unit share, so a Zergling or Scourge Egg counts two.
+- Larva let a Zerg owner fill its unit share within minutes, where the serial
+  queue took most of a match. Its army therefore leaves the slots of the
+  Drones it still wants, so an owner that lost its mineral line, or spent its
+  Drones on structures, can always order them again.
+- A Zerg owner with no worker on gas takes the Zergling at once when its pick
+  needs gas it lacks, instead of waiting for 400 free minerals: with Larva,
+  every Larva held for a gas unit is an order lost.
+- A Zerg owner spends minerals on Larva as they arrive, so it would never bank
+  a Hatchery at a field with ore once its home fields are dry (the plan's
+  later halls wait for a rich bank). With no ore near any of its halls, ore
+  left elsewhere and its wanted Drones present, it holds the Hatchery price
+  and expands to the nearest free start location with ore.
 - Structures are placed on rotating lattice rings around the main depot. Placement
   keeps worker lanes to minerals and gas clear, reserves Terran addon spots,
   and keeps a vertical lane open through each producer's fixed unit exit. A
@@ -249,7 +268,7 @@ why:
 | Missing capability | Effect on opponents |
 | --- | --- |
 | Nearest-depot cargo return (`SC64_NEAREST_RESOURCE_DEPOT`) is off in canonical products. Cargo goes to the owner's first completed depot. | An expansion mines inefficiently until the main depot is gone. Expansions are taken only when the home field runs low, or as recovery depots. |
-| Zerg larva products are queued serially per Hatchery in these products. Parallel eggs exist only in the Z7 runtime. | Zerg production capacity comes from extra Hatcheries. Queues are capped at two items. |
+| Larva are a count on each town hall and spawn one about every 14 seconds per hall ([Custom Game Larva and Eggs](DEVELOPMENT.md#custom-game-larva-and-eggs)). | Zerg production capacity comes from extra Hatcheries, not from bank size: a Zerg owner with few halls banks minerals while it waits for Larva. |
 | Per-owner weapon and armor upgrades: the planner never starts research. In the Protoss P10 product a human Protoss researches at a Forge and Cybernetics Core, and the engine already pays, ticks, saves and applies levels for any Protoss owner, but no computer opponent issues the command (see [the research audit](audits/2026-11-11-protoss-research-sram/README.md)). Elsewhere unit levels apply only to the human. | No Forge, Cybernetics Core, Engineering Bay, Evolution Chamber or Armory research. Those buildings are built only for defenses and unit prerequisites. |
 | Medic healing, Queen spells, High Templar, Science Vessel, Defiler and Dark Templar products | Not trained. They have no working ordinary combat role in custom games. |
 | Reaver (Scarab ammunition), Arbiter, Observer, Shuttle and Ultralisk ordinary production (producer `255` or explicitly rejected) | Not trained. Robotics, Templar and Ultralisk Cavern paths are omitted. |

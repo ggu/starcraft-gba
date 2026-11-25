@@ -32,6 +32,9 @@ static int mirror_human, mirror_frame = -1;
  *    Queue appends are counted exactly: the queue head only ever moves
  *    forward by one per completed product, so appends = count change +
  *    head movement.
+ *  - An Egg that appears (a Custom Game Larva order) costs its product's
+ *    rule-table price, read from actor storage: a slot that holds a live Egg
+ *    it did not hold before, or whose Egg timer rose.
  *  - A paid Interceptor order (a Carrier-class unit's queue count rising, or
  *    a training child appearing as the count falls) costs the Interceptor's
  *    rule-table price, read from actor storage like a queue append.
@@ -58,7 +61,7 @@ typedef struct {
 typedef struct { int alive, owner, type, x, y, hp, maxhp, progress, raw_type, constructing, head, count; } AuditBuilding;
 static struct { int on, ore_start; OwnerAudit o[5]; } ledger;
 static AuditBuilding audit_pre_b[MAX_BUILDINGS];
-static struct { int owner, carry, parent, orders, interceptor; int reaver_total, scarab_of; } audit_pre_u[MAX_UNITS];
+static struct { int owner, carry, parent, orders, interceptor; int reaver_total, scarab_of; int egg, egg_timer; } audit_pre_u[MAX_UNITS];
 static int audit_pre_minerals[5], audit_pre_cap[5];
 
 static int audit_owners(int *ids)
@@ -146,6 +149,10 @@ static void audit_before(void)
     for (int i = 0; i < MAX_UNITS; ++i) {
         audit_pre_u[i].owner = u[i].owner;
         audit_pre_u[i].carry = audit_mineral_cargo(&u[i]);
+#ifdef SC64_EGG_RUNTIME
+        audit_pre_u[i].egg = u[i].alive && u[i].type == SC64_EGG_ACTOR;
+        audit_pre_u[i].egg_timer = u[i].work_timer;
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         audit_pre_u[i].parent = u[i].alive && sc64_p7_carrier_parent_type(u[i].type);
         audit_pre_u[i].orders = audit_pre_u[i].parent ? u[i].carry : 0;
@@ -218,6 +225,19 @@ static void audit_after(void)
             audit_note(q->owner, sc64_race_raw_building(charged));
         }
     }
+#ifdef SC64_EGG_RUNTIME
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        const Unit *q = &u[i];
+        const Sc64RaceUnitRule *r;
+        if (!q->alive || q->type != SC64_EGG_ACTOR || q->owner >= 5 ||
+            (audit_pre_u[i].egg && q->work_timer <= audit_pre_u[i].egg_timer)) continue;
+        r = sc64_race_unit_rule(q->target);
+        if (!r || !sc64_z7_egg_product_valid(q->target)) { ++ledger.o[q->owner].model_errors; continue; }
+        cost[q->owner] += r->minerals; cost_gas[q->owner] += r->gas;
+        if (r->supply) supply_push[q->owner] = 1;
+        audit_note(q->owner, sc64_race_raw_unit(q->target));
+    }
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
         int was = audit_pre_u[i].carry, now;
         if (!was) continue;
@@ -753,6 +773,20 @@ static int sunken_morph(void)
 static int ready_sunken_morph(void) { return sunken_morph() >= 0; }
 
 static void kill_unit(int slot) { hit_target(slot, 10000, U_MARINE, SIDE); }
+
+/* Remove the owner's Eggs through the engine's death path: its workers
+ * still in their Eggs (workers != 0) or every other order (workers == 0).
+ * An Egg is to Larva production what a queue entry is to a facility. */
+static void drop_eggs(int owner, int workers)
+{
+#ifdef SC64_EGG_RUNTIME
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && u[i].type == SC64_EGG_ACTOR &&
+            !sc64_race_is_worker(u[i].target) == !workers) kill_unit(i);
+#else
+    (void)owner; (void)workers;
+#endif
+}
 static void kill_building(int slot) { hit_target(MAX_UNITS + slot, 100000, U_MARINE, SIDE); }
 
 static int save_through_pause(void)
@@ -1353,6 +1387,7 @@ static int cut_army(int owner, int keep, int *kept_slots, int home_only)
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == owner && !sc64_race_is_worker(b[i].queue[b[i].queue_head]))
             b[i].queue_count = 0, b[i].queue_progress = 0;
+    drop_eggs(owner, 0);
     return kept;
 }
 
@@ -1444,6 +1479,7 @@ static int forced_commit(int scenario)
         for (int i=0;i<MAX_BUILDINGS;++i)
             if (b[i].alive && b[i].owner==owner && !sc64_race_is_worker(b[i].queue[b[i].queue_head]))
                 b[i].queue_count=0, b[i].queue_progress=0;
+        drop_eggs(owner, 0);
         kept=3;
     } else kept = cut_army(owner, 3, slots, 0);
     if (kept != 3) goto done;
@@ -1677,6 +1713,7 @@ static int owner_workers(int owner)
 /* Remove every queued worker of the owner, keeping other orders in place. */
 static void drop_queued_workers(int owner)
 {
+    drop_eggs(owner, 1);
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         Building *q = &b[i];
         int kept[5], n = 0, head_dropped;
@@ -1691,6 +1728,7 @@ static void drop_queued_workers(int owner)
         if (head_dropped) q->queue_progress = 0;
     }
 }
+
 
 static int raid(int scenario, int ticks)
 {
@@ -1714,6 +1752,13 @@ static int raid(int scenario, int ticks)
     main_depot = home.home;
     if (screen != SCREEN_PLAY || won || lost || main_depot < 0) goto done;
     before = owner_workers(owner); bank = race_owner_minerals(owner); at = frame;
+#ifdef SC64_EGG_RUNTIME
+    /* Workers still in their Eggs are part of the worker line the raid
+     * takes: they are removed below, as queued workers are. */
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner && u[i].type == SC64_EGG_ACTOR &&
+            sc64_race_is_worker(u[i].target)) { kill_unit(i); ++before; ++killed; }
+#endif
     if (scenario == 1) {
         kill_building(main_depot);
         depots_killed = !b[main_depot].alive || b[main_depot].owner != owner;
@@ -1910,6 +1955,7 @@ static int air_pin(int scenario)
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == owner && !sc64_race_is_worker(b[i].queue[b[i].queue_head]))
             b[i].queue_count = 0, b[i].queue_progress = 0;
+    drop_eggs(owner, 0);
     if (kept != 3) goto done;
     exhaust_minerals(owner);
     /* The flyer hovers on the far side of the depot from the map center,
@@ -2194,6 +2240,9 @@ int main(int argc, char **argv)
     uint32_t reference = world_hash();
     int reference_frame = frame;
     snapshot(stdout, "reference");
+    /* A match that ended in the continuation window has no reference to
+     * resume to: say so, and do not attempt the load. */
+    if (screen != SCREEN_PLAY || won || lost) { puts("{\"kind\":\"ended-before-load\"}"); return 7; }
     game_init(); previous = 0;
     input(KEY_L);
     if (screen != SCREEN_PLAY || !race_mode) { puts("{\"kind\":\"load-failed\"}"); return 5; }

@@ -446,7 +446,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "Custom Egg service requires authenticated custom transport without competing staged namespaces"
 #endif
 #endif
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE)) || !defined(SC64_RACES))
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && ((!defined(GBA_HOST) && !defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE) && !defined(SC64_CUSTOM_EGGS_ACTIVE)) || !defined(SC64_RACES))
 #error "Shared Egg wire identity is HOST-only and requires race rules"
 #endif
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) && defined(SC64_GUARDIAN_COCOON_STAGE)
@@ -484,6 +484,7 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #endif
 #if defined(SC64_SHARED_EGG_PRODUCER_HOST_STAGE) && \
     ((!defined(SC64_SHARED_EGG_CUSTOM_SERVICE) && !defined(SC64_SHARED_EGG_LATE_SERVICE) && \
+      !defined(SC64_CUSTOM_EGGS_ACTIVE) && \
       (!defined(GBA_HOST) || !defined(SC64_GUARDIAN_EGG_CANDIDATE_HOST_STAGE))) || \
      !defined(SC64_SHARED_SCOURGE_COMBAT))
 #error "Shared Egg producer requires an authenticated custom candidate"
@@ -747,7 +748,7 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
 #endif
 /* HOST-only candidate namespaces. Authentication and journal admission are
  * separate work; none of these selectors is wired into a save path here. */
-#ifdef SC64_SHARED_EGG_WIRE_HOST_STAGE
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_CUSTOM_EGGS_ACTIVE)
 _Static_assert((SAVE_VERSION & 0x40000000u) != 0,
                "Egg tag selector overlaps an existing namespace");
 #define SC64_SHARED_EGG_SAVE_VERSION (SAVE_VERSION ^ 0x40000000u)
@@ -4072,7 +4073,7 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
             if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
             int radius = 6;
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_EGG_COLLISION_RADIUS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             int mover_radius = sc64_game_unit_collision_radius(q->type);
             int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
             radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -8838,7 +8839,7 @@ tick_combat(Unit * q, int target)
              * pixels from source bounds; retain the six-pixel fallback in
              * the standard roster and do not widen ranged/min-range weapons. */
             int contact_range=6;
-#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
+#if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_EGG_COLLISION_RADIUS) || defined(SC64_GUARDIAN_DISTINCT_STAGE)
             if (target<MAX_UNITS) {
                 int mover_radius=sc64_game_unit_collision_radius(q->type);
                 int target_radius=sc64_game_unit_collision_radius(u[target].type);
