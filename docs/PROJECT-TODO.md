@@ -33,6 +33,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. Prioritize those paths for
   the race cartridges.
+  The [November 25 selection-ring builds](audits/2026-11-21-current-skirmish-matrix.md#november-25-selection-ring-release)
+  pass 54 physical-button Custom Game starts, pause saves, and fresh
+  continuations. Full-match and hardware measurements remain open.
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
