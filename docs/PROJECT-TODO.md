@@ -2071,6 +2071,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   stops the earlier escape. Keeping Kerrigan at her retreat destination
   lets the controller destroy both Nexuses and [win on ARM at frame
   86,969](audits/2026-11-12-z8-normal-physical.md#ordinary-arm-victory-after-the-delayed-retreat).
+  Kerrigan has 392 HP. Fresh HOME restores RESULT and identical SRAM.
   The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
   verifies three Hydralisks and a new mining Drone at frame 35,958.
   Establish the defense earlier from frame 34,723 to survive the raid.

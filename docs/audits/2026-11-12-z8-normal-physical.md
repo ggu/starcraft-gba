@@ -1558,10 +1558,18 @@ reaches the result screen at frame 86,969 and logical call 87,997 with
 units and 38 enemy buildings. This completes the ordinary-input route to
 victory on this version. The comparison covers the named observations.
 
+An independent replay of all 36 checkpoints also verifies the terminal
+roster. Both enemy Nexuses are absent, Kerrigan has 392 HP, the scheduler
+fault is zero, and the Z8 completion bit is set. A new HOME process loads
+the victory journal directly into RESULT at frame 86,969 and re-exports
+it byte for byte.
+
 | Input or receipt | SHA-256 |
 | --- | --- |
 | Padded-journal ARM ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
 | Fresh HOME through victory | `97946f7862b7a648ba75c758e756df36647225ca1286b438276c1c3fd4af2800` |
+| Independent terminal replay and fresh HOME | `b917e40c99b32a49cf2dc2e15324617ef16be507440a11be0619c74f46030cae` |
+| Victory journal and fresh re-export | `f0946a81d56cf77f0f034d735544cc130217051b4531eabf6714bf3d5882f2f9` |
 
 ### Native Overlord research permission
 
