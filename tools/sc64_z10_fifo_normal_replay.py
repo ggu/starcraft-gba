@@ -60,8 +60,9 @@ def main():
     try:
         for k in (0,0,512,0):g.step(k)
         prior=g.u32('race_completed')
-        require(prior & (1<<20) and g.u32('won') and g.u32('race_selected_mission')==20,
-                'seed is not Z9 victory')
+        required = (1 << 0) | (1 << 1) | sum(1 << i for i in range(14, 21))
+        require(prior & required == required and g.u32('won') and g.u32('race_selected_mission')==20,
+                'seed is not a Z1–Z9 victory chain')
         g.tap(1); require(g.u32('frame')==1 and g.u32('race_selected_mission')==21,'launch failed')
         urules=g.rsp.read(g.sym['sc64_race_unit_rules'],g.sizes['sc64_race_unit_rules'])
         brules=g.rsp.read(g.sym['sc64_race_building_rules'],g.sizes['sc64_race_building_rules'])

@@ -38,7 +38,7 @@ python3 tools/sc64_z10_fifo_normal_replay.py --seed "$z9_victory" \
   --runner "$physical_runner" --out "$new_output_dir"
 ```
 
-The replay checks the prior completed bit and Z9 victory, loads via ordinary
+The replay checks all Z1–Z9 completed bits and Z9 victory, loads via ordinary
 HOME input, presses A on the result, splices in the Z10 controller's input tape,
 and requires every listed checkpoint and the final completion mask. The tape,
 cartridge, saves and generated inputs remain private.
