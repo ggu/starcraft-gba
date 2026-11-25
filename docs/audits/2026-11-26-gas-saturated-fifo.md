@@ -188,3 +188,30 @@ use different battle states and establish no speedup versus release.
 | Zerg Blood Bath | 17,769–18,267 | 12.35 | 11.80 | 536,332 | 323,561 |
 | Protoss Outpost | 9,590–10,091 | 14.30 | 14.22 | 440,766 | 343,358 |
 | Protoss Blood Bath (start order 201) | 12,926–13,423 | 11.84 | 10.87 | 647,621 | 256,499 |
+
+### Where Protoss Blood Bath spends its order budget
+
+Replaying the same 512 calls from the order-201 pause save with
+`SC64_DIAGNOSTIC_ORDERS` and `SC64_DIAGNOSTIC_SETUP` exposed the following
+mean costs over 498 advancing updates. The diagnostic build used 673,867
+cycles in orders versus 647,621 on the plain trial build. These readings
+include instrumentation overhead.
+
+| Timed work | Mean cycles per advancing update |
+| --- | ---: |
+| Nearest-enemy queries | 206,246 |
+| Movement helper | 137,961 |
+| Order setup | 112,519 |
+| Of setup, unit buckets / owner lists / target index / Arbiter | 19,354 / 15,668 / 29,411 / 45,219 |
+
+Avoid adding the setup details to their inclusive parent. The remaining
+order loop work still needs attribution. A faster nearest-enemy query alone
+cannot recover the full 30 fps deficit. Check candidate changes against
+unmodified total loop cycles and the same input tape.
+
+Both builds matched all eight recorded gameplay checkpoints and the final
+world fingerprint. Of 513 displayed samples, 510 matched exactly. At
+samples 55, 58 and 66 both raw bitmap pages and the palette were identical;
+the builds displayed opposite pages at the debugger sampling instant.
+`tools/sc64_custom_full_match.py pace` now emits these optional order
+counters in the per-update rows when the ELF contains them.

@@ -79,7 +79,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   continuation and result reload. Keep paired losses as baselines and compare
   identical starting positions: Blood Bath can draw different positions on
   the two builds with the same lobby wait. Winning battle cuts still run at
-  11.84–18.52 updates/s. Orders and actor drawing remain priorities.
+  11.84–18.52 updates/s. In Protoss Blood Bath, the instrumented orders
+  averaged 206k cycles in nearest-enemy queries, 138k in movement and
+  113k in setup. Prioritize these with actor drawing and measure total
+  cycles on an uninstrumented candidate.
   [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
