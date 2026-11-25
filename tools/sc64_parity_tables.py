@@ -710,7 +710,7 @@ def profile_flags(root: Path) -> dict:
                 if token.startswith('-D'):
                     kept.append(token)
                 elif token == '-include' and i + 1 < len(tokens):
-                    kept += ['-include', str((root / tokens[i + 1]).resolve())]
+                    kept += ['-include', tokens[i + 1]]  # repo-relative; probes run in root
             flags[name] = kept
     missing = [name for name, _ in PROFILES if not flags.get(name)]
     if missing:
@@ -803,6 +803,9 @@ def read_engine(root: Path, work: Path) -> dict:
         flags = flags_by_profile[name]
         names = work / f'{name}-names.h'
         enum_names_header(root, flags, names)
+        # The probe reads the reference rule helpers. Z10's SC64_FACT_TABLES
+        # swaps in generated tables built from those same helpers, and
+        # tests/test_sc64_fact_tables.py checks the tables against them.
         lines = compile_and_run(root, work, name, ['-DPARITY_RULES', f'-DPARITY_NAMES="{names}"', *flags])
         profiles[name] = parse_rule_lines(lines)
         profiles[name]['defines'] = profile_defines(root, flags)
@@ -875,17 +878,25 @@ def write_private(root: Path, outputs: dict) -> None:
         entry = parent / path.name
         if entry.is_symlink():
             raise ValueError(f'{entry} is a symlink; refusing to replace it')
+        if entry.exists() and not entry.is_file():
+            raise ValueError(f'{entry} exists and is not a regular file')
         check_private(root, parent)
         # The unresolved entry is what os.replace overwrites; git check-ignore
         # never reports a tracked entry as ignored, so a tracked one is refused.
         check_private(root, entry)
         planned.append((parent, entry, text))
-    for parent, entry, text in planned:
-        with tempfile.NamedTemporaryFile('w', dir=parent, prefix='.' + entry.name + '.',
-                                         delete=False) as f:
-            f.write(text)
-            temp = Path(f.name)
-        os.replace(temp, entry)
+    temps = []
+    try:
+        for parent, entry, text in planned:
+            with tempfile.NamedTemporaryFile('w', dir=parent, prefix='.' + entry.name + '.',
+                                             delete=False) as f:
+                temps.append(Path(f.name))
+                f.write(text)
+        for temp, (_, entry, _) in zip(temps, planned):
+            os.replace(temp, entry)
+    finally:
+        for temp in temps:
+            temp.unlink(missing_ok=True)
 
 
 def report_lines(result: dict) -> list[str]:

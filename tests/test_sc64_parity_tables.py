@@ -335,6 +335,12 @@ class EngineSourceTest(unittest.TestCase):
                 pt.write_private(repo, {repo / 'private' / 'a.json': 'new\n',
                                         repo / 'private' / 'link.json': 'new\n'})
             self.assertEqual((repo / 'private' / 'a.json').read_text(), 'old\n')
+            (repo / 'private' / 'dir.txt').mkdir()
+            with self.assertRaises(ValueError):
+                pt.write_private(repo, {repo / 'private' / 'a.json': 'new\n',
+                                        repo / 'private' / 'dir.txt': 'new\n'})
+            self.assertEqual((repo / 'private' / 'a.json').read_text(), 'old\n')
+            self.assertEqual(sorted(x.name for x in (repo / 'private').iterdir() if x.name.startswith('.')), [])
 
     def test_missing_inputs_skip_cleanly(self):
         with tempfile.TemporaryDirectory() as temp:
