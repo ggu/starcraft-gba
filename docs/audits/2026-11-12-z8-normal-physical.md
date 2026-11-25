@@ -1518,6 +1518,67 @@ the stronger objective damage recorded in this audit.
 | Evacuation journal and input receipt | `2c3fe6c0911644bfdd4b91ce6ccb6ff428e4abae361f491fd2b2bdad7357b1f9` / `b0e4565f8d0d3ddd17b5ffdbe1b3d4129613cb8e0e3cba93c3998d64e748f75c` |
 | HOME load and three-Hydralisk attack | `89a4122ec6107d774a59811b8fa0e1f51468e5da23748a77e037c8a769598b9f` |
 
+### Rendered controller interception before the southern escape
+
+On HOST with rendering after every normal input, the southern Dark
+Templar enters the defeat region with 8 HP at frame 34,840. Both Nexuses
+are intact and Kerrigan is at full health. The game observes the escape
+and reaches defeat without an adapter fault.
+
+A separate controller input tape moves the southern guard and Overlord
+forward at frame 32,000. The Dark Templar falls by frame 34,680 and the
+mission continues past the escape. This route destroys one Nexus.
+Kerrigan eventually dies at frame 79,934 with the second Nexus intact.
+Moving the guard forward at the very start loses to an earlier escape.
+The delayed interception is the verified HOST branch to retain while
+working on Kerrigan's survival and the second assault. Neither HOST tape
+establishes a new ARM victory.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Rendered HOST defeat trace | `8a9d63ff9cb7da5577d9a627ca4a8b783eb6b4068bc054e1808591ca54f6dc64` |
+| Escape and outcome diagnosis | `6118c47b40338e2dfc1b664b884be2d9e899098c53468c68cc0fc6106fb0dedf` |
+| Delayed-guard input tape | `32e57b5b5816f62b4a007075f9e9f12c185aef9ed54de305b18c25074a280bea` |
+
+In the next HOST run, Kerrigan withdraws before the Dragoons arrive and
+the controller keeps her at the safer destination instead of returning
+her to the front line. The southern interception still succeeds. The
+controller destroys both Nexuses and reaches victory at frame 86,969
+after 87,997 input calls, with Kerrigan at 392 HP and zero faults. This
+tape has SHA-256 `2a96ab60f75bc24365942051508ccc5039143453a839ec7654e7482dcb389330`.
+
+### Ordinary ARM victory after the delayed retreat
+
+The padded-journal Z10 ROM replays the winning tape from empty HOME.
+Seven ordinary A presses acknowledge the queued dialogue. All 36 named
+checkpoint observations agree on the compared frame, screen, win/loss,
+unit and enemy building counts, resource bank and cursor. The ARM run
+reaches the result screen at frame 86,969 and logical call 87,997 with
+`won=1` and `lost=0`. At victory it reports 23 friendly units, 40 enemy
+units and 38 enemy buildings. This completes the ordinary-input route to
+victory on this version. The comparison covers the named observations.
+
+An independent replay of all 36 checkpoints also verifies the terminal
+roster. Both enemy Nexuses are absent, Kerrigan has 392 HP, the scheduler
+fault is zero, and the Z8 completion bit is set. A new HOME process loads
+the victory journal directly into RESULT at frame 86,969 and re-exports
+it byte for byte.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Padded-journal ARM ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
+| Fresh HOME through victory | `97946f7862b7a648ba75c758e756df36647225ca1286b438276c1c3fd4af2800` |
+| Independent terminal replay and fresh HOME | `b917e40c99b32a49cf2dc2e15324617ef16be507440a11be0619c74f46030cae` |
+| Victory journal and fresh re-export | `f0946a81d56cf77f0f034d735544cc130217051b4531eabf6714bf3d5882f2f9` |
+
+The latest vitals build repeats the whole path from empty HOME. All 36
+sampled checkpoints match, seven ordinary A inputs acknowledge dialogue,
+and its terminal Nexus, Kerrigan and completion observations agree.
+It exports the identical victory journal. The vitals ROM SHA-256 is
+`08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16`, and
+the run receipt SHA-256 is
+`5d82f90fe1721e3e908e8ce2ca888db0040cee57894deee5166017507242ed0d`.
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source
