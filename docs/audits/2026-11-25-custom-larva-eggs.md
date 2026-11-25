@@ -1,10 +1,9 @@
 # Custom Game Larva and Eggs
 
 Checked on 2026-11-25 and 26 on branch `claude/zerg-larva-eggs-0a3380`
-merged with base `b6b601f2`; comparisons are against base `d39bd015`, and the
-later base commits change tools, documents and the skirmish pack gate only.
-Base and change used the same prepared inputs, including the 56-patch Blood
-Bath skirmish pack of
+merged with base `737c0caa` (finite gas from
+[#903](https://github.com/ggu/starcraft-gba/pull/903)). Base and change used
+the same prepared inputs, including the 56-patch Blood Bath skirmish pack of
 [#887](https://github.com/ggu/starcraft-gba/pull/887). The rules and their
 references are in
 [Custom Game Larva and Eggs](../DEVELOPMENT.md#custom-game-larva-and-eggs).
@@ -61,7 +60,8 @@ their earlier record is placed by the test.
 ## Campaign missions
 
 The Z10 campaign controller (`build/test-sc64-z10-campaign-run`) writes a
-byte-identical input and checkpoint log on the base and on this branch: the
+byte-identical input and checkpoint log on base `d39bd015` and on this branch
+merged with it: the
 mission is won at frame 49,302 in both. Its tape replay
 (`make test-sc64-z10-replay`) fails the same way on the base and here: the
 replayed match leaves the recorded one and restarts the mission. That failure
@@ -71,7 +71,7 @@ is not caused by this change.
 
 `tools/sc64_custom_larva_eggs_arm.py`, port-free mGBA runner
 (`10189afc…`), physical buttons only, blank save, Z10 ROM
-`f22d24c2…6ed7e`, Outpost, Zerg against one Zerg opponent:
+`b612b985…10949`, Outpost, Zerg against one Zerg opponent:
 
 | Point | Update | Human Eggs (timers) | Computer Eggs (timers) | Queue entries |
 | --- | --- | --- | --- | --- |
@@ -91,7 +91,7 @@ The AI matrix (607 cases, four profiles, unsanitized `-O2` harness) on the
 
 | Tree | Passed | Failed |
 | --- | ---: | ---: |
-| Base `d39bd015` | 530 | 77 |
+| Base `737c0caa` | 530 | 77 |
 | This branch | 541 | 66 |
 
 The base itself fails 77 cases on this pack; those failures are not examined
@@ -125,44 +125,62 @@ opponents' median peak army supply is 43 against 42.
 
 ## Custom Game full matches
 
-The whole-match tapes of
-[#890](https://github.com/ggu/starcraft-gba/pull/890)
-(`make check-sc64-custom-full-matches`) were authored before this change and
-before [#892](https://github.com/ggu/starcraft-gba/pull/892). On base
-`d39bd015` with the 56-patch pack, 5 of its 11 qualified lobbies still win;
-Terran Blood Bath against three computers, Zerg Blood Bath against two, and
-all four Protoss lobbies lose without this change. On this branch six lobbies
-win, replay on the ROM, continue from their pause save in a fresh process and
-reload their victory save; three of them needed a new plan for the player:
+`make check-sc64-custom-full-matches` authors each lobby of `QUALIFIED`
+(`tools/sc64_custom_full_match.py`) with the HOST player and replays it on the
+cartridge with physical buttons. Base `737c0caa` qualifies 18 lobbies with
+finite gas ([gas audit](2026-11-26-n64-gas-pickup.md#custom-matches-with-finite-reserves-enabled)).
+With Larva and Eggs the Zerg opponents are stronger and 9 of those 18 plans
+fail on HOST: six lose, Protoss on Outpost against three computers reaches the
+update limit, and both Zerg Outpost lobbies with two or three computers win
+without ever having enough hostile units on one screen for the pause save.
+Every failing lobby has a Zerg computer.
 
-| Cartridge | Map | Opponents | `--plan` | Updates | Frame | Pause save (frame, units on screen) | Fresh-process continuation | Victory reload |
-| --- | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| Terran | Outpost | Zerg, Protoss, Terran | `PRODUCERS=3` | 30,765 | 29,794 | 13,746 (61 own, 7 hostile) | 111 checks match, same result and victory save | opens RESULT, SRAM unchanged |
-| Terran | Outpost | Terran, Zerg | `PRODUCERS=2,WORKERS=14` (new) | 28,081 | 27,308 | 14,085 (52 own, 10 hostile) | 82 checks match, same result and victory save | opens RESULT, SRAM unchanged |
-| Terran | Blood Bath Melee | Protoss, Zerg | `LOBBY_WAIT=8,FIRST_ATTACK=7000` | 46,414 | 43,822 | 11,379 (11 own, 21 hostile) | 382 checks match, same result and victory save | opens RESULT, SRAM unchanged |
-| Zerg Z10 | Outpost | Terran, Zerg, Protoss | `WORKERS=12,LINE=38` (new) | 30,818 | 30,019 | 18,896 (14 own, 5 hostile) | 72 checks match, same result and victory save | opens RESULT, SRAM unchanged |
-| Zerg Z10 | Outpost | Protoss, Zerg | `WORKERS=10,LINE=38` (new) | 24,425 | 23,645 | 21,749 (12 own, 6 hostile) | 20 checks match, same result and victory save | opens RESULT, SRAM unchanged |
-| Zerg Z10 | Blood Bath Melee | Terran, Zerg | `LINE=38,PRODUCERS=1,LOBBY_WAIT=22` | 23,238 | 22,587 | 12,829 (27 own, 12 hostile) | 128 checks match, same result and victory save | opens RESULT, SRAM unchanged |
+A HOST search over the plan settings (workers, producers, attack timing,
+defenses and the lobby wait that picks the Blood Bath start order) found new
+plans for seven of them. Protoss on Outpost against Terran and Zerg lost all
+37 plans tried, so its cell is covered by Terran and Protoss instead. On this
+branch all 17 lobbies win on the ROM; each continues from its mid-battle pause
+save in a fresh process to the same result and victory save, and its victory
+save reopens RESULT without changing SRAM:
 
-The two Zerg Outpost lobbies swap the worker counts #890 gave them. With
-#890's counts the player still wins, but never has enough hostile units on
-one screen for its pause save.
+| Cartridge | Map | Opponents | Plan | Victory frame | Pause save (frame, units on screen) | Checks after the save | Emulated updates/s |
+| --- | --- | --- | --- | ---: | --- | ---: | ---: |
+| Terran | Outpost | Zerg | unchanged | 32,082 | 17,744 (33 own, 14 hostile) | 116 | 21.19 |
+| Terran | Outpost | Terran, Zerg | new | 27,308 | 14,085 (52 own, 10 hostile) | 82 | 20.91 |
+| Terran | Outpost | Zerg, Protoss, Terran | unchanged | 29,794 | 13,746 (61 own, 7 hostile) | 111 | 21.52 |
+| Terran | Blood Bath | Zerg | unchanged | 22,769 | 17,939 (32 own, 6 hostile) | 68 | 19.34 |
+| Terran | Blood Bath | Protoss, Zerg | unchanged | 43,822 | 11,379 (11 own, 21 hostile) | 382 | 15.32 |
+| Terran | Blood Bath | Zerg, Protoss, Terran | new | 31,471 | 14,272 (9 own, 13 hostile) | 203 | 18.22 |
+| Zerg Z10 | Outpost | Protoss | unchanged | 16,051 | 11,857 (16 own, 8 hostile) | 41 | 24.35 |
+| Zerg Z10 | Outpost | Protoss, Zerg | new | 23,645 | 21,749 (12 own, 6 hostile) | 20 | 21.90 |
+| Zerg Z10 | Outpost | Terran, Zerg, Protoss | new | 30,019 | 18,896 (14 own, 5 hostile) | 72 | 20.81 |
+| Zerg Z10 | Blood Bath | Protoss | unchanged | 13,621 | 9,401 (8 own, 9 hostile) | 57 | 26.32 |
+| Zerg Z10 | Blood Bath | Terran, Zerg | unchanged | 27,388 | 12,762 (21 own, 10 hostile) | 186 | 18.64 |
+| Protoss P10 | Outpost | Terran | unchanged | 27,278 | 12,863 (10 own, 24 hostile) | 106 | 21.80 |
+| Protoss P10 | Outpost | Terran, Protoss | new lineup | 33,629 | 14,239 (23 own, 6 hostile) | 139 | 22.30 |
+| Protoss P10 | Outpost | Protoss, Terran, Zerg | new | 41,845 | 9,556 (24 own, 6 hostile) | 212 | 20.75 |
+| Protoss P10 | Blood Bath | Terran | unchanged | 28,291 | 14,553 (56 own, 12 hostile) | 137 | 17.28 |
+| Protoss P10 | Blood Bath | Terran, Zerg | new | 21,804 | 15,544 (27 own, 5 hostile) | 50 | 18.46 |
+| Protoss P10 | Blood Bath | Terran, Zerg, Protoss | new | 28,246 | 8,716 (19 own, 8 hostile) | 203 | 16.31 |
 
-The other five lobbies of the list lose on the base as well and are not
-requalified here.
+Zerg on Blood Bath against three computers is open (`OPEN_CELLS`): 104 plans
+against three Zerg computers lost between frames 20,348 and 72,698, and 24
+plans over four lineups with no Zerg computer (`tpt`, `tpp`, `ttt`, `ppt`)
+lost too. The base
+qualified it against three serial-queue Zerg computers. The coverage test now
+requires every other race, map and opponent count to have a lobby.
 
 ## Performance
 
 Emulated cycles per update over updates 6,000 to 9,000 of a passive human on
-Blood Bath, with the same inputs for base `d39bd015` (Z10 ROM `f4a221a3…`) and
-this branch (`f22d24c2…`). The base cartridge was built with the 56-patch pack
-before revision 2, which adds only geyser amounts that the game does not read:
+Blood Bath, with the same inputs for base `737c0caa` (Z10 ROM `1573dc01…`) and
+this branch (`b612b985…`):
 
 | Lobby | Base | Change | Difference | Units at window end (base, change) |
 | --- | --- | --- | --- | --- |
-| Zerg human, three Zerg opponents | 577,575 | 596,849 | +3.3% | 110, 138 |
-| Zerg human, Terran, Zerg, Protoss | 579,791 | 583,385 | +0.6% | 111, 113 |
-| Terran human, Terran, Protoss, Terran | 567,526 | 567,431 | −0.02% | 109, 109 |
+| Zerg human, three Zerg opponents | 577,603 | 596,938 | +3.3% | 110, 138 |
+| Zerg human, Terran, Zerg, Protoss | 579,936 | 583,535 | +0.6% | 111, 113 |
+| Terran human, Terran, Protoss, Terran | 567,533 | 567,432 | −0.02% | 109, 109 |
 
 The Zerg lobbies are different worlds: with Eggs the Zerg opponents field
 more units. With no Zerg player both ROMs play the identical match, so the
@@ -171,14 +189,14 @@ code itself costs nothing measurable.
 ## Memory
 
 Every delivered ROM links and verifies: Terran, Z7, Z8, Z9, Z10, P7, P10 and
-Showcase. Against base `d39bd015`:
+Showcase. Against base `737c0caa`:
 
 | ROM | `__bss_end` base → change | `__iwram_end` base → change | Hot-IWRAM stack check, spare bytes base → change |
 | --- | --- | --- | --- |
-| Z10 | 0x020399a0 → 0x020399a0 | 0x030062d8 → 0x030062d8 | 584 → 584 |
-| Terran | 0x0203a7fc → 0x0203a800 | 0x03005c88 → 0x03005d28 | 256 → 128 |
-| P10 | 0x0203b268 → 0x0203b26c | 0x03006190 → 0x030062a8 | 820 → 464 |
-| Showcase | 0x02038acc → 0x02038ad0 | 0x03005078 → 0x03005138 | no hot list |
+| Z10 | 0x02039a68 → 0x02039a68 | 0x030062d8 → 0x030062d8 | 536 → 536 |
+| Terran | 0x0203a83c → 0x0203a840 | 0x03005c88 → 0x03005d28 | 256 → 128 |
+| P10 | 0x0203b32c → 0x0203b32c | 0x03006190 → 0x030062a8 | 816 → 464 |
+| Showcase | 0x02038b8c → 0x02038b90 | 0x03005078 → 0x03005138 | no hot list |
 
 The growth is the Egg branch of the order loop and the Egg priority in target
 selection. In products without campaign actor tables the Custom Game Egg keeps
