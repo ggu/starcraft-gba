@@ -469,6 +469,8 @@ static void sc64_facility_frontiers_reset(void)
  * oversized geometry before any route-grid access can use these fields. */
 #ifdef SC64_WIDE_POINT_MEMO_PROBE
 static void sc64_wide_memo_reset(void);
+#else
+#define sc64_wide_memo_reset() ((void)0)
 #endif
 static int sc64_route_configure(void)
 {
@@ -481,6 +483,7 @@ static int sc64_route_configure(void)
 #ifdef SC64_RANGE_WORK
             sc64_range_route_reset();
 #endif
+            sc64_wide_memo_reset();
             sc64_route_config_cols = cols;
             sc64_route_config_rows = rows;
             sc64_route_active_bytes = 0;
@@ -501,10 +504,13 @@ static int sc64_route_configure(void)
     }
     cells = (unsigned)cols * (unsigned)rows;
     bytes = (cells * 3u + 7u) / 8u;
-    if (bytes == 0 || bytes > SC64_ROUTE_BYTES || bytes > SC64_ROUTE_POOL_BYTES)
+    if (bytes == 0 || bytes > SC64_ROUTE_BYTES || bytes > SC64_ROUTE_POOL_BYTES) {
+        sc64_wide_memo_reset();
         return 0;
+    }
     if (sc64_route_config_cols == cols && sc64_route_config_rows == rows &&
         sc64_route_active_bytes == bytes && sc64_route_active_slots != 0) return 1;
+    sc64_wide_memo_reset();
 #ifdef SC64_RANGE_WORK
     sc64_range_route_reset();
 #endif
@@ -700,9 +706,7 @@ sc64_routes_reset(void)
 /* The donors' bytes are only good for the grid they were flooded on. */
 static void sc64_routes_forget_donors(void)
 {
-#ifdef SC64_WIDE_POINT_MEMO_PROBE
     sc64_wide_memo_reset();
-#endif
     SC64_ROUTE_DONORS_CLEAR();
 #ifdef SC64_ROUTE_KEEP_FIELDS
     sc64_route_grid_copied = 0;
@@ -811,9 +815,7 @@ static void __attribute__((noinline, unused)) sc64_routes_topology_changed(void)
 /* Called by build_path_grid before it rewrites the grid. */
 static void __attribute__((noinline, unused)) sc64_routes_grid_begin(void)
 {
-#ifdef SC64_WIDE_POINT_MEMO_PROBE
     sc64_wide_memo_reset();
-#endif
     sc64_route_grid_copied = 0;
 #ifdef SC64_ROUTE_POINT_POINTER_PROBE
     sc64_route_point_saved = -1;

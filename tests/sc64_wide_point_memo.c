@@ -39,6 +39,16 @@ int main(void)
         check_memo_goal(i);
     }
     assert(sc64_wide_memo.used == SC64_MEMO_GOALS);
+    assert(sc64_route_configure() && sc64_wide_memo.reached);
+    race_rows = 96;
+    assert(sc64_route_configure() && !sc64_wide_memo.reached);
+    race_rows = 128;
+    assert(sc64_route_configure());
+    check_memo_goal(1);
+    race_rows = 0;
+    assert(!sc64_route_configure() && !sc64_wide_memo.reached);
+    race_rows = 128;
+    assert(sc64_route_configure());
     for (int edit = 0; edit < 64; ++edit) {
         int cell = rn(16384);
         desired[cell] ^= 1;
