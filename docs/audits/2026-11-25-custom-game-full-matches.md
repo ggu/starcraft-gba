@@ -7,6 +7,15 @@ through the pause menu during a battle, continued from that save in a fresh
 process, and its victory record reloaded in another. Emulator evidence only:
 nothing here was measured on a GBA.
 
+Three engine changes merged after `7316734e` and are not covered here:
+[#887](https://github.com/ggu/starcraft-gba/pull/887) restores Blood Bath
+from 32 to 56 mineral patches, so the Blood Bath rows below were played on
+the old layout and need new tapes;
+[#882](https://github.com/ggu/starcraft-gba/pull/882) moves hot code into
+IWRAM and [#806](https://github.com/ggu/starcraft-gba/pull/806) adds shield
+flashes. The Outpost tapes have not been replayed on cartridges with those
+changes either.
+
 ## Results
 
 | Cartridge | Map | Opponents | Result | Updates | Frame | Pause save (update, units on screen) | Fresh-process continuation | Victory reload | Emulated updates/s |
