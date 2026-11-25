@@ -95,39 +95,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   skirmish importer now keeps each source site’s full 32-bit gas quantity
   in both the map descriptor and private report. Regenerating Blood Bath
   preserved the four existing coordinates and recorded 10,000 gas at each.
-  The shared worker still awards eight gas per normal trip. The
-  [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
-  pickups of eight while stocked and two below eight from authenticated N64
-  code. On an unmodified Blood Bath replay, two Probes carried two gas each
-  after their Assimilator emptied and the observed bank increased by two twice. The opt-in shared worker implementation
-  now tracks source sites across extraction, refinery replacement and
-  save/load. `make check-sc64-source-gas` exercises all three worker types on
-  Blood Bath for each race product and checks source placements across all 30
-  campaign maps. The fixture moves workers between pickup and deposit and
-  seeds the last stocked trip. Blood Bath uses the imported 10,000 gas per
-  site. Outpost uses an authored 5,000. On the Terran cartridge a legacy T9 save
-  opened with zero consumption. After 512 ordinary updates, a fresh load
-  preserved 128 gas consumed at site 2. The older cartridge refused the new
-  record and fell back when an older journal slot was available. On all four cartridges, legacy Outpost and Blood
-  Bath three-AI saves loaded with zero depletion. After 256 ordinary updates
-  all eight cases had consumed gas and a fresh emulator loaded the same frame
-  and site amounts from the new pause save. Relative to release, the linked
-  race ROM code grew by 864–1,016 bytes, Showcase by 912, and static EWRAM by
-  64–200 bytes across the four profiles. IWRAM section sizes held steady.
-  Eight paired, 2,048-update continuations from the same three-AI saves
-  changed elapsed emulated cycles by under 0.05%. At 64 sample points
-  per case, actor arrays, world summaries, both video pages and the palette
-  matched release. Showcase Outpost displayed the other page once, and its
-  two pages contained different images. The candidate ran at 16.76–24.08
-  simulation updates/s across these cases. The field cursor, renderer and
-  placement rules now use the source sites beneath preplaced gas buildings.
-  In Terran 3, Zerg 2 and Protoss 2, the product HOST fixture destroys an
-  occupied site that was absent from the neutral-node list, pays a worker
-  to rebuild, advances construction, deposits gas and reloads the save.
-  It seeds the wallet and positions the workers. Each cartridge opened its
-  HOST-produced mission save in mGBA, continued, paused, wrote its own save
-  and restored the same mission frame and site consumption in a fresh process.
-  Verify stack headroom and late campaign behavior before release activation.
+  The [N64 and GBA gas audit](audits/2026-11-26-n64-gas-pickup.md)
+  records natural eight- and two-unit cargo and the opt-in shared worker
+  implementation. Rebuilding a preplaced refinery, preserving its balance
+  through save/load, the 30 chapter transitions and four product stack
+  budgets are verified. Before enabling this on release cartridges, finish
+  the busy Zerg 7 campaign replay with finite gas and check the late economy.
   The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
