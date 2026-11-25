@@ -10,9 +10,21 @@
 
 static FILE *trace;
 static u16 prior;
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+#if !defined(GBA_HOST) || !defined(SC64_TEXT_BOXES) || !defined(SC64_TEXT_BOX_HOST_MODAL)
+#error "normal HOME author needs the host modal text-box runtime"
+#endif
+static unsigned long host_tick;
+#include "sc64_controller_authored_pages.h"
+#else
 static unsigned host_tick;
+#endif
 
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+static void step(u16 held)
+#else
 static void input(u16 held)
+#endif
 {
     /* Once the mission ends, later calls are not inputs: the trace stops at
      * the deciding call, so a replay ends there too. */
@@ -22,14 +34,23 @@ static void input(u16 held)
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
     game_update(held,pressed);
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+    game_render();
+#endif
     prior=held;
     ++host_tick;
     if(trace&&changed)
         fprintf(trace,"{\"kind\":\"input\",\"call_index\":%u,\"frame_before\":%u,\"frame_after\":%u,\"held\":%u,\"pressed\":%u}\n",
             call_index,frame_before,(unsigned)frame,(unsigned)held,(unsigned)pressed);
 }
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+static void input(u16 held) { step(held); sc64_controller_ack_pages(step,held,&host_tick,stderr); }
+#endif
 #define KEY_TAP(k) do{input((k));input(0);}while(0)
 
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+static void briefing_press(u16 key) { KEY_TAP(key); }
+#endif
 static void launch_catalog_mission(int global_id)
 {
     int ordinal=sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,global_id);
@@ -37,7 +58,11 @@ static void launch_catalog_mission(int global_id)
     for(int page=0;page<ordinal/2;page++)KEY_TAP(KEY_RIGHT);
     if(ordinal&1)KEY_TAP(KEY_DOWN);
     KEY_TAP(KEY_A);
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+    if (!sc64_controller_reveal_briefing(briefing_press,global_id,&host_tick,stderr)) abort();
+#else
     KEY_TAP(KEY_START);
+#endif
 }
 
 static void move_cursor(int x,int y)
@@ -417,7 +442,7 @@ static int pause_menu_save(const char *path,int selectable_unit)
     if(!sf||fwrite(host_save,1,sizeof(host_save),sf)!=sizeof(host_save)){perror(save_path);return 0;}
     fclose(sf);
     fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
-        (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
+        (unsigned)frame,first,(unsigned)host_tick,paused,screen,building,menu_last);
     return 1;
 }
 

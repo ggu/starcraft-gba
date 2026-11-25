@@ -39,6 +39,18 @@ static int knob(const char*n,int d){const char*v=getenv(n);return v?atoi(v):d;}
 #define knob(n,d) (d)
 #endif
 
+#ifdef SC64_ZERG_LATE_NORMAL_HOME
+/* FIFO qualification: keep more Drones mining minerals and launch the
+ * Mutalisk fleet earlier. The legacy controller retains its original values. */
+#define Z10_DEFAULT_GASPER 3
+#define Z10_DEFAULT_MGO 10
+#define Z10_DEFAULT_MFLOOR 3
+#else
+#define Z10_DEFAULT_GASPER 6
+#define Z10_DEFAULT_MGO 34
+#define Z10_DEFAULT_MFLOOR 5
+#endif
+
 enum { HOME_X=704, HOME_Y=1896, RAW_TEMPLE=174, RAW_CRYSTAL=219, RAW_CANNON=162 };
 
 /* The way the Drone walks, as the path finder takes it: from the hive up the east
@@ -235,7 +247,7 @@ static void census(const char *label,int leg)
     fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,"
         "\"side_units\":%d,\"hydras\":%d,\"mutas\":%d,\"hatch\":%d,\"larva\":%d,\"queued\":%d,\"sunk\":%d,\"drones\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,\"leg\":%d,\"bank\":[%d,%d],"
         "\"supply\":[%d,%d],\"cursor\":[%d,%d],\"countdown\":0,\"towns\":%u,\"fault\":%u,\"peak_units\":%d,\"peak_buildings\":%d}\n",
-        label,(unsigned)frame,host_tick,screen,won,lost,count_units(SIDE,-1),count_units(SIDE,U_HYDRALISK),count_units(SIDE,U_MUTALISK),ck_hatch(),ck_larva(),ck_queued(),count_buildings(B_SUNKEN_COLONY,1),drone_count(),
+        label,(unsigned)frame,(unsigned)host_tick,screen,won,lost,count_units(SIDE,-1),count_units(SIDE,U_HYDRALISK),count_units(SIDE,U_MUTALISK),ck_hatch(),ck_larva(),ck_queued(),count_buildings(B_SUNKEN_COLONY,1),drone_count(),
         count_units(ENEMY,-1),eb,leg,minerals,gas,race_owner_supply(SIDE),race_owner_supply_cap(SIDE),cx,cy,
         (unsigned)race_zl_ai.started,(unsigned)race_zl_sched.core.fault,peak_units_g,peak_buildings_g);
     fflush(trace);
@@ -255,7 +267,7 @@ int main(int argc,char **argv)
         next_save_build=0,next_runner=0,runner=-1,next_lair=0,next_muta=0,muta_go=0,next_mgather=0,
         next_colony=0,next_fort=0,next_reinforce=0,taken=0;
     const int hatch_goal=knob("Z10_HATCH",6),gas_drones=3,hydra_cap=knob("Z10_CAP",30),muta_cap=knob("Z10_MUTAS",40),
-        muta_go_count=knob("Z10_MGO",34),muta_floor=knob("Z10_MFLOOR",5),muta_reach=knob("Z10_MREACH",300),
+        muta_go_count=knob("Z10_MGO",Z10_DEFAULT_MGO),muta_floor=knob("Z10_MFLOOR",Z10_DEFAULT_MFLOOR),muta_reach=knob("Z10_MREACH",300),
         def_reach=knob("Z10_DEFR",260),fight_period=90;
     int raid=0;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
@@ -381,7 +393,7 @@ int main(int argc,char **argv)
             }
         }
         COST(5)
-        if(frame>=next_gas&&!(raid&&knob("Z10_RAIDGATE",1))&&frame>=knob("Z10_GASAT",900)){(void)assign_gas_multi(knob("Z10_GASPER",6));next_gas=frame+300;}
+        if(frame>=next_gas&&!(raid&&knob("Z10_RAIDGATE",1))&&frame>=knob("Z10_GASAT",900)){(void)assign_gas_multi(knob("Z10_GASPER",Z10_DEFAULT_GASPER));next_gas=frame+300;}
         COST(7)
         /* The two starting Creep Colonies become Sunken Colonies once the pool stands. */
         if(frame>=next_colony&&!(raid&&knob("Z10_RAIDGATE",1))&&count_buildings(B_SPAWNING_POOL,1)){
@@ -496,6 +508,6 @@ int main(int argc,char **argv)
     census("final",front);
     fclose(trace);
     printf("z10 controller: frame=%u calls=%u won=%d lost=%d screen=%d fault=%u drones=%d hydras=%d mutas=%d front=%d temple=%d crystal=%d peak_units=%d peak_buildings=%d\n",
-        (unsigned)frame,host_tick,won,lost,screen,(unsigned)race_zl_sched.core.fault,drone_count(),count_units(SIDE,U_HYDRALISK),count_units(SIDE,U_MUTALISK),front,temple()>=0,crystal()>=0,peak_units_g,peak_buildings_g);
+        (unsigned)frame,(unsigned)host_tick,won,lost,screen,(unsigned)race_zl_sched.core.fault,drone_count(),count_units(SIDE,U_HYDRALISK),count_units(SIDE,U_MUTALISK),front,temple()>=0,crystal()>=0,peak_units_g,peak_buildings_g);
     return won?0:1;
 }
