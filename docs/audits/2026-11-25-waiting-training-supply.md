@@ -159,3 +159,20 @@ native refund comparison. The final raw image hashes are
 `75063a640617bb1d63068dd772b58a7f5bed9766eeedf79dc7043d6110384b2e`
 (control) and `ee672ffc29051f9c421b5fe0f26bc97f4a8ff7bcb58fc95b2fd96b8620f70661`
 (B).
+
+### Select a Probe while the Nexus is waiting
+
+On native Challenger, close the Nexus card and move the field cursor upward
+with three five-step analog pulses (Y = −24,000), releasing for five steps
+between pulses. Select the worker with A. The final image identifies the
+Probe, shows 20 shields and 20 HP, and displays the Build, BuildAdv and Move
+field commands. Supply is still 9/9. This gives the next test a verified
+starting point for opening the build menu with C-left. Two later observer
+runs stopped before that input, leaving placement and queue recovery open.
+
+The observer SHA-256 was
+`2b9ebe9365e0a7a57f6d0899520a694d37084b368e2f89876f0364363aeb8dd9`.
+The input tape hashes to
+`14316a2354fa09ffffac562d64c16cc4f03b4bcbe9dcd2797228c97ff7feac48`
+and the decoded image to
+`e41bfba1f8b2ffb3faf97714d8445500e41d09840ce4e9b81c1515a4a8dc75ad`.
