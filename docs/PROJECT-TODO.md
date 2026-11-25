@@ -83,9 +83,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Zerg](audits/2026-11-26-z10-fifo-normal.md).
 
 - **Terran campaign after the Custom Game Larva merge.** The standard
-  cartridge cleared T1–T4 from blank SRAM with ordinary result advances,
-  a fresh mid-mission load in each chapter and identical victory re-exports.
-  Continue T5 from this T4 victory and retain it through T10. The T4
+  cartridge cleared T1–T5 from blank SRAM with ordinary result advances,
+  fresh mid-mission loads and identical victory re-exports. The T5 paid
+  air route is replayable from the T4 result using the committed button
+  recording. Continue from this T5 victory through T10. The T4
   main loop averaged 24.60 Hz on this route.
   [Replay commands, hashes and timing](audits/2026-11-26-terran-linked-opening.md).
 

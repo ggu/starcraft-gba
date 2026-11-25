@@ -53,3 +53,38 @@ The runner SHA-256 was
 `050e5e7dcab772798780a11d1c6c3b4b84135e4b681aa11e08f666738ebaa9bf`.
 The verifier pins every input in each receipt. Local SRAM and original game
 data stay out of the repository.
+
+## Continue to T5, Revolution
+
+The same standard Terran cartridge loaded the T4 victory and advanced into
+Revolution. The route rescued the heroes, assigned miners, paid for aircraft
+and destroyed the enemy base. Raynor and Kerrigan survived. The cartridge
+entered the victory screen at frame 145,471 with zero enemy buildings and
+completion mask `0x1f0`.
+
+The [button recording](../../tests/fixtures/terran-t5-paid-route.json)
+contains 3,892 runs of held GBA buttons split across 39 emulator sessions.
+Each session starts from the previous session's exported SRAM. Each
+`[buttons, updates]` pair specifies a button mask and the number of game-loop
+iterations to hold it. The expected SHA-256 covers both SRAM banks. These
+inputs include the opening, paid production, attacks, pause saves and reloads.
+The recording is tied to the T4 result above. Use the stage name and frame
+from the verifier to investigate a future release that diverges.
+
+With the same shell variables and T4 output directory as above:
+
+```bash
+python3 tools/sc64_t5_linked_victory.py \
+  --previous-victory "$work/t4/victory-readback.sav" \
+  --rom "$TERRAN_ROM" --elf "$TERRAN_ELF" --runner "$PHYSICAL_OBSERVER" \
+  --out "$work/t5"
+```
+
+On success, `$work/t5/result.json` contains every stage hash. The fresh
+victory re-export is `$work/t5/victory-readback.sav`, SHA-256
+`1f47c043a05007c926b4d08923998c88516a9289f5517993a2892939910c3202`.
+
+An independent replay matched all 39 stage hashes, the final world after
+fresh load, and the transition to T6 at frame zero. The button runs took
+146,309 completed main-loop iterations and 99,807,435,490 emulated guest
+cycles, averaging 24.59 updates/s including HOME loads and pause saves.
