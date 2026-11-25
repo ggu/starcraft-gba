@@ -857,6 +857,29 @@ void gfx_blit16_rows(int x,int y,const u8 *src,int row0,int row1) {
  }
 }
 #endif
+#if (defined(GBA_SPRITE_WORDS) || defined(SC64_SHOWCASE_ENABLED)) && \
+    !defined(GBA_DISABLE_SPRITE_ROW_WORDS)
+#define GBA_SPRITE_ROW_WORDS 1
+typedef u16 __attribute__((may_alias)) GbaSpriteHalfword;
+static inline void gfx_sprite_store_pair(volatile u16 *dst, u16 pair) {
+ if(!pair)return;
+ if(!(pair&255u))pair|=*dst&255u;
+ else if(pair<256u)pair|=*dst&0xff00u;
+ *dst=pair;
+}
+
+#ifdef GBA_HOST
+typedef u32 __attribute__((may_alias)) GbaSpriteWord;
+
+static inline void gfx_sprite_store_word(volatile u32 *dst, u32 color) {
+ if(!color)return;
+ /* Remove the borrow matches on nonzero lanes before preserving VRAM. */
+ u32 zero=(color-0x01010101u)&~(color|(color<<7))&0x80808080u;
+ if(zero)color|=*dst&((zero<<1)-(zero>>7));
+ *dst=color;
+}
+#endif
+#endif
 HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
  if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
 #ifdef GBA_SCENE_CLIP
@@ -873,6 +896,61 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   int col=left;const u8*s=src+row*width;
   volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
   if((x+col)&1){if(s[col])*d=(*d&255)|((u16)s[col]<<8);d++;col++;}
+#ifdef GBA_SPRITE_ROW_WORDS
+  if(!((uintptr_t)(s+col)&1u)) {
+   if(col+5<right&&((uintptr_t)d&2u)) {
+    gfx_sprite_store_pair(d,*(const GbaSpriteHalfword *)(const void *)(s+col));
+    col+=2;
+    ++d;
+   }
+   if(col+3<right&&!((uintptr_t)d&3u)) {
+    unsigned halfwords = (uintptr_t)(s+col)&2u;
+#ifndef GBA_HOST
+    const u8 *q=s+col;
+    unsigned remaining=(unsigned)(right-col)>>2;
+    col+=(int)(remaining*4);
+    /* Load one aligned word or two aligned halfwords. The rest of the
+     * loop preserves exactly the zero lanes and advances the same clip. */
+    __asm__ volatile(
+     "1: cmp %[halfwords], #0\n\t"
+     "ldreq r2, [%[src]], #4\n\t"
+     "ldrneh r2, [%[src]], #2\n\t"
+     "ldrneh r3, [%[src]], #2\n\t"
+     "orrne r2, r2, r3, lsl #16\n\t"
+     "cmp r2, #0\n\t"
+     "beq 2f\n\t"
+     "sub r3, r2, %[ones]\n\t"
+     "orr ip, r2, r2, lsl #7\n\t"
+     "bic r3, r3, ip\n\t"
+     "ands r3, r3, %[high]\n\t"
+     "movne ip, r3, lsl #1\n\t"
+     "subne r3, ip, r3, lsr #7\n\t"
+     "ldrne ip, [%[dst]]\n\t"
+     "andne ip, ip, r3\n\t"
+     "orrne r2, r2, ip\n\t"
+     "str r2, [%[dst]]\n"
+     "2: add %[dst], %[dst], #4\n\t"
+     "subs %[remaining], %[remaining], #1\n\t"
+     "bne 1b"
+     : [src] "+&r"(q), [dst] "+&r"(d), [remaining] "+&r"(remaining)
+     : [halfwords] "r"(halfwords), [ones] "r"(0x01010101u), [high] "r"(0x80808080u)
+     : "r2", "r3", "ip", "cc", "memory");
+#else
+    for(;col+3<right;col+=4,d+=2) {
+     const u8 *q=s+col;
+     u32 word;
+     if(halfwords) {
+      const GbaSpriteHalfword *pair=(const GbaSpriteHalfword *)(const void *)q;
+      word=pair[0]|((u32)pair[1]<<16);
+     } else {
+      word=*(const GbaSpriteWord *)(const void *)q;
+     }
+     gfx_sprite_store_word((volatile u32 *)(void *)d,word);
+    }
+#endif
+   }
+  }
+#else
 #ifdef GBA_SPRITE_WORDS
   /* Advancing both pointers by two preserves their alignment difference. */
   int word_right=(((uintptr_t)d^(uintptr_t)(s+col))&3u)?0:right;
@@ -904,6 +982,40 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
    else if(a)*d=(*d&0xff00)|a;
    else if(b)*d=(*d&255)|((u16)b<<8);
   }
+#endif
+#ifdef GBA_SPRITE_ROW_WORDS
+#ifndef GBA_HOST
+  unsigned pairs=(unsigned)(right-col)>>1;
+  if(pairs) {
+   const u8 *q=s+col;
+   col+=(int)(pairs*2);
+   /* A pair with only one nonzero byte preserves its other VRAM byte. */
+   __asm__ volatile(
+    "1: ldrb r2, [%[src]], #1\n\t"
+    "ldrb r3, [%[src]], #1\n\t"
+    "orrs r2, r2, r3, lsl #8\n\t"
+    "beq 2f\n\t"
+    "tst r2, #255\n\t"
+    "ldreqh r3, [%[dst]]\n\t"
+    "andeq r3, r3, #255\n\t"
+    "orreq r2, r2, r3\n\t"
+    "cmp r2, #255\n\t"
+    "ldrlsh r3, [%[dst]]\n\t"
+    "bicls r3, r3, #255\n\t"
+    "orrls r2, r2, r3\n\t"
+    "strh r2, [%[dst]]\n"
+    "2: add %[dst], %[dst], #2\n\t"
+    "subs %[pairs], %[pairs], #1\n\t"
+    "bne 1b"
+    : [src] "+&r"(q), [dst] "+&r"(d), [pairs] "+&r"(pairs)
+    :
+    : "r2", "r3", "cc", "memory");
+  }
+#else
+  for(;col+1<right;col+=2,++d)
+   gfx_sprite_store_pair(d,(u16)(s[col]|((u16)s[col+1]<<8)));
+#endif
+#endif
   if(col<right&&s[col])*d=(*d&0xff00)|s[col];
  }
 }
