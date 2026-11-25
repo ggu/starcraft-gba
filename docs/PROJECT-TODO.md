@@ -71,8 +71,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the packaged ROM. A Mutalisk diversion north of the return location
   let the Drone deliver the crystal from the south. Loading victory at
   frame 59,957 advances to Z10. The Z10 frame-101 pause save restores the
-  Z9 completion flag and re-exports byte for byte. Reproduce the Z9
-  opening and delivery on the continuous campaign save.
+  Z9 completion flag and re-exports byte for byte. Starting at that
+  Z9 victory, Full Circle plays through all 28 checkpoints to victory
+  at frame 63,523, with both final chapter flags (3,145,728) and zero
+  unsupported events. A fresh process restores the campaign and world,
+  re-exporting the same SRAM. A on the finale result retries Z10 and
+  keeps both flags through a pause save and fresh load. Reproduce the
+  Z9 opening and delivery on the continuous campaign save.
   Also qualify campaign Overlord transport. The authenticated Z9 scenario
   allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
   default costs). The release exposes that research only in Z6 and
@@ -104,7 +109,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   readback SHA-256 is
   `e3622fdc9c1796b205a5b44e1a4c4a6d72ecd1233d7e0427cabf0e11a8f46be1`.
   The P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
-  victory retains all three completion bits (234,881,024).
+  victory retains all three completion bits (234,881,024). Continuing
+  into P9 reproduces all 57 checkpoint observations and wins at frame
+  134,481. A fresh process restores P6–P9 complete.
 
   A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
