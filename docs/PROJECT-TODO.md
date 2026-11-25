@@ -1056,6 +1056,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Vital meter rows](audits/2026-11-22-dense-release-attribution.md#drawing-filled-vital-cells-in-one-pass)
   cut the selected-actor bar cost by 46.9% and mean Z9 loop time by
   another 2.25%. The two changes together save 4.40% in that window.
+  The meter-build profile still spends 46,596 cycles per frame in
+  Pylon power queries on the dense Z9 sample. Requalify the existing
+  [adaptive Pylon buckets](https://github.com/ggu/starcraft-gba/pull/834)
+  on the merged engine, including stack margin and sparse Custom Game.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -2074,7 +2078,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   advances the dialogue that froze the mission at frame 60,149, delivers
   the crystal and wins on the padded ARM build at frame 63,523.
   The crystal checkpoint and victory journal both fresh-load and
-  re-export byte for byte.
+  re-export byte for byte. The latest vitals build also reproduces
+  the same late-suffix inputs and result journal exactly.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second

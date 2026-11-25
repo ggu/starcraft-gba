@@ -80,6 +80,11 @@ and re-exports the victory journal byte for byte.
 | Ordinary-button suffix receipt | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
 | Victory journal and fresh HOME re-export | `eb5b2035d88174f17aa617f59f3bb3290b3deed72ecbdf00559cff6638414a37` |
 
+The [vitals-row build](2026-11-22-dense-release-attribution.md#drawing-filled-vital-cells-in-one-pass)
+loads the same late save and repeats the physical-button suffix. Its input
+receipt and victory SRAM are byte-identical to the values above. Its ROM
+SHA-256 is `08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16`.
+
 ## All three current finales
 
 Ordinary controller tapes also completed the finales on the exact T10 and
