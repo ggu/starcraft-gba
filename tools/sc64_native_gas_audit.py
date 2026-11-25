@@ -50,7 +50,7 @@ def audit(rom):
                             'below_8_reserve_after': 0},
         'worker_cargo_offset': 203,
         'owner_gas_bank_address': '0x800b1d74',
-        'evidence': 'authenticated ROM static analysis; no live depleted trip',
+        'evidence': 'authenticated ROM static analysis (see audit for emulator observations)',
     }
 
 
