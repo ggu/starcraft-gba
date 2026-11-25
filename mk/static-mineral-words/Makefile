@@ -23,10 +23,10 @@ $(SC64_STATIC_MINERAL_WORDS_HEADER): $(SC64_STATIC_MINERAL_WORDS_SOURCE) tools/s
 	$(PYTHON) tools/sc64_static_mineral_words.py $< > $@.tmp
 	mv $@.tmp $@
 sc64-static-mineral-words: $(SC64_STATIC_MINERAL_WORDS_HEADER)
-$(SC64_STATIC_MINERAL_WORDS_ELFS): build/static-mineral-words-config
+$(SC64_STATIC_MINERAL_WORDS_ELFS) build/test-sc64-p10-p9-normal-home: build/static-mineral-words-config
 ifeq ($(SC64_STATIC_MINERAL_WORDS),1)
 $(SC64_STATIC_MINERAL_WORDS_ELFS): CFLAGS += -DSC64_STATIC_MINERAL_WORDS -Ibuild/generated
-$(SC64_STATIC_MINERAL_WORDS_ELFS): $(SC64_STATIC_MINERAL_WORDS_HEADER)
+$(SC64_STATIC_MINERAL_WORDS_ELFS) build/test-sc64-p10-p9-normal-home: $(SC64_STATIC_MINERAL_WORDS_HEADER)
 endif
 test-sc64-static-mineral-words:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_static_mineral_words.py'

@@ -27,6 +27,14 @@ static const Sc64TextBoxMission *race_text_box_mission(void)
 #define RACE_TEXT_BOX_LOG(row) ((void)0)
 #endif
 
+/* Host parity traces (tests/sc64_parity_trace.h) see every posted row and
+ * whether it opened a box. Unless a host build defines it, this is the push. */
+#ifndef SC64_TEXT_BOX_POSTED
+#define SC64_TEXT_BOX_POSTED(row, pushed) (pushed)
+#elif !defined(GBA_HOST)
+#error "SC64_TEXT_BOX_POSTED is a host-only parity hook"
+#endif
+
 /* Rows are few, and a post is a rare event, so a bounded scan is enough. */
 static int race_text_box_post_string(unsigned long string_id)
 {
@@ -35,7 +43,7 @@ static int race_text_box_post_string(unsigned long string_id)
     for (unsigned i = 0; i < m->row_count; ++i)
         if (m->rows[i].string_id == string_id) {
             RACE_TEXT_BOX_LOG(&m->rows[i]);
-            return sc64_text_box_contains(i) || sc64_text_box_push(i);
+            return sc64_text_box_contains(i) || SC64_TEXT_BOX_POSTED(&m->rows[i], sc64_text_box_push(i));
         }
     return 0;
 }
@@ -47,7 +55,7 @@ static int race_text_box_post_row(unsigned trigger, unsigned action)
     for (unsigned i = 0; i < m->row_count; ++i)
         if (m->rows[i].trigger == trigger && m->rows[i].action == action) {
             RACE_TEXT_BOX_LOG(&m->rows[i]);
-            return sc64_text_box_contains(i) || sc64_text_box_push(i);
+            return sc64_text_box_contains(i) || SC64_TEXT_BOX_POSTED(&m->rows[i], sc64_text_box_push(i));
         }
     return 0;
 }

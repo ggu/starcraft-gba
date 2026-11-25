@@ -11,14 +11,13 @@ import shutil
 import resource
 import struct
 
+from sc64_protoss_observe import observe_p9
 import sc64_p8_arm_replay as px
 from sc64_carrier_release_physical import slot
 from sc64_p8_physical_save import P10_CARGO_TAGS, SLOT_SIZE
 from sc64_p10_tape_save import join_timing, save_window
 from sc64_races_profile import dwarf_struct_layout
-from sc64_skirmish_sram_continuation import (
-    BUILDING_FIELDS, UNIT_FIELDS, KEY_L, PhysicalGame,
-)
+from sc64_skirmish_sram_continuation import KEY_L, PhysicalGame
 from sc64_z7_normal_replay import input_hashes, require_unchanged, timing_delta, timing_snapshot
 
 MIB = 1024 * 1024
@@ -51,7 +50,8 @@ def main():
     args = parser.parse_args()
     resource.setrlimit(resource.RLIMIT_FSIZE, (FILE_LIMIT, FILE_LIMIT))
     files = (args.trace, args.pages, args.rom, args.elf, args.runner, Path(__file__),
-             Path(__file__).with_name('sc64_p10_tape_save.py'))
+             Path(__file__).with_name('sc64_p10_tape_save.py'),
+             Path(__file__).with_name('sc64_protoss_observe.py'))
     pins = input_hashes(files)
     px.MISSION, px.PREFIX = 28, 'P9'
     plan = px.load_trace(args.trace)
@@ -92,8 +92,6 @@ def main():
                 checks[tick + 2].append(dict(row, kind='modal_released'))
     print('Validated', plan['stop'], 'ordinary calls and', len(keys), 'held-key changes', flush=True)
 
-    u = {k: i + 1 for i, k in enumerate(UNIT_FIELDS)}
-    b = {k: i + 1 for i, k in enumerate(BUILDING_FIELDS)}
     campaign = dwarf_struct_layout(args.elf, 'Sc64RaceCampaignState')[1]
     runtime = dwarf_struct_layout(args.elf, 'Sc64P9PersistentState')[1]
     runner_size, runner = dwarf_struct_layout(args.elf, 'Sc64P9Runner')
@@ -145,33 +143,7 @@ def main():
         return struct.unpack('<4H', r.read(0x06013FE0, 8))
 
     def observe():
-        s = g.state()
-        units, buildings = s['units'], s['buildings']
-        def hero(raw, fields):
-            return next(([x[u[k]] for k in fields] for x in units if x[u['raw_type']]==raw),
-                        [-1]*len(fields))
-        switches=n('race_p9', runtime, 'switches')
-        cerebrate=[0,-1]
-        for i,owner in enumerate((6,5)):
-            if not switches & (1<<i):
-                actor=next((x for x in buildings if x[b['raw_type']]==151 and
-                            x[b['raw_owner']]==owner),None)
-                if actor:
-                    cerebrate=[i+1,actor[b['hp']]]
-                    break
-        state=r.read(sym['race_p9'],sizes['race_p9'])
-        def runner_value(i,key):
-            start=runtime['runner']+runner_size*i+runner[key]
-            return int.from_bytes(state[start:start+runner.widths[key]],'little')
-        return dict(frame=s['frame'], screen=s['screen'], won=n('won'), lost=n('lost'),
-                    side_units=sum(x[u['owner']]==0 for x in units),
-                    probes=sum(x[u['owner']]==0 and x[u['raw_type']]==64 for x in units),
-                    enemy_units=sum(x[u['owner']]==1 for x in units),
-                    enemy_buildings=sum(x[b['owner']]==1 for x in buildings),
-                    cerebrate=cerebrate, zeratul=hero(75,('owner','hp','shield','x','y')),
-                    fenix=hero(78,('owner','hp','shield')), bank=[s['minerals'],s['gas']],
-                    supply=[n('supply_used'),min(n('supply_cap'), 400)], switches=switches,
-                    done=[runner_value(i,'done') for i in range(4)], outcome=runner_value(0,'outcome'))
+        return observe_p9(g, n, runtime, runner, runner_size)
 
     briefing, pages, observations = [], [], []
     try:

@@ -19,11 +19,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Disjoint cycle budgets.** Reconcile loop and stage timer boundaries on the two flagged samples, then measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
+
 - **Busy three-opponent performance.** The release's six recorded battle
   windows measured 11.29–16.73 loop updates/s. The original controls and
   camera are reproducible from the match traces. Prioritize ground orders
   and depth-sorted actor drawing in the slow Zerg windows, then measure the
-  other races on both maps. Compare total guest cycles, actual bitmap
+  other races on both maps. Reusing the HUD supply counts across six
+  256-update battle replays saved at most 0.20% of total cycles and cost
+  0.08% in Zerg Outpost. Both bitmap pages and the palette matched at all
+  1,542 samples. Keep the existing HUD and prioritize orders and drawing.
+  Compare total guest cycles, actual bitmap
   changes, save continuation and on-device pacing. See the
   [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
 
@@ -46,7 +52,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   occupying each gas site at a time. The packaged GBA Blood Bath game showed
   up to three workers counting down concurrently at one building. Qualify
   single occupancy, wait order, cancellation, destruction, saved trips and
-  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building).
+  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
+
+- **Campaign save continuity on the finite-gas cartridges.** The packaged
+  Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
+  saves after both. The older P9 tape diverges on both sides of the gas
+  change. [Route, SRAM hashes and repeatable check](audits/2026-11-26-protoss-finale-chain.md).
+  Terran cleared T9 and T10 from a retained T8 victory. Requalify T8 from T7:
+  its historical route first differs in the resource banks at frame 117,534.
 
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
