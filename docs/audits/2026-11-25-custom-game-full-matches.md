@@ -17,6 +17,14 @@ tooling) touch only audio, linker and tooling sources, not the game or
 skirmish code, and were not replayed. The same work on the earlier
 `7316734e` cartridges is kept [below](#earlier-build-7316734e).
 
+## Since Larva and Eggs
+
+The results below were taken before Custom Game Zerg production moved to
+Larva and Eggs and before [#892](https://github.com/ggu/starcraft-gba/pull/892).
+On base `d39bd015` 5 of the 11 lobbies still win; with Larva and Eggs six win
+and replay, three of them with new plans in `QUALIFIED`. See
+[Custom Game Larva and Eggs](2026-11-25-custom-larva-eggs.md#custom-game-full-matches).
+
 ## Results
 
 | Cartridge | Map | Opponents | Result | Updates | Frame | Pause save (update, units on screen) | Fresh-process continuation | Victory reload | Emulated updates/s |

@@ -86,7 +86,12 @@ different updates, so no update runs more than one plan.
   a Hatchery at a field with ore once its home fields are dry (the plan's
   later halls wait for a rich bank). With no ore near any of its halls, ore
   left elsewhere and its wanted Drones present, it holds the Hatchery price
-  and expands to the nearest free start location with ore.
+  and expands to the nearest free start location with ore. It holds a
+  Hatchery price only while its bank and the ore its Drones carry back can
+  reach it; an owner that can never pay spends what it has and goes all in.
+- A Zerg owner that banks 1,000 minerals with every Larva spent is short of
+  Larva, not of Drones: its next planned Hatchery does not wait for the plan's
+  worker count.
 - Structures are placed on rotating lattice rings around the main depot. Placement
   keeps worker lanes to minerals and gas clear, reserves Terran addon spots,
   and keeps a vertical lane open through each producer's fixed unit exit. A

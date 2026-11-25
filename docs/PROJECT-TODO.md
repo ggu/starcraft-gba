@@ -434,6 +434,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Whole two- and three-CPU matches](audits/2026-11-25-custom-game-full-matches.md)
   now win and replay on the race cartridges, each with a mid-battle
   save continued in a fresh process; its table lists the open cases.
+  After #892 and Larva and Eggs six of its eleven lobbies win and
+  replay; Terran Blood Bath against three CPUs and all four Protoss
+  lobbies lose on base `d39bd015` as well and need new plans
+  ([Larva and Egg audit](audits/2026-11-25-custom-larva-eggs.md#custom-game-full-matches)).
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
