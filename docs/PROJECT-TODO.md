@@ -177,6 +177,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   bits. This completes the continuous ten-mission runs on all three race
   cartridges in package `5f758095`. T9 averaged 17.74 emulated updates/s
   and T10 averaged 18.52, including presentation waits and menu input.
+  On the finite-gas release, a newly authored T8 tape was replayed from
+  a retained T7 victory in mGBA. All 467 checkpoint ticks matched without
+  wallet or objective exceptions; T8 won at frame 285,946 and its result
+  reloaded with identical SRAM. Its actual victory save advanced to T9,
+  where a newly authored finite-gas tape matched all 54 checkpoints and won
+  at frame 49,486. Its victory advanced to T10, which matched all six
+  checkpoints and won at frame 3,361 with completion mask `0x3ff0`.
+  Both results reloaded and re-exported identical SRAM. This carried
+  T7-victory-to-T10 segment is documented in the [finite-gas T8 audit](audits/2026-11-26-t8-finite-gas-route.md).
   Late-campaign speed and hardware frame pacing remain priorities.
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
