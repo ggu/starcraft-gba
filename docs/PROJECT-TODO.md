@@ -98,7 +98,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The shared worker still awards eight gas per normal trip. The
   [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
   pickups of eight while stocked and two below eight from authenticated N64
-  code; a live depleted trip remains to be captured. The opt-in shared worker implementation
+  code. On an unmodified Blood Bath replay, two Probes carried two gas each
+  after their Assimilator emptied and the observed bank increased by two twice. The opt-in shared worker implementation
   now tracks source sites across extraction, refinery replacement and
   save/load. `make check-sc64-source-gas` exercises all three worker types on
   Blood Bath for each race product and checks source placements across all 30
