@@ -200,6 +200,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   save and fresh continuation. The victory itself reloads byte for
   byte. Repeat full matches on Outpost and with two or three CPUs.
   Continue hardware timing.
+  [Whole two- and three-CPU matches](audits/2026-11-25-custom-game-full-matches.md)
+  now win and replay on the race cartridges, each with a mid-battle
+  save continued in a fresh process; its table lists the open cases.
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
