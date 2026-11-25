@@ -29,8 +29,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Every chapter's victory journal re-exports byte for byte. The private
   ten-mission receipt index hashes to
   `c632a63424a53882bb092bc01911a3ff2ebb0d7ec3dc8e9ec8542c29856a2937`.
-  Continue the exact-package Zerg and Protoss campaigns and physical
-  cartridge timing.
+  On a continuous save, T2, T3 and T4 win at frames 29,366, 54,000
+  and 8,911. The T5 opening reloaded at frame 19,419 with the four
+  completion flags (0xf0). That run cleared T5 at frame 145,471 with
+  both heroes alive and all enemy buildings destroyed. Fresh SRAM
+  re-exported byte for byte with all five bits (0x1f0). Continue T6.
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
@@ -76,13 +79,24 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   at frame 63,523, with both final chapter flags (3,145,728) and zero
   unsupported events. A fresh process restores the campaign and world,
   re-exporting the same SRAM. A on the finale result retries Z10 and
-  keeps both flags through a pause save and fresh load. Reproduce the
-  Z9 opening and delivery on the continuous campaign save.
-  Also qualify campaign Overlord transport. The authenticated Z9 scenario
-  allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
-  default costs). The release exposes that research only in Z6 and
-  custom games. Verify mission permissions, paid research, cargo, and
-  SRAM continuation before relying on an airlift for this objective.
+  keeps both flags through a pause save and fresh load.
+
+  The continuous Z1–Z8 save now clears Z9. The crystal spawned at
+  frame 46,365 and a Drone delivered it at frame 57,787. The victory
+  journal re-exported byte for byte (SHA-256
+  `71e4d60f9e6a6f99c84ce3a7fb00d31a77c0fa6e8eba7e3af252c52e150e4b97`).
+  Z10 resumed at frame 101 with all nine prior flags (2,080,771).
+  Full Circle then won at frame 63,523 with all 28 checkpoints matched,
+  zero unsupported events and all ten flags (4,177,923). A fresh load
+  restored the victory state and re-exported identical SRAM. Pressing A
+  retried Z10. Its frame-101 pause save reloaded with all ten flags.
+  This verifies the complete continuous Zerg campaign on the November
+  25 package in mGBA. Recheck affected chapters on later engine builds.
+  The authenticated Z9 scenario allows player 3 to research Ventral
+  Sacs. On the newer source merged in #874, Z9 passed paid research,
+  mid-job reload, boarding, loaded-cargo reload and unloading in mGBA.
+  The continuous campaign run above used the earlier package and a
+  ground delivery.
 
 - **Packaged Protoss campaign.** P2 now wins from HOME on the packaged
   Protoss10 ROM with regenerated controller inputs. The 38,435-input run
@@ -108,7 +122,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   byte for byte, carrying all previously completed chapters. The P6
   readback SHA-256 is
   `e3622fdc9c1796b205a5b44e1a4c4a6d72ecd1233d7e0427cabf0e11a8f46be1`.
-  The P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
+  The continuous P1 save then clears P7 and P8. After P8 at frame
+  98,849, fresh SRAM retains all eight flags (264,241,164), SHA-256
+  `dd39755042242391d0a78f825565e6fe9409d1872c741d57e683801aa41fd121`.
+  This journal cleared P9 at frame 134,481, then P10 at frame 53,225
+  with all ten bits (1,069,547,532). Each of the ten victory journals
+  was independently opened from HOME again on the packaged ROM. Every
+  mission number and cumulative flag matched, and every SRAM re-export
+  matched its input byte for byte. Final victory SRAM SHA-256 is
+  `bad33ae45804fd192f1dfdf439cb52a1e9eb064fa7fb30f9e1b88a010a42cb32`.
+  Retrying P10 and reloading its frame-11 pause preserved all ten flags.
+  The separate P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
   victory retains all three completion bits (234,881,024). Continuing
   into P9 reproduces all 57 checkpoint observations and wins at frame
   134,481. A fresh process restores P6–P9 complete.
@@ -238,7 +262,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fresh emulator process. All nine intermediate Protoss chapter transitions
   also reach the expected next mission on this package. Each following
   mission saves and reloads with the same frame and completion mask.
-  Z1–Z8 pass the corresponding transitions. The three finales retry
+  Z1–Z9 pass the corresponding transitions. The three finales retry
   the final chapter with A and preserve its completion bit through a new
   pause save. The new T5 victory also advances into T6 and reloads at
   frame 101. On T9 the strict historical comparison first diverges at
@@ -274,7 +298,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   emulated updates/s). Both builds reached the same endpoint and matched at
   all 72 sampled world and video checkpoints. Paired pause screens matched
   across all four products, as did victory screens on the three race builds.
-  Prioritize route expansion and movement on this save for sustained pacing.
+  In a read-only census on the menu-renderer build, the route-build
+  counter advanced on 3,681 of 4,866 advancing updates. Orders averaged
+  1,578,347 cycles on those updates versus 552,404 on the other 1,185.
+  On the same interval, a read-only instruction trace counted 3,024
+  calls to the linear field builder for 32 distinct destination cells.
+  All calls saw the same 2,048 walkability bytes. Two destinations
+  accounted for 347 calls each. Guest clocks, world and both display
+  pages matched the uninstrumented control. These fills consumed
+  2,240,666,503 guest cycles, 22.45% of the window. For the two
+  most frequent destinations a fill averaged about 735,000–737,000
+  cycles. Investigate exact reuse on an unchanged grid, preserving
+  the existing cache eviction and path decisions. Measure the entire
+  update including lookup and invalidation costs.
   Physical GBA timing remains open.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
