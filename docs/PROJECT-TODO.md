@@ -61,7 +61,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   from frame 10,274 and through 128 subsequent updates. The three race ROMs
   passed their ARM stack checks (spare bytes after the 512-byte margin:
   Terran 240, Zerg 432, Protoss 816). Measure full-match outcomes and frame
-  timing before activation, and qualify representative campaign saves.
+  timing before activation. On the trial all 30 retained result transitions
+  passed, and T10 won from a carried T9 result. In a separate T9 replay
+  the trial extracted 280 gas in 2,048 updates from a site that supplied 528
+  on release. Compare paid production, native service cadence, and light
+  versus busy scenes before changing the timer. P9 won on the trial from
+  a retained P8 victory and reloaded its result. The old P10 tape first
+  diverged at controller update 19,591. Re-author and qualify P10 and Z10
+  under the new economy before enabling shared refinery service.
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged

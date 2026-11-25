@@ -12,17 +12,21 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def analyze(rows, first_tick=None, last_tick=None):
+def analyze(rows, first_tick=None, last_tick=None, *, grant_spacing=False):
     if first_tick is not None and last_tick is not None and first_tick > last_tick:
         raise ValueError("invalid tick window")
     waiting = {}  # (worker, site) -> first observed field
     prior_active = set()
     grants = []
+    previous_grant = {}
+    intervals = []
     peak = 0
     previous_field = previous_tick = -1
     for field, tick, actors in rows:
         if field <= previous_field or tick < previous_tick:
             raise ValueError("unordered observation")
+        if grant_spacing and previous_field >= 0 and field != previous_field + 1:
+            raise ValueError("grant spacing requires consecutive video fields")
         previous_field, previous_tick = field, tick
         if len({worker for worker, _, _ in actors}) != len(actors):
             raise ValueError(f"duplicate worker at field {field}")
@@ -49,13 +53,21 @@ def analyze(rows, first_tick=None, last_tick=None):
             if waiting[key] != oldest:
                 raise ValueError(f'older waiter bypassed at field {field}')
             grants.append(tick)
+            if grant_spacing:
+                if site in previous_grant:
+                    f, t = previous_grant[site]
+                    intervals.append(dict(site=site, fields=field-f, ticks=tick-t))
+                previous_grant[site] = (field, tick)
         if in_window:
             peak = max(peak, max((sum(1 for _, s in current if s == site)
                                   for site in {s for _, s in current}), default=0))
         # Service ends this wait. A direct return to 82 is a new arrival.
         waiting = {k: v for k, v in waiting.items() if k in current}
         prior_active = active
-    return {'grants': grants, 'peak_waiters': peak}
+    result = {'grants': grants, 'peak_waiters': peak}
+    if grant_spacing:
+        result['grant_intervals'] = intervals
+    return result
 
 
 def main():
@@ -63,10 +75,12 @@ def main():
     p.add_argument('capture', type=Path)
     p.add_argument('--first-tick', type=int)
     p.add_argument('--last-tick', type=int)
+    p.add_argument('--grant-spacing', action='store_true',
+                   help='report fields and guest ticks between observed grants at each site')
     args = p.parse_args()
     with args.capture.open() as f:
         print(json.dumps(analyze((json.loads(line) for line in f if line.strip()),
-                                 args.first_tick, args.last_tick)))
+                                 args.first_tick, args.last_tick, grant_spacing=args.grant_spacing)))
 
 
 if __name__ == '__main__':

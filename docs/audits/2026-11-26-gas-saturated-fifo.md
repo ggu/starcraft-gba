@@ -49,13 +49,11 @@ the duration for an implementation.
 
 ## Implementation boundaries
 
-Current GBA worker timers are independent. A future opt-in single-server
+Release GBA worker timers are independent. An opt-in single-server
 implementation needs to preserve arrival order, invalidate waiting or active
 workers on retarget, death, transport and refinery loss, and let independent
 sites run concurrently. Test fresh save/load during contention and older saves
-with multiple partial timers, without losing carried resources. Timer-field
-encoding and save compatibility have not been established. No behavior or
-shipping build setting is changed by this observation checker.
+with multiple partial timers, without losing carried resources. The following sections track the shared trial separately from the release.
 
 ## Experimental GBA save continuation
 
@@ -83,3 +81,47 @@ At the qualified trial revision, the race cartridges cleared their configured
 512-byte stack margin with 240 spare bytes on Terran, 432 on Zerg and 816 on
 Protoss. Showcase uses a different link without this stack check. The trial
 still requires campaign and full-match economy and timing comparisons.
+
+## Campaign and skirmish measurements on 528d9082
+
+On the three race cartridges, 30 retained victories opened with the expected
+completion bits. Each advanced to the next chapter or restarted its finale,
+then wrote a pause save. In a fresh mGBA process each save restored the
+expected mission, frame and completion mask and re-exported identical SRAM.
+This covers chapter transitions. Separately, ordinary inputs from a retained
+T9 victory completed T10 at frame 3,361 with Raynor alive and the Ion Cannon
+destroyed. All six gameplay checkpoints matched and the victory save survived
+a fresh boot.
+
+At frame 35,363 of a retained T9 campaign save, three workers were queued
+at the same refinery. A fresh load preserved their order and the selected world
+state on all 512 subsequent neutral-input updates. A separate run starting
+from the same legacy SRAM compared the finite-gas release with the single-worker
+trial. The player's bank started at 1,702 gas on both. During 2,048 neutral
+updates only one map site lost gas. It supplied 528 on release and 280 on the
+trial. The player finished with 2,222 versus 1,990 gas, and 226 minerals on
+both. Amount extracted and bank balance cover different parts of the trip.
+
+To compare pacing, run the native checker above with `--grant-spacing`.
+In the saturated N64 sample, 15 consecutive start-to-start gaps at one
+refinery spanned 121–151 video fields, median 130 fields (about 2.17 seconds
+at a nominal 60 fields/s). Each gap was 37 guest-counter increments.
+On trial P10, a repeat of the busy Blood Bath save from frame 10,257
+produced five back-to-back service gaps at each of three sites. Count a gap
+when an observed empty worker starts at timer 59 and the next service begins
+one update after the preceding pickup. All 15 gaps were 60 GBA updates,
+3.12–3.18 emulated seconds (median 3.15). These captures have different
+armies and loads. A global timer change also affects lighter scenes, where
+60 updates at the 30-updates/s target would take two seconds. Measure a light
+scene and dense combat before choosing the shipping duration.
+
+The trial P10 cartridge completed P9 from a retained P8 victory. Its original
+43 checkpoint records and fresh result SRAM matched. From that P9 result,
+the first P10 mismatch was at input 19,591: 128 enemy units versus 127
+expected, and 916 gas versus 940 expected. The same adaptive control policy
+on HOST reached 220,000 inputs without winning or losing. It had 45 combat
+units at the cutoff; the policy normally waits for 60 or a low mineral bank.
+The Z10 cartridge admitted the retained Z9 victory; its old finale inputs
+first disagreed with the measured release gas bank at input 13,374 (668 gas
+on the trial versus 996 on release). A result-transition pass alone does
+not establish either finale win from a playable start.

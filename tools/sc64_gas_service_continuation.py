@@ -44,7 +44,8 @@ def snapshot(game):
                          game.sizes['b'] // game.building_stride,
                          game.sizes['u'] // game.unit_stride)
     state = summary(game.state())
-    return dict(frame=state['frame'], world=state['fingerprint'], queues=queues)
+    return dict(frame=state['frame'], world=state['fingerprint'], queues=queues,
+                mode=game.u32('race_mode'), mission=game.u32('race_selected_mission'))
 
 
 def boot(args, phase, seed):
@@ -55,8 +56,8 @@ def boot(args, phase, seed):
 def load(game):
     game.step(0, 2)
     game.step(KEY_L)
-    if game.u32('screen') != SCREEN_PLAY or game.u32('race_mode') != 1:
-        raise ValueError("fresh boot did not load the custom game")
+    if game.u32('screen') != SCREEN_PLAY:
+        raise ValueError("fresh boot did not load a game in progress")
 
 
 def continuation(game, count):
