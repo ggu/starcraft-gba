@@ -34,9 +34,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and reloaded its victory save byte for byte. Zerg 10 won from an old
   frame-60,123 save on the cartridge in mGBA. Its old full-mission tape
   first differed at frame 8,354 and later restarted the mission. A new
-  host controller run won at frame 198,954. Replay its ordinary inputs
-  on the cartridge and verify the crystal delivery and victory save
-  before promoting the change.
+  host controller played a replacement route. From HOME in mGBA, the
+  Zerg cartridge replayed its 202,274 button updates, matched all 97
+  checkpoints, delivered the crystal and won at frame 198,954. A fresh
+  HOME load restored the victory and re-exported identical SRAM. The
+  previous Zerg 9 victory handoff is being checked separately.
 
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
