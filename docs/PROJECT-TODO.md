@@ -29,8 +29,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   saves re-exported byte for byte on all four ROMs and matched the
   original builds for 512 further updates. In three-CPU matches with each
   human race, workers mined a restored patch within 4,500–6,500 updates.
-  All three matches ran for 12,000 updates. Measure later expansion and
-  resource contention now that all the map's minerals are available.
+  All three matches ran for 12,000 updates. Over the final 500 updates,
+  mGBA guest cycles corresponded to 24.55 updates/s on Terran, 17.99 on
+  Zerg and 19.60 on Protoss. These are different battle states. Continue
+  profiling late matches and verify frame cadence on hardware. All 72 lobby
+  launches across the four cartridges, both maps, three human races and
+  one to three independently chosen CPU seats reached gameplay. The
+  running matches retained the chosen races and occupied seats.
   Regenerate the private skirmish header with
   `tools/sc64_skirmish_pack.py` before building. Use `--cover` for
   cover-enabled profiles and their existing generated output path.
