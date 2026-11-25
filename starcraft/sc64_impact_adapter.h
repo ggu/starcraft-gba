@@ -26,6 +26,22 @@ static u8 race_impact_count;
 /* Diagnostics only; neither is saved and neither affects simulation. */
 static u8 race_impact_high_water;
 static u16 race_impact_deferred;
+#if defined(SC64_SHIELD_FLASH_ENABLED) && !defined(SC64_SCARAB_WEAPON_PROBE)
+/* Presentation only, never saved: each queued row's launch direction for the
+ * shield overlay, keyed by the row's target. Rows changed without these
+ * (a save load) no longer match their key and fall back to the target's
+ * facing. */
+#define RACE_IMPACT_SHIELD_DIRS 1
+static u8 race_impact_dir[RACE_IMPACT_CAPACITY];
+static u16 race_impact_dir_target[RACE_IMPACT_CAPACITY];
+
+static u8
+race_impact_row_dir(unsigned i)
+{
+    return race_impact_dir_target[i] == (u16)sc64_impact_event_target(&race_impact_rows[i]) ?
+           race_impact_dir[i] : SC64_SHIELD_DIR_NONE;
+}
+#endif
 
 static void
 race_impact_reset(void)
@@ -33,6 +49,10 @@ race_impact_reset(void)
     race_impact_count = 0;
     race_impact_high_water = 0;
     race_impact_deferred = 0;
+#ifdef RACE_IMPACT_SHIELD_DIRS
+    /* Restored rows must not match a previous world's directions. */
+    memset(race_impact_dir_target, 0xff, sizeof(race_impact_dir_target));
+#endif
 }
 
 static void
@@ -50,6 +70,17 @@ race_impact_clear_target(int ref)
         race_impact_rows[keep++]=row;
     }
     race_impact_count=(u8)keep;
+#elif defined(RACE_IMPACT_SHIELD_DIRS)
+    /* sc64_impact_clear_target's order-preserving compaction, with the
+     * presentation directions moved alongside. */
+    unsigned keep = 0;
+    for (unsigned i = 0; i < race_impact_count; ++i) {
+        if (sc64_impact_event_target(&race_impact_rows[i]) == ref) continue;
+        race_impact_dir[keep] = race_impact_row_dir(i);
+        race_impact_dir_target[keep] = (u16)sc64_impact_event_target(&race_impact_rows[i]);
+        race_impact_rows[keep++] = race_impact_rows[i];
+    }
+    race_impact_count = (u8)keep;
 #else
     if (race_impact_count)
         (void)sc64_impact_clear_target(race_impact_rows, &race_impact_count, ref);
@@ -169,6 +200,13 @@ race_impact_launch(int target, int damage, int hits, int owner,
     Sc64ImpactPushResult r = sc64_impact_push(race_impact_rows, RACE_IMPACT_CAPACITY,
                                               &race_impact_count, &hit, steps);
     if (r == SC64_IMPACT_QUEUED) {
+#ifdef RACE_IMPACT_SHIELD_DIRS
+        race_impact_dir[race_impact_count - 1u] = sc64_shield_launch_dir;
+        race_impact_dir_target[race_impact_count - 1u] = (u16)target;
+#endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+        sc64_shield_launch_dir = SC64_SHIELD_DIR_NONE;
+#endif
         if (race_impact_count > race_impact_high_water)
             race_impact_high_water = race_impact_count;
         return;
@@ -179,13 +217,19 @@ race_impact_launch(int target, int damage, int hits, int owner,
 }
 
 static void
-race_impact_resolve(const Sc64ImpactEvent *e)
+race_impact_resolve(const Sc64ImpactEvent *e, u8 shield_dir)
 {
     Sc64ImpactHit hit;
     sc64_impact_unpack(e, &hit);
+#ifdef SC64_SHIELD_FLASH_ENABLED
+    sc64_shield_hit_dir = shield_dir;
+#else
+    (void)shield_dir;
+#endif
     for (int i = 0; i < hit.hits && target_alive(hit.target); ++i)
         hit_target_impl(hit.target, hit.damage, hit.source_type, hit.owner,
                         hit.damage_class);
+    SC64_SHIELD_HIT_DONE();
 }
 
 /* A target that dies or stops being targetable (loaded, hidden, burrowed)
@@ -227,18 +271,42 @@ race_impact_tick(void)
         for(unsigned j=i+1;j<race_impact_count;j++)race_impact_rows[j-1]=race_impact_rows[j];
         --race_impact_count;
         if(due.source_type==SC64_SCARAB_IMPACT_MARKER)race_scarab_probe_bullet_resolve(&due);
-        else race_impact_resolve(&due);
+        else race_impact_resolve(&due, 0xffu);
     }
 #else
     Sc64ImpactEvent due[RACE_IMPACT_CAPACITY];
     unsigned ready, keep = 0;
     if (!race_impact_count) return;
+#ifdef RACE_IMPACT_SHIELD_DIRS
+    /* Mirror the filter below and sc64_impact_step's partition (due rows in
+     * launch order, the rest kept in order) for the presentation directions. */
+    u8 due_dir[RACE_IMPACT_CAPACITY];
+    {
+        unsigned live = 0, d = 0, k = 0;
+        for (unsigned i = 0; i < race_impact_count; ++i)
+            if (target_alive(sc64_impact_event_target(&race_impact_rows[i]))) {
+                race_impact_dir[live] = race_impact_row_dir(i);
+                race_impact_dir_target[live] = (u16)sc64_impact_event_target(&race_impact_rows[i]);
+                ++live;
+            }
+        for (unsigned i = 0, j = 0; i < race_impact_count; ++i) {
+            if (!target_alive(sc64_impact_event_target(&race_impact_rows[i]))) continue;
+            if (race_impact_rows[i].steps == 1u) due_dir[d++] = race_impact_dir[j];
+            else { race_impact_dir[k] = race_impact_dir[j]; race_impact_dir_target[k] = race_impact_dir_target[j]; ++k; }
+            ++j;
+        }
+    }
+#endif
     for (unsigned i = 0; i < race_impact_count; ++i)
         if (target_alive(sc64_impact_event_target(&race_impact_rows[i])))
             race_impact_rows[keep++] = race_impact_rows[i];
     race_impact_count = (u8)keep;
     ready = sc64_impact_step(race_impact_rows, &race_impact_count, due);
-    for (unsigned i = 0; i < ready; ++i) race_impact_resolve(&due[i]);
+#ifdef RACE_IMPACT_SHIELD_DIRS
+    for (unsigned i = 0; i < ready; ++i) race_impact_resolve(&due[i], due_dir[i]);
+#else
+    for (unsigned i = 0; i < ready; ++i) race_impact_resolve(&due[i], 0xffu);
+#endif
 #endif
 }
 

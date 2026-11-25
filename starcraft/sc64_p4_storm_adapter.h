@@ -164,7 +164,13 @@ static int race_p4_storm_tick(void)
             if(!sc64_pr_q8_storm_commit(i,hp_q8,shields_q8))return 0;
 #else
             u[i].hp = hp_q8 / SC64_STORM_ENERGY_ONE;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            { int shield_before = u[i].shield;
+              u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+              SC64_SHIELD_DEBIT(i, shield_before - u[i].shield, u[i].shield); }
+#else
             u[i].shield = shields_q8 / SC64_STORM_ENERGY_ONE;
+#endif
 #endif
             if (u[i].hp <= 0) {
                 u[i].hp = 0; u[i].alive = 0; u[i].selected = 0;

@@ -20,6 +20,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ROM_SHA1 = "a36d91b5aac7bb95df0d7de5f9814f5270e25c2b"
 UNIT_COUNT, FLINGY_COUNT, SPRITE_COUNT, IMAGE_COUNT, WEAPON_COUNT = 228, 209, 517, 999, 130
+# OpenBW ImageTypes::IMAGEID_Shield_Overlay; images.dat uses the same row numbering.
+SHIELD_OVERLAY_IMAGE = 424
+# units.dat column order: flingy u8, subunit1 u16, subunit2 u16, infestation
+# u16[96], construction u32, direction u8, then shield-enable u8.
+UNIT_SHIELD_ENABLE_OFFSET = 228 + 2 * 228 + 2 * 228 + 2 * 96 + 4 * 228 + 228
 ATTACK_ANIMS = ("GndAttkInit", "AirAttkInit", "GndAttkRpt", "AirAttkRpt",
                 "GndAttkToIdle", "AirAttkToIdle")
 # Ordinals match OpenBW iscript_opcodes at 4b046d5f65302b10cb0a745f0fecd37ec85b20a8.
@@ -443,6 +448,23 @@ def generate(rom_path: Path, out_path: Path) -> dict:
         elif isinstance(value, list):
             for item in value: collect_images(item)
     collect_images(sources); collect_images(defenses)
+    # The shield hit overlay is created by the damage routine, not by a weapon
+    # script, so nothing above references it. OpenBW names it
+    # IMAGEID_Shield_Overlay (424); keep its frames and Init/Death streams.
+    image_ids.add(SHIELD_OVERLAY_IMAGE)
+    # Every units.dat row with shields enabled (units and buildings), with its
+    # main image (units -> flingy -> sprites -> images), independent of the
+    # weapon roster: unarmed Shuttles and Observers flash too.
+    unit_shield = read_column(units, UNIT_COUNT, "B", UNIT_SHIELD_ENABLE_OFFSET, "units.shield_enable")
+    shield_actors = []
+    for raw in range(UNIT_COUNT):
+        if not unit_shield[raw]:
+            continue
+        flingy_id = unit_flingy[raw]
+        sprite_id = flingy_sprite[flingy_id] if flingy_id < FLINGY_COUNT else SPRITE_COUNT
+        image = sprite_image[sprite_id] if sprite_id < SPRITE_COUNT else IMAGE_COUNT
+        if 0 <= image < IMAGE_COUNT:
+            shield_actors.append((raw, image, bool(image_col["directional"][image])))
     # Include children started by each referenced image's own Init/Death and
     # attack streams (for example animated engine or halo attachments).
     animation_names = ("Init", "Death") + ATTACK_ANIMS
@@ -488,6 +510,9 @@ def generate(rom_path: Path, out_path: Path) -> dict:
         "special_emission_actors": {str(raw): label for raw, label in SPECIAL_EMISSION_ACTORS.items()},
         "referenced_images": image_audit,
         "source_animations": source_animations,
+        "shield_overlay": {"image_id": SHIELD_OVERLAY_IMAGE, "lo_kind": 5,
+                           "candidate_actors": [{"raw_unit": r, "image": i, "directional": d}
+                                                for r, i, d in shield_actors]},
         "units": sources, "buildings": defenses,
         "limitations": ["DAT and GRP chains are source data; IScript streams are linear-path extracts with loops represented by loop_pc.",
             "The inventory does not infer projectile travel or hit position when runtime/script semantics require native engine behavior.",
