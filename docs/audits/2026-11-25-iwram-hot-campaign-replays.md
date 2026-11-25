@@ -266,18 +266,18 @@ tree give Terran `b8b38ec719ad`/`2ecbb8747ac4`, Zerg `d783814ad792`/`a3cbd4dc699
 are those in the table above. The shorter pairs and the stack-critical
 routes ran again on this pair:
 
-26 pairs, all matched: `p1`, `p2`, `p3-brief`, `p3-mid`, `p3-start`,
+27 pairs, all matched: `p1`, `p2`, `p3-brief`, `p3-mid`, `p3-start`,
 `p5-brief`, `p5-mid`, `p5-start`, `p7`, `p7-brief`, `p9-brief`, `t1`,
 `t10`, `t2`, `t4`, `t6`, `t7`, `z1-opening`, `z10`, `z10-brief`, `z2`,
-`z3-brief`, `z5`, `z9-late`, `z9-road`, `z9-start`. They ran 202,510
-updates per ROM and compared 2,213 samples and 69 saves.
+`z3`, `z3-brief`, `z5`, `z9-late`, `z9-road`, `z9-start`. They ran
+271,766 updates per ROM and compared 2,989 samples and 102 saves.
 
 Stack on the relinked tip ROMs:
 
 | Mission | Tracked runs | Updates tracked | Boot | Play | Pause and save | Result screen | Deepest | Function at the deepest point | IRQ | Under the bound | Free above the code |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
 | Terran 2 | `t2` | 29,455 | 2,712 | 4,944 | 4,168 | 5,872 | 5,872 | `memcpy` | 296 | 1,920 | 3,120 |
-| Zerg 3 | `z3-brief` | 542 | 2,680 | 4,960 | 4,960 | n/a | 4,960 | `sc64_source_unit_attack_pose_resolve` | 296 | 888 | 2,456 |
+| Zerg 3 | `z3`, `z3-brief` | 69,798 | 2,680 | 5,712 | 5,712 | 5,024 | 5,712 | `gfx_blit_sprite_mapped` | 296 | 136 | 1,704 |
 | Zerg 9 | `z9-start`, `z9-road`, `z9-late` | 8,442 | 2,680 | 5,024 | 5,024 | n/a | 5,024 | `gfx_ellipse_outline_rows` | 296 | 824 | 2,392 |
 | Zerg 10 | `z10`, `z10-brief` | 4,147 | 2,680 | 5,632 | 4,960 | 5,632 | 5,632 | `sc64_weapon_source_vfx_draw_image_frame_resolved` | 296 | 216 | 1,784 |
 | Protoss 1 | `p1` | 15,522 | 2,720 | 5,760 | n/a | 5,000 | 5,760 | `gfx_blit_sprite_mapped` | 296 | 180 | 1,896 |
