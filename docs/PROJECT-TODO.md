@@ -111,15 +111,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Bath three-AI saves loaded with zero depletion. After 256 ordinary updates
   all eight cases had consumed gas and a fresh emulator loaded the same frame
   and site amounts from the new pause save. Relative to release, the linked
-  race ROM code grew by 856–992 bytes, Showcase by 896, and static EWRAM by
+  race ROM code grew by 864–1,016 bytes, Showcase by 912, and static EWRAM by
   64–200 bytes across the four profiles. IWRAM section sizes held steady.
   Eight paired, 2,048-update continuations from the same three-AI saves
-  changed elapsed emulated cycles by at most 0.020%. At 64 sample points
+  changed elapsed emulated cycles by under 0.05%. At 64 sample points
   per case, actor arrays, world summaries, both video pages and the palette
   matched release. Showcase Outpost displayed the other page once, and its
   two pages contained different images. The candidate ran at 16.76–24.08
-  simulation updates/s across these cases. Check normal placement after a
-  preplaced campaign refinery is destroyed before activation.
+  simulation updates/s across these cases. The field cursor, renderer and
+  placement rules now use the source sites beneath preplaced gas buildings.
+  In Terran 3, Zerg 2 and Protoss 2, the product HOST fixture destroys an
+  occupied site that was absent from the neutral-node list, pays a worker
+  to rebuild, advances construction, deposits gas and reloads the save.
+  It seeds the wallet and positions the workers. Each cartridge opened its
+  HOST-produced mission save in mGBA, continued, paused, wrote its own save
+  and restored the same mission frame and site consumption in a fresh process.
+  Verify stack headroom and late campaign behavior before release activation.
   The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual

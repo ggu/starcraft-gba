@@ -156,6 +156,11 @@ static int rebuild_campaign_site(int mission)
         assert(miner >= 0);
         trip(miner, replacement, 8);
         assert(sc64_geyser_consumed[node] == 16);
+        assert(race_save_game());
+        sc64_geyser_consumed[node] = 0;
+        assert(race_load_game());
+        assert(geyser_at(x, y) == node && building_complete(replacement));
+        assert(sc64_geyser_consumed[node] == 16);
         printf("Rebuilt preplaced gas structure via paid worker command on mission %d\n", mission);
         return 1;
     }
