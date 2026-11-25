@@ -88,8 +88,9 @@ static u32 rng(void)
 __attribute__((noinline)) void audio_probe_done(void) { __asm__ volatile(""); }
 
 static u32 sum_low, sum_high, decoder_bad, samples_done, layouts_used;
-/* When set, no decoder may leave its stream pointer past this address. */
-static const u8 *stream_limit;
+/* When set, no decoder may leave its stream pointer past stream_limit, and
+ * after a stream's last frame it must be at stream_end. */
+static const u8 *stream_limit, *stream_end;
 
 /* Both decoders over one stream, frame by frame. */
 static void decode_stream(u32 stream, const u8 *start, u32 samples)
@@ -112,6 +113,9 @@ static void decode_stream(u32 stream, const u8 *start, u32 samples)
             out_text(" sample "); out_num(at); out_text(" columns "); out_num(columns); out_flush();
         }
         for (u32 j = 0; j < n / 4u; ++j) { sum_low += table_asm[columns * j + column]; sum_high += sum_low; }
+    }
+    if (stream_end && (a.next != stream_end || r.next != stream_end) && !decoder_bad++) {
+        out_text("audio arm probe: stream "); out_num(stream); out_text(" did not end at its last word"); out_flush();
     }
     samples_done += samples;
 }
@@ -156,10 +160,12 @@ int main(void)
                     u32 mask = 1u << ((at + bit) & 31u), *w = &random_words[(at + bit) >> 5];
                     *w = bit == 3u || bit == 4u || bit == 5u ? *w & ~mask : *w | mask;
                 }
+            /* Its bits, in whole words: neither decoder may load one more. */
+            stream_end = (const u8 *)(random_words + (at + 31u) / 32u);
         }
-        stream_limit = (const u8 *)(random_words + RANDOM_WORDS);
+        stream_limit = stream_end ? stream_end : (const u8 *)(random_words + RANDOM_WORDS);
         decode_stream(SC64_AUDIO_SAMPLE_COUNT + SC64_AUDIO_MUSIC_TRACKS + round, (const u8 *)random_words, RANDOM_SAMPLES);
-        stream_limit = 0;
+        stream_limit = stream_end = 0;
     }
     out_text("audio arm probe: random streams="); out_num(RANDOM_STREAMS); out_text(" samples="); out_num(samples_done - bank_samples);
     out_text(" mismatches="); out_num(decoder_bad - bank_bad); out_flush();

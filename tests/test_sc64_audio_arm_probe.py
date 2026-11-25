@@ -36,5 +36,14 @@ class AudioArmProbeTest(unittest.TestCase):
         self.assertEqual(probe.verdict(mixed, HOST), [])
 
 
+    def test_runner_command(self):
+        here = Path(__file__).resolve()
+        self.assertEqual(probe.runner_command(str(here)), str(here))
+        self.assertEqual(probe.runner_command('./' + here.name), str(Path.cwd() / here.name))
+        self.assertTrue(Path(probe.runner_command('sh')).is_absolute())
+        with self.assertRaises(RuntimeError):
+            probe.runner_command('no-such-sc64-runner')
+
+
 if __name__ == '__main__':
     unittest.main()

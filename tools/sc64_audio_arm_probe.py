@@ -18,6 +18,7 @@ Game memory is read, never written. Emulator evidence only."""
 import os
 import re
 import select
+import shutil
 import struct
 import subprocess
 import sys
@@ -62,14 +63,24 @@ def symbols(elf: Path) -> dict[str, int]:
     return {parts[2]: int(parts[0], 16) for parts in map(str.split, out.splitlines()) if len(parts) == 3}
 
 
-def run(rom: Path, elf: Path, runner: Path) -> dict[str, int]:
+def runner_command(runner: str) -> str:
+    """A bare name is looked up on PATH; anything with a directory is that file."""
+    if os.sep not in runner and not (os.altsep and os.altsep in runner):
+        found = shutil.which(runner)
+        if not found:
+            raise RuntimeError(f"no runner named {runner} on PATH")
+        return found
+    return str(Path(runner).resolve())
+
+
+def run(rom: Path, elf: Path, runner: str) -> dict[str, int]:
     sym = symbols(elf)
     for name in ("audio_probe_done", "audio_probe_result"):
         if name not in sym:
             raise RuntimeError(f"{elf} has no {name}")
     with tempfile.TemporaryDirectory(prefix="audio-arm-probe-") as home:
         env = dict(os.environ, HOME=home, XDG_CONFIG_HOME=home + "/.config", TMPDIR=home)
-        proc = subprocess.Popen([str(runner.resolve()), str(rom.resolve()), "--physical"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        proc = subprocess.Popen([runner_command(runner), str(rom.resolve()), "--physical"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, text=True, bufsize=1, env=env)
 
         def command(text: str, seconds: int = 60) -> str:
@@ -101,9 +112,9 @@ def main(argv: list[str]) -> int:
     if len(argv) != 5:
         print(__doc__, file=sys.stderr)
         return 2
-    rom, elf, runner, host_out = map(Path, argv[1:])
+    rom, elf, host_out = Path(argv[1]), Path(argv[2]), Path(argv[4])
     host = host_sum(host_out.read_text(encoding="utf-8"))
-    result = run(rom, elf, runner)
+    result = run(rom, elf, argv[3])
     print("audio arm probe: {linear} of {streams} streams, {samples} samples, sum {sum_low:08x} {sum_high:08x}, "
           "{decoder_bad} decoder and {mixer_bad} voice-sum differences".format(**result))
     reasons = verdict(result, host)
