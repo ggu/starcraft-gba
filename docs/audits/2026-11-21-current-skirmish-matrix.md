@@ -1,5 +1,22 @@
 # Ordinary-button skirmish matrix
 
+## November 25 selection-ring release
+
+The current Terran (`ad7eb4f1…`), Zerg (`a061a9bd…`) and Protoss
+(`c04dd0dd…`) ARM images pass 54 Custom Game launch and continuation
+cases. Each cartridge plays both maps, each human race and one,
+two or three CPUs through ordinary menu and pause controls. The
+three seat layouts also cover closed rows and a Random row. After
+120 updates each match saves, loads from HOME in a fresh process,
+and continues for 60 matching updates. All 54 re-exported journals
+match their input SRAM. These openings qualify the menu and save
+matrix. Whole-match pacing and hardware have separate checks.
+
+Local aggregate SHA-256
+`3b8d5be9655f6ccc59cb3eb896d950ec7481ad8dba2b67983f8fcc3a4f7d13d1`.
+
+## November 21 named and closed seats
+
 The three normal race ROMs at `e92caada` launched both Outpost and
 Blood Bath through the Custom Game menu in mGBA. Each cartridge tested
 all three human races. Each of the three independent CPU rows was

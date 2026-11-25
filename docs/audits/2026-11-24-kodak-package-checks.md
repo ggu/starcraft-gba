@@ -1076,6 +1076,36 @@ rises to 7/26. The observations cover the paid production
 path on both systems. N64 displays the extra supply at
 queue time. These GBA observations read actual used supply.
 
+A fresh N64 process repeats the saved-game input sequence. Its first
+two frame hashes match the previous run, it renders the 50-mineral
+purchase and the immediate 5/26 to 6/26 supply change, and it shows
+the queue clear after the Marine appears. The SCV's subsequent trips
+lift the post-purchase bank from 206 to 246 with only neutral input.
+Input and output FlashRAM match. The current Terran release and the
+selection-ring candidate agree across four controller-only checkpoints.
+They start at 5/26 supply and 200 minerals, deduct 50 minerals at
+frame 69, and reach 6/26 supply and seven human units with the queue
+clear by frame 569. The bank stays at 150 over that interval. The
+native and GBA pre-purchase banks reflect different mining histories.
+
+Both current GBA framebuffer pages show 6/26 while the first Marine
+is in progress, matching the N64 display. The first-slot comparison
+above reads the GBA live-unit counter, which excludes production.
+In a second fresh N64 run the next Marine costs another 50 while the
+first is still in progress. The native HUD remains at 6/26 with two
+portraits visible, then reaches 7/26 after the first completes and
+the next starts. The current and candidate GBA ROMs charge the same
+50 for the second Marine but already show 7/26 with both Marines in
+the queue and neither finished. The N64 near-cap admission check
+still needs its own controller replay.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Fresh N64 purchase and completion | `c230e0cff5fe4a97fa91ed1250e6fb4a4ef8df4cae7dfdf4cd16e033ecb09654` |
+| Current GBA and renderer candidate checkpoints | `365ce8456c5b5aac9fea1dfcd89320845b53e50402395361dc06139f46230d6e` |
+| Fresh N64 with two paid Marines | `d786dcce4f3803430929313e7e8333b5c5545f729b606c62aa19aa490660b3ce` |
+| Current GBA and candidate with two paid Marines | `1a70b2021eb7563e260d322e1563096eb4f548458c7fcf29de123fec934d3e72` |
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |

@@ -504,6 +504,38 @@ and Z10 prepared HOST shield fixtures also pass.
 | Seven paired campaign and Custom Game windows | `903f1328730359b58683f5c4e4091ab4648f4cb0d5c0d259f9540c18e6cb8a23` |
 | Five Showcase scene pairs | `287563ac1df684fdf02212af5a1d7ff0409b6f09fabb3497317c7ed6aa68c5f5` |
 
+## Rasterizing unobstructed selection rings by row
+
+Unobstructed selection rings apply scene clipping once and write the
+visible rows directly as Mode 4 pixel pairs. The existing ellipse equation,
+flat ends, and covered building arcs retain their established behavior.
+The row writer stays in ROM. All four regular ARM images link with the
+same EWRAM and IWRAM guard endpoints as release `d6b2d988`.
+
+During the eight matched Z9 updates at frames 27,561–27,568, mean ring
+cycles fall from 107,226 to 97,688 (8.9%) and full-loop cycles fall from
+1,346,391 to 1,336,148 (0.76%). The sampled world summaries and both
+framebuffer pages match. The 160-update comparison from the same save
+reduces mean loop cycles from 1,644,635 to 1,634,448 (0.62%) and p95
+from 1,797,304 to 1,778,232 (1.06%). All 160 updates still exceed the
+two-VBlank budget. Orders are the first target for larger gains in the
+late three-CPU Outpost windows.
+
+Six Custom Game control windows are cycle-identical. The seven paired
+windows have identical world, camera, entities, palette, both framebuffer
+pages, pause SRAM and fresh continuations. Five Showcase scenes reduce
+mean loop cycles by 0.26–0.72%. Both pages match through all 600 Showcase
+comparisons. One sample presents a different page and agrees at the next
+update. The field UI oracle covers all 2,294 supported radius pairs, and
+a separate tile test matches framebuffer pixels, palette aliasing and
+dirty masks for 3,432 combinations of clipping, color and geometry.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z9 instruction profile | `84277b6c1e5d00b0ead2bc15efe5493f19f5766305bc57673eb6c6214db91911` |
+| Seven matched campaign and Custom Game windows | `b843635feb8a7b70fdf67ca772ccd88c91353aadd5e3eb928829d1df3f6d5b06` |
+| Five matched Showcase scenes | `f9f80828275bafa45fe8a82c439d397bd717e75da6aea59b05890586d9cc0370` |
+
 ## Generated bounds for offscreen animation checks
 
 The regular asset preparation commands now emit anchor radii alongside
