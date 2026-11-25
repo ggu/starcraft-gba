@@ -108,7 +108,7 @@ static int race_z7_save_candidate_has_gas(const RaceSave *candidate,
 {
     unsigned count=(unsigned)candidate->state[16];
     for (unsigned i=0;i<count;++i)
-        if (candidate->geysers[i].x==x && candidate->geysers[i].y==y) return 1;
+        if (sc64_gas_save_coordinate(candidate->geysers[i].x)==x && sc64_gas_save_coordinate(candidate->geysers[i].y)==y) return 1;
     return 0;
 }
 
@@ -589,11 +589,11 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
      * and rejects duplicate, invented, consumed-while-occupied, and stale
      * off-map nodes before live state is mutated. */
     for (unsigned i=0;i<(unsigned)candidate->state[16];++i) {
-        int x=candidate->geysers[i].x,y=candidate->geysers[i].y;
+        int x=sc64_gas_save_coordinate(candidate->geysers[i].x),y=sc64_gas_save_coordinate(candidate->geysers[i].y);
         if (x<0 || y<0 || x>=(int)width*16 || y>=(int)height*16 ||
             !race_z7_save_gas_source_row(map,x,y,0)) return 0;
         for (unsigned j=0;j<i;++j)
-            if (candidate->geysers[j].x==x && candidate->geysers[j].y==y) return 0;
+            if (sc64_gas_save_coordinate(candidate->geysers[j].x)==x && sc64_gas_save_coordinate(candidate->geysers[j].y)==y) return 0;
     }
     for (unsigned row=0;row<map->unit_count;++row) {
         const Sc64ImportedUnit *src=&map->units[row];

@@ -384,8 +384,8 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
         for (unsigned row = 0; row < map->unit_count; ++row)
             if (map->units[row].source_type == 188u) {
                 if (!(seen_geysers[ordinal >> 3] & (1u << (ordinal & 7u))) &&
-                    candidate->geysers[i].x == map->units[row].x_px &&
-                    candidate->geysers[i].y == map->units[row].y_px) {
+                    sc64_gas_save_coordinate(candidate->geysers[i].x) == map->units[row].x_px &&
+                    sc64_gas_save_coordinate(candidate->geysers[i].y) == map->units[row].y_px) {
                     seen_geysers[ordinal >> 3] |= (u8)(1u << (ordinal & 7u));
                     found = 1; break;
                 }
