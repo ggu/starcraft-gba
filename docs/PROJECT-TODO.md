@@ -28,9 +28,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
 
 - **Zerg weapon lookup.** The Zerg release build omitted the indexed weapon
-  art lookup used by the other three products. The candidate reduced cycles
-  in all six recorded Zerg skirmish windows with the same art on both pages.
-  Track full-match outcomes, late campaign play and hardware pacing in the
+  art lookup used by the other three products. The shared setting reduced
+  cycles in all six Zerg skirmish windows with the same art on both pages.
+  All six full matches and the Zerg finale reproduced their victory saves.
+  Hardware timing remains open. See the
   [Zerg10 lookup audit](audits/2026-11-26-z10-weapon-lookup.md).
 
 - **Route field work.** In an 80-update Zerg Blood Bath sample, the 44

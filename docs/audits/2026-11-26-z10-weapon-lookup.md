@@ -64,3 +64,23 @@ neutral update before START. Mean latency was 72.04 ms on the control and
 respectively. Individual pairs ranged from 14.36 ms faster to 9.91 ms
 slower, depending on VBlank phase. This measures guest time at a sampled
 button edge; it excludes physical button scanning and LCD response.
+
+## Full matches and Zerg finale
+
+All six Zerg skirmishes won from the lobby on the indexed ROM with their
+existing race selections, starting order and original controller plans.
+Every result matched the control victory frame and SRAM bytes. Each battle
+save continued to victory and the terminal save restored in a fresh process.
+The three-allied-Zerg Blood Bath win took 69,900 input updates, averaged
+15.00 guest updates/s over the whole match (control 14.90), and ended at
+mission frame 68,369.
+
+From a real Zerg 9 victory, the full Zerg 10 finale reached victory at frame
+198,954. All 97 named checkpoints, the terminal world, mission scheduler and
+victory SRAM matched the finite-gas release. A fresh reload re-exported the
+same victory bytes (SHA-256
+`3c18586bf8a6f686e5734d4f23822da3bf7a9201cae45e917d8527529e8ff7a0`).
+
+Changing the Make option to zero on an already populated build reproduced
+the previous cartridge byte for byte. Switching back to one reproduced the
+qualified indexed ROM.
