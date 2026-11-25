@@ -215,7 +215,7 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
         ||
         candidate->state[0] != 0 || candidate->state[1] != R_ZERG ||
         candidate->state[2] != SC64_Z6_GLOBAL_ID || candidate->state[7] < 0 ||
-        candidate->state[16] < 0 || candidate->state[16] > MAX_RACE_GEYSERS ||
+        sc64_gas_save_count(candidate->state[16]) < 0 || sc64_gas_save_count(candidate->state[16]) > MAX_RACE_GEYSERS ||
         candidate->campaign.mission != SC64_Z6_GLOBAL_ID ||
         candidate->campaign.elapsed_frames != (u32)candidate->state[7] ||
         candidate->campaign.objective_stage != 0 ||
@@ -377,7 +377,7 @@ race_z6_save_candidate_valid(const RaceSave *candidate,
     /* A fresh HOME load has no live map yet. Authenticate this candidate
        against the immutable map rather than the current world's count. */
     if (source_geysers > MAX_RACE_GEYSERS ||
-        (unsigned)candidate->state[16] != source_geysers) return 0;
+        (unsigned)sc64_gas_save_count(candidate->state[16]) != source_geysers) return 0;
     for (unsigned i = 0; i < source_geysers; ++i) {
         int found = 0;
         unsigned ordinal = 0;

@@ -3172,6 +3172,11 @@ static int race_save_game(void) {
                             0,
 #endif
                             race_selected_mission, sc64_gas_site_capacity)) return 0;
+    for (unsigned i = 0; i < 2u * MAX_RACE_GEYSERS; ++i)
+        if (sc64_geyser_consumed[i]) {
+            race_data.state[16] |= SC64_GAS_SAVE_MARKER;
+            break;
+        }
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
@@ -3342,7 +3347,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         construction_save_marker != SC64_CONSTRUCTION_SAVE_MARKER) return 0;
 #endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
-       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
+       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||!sc64_gas_save_count_valid(v[16]))return 0;
 #ifdef SC64_CAMPAIGN_RACE
     if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE)
 #ifdef SC64_T4_RUNTIME
@@ -3495,7 +3500,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
 #ifdef SC64_SOURCE_GAS
-    if (!sc64_gas_save_debts_valid(race_data.geysers, v[0],
+    if (!sc64_gas_save_debts_valid(race_data.geysers, v[16], v[0],
 #ifdef SC64_IMPORTED_SKIRMISH
                                    v[20],
 #else
@@ -5428,7 +5433,7 @@ static int race_load_game(void) {
 #endif
     minerals=v[5];gas=v[6];frame=v[7];cx=v[8];cy=v[9];train_type=v[10];
     weapons_level=v[11];armor_level=v[12];weapons_research=v[13];armor_research=v[14];seed=(u32)v[15];
-    geyser_count=v[16];mission_objective_stage=v[17];won=v[18];lost=v[19];
+    geyser_count=sc64_gas_save_count(v[16]);mission_objective_stage=v[17];won=v[18];lost=v[19];
     race_cols=race_mode?64:sc64_race_maps[race_selected_mission].width;
     race_rows=race_mode?64:sc64_race_maps[race_selected_mission].height;
     if(race_mode)race_skirmish_geometry();
