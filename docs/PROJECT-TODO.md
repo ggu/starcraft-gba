@@ -67,6 +67,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   custom games. Verify mission permissions, paid research, cargo, and
   SRAM continuation before relying on an airlift for this objective.
 
+- **Packaged Protoss campaign.** A regenerated P8 controller tape
+  plays The Trial of Tassadar from HOME to victory on the packaged
+  Protoss10 ROM. After 100,630 inputs the stasis cell is gone, all three
+  trigger runners are free of faults, and victory registers at frame
+  98,849. Fresh HOME restores the result and re-exports identical SRAM
+  (`b8624a22d8e77fccd3942ef7f647c67d41c5dd9f16e29d49d418e0bec2445ef4`).
+  Advancing to P9 and saving and loading at frame 101 preserves the
+  P8 completion bit. The tape SHA-256 is
+  `8cd63fc978c64ca7e639cd89432f88c439d1de5bc655be1792b431cdfd1c04d0`.
+  P4 still needs a winning route on this package. Its earlier inputs
+  first diverge by 100 minerals at input 18,000, and the regenerated
+  host controller loses at frame 111,670.
+
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
   finish on the padded-journal Z10 build. The vitals build repeats the
