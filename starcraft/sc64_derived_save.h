@@ -73,7 +73,7 @@ static int sc64_derived_unit_hp_for_raw(int type, int raw_type) {
    * but keeps U_RAYNOR). The compact row already stores raw_type, so rebuild
    * imported actors from that canonical source record when it has HP facts. */
   const Sc64StockUnitProfile *stock = sc64_stock_unit_profile(raw_type);
-  if (stock && stock->hp) hp = (int)stock->hp;
+  if (stock && stock->hp && !sc64_native_zealot(type, raw_type)) hp = (int)stock->hp;
 #else
   (void)raw_type;
 #endif

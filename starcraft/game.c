@@ -1529,7 +1529,7 @@ static void sc64_facing_reset_slot(int slot);
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
 /* The collision headers below consult per-instance burrow state. */
-static int race_p6_combat_unit_burrowed(int slot);
+static int (race_p6_combat_unit_burrowed)(int slot);
 #endif
 static Building b[MAX_BUILDINGS];
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS
@@ -2078,6 +2078,7 @@ frontier_owner_profile(int owner)
 #error "Briefings need source-font pixel wrapping; run make sc64-interface"
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+#include "sc64_custom_game_gates.h"
 #ifdef SC64_CAMPAIGN_CONTROLLER_HOST_STAGE
 /* Transient source controller, distinct from retained CHK origin. A reused
  * slot starts unknown; only authenticated source events can bind it. */
@@ -2227,7 +2228,7 @@ static int race_t5_unit_product_available(int owner, int raw_owner, int type);
 static Sc64T6MissionState race_t6;
 #ifdef SC64_TERRAN_LATE_RUNTIME
 static int race_late_building_in_flight(const Building *q);
-static int race_late_airborne(int slot);
+static int (race_late_airborne)(int slot);
 static int race_late_lift(int slot);
 static int race_late_flight_order(int slot, int x, int y, int land);
 static void race_late_flight_tick(void);
@@ -2239,7 +2240,7 @@ static int race_t6_active(void)
 static int race_t6_init(void), race_t6_tick(void);
 static int sc64_t6_runtime_owner(unsigned source);
 static int sc64_t6_owners_hostile(int owner, int other);
-static int race_t6_unit_burrowed(int slot);
+static int (race_t6_unit_burrowed)(int slot);
 static void race_t6_unit_created(int slot);
 static void race_t6_building_died(int owner, int raw_owner);
 static int race_t6_unit_product_available(int owner, int raw_owner, int type);
@@ -2358,7 +2359,7 @@ static int race_z7_egg_cancel_available(void);
 static int race_z7_egg_cancel_selected(void);
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
-static int race_p6_combat_unit_burrowed(int slot);
+static int (race_p6_combat_unit_burrowed)(int slot);
 static int race_p6_combat_target_detected(int target, int viewer_owner);
 static int race_p6_combat_infested_attack(Unit *q, int target);
 static int race_p6_combat_burrow_release_tick(void);
@@ -2785,8 +2786,10 @@ static void sc64_direct_attack_clear_references(int entity);
 static int sc64_direct_attack_find_target(int x, int y);
 static int sc64_direct_attack_issue_target(int target);
 static void sc64_direct_attack_tick_unit(int slot);
-static void tick_combat(Unit *q, int target);
 #endif
+/* validated: see sc64_combat_validated.h. */
+static void tick_combat_from(Unit *q, int target, int validated);
+#define tick_combat(q, target) tick_combat_from((q), (target), 0)
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
 #ifndef SC64_RACES
 #error "SC64_NEAREST_RESOURCE_DEPOT requires the race campaign runtime"
@@ -8777,6 +8780,7 @@ sc64_structure_melee_retry(Unit *q, int slot, const int edges[4])
 #endif
 #endif
 
+#include "sc64_combat_validated.h"
 #ifdef SC64_Z6_RUNTIME
 /* The large weapon body is already in ROM; keep its validation wrapper
  * there as well rather than duplicating it in every ARM order branch. */
@@ -8784,7 +8788,7 @@ static void __attribute__((noinline))
 #else
 static void
 #endif
-tick_combat(Unit * q, int target)
+tick_combat_from(Unit * q, int target, int validated)
 {
     int dx, dy, range, damage;
 #ifdef SC64_SCARAB_AUTONOMOUS_PROBE
@@ -8812,7 +8816,9 @@ tick_combat(Unit * q, int target)
     if (race_p6_combat_infested_attack(q, target)) return;
 #endif
 #ifdef SC64_RACES
-    if(!SC64_CAN_ATTACK_FROM_SOURCE(q->type,target,q->owner,q->raw_owner))return;
+    if(!SC64_COMBAT_TARGET_ALLOWED(q,target,validated))return;
+#else
+    (void)validated;
 #endif
 #ifdef SC64_P7_ARCHON_SPLASH
     /* Archon weapon 70 measures reach between source collision rectangles,
@@ -9272,7 +9278,9 @@ target_lists_unavailable:
         }
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
-        if (race_p6_combat_unit_burrowed(i)) continue;
+        /* Ungated call (sc64_custom_game_gates.h): an inline race_mode test
+         * here slows this ROM loop for every unit in campaign missions. */
+        if ((race_p6_combat_unit_burrowed)(i)) continue;
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
         int p7_recharge_order=race_battery_order_is_recharge(q->order);
@@ -9369,7 +9377,7 @@ target_lists_unavailable:
                 +18
 #endif
                 ,q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
-            if (target >= 0) tick_combat(q, target);
+            if (target >= 0) tick_combat_from(q, target, SC64_COMBAT_QUERY_VALIDATED);
             continue;
         }
 #endif
@@ -9519,7 +9527,7 @@ target_lists_unavailable:
                 64,
 #endif
                 q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
-            if (target >= 0) tick_combat(q, target);
+            if (target >= 0) tick_combat_from(q, target, SC64_COMBAT_QUERY_VALIDATED);
             else if (dist2(q->x, q->y, q->tx, q->ty) > 36) move_toward(q, q->tx, q->ty);
             else q->order = ORDER_IDLE;
 #else
@@ -11830,11 +11838,13 @@ draw_minimap(void)
 #ifdef SC64_Z8_RUNTIME
         if (u[i].owner != SIDE && race_z8_unit_hidden_from_side(i)) continue;
 #endif
+        /* Ungated calls (sc64_custom_game_gates.h): an inline race_mode test
+         * in this per-unit loop slows the frame in campaign missions. */
 #ifdef SC64_T6_RUNTIME
-        if (race_t6_unit_burrowed(i)) continue;
+        if ((race_t6_unit_burrowed)(i)) continue;
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
-        if (race_p6_combat_unit_burrowed(i)) continue;
+        if ((race_p6_combat_unit_burrowed)(i)) continue;
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_HIDDEN) ||

@@ -10,10 +10,10 @@ class ScarabFlightBridgeTest(unittest.TestCase):
         fixture = (ROOT / 'tests/sc64_scarab_flight_bridge.c').read_text().replace('/* SC64_REAL_UNIT_DEFINITION */', definition).replace('"../starcraft/', '"' + str(ROOT / 'starcraft') + '/')
         save = (ROOT / 'starcraft/race_save_adapter.h').read_text()
         start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_game(void)'))
-        end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', start)
+        end = save.index('\n    }\n#endif', start) + len('\n    }')
         fixture = fixture.replace('/* SC64_REAL_LEGACY_ENCODE */', save[start:end])
         start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_load_game(void)'))
-        end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', start)
+        end = save.index('\n    }\n#endif', start) + len('\n    }')
         fixture = fixture.replace('/* SC64_REAL_LEGACY_DECODE */', save[start:end])
         profiles = {'terran':'T4_RUNTIME T5_RUNTIME TERRAN_LATE_ACTORS', 'zerg':'ZP_CAMPAIGN_ACTORS Z5_ACTORS Z6_ACTORS', 'p7':'ZP_CAMPAIGN_ACTORS Z5_ACTORS Z6_ACTORS P5_ACTORS P6_ACTORS P7_ACTORS P7_PROJECTILES_ENABLED', 'showcase':'ZP_CAMPAIGN_ACTORS Z5_ACTORS Z6_ACTORS P5_ACTORS P6_ACTORS P7_ACTORS'}
         with tempfile.TemporaryDirectory() as d:
