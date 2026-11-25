@@ -256,9 +256,18 @@ def main():
     parser.add_argument("--chapter", type=int, choices=range(1, 11), default=9)
     parser.add_argument("--save-tick", type=int, required=True,
                         help="neutral completed gameplay tick for pause, save and fresh HOME load")
+    parser.add_argument("--previous-victory", type=Path,
+                        help="start T2, T3 or T4 by continuing the preceding chapter's victory SRAM")
     args = parser.parse_args()
+    if args.previous_victory and args.chapter not in (2, 3, 4):
+        parser.error("--previous-victory is supported for T2 through T4")
+    seed = args.previous_victory.read_bytes() if args.previous_victory else b"\xff" * (2 * SLOT_SIZE)
+    if len(seed) != 2 * SLOT_SIZE:
+        parser.error("expected a 32 KiB predecessor SRAM image")
     resource.setrlimit(resource.RLIMIT_FSIZE, (16 << 20, 16 << 20))
     files = (args.trace, args.rom, args.elf, args.runner, Path(__file__))
+    if args.previous_victory:
+        files += (args.previous_victory,)
     if args.chapter == 1:
         files += (Path(t1.__file__), Path(__file__).with_name("sc64_t1_trace_export.py"))
     elif args.chapter == 2:
@@ -344,7 +353,7 @@ def main():
         (directory / "headless.log").symlink_to("/dev/null")
         return PhysicalGame(args.runner, args.rom, args.elf, directory, **save)
 
-    g = open_game("guest", save_output=pause_path)
+    g = open_game("guest", save_input=args.previous_victory, save_output=pause_path)
     last_carrier_slot = -1
     if chapter in (1, 2):
         names = ("U_SCV", "U_MARINE", "U_ZERGLING", "U_RAYNOR")
@@ -456,14 +465,29 @@ def main():
                                                for name in mission_symbols),
                     controls=controls)
 
-    def journal(image, bank, frame, won):
-        payload = slot(image, bank, OUTER_TAG, bank + 1)
+    def journal(image, previous, frame, won):
+        banks = [slice(i * SLOT_SIZE, (i + 1) * SLOT_SIZE) for i in (0, 1)]
+        changed = [i for i in (0, 1) if image[banks[i]] != previous[banks[i]]]
+        assert len(changed) == 1, "a save must replace exactly one journal bank"
+        bank, = changed
+        if previous == b"\xff" * (2 * SLOT_SIZE):
+            assert bank == 0
+            sequence = 1
+        else:
+            retained = 1 - bank
+            serial = struct.unpack_from("<I", previous, retained * SLOT_SIZE + 12)[0]
+            prior = slot(previous, retained, OUTER_TAG, serial)
+            state = struct.unpack_from("<20I", prior, save_layout["state"])
+            assert (state[0], state[2], state[3], state[18], state[19]) == (
+                0, mission if won else mission - 1, prior_mask, 1 - won, 0)
+            sequence = ((serial + 1) & 0xffffffff) or 1
+        payload = slot(image, bank, OUTER_TAG, sequence)
         assert len(payload) >= save_layout["state"] + 80
         assert struct.unpack_from("<I", payload, save_layout["version"])[0] == INNER_TAG
         words = struct.unpack_from("<20I", payload, save_layout["state"])
         assert (words[0], words[1], words[2], words[7]) == (0, 0, mission, frame)
-        assert (words[3], words[18], words[19]) == (won << mission, won, 0)
-        return dict(sequence=bank + 1, frame=frame, payload_bytes=len(payload),
+        assert (words[3], words[18], words[19]) == (prior_mask | (won << mission), won, 0)
+        return dict(bank=bank, sequence=sequence, frame=frame, payload_bytes=len(payload),
                     tag=f"{OUTER_TAG:#010x}", sha256=hashlib.sha256(image).hexdigest())
 
     def compare(tick):
@@ -551,7 +575,22 @@ def main():
     try:
         assert n("screen") == n("frame") == g.front_field("page") == 0
         before = timing_snapshot(g.rsp, g.sym, g.sizes)
-        reveal_briefing()
+        prior_mask = 0
+        if args.previous_victory:
+            g.step(0, 2)
+            g.step(KEY_L)
+            g.step(0)
+            assert (n("screen"), n("race_mode"), n("won"), n("lost"),
+                    n("race_selected_mission")) == (3, 0, 1, 0, mission - 1)
+            prior_mask = n("race_completed")
+            required = sum(1 << index for index in range(4, mission))
+            assert prior_mask & required == required
+            g.step(KEY_A)
+            assert (n("screen"), n("frame"), n("race_selected_mission"),
+                    n("race_completed")) == (1, 0, mission, prior_mask)
+        else:
+            reveal_briefing()
+        final_mask = prior_mask | (1 << mission)
         opening = compare(0)
         if chapter == 3:
             assert (opening["side_units"] + opening["enemy_units"],
@@ -596,12 +635,11 @@ def main():
                 assert persisted() == saved and n("selected_building") == -1
                 g.rsp.export_sram()
                 pause_image = pause_path.read_bytes()
-                pause = journal(pause_image, 0, n("frame"), 0)
+                pause = journal(pause_image, seed, n("frame"), 0)
                 if chapter in (1, 2, 4, 5, 6):
                     pause["selected_units"] = saved["controls"]["selected_units"]
                 if chapter == 1:
                     pause["tape_resume_tick"] = resume_tick
-                assert pause_image[SLOT_SIZE:] == b"\xff" * SLOT_SIZE
                 (args.out / "pause.json").write_text(json.dumps(pause, indent=2) + "\n")
                 prefix = timing_delta(before, timing_snapshot(g.rsp, g.sym, g.sizes), g.rsp.completed)
                 g.close()
@@ -633,12 +671,12 @@ def main():
                 edges = [(t + offset, mask) for t, mask in transitions if t >= resume_tick]
                 print("Fresh load", tick, n("frame"), flush=True)
         if chapter in (1, 2):
-            assert (observed["screen"], observed["phase"], n("race_completed")) == (3, 3, 1 << mission)
+            assert (observed["screen"], observed["phase"], n("race_completed")) == (3, 3, final_mask)
             assert observed["objective_flags"] & 1 and observed["raynor_slot"] == checkpoints[0]["raynor_slot"]
             if chapter == 2:
                 assert observed["backwater_outcome"] == 1
         elif chapter == 3:
-            assert n("race_completed") == 1 << mission and observed["objective_flags"] & 1
+            assert n("race_completed") == final_mask and observed["objective_flags"] & 1
             assert (observed["side_units"], observed["side_buildings"], observed["waves"]) == (16, 10, 11)
         elif chapter == 4:
             t4.verify_final(plan["final"], observed)
@@ -646,7 +684,7 @@ def main():
             t5.verify_final(plan["final"], observed)
         else:
             _verify_terminal(plan, observed)
-        assert len(briefing) == briefing_pages
+        assert len(briefing) == (0 if args.previous_victory else briefing_pages)
         if chapter == 5:
             assert 0 < len(dialogue) <= dialogue_count
         else:
@@ -658,15 +696,14 @@ def main():
         g.rsp.export_sram()
         victory_image = victory_path.read_bytes()
         assert pause_path.read_bytes() == pause_image
-        assert victory_image[:SLOT_SIZE] == pause_image[:SLOT_SIZE]
-        victory = journal(victory_image, 1, n("frame"), 1)
+        victory = journal(victory_image, pause_image, n("frame"), 1)
         g.close()
         g = None
         readback = args.out / "victory-readback.sav"
         g = open_game("result", save_input=victory_path, save_output=readback)
         assert n("screen") == n("frame") == g.front_field("page") == 0
         g.step(KEY_L)
-        assert (n("screen"), n("won"), n("lost"), n("race_completed")) == (3, 1, 0, 1 << mission)
+        assert (n("screen"), n("won"), n("lost"), n("race_completed")) == (3, 1, 0, final_mask)
         loaded = persisted()
         assert loaded == final_state, ("result reload differs", [k for k in loaded if loaded[k] != final_state[k]])
         # Unit selection is serialized with the actors. Building selection
@@ -681,9 +718,10 @@ def main():
         g.tap(KEY_A)
         next_mission = mission + 1 if chapter < 10 else mission
         assert n("screen") == 1 and n("race_selected_mission") == next_mission
-        assert n("won") == n("lost") == 0 and n("race_completed") == 1 << mission
+        assert n("won") == n("lost") == 0 and n("race_completed") == final_mask
         require_unchanged(files, pins)
-        result = dict(gameplay_calls=stop, cut=cut, briefing=briefing, dialogue=dialogue,
+        result = dict(entry="previous-victory" if args.previous_victory else "briefing",
+                      prior_mask=prior_mask, final_mask=final_mask, gameplay_calls=stop, cut=cut, briefing=briefing, dialogue=dialogue,
                       checkpoints=checkpoints, pause=pause, victory=victory,
                       result_action_mission=next_mission, victory_selection=victory_selection,
                       victory_selected_units=final_state["controls"]["selected_units"],
