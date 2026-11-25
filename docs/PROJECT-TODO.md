@@ -19,6 +19,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Packaged Terran campaign.** All ten missions now have individual
+  opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
+  `1779e2ef70d4858a599cce2a32249fcaff9fc129e80e30a26fad425879975960`).
+  The final outstanding replay, T8, matches the historical checkpoints
+  through input 143,260, finishes at frame 139,216 and restores the victory
+  in a fresh emulator. T5 uses new attack orders and its own pause saves.
+  T9 reaches victory with the old inputs and 13 divergent checkpoints.
+  Every chapter's victory journal re-exports byte for byte. The private
+  ten-mission receipt index hashes to
+  `c632a63424a53882bb092bc01911a3ff2ebb0d7ec3dc8e9ec8542c29856a2937`.
+  Continue the exact-package Zerg and Protoss campaigns and physical
+  cartridge timing.
+
+- **Z5 campaign progression.** Starting at a genuine Z4 victory on the
+  packaged Zerg ROM, A enters Z5. The 14 recorded input segments clear
+  Z5 at frame 18,974 and fresh HOME restores the result. All 14 release
+  saves match the historical stage bytes, including the victory SRAM
+  `9ec9117fab1dd841230701bbfb9dbb7441069dc8881cadc6695592a350ea9b45`.
+  The separate HOME recording remains active at its end and after 3,000
+  additional neutral inputs. Keep these routes distinct in future checks.
+
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
   finish on the padded-journal Z10 build. The vitals build repeats the
