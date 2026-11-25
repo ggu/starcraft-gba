@@ -55,8 +55,26 @@ selection. This is a transient one-sample early selection in this replay,
 not a persistent rendering delay; it is still a visible difference at 1,024.
 The sample does not establish the sub-update flip time or other situations.
 
-Still needed before enabling the option: final-source full campaign and SRAM
-qualification, other map shapes and all four production cartridge builds,
-additional busy scenarios, profiling for presentation effects, and real GBA
-measurements. The mGBA cycle counts include presentation waits and UI and do
-not establish hardware frame rate.
+### Campaign continuation and combined release build
+
+The final FIFO probe on the original memo test base replayed the Z7
+continuation from tick 136,697 to 270,585. All 45 remaining checkpoints
+and their semantic world fingerprints matched the earlier control. It won
+at frame 267,585. The victory SRAM matched the control and a fresh reload
+byte for byte. This run starts from the retained battle save.
+
+Separately, both probes together were built on the shared combat and
+Zealot-vitals release with the corrected 56-patch Blood Bath pack.
+Over the same 4,901 Z7 updates, the unmodified corrected Z10 ROM
+(`81cba018…`) averaged 1,902,744 guest cycles. Both probes together
+(`3b0873b9…`) averaged 1,639,400, a 13.84% reduction. Effective update
+rate rose from 8.82 to 10.23 per second. All 72 sampled world states,
+both video pages, palettes, menus and selected pages matched in this
+comparison. The earlier FIFO-only comparison isolates its smaller gain.
+
+All four combined products linked at 32 MiB. The smallest remaining
+EWRAM margin was 3,920 bytes on Protoss. The race stack checks cleared
+the required 512-byte safety margin by 256 bytes on Terran, 556 on Zerg
+and 820 on Protoss. Showcase cleared its static IWRAM boundary by 392
+bytes. Additional busy scenarios, a full campaign run on the integrated
+release, and physical GBA timing remain open.

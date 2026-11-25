@@ -19,6 +19,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Wide-map movement.** On the corrected 56-patch release, the two
+  opt-in route changes together reached 10.23 updates/s in a Z7 battle
+  that runs at 8.82 on the release Z10 cartridge. All four products
+  passed their linker guards. Next measure the integrated candidate
+  during a full campaign and on hardware before enabling it. See the
+  [paired runs and memory margins](audits/2026-11-26-wide-facility-fifo.md).
+
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
   3,000. The original pack stopped after assigning eight patches per
