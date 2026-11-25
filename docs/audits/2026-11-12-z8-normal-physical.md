@@ -1116,6 +1116,19 @@ formation remains available, with a 9,067-mineral and 409-gas
 bank. Reinforce at that position before committing the next
 attack.
 
+A different attack from the eleven-Hydralisk formation stages near
+(1900, 1300) and targets the Pylon before the Nexus. The Pylon falls
+by frame 66,786, and the Hydralisks fall by frame 67,310. Fresh HOME
+at frame 67,315 confirms the Nexus at 750 HP and 170 shields, with
+Kerrigan at 400 HP and the mission still active. This is the strongest
+result from the eleven-Hydralisk checkpoint. The earlier direct attack
+recorded in this audit reached 80 shields.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Pylon and Nexus input replay | `3fd2ec529c4dd1da7a360e2588ce2c86bbb3d60cd9ba7fd7c99dfe943a9866b4` |
+| Frame 67,315 journal | `ce34de805cc021368ce2cc4b94aae805813ee25fe221d9d49b868a33ddf9a70b` |
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Independent eleven-Hydralisk staging replay and fresh HOME | `8403e3e4258222774f468cee87c5f75c518bf7d12cc76cb564f284e1abaa90bb` |

@@ -186,3 +186,16 @@ Its corrected 24,000-call tape matches 62 named ARM observations on #708;
 a full HOST win is recorded separately. The exact full replay on #711 remains
 in progress. See the [route observer audit](2026-11-22-z7-route-observer-purity.md)
 for the evidence and limits.
+
+### November 25 rendered-controller recovery
+
+The prepared current HOST controller with ASan, UBSan and route-purity checks
+regenerates the corrected 270,585-call tape. Normal inputs win at frame
+267,585 with terminal consistency, zero adapter faults and zero enemy
+buildings. The tape SHA-256 is
+`022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`,
+matching the November 22 corrected tape. The current padded Z10 ARM ROM
+then starts the same tape from empty HOME with ordinary buttons. The
+first 146 named observations through call 78,020, frame 76,568, match.
+The ARM replay still needs to reach the victory before it can count
+toward current-cartridge coverage.

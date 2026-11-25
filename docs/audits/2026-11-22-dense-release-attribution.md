@@ -430,6 +430,42 @@ this approach. Retain the current exact crop on unknown art.
 | Preview Custom Game matrix | `780123b907f8bd2dc761cf2cd93f665cc4ec75191554ef08e9e8a4ee984585d5` |
 | Crop candidate population | `947f742a62c67c36cecd575abf49a89749e6ecad8cb6e441ef5cf3c3b36d1907` |
 
+## Selection-ring work in Zerg 9
+
+The November 25 matched ARM emulator profiler captures frames 27,561–27,568
+from the active Z9 campaign journal. The profiled and ordinary replays
+match the sampled world, both framebuffer pages, and elapsed cycles.
+Selection rings cost 143,749 cycles per update, including 100,564 cycles
+in their 560 calls to `gfx_rect`. A dedicated IWRAM span drawer fails the
+unchanged code-size guard in Z10, P10 and Showcase.
+
+The shared renderer uses `gfx_pixel` for one-pixel spans and computes
+consecutive ellipse squares using integer differences. The other spans
+still use the existing rectangle writer. The field UI oracle verifies all
+2,294 supported radius pairs against the direct equation. Over the same
+eight ARM updates, mean ellipse cycles fall to 107,230, a 25.4% reduction.
+Ring calls to `gfx_rect` drop to 140 per update, with the other 420 going
+to `gfx_pixel`. Mean inclusive `game_render` cycles fall from 731,832 to
+695,296. Elapsed cycles improve in all eight updates by 30,578–42,255.
+
+Over a separate 160-update Z9 comparison from the same save, average
+drawing falls 3.34% and mean loop time falls 2.20%. The p95 improves from
+1,877,834 to 1,833,454 cycles. All 160 updates still miss the two-VBlank
+budget. Six matched Custom Game controls on the three race ROMs have
+identical timing. Across all seven comparisons, worlds, framebuffer
+pages, palette, presentation state, exact pause SRAM and fresh
+continuation agree. Five Showcase scenes with an ordinary selection
+input improve mean loop time by 0.69–1.24%. Both video pages agree across
+all 600 pairs. Twice the displayed page differs at the sampled update,+and it agrees at the following update. All four regular ARM profiles
+link with identical EWRAM and IWRAM endpoints.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Baseline profiler | `5e9888edf0b43bf724c9958441168d6efab5d711954f187b628e37a5c3d4d5e1` |
+| Updated profiler | `c9a585fc24e8e612dbb948c5862bd3590436e1488f58d8b44236dda46fd937e0` |
+| Seven paired campaign and Custom Game windows | `1243a7791393637a81a6befc3f3f4ea61b6b974af053d76d31f0b66e16983378` |
+| Five Showcase readbacks | `71e5a1d38203f9576193473fc348785b59c032af855761c3463cd6b9aa5e9b3b` |
+
 ## Generated bounds for offscreen animation checks
 
 The regular asset preparation commands now emit anchor radii alongside
