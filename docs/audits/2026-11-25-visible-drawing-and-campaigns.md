@@ -91,6 +91,13 @@ halfwords per quad and preserves transparent bytes in their original
 positions. Remaining pairs and clipped edges use halfword writes.
 The Z10 blitter prologue allocates 20 more stack bytes. The paired
 tests cover the retained workloads and the existing static boundary.
+Eight P7 visible-army frames contain 178 byte blitter calls on each
+ROM. The lowest sampled entry stack pointer is `0x03006b20` on both.
+After the prologue the observed minimum is `0x03006afc` on the
+release and `0x03006ae8` on the candidate. These leave 7,252 and
+7,136 bytes, respectively, above each ROM's IWRAM code end at that
+call site. Other call paths and the whole-program minimum remain
+unmeasured.
 
 | Workload | Mean cycle reduction with both ARM loops |
 | --- | ---: |
@@ -127,6 +134,7 @@ Custom Game opening, pause and fresh-load cases.
 | Z10 panned Outpost size-compiled ARM quad | `354cf2fd5cc2e058931239f5eee825b833c9b81b3f557355c8342eef81bbd205` |
 | P7 visible army control / size-compiled ARM quad | `820b844769143c361efcee23f9b0fe2559285eb495f38e2d6c808bdbf3996e89` / `d0fd2800785c2011cf7ed38937e10053cb9a9106241f1f6199bb11da114a5abc` |
 | ARM Mode 4 differential, 1,024 cases on each path | `30f47cdd0c997453b215563f3a4d3eb33db2ed2619c1e79c50cccc80c54fdaca` |
+| Sampled P7 byte blitter stack pointers | `83c599adea0696f391cb854ed9f740b253dd10d65199828683ca4d48df40e151` |
 | Candidate 54-case Custom Game matrix | `da0f9b1065be96a29cba4a9126d37cf719c4449ab0a1bebd8d845446f5511dfe` |
 | Terran fixed and panned Outpost pairs | `ba0c628a8b179cad3af9f5abe573a66ca63f7871003f5e1e8a06aec976488801` |
 | ARM quad and pair Showcase Carrier and P7 | `33ac68765678ffcbcd5bcf4651f6081cf1d87db05a149407d5c843ec32e182c3` / `2c405d68357a1d2a7eba64c933387359c244eddc0264e554a13b9b7ca27271d3` |
@@ -160,6 +168,10 @@ and the selection is empty by 20,300. Capture a clean resume point
 at or before the last matched unit order at tick 19,907 and
 re-establish group selection there. Reset receipt SHA-256
 `4375e63fb25ced0f086f200ce43c3f8d33f751d0a2203681d51172cb51b481c6`.
+A new pause save at tick 19,731, frame 19,419, restores the world,
+selected unit, camera and both living heroes through fresh HOME.
+Checkpoint receipt SHA-256
+`ab9ce693c304bbba8c69b9f4698df82ed0ad138dbd758e99c2ee88b054006cce`.
 
 The P7 suffix from frame 8,845 matches the old world-state fingerprint
 through sampled call 40,000, with framebuffer differences in earlier
@@ -170,3 +182,7 @@ a stopped frame 55,257. A current route through the remaining
 objectives and a fresh result readback remain open. Diagnostic
 receipt SHA-256
 `d137b7183e3b8e254ef0b99f7f23cc18375333ed3634c7fdd6df775ef4f412f4`.
+A new ordinary pause at call 56,961, frame 55,252, restores the
+units, buildings and mission state through fresh HOME with a
+byte-identical SRAM re-export. Checkpoint receipt SHA-256
+`e7437658a274cbb544437567381ad22794f6c51fbd2c594b3de1693baef13b28`.

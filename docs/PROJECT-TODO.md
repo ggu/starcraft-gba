@@ -41,7 +41,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   exact wins on that ROM. The archived T5 route opens pause and hits
   the restart shortcut at input tick 20,403. A P7 continuation stays active past the
   old tape's late input boundary with all three Nexuses standing.
-  Update both routes from their last reproducible gameplay states.
+  Retape from the new fresh-HOME checkpoints at frame 19,419 for T5
+  and frame 55,252 for P7.
   Use the retained ordinary-input tapes to qualify the rest of the
   combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.
