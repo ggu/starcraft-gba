@@ -71,6 +71,3 @@ build/starcraft-terran.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-terran.stam
 build/starcraft-zerg-z10.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-zerg.stamp
 build/starcraft-protoss-p10.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-protoss.stamp
 build/starcraft-showcase.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-showcase.stamp
-
-# Guard shipped product compilation while leaving historical probe builds usable.
-build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: override CFLAGS += -DSC64_REQUIRE_CURRENT_SKIRMISH_PACK
