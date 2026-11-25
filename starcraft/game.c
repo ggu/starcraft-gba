@@ -168,10 +168,14 @@ static Sc64ProtossResearchLevels sc64_experimental_research_levels;
 #if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_P5_RUNTIME)
 #error "P5 Shuttle transport requires the P5 runtime"
 #endif
+#ifdef GBA_HOST
+#include <string.h>
+#else
 void *memcpy(void *dst, const void *src, size_t n);
 void *memmove(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
+#endif
 
 #if defined(SC64_SHOWCASE_ENABLED) && \
     (!defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
