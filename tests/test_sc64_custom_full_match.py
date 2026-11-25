@@ -128,9 +128,7 @@ class Matrix(unittest.TestCase):
             self.assertTrue(all(race in match.RACES for race in cpus))
             match.parse_plan(plan[0] if plan else "")
             covered.add((product, int(map_id), len(cpus)))
-        self.assertTrue(all(reason.strip() for reason in match.OPEN_CELLS.values()))
-        self.assertFalse(covered & set(match.OPEN_CELLS))
-        self.assertEqual(covered | set(match.OPEN_CELLS), expected)
+        self.assertEqual(covered, expected)
 
 
 class Author(unittest.TestCase):

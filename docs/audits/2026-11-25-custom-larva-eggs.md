@@ -163,12 +163,44 @@ save reopens RESULT without changing SRAM:
 | Protoss P10 | Blood Bath | Terran, Zerg | new | 21,804 | 15,544 (27 own, 5 hostile) | 50 | 18.46 |
 | Protoss P10 | Blood Bath | Terran, Zerg, Protoss | new | 28,246 | 8,716 (19 own, 8 hostile) | 203 | 16.31 |
 
-Zerg on Blood Bath against three computers is open (`OPEN_CELLS`): 62 plans
-against three Zerg computers lost between frames 20,348 and 72,698, and 24
-plans over four lineups with no Zerg computer (`tpt`, `tpp`, `ttt`, `ppt`)
-lost too. The base
-qualified it against three serial-queue Zerg computers. The coverage test now
-requires every other race, map and opponent count to have a lobby.
+The original search left Zerg on Blood Bath against three computers open:
+62 plans against three Zerg computers and 24 plans across four other lineups
+lost. The original table above records the 17 lobbies qualified at that point.
+
+### Eighteenth lobby on the integrated branch
+
+A subsequent ordinary-input plan wins Blood Bath against three Zerg CPUs.
+The normal lobby resolves start order 156 (human owner 0; Zerg CPU owners 1,
+3 and 4). The HOST author uses the existing controller, with `LINE=38`,
+`WORKERS=14`, `EARLY_WORKERS=6`, `PRODUCERS=2`, `MAX_PRODUCERS=3`,
+`FIRST_ATTACK=6500`, `ATTACK_MIN=6`, `ATTACK_RATIO=1`, `ATTACK_MARGIN=4`,
+`RETREAT=1`, `RECALL_THREAT=3`, `DEFENSE=143`, `DEFENSES=4` and
+`DEFENSE_FRAME=4000`. The same trace was produced by the unmodified HOST
+controller and an experimental controller with a tunable opening threshold;
+the experimental change is not needed.
+
+On the original branch cartridge (`b612b985…10949`) the physical-button
+replay wins at frame 61,183, checks 750 gameplay points, and resumes from
+its ordinary frame-9,044 pause save to the same result with 649 further
+checks. The fresh RESULT load preserves victory and SRAM. The pause shows
+15 own and 14 hostile units, and the replay averages 15.26 emulated updates/s.
+The input trace SHA-256 is
+`38a6a8e03ebbf660b31ec318c7b23d157ab20166333bc1f386dc5a04ede81144`.
+
+The same trace also passes the integrated cartridge built from the merge of
+`c12a8bdc` and `e51fd194` (ROM SHA-256
+`2d1d00751fbc9e82a012823ec54fedda54dd3a55b0cf5d1a001be2de268fe7fe`).
+All 750 checks and the 649-check fresh continuation match; the final world,
+pause SRAM, victory SRAM and fresh RESULT reload match the original run.
+The integrated replay averages 15.40 emulated updates/s. This is a separate
+qualification of the eighteenth lobby; the preceding table retains its
+original 17-cartridge measurements.
+
+Additional integration checks pass the Terran, Z10, P10 and Showcase
+Larva/Egg lifecycle suites with ASan and UBSan, and Z10 fresh-process Egg
+save/resume with one and three opponents. The resume comparator and the
+capability and AI-matrix Python suites pass 66 checks in total.
+
 
 ## Performance
 

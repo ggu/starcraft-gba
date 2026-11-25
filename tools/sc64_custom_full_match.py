@@ -79,6 +79,9 @@ QUALIFIED: tuple[str, ...] = (
     "zerg:0:tzp:WORKERS=12,LINE=38",
     "zerg:1:p:LINE=38,WORKERS=12,PRODUCERS=1,FIRST_ATTACK=7000,LOBBY_WAIT=16",
     "zerg:1:tz:LINE=38,WORKERS=12,PRODUCERS=1,FIRST_ATTACK=7000,LOBBY_WAIT=22",
+    ("zerg:1:zzz:LINE=38,WORKERS=14,EARLY_WORKERS=6,PRODUCERS=2,MAX_PRODUCERS=3,"
+     "FIRST_ATTACK=6500,ATTACK_MIN=6,ATTACK_RATIO=1,ATTACK_MARGIN=4,RETREAT=1,"
+     "RECALL_THREAT=3,DEFENSE=143,DEFENSES=4,DEFENSE_FRAME=4000"),
     "protoss:0:t:LINE=66,WORKERS=12,DEFENSES=4,PRODUCERS=2,FIRST_ATTACK=7000,DEFENSE=162",
     "protoss:0:tp:LINE=65,WORKERS=10,DEFENSE=162,DEFENSES=4,PRODUCERS=2,FIRST_ATTACK=7000",
     "protoss:0:ptz:LINE=65,WORKERS=16,DEFENSE=162,DEFENSES=4,PRODUCERS=3,FIRST_ATTACK=7000",
@@ -87,11 +90,6 @@ QUALIFIED: tuple[str, ...] = (
      "FIRST_ATTACK=3000,ATTACK_MIN=8,ATTACK_RATIO=1,ATTACK_MARGIN=0,LOBBY_WAIT=4"),
     "protoss:1:tzp:LINE=66,TECH_FRAME=30000,LOBBY_WAIT=18,WORKERS=12,PRODUCERS=3",
 )
-# (product, map, CPU count) cells with no qualified lobby, and why; see
-# docs/audits/2026-11-25-custom-larva-eggs.md#custom-game-full-matches.
-OPEN_CELLS: dict[tuple[str, int, int], str] = {
-    ("zerg", 1, 3): "with Larva and Eggs no HOST plan for zzz, tpt, tpp, ttt or ppt has won",
-}
 
 
 class MatchError(RuntimeError):

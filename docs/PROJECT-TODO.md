@@ -528,8 +528,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Whole two- and three-CPU matches](audits/2026-11-25-custom-game-full-matches.md)
   now win and replay on the race cartridges, each with a mid-battle
   save continued in a fresh process; its table lists the open cases.
-  With Larva and Eggs 17 lobbies win and replay; Zerg on Blood Bath
-  against three CPUs has no winning plan and is open
+  With Larva and Eggs all 18 lobbies win and replay, including Zerg on
+  Blood Bath against three Zerg CPUs
   ([Larva and Egg audit](audits/2026-11-25-custom-larva-eggs.md#custom-game-full-matches)).
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
