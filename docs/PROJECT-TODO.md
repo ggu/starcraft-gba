@@ -27,6 +27,21 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   changes, save continuation and on-device pacing. See the
   [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
 
+- **Zerg weapon lookup.** The Zerg release build omitted the indexed weapon
+  art lookup used by the other three products. The shared setting reduced
+  cycles in all six Zerg skirmish windows with the same art on both pages.
+  All six full matches and the Zerg finale reproduced their victory saves.
+  Hardware timing remains open. See the
+  [Zerg10 lookup audit](audits/2026-11-26-z10-weapon-lookup.md).
+
+- **Route field work.** In an 80-update Zerg Blood Bath sample, the 44
+  dense point floods all used distinct goals on the same walkability grid.
+  Serving the observed direct and nearby-root requests took 122,980 full
+  flood dequeues. Offline FIFO prefixes reached the observed origins in
+  25,706 dequeues. Test whether a bounded resumable implementation can
+  deliver a whole-frame gain while preserving every direction, secondary
+  query, topology invalidation and memory guard.
+
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
   regenerated from `d39bd015` use 56 source patches (styles 176/177/178:

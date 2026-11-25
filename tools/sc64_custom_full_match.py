@@ -346,6 +346,11 @@ def pace(args) -> dict:
         seats = lobby(game, trace)
         game.rsp.play_to(first - shift, inputs)
         at_resume(game, trace, "pacing")
+        interval_address = game.sym.get("gba_present_intervals")
+        def present_counts():
+            data = game.rsp.read(interval_address, 32)
+            return [int.from_bytes(data[i:i+4], "little") for i in range(0, 32, 4)]
+        initial_counts = present_counts() if interval_address else []
         clock = game.rsp.clock()
         rows, checks = [], 0
         previous_bitmap = displayed_bitmap(game) if args.video else None
@@ -370,6 +375,8 @@ def pace(args) -> dict:
                 if problems:
                     raise MatchError(f"pacing diverged at {tick}: " + "; ".join(problems))
                 checks += 1
+        intervals = [((after - before) & 0xffffffff) for before, after in
+                     zip(initial_counts, present_counts())] if initial_counts else []
         final = observe(game)
         if final["screen"] != SCREEN_PLAY:
             raise MatchError("match left play during the pacing window")
@@ -388,6 +395,10 @@ def pace(args) -> dict:
               "active_updates": len(active), "mean_active_stage_cycles": averages, "end_fingerprint": final["fingerprint"],
               "sha256": {k: sha256(getattr(args, k)) for k in ("rom", "elf", "runner", "save", "trace")},
               "samples": rows}
+    if intervals:
+        result["page_holds_in_vblanks"] = {str(i) if i < 7 else "7+": count
+                                           for i, count in enumerate(intervals)}
+        result["page_flips_per_second"] = sum(intervals) * GBA_HZ / sum(cycles)
     if args.video:
         changes = sum(row["bitmap_changed"] for row in rows)
         result["bitmap_changes"] = changes
