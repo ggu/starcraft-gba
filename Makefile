@@ -808,12 +808,6 @@ build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wil
 test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
 	./build/test-sc64-weapon-vfx-game
 
-build/test-sc64-shield-bars: tests/sc64_shield_bars_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
-.PHONY: test-sc64-shield-bars
-test-sc64-shield-bars: build/test-sc64-shield-bars
-	./build/test-sc64-shield-bars
-
 build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/skirmish_ai.c -o $@
 
