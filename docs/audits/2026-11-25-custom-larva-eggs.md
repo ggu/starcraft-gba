@@ -1,8 +1,10 @@
 # Custom Game Larva and Eggs
 
 Checked on 2026-11-25 and 26 on branch `claude/zerg-larva-eggs-0a3380`
-merged with base `d39bd015`. Base and change used the same prepared inputs,
-including the 56-patch Blood Bath skirmish pack of
+merged with base `b6b601f2`; comparisons are against base `d39bd015`, and the
+later base commits change tools, documents and the skirmish pack gate only.
+Base and change used the same prepared inputs, including the 56-patch Blood
+Bath skirmish pack of
 [#887](https://github.com/ggu/starcraft-gba/pull/887). The rules and their
 references are in
 [Custom Game Larva and Eggs](../DEVELOPMENT.md#custom-game-larva-and-eggs).
@@ -69,7 +71,7 @@ is not caused by this change.
 
 `tools/sc64_custom_larva_eggs_arm.py`, port-free mGBA runner
 (`10189afc…`), physical buttons only, blank save, Z10 ROM
-`0b4aa5d6…6aeba`, Outpost, Zerg against one Zerg opponent:
+`f22d24c2…6ed7e`, Outpost, Zerg against one Zerg opponent:
 
 | Point | Update | Human Eggs (timers) | Computer Eggs (timers) | Queue entries |
 | --- | --- | --- | --- | --- |
@@ -153,7 +155,8 @@ requalified here.
 
 Emulated cycles per update over updates 6,000 to 9,000 of a passive human on
 Blood Bath, with the same inputs for base `d39bd015` (Z10 ROM `f4a221a3…`) and
-this branch (`0b4aa5d6…`):
+this branch (`f22d24c2…`). The base cartridge was built with the 56-patch pack
+before revision 2, which adds only geyser amounts that the game does not read:
 
 | Lobby | Base | Change | Difference | Units at window end (base, change) |
 | --- | --- | --- | --- | --- |
