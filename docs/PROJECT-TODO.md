@@ -87,9 +87,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles on an uninstrumented candidate. Caching six static weapon fields
   saved 1.13% on Blood Bath and 0.33% on Outpost in P10. Prioritize reducing
   the number of target candidates examined and the cost of drawing actors.
-  Of the 12 one- and two-AI cells, 11 have wins with fresh pause and
-  victory reloads. Qualify Protoss Outpost against one Terran with ordinary
-  inputs. [Small-lobby matrix](audits/2026-11-26-gas-fifo-small-skirmishes.md).
+  All 12 one- and two-AI cells also have wins with fresh pause and victory
+  reloads. The last was Protoss Outpost against one Terran: an earlier
+  Zealot assault won at frame 23,732 with 73 fresh-continuation checks. [Small-lobby matrix](audits/2026-11-26-gas-fifo-small-skirmishes.md).
   [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
