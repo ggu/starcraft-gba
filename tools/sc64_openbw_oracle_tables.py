@@ -26,6 +26,27 @@ TABLES = {
     'iscript.bin': ('012/002', 'f8e5f3d0fcca644470c37de65486e44b09eb30141eedccea3445afe7bc0f65bc'),
 }
 
+def read_tables(rom_path, extractor_path):
+    """Return the nine authenticated tables in memory; nothing is written."""
+    extractor = load_sprites(ROOT / 'tools/sc64_sprites.py').load_extractor(Path(extractor_path))
+    rom = extractor.load_rom(str(rom_path))
+    if hashlib.sha1(rom).hexdigest() != EXPECTED_ROM_SHA1:
+        raise ValueError('ROM authentication failed')
+    archive = extractor.BoltArchive(rom)
+    entries = {}
+    for entry in archive.entries():
+        if entry.path in entries: raise ValueError('duplicate archive entry')
+        entries[entry.path] = entry
+    result = {}
+    for name, (path, digest) in TABLES.items():
+        if path not in entries: raise ValueError('missing archive entry ' + path)
+        data = archive.read(entries[path])
+        if hashlib.sha256(data).hexdigest() != digest: raise ValueError('table authentication failed: ' + path)
+        result[name] = data
+    if len(result['orders.dat']) != 189 * 22:
+        raise ValueError('orders table size does not match the pinned 189-row schema')
+    return result
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--rom', type=Path, required=True)
@@ -35,23 +56,10 @@ def main():
     out = a.out.resolve()
     if not out.is_relative_to((ROOT / '.local').resolve()) or out.exists():
         p.error('output must be a new directory under this worktree .local')
-    extractor = load_sprites(ROOT / 'tools/sc64_sprites.py').load_extractor(a.extractor)
-    rom = extractor.load_rom(str(a.rom))
-    if hashlib.sha1(rom).hexdigest() != EXPECTED_ROM_SHA1:
-        p.error('ROM authentication failed')
-    archive = extractor.BoltArchive(rom)
-    entries = {}
-    for entry in archive.entries():
-        if entry.path in entries: p.error('duplicate archive entry')
-        entries[entry.path] = entry
-    result = {}
-    for name, (path, digest) in TABLES.items():
-        if path not in entries: p.error('missing archive entry ' + path)
-        data = archive.read(entries[path])
-        if hashlib.sha256(data).hexdigest() != digest: p.error('table authentication failed: ' + path)
-        result[name] = data
-    if len(result['orders.dat']) != 189 * 22:
-        p.error('orders table size does not match the pinned 189-row schema')
+    try:
+        result = read_tables(a.rom, a.extractor)
+    except ValueError as error:
+        p.error(str(error))
     out.mkdir(parents=True, exist_ok=False)
     for name, data in result.items():
         with (out / name).open('xb') as f: f.write(data)
