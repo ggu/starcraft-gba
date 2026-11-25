@@ -8,10 +8,10 @@ import verify_sc64_egg_preview as preview
 
 class PreviewRamTest(unittest.TestCase):
     def test_valid_and_boundary_rejection(self):
-        self.assertEqual(preview.ram_ends('0203dfff B __bss_end\n03004fff T __iwram_end\n'),
-                         {'__bss_end': 0x0203dfff, '__iwram_end': 0x03004fff})
+        self.assertEqual(preview.ram_ends('0203dfff B __bss_end\n030051ff T __iwram_end\n'),
+                         {'__bss_end': 0x0203dfff, '__iwram_end': 0x030051ff})
         for symbols in ('0203e000 B __bss_end\n03004fff T __iwram_end\n',
-                        '0203dfff B __bss_end\n03005000 T __iwram_end\n',
+                        '0203dfff B __bss_end\n03005200 T __iwram_end\n',
                         '01ffffff B __bss_end\n03004fff T __iwram_end\n',
                         '0203dfff B __bss_end\n02ffffff T __iwram_end\n',
                         '0203dfff B __bss_end\n',

@@ -174,15 +174,15 @@ static u32 stack_paint(void)
 {
     u32 sp0; __asm__ volatile("mov %0, sp" : "=r"(sp0));
     u32 top = (sp0 - 512u) & ~3u;
-    for (volatile u32 *p = (volatile u32 *)0x03005000u; (u32)p < top; ++p) *p = 0xa55aa55au;
+    for (volatile u32 *p = (volatile u32 *)0x03005200u; (u32)p < top; ++p) *p = 0xa55aa55au;
     return top;
 }
 static void report_stack(u32 top)
 {
     u32 low = top;
-    for (volatile u32 *p = (volatile u32 *)0x03005000u; (u32)p < top; ++p)
+    for (volatile u32 *p = (volatile u32 *)0x03005200u; (u32)p < top; ++p)
         if (*p != 0xa55aa55au) { low = (u32)p; break; }
-    begin("STACK"); put_num("margin", low - 0x03005000u); put_num("used", 0x03007e00u - low); finish();
+    begin("STACK"); put_num("margin", low - 0x03005200u); put_num("used", 0x03007e00u - low); finish();
 }
 #endif
 
