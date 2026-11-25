@@ -44,3 +44,25 @@ and `f10192aab83c53c616888b0430e354d9dc49f163d7e3a94796ff7ca362df7b7a`,
 respectively. The private stage scripts and generated traces are not supplied
 as repository replay targets. This is emulator evidence for the trial ROM,
 not a physical-hardware measurement or a completed T1–T10 run.
+
+## Carried T6 and T7
+
+The actual T5 victory save then entered T6. Its trial HOST trace was
+byte-identical to the earlier finite-gas reference. On the candidate cartridge
+all 42 recorded checkpoint ticks matched without exceptions; T6 won at frame
+23,536 with Norad and Raynor alive, both Dropships at the goal and completion
+mask `0x3f0`. A fresh HOME result reload re-exported identical SRAM (SHA-256
+`0e4296e2f29afdb4c67f4cc841fa485874a207c69274c92327a9fc77f298c028`).
+
+That actual T6 result entered T7. The FIFO HOST controller produced a new
+winning trace, SHA-256
+`04ebbaeaa567cdb3262862a37092fe44e7b96c2112a70d8b03a0315da843b713`.
+The cartridge matched all 12 distinct checkpoint ticks without wallet or
+objective exceptions and won at frame 4,081 with Kerrigan alive, the emitter
+at the goal, no faults and mask `0x7f0`. A fresh HOME load re-exported
+identical SRAM (SHA-256
+`2e6d17a6771abde6da2508f0e0efffa2c0c77f67be1a3ebb9c7f178dd1576d77`).
+The private T7 replay reduced its generic free-disk reserve from 256 to
+48 MiB after two reserve stops; its log was redirected to `/dev/null` and
+its save outputs are small. No gameplay or comparison rule was changed.
+The continuation from this newly produced T7 save through T8–T10 is ongoing.
