@@ -9,18 +9,23 @@ every campaign route, checkpoint tape and pause save found on this
 machine on the previous-link ROM and the relinked ROM of each race,
 and compares the two runs.
 
-There is no blocking finding. All 70 finished pairs match: 21 missions
-replay in full from HOME or the previous chapter's victory to victory,
-and every other mission with a route, checkpoint or pause save matches
-on the evidence it has. The Zerg 7 and Protoss 9 routes are still
-running at the time of writing and are reported when finished. No
-relinked run's main stack went above the bound of the stricter checker
-on PR #882 (Terran 7,792, Zerg 5,848, Protoss 5,940 bytes) or came
-within 512 bytes of `__iwram_end`. The closest to its bound is Zerg 3:
-5,720 bytes, 128 under. The closest to the code is also Zerg 3, with
-1,696 bytes free. The IRQ stack reached 296 bytes, against its bound
-of 304 of 416. The relinked ROM's main-stack low-water equals the
-previous link's at every one of the 5,302 marks taken.
+There is no blocking finding. 69 of the 70 finished pairs match
+completely, and the remaining one, the Protoss 4 tape that no longer
+wins on the packaged ROM, is identical on both ROMs up to the same
+driver error. 21 missions replay in full from HOME or the previous
+chapter's victory to victory, and every other mission with a route,
+checkpoint or pause save matches on the evidence it has. The Zerg 7
+and Protoss 9 routes are still running at the time of writing and are
+reported when finished. No stack-tracked relinked run's main stack
+went above the bound of the stricter checker on PR #882 (Terran 7,792,
+Zerg 5,848, Protoss 5,940 bytes) or came within 512 bytes of
+`__iwram_end`. The closest to its bound is Zerg 3: 5,720 bytes, 128
+under. The closest to the code is also Zerg 3, with 1,696 bytes free.
+The IRQ stack reached 296 bytes, against its bound of 304 of 416. The
+relinked ROM's main-stack low-water equals the previous link's at
+every one of the 5,302 marks taken. Stack tracking covered 502,926
+updates of 35 pairs; the other routes are covered by the static bound
+the build checks.
 
 ## ROM pairs
 
@@ -92,7 +97,7 @@ victory save, to this mission's victory. "Partial replay" is a late
 checkpoint continued to victory or a tape that ends before victory.
 "Save only" is pause saves continued with neutral input.
 
-| Mission | Evidence | Inputs | Updates per ROM | Emulator processes per ROM | Samples compared | Saves compared | Route ends at | Handoff reaches | Result |
+| Mission | Evidence | Inputs | Route updates per ROM | Emulator processes per ROM | Samples compared | Saves compared | Route ends at | Handoff reaches | Result |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
 | Terran 1 | full replay | HOME tape to victory, pause and fresh reload at tick 6,222 | 10,204 | 5 | 120 | 5 | frame 10,120, victory | Terran 2 at frame 311 | matched |
 | Terran 2 | full replay | HOME tape to victory, pause and fresh reload at tick 18,213 | 29,455 | 5 | 312 | 5 | frame 29,366, victory | Terran 3 at frame 340 | matched |
@@ -117,7 +122,7 @@ checkpoint continued to victory or a tape that ends before victory.
 | Protoss 1 | full replay | HOME tape to victory | 15,522 | 4 | 171 | 4 | frame 15,305, victory | Protoss 2 at frame 318 | matched |
 | Protoss 2 | partial replay | HOME tape to its end at call 35,618 (mission still active), then its pause save continued | 38,498 | 5 | 403 | 5 | frame 36,500, mission active | Protoss 3 at frame 401 | matched |
 | Protoss 3 | save only | two pause saves (frames 101 and 20,000) continued | 6,628 | 8 | 99 | 8 | frame 23,300, mission active | Protoss 4 at frame 401 | matched |
-| Protoss 4 | partial replay | HOME tape with a frame-986 pause and fresh reload; the tape does not win | 87,032 | 4 | 885 | 3 | frame 86,028, mission active | Protoss 5 at frame 401 | matched |
+| Protoss 4 | partial replay | HOME tape with a frame-986 pause and fresh reload; the tape does not win | 87,032 | 4 | 885 | 3 | frame 86,028, mission active | Protoss 5 at frame 401 | identical; both ROMs end the tape with the same driver error |
 | Protoss 5 | save only | two pause saves (frames 101 and 2,700) continued | 6,628 | 8 | 99 | 8 | frame 6,000, mission active | Protoss 6 at frame 401 | matched |
 | Protoss 6 | full replay | HOME tape to victory, fresh reload at call 65,803 | 94,434 | 6 | 1,251 | 5 | frame 92,986, victory | Protoss 7 at frame 93 | matched |
 | Protoss 7 | partial replay | frame-76,682 pause save, 905 recorded input runs to victory | 6,289 | 6 | 89 | 6 | frame 80,828, victory | Protoss 8 at frame 343 | matched |
@@ -125,10 +130,12 @@ checkpoint continued to victory or a tape that ends before victory.
 | Protoss 9 | full replay | Protoss 8 victory save, A, then one blind tape | running | | | | | | still running |
 | Protoss 10 | full replay | HOME tape to victory, fresh reload at call 31,887 | 54,502 | 5 | 563 | 5 | frame 53,225, victory | Protoss 10 at frame 97 (retry) | matched |
 
-Updates, processes, samples and saves are per ROM and include the
-handoff and briefing pairs. In all, 70 pairs ran 1,431,641 updates in 324 emulator processes per
-ROM and compared 15,163 samples and 300 saves; every save written at
-the same update by the two ROMs is byte-identical.
+"Route updates" counts the route's own pairs. Processes, samples and
+saves are per ROM and also include the handoff and briefing pairs.
+In all, the 70 finished pairs, routes, handoffs and briefings
+together, ran 1,431,641 updates in 324 emulator processes per ROM and
+compared 15,163 samples and 300 saves; every save written at the same
+update by the two ROMs is byte-identical.
 
 Notes on individual missions:
 
@@ -176,6 +183,14 @@ Notes on individual missions:
   Protoss 6 `b01855f7314b`, Protoss 7 `ad66dc354fd3`, Protoss 8
   `b8624a22d8e7`, Protoss 10 `4bb1ae15b1eb`.
 - The finales' handoffs retry the finale, as on the packaged ROMs.
+- Most handoffs start from the victory save that the route wrote on
+  the same ROM. The Protoss 2–5 handoffs start from retained victory
+  saves of earlier builds, because those missions have no winning
+  route here, so they check the result screen and the next
+  deployment, not a continuous replay into the next chapter.
+- A Protoss 4 pair counts as identical rather than matched: the
+  recorder's own `compare` requires a zero exit, and the driver exits
+  with an error on both ROMs where the tape ends without victory.
 
 ## Displayed page
 
@@ -212,8 +227,9 @@ first interval. The stack top is `0x03007E00`; the IRQ stack top is
 | Zerg 10 | 5,848 | `0x03006108` | 1,568 | 6,904 |
 | Protoss 10 | 5,940 | `0x03006018` | 1,716 | 7,144 |
 
-The missions the placement audit had not measured, plus Zerg 9 and
-Protoss 10, on the relinked ROMs:
+Every mission with a stack-tracked pair, on the relinked ROMs. The
+placement audit had not measured Protoss 1–9, Terran 2, Zerg 3 and
+Zerg 10; Zerg 9 and Protoss 10 are here as well:
 
 | Mission | Tracked runs | Updates tracked | Boot | Play | Pause and save | Result screen | Deepest | Function at the deepest point | IRQ | Under the bound | Free above the code |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
@@ -237,7 +253,7 @@ The deepest points are drawing (sprite blitters, weapon effects and
 selection ellipses) and the pause save's `memcpy`. The previous link
 reached the same low-water at every mark. At each process end the
 recorder also finds the lowest non-zero byte between `__iwram_end`
-and the stack top. In all 111 processes it lies at or above the
+and the stack top. In all 101 processes it lies at or above the
 tracked low-water, by 0–68 bytes where the deepest words pushed were
 zero, so the tracked figure is the deeper of the two.
 

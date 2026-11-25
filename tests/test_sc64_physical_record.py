@@ -102,6 +102,9 @@ class FakeReplay(physical.PhysicalReplay):
             self.ticks += count  # the transport itself advances `completed` from this answer
             self.history += self.held * count
             return f"STEPS {count} {self.ticks} 0"
+        if command == "c":
+            self.ticks += 1
+            return "STOP 0"
         if command == "s":
             Path(self.save_output).write_bytes(bytes([self.history & 255]) * 32768)
             return "OK 32768"
@@ -119,7 +122,7 @@ import sc64_headless_physical as physical
 out = Path(sys.argv[1])
 out.mkdir()
 proc, rsp, log = physical.start(None, None, out, SYMBOLS, SIZES, save_output=out / "pause.sav")
-rsp.set_keys(1)
+rsp.set_keys(mask=1)
 rsp._advance(15)
 rsp.set_keys(int(sys.argv[2]))
 rsp._advance(25)
@@ -297,7 +300,7 @@ class TestPhysicalRecord(unittest.TestCase):
 
     def test_commands_sent_around_the_recorder_make_the_record_incomplete(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for i, command in enumerate(("K2", "U5,0,0", "s")):
+            for i, command in enumerate(("K2", "U5,0,0", "c", "s")):
                 with self.subTest(command=command):
                     rows = self.play(Path(tmp) / str(i), ending=f"rsp.cmd({command!r}); proc.stdin.close()")
                     self.assertIn({"t": "bypass", "proc": 0, "command": command[0]}, rows)

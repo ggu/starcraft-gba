@@ -20,7 +20,7 @@ every emulator process it starts to DIR/rec.jsonl:
   sram    SHA-256 of each exported save
   end     lowest non-zero byte above __iwram_end and in the IRQ stack
   lost    the emulator was gone before its final sample could be taken
-  bypass  a button, update or export command was sent around the recorder
+  bypass  a button, run, update or export command was sent around the recorder
 
 `compare` checks that two records contain the same inputs, samples and saves,
 and that each is whole: a zero exit, at least one emulator process, and for
@@ -104,10 +104,10 @@ class Recorder:
         export, write = headless.HeadlessReplay.export_sram, headless.HeadlessReplay.write
 
         def guarded(method):
-            def inner(self, *args):
+            def inner(self, *args, **kwargs):
                 recorder.inside += 1
                 try:
-                    return method(self, *args)
+                    return method(self, *args, **kwargs)
                 finally:
                     recorder.inside -= 1
             return inner
@@ -128,7 +128,8 @@ class Recorder:
                 transport = rsp.cmd
 
                 def recorded_command(text):
-                    if not recorder.inside and text[:1] in ("K", "U", "s"):
+                    # K sets buttons, U and c run the emulator, s exports the save.
+                    if not recorder.inside and text[:1] in ("K", "U", "c", "s"):
                         recorder.emit({"t": "bypass", "proc": rsp._rec["proc"], "command": text[:1]})
                     return transport(text)
                 rsp.cmd = recorded_command
@@ -157,7 +158,7 @@ class Recorder:
             return proc, rsp, log
 
         def recorded_keys(self, mask):
-            set_keys(self, mask)
+            set_keys(self, mask=mask)
             recorder.emit({"t": "keys", "proc": self._rec["proc"], "at": self.completed, "mask": mask})
 
         def recorded_advance(self, count):
