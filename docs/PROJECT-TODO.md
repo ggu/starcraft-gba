@@ -30,8 +30,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and production build repeats the full Z8 win and confirms a byte-identical
   victory re-export from fresh HOME. The [adaptive Pylon builds](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
   repeat full Terran 2 and Protoss 5 wins with fresh save and result loads,
-  plus the late Zerg 10 win. Use the retained ordinary-input tapes to
-  qualify the rest of the combined Terran, Zerg and Protoss package.
+  a full Zerg 8 win with fresh victory readback, and the late Zerg 10 win.
+  Use the retained ordinary-input tapes to qualify the rest of the
+  combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
@@ -144,10 +145,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [Terran witness-table pairs](audits/2026-11-24-kodak-package-checks.md#monotone-route-witnesses-on-two-current-terran-saves)
   are flat in two-CPU Outpost and cut 1.56% of mean frame
   cycles in three-CPU Blood Bath. Both save continuations
-  match. Repeat with active orders on the same 96-update Blood Bath
-  interval used by the [route overlap census](audits/2026-11-24-kodak-package-checks.md#monotone-route-search-outcomes).
-  Count witness uses, expiry, and admission misses before changing the
-  retention policy.
+  match. The [current 96-update Blood Bath pair](audits/2026-11-24-kodak-package-checks.md#witness-use-on-the-pylon-release)
+  regresses by 0.44% with just 13 hits in 419 lookups. Leave the cache
+  off in production. Any follow-up needs a live workload with sufficient
+  retained paths and a cheaper miss path. Prioritize repeated draw and
+  movement costs on both maps.
   The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
   finds only seven redundant crops across 48 updates. On Outpost the
   base projectile pass takes 39.6–64.7k cycles per update across the
@@ -155,6 +157,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Profile motion and raster work with the merged FOLLOW viewport
   cull in the fixed-camera cut and a visible holdout. Retain the
   current ground-trail picker until a measured workload exercises it.
+  The [current sprite-entry census](audits/2026-11-24-kodak-package-checks.md#direct-sprite-entries-on-the-pylon-release)
+  finds only one misaligned generic sprite draw in eight dense Z9 updates
+  and none in eight panned P10 updates. Dense Z9 spends about 53.8k cycles
+  per update in the packed path, mostly unit walk frames. Prioritize
+  packed walk draws in Z9 and tracer preparation in P10. The same P10
+  sample spends 221.3k cycles per update in tracer parts, including 21.2k
+  in projectile animation selection. Trace the raster exit reasons and
+  benchmark earlier exact rejection and cheaper timeline lookup.
   The [Outpost camera holdout](audits/2026-11-24-kodak-package-checks.md#pan-from-the-base-to-the-outpost-fight)
   moves the same battle into view. Zerg and Protoss now use 325–391k
   tracer cycles per update, roughly half of those inside the watched
@@ -2178,7 +2188,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms a 50-mineral refund and uninterrupted first-Marine training
   on N64 and the updated GBA build. The HUD stays at 6/26 while
   a second Marine waits. Both versions return to 5/26 when the sole
-  active Marine is canceled. Verify N64 admission near the cap.
+  active Marine is canceled. A fresh N64 run displays four queued
+  Marines. Verify a funded queue limit and admission near the supply cap.
   The GBA reserves all paid training slots for admission.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.

@@ -8560,6 +8560,18 @@ and a fresh victory readback. Zerg 10 won at frame 63,523 from the existing
 late checkpoint with the expected completion bit. The all-mission sweep on
 a single release trio remains open.
 
+Zerg 8 repeated the full HOME run at frame 86,969 with all 36 observations
+and seven dialogue acknowledgments. Fresh HOME read the victory and
+re-exported identical SRAM. At a separate mid-mission cut, both builds
+produce and re-export the same pause journal. Loading preserves the
+captured world, camera and cursor and clears the selected Hatchery through
+the canonical save loader. The two builds match immediately and after
+1, 60 and 240 neutral updates. An ordinary A press reselects the Hatchery.
+Resuming the tape two calls later matches the first two checkpoints.
+At frame 13,949 the resumed route has 55 friendly units instead of 54.
+The frame, bank, cursor and enemy counts match. Investigate that
+difference in the remaining exact-trio campaign sweep.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Z9, Z10 and P10 paired windows | `cc3fd3e1361ba5967d170b4e43658fa4798fe2a86890253b7323f61f027321fd` |
@@ -8569,4 +8581,7 @@ a single release trio remains open.
 | Stack watermark | `1bfbac56add7489a4f9c54cf14f2e7ddc8706eeae9dc35d9abb82ed9434cf031` |
 | Terran 2 release and Pylon-on full runs | `f84a434e9ec46c8cefa1f507aea8d64b7c502f2123c5bd62425c95295f0598df` / `f7ad2c0421a32197262141a6639952fb4b3054b072d173c2057e599e81440a43` |
 | Protoss 5 full run | `d2fbaa53a5e44f60c6fcf5318ea5297545039d525c06fc43c8c0b3f1bc6f1e6d` |
+| Zerg 8 full run and victory re-export | `5d82f90fe1721e3e908e8ce2ca888db0040cee57894deee5166017507242ed0d` / `f0946a81d56cf77f0f034d735544cc130217051b4531eabf6714bf3d5882f2f9` |
+| Zerg 8 paired pause and fresh continuation | `b93255432e03c068871e2af443d2afeca761fdb15aa230c1681d0ac9d1d4ef75` |
+| Zerg 8 next-checkpoint divergence after ordinary reselection | `2e62c3556f15f4f65bde83530a533e15bb322c75ef221107311041800811aa07` |
 | Zerg 10 late checkpoint through victory | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
