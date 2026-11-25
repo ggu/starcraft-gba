@@ -98,9 +98,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Separately, the P1 save clears P2 and P3, with matching checkpoint
   observations and byte-identical victory readbacks. Its P4 frame-101
   field save restores the first three completion flags (4,194,316).
-  The same save then clears P4 at frame 81,129 and P5 at frame 5,057.
-  Both victory saves restore and re-export byte for byte, carrying all
-  previously completed chapters.
+  The same save then clears P4 at frame 81,129, P5 at frame 5,057
+  and P6 at frame 92,986. All three victory saves restore and re-export
+  byte for byte, carrying all previously completed chapters. The P6
+  readback SHA-256 is
+  `e3622fdc9c1796b205a5b44e1a4c4a6d72ecd1233d7e0427cabf0e11a8f46be1`.
   The P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
   victory retains all three completion bits (234,881,024).
 
