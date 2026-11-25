@@ -63,6 +63,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   P10 build repeats idle refusal, fresh-load queue persistence and
   resumption after Pylon completion. Verify native Pylon recovery.
 
+  The packaged Terran ROM at `5f758095` restores a retained pause and
+  victory save from earlier builds for each of T1–T10 (20 fresh emulator
+  processes). Each pause restored the expected mission and frame and ran
+  eight more updates. Each victory restored the mission completion bit
+  and held the terminal frame through eight updates. All 20 SRAM exports
+  matched their inputs byte for byte. The private receipt SHA-256 is
+  `f8920c61db85532b944c56f51fb638a1275fb3741f6b8d8a0131fcef504235d4`.
+  T1, T2 and T4 also replay from the ordinary campaign menu through
+  victory on these exact ROM bytes, with a mid-mission pause and fresh
+  HOME reload of each victory. Their terminal frames are 10,120, 29,366
+  and 8,911 respectively. The earlier full T3 run on the same bytes
+  ends at frame 54,000. Continue with T5–T10 on this package.
+
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
   and fall to 14.14–17.90 in the last measured window. Every sampled
