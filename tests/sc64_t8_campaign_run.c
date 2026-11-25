@@ -10,7 +10,8 @@
 #endif
 static FILE *trace;
 static u32 ticks;
-static int run_limit=200000,first=1,last=-1;
+enum { T8_MAX_UPDATES = 500000 };
+static int run_limit=T8_MAX_UPDATES,first=1,last=-1;
 static u16 prior;
 static int hero=-1;
 static int active(void){return ticks<(u32)run_limit&&screen==SCREEN_PLAY&&!won&&!lost;}
@@ -163,4 +164,4 @@ static int run(void){
  checkpoint(won?"won":lost?"lost":"limit");inspect();
  return won&&!lost&&mission_unsupported_count==0&&hero>=0&&u[hero].alive&&race_campaign.phase==SC64_RACE_PHASE_COMPLETE&&(race_completed&(1<<race_selected_mission));
 }
-int main(int argc,char **argv){const char *path=0;int read_only=0;for(int i=1;i<argc;i++){if(!strcmp(argv[i],"--trace")&&i+1<argc)path=argv[++i];else if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=atoi(argv[++i]);else if(!strcmp(argv[i],"--inspect"))read_only=1;else return 2;}if(run_limit<1||run_limit>500000)return 2;game_init();hero=source_unit(race_selected_mission==11?29:19);if(read_only){inspect();inspect_routes();return 0;}if(path){trace=fopen(path,"w");if(!trace)return 2;fprintf(trace,"{\"trace_schema\":1,\"entry\":\"t8-probe-entry\",\"policy\":\"bounded-normal-controller-attempt\",\"profile\":\"terran-t8\",\"mission\":%d,\"tick_limit\":%d,\"events\":[\n",race_selected_mission,run_limit);}checkpoint("start");int success=run();if(trace){fputs("\n]}\n",trace);fclose(trace);}fprintf(stderr,"mission=%d win=%d lost=%d tick=%u frame=%u faults=%d success=%d\n",race_selected_mission,won,lost,(unsigned)ticks,(unsigned)frame,mission_unsupported_count,success);return success?0:1;}
+int main(int argc,char **argv){const char *path=0;int read_only=0;for(int i=1;i<argc;i++){if(!strcmp(argv[i],"--trace")&&i+1<argc)path=argv[++i];else if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=atoi(argv[++i]);else if(!strcmp(argv[i],"--inspect"))read_only=1;else return 2;}if(run_limit<1||run_limit>T8_MAX_UPDATES)return 2;game_init();hero=source_unit(race_selected_mission==11?29:19);if(read_only){inspect();inspect_routes();return 0;}if(path){trace=fopen(path,"w");if(!trace)return 2;fprintf(trace,"{\"trace_schema\":1,\"entry\":\"t8-probe-entry\",\"policy\":\"bounded-normal-controller-attempt\",\"profile\":\"terran-t8\",\"mission\":%d,\"tick_limit\":%d,\"events\":[\n",race_selected_mission,run_limit);}checkpoint("start");int success=run();if(trace){fputs("\n]}\n",trace);fclose(trace);}fprintf(stderr,"mission=%d win=%d lost=%d tick=%u frame=%u faults=%d success=%d\n",race_selected_mission,won,lost,(unsigned)ticks,(unsigned)frame,mission_unsupported_count,success);return success?0:1;}
