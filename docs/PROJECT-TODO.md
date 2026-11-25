@@ -1204,7 +1204,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [native witness](audits/2026-11-21-native-blood-bath-lurker.md#concurrent-hydralisk-eggs-at-two-structures)
   sees two overlapping Hydralisk Eggs near separate structures, each
   raw-Egg-to-Hydralisk in 438 guest-counter increments. It does not settle
-  same-Hatchery parallelism, payment, or conversion to GBA updates.
+  payment, or conversion to GBA updates. A [later witness](audits/2026-11-21-native-blood-bath-lurker.md#concurrent-eggs-referencing-one-hatchery)
+  sees two overlapping Eggs whose actor records both point to one Hatchery;
+  verify that field’s meaning and capture the issuing commands and payment.
   The [normal CPU Drone comparison](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
   follows a native Larva, Egg and Drone in the same slot, and a
   current GBA Hatchery debit, queue and new-slot Drone through
