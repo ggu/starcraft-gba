@@ -39,10 +39,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Terran 6–10](audits/2026-11-25-visible-drawing-and-campaigns.md#exact-campaign-checks)
   also pass with fresh pause and result loads, bringing Terran to nine
   exact wins on that ROM. The archived T5 route opens pause and hits
-  the restart shortcut at input tick 20,403. A P7 continuation stays active past the
-  old tape's late input boundary with all three Nexuses standing.
+  the restart shortcut at input tick 20,403. A P7 continuation stays
+  active past the old tape's late input boundary with the three
+  heroes alive and the enemy Nexus standing.
   Retape from the new fresh-HOME checkpoints at frame 19,419 for T5
-  and frame 55,252 for P7.
+  and frame 55,252 for P7. T5 now has a productive five-SCV
+  checkpoint and a later fresh load with three Wraiths.
+  P7 can rebuild 45 Dragoons but still needs a route
+  through the enemy defenses.
   Use the retained ordinary-input tapes to qualify the rest of the
   combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.
@@ -2214,6 +2218,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   a second Marine waits. Both versions return to 5/26 when the sole
   active Marine is canceled. A funded N64 Backwater run confirms one
   active and four waiting Marines, matching the GBA queue size.
+  The [paired affordability check](audits/2026-11-25-visible-drawing-and-campaigns.md#backwater-marine-affordability)
+  confirms both games reject an order under 50 minerals with a
+  free slot and remaining supply.
   Verify admission near the local and global supply limits separately.
   The GBA reserves all paid training slots for admission.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)

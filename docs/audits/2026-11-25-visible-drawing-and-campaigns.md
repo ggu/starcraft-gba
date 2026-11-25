@@ -172,6 +172,16 @@ A new pause save at tick 19,731, frame 19,419, restores the world,
 selected unit, camera and both living heroes through fresh HOME.
 Checkpoint receipt SHA-256
 `ab9ce693c304bbba8c69b9f4698df82ed0ad138dbd758e99c2ee88b054006cce`.
+Ordinary cursor orders return both SCVs to mineral gathering.
+Three paid workers complete, and a fresh HOME load at frame 24,067
+restores five SCVs, 954 minerals and 300 gas with both heroes alive.
+The fresh-load receipt SHA-256 is
+`f838b7a1a2194ff33c6263174e033af3d7939550f7fe7fb20121ab81ac337830`.
+The existing Starport adds a Control Tower for 50 minerals and
+50 gas, then completes two Wraith orders at 150 minerals and
+100 gas each. Fresh HOME restores three Wraiths, both heroes,
+and the mining economy at frame 28,666. Receipt SHA-256
+`91556e279e65127da4469c6a811711cae80347b1f66531516c882f9c0c84fb45`.
 
 The P7 suffix from frame 8,845 matches the old world-state fingerprint
 through sampled call 40,000, with framebuffer differences in earlier
@@ -186,3 +196,30 @@ A new ordinary pause at call 56,961, frame 55,252, restores the
 units, buildings and mission state through fresh HOME with a
 byte-identical SRAM re-export. Checkpoint receipt SHA-256
 `e7437658a274cbb544437567381ad22794f6c51fbd2c594b3de1693baef13b28`.
+Ordinary Gateway production rebuilds the army to 45 Dragoons and
+creates a pre-assault save at frame 71,324. The front assault
+loses that army and leaves the enemy Nexus at 750 HP and 750
+shields. The next route needs a different approach.
+
+## Backwater Marine affordability
+
+In a fresh native N64 replay, Backwater's Barracks has one active
+Marine, three waiting and a free slot after its first completion.
+The HUD shows 7/26 supply and 22 minerals. An ordinary A press
+leaves the queue intact and displays `NOT ENOUGH MINERALS...`.
+Mineral income raises the bank to 30 during the sample. The
+before/after frame hashes are
+`44b88fcb26a0fd09142943d581b9a2c192ebea98379376577343c6911cd05b38`
+and `2fc2f5eac7b4727e59be7b1a3f9eae34a63511b7aea8654fb7a148351fd4e3db`.
+
+The candidate Terran GBA ROM starts the comparison at 200 minerals.
+Four paid ordinary A presses reduce the balance by 50 each. A fifth
+press at frame 88 keeps all four orders and the same active queue
+head with 6/26 supply, displays `NEED MORE MINERALS`, and the active
+Marine continues training. The same run on `18e550d7` returns
+identical queue and framebuffer results. This pairs the affordability branch with
+a free queue slot and supply in both games. Local-cap and global-cap
+admission remain separate checks. The GBA candidate and release
+receipt SHA-256 values are
+`f31757950cd78dd71de3fc9862e77724a48cf23bfb3674a940eeb56cd39d1b22`
+and `6ceed541ff39308b089c4e286dfdf66c3314123229f5ae3486560f3ae6cac794`.
