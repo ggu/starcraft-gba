@@ -31,6 +31,9 @@ class BudgetTest(unittest.TestCase):
         b = disjoint_pace_budget([row(), row(world_advanced=False, cycles=1)])
         self.assertEqual(b['samples'], 1)
         self.assertEqual(b['mean_total_cycles'], 1000)
+        mixed = pace_budget_report([row(), row(cycles=1200), row(world_advanced=False)])
+        self.assertEqual(mixed['samples'], 2)
+        self.assertEqual(mixed['mean_total_cycles'], 1100)
         with self.assertRaisesRegex(MatchError, 'no simulation updates'):
             disjoint_pace_budget([row(world_advanced=False)])
 
