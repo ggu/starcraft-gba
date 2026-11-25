@@ -34,3 +34,13 @@ new terminal and dialogue timing. These private adaptations and the generated
 traces are not included as reproducible repository targets. The run is a
 T7-victory-to-T10 segment, not a fresh ten-mission campaign or a physical
 hardware measurement. It does not enable the experimental rule by default.
+
+## Beginning a new campaign on the trial
+
+A separate blank-SRAM run entered T1 through HOME, paused and reloaded
+at input 6,222, matched 12 checkpoint ticks and won at frame 10,120.
+The trial then loaded that exact T1 victory, advanced into T2 and won
+at frame 29,366 with 31 matching checkpoint ticks. Both results
+reloaded and re-exported identical SRAM in fresh processes. The T2 run
+checks the result reload only. This opening pair has not yet been linked
+through the middle of the campaign to the T7 victory used above.

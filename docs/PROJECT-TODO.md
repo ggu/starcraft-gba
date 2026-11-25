@@ -70,7 +70,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   timing before activation. On the trial all 30 retained result transitions
   passed. The Terran cartridge carried the actual victory save through
   T7→T8→T9→T10. All 467/53/6 checkpoints and three fresh result reloads
-  matched. [Trial campaign receipt](audits/2026-11-26-fifo-terran-campaign.md). In a separate T9 replay
+  matched. A new campaign separately cleared T1 and T2; carry its own
+  victory forward through T3–T7 to join the late campaign chain.
+  [Trial campaign receipt](audits/2026-11-26-fifo-terran-campaign.md). In a separate T9 replay
   the trial extracted 280 gas in 2,048 updates from a site that supplied 528
   on release. Compare paid production, native service cadence, and light
   versus busy scenes before changing the timer. P9 won on the trial from
