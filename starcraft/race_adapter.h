@@ -1153,8 +1153,8 @@ static int race_build_request_valid(int owner, int worker, int type,
     if (type == B_REFINERY || type == B_EXTRACTOR || type == B_ASSIMILATOR) {
         int geyser = geyser_at(*x, *y);
         if (geyser < 0) return 0;
-        *x = geysers[geyser].x;
-        *y = geysers[geyser].y;
+        *x = field_geysers[geyser].x;
+        *y = field_geysers[geyser].y;
     }
     if (!r || !race_owner_fields_race(owner, r->race) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner ||
@@ -2012,6 +2012,9 @@ static void race_skirmish_init(void)
         geyser_count=map->geyser_count;
         for(i=0;i<geyser_count;i++){geysers[i].x=map->geysers[i].x;geysers[i].y=map->geysers[i].y;}
     }
+#endif
+#ifdef SC64_SOURCE_GAS
+    sc64_gas_start();
 #endif
     for (i = 0; i < race_bots && i < 3; ++i)
         race_player[race_bot_owner_ids[i]] =

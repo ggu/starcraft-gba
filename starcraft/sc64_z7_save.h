@@ -106,9 +106,9 @@ static int race_z7_save_gas_source_row(const Sc64RaceMap *map,int x,int y,
 static int race_z7_save_candidate_has_gas(const RaceSave *candidate,
                                           int x,int y)
 {
-    unsigned count=(unsigned)candidate->state[16];
+    unsigned count=(unsigned)sc64_gas_save_count(candidate->state[16]);
     for (unsigned i=0;i<count;++i)
-        if (candidate->geysers[i].x==x && candidate->geysers[i].y==y) return 1;
+        if (sc64_gas_save_coordinate(candidate->geysers[i].x)==x && sc64_gas_save_coordinate(candidate->geysers[i].y)==y) return 1;
     return 0;
 }
 
@@ -288,8 +288,8 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
 #endif
         || candidate->state[0]!=0 ||
         candidate->state[1]!=R_ZERG || candidate->state[2]!=SC64_Z7_GLOBAL_ID ||
-        candidate->state[7]<0 || candidate->state[16]<0 ||
-        candidate->state[16]>MAX_RACE_GEYSERS ||
+        candidate->state[7]<0 || sc64_gas_save_count(candidate->state[16])<0 ||
+        sc64_gas_save_count(candidate->state[16])>MAX_RACE_GEYSERS ||
         candidate->campaign.mission!=SC64_Z7_GLOBAL_ID ||
         candidate->campaign.elapsed_frames!=(u32)candidate->state[7] ||
         candidate->campaign.objective_stage!=0 ||
@@ -581,19 +581,19 @@ race_z7_save_candidate_valid(const RaceSave *candidate,
         }
     }
     if (source_geysers!=1u || source_extractors!=5u ||
-        candidate->state[16]<(int)source_geysers ||
-        candidate->state[16]>(int)(source_geysers+source_extractors)) return 0;
+        sc64_gas_save_count(candidate->state[16])<(int)source_geysers ||
+        sc64_gas_save_count(candidate->state[16])>(int)(source_geysers+source_extractors)) return 0;
     /* The saved node list is exactly the immutable neutral starting geyser
      * plus raw-149 source Extractor positions whose original building row is
      * no longer alive.  This is independent of current runtime map binding,
      * and rejects duplicate, invented, consumed-while-occupied, and stale
      * off-map nodes before live state is mutated. */
-    for (unsigned i=0;i<(unsigned)candidate->state[16];++i) {
-        int x=candidate->geysers[i].x,y=candidate->geysers[i].y;
+    for (unsigned i=0;i<(unsigned)sc64_gas_save_count(candidate->state[16]);++i) {
+        int x=sc64_gas_save_coordinate(candidate->geysers[i].x),y=sc64_gas_save_coordinate(candidate->geysers[i].y);
         if (x<0 || y<0 || x>=(int)width*16 || y>=(int)height*16 ||
             !race_z7_save_gas_source_row(map,x,y,0)) return 0;
         for (unsigned j=0;j<i;++j)
-            if (candidate->geysers[j].x==x && candidate->geysers[j].y==y) return 0;
+            if (sc64_gas_save_coordinate(candidate->geysers[j].x)==x && sc64_gas_save_coordinate(candidate->geysers[j].y)==y) return 0;
     }
     for (unsigned row=0;row<map->unit_count;++row) {
         const Sc64ImportedUnit *src=&map->units[row];

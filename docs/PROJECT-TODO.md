@@ -95,12 +95,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   skirmish importer now keeps each source site’s full 32-bit gas quantity
   in both the map descriptor and private report. Regenerating Blood Bath
   preserved the four existing coordinates and recorded 10,000 gas at each.
-  The shared worker still awards eight gas per normal trip. The
-  [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
-  pickups of eight while stocked and two below eight from authenticated N64
-  code; a live depleted trip remains to be captured. Implement remaining gas
-  per map site and preserve it through refinery destruction, rebuilding and
-  save/load.
+  The [N64 and GBA gas audit](audits/2026-11-26-n64-gas-pickup.md)
+  records natural eight- and two-unit cargo and the opt-in shared worker
+  implementation. Rebuilding a preplaced refinery, preserving its balance
+  through save/load, the 30 chapter transitions and four product stack
+  budgets are verified. Before enabling this on release cartridges, finish
+  the busy Zerg 7 campaign replay with finite gas and check the late economy.
+  The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256

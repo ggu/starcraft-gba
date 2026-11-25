@@ -57,6 +57,9 @@ static void sc64_showcase_start(int scene)
     death_vfx_reset();
     memset(invincible_units,0,sizeof(invincible_units));
     memset(invincible_buildings,0,sizeof(invincible_buildings));
+#ifdef SC64_SOURCE_GAS
+    sc64_gas_site_count=0;
+#endif
     geyser_count=0;minerals=gas=0;supply_used=supply_cap=0;
     memset(race_minerals,0,sizeof(race_minerals));
     memset(race_gas,0,sizeof(race_gas));

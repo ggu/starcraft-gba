@@ -3161,6 +3161,23 @@ static int race_save_game(void) {
                                SC64_PR_USED_BITS, race_mode ? 5u : 8u,
                                &sc64_experimental_research_levels)) return 0;
 #endif
+#ifdef SC64_SOURCE_GAS
+    /* All semantic candidate validators above see ordinary coordinates.
+     * Pack only after they finish, immediately before authenticated writing. */
+    if (!sc64_gas_save_pack(race_data.geysers, sc64_geyser_consumed,
+                            race_mode,
+#ifdef SC64_IMPORTED_SKIRMISH
+                            race_skirmish_map,
+#else
+                            0,
+#endif
+                            race_selected_mission, sc64_gas_site_capacity)) return 0;
+    for (unsigned i = 0; i < 2u * MAX_RACE_GEYSERS; ++i)
+        if (sc64_geyser_consumed[i]) {
+            race_data.state[16] |= SC64_GAS_SAVE_MARKER;
+            break;
+        }
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_PACKED_MINERAL_FIFO
@@ -3330,7 +3347,12 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
         construction_save_marker != SC64_CONSTRUCTION_SAVE_MARKER) return 0;
 #endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
-       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
+       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||
+#ifdef SC64_SOURCE_GAS
+       !sc64_gas_save_count_valid(v[16]))return 0;
+#else
+       v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
+#endif
 #ifdef SC64_CAMPAIGN_RACE
     if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE)
 #ifdef SC64_T4_RUNTIME
@@ -3482,6 +3504,15 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_SOURCE_GAS
+    if (!sc64_gas_save_debts_valid(race_data.geysers, v[16], v[0],
+#ifdef SC64_IMPORTED_SKIRMISH
+                                   v[20],
+#else
+                                   0,
+#endif
+                                   v[2], sc64_gas_site_capacity)) return 0;
+#endif
 #ifdef SC64_PACKED_MINERAL_FIFO
     if ((plan->mineral_fifo_auth.features & SC64_STAGE_SAVE_MINERAL_FIFO) &&
         !race_save_prepare_mineral_fifo(&race_data, (unsigned)width * 16u,
@@ -3946,8 +3977,10 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                       (unsigned)(height * 16), &decoded)) return 0;
     }
     for (int i = 0; i < MAX_RACE_GEYSERS; ++i)
-        if (race_data.geysers[i].x < 0 || race_data.geysers[i].x >= width * 16 ||
-            race_data.geysers[i].y < 0 || race_data.geysers[i].y >= height * 16) return 0;
+        if (sc64_gas_save_coordinate(race_data.geysers[i].x) < 0 ||
+            sc64_gas_save_coordinate(race_data.geysers[i].x) >= width * 16 ||
+            sc64_gas_save_coordinate(race_data.geysers[i].y) < 0 ||
+            sc64_gas_save_coordinate(race_data.geysers[i].y) >= height * 16) return 0;
 #else
     for(int i=0;i<MAX_MINERALS;i++)if(race_data.minerals_map[i].amount<0||
         race_data.minerals_map[i].amount>65535)return 0;
@@ -5405,7 +5438,7 @@ static int race_load_game(void) {
 #endif
     minerals=v[5];gas=v[6];frame=v[7];cx=v[8];cy=v[9];train_type=v[10];
     weapons_level=v[11];armor_level=v[12];weapons_research=v[13];armor_research=v[14];seed=(u32)v[15];
-    geyser_count=v[16];mission_objective_stage=v[17];won=v[18];lost=v[19];
+    geyser_count=sc64_gas_save_count(v[16]);mission_objective_stage=v[17];won=v[18];lost=v[19];
     race_cols=race_mode?64:sc64_race_maps[race_selected_mission].width;
     race_rows=race_mode?64:sc64_race_maps[race_selected_mission].height;
     if(race_mode)race_skirmish_geometry();
@@ -5516,7 +5549,13 @@ static int race_load_game(void) {
     memcpy(race_player,race_data.players,sizeof(race_player));
     memcpy(race_minerals,race_data.ore,sizeof(race_minerals));
     memcpy(race_gas,race_data.vespene,sizeof(race_gas));
-    memcpy(geysers,race_data.geysers,sizeof(race_data.geysers));race_campaign=race_data.campaign;
+#ifdef SC64_SOURCE_GAS
+    sc64_gas_save_publish(race_data.geysers, geysers, sc64_geyser_consumed);
+    sc64_gas_rebuild_sites();
+#else
+    memcpy(geysers,race_data.geysers,sizeof(race_data.geysers));
+#endif
+    race_campaign=race_data.campaign;
     SC64_PSC_WORLD_LOADED();   /* the actors are in place: a flight or a Scarab in the making may be among them */
 #ifdef SC64_UNIFIED
     backwater=race_data.backwater;
