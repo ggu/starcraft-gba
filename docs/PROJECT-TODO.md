@@ -98,9 +98,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The shared worker still awards eight gas per normal trip. The
   [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
   pickups of eight while stocked and two below eight from authenticated N64
-  code; a live depleted trip remains to be captured. Implement remaining gas
-  per map site and preserve it through refinery destruction, rebuilding and
-  save/load.
+  code; a live depleted trip remains to be captured. The opt-in shared worker implementation
+  now tracks source sites across extraction, refinery replacement and
+  save/load. `make check-sc64-source-gas` exercises all three worker types on
+  Blood Bath for each race product and checks source placements across all 30
+  campaign maps. The fixture moves workers between pickup and deposit and
+  seeds the last stocked trip. Blood Bath uses the imported 10,000 gas per
+  site. Outpost uses an authored 5,000. On the Terran cartridge a legacy T9 save
+  opened with zero consumption. After 512 ordinary updates, a fresh load
+  preserved 128 gas consumed at site 2. The older cartridge refused the new
+  record and fell back when an older journal slot was available. Repeat on
+  the other cartridges, check normal placement after a campaign's preplaced
+  refinery is destroyed, and measure memory budgets before release activation.
+  The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256

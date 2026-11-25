@@ -71,3 +71,17 @@ build/starcraft-terran.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-terran.stam
 build/starcraft-zerg-z10.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-zerg.stamp
 build/starcraft-protoss-p10.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-protoss.stamp
 build/starcraft-showcase.elf: $(SKIRMISH_PACK_STAMP_DIR)/skirmish-pack-showcase.stamp
+
+
+# Exercises private map data and shared worker/depot code for each cartridge.
+.PHONY: check-sc64-source-gas
+check-sc64-source-gas: $(addprefix check-sc64-source-gas-,terran zerg protoss)
+
+define SOURCE_GAS_GAME_TEST
+.PHONY: check-sc64-source-gas-$(1)
+check-sc64-source-gas-$(1): build/test-sc64-source-gas-$(1)
+	./$$<
+build/test-sc64-source-gas-$(1): tests/sc64_source_gas_game.c $$(CUSTOM_FULL_MATCH_ELF_$(1)) $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CUSTOM_FULL_MATCH_INPUTS_$(1)) common/gba.c $$(COMMON_HEADERS) mk/custom-full-match/Makefile | build
+	$$(CLANG) $$(CUSTOM_FULL_MATCH_HOST_FLAGS) -DSC64_SOURCE_GAS $$(CUSTOM_FULL_MATCH_FLAGS_$(1)) $$< common/gba.c $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) -o $$@
+endef
+$(foreach product,terran zerg protoss,$(eval $(call SOURCE_GAS_GAME_TEST,$(product))))

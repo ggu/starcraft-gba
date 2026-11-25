@@ -51,6 +51,8 @@ static int sc64_gas_source_site(int mode, int map_id, int mission,
 static unsigned sc64_gas_site_capacity(int mode, int map_id, int mission,
                                        unsigned ordinal)
 {
+    /* Save preflight can inspect a different map from the active world. */
+    if (mode == 1 && map_id == 0) return ordinal < 4 ? 5000u : 0;
     Sc64GasSite site;
     return sc64_gas_source_site(mode, map_id, mission, ordinal, &site) ? site.initial : 0;
 }
