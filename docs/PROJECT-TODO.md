@@ -43,6 +43,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Separately, all 30 retained campaign victories advanced to the next
   chapter or retried their finale. Each resulting pause save reloaded
   in a fresh mGBA process with the same state and SRAM bytes.
+  With the combat optimization from #893 included, all 30 transitions
+  and 72 lobby launches passed again. On two busy Zerg skirmish saves,
+  1,024 further updates matched both display pages, actors and world
+  state at all 129 samples per map. Pause saves matched byte for byte.
+  Whole-update guest cycles fell 0.50% on Outpost and 0.12% on Blood Bath.
+  These short fixed-camera windows do not establish 30 fps on hardware.
 
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
