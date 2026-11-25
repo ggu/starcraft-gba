@@ -83,3 +83,8 @@ python3 tools/sc64_t5_linked_victory.py \
 On success, `$work/t5/result.json` contains every stage hash. The fresh
 victory re-export is `$work/t5/victory-readback.sav`, SHA-256
 `1f47c043a05007c926b4d08923998c88516a9289f5517993a2892939910c3202`.
+
+An independent replay matched all 39 stage hashes, the final world after
+fresh load, and the transition to T6 at frame zero. The button runs took
+146,309 completed main-loop iterations and 99,807,435,490 emulated guest
+cycles, averaging 24.59 updates/s including HOME loads and pause saves.
