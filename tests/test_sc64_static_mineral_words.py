@@ -3,6 +3,9 @@
 
 import pathlib
 import re
+import os
+import subprocess
+import tempfile
 import sys
 import unittest
 
@@ -23,6 +26,41 @@ def source_bank() -> str:
 
 
 class MineralWordBankTests(unittest.TestCase):
+    def test_prepared_bank_tracks_same_path_with_old_timestamp(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            work = pathlib.Path(directory)
+            (work / 'tools').symlink_to(root / 'tools', target_is_directory=True)
+            (work / 'build').mkdir()
+            source = work / 'input.h'
+            source.write_text(source_bank())
+            (work / 'Makefile').write_text(
+                f'PYTHON := {sys.executable}\n'
+                'SC64_STATIC_MINERAL_WORDS_SOURCE := input.h\n'
+                'build:\n\t@mkdir -p build\n'
+                f'include {root}/mk/static-mineral-words/Makefile\n')
+            def build():
+                subprocess.run(['make', '-s', 'sc64-static-mineral-words'],
+                               cwd=work, check=True, capture_output=True, text=True)
+            build()
+            output = work / 'build/generated/sc64_static_mineral_words_generated.h'
+            first = output.read_bytes()
+            source.write_text(source_bank().replace('0,1,0,', '0,9,0,', 1))
+            os.utime(source, (1, 1))
+            build()
+            second = output.read_bytes()
+            self.assertNotEqual(first, second)
+            timestamp = output.stat().st_mtime_ns
+            build()
+            self.assertEqual(timestamp, output.stat().st_mtime_ns)
+            alternate = work / 'alternate.h'
+            alternate.write_text(source_bank())
+            os.utime(alternate, (1, 1))
+            subprocess.run(['make', '-s', 'sc64-static-mineral-words',
+                            'SC64_STATIC_MINERAL_WORDS_SOURCE=alternate.h'],
+                           cwd=work, check=True, capture_output=True, text=True)
+            self.assertEqual(first, output.read_bytes())
+
     def test_preserves_frame_identity_and_all_phases(self):
         source = source_bank()
         generated = emit(source)
