@@ -71,16 +71,8 @@ static int live_units(void)
     return count;
 }
 
-static void checkpoint(void)
+static void capture_checkpoint(T3Checkpoint *c)
 {
-    T3Checkpoint *c;
-    if (ticks % 1000u || checkpoint_count >=
-        sizeof(checkpoints) / sizeof(checkpoints[0])) return;
-    /* Rendering reuses the common post-production supply totals. Check their
-     * consistency through production and the late loss of units/buildings. */
-    assert(supply_used == race_owner_supply(SIDE));
-    assert(supply_cap == race_owner_supply_cap(SIDE));
-    c = &checkpoints[checkpoint_count++];
     c->tick = ticks;
     c->elapsed = race_t3.elapsed_ticks;
     c->remaining = race_t3.remaining_ticks;
@@ -101,7 +93,33 @@ static void checkpoint(void)
     c->enemy_gas = (u16)race_gas[ENEMY];
     c->sent = race_campaign.enemy_units_sent;
     c->waves = race_campaign.enemy_wave;
+}
+
+static void checkpoint(void)
+{
+    if (ticks % 1000u || checkpoint_count >=
+        sizeof(checkpoints) / sizeof(checkpoints[0])) return;
+    /* Rendering reuses the common post-production supply totals. Check their
+     * consistency through production and the late loss of units/buildings. */
+    assert(supply_used == race_owner_supply(SIDE));
+    assert(supply_cap == race_owner_supply_cap(SIDE));
+    capture_checkpoint(&checkpoints[checkpoint_count++]);
     game_render();
+}
+
+static void write_checkpoint(FILE *f, const T3Checkpoint *c)
+{
+    fprintf(f, "{\"tick\":%u,\"elapsed\":%u,\"remaining\":%u,"
+               "\"killed\":%u,\"outcome\":%u,\"objective\":%u,\"phase\":%u,"
+               "\"won\":%u,\"lost\":%u,\"screen\":%u,"
+               "\"side_units\":%u,\"enemy_units\":%u,"
+               "\"side_buildings\":%u,\"enemy_buildings\":%u,"
+               "\"side_ore\":%u,\"side_gas\":%u,\"enemy_ore\":%u,"
+               "\"enemy_gas\":%u,\"sent\":%u,\"waves\":%u}",
+            c->tick, c->elapsed, c->remaining, c->killed,
+            c->outcome, c->objective, c->phase, c->won, c->lost, c->screen,
+            c->side_units, c->enemy_units, c->side_buildings, c->enemy_buildings,
+            c->side_ore, c->side_gas, c->enemy_ore, c->enemy_gas, c->sent, c->waves);
 }
 
 static void write_trace(void)
@@ -126,19 +144,14 @@ static void write_trace(void)
     fprintf(f, "],\"checkpoints\":[");
     for (i = 0; i < checkpoint_count; ++i) {
         const T3Checkpoint *c = &checkpoints[i];
-        fprintf(f, "%s{\"tick\":%u,\"elapsed\":%u,\"remaining\":%u,"
-                   "\"killed\":%u,\"outcome\":%u,\"objective\":%u,\"phase\":%u,"
-                   "\"won\":%u,\"lost\":%u,\"screen\":%u,"
-                   "\"side_units\":%u,\"enemy_units\":%u,"
-                   "\"side_buildings\":%u,\"enemy_buildings\":%u,"
-                   "\"side_ore\":%u,\"side_gas\":%u,\"enemy_ore\":%u,"
-                   "\"enemy_gas\":%u,\"sent\":%u,\"waves\":%u}",
-                i ? "," : "", c->tick, c->elapsed, c->remaining, c->killed,
-                c->outcome, c->objective, c->phase, c->won, c->lost, c->screen,
-                c->side_units, c->enemy_units, c->side_buildings, c->enemy_buildings,
-                c->side_ore, c->side_gas, c->enemy_ore, c->enemy_gas, c->sent, c->waves);
+        if (i) fputc(',', f);
+        write_checkpoint(f, c);
     }
-    fprintf(f, "]}\n");
+    T3Checkpoint terminal;
+    capture_checkpoint(&terminal);
+    fprintf(f, "],\"terminal_checkpoint\":");
+    write_checkpoint(f, &terminal);
+    fprintf(f, "}\n");
     fclose(f);
 }
 
