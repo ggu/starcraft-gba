@@ -38,7 +38,22 @@ int main(void)
                     ++count;
                 }
     }
-#ifdef SC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED
+#ifdef SC64_PROTOSS_BASE_WORDS_EXPECTED
+    assert(count == 120 * SC64_PROTOSS_BASE_WORDS_EXPECTED);
+#ifdef SC64_PROTOSS_BASE_EXPECT_P10
+    assert(sc64_building_word_sources[0] == &sc64_race_sprite_hatchery &&
+           sc64_building_word_sources[1] == &sc64_race_sprite_overmind_with_shell &&
+           sc64_building_word_sources[2] == &sc64_race_sprite_nexus);
+#endif
+#ifdef SC64_PROTOSS_BASE_EXPECT_TERRAN
+    assert(sc64_building_word_sources[SC64_PROTOSS_BASE_WORDS_EXPECTED - 6] == sc64_race_building_art_sprite(106) &&
+           sc64_building_word_sources[SC64_PROTOSS_BASE_WORDS_EXPECTED - 5] == sc64_race_building_art_sprite(111) &&
+           sc64_building_word_sources[SC64_PROTOSS_BASE_WORDS_EXPECTED - 4] == sc64_race_building_art_sprite(109));
+#endif
+    assert(sc64_building_word_sources[SC64_PROTOSS_BASE_WORDS_EXPECTED - 3] == &sc64_race_sprite_pylon);
+    assert(sc64_building_word_sources[SC64_PROTOSS_BASE_WORDS_EXPECTED - 2] == &sc64_race_sprite_gateway);
+    assert(sc64_building_word_sources[SC64_PROTOSS_BASE_WORDS_EXPECTED - 1] == &sc64_race_sprite_forge);
+#elif defined(SC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED)
     assert(count == 360 && sc64_building_word_sources[0] == sc64_race_building_art_sprite(106) &&
            sc64_building_word_sources[1] == sc64_race_building_art_sprite(111) &&
            sc64_building_word_sources[2] == sc64_race_building_art_sprite(109));

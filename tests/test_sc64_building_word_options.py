@@ -50,6 +50,34 @@ class BuildingWordOptionsTest(unittest.TestCase):
                 expected = PACKED[:index] + (STOCK[index],) + PACKED[index + 1:]
                 self.assertEqual(self.banks(f'{option}=0'), expected)
 
+    def test_opt_in_adds_exactly_the_protoss_base_roster(self):
+        banks = self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1')
+        self.assertEqual(banks, (
+            'terran-command_center-barracks-supply_depot-pylon-gateway-forge-words',
+            PACKED[1],
+            'p10-hatchery-overmind-nexus-command_center-barracks-supply_depot-pylon-gateway-forge-words',
+            'showcase-command_center-barracks-supply_depot-pylon-gateway-forge-words',
+        ))
+        self.assertEqual(self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1',
+                                    'CANONICAL_TERRAN_BUILDING_WORDS=0'), (
+            'terran-pylon-gateway-forge-words', STOCK[1],
+            'p10-hatchery-overmind-nexus-pylon-gateway-forge-words',
+            'showcase-pylon-gateway-forge-words',
+        ))
+        self.assertNotEqual(self.plan('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=2').returncode, 0)
+        self.assertEqual(self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1',
+                                    'CFLAGS=-DSC64_TILE_RENDERER'), ('', 'generated', '', ''))
+
+    def test_configuration_changes_when_the_selected_roster_changes(self):
+        names = ('TERRAN_NORMAL_OPTIONS', 'P10_BUILDING_WORD_DIR', 'SHOWCASE_BUILDING_WORD_ENABLED')
+        recipe = '.PHONY: print-config\nprint-config:\n\t@printf "%s\\n" ' + ' '.join(f"'$({v})'" for v in names) + '\n'
+        def config(value):
+            run = subprocess.run(['make', '-s', '-f', 'Makefile', '-f', '-',
+                                  f'CANONICAL_PROTOSS_BASE_BUILDING_WORDS={value}', 'print-config'],
+                                 input=recipe, cwd=ROOT, text=True, capture_output=True, check=True)
+            return run.stdout.splitlines()
+        self.assertTrue(all(a != b for a, b in zip(config(0), config(1))))
+
     def test_incompatible_renderers_skip_the_shared_extension(self):
         self.assertEqual(self.banks('CFLAGS=-DSC64_TILE_RENDERER'), ('', 'generated', '', ''))
         self.assertEqual(self.banks('CFLAGS=-DSC64_TILE_RENDERER=1'), ('', 'generated', '', ''))

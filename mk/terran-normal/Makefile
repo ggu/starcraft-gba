@@ -19,17 +19,26 @@ ifneq ($(TERRAN_BUILDING_WORDS),1)
 $(error TERRAN_BUILDING_WORDS must be 0 or 1)
 endif
 endif
-TERRAN_BUILDING_WORD_DIR := build/generated/terran-base-building-words
+TERRAN_BUILDING_WORD_EMPTY :=
+TERRAN_BUILDING_WORD_SPACE := $(TERRAN_BUILDING_WORD_EMPTY) $(TERRAN_BUILDING_WORD_EMPTY)
+TERRAN_BUILDING_WORD_NAMES := $(strip $(if $(filter 1,$(TERRAN_BUILDING_WORDS)),command_center barracks supply_depot) $(if $(filter 1,$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS)),pylon gateway forge))
+TERRAN_BUILDING_WORD_LEGACY_DIR := build/generated/terran-base-building-words
+TERRAN_BUILDING_WORD_DIR := $(if $(filter 1,$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS)),build/generated/terran-$(subst $(TERRAN_BUILDING_WORD_SPACE),-,$(TERRAN_BUILDING_WORD_NAMES))-words,$(TERRAN_BUILDING_WORD_LEGACY_DIR))
 TERRAN_BUILDING_WORD_BANK := $(TERRAN_BUILDING_WORD_DIR)/sc64_building_words_generated.h
-TERRAN_BUILDING_WORD_INPUTS := $(if $(and $(filter 1,$(TERRAN_BUILDING_WORDS)),$(call sc64_can_pack_building_words,$(CFLAGS) $(TERRAN_ROM_FLAGS))),$(TERRAN_BUILDING_WORD_BANK))
+TERRAN_BUILDING_WORD_INPUTS := $(if $(and $(TERRAN_BUILDING_WORD_NAMES),$(call sc64_can_pack_building_words,$(CFLAGS) $(TERRAN_ROM_FLAGS))),$(TERRAN_BUILDING_WORD_BANK))
 TERRAN_BUILDING_WORD_FLAGS := -DSC64_BUILDING_WORDS_PROBE -I$(TERRAN_BUILDING_WORD_DIR)
 
-$(TERRAN_BUILDING_WORD_BANK): $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
+$(TERRAN_BUILDING_WORD_LEGACY_DIR)/sc64_building_words_generated.h: $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
 	mkdir -p $(dir $@)
 	$(PYTHON) tools/sc64_building_words.py $< --frame command_center --frame barracks --frame supply_depot > $@.tmp
 	mv $@.tmp $@
 
-TERRAN_NORMAL_OPTIONS := $(TERRAN_CARRIER_RELEASE) $(if $(TERRAN_BUILDING_WORD_INPUTS),1,0)
+build/generated/terran-%-words/sc64_building_words_generated.h: $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h tools/sc64_building_words.py tools/sc64_unit_facing.py | build
+	mkdir -p $(dir $@)
+	$(PYTHON) tools/sc64_building_words.py $< $(foreach frame,$(subst -, ,$*),--frame $(frame)) > $@.tmp
+	mv $@.tmp $@
+
+TERRAN_NORMAL_OPTIONS := $(TERRAN_CARRIER_RELEASE) $(if $(TERRAN_BUILDING_WORD_INPUTS),$(TERRAN_BUILDING_WORD_DIR),0)
 TERRAN_NORMAL_CONFIG := $(if $(shell test -f build/terran-normal-config && printf '%s\n' '$(TERRAN_NORMAL_OPTIONS)' | cmp -s - build/terran-normal-config && printf matched),,force-terran-normal-rebuild)
 .PHONY: force-terran-normal-config force-terran-normal-rebuild
 force-terran-normal-config:
@@ -43,8 +52,8 @@ build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(TERRAN_ARM_SOURCES) $(
 	$(SIZE) $@
 
 .PHONY: test-sc64-terran-building-words-pixels
-build/test-sc64-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) $(TERRAN_BUILDING_WORD_BANK) common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_BUILDING_WORD_FLAGS) -DSC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
+build/test-sc64-terran-building-words-pixels: tests/sc64_building_words_pixels.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) $(TERRAN_BUILDING_WORD_LEGACY_DIR)/sc64_building_words_generated.h common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon -DSC64_BUILDING_WORDS_PROBE -I$(TERRAN_BUILDING_WORD_LEGACY_DIR) -DSC64_TERRAN_BASE_BUILDING_WORDS_EXPECTED $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
 test-sc64-terran-building-words-pixels: build/test-sc64-terran-building-words-pixels
 	./$<
 
@@ -71,3 +80,11 @@ build/test-sc64-custom-defense-terran: tests/sc64_terran_custom_defense_cells_te
 
 # Race cartridge IWRAM placement; needs LDFLAGS, defined before this file is read.
 include mk/iwram-hot/Makefile
+
+# Prepared-source parity for the opt-in combined roster.
+.PHONY: test-sc64-terran-protoss-base-words-pixels
+build/test-sc64-terran-protoss-base-words-pixels: tests/sc64_building_words_pixels.c $(TERRAN_ARM_SOURCES) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) $(TERRAN_BUILDING_WORD_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/terran-normal/Makefile build/terran-normal-config $(TERRAN_NORMAL_CONFIG) | build
+	@test '$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS)' = 1 && test -n '$(TERRAN_BUILDING_WORD_INPUTS)'
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_BUILDING_WORD_FLAGS) -DSC64_PROTOSS_BASE_WORDS_EXPECTED=$(words $(TERRAN_BUILDING_WORD_NAMES)) $(if $(filter 1,$(TERRAN_BUILDING_WORDS)),-DSC64_PROTOSS_BASE_EXPECT_TERRAN) $(TERRAN_CARRIER_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES)) -o $@
+test-sc64-terran-protoss-base-words-pixels: build/test-sc64-terran-protoss-base-words-pixels
+	./$<

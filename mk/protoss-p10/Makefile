@@ -62,7 +62,8 @@ P10_BUILDING_WORD_NAMES := $(strip \
 	$(if $(filter 1,$(P10_HATCHERY_WORDS)),hatchery) \
 	$(if $(filter 1,$(P10_OVERMIND_WORDS)),overmind) \
 	$(if $(filter 1,$(P10_NEXUS_WORDS)),nexus) \
-	$(if $(filter 1,$(P10_TERRAN_BUILDING_WORDS)),command_center barracks supply_depot))
+	$(if $(filter 1,$(P10_TERRAN_BUILDING_WORDS)),command_center barracks supply_depot) \
+	$(if $(filter 1,$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS)),pylon gateway forge))
 P10_BUILDING_WORD_EMPTY :=
 P10_BUILDING_WORD_SPACE := $(P10_BUILDING_WORD_EMPTY) $(P10_BUILDING_WORD_EMPTY)
 P10_BUILDING_WORD_DIR := build/generated/p10-$(subst $(P10_BUILDING_WORD_SPACE),-,$(P10_BUILDING_WORD_NAMES))-words
@@ -228,3 +229,10 @@ build/test-sc64-unit-edge-crop: tests/sc64_unit_edge_crop.c $(STARCRAFT) $(wildc
 test-sc64-unit-edge-crop: build/test-sc64-unit-edge-crop
 	./build/test-sc64-unit-edge-crop
 test-sc64-protoss-p10: test-sc64-unit-edge-crop
+
+.PHONY: test-sc64-p10-protoss-base-words-pixels
+build/test-sc64-p10-protoss-base-words-pixels: tests/sc64_building_words_pixels.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_BUILDING_WORD_HEADER) $(P10_HATCHERY_CONFIG) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p10/Makefile | build
+	@test '$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS)' = 1 && test '$(P10_HATCHERY_WORDS)$(P10_OVERMIND_WORDS)$(P10_NEXUS_WORDS)$(P10_TERRAN_BUILDING_WORDS)' = 1111 && test -n '$(P10_BUILDING_WORD_HEADER)'
+	$(CLANG) $(P8_HOST_FLAGS) $(P10_BUILDING_WORD_FLAGS) -DSC64_PROTOSS_BASE_WORDS_EXPECTED=9 -DSC64_PROTOSS_BASE_EXPECT_TERRAN -DSC64_PROTOSS_BASE_EXPECT_P10 $(PROTOSS_P10_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-sc64-p10-protoss-base-words-pixels: build/test-sc64-p10-protoss-base-words-pixels
+	./$<
