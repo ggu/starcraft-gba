@@ -20,6 +20,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ROM_SHA1 = "a36d91b5aac7bb95df0d7de5f9814f5270e25c2b"
 UNIT_COUNT, FLINGY_COUNT, SPRITE_COUNT, IMAGE_COUNT, WEAPON_COUNT = 228, 209, 517, 999, 130
+# OpenBW ImageTypes::IMAGEID_Shield_Overlay; images.dat uses the same row numbering.
+SHIELD_OVERLAY_IMAGE = 424
+# units.dat column order: flingy u8, subunit1 u16, subunit2 u16, infestation
+# u16[96], construction u32, direction u8, then shield-enable u8.
+UNIT_SHIELD_ENABLE_OFFSET = 228 + 2 * 228 + 2 * 228 + 2 * 96 + 4 * 228 + 228
 ATTACK_ANIMS = ("GndAttkInit", "AirAttkInit", "GndAttkRpt", "AirAttkRpt",
                 "GndAttkToIdle", "AirAttkToIdle")
 # Ordinals match OpenBW iscript_opcodes at 4b046d5f65302b10cb0a745f0fecd37ec85b20a8.
@@ -196,6 +201,38 @@ def read_column(data: bytes, count: int, fmt: str, off: int, name: str):
     return [struct.unpack_from("<" + fmt, data, off + i * size)[0] for i in range(count)]
 
 
+# Column-major PC layouts. WEAPON_FIELDS is every weapons.dat field used in
+# the source table contract; FLINGY_FIELDS is the whole 15-byte flingy.dat row.
+WEAPON_FIELDS = (
+    ("label", "H"), ("flingy", "I"), ("unused", "B"), ("target", "H"),
+    ("min_range", "I"), ("max_range", "I"), ("upgrade", "B"),
+    ("damage_type", "B"), ("bullet_type", "B"), ("lifetime", "B"),
+    ("hit_type", "B"), ("inner", "H"), ("medium", "H"), ("outer", "H"),
+    ("damage", "H"), ("bonus", "H"), ("cooldown", "B"), ("count", "B"),
+    ("angle", "B"), ("head_offset", "b"), ("forward", "b"), ("upward", "b"),
+    ("error", "H"), ("icon", "H"),
+)
+FLINGY_FIELDS = (
+    ("sprite", "H"), ("top_speed", "i"), ("acceleration", "h"),
+    ("halt_distance", "i"), ("turn_radius", "B"), ("unused", "B"),
+    ("movement_control", "B"),
+)
+
+
+def column_offsets(fields, count: int) -> dict:
+    """Map each field of a column-major table to (byte offset, struct format)."""
+    out = {}; cursor = 0
+    for name, fmt in fields:
+        out[name] = (cursor, fmt); cursor += count * struct.calcsize("<" + fmt)
+    return out
+
+
+def parse_columns(data: bytes, count: int, fields, label: str) -> dict:
+    """Read every listed column of a column-major table into {field: [values]}."""
+    return {name: read_column(data, count, fmt, off, label + "." + name)
+            for name, (off, fmt) in column_offsets(fields, count).items()}
+
+
 def grp_path(gfi: int) -> str | None:
     if gfi == 0:
         return None
@@ -233,19 +270,8 @@ def generate(rom_path: Path, out_path: Path) -> dict:
     unit_air_weapon = read_column(units, UNIT_COUNT, "B", 6348, "units.air_weapon")
     weapon_flingy = read_column(weapons, WEAPON_COUNT, "I", 2*WEAPON_COUNT, "weapons.flingy")
     weapon_bullet = read_column(weapons, WEAPON_COUNT, "B", 2*WEAPON_COUNT+4*WEAPON_COUNT+1, "weapons.bullet")
-    # All weapons.dat fields used in the source table contract.
-    weapon_specs = [
-        ("label", "H"), ("flingy", "I"), ("unused", "B"), ("target", "H"),
-        ("min_range", "I"), ("max_range", "I"), ("upgrade", "B"),
-        ("damage_type", "B"), ("bullet_type", "B"), ("lifetime", "B"),
-        ("hit_type", "B"), ("inner", "H"), ("medium", "H"), ("outer", "H"),
-        ("damage", "H"), ("bonus", "H"), ("cooldown", "B"), ("count", "B"),
-        ("angle", "B"), ("head_offset", "b"), ("forward", "b"), ("upward", "b"),
-        ("error", "H"), ("icon", "H"),
-    ]
-    wo = {}; cursor = 0
-    for name, fmt in weapon_specs:
-        wo[name] = (cursor, fmt); cursor += WEAPON_COUNT * struct.calcsize("<" + fmt)
+    wo = column_offsets(WEAPON_FIELDS, WEAPON_COUNT)
+    cursor = sum(WEAPON_COUNT * struct.calcsize("<" + fmt) for _, fmt in WEAPON_FIELDS)
     if len(weapons) < cursor:
         raise ValueError("weapons.dat is shorter than parsed field layout")
     def wv(name, row):
@@ -372,7 +398,7 @@ def generate(rom_path: Path, out_path: Path) -> dict:
                             script_for(wi, "GndAttkInit"), script_for(wi, "AirAttkInit")]
             weapon_rows.append({"mode": mode, "weapon_id": wid, "weapon_owner_role": owner_role,
                 "weapon_owner_raw": owner_unit_raw,
-                "weapon_fields": {name: wv(name, wid) for name, _ in weapon_specs},
+                "weapon_fields": {name: wv(name, wid) for name, _ in WEAPON_FIELDS},
                 "weapon_graphic_status": "present" if chain else "weapons.dat flingy is zero; no projectile graphic chain",
                 "weapon_graphic_chain": chain, "weapon_image_metadata": (
                     {k: image_col[k][wi] for k in image_col} if 0 <= wi < IMAGE_COUNT else None),
@@ -392,7 +418,7 @@ def generate(rom_path: Path, out_path: Path) -> dict:
             row["launched_unit_visual"] = {"raw_unit": 85,
                 "actor_image": chain_flingy(unit_flingy[85])["image"],
                 "ground_weapon_id": scarab_weapon,
-                "weapon_fields": {name: wv(name, scarab_weapon) for name, _ in weapon_specs},
+                "weapon_fields": {name: wv(name, scarab_weapon) for name, _ in WEAPON_FIELDS},
                 "weapon_graphic_chain": chain_flingy(weapon_flingy[scarab_weapon])
                     if scarab_weapon < WEAPON_COUNT and 0 < weapon_flingy[scarab_weapon] < FLINGY_COUNT else None}
             row["note"] = "Reaver attack is represented by launched Scarab raw unit 85; its source weapons.dat ground weapon is separate from the Reaver raw83 row."
@@ -428,7 +454,7 @@ def generate(rom_path: Path, out_path: Path) -> dict:
             chain = chain_flingy(graphic_flingy) if 0 < graphic_flingy < FLINGY_COUNT else None
             wi = chain["image"] if chain else -1
             row["weapons"].append({"mode": mode, "weapon_id": wid, "weapon_owner_raw": raw,
-                "weapon_fields": {name: wv(name, wid) for name, _ in weapon_specs},
+                "weapon_fields": {name: wv(name, wid) for name, _ in WEAPON_FIELDS},
                 "weapon_graphic_status": "present" if chain else "weapons.dat flingy is zero; no projectile graphic chain",
                 "weapon_graphic_chain": chain,
                 "projectile_animations": [script_for(wi, anim) for anim in ("Init", "Death", "GndAttkInit", "AirAttkInit")]})
@@ -443,6 +469,23 @@ def generate(rom_path: Path, out_path: Path) -> dict:
         elif isinstance(value, list):
             for item in value: collect_images(item)
     collect_images(sources); collect_images(defenses)
+    # The shield hit overlay is created by the damage routine, not by a weapon
+    # script, so nothing above references it. OpenBW names it
+    # IMAGEID_Shield_Overlay (424); keep its frames and Init/Death streams.
+    image_ids.add(SHIELD_OVERLAY_IMAGE)
+    # Every units.dat row with shields enabled (units and buildings), with its
+    # main image (units -> flingy -> sprites -> images), independent of the
+    # weapon roster: unarmed Shuttles and Observers flash too.
+    unit_shield = read_column(units, UNIT_COUNT, "B", UNIT_SHIELD_ENABLE_OFFSET, "units.shield_enable")
+    shield_actors = []
+    for raw in range(UNIT_COUNT):
+        if not unit_shield[raw]:
+            continue
+        flingy_id = unit_flingy[raw]
+        sprite_id = flingy_sprite[flingy_id] if flingy_id < FLINGY_COUNT else SPRITE_COUNT
+        image = sprite_image[sprite_id] if sprite_id < SPRITE_COUNT else IMAGE_COUNT
+        if 0 <= image < IMAGE_COUNT:
+            shield_actors.append((raw, image, bool(image_col["directional"][image])))
     # Include children started by each referenced image's own Init/Death and
     # attack streams (for example animated engine or halo attachments).
     animation_names = ("Init", "Death") + ATTACK_ANIMS
@@ -488,6 +531,9 @@ def generate(rom_path: Path, out_path: Path) -> dict:
         "special_emission_actors": {str(raw): label for raw, label in SPECIAL_EMISSION_ACTORS.items()},
         "referenced_images": image_audit,
         "source_animations": source_animations,
+        "shield_overlay": {"image_id": SHIELD_OVERLAY_IMAGE, "lo_kind": 5,
+                           "candidate_actors": [{"raw_unit": r, "image": i, "directional": d}
+                                                for r, i, d in shield_actors]},
         "units": sources, "buildings": defenses,
         "limitations": ["DAT and GRP chains are source data; IScript streams are linear-path extracts with loops represented by loop_pc.",
             "The inventory does not infer projectile travel or hit position when runtime/script semantics require native engine behavior.",

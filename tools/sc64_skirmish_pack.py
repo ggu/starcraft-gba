@@ -28,7 +28,6 @@ MAPS = [('blood_bath', '008/04F')]
 MINERAL_TYPES = {176, 177, 178}
 GEYSER_TYPE = 188
 START_TYPE = 214
-MAX_MINERALS = 32
 MINERALS_PER_START = 8
 MAX_GEYSERS = 4
 SUPPORTED_DIMENSIONS = {64, 96}
@@ -112,9 +111,9 @@ def select_starts(blocked: list[int], width: int, height: int,
 
 
 def choose_minerals(resources: list[dict], starts: list[tuple[int, int]]) -> tuple[list[dict], dict]:
-    """Retain nearest eight distinct patches per selected start, bounded at 32."""
+    """Preserve the legacy start-patch indices, then append the other source patches."""
     patches = sorted(({'x': u['x_source_px'] // 2, 'y': u['y_source_px'] // 2,
-                       'amount': min(u['resources'], 0xffff)}
+                       'amount': min(u['resources'], 0xffff), 'style': u['source_type']}
                       for u in resources), key=lambda p: (p['x'], p['y'], p['amount']))
     selected = []
     seen = set()
@@ -129,20 +128,19 @@ def choose_minerals(resources: list[dict], starts: list[tuple[int, int]]) -> tup
                 key = (patch['x'], patch['y'])
                 if key in seen:
                     continue
-                if len(selected) >= MAX_MINERALS:
-                    break
                 selected.append(patch)
                 seen.add(key)
                 per_start[start_index] += 1
                 break
-            if len(selected) >= MAX_MINERALS:
-                break
-        if len(selected) >= MAX_MINERALS:
-            break
+    remaining = patches.copy()
+    for patch in selected:
+        remaining.remove(patch)
+    selected.extend(remaining)
+    if len(selected) > 255:
+        raise ValueError('mineral count exceeds the skirmish descriptor byte')
     return selected, {'source_count': len(patches), 'packed_count': len(selected),
-                      'omitted_count': len(patches) - len(selected),
-                      'new_patches_selected_per_start': per_start,
-                      'policy': f'nearest distinct patches, up to {MINERALS_PER_START} per selected start; bounded at {MAX_MINERALS}'}
+                      'omitted_count': 0, 'new_patches_selected_per_start': per_start,
+                      'policy': 'legacy start-patch indices first, then all remaining source placements'}
 
 
 def _emit_map(lines: list[str], index: int, slug: str, info, blocked: list[int],
@@ -156,9 +154,9 @@ def _emit_map(lines: list[str], index: int, slug: str, info, blocked: list[int],
     lines.append('};\n')
     lines.append(f'static const unsigned short {prefix}_start_x[4] = {{{",".join(str(x) for x, _ in starts)}}};\n')
     lines.append(f'static const unsigned short {prefix}_start_y[4] = {{{",".join(str(y) for _, y in starts)}}};\n')
-    padded_minerals = minerals + [{'x': 0, 'y': 0, 'amount': 0}] * (MAX_MINERALS - len(minerals))
-    lines.append(f'static const Sc64SkirmishMineral {prefix}_minerals[{MAX_MINERALS}] = {{\n')
-    lines.extend(f"    {{{p['x']}u,{p['y']}u,{p['amount']}u}},\n" for p in padded_minerals)
+    mineral_rows = minerals or [{'x': 0, 'y': 0, 'amount': 0, 'style': 0}]
+    lines.append(f'static const Sc64SkirmishMineral {prefix}_minerals[{len(mineral_rows)}] = {{\n')
+    lines.extend(f"    {{{p['x']}u,{p['y']}u,{p['amount']}u,{p['style']}u}},\n" for p in mineral_rows)
     lines.append('};\n')
     padded_geysers = geysers + [{'x': 0, 'y': 0}] * (MAX_GEYSERS - len(geysers))
     lines.append(f'static const Sc64SkirmishGeyser {prefix}_geysers[{MAX_GEYSERS}] = {{\n')
@@ -194,7 +192,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include
         '/* Source: references/sc64-maps/extract_sc64_maps.py @ ' + UPSTREAM_COMMIT + ' */\n',
         '#ifndef SC64_SKIRMISH_GENERATED_H\n#define SC64_SKIRMISH_GENERATED_H\n',
         f'#define SC64_SKIRMISH_IMPORTED_COUNT {len(MAPS)}\n',
-        'typedef struct { unsigned short x,y,amount; } Sc64SkirmishMineral;\n',
+        '#define SC64_SKIRMISH_MINERAL_TYPES 1\n',
+        'typedef struct { unsigned short x,y,amount; unsigned char style; } Sc64SkirmishMineral;\n',
         'typedef struct { unsigned short x,y; } Sc64SkirmishGeyser;\n',
         'typedef struct { unsigned short width,height; const unsigned char (*tile_pixels)[256]; const unsigned short *tile_lookup; const unsigned char *blocked; unsigned short start_x[4],start_y[4]; const Sc64SkirmishMineral *minerals; unsigned char minerals_count; const Sc64SkirmishGeyser *geysers; unsigned char geyser_count; const char *title; } Sc64SkirmishMap;\n',
     ]

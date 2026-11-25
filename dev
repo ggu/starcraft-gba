@@ -340,6 +340,10 @@ def weapon_source_input_ready(path: Path) -> bool:
                       text, re.MULTILINE) is not None and
             re.search(r"^#define\s+SC64_WEAPON_SOURCE_METADATA\s+1\s*$",
                       text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_WEAPON_SOURCE_SHIELD_OVERLAY\s+1\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_WEAPON_SOURCE_SHIELD_ACTOR_COUNT\s+[1-9]\d*\s*$",
+                      text, re.MULTILINE) is not None and
             all(f"{accessor}(" in text for accessor in (
                 "sc64_weapon_source_profile_lookup",
                 "sc64_weapon_source_image_lookup",
