@@ -318,6 +318,62 @@ def displayed_bitmap(game: PhysicalGame) -> bytes:
     return hashlib.sha256(pixels.translate(low) + pixels.translate(high)).digest()
 
 
+PACE_COUNTERS = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
+                 "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
+TWO_VBLANK_CYCLES = 2 * 280896
+
+
+def pace_budget_report(rows):
+    """Validate each active sample once; preserve raw results if any disagree."""
+    stages, totals, errors = [], [], []
+    for row in rows:
+        try:
+            if type(row.get("world_advanced")) is not bool:
+                raise MatchError("pacing sample missing or invalid world_advanced")
+            if not row["world_advanced"]:
+                continue
+            missing = [key for key in ("cycles", *PACE_COUNTERS) if key not in row]
+            if missing:
+                raise MatchError(f"pacing sample missing counters: {', '.join(missing)}")
+            if any(type(row[key]) is not int or row[key] < 0 for key in ("cycles", *PACE_COUNTERS)):
+                raise MatchError("pacing sample has invalid cycle counters")
+            total, update, draw = (row[k] for k in ("cycles", "demo_update_cycles", "gfx_draw_cycles"))
+            orders, sight, other = (row[k] for k in ("sc64_orders_cycles", "sc64_sight_cycles", "sc64_other_cycles"))
+            background, actors, hud = (row[k] for k in ("sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles"))
+            stage = dict(orders=orders, sight=sight, other_simulation=other,
+                         remaining_simulation=update-orders-sight-other,
+                         map_background=background, actors=actors, hud=hud,
+                         remaining_render=draw-background-actors-hud,
+                         interval_less_update_and_draw=total-update-draw)
+            if any(value < 0 for value in stage.values()):
+                raise MatchError("pacing sample has inconsistent nested counters")
+            stages.append(stage)
+            totals.append(total)
+        except MatchError as exc:
+            errors.append(dict(host_tick=row.get("host_tick"), reason=str(exc)))
+    if errors:
+        return dict(available=False, invalid_samples=len(errors), offending_samples=errors)
+    if not stages:
+        return dict(available=False, invalid_samples=0, reason="the pacing window contains no simulation updates")
+    means = {key: statistics.mean(stage[key] for stage in stages) for key in stages[0]}
+    mean_total = statistics.mean(totals)
+    return dict(available=True, denominator="advancing world updates", samples=len(stages),
+                mean_total_cycles=mean_total, nominal_30_fps_cycles=GBA_HZ / 30,
+                two_vblank_cycles=TWO_VBLANK_CYCLES,
+                mean_deficit_to_nominal_30_fps=mean_total - GBA_HZ / 30,
+                mean_disjoint_cycles=means,
+                residual_note="interval less inclusive update and draw; timing boundaries may differ; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
+
+
+def disjoint_pace_budget(rows):
+    """Strict variant for callers that require a reconciled breakdown."""
+    report = pace_budget_report(rows)
+    if not report["available"]:
+        reason = report.get("reason") or report["offending_samples"][0]["reason"]
+        raise MatchError(reason)
+    return report
+
+
 def pace(args) -> dict:
     """Time the recorded controls immediately after a qualified battle save."""
     trace = load_trace(args.trace)
@@ -331,8 +387,7 @@ def pace(args) -> dict:
     if not any(first < tick <= last for tick in trace["checks"]):
         raise MatchError("pacing window contains no recorded gameplay checkpoint")
     shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
-    counters = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
-                "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
+    counters = PACE_COUNTERS
     if args.output.exists():
         raise MatchError(f"{args.output} already exists")
     args.output.mkdir(parents=True, exist_ok=False)
@@ -363,7 +418,7 @@ def pace(args) -> dict:
                 raise MatchError(f"invalid game clock at update {tick}")
             rows.append({"host_tick": tick, "cycles": now - clock, "frame": next_frame,
                          "world_advanced": next_frame != world_frame,
-                         **{name: game.u32(name) for name in counters}})
+                         **{name: game.u32(name) for name in counters if name in game.sym}})
             if args.video:
                 bitmap = displayed_bitmap(game)
                 rows[-1]["bitmap_changed"] = bitmap != previous_bitmap
@@ -387,12 +442,14 @@ def pace(args) -> dict:
     active = [row for row in rows if row["world_advanced"]]
     if not active:
         raise MatchError("the pacing window contains no simulation updates")
-    averages = {name: statistics.mean(row[name] for row in active) for name in counters}
+    averages = {name: statistics.mean(row[name] for row in active)
+                for name in counters if all(name in row for row in active)}
     result = {"ok": True, "lobby": seats, "checks": checks, "updates": len(rows),
               "updates_per_second": GBA_HZ / statistics.mean(cycles),
               "p95_cycles": cycles[(95 * len(rows) + 99) // 100 - 1],
-              "over_two_fields": sum(c > 561792 for c in cycles),
-              "active_updates": len(active), "mean_active_stage_cycles": averages, "end_fingerprint": final["fingerprint"],
+              "over_two_fields": sum(c > TWO_VBLANK_CYCLES for c in cycles),
+              "active_updates": len(active), "mean_active_stage_cycles": averages,
+              "disjoint_budget": pace_budget_report(rows), "end_fingerprint": final["fingerprint"],
               "sha256": {k: sha256(getattr(args, k)) for k in ("rom", "elf", "runner", "save", "trace")},
               "samples": rows}
     if intervals:
