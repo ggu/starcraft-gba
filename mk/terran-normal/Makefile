@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 include mk/carrier-release/flags/Makefile
+TERRAN_ROM_FLAGS += -DSC64_SOURCE_GAS
 # The normal Terran cartridge uses the shared compact Custom Game journal.
 TERRAN_CARRIER_RELEASE ?= 1
 ifneq ($(TERRAN_CARRIER_RELEASE),0)

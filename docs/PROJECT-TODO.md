@@ -96,11 +96,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   in both the map descriptor and private report. Regenerating Blood Bath
   preserved the four existing coordinates and recorded 10,000 gas at each.
   The [N64 and GBA gas audit](audits/2026-11-26-n64-gas-pickup.md)
-  records natural eight- and two-unit cargo and the opt-in shared worker
+  records natural eight- and two-unit cargo and the shared worker
   implementation. Rebuilding a preplaced refinery, preserving its balance
   through save/load, the 30 chapter transitions and four product stack
-  budgets are verified. Before enabling this on release cartridges, finish
-  the busy Zerg 7 campaign replay with finite gas and check the late economy.
+  budgets are verified. Terran 10, Protoss 10, Zerg 7 and Zerg 10 all reached victory
+  with finite reserves and fresh-loaded their results. The four candidate
+  cartridge builds and their HOST match authors now enable the same rule.
+  Recheck the full custom-match lineup matrix with finite reserves and
+  report any changed result before distributing these cartridges.
   The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
