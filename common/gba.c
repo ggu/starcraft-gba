@@ -1279,7 +1279,24 @@ void gfx_ellipse_outline_rows(int x,int y,const u8 *half,int ry,int top,int bott
             gfx_outline_span(row, py, x - outer, x + outer + 1, pair);
         } else {
             int inner = half[dy + 1] + 1;
-            if (inner > outer) inner = outer;
+            if (inner >= outer) {
+                int left = x - outer;
+                int right = x + outer;
+                if (left >= 0 && right < 240) {
+                    /* Both outline pixels occupy the same halfword lane. */
+                    GFX_TILE_TOUCH(left, py, left + 1, py + 1);
+                    GFX_TILE_TOUCH(right, py, right + 1, py + 1);
+                    volatile u16 *first = row + (left >> 1);
+                    volatile u16 *last = first + outer;
+                    unsigned shift = (left & 1) * 8;
+                    unsigned keep = 0xffffu ^ (255u << shift);
+                    unsigned ink = (unsigned)color << shift;
+                    *first = (*first & keep) | ink;
+                    *last = (*last & keep) | ink;
+                    continue;
+                }
+                inner = outer;
+            }
             gfx_outline_span(row, py, x - outer, x - inner + 1, pair);
             gfx_outline_span(row, py, x + inner, x + outer + 1, pair);
         }
