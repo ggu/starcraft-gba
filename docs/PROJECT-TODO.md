@@ -71,6 +71,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the trial; qualify a revised ordinary-input Z10 route. Gas service already
   took 1.98 emulated seconds in the lighter Z1 sample, versus 3.09 in busy
   P10. Prioritize busy-frame pacing before tuning the shared timer.
+  Three-AI ARM tests covered both maps for all three races. The trial won
+  Zerg Blood Bath and Terran Outpost with the original plans and Protoss
+  Outpost with a different plan. Qualify winning routes for Zerg Outpost,
+  Terran Blood Bath and Protoss Blood Bath. Keep paired losses as baselines.
+  [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
