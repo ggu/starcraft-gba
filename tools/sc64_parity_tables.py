@@ -800,7 +800,14 @@ def read_engine(root: Path, work: Path) -> dict:
     profiles = {}
     flags_by_profile = profile_flags(root)
     for name, _ in PROFILES:
-        flags = flags_by_profile[name]
+        relative = flags_by_profile[name]
+        # Hash the repo-relative line; hand clang absolute forced includes so
+        # a missing header can never be found through CPATH in another tree.
+        flags = [str(root / x) if i and relative[i - 1] == '-include' else x
+                 for i, x in enumerate(relative)]
+        for i, x in enumerate(flags):
+            if i and flags[i - 1] == '-include' and not Path(x).is_file():
+                raise ValueError(f'{name}: forced include {x} is missing')
         names = work / f'{name}-names.h'
         enum_names_header(root, flags, names)
         # The probe reads the reference rule helpers. Z10's SC64_FACT_TABLES
@@ -809,7 +816,7 @@ def read_engine(root: Path, work: Path) -> dict:
         lines = compile_and_run(root, work, name, ['-DPARITY_RULES', f'-DPARITY_NAMES="{names}"', *flags])
         profiles[name] = parse_rule_lines(lines)
         profiles[name]['defines'] = profile_defines(root, flags)
-        profiles[name]['flags_sha256'] = hashlib.sha256(' '.join(flags).encode()).hexdigest()
+        profiles[name]['flags_sha256'] = hashlib.sha256(' '.join(relative).encode()).hexdigest()
     constants = read_constants(root)
     research = engine_research(stock, root, constants)
     return {'stock': stock, 'profiles': profiles, 'constants': constants, 'research': research}
