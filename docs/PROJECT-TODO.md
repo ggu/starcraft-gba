@@ -19,6 +19,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Combined campaign qualification.** All 30 original missions now have
+  ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
+  finish on the padded-journal Z10 build. The vitals build repeats the
+  [full Z7 win](audits/2026-11-12-z7-normal-physical.md#november-25-vitals-release-replay)
+  through all 206 named checkpoints and repeats the full Z8 route and
+  late Z10 suffix with identical victory journals. The [selection-ring
+  release](audits/2026-11-12-z7-normal-physical.md#november-25-selection-ring-release-replay)
+  repeats all 206 Z7 checkpoints through victory. The combined collision
+  and production build repeats the full Z8 win and confirms a byte-identical
+  victory re-export from fresh HOME. The [adaptive Pylon builds](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
+  repeat full Terran 2 and Protoss 5 wins with fresh save and result loads,
+  a full Zerg 8 win with fresh victory readback, and the late Zerg 10 win.
+  Wasteland and Desperate Alliance also pass full runs on the Pylon
+  release, including fresh pause and result loads.
+  The [fogged-viewport build](audits/2026-11-25-fogged-tracer-viewport.md)
+  repeats Terran 1–4, Protoss 1 and 5, and Zerg 2 and 8 from HOME,
+  with fresh victory readbacks on all eight runs.
+  Use the retained ordinary-input tapes to qualify the rest of the
+  combined Terran, Zerg and Protoss package.
+  Continue native parity and GBA SP timing.
+
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
   and fall to 14.14–17.90 in the last measured window. Every sampled
@@ -26,6 +47,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. Prioritize those paths for
   the race cartridges.
+  The [November 25 selection-ring builds](audits/2026-11-21-current-skirmish-matrix.md#november-25-selection-ring-release)
+  pass 54 physical-button Custom Game starts, pause saves, and fresh
+  continuations. Full-match and hardware measurements remain open.
   [Runs with one or two CPUs on the same cartridges](audits/2026-11-24-kodak-package-checks.md#pacing-with-one-or-two-cpus)
   put late one-CPU Blood Bath near 30 emulated updates/s. Late
   one-CPU Outpost drops to 26.13–28.25, and every late two-CPU
@@ -126,8 +150,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [Terran witness-table pairs](audits/2026-11-24-kodak-package-checks.md#monotone-route-witnesses-on-two-current-terran-saves)
   are flat in two-CPU Outpost and cut 1.56% of mean frame
   cycles in three-CPU Blood Bath. Both save continuations
-  match. Measure witness hits and repeat with active orders
-  before enabling the cache.
+  match. The [current 96-update Blood Bath pair](audits/2026-11-24-kodak-package-checks.md#witness-use-on-the-pylon-release)
+  regresses by 0.44% with just 13 hits in 419 lookups. Leave the cache
+  off in production. Any follow-up needs a live workload with sufficient
+  retained paths and a cheaper miss path. Prioritize repeated draw and
+  movement costs on both maps.
   The [exact crop and tracer census](audits/2026-11-24-kodak-package-checks.md#sprite-crop-and-projectile-draw-calls)
   finds only seven redundant crops across 48 updates. On Outpost the
   base projectile pass takes 39.6–64.7k cycles per update across the
@@ -135,6 +162,17 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Profile motion and raster work with the merged FOLLOW viewport
   cull in the fixed-camera cut and a visible holdout. Retain the
   current ground-trail picker until a measured workload exercises it.
+  The [current sprite-entry census](audits/2026-11-24-kodak-package-checks.md#direct-sprite-entries-on-the-pylon-release)
+  finds only one misaligned generic sprite draw in eight dense Z9 updates
+  and none in eight panned P10 updates. Dense Z9 spends about 53.8k cycles
+  per update in the packed path, mostly unit walk frames. Prioritize
+  packed walk draws in Z9 and tracer preparation in P10. In the same
+  P10 cut the camera sees zero visible tiles and all 264 sampled
+  rasters exit through fog. [Skipping source tracer drawing in that viewport](audits/2026-11-25-fogged-tracer-viewport.md)
+  brings panned P10 and Z10 mean costs down by 15.48% and 18.12%.
+  The camera sweep into and out of fog matches both pages and tracer
+  state on every update. Visible battles remain above budget. Profile
+  tracer preparation and packed walk frames while units are in view.
   The [Outpost camera holdout](audits/2026-11-24-kodak-package-checks.md#pan-from-the-base-to-the-outpost-fight)
   moves the same battle into view. Zerg and Protoss now use 325–391k
   tracer cycles per update, roughly half of those inside the watched
@@ -1013,13 +1051,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   keeps the RAM guards and repeats the campaign and skirmish
   startup and save checks, including the single-CPU active Terran
   win. Confirm local release integration, hardware pacing and
-  active multi-CPU results. The [current P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
-  rejects nine impacts and keeps the earlier journal intact.
+  active multi-CPU results. The [installed P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
+  rejects nine impacts and keeps the earlier journal intact. The
+  [expanded P10 journal](IMPACT-EVENTS.md#typed-p10-layout) accepts
+  that exact save and fresh-loads its ordered queue. It also passes
+  a constructed campaign replay and the maximum 32-event ARM save.
+  Measure the longer pause-save operation on a GBA SP.
   The [Z10 campaign journal](IMPACT-EVENTS.md#z10-campaign-with-the-carrier-cartridge-layout)
   saves the exact Z3 12-impact burst and restores all 32
-  rows in the maximum fixture. The [P10 layout prototype](IMPACT-EVENTS.md#typed-p10-layout)
-  fits both shots, transport and research in the same slot.
-  Integrate and qualify P10's typed journal and real replay.
+  rows in the maximum fixture.
   The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
   restores Terran recovery in three cases across the race
   profiles. Qualify busy ARM matches and address the six
@@ -1031,6 +1071,37 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   measures the extra order cost at 66–73% of the Outpost
   increase. Its instruction cuts place 61–81% of the extra
   order cost in movement. Target contact work first for Outpost.
+  The [rectangular memo trial](audits/2026-11-15-z7-contact-cost.md#column-bounds-in-the-current-replay-windows)
+  retains more cache entries in the late three-CPU Outpost fight
+  but records zero hits and raises p95. Z7 and Z9 checkpoint windows
+  also record zero hits. Keep the current row memo and prioritize
+  the uncached scan and visible actor drawing.
+  The [screen-edge raster trial](audits/2026-11-24-kodak-package-checks.md#screen-edge-visibility-in-the-whole-raster-path)
+  preserves both framebuffer pages across seven ARM windows, with
+  no reduction in budget overruns and slower drawing in all three
+  panned Outpost windows. Keep the current raster.
+  The [selection-ring renderer](audits/2026-11-22-dense-release-attribution.md#selection-ring-work-in-zerg-9)
+  cuts Z9 overlay cost by 25.4% and the separate busy window's
+  mean loop time by 2.20%, with unchanged video-page bytes and RAM
+  guard endpoints. The window remains above the two-VBlank budget.
+  Continue profiling actor and effect drawing in dense battles.
+  [Vital meter rows](audits/2026-11-22-dense-release-attribution.md#drawing-filled-vital-cells-in-one-pass)
+  cut the selected-actor bar cost by 46.9% and mean Z9 loop time by
+  another 2.25%. The two changes together save 4.40% in that window.
+  [Rasterizing complete rings by row](audits/2026-11-22-dense-release-attribution.md#rasterizing-unobstructed-selection-rings-by-row)
+  saves a further 0.62% in Z9 and 0.26–0.72% in five Showcase scenes.
+  Prioritize movement and targeting setup in the dense Custom Game
+  samples. Those core simulation costs are larger and apply throughout
+  a battle.
+  The [adaptive Pylon lookup](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
+  is enabled across all four canonical ROMs. On the combined engine it
+  reduces mean loop cycles by 1.96% and 1.11% in two 69-Pylon Z9 windows.
+  RAM endpoints, sampled stack high-water writes, both framebuffer pages,
+  state and fresh save continuation match. Isolated display-register
+  samples differ. The 54 Custom Game openings and fresh loads, full
+  Terran 2 and Protoss 5 replays, and Zerg 10 late checkpoint through
+  victory all passed. Keep whole-program peak stack, physical frame
+  delivery and the 30-mission sweep on one release trio open.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
@@ -1040,13 +1111,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   within the budget while 52 individual updates still miss it.
   The [combined renderer and collision pair](audits/2026-11-24-kodak-package-checks.md#compose-the-renderer-and-rom-collision-option)
   saves another 1.03% of mean time in the panned Z10 fight
-  with a higher p95. Keep the collision option off by default.
+  with a higher p95 in that earlier sample.
   The [current contact and movement census](audits/2026-11-24-contact-axis-bias.md#current-paired-frames-and-contact-attribution)
   measures 1.05–2.70% gains in four busy changed-ROM
   windows. Three-CPU frames remain above budget and
-  individual slower frames occur. Both pages and paired
-  worlds agree. Confirm GBA SP frame delivery before
-  enabling it by default. P10 spends 131,466 cycles per
+  individual slower frames occur. The [default-on pairs with the row renderer](audits/2026-11-24-contact-axis-bias.md#default-on-with-the-selection-ring-renderer)
+  match gameplay, both framebuffer pages, all seven pause journals,
+  and fresh continuation. The Wasteland win and the late Z10 victory
+  also replay on the new ROMs. Measure physical GBA SP frame delivery.
+  P10 spends 131,466 cycles per
   sampled update in direct nearest-target queries and
   36,473 in rebuilding the target index. [Per-row occupancy trials](audits/2026-11-24-contact-axis-bias.md#per-row-target-mask-trials)
   raise both costs. Reuse facts from the existing index
@@ -2024,6 +2097,34 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The ground push destroys the Pool. A combined defense with
   a distant attack order also loses the Hydralisks and Drones.
   Try a closer ground hold before sending the intercept north.
+  Two fresh loads agree on the three-Sunken checkpoint. Ordering
+  all 12 fighters east loses the whole base. The campaign stays
+  active with 16 surviving actors under its zero-total-actors loss
+  rule. Verify the equivalent state on N64 when a matching campaign
+  checkpoint is available.
+  The [regenerated Z7 winning input tape](audits/2026-11-12-z7-normal-physical.md#november-25-rendered-controller-recovery)
+  wins on the padded-journal ARM build at frame 267,585 after
+  matching all 206 named checks from empty HOME. The Z8 and Z10 results
+  below bring recent normal build coverage to all 30 missions.
+  The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
+  preserve the economy at frame 87,554 and hold the Pool with four
+  Hydralisks through frame 89,195. Protect the forward detector before
+  pushing the Nexus. The [staged eastern attack](audits/2026-11-12-z8-normal-physical.md#stage-the-eastern-formation-together)
+  destroys a Pylon and lowers the Nexus to 170 shields before losing
+  the assault force. On HOST, [moving the southern guard forward at frame 32,000](audits/2026-11-12-z8-normal-physical.md#rendered-controller-interception-before-the-southern-escape)
+  stops the earlier escape. Keeping Kerrigan at her retreat destination
+  lets the controller destroy both Nexuses and [win on ARM at frame
+  86,969](audits/2026-11-12-z8-normal-physical.md#ordinary-arm-victory-after-the-delayed-retreat).
+  Kerrigan has 392 HP. Fresh HOME restores RESULT and identical SRAM.
+  The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
+  verifies three Hydralisks and a new mining Drone at frame 35,958.
+  Establish the defense earlier from frame 34,723 to survive the raid.
+  The [Z10 dialogue-aware replay](audits/2026-11-21-z10-current-full-circle.md#victory-after-acknowledging-the-late-dialogue)
+  advances the dialogue that froze the mission at frame 60,149, delivers
+  the crystal and wins on the padded ARM build at frame 63,523.
+  The crystal checkpoint and victory journal both fresh-load and
+  re-export byte for byte. The latest vitals build also reproduces
+  the same late-suffix inputs and result journal exactly.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second
@@ -2053,7 +2154,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reinforces, removes the remaining production and clears the
   last depots at frame 170,041. Fresh HOME restores RESULT
   and identical victory SRAM. A advances into Terran 6.
-  Finish Z7, Z8 and Z10 on this package and qualify GBA SP timing.
+  Qualify the remaining routes on the latest combined package and
+  measure GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second
@@ -2089,7 +2191,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pass. Existing Wasteland and Backwater journals display
   one fewer supply with their prior actors intact, and
   Backwater trains a Marine for 50 minerals. Trace the
-  native SCV's first target and order separately.
+  native SCV's first target and order separately. The [Cancel Last
+  comparison](audits/2026-11-24-kodak-package-checks.md#canceling-the-last-queued-unit)
+  confirms a 50-mineral refund and uninterrupted first-Marine training
+  on N64 and the updated GBA build. The HUD stays at 6/26 while
+  a second Marine waits. Both versions return to 5/26 when the sole
+  active Marine is canceled. A funded N64 Backwater run confirms one
+  active and four waiting Marines, matching the GBA queue size.
+  Verify admission near the local and global supply limits separately.
+  The GBA reserves all paid training slots for admission.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
@@ -2363,10 +2473,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   samples spend 218k cycles per update on the sprite blitter and 288k on
   defenses. Prioritize exact Cannon power and target queries, then sprite
   drawing and exploration. Preserve the existing 64×64 route fast path.
-  The [adaptive Cannon power draft](https://github.com/ggu/starcraft-gba/pull/834)
-  cuts the dense lookup fixture from 80,203 to 41,838 cycles.
-  Compare whole frames, stack and fresh saves on all four products
-  before enabling it.
+  The [adaptive Cannon power lookup](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
+  cuts the dense lookup fixture from 80,203 to 41,838 cycles and
+  retains sampled stack and fresh save behavior on the combined build.
   [Late Zerg packed walk frames](audits/2026-11-12-late-zerg-walk-words.md)
   reuse the other products' renderer and save 0.81–2.80% in the Z10 battle
   windows with 24 identical sampled frames and palettes.

@@ -9909,10 +9909,10 @@ update_exploration(void)
 static void
 cancel_queue(int building)
 {
-    int type;
-    if (building < 0 || building >= MAX_BUILDINGS || !b[building].queue_count)
-	return;
-    type = b[building].queue[b[building].queue_head];
+    if (building < 0 || building >= MAX_BUILDINGS) return;
+    Building *q = &b[building];
+    if (!q->queue_count) return;
+    int type = q->queue[(q->queue_head + q->queue_count - 1) % 5];
     minerals += unit_cost(type);
     gas += unit_gas_cost(type);
 #ifdef SC64_RACES
@@ -9920,13 +9920,14 @@ cancel_queue(int building)
      * Egg is a separate actor with its own cancellation path. */
     {
         const Sc64RaceUnitRule *rule = sc64_race_unit_rule(type);
-        if (rule && (rule->flags & SC_RACE_F_LARVA) && b[building].larva < 3)
-            ++b[building].larva;
+        if (rule && (rule->flags & SC_RACE_F_LARVA) && q->larva < 3)
+            ++q->larva;
     }
 #endif
-    b[building].queue_head = (b[building].queue_head + 1) % 5;
-    b[building].queue_count--;
-    b[building].queue_progress = 0;
+    if (--q->queue_count == 0) {
+        q->queue_head = (q->queue_head + 1) % 5;
+        q->queue_progress = 0;
+    }
     toast(0);
 }
 
@@ -11100,7 +11101,9 @@ selection_color(int owner)
 static void
 selection_row(int left,int right,int row,u8 color)
 {
-    if (row >= 12 && row < 120) gfx_rect(left,row,right-left+1,1,color);
+    if (row < 12 || row >= 120) return;
+    if (left == right) gfx_pixel(left, row, color);
+    else gfx_rect(left, row, right - left + 1, 1, color);
 }
 
 static void
@@ -11132,11 +11135,25 @@ draw_selection_ellipse(int x,int y,int rx,int ry,u8 color,int parts,
      * i.e. a^2*(2ry+1)^2 <= rx^2*((2ry+1)^2 - 4dy^2). Sampling row centres
      * keeps the top and bottom rows flat instead of single-pixel points. */
     int a = rx, d = 2*ry + 1;
+    int d_squared = d * d, rx_squared = rx * rx;
+    int width_term = rx_squared * d_squared, row_limit = width_term;
+    int width_step = (2 * rx - 1) * d_squared, row_step = 4 * rx_squared;
     for (int dy = 0; dy <= ry; ++dy) {
-        while (a > 0 && a*a*d*d > rx*rx*(d*d - 4*dy*dy)) --a;
+        /* The difference of consecutive squares is odd. Advance the
+         * original inequality by these differences between rows and widths. */
+        while (a > 0 && width_term > row_limit) {
+            width_term -= width_step;
+            width_step -= 2 * d_squared;
+            --a;
+        }
         half[dy] = (u8)a;
+        row_limit -= row_step;
+        row_step += 8 * rx_squared;
     }
-    half[ry+1] = 0;
+    if (parts == SELECTION_RING && !cover) {
+        gfx_ellipse_outline_rows(x, y, half, ry, 12, 120, color);
+        return;
+    }
     /* Each row joins its edge to the next row's so the outline has no gaps. */
     for (int dy = 0; dy <= ry; ++dy) {
         int hi = half[dy], lo = dy == ry ? 0 : half[dy+1] + 1;
@@ -11181,10 +11198,10 @@ vital_fill(int value,int maximum,int width)
 static void
 vital_strip(int left,int top,int width,int fill,u8 light,u8 dark)
 {
-    vital_rect(left,top,fill,1,light);
-    vital_rect(left,top+1,fill,1,dark);
-    vital_rect(left+fill,top,width-fill,1,C_STONE);
-    vital_rect(left+fill,top+1,width-fill,1,C_UI);
+    if (top >= 12 && top < 120)
+        gfx_meter_row(left, top, width, fill, light, C_STONE);
+    if (top + 1 >= 12 && top + 1 < 120)
+        gfx_meter_row(left, top + 1, width, fill, dark, C_UI);
 }
 
 static void __attribute__((noinline))
@@ -11207,10 +11224,6 @@ draw_actor_vitals(int x,int top,int width,int hp,int maxhp,
         vital_rect(left,bottom+1,width,4,C_BLACK);
         vital_strip(left,bottom+2,width,vital_fill(energy,maxenergy,width),
                     C_PURPLE,C_ZERG);
-    }
-    for (int dx=0;dx<width;dx+=3) {
-        vital_rect(left+dx,top+1,1,bottom-top-2,C_BLACK);
-        if (maxenergy>0) vital_rect(left+dx,bottom+2,1,2,C_BLACK);
     }
 }
 
@@ -12584,7 +12597,7 @@ draw_hud_resources(void)
 {
 #ifdef SC64_RACES
     int faction = race_command_race();
-    Sc64RaceSupplyLedger ledger = race_owner_supply_ledger(SIDE, faction);
+    Sc64RaceSupplyLedger ledger = race_owner_supply_ledger_for_queue(SIDE, faction, 0);
     int used = race_supply_ledger_reserved(ledger) / 2;
     int cap = sc64_supply_limit(ledger.provided) / 2;
 #else
@@ -12683,9 +12696,9 @@ draw_hud_commands_body(void)
             gfx_text(65, 126, unit_name(train_type), C_WHITE);
             gfx_text(125, 126, "Q", C_CYAN);
             gfx_num(137, 126, q->queue_count, C_GOLD);
-            gfx_text(5, 137, "A TRAIN L CANCEL R TYPE", C_GOLD);
+            gfx_text(5, 137, "A TRAIN L CANCEL LAST R TYPE", C_GOLD);
 	} else if (q->type == B_COMMAND)
-	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL QUEUE", C_GOLD);
+	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL LAST", C_GOLD);
 	else if (q->type == B_REFINERY)
 	    gfx_text(5, 137, "A ASSIGN WORKER TO GAS", C_CYAN);
     } else if (n) {
@@ -12956,7 +12969,7 @@ sc64_hud_changed(void)
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive && b[i].owner == SIDE) {
         if (b[i].type == B_BARRACKS) values[13] = 1;
 #ifdef SC64_RACES
-        race_supply_count_building(&ledger, &b[i], supply_faction);
+        race_supply_count_building(&ledger, &b[i], supply_faction, 0);
 #endif
     }
     if (selected_building >= 0 && b[selected_building].alive) {

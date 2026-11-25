@@ -103,6 +103,30 @@ static void draw_storm_marker(const Sc64PsionicStorm *storm)
 #include "sc64_world_depth.h"
 #endif
 
+#ifdef SC64_TRACER_EMPTY_VIEW
+/* The source raster paints the clipped 240 by 108 battlefield. Count
+ * partially covered edge cells and leave negative cameras to the painter. */
+static int
+sc64_tracer_view_is_hidden(void)
+{
+    if (camx < 0 || camy < 0) return 0;
+    int col0 = (unsigned)camx >> 4;
+    int row0 = (unsigned)camy >> 4;
+    int col1 = limit((((unsigned)camx + 239u) >> 4) + 1u, 0, MAP_COLS);
+    int row1 = limit((((unsigned)camy + 107u) >> 4) + 1u, 0, MAP_ROWS);
+    if (col0 >= col1) return 1;
+    for (int row = row0; row < row1; ++row) {
+#ifdef SC64_TERRAIN_ROW_MASKS_ACTIVE
+        if (sc64_terrain_grid_run(visible, row, col0, col1 - col0)) return 0;
+#else
+        for (int col = col0; col < col1; ++col)
+            if (SC64_GRID_GET(visible, row * MAP_COLS + col)) return 0;
+#endif
+    }
+    return 1;
+}
+#endif
+
 static void
 draw_map(void)
 {
@@ -432,6 +456,9 @@ sc64_tile_background_done:
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     sc64_tracer_profile_reset();
 #endif
+#ifdef SC64_TRACER_EMPTY_VIEW
+    sc64_tracer_view = SC64_TRACER_VIEW_UNCHECKED;
+#endif
 #ifdef SC64_WORLD_DEPTH
     sc64_draw_depth_ordered_actors();
 #else
@@ -446,6 +473,9 @@ sc64_tile_background_done:
     draw_death_vfx(0);
 #endif
     draw_tracers_pass(1);
+#ifdef SC64_TRACER_EMPTY_VIEW
+    sc64_tracer_view = SC64_TRACER_VIEW_MAY_DRAW;
+#endif
 #ifdef SC64_SHIELD_FLASH_ENABLED
     sc64_shield_flash_draw();
 #endif

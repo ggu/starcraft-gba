@@ -68,6 +68,18 @@ static int race_research_campaign_candidate_rule(const RaceSave *candidate,
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL
 #define SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION SC64_SAVE_TAG_RESEARCH_JOBS(SC64_TRANSPORT_SAVE_VERSION)
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+#define SC64_P10_IMPACTS_TAG SC64_SAVE_TAG_P10_IMPACTS(SC64_TRANSPORT_SAVE_VERSION)
+static const u32 race_p10_impact_tags[] = {
+    SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,
+    SC64_TRANSPORT_SAVE_VERSION,
+    SC64_RESEARCH_TRANSPORT_SAVE_VERSION,
+    SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION,
+    SC64_P10_IMPACTS_TAG,
+};
+_Static_assert(sizeof(race_p10_impact_tags) / sizeof(race_p10_impact_tags[0]) <=
+               GBA_SAVE_MAX_ACCEPTED_TAGS, "P10 impact journal family fits the selector");
+#endif
 #ifdef SC64_P10_RESEARCH_EGG_SRAM_PROBE
 /* Combine the existing Egg feature selector and research namespace. Keep
  * the proven Egg inner version and the research building padding layout. */
@@ -4903,6 +4915,9 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
 #ifdef SC64_Z10_PADDED_IMPACT_SAVE
         && tag != SC64_Z10_IMPACTS_TAG
 #endif
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+        && tag != SC64_P10_IMPACTS_TAG
+#endif
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
         && tag != SC64_SHOWCASE_CARRIER_TAG
 #endif
@@ -4940,6 +4955,15 @@ static int race_worker_cargo_prepare_selected(const void *raw,u32 len,u32 tag,vo
         ) ? SC64_TRANSPORT_SAVE_VERSION :
 #endif
         tag,plan->impact_candidate,&plan->impact_candidate_count)) return 0;
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+    /* Keep the true outer tag through impact decoding. Research and job
+     * validation then use the established tag for the decoded game mode. */
+    if (tag == SC64_P10_IMPACTS_TAG) {
+        if (race_data.state[0] == 0) tag = SC64_TRANSPORT_SAVE_VERSION;
+        else if (race_data.state[0] == 1) tag = SC64_RESEARCH_JOBS_TRANSPORT_SAVE_VERSION;
+        else return 0;
+    }
+#endif
 #if defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) && !defined(SC64_SHARED_TRANSPORT)
     if (race_data.version != tag) return 0;
 #else
@@ -5096,6 +5120,8 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION,SC64_GUARDIAN_TRANSPORT_SAVE_VERSION};
 #elif defined(SC64_PACKED_MINERAL_FIFO)
 #define tags race_fifo_tags
+#elif defined(SC64_P10_PADDED_IMPACT_SAVE)
+#define tags race_p10_impact_tags
 #else
     const u32 tags[]={SC64_WORKER_CARGO_LEGACY_TRANSPORT_SAVE_VERSION,SC64_TRANSPORT_SAVE_VERSION
 #ifdef SC64_SHOWCASE_CARRIER_PROBE
@@ -5144,7 +5170,7 @@ static int race_worker_cargo_select(RaceLoadPlan *plan,GbaSaveSelection *selecti
 #endif
 #endif
 #endif /* Z10 Carrier probe */
-#ifdef SC64_PACKED_MINERAL_FIFO
+#if defined(SC64_PACKED_MINERAL_FIFO) || defined(SC64_P10_PADDED_IMPACT_SAVE)
 #undef tags
 #endif
 }

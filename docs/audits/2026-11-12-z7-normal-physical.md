@@ -186,3 +186,64 @@ Its corrected 24,000-call tape matches 62 named ARM observations on #708;
 a full HOST win is recorded separately. The exact full replay on #711 remains
 in progress. See the [route observer audit](2026-11-22-z7-route-observer-purity.md)
 for the evidence and limits.
+
+### November 25 rendered-controller recovery
+
+The prepared current HOST controller with ASan, UBSan and route-purity checks
+regenerates the corrected 270,585-call tape. Normal inputs win at frame
+267,585 with terminal consistency, zero adapter faults and zero enemy
+buildings. The tape SHA-256 is
+`022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`,
+matching the November 22 corrected tape. The padded-journal Z10 ARM ROM
+replays it from empty HOME using ordinary buttons. All 206 named model,
+entity-count and economy checkpoints match. It wins at the same frame
+with seven enemy units, zero enemy buildings and zero adapter faults.
+
+The full replay averages 1,313,688 guest cycles per update, about 12.77
+emulated updates per second including rendering and pacing. This run
+verifies the entire ordinary route to victory on this exact ARM build.
+Full actor arrays and a fresh reload of the victory are outside this run.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Padded-journal Z10 ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
+| Matching ELF | `da20e5abc0457b5d60b6476fbdb4d9a06bf2f9756cb271963de63c908b1f14f9` |
+| Full physical-button win receipt | `115a0db4473784c8b10927c20acd0f58dda1dae1972d365c9f04135b03f7a33f` |
+
+### November 25 vitals release replay
+
+The exact Z10 image from [#853](https://github.com/ggu/starcraft-gba/pull/853)
+replays the same tape with physical buttons from a fresh HOME. All 206
+named mission, economy and entity-count checkpoints match. It wins at
+game frame 267,585 after 270,585 guest update calls. The result screen
+reports victory, seven enemy units, zero enemy buildings and zero
+adapter faults. This run observes counts and mission fields. A full
+actor array comparison and a fresh reload of the victory remain separate.
+
+Mean loop cost is 1,312,171 guest cycles, or 12.79 emulated updates/s
+including UI and presentation waits. This rate covers the complete tape
+on the vitals build. Hardware and the [subsequent renderer build](https://github.com/ggu/starcraft-gba/pull/854)
+still need their own end-to-end observation.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Z10 ROM | `08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16` |
+| Matching ELF | `fdfcfa7a83fb7eb3e47153dcfc229d37e9cc67df184d5f78119c2a106fce0b56` |
+| Full physical-button win receipt | `441e02d324ebe378571134408e89bc7269279719614069ec361e7b918d1bd3d3` |
+
+### November 25 selection-ring release replay
+
+The Z10 ROM from [#854](https://github.com/ggu/starcraft-gba/pull/854)
+replays the same normal-button tape from fresh HOME and wins at
+game frame 267,585. All 206 named checkpoints match. The terminal
+screen reports victory, seven enemy units, zero enemy buildings and
+zero adapter faults. Over 270,585 guest calls the mean cost is
+1,311,899 cycles, about 12.79 emulated main-loop updates/s with UI
+and presentation waits. Exact latest-composition replays and
+physical GBA SP timing remain open.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Z10 ROM | `a061a9bd503522b79019f71bc4d766a5985ef4d9455afc9792e6d1d246a57980` |
+| Matching ELF | `49980741d66e993a7732864cf5f7c3ea17825463a05baf1420bc2a773849b10e` |
+| Full physical-button win receipt | `f1743c62926265ace2eb9c7dfc4a36b4c7a61c5f2c040dadc924a77c8c802ca0` |

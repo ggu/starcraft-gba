@@ -430,6 +430,112 @@ this approach. Retain the current exact crop on unknown art.
 | Preview Custom Game matrix | `780123b907f8bd2dc761cf2cd93f665cc4ec75191554ef08e9e8a4ee984585d5` |
 | Crop candidate population | `947f742a62c67c36cecd575abf49a89749e6ecad8cb6e441ef5cf3c3b36d1907` |
 
+## Selection-ring work in Zerg 9
+
+The November 25 matched ARM emulator profiler captures frames 27,561–27,568
+from the active Z9 campaign journal. The profiled and ordinary replays
+match the sampled world, both framebuffer pages, and elapsed cycles.
+Selection rings cost 143,749 cycles per update, including 100,564 cycles
+in their 560 calls to `gfx_rect`. A dedicated IWRAM span drawer fails the
+unchanged code-size guard in Z10, P10 and Showcase.
+
+The shared renderer uses `gfx_pixel` for one-pixel spans and computes
+consecutive ellipse squares using integer differences. The other spans
+still use the existing rectangle writer. The field UI oracle verifies all
+2,294 supported radius pairs against the direct equation. Over the same
+eight ARM updates, mean ellipse cycles fall to 107,230, a 25.4% reduction.
+Ring calls to `gfx_rect` drop to 140 per update, with the other 420 going
+to `gfx_pixel`. Mean inclusive `game_render` cycles fall from 731,832 to
+695,296. Elapsed cycles improve in all eight updates by 30,578–42,255.
+
+Over a separate 160-update Z9 comparison from the same save, average
+drawing falls 3.34% and mean loop time falls 2.20%. The p95 improves from
+1,877,834 to 1,833,454 cycles. All 160 updates still miss the two-VBlank
+budget. Six matched Custom Game controls on the three race ROMs have
+identical timing. Across all seven comparisons, worlds, framebuffer
+pages, palette, presentation state, exact pause SRAM and fresh
+continuation agree. Five Showcase scenes with an ordinary selection
+input improve mean loop time by 0.69–1.24%. Both video pages agree across
+all 600 pairs. Twice the displayed page differs at the sampled update,+and it agrees at the following update. All four regular ARM profiles
+link with identical EWRAM and IWRAM endpoints.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Baseline profiler | `5e9888edf0b43bf724c9958441168d6efab5d711954f187b628e37a5c3d4d5e1` |
+| Updated profiler | `c9a585fc24e8e612dbb948c5862bd3590436e1488f58d8b44236dda46fd937e0` |
+| Seven paired campaign and Custom Game windows | `1243a7791393637a81a6befc3f3f4ea61b6b974af053d76d31f0b66e16983378` |
+| Five Showcase readbacks | `71e5a1d38203f9576193473fc348785b59c032af855761c3463cd6b9aa5e9b3b` |
+
+## Drawing filled vital cells in one pass
+
+On the same eight Z9 frames, the post-ring build spends 79,190 mean
+cycles in selected-actor vitals, with 14 calls per frame. The shared
+renderer writes each filled or empty strip row with its dividers already
+in place. The black frame and the gap above an energy bar keep their
+original extent. The strip clips from the original cell origin so
+screen-edge clipping preserves divider alignment and both color shades.
+
+Mean inclusive vitals time falls to 42,060 cycles per frame, a 46.9%
+reduction, and mean `game_render` time falls from 695,296 to 658,159
+cycles. Each sampled update improves by 30,966–43,238 guest cycles.
+The selected world summaries and both framebuffer pages agree.
+
+In the longer 160-update Z9 window, mean loop time falls from 1,682,476
+to 1,644,635 cycles and p95 falls from 1,833,454 to 1,797,304. This is
+a further 2.25% improvement in mean time and 4.40% in total since
+before the selection-ring change. All 160 updates remain over the
+two-VBlank budget. The six Custom Game controls are cycle-identical.
+Across all seven windows the observed worlds, palette, framebuffer
+pages, presentation state, pause SRAM and fresh continuations agree.
+
+Mean loop time improves 0.87–1.84% across five Showcase scenes. Both
+framebuffer pages agree across all 600 pairs. The displayed page
+differs once and agrees on the following update. All four regular ARM
+links retain their IWRAM and EWRAM endpoints.
+
+The existing whole-frame vital-bar oracle passes all 6,240 cases. A
+separate 4,200-case tile-backend oracle compares black palette aliasing,
+pixels, clipping and dirty masks against the rectangle path. The P10
+and Z10 prepared HOST shield fixtures also pass.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Matched meter-row profiler | `353cf8d8a7e5ac925396df8b86ed031249019beba6f0b77ae4b0fd7c59a46bd2` |
+| Seven paired campaign and Custom Game windows | `903f1328730359b58683f5c4e4091ab4648f4cb0d5c0d259f9540c18e6cb8a23` |
+| Five Showcase scene pairs | `287563ac1df684fdf02212af5a1d7ff0409b6f09fabb3497317c7ed6aa68c5f5` |
+
+## Rasterizing unobstructed selection rings by row
+
+Unobstructed selection rings apply scene clipping once and write the
+visible rows directly as Mode 4 pixel pairs. The existing ellipse equation,
+flat ends, and covered building arcs retain their established behavior.
+The row writer stays in ROM. All four regular ARM images link with the
+same EWRAM and IWRAM guard endpoints as release `d6b2d988`.
+
+During the eight matched Z9 updates at frames 27,561–27,568, mean ring
+cycles fall from 107,226 to 97,688 (8.9%) and full-loop cycles fall from
+1,346,391 to 1,336,148 (0.76%). The sampled world summaries and both
+framebuffer pages match. The 160-update comparison from the same save
+reduces mean loop cycles from 1,644,635 to 1,634,448 (0.62%) and p95
+from 1,797,304 to 1,778,232 (1.06%). All 160 updates still exceed the
+two-VBlank budget. Orders are the first target for larger gains in the
+late three-CPU Outpost windows.
+
+Six Custom Game control windows are cycle-identical. The seven paired
+windows have identical world, camera, entities, palette, both framebuffer
+pages, pause SRAM and fresh continuations. Five Showcase scenes reduce
+mean loop cycles by 0.26–0.72%. Both pages match through all 600 Showcase
+comparisons. One sample presents a different page and agrees at the next
+update. The field UI oracle covers all 2,294 supported radius pairs, and
+a separate tile test matches framebuffer pixels, palette aliasing and
+dirty masks for 3,432 combinations of clipping, color and geometry.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z9 instruction profile | `84277b6c1e5d00b0ead2bc15efe5493f19f5766305bc57673eb6c6214db91911` |
+| Seven matched campaign and Custom Game windows | `b843635feb8a7b70fdf67ca772ccd88c91353aadd5e3eb928829d1df3f6d5b06` |
+| Five matched Showcase scenes | `f9f80828275bafa45fe8a82c439d397bd717e75da6aea59b05890586d9cc0370` |
+
 ## Generated bounds for offscreen animation checks
 
 The regular asset preparation commands now emit anchor radii alongside

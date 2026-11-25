@@ -21,6 +21,70 @@ The emulator measured 70,347,482,196 guest cycles across 49,540 updates, about 1
 
 The prepared cartridge, controller, save, runner and detailed receipts are local. The first continuation process stopped after call 30,000. The successful continuation restarted from the validated HOME save.
 
+## November 25 controller replay on the padded journal build
+
+The current HOST controller wins in 53,430 ordinary input calls at frame
+51,588, with zero scheduler faults. It writes a pause save at frame 2,527.
+The same input tape from empty HOME on the padded ARM ROM matches the
+first five checked observations through frame 6,021. It diverges at call
+8,953, frame 8,518. The ARM world has 17 friendly units and 1,237 minerals
+where HOST reports 14 and 879. Both remain active with the same enemy
+counts, 625 gas and zero scheduler faults. Treat this as a reproduced
+controller mismatch and inspect the preceding macro inputs before counting
+a current ARM win.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Current HOST controller tape | `c9c4b76362e3bb389a16068b02fc48c52ebb6b82c5477cb6ba71e396434353b9` |
+| Padded ARM prefix and first differing checkpoint | `6653dd78b0f46b910899ec9d972ee157fe35ccc918b31f713a0eb44226d06de4` |
+
+A second scratch HOST controller calls `game_render()` after each logical
+input, as in the rendered Z7 qualification. It produces a different winning
+tape of 65,594 calls, reaching frame 63,523. The padded ARM ROM matches
+the selected field observations at 26 checkpoints and advances far past
+the earlier mismatch. At call 63,553, the ARM is at frame 61,207 and HOST
+is at frame 61,554. Counts, bank and cursor have diverged. Both sides
+are still active with zero scheduler faults and 129 enemy buildings.
+This bounds the remaining mismatch in the rendered route. Check the
+controller and modal or pause inputs before that checkpoint.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Rendered HOST winning tape | `7ed5ef9774299acc9efb4b01986938fe1af30db3088094fc389b595b516fd7b0` |
+| Rendered tape ARM checkpoints and late mismatch | `66fd8fa1f49792a7afe339d4bc159403547353f0557fdcd15425e470afb18099` |
+
+### Victory after acknowledging the late dialogue
+
+An ordinary physical-button replay from empty HOME matches the rendered
+tape at call 62,029, game frame 60,122, and exports a pause save. A fresh
+HOME re-export is byte-identical. After 26 advancing updates from the
+loaded checkpoint, a two-page box freezes gameplay at frame 60,149.
+Two ordinary A press-and-release pairs clear it while the mission frame
+stays fixed. This accounts for the first 183-frame divergence in the
+unmodified physical input tape.
+
+The continuation acknowledges each later queued box with ordinary A
+inputs and tracks the tape by logical gameplay frames. A second pause
+save at frame 60,567 fresh-loads with the crystal present and re-exports
+byte-identically. The route brings the crystal to (712, 490) and reaches
+the result screen at frame 63,523, with `won=1`, `lost=0`, and zero scheduler
+faults. An independent repeat of the suffix exports the same victory SRAM.
+Another fresh HOME loads that result with mission 21's completion bit set
+and re-exports the victory journal byte for byte.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Padded-journal ARM ROM | `72a3fcea4044358b2380795ded70d4cc4dd78119c4041e2c055bd1189f59ee01` |
+| Frame 60,122 pause journal | `56cbbc8f6c6c5f63eacc6e8d8b6ffa088dc05ca912a7ac1d64fb574bcdefa52f` |
+| Crystal checkpoint journal | `5b70bf7eddcbd74d20aef91c190fff9a320f010806bc3b80fc199dffc870a924` |
+| Ordinary-button suffix receipt | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
+| Victory journal and fresh HOME re-export | `eb5b2035d88174f17aa617f59f3bb3290b3deed72ecbdf00559cff6638414a37` |
+
+The [vitals-row build](2026-11-22-dense-release-attribution.md#drawing-filled-vital-cells-in-one-pass)
+loads the same late save and repeats the physical-button suffix. Its input
+receipt and victory SRAM are byte-identical to the values above. Its ROM
+SHA-256 is `08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16`.
+
 ## All three current finales
 
 Ordinary controller tapes also completed the finales on the exact T10 and
@@ -249,3 +313,27 @@ mobile-defense starting point.
 | --- | --- |
 | Den and Hydralisk production trace | `e1c478e09985587793a3a6dfd8e7fc512fd95ec09e2417342956a8ff040223de` |
 | Frame 34,723 SRAM and fresh HOME | `16ab2580cd5d70016b4887b0aaac0d716882ec802b3eeea7a8ef16dc03c0f0c9` / `2483c0ec0597d5b2864dedf1174b3820ea856ebb53b17191b02853d3b652a8d9` |
+
+### Hold at the relocated Hatchery
+
+From the Hydra production checkpoint, the Hatchery produces a paid Drone.
+At frame 35,958, fresh HOME and a byte-identical SRAM export confirm the
+full-health Hatchery, three Hydralisks, one mining Drone, and 200 minerals
+and 600 gas. Enemy units are attacking the Den and the Pool. Two Hydralisks
+queued after this point arrive too late to protect the base. A second
+Drone raises the bank to 254 minerals before both Drones die. Evacuation
+preserves the original Drone past frame 38,087 with only 149 minerals
+after the Hatchery falls. The earlier frame-34,723 save gives more time
+to place defenders or reposition workers before the attackers arrive.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Frame 35,958 inputs | `4c1fd9baf8569077b67e3558db8dbc9db857c15b3efe3a65be666a2890b97d25` |
+| Frame 35,958 SRAM and fresh HOME | `dd4cae3b8320fdc9261ba63473e0a8eb6ed911e54dcacc8f79ae876523d39627` / `d00cb96ed2f8be2d462c496c70e5eb4d36f77a28538f735da1c421466e93b349` |
+
+A closer position around (300, 1080) from the earlier frame-34,723
+checkpoint also loses the three Hydralisks and the Overlord by frame
+36,418. The Hatchery is down to 89 HP at frame 36,818 and falls shortly
+afterward. The next defensive attempt needs more production or an
+alternate route ahead of those three Hydralisks. Exact inputs have
+SHA-256 `5c9fe849dc7ff54431440beb5a2cfbc4a44ba2ea977d2a87f5903ca005aac86a`.

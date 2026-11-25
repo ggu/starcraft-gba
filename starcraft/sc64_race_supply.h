@@ -29,7 +29,8 @@ race_supply_count_unit(Sc64RaceSupplyLedger *ledger, const Unit *q, int faction)
 }
 
 static inline void
-race_supply_count_building(Sc64RaceSupplyLedger *ledger, const Building *q, int faction)
+race_supply_count_building(Sc64RaceSupplyLedger *ledger, const Building *q,
+                           int faction, int include_waiting)
 {
     if (race_supply_building_provides(q)) {
         const Sc64RaceBuildingRule *r = sc64_race_building_rule(q->type);
@@ -37,7 +38,10 @@ race_supply_count_building(Sc64RaceSupplyLedger *ledger, const Building *q, int 
     }
     /* Count the product's race, not the producer's race or origin owner.
      * The current owner of the alive producer owns its pending products. */
-    for (int j = 0; j < q->queue_count; ++j) {
+    /* The resource bar counts the active order. Admission also counts every
+     * paid order waiting behind it. */
+    int count = include_waiting ? q->queue_count : q->queue_count != 0;
+    for (int j = 0; j < count; ++j) {
         int type = q->queue[(q->queue_head + j) % 5];
         const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
         if (r && r->race == faction)
@@ -63,7 +67,7 @@ static inline int race_supply_nuke_reservations(int owner, int faction)
 /* Admission and uncached resource-bar drawing need a fresh view. The normal
  * HUD invalidation and AI census reuse their already-existing actor walks. */
 static Sc64RaceSupplyLedger __attribute__((noinline))
-race_owner_supply_ledger(int owner, int faction)
+race_owner_supply_ledger_for_queue(int owner, int faction, int include_waiting)
 {
     Sc64RaceSupplyLedger ledger = {0};
     if (owner < 0 || owner >= 5 || faction < R_TER || faction > R_PROTOSS)
@@ -73,8 +77,14 @@ race_owner_supply_ledger(int owner, int faction)
             race_supply_count_unit(&ledger, &u[i], faction);
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == owner)
-            race_supply_count_building(&ledger, &b[i], faction);
+            race_supply_count_building(&ledger, &b[i], faction, include_waiting);
     ledger.queued += race_supply_nuke_reservations(owner, faction);
     return ledger;
+}
+
+static inline Sc64RaceSupplyLedger
+race_owner_supply_ledger(int owner, int faction)
+{
+    return race_owner_supply_ledger_for_queue(owner, faction, 1);
 }
 #endif

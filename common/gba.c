@@ -1125,6 +1125,118 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
         if(left)*dst=(*dst&0xff00)|color;
     }
 }
+
+static inline void gfx_outline_span(volatile u16 *row,int y,int left,int right,u16 color)
+{
+    (void)y;
+    if (left < 0) left = 0;
+    if (right > 240) right = 240;
+    if (left >= right) return;
+    GFX_TILE_TOUCH(left, y, right, y + 1);
+    volatile u16 *dst = row + (left >> 1);
+    if (left & 1) {
+        *dst = (*dst & 255u) | (color & 0xff00u);
+        ++dst;
+        ++left;
+    }
+    for (; left + 2 <= right; left += 2) *dst++ = color;
+    if (left < right) *dst = (*dst & 0xff00u) | (u8)color;
+}
+
+/* Draw a full unobstructed outline with one clipping pass. The caller
+ * supplies the outer half width of each row, including the two flat ends. */
+void gfx_ellipse_outline_rows(int x,int y,const u8 *half,int ry,int top,int bottom,u8 color)
+{
+#ifdef GBA_SCENE_CLIP
+    if (top < gfx_clip_top) top = gfx_clip_top;
+    if (bottom > gfx_clip_bottom) bottom = gfx_clip_bottom;
+#else
+    if (top < 0) top = 0;
+    if (bottom > 160) bottom = 160;
+#endif
+    if (top < y - ry) top = y - ry;
+    if (bottom > y + ry + 1) bottom = y + ry + 1;
+    if (top >= bottom) return;
+    color = GFX_TILE_COLOR(color);
+    const u16 pair = color | ((u16)color << 8);
+    volatile u16 *row = pixels + top * 120;
+    for (int py = top; py < bottom; ++py, row += 120) {
+        int dy = py < y ? y - py : py - y;
+        int outer = half[dy];
+        if (dy == ry) {
+            gfx_outline_span(row, py, x - outer, x + outer + 1, pair);
+        } else {
+            int inner = half[dy + 1] + 1;
+            if (inner > outer) inner = outer;
+            gfx_outline_span(row, py, x - outer, x - inner + 1, pair);
+            gfx_outline_span(row, py, x + inner, x + outer + 1, pair);
+        }
+    }
+}
+
+/* Three two-pixel stores repeat a three-pixel cell without a divider test
+ * for each pixel. The phase is measured from the unclipped meter origin. */
+static inline void gfx_meter_span(volatile u16 *row, int origin, int left, int right,
+                                  u8 divider, u8 shade)
+{
+    if (left >= right) return;
+    unsigned phase = (unsigned)(left - origin) % 3u;
+    volatile u16 *dst = row + (left >> 1);
+    if (left & 1) {
+        u8 pixel = phase ? shade : divider;
+        *dst = (*dst & 255u) | ((u16)pixel << 8);
+        ++dst;
+        ++left;
+        phase = phase == 2 ? 0 : phase + 1;
+    }
+    const u16 pairs[3] = {
+        divider | ((u16)shade << 8),
+        shade | ((u16)shade << 8),
+        shade | ((u16)divider << 8),
+    };
+    u16 first = pairs[phase];
+    u16 second = pairs[phase == 0 ? 2 : phase - 1];
+    u16 third = pairs[phase == 2 ? 0 : phase + 1];
+    for (; left + 6 <= right; left += 6) {
+        dst[0] = first;
+        dst[1] = second;
+        dst[2] = third;
+        dst += 3;
+    }
+    if (left + 2 <= right) {
+        *dst++ = first;
+        left += 2;
+        first = second;
+        second = third;
+    }
+    if (left + 2 <= right) {
+        *dst++ = first;
+        left += 2;
+        first = second;
+    }
+    if (left < right) *dst = (*dst & 0xff00u) | (u8)first;
+}
+
+void gfx_meter_row(int x,int y,int width,int fill,u8 filled,u8 empty)
+{
+    if (width <= 0 || x >= 240 || x + width <= 0) return;
+#ifdef GBA_SCENE_CLIP
+    if (y < gfx_clip_top || y >= gfx_clip_bottom) return;
+#else
+    if ((unsigned)y >= 160) return;
+#endif
+    int left = x < 0 ? 0 : x;
+    int right = x + width > 240 ? 240 : x + width;
+    int middle = x + fill;
+    if (middle < left) middle = left;
+    if (middle > right) middle = right;
+    GFX_TILE_TOUCH(left, y, right, y + 1);
+    volatile u16 *row = pixels + y * 120;
+    const u8 divider = GFX_TILE_COLOR(C_BLACK);
+    gfx_meter_span(row, x, left, middle, divider, GFX_TILE_COLOR(filled));
+    gfx_meter_span(row, x, middle, right, divider, GFX_TILE_COLOR(empty));
+}
+
 void gfx_fill_rows(int y, int height, u8 color)
 {
 #if defined(GBA_HOST)

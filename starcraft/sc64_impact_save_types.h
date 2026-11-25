@@ -19,6 +19,23 @@
 #define SC64_TRANSPORT_TRAILER_BYTES 0
 #endif
 
+#ifdef SC64_P10_PADDED_IMPACT_SAVE
+#if !defined(SC64_P10_RUNTIME) || !defined(SC64_P7_TYPED_COMPACT_ENABLED) || \
+    !defined(SC64_RESEARCH_SRAM_PRODUCT) || !defined(SC64_EXPERIMENTAL_RESEARCH_JOURNAL) || \
+    !defined(SC64_EXPERIMENTAL_RESEARCH_JOBS_JOURNAL) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || \
+    !defined(SC64_SHARED_TRANSPORT) || !defined(SC64_WORKER_CARGO_KIND) || \
+    defined(SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS_JOURNAL) || defined(SC64_PACKED_MINERAL_FIFO) || \
+    defined(SC64_SHARED_EGG_CUSTOM_CANDIDATE) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
+    defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_NUKE_SILO_JOURNAL) || \
+    defined(SC64_Q8_FLASH_HOST_STAGE) || defined(SC64_Q8_FLASH_ARM_PROBE) || \
+    defined(SC64_P6_PACKED_IMPACT_SAVE) || defined(SC64_BUILDING_PAD_IMPACT_SAVE)
+#error "expanded impacts require the normal typed P10 journal and Yamato layout"
+#endif
+#include "sc64_p10_padded_impact_payload.h"
+_Static_assert(sizeof(RaceSave) + SC64_P10_PI_TAIL + SC64_TRANSPORT_TRAILER_BYTES ==
+               RACE_IMPACT_RECORD_MAX, "P10 expanded record fits with both Yamato shots");
+#endif
+
 #ifdef SC64_P6_PACKED_IMPACT_SAVE
 #if !defined(SC64_P6_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_UNIFIED) || \
     SC64_CAMPAIGN_RACE != 2 || defined(SC64_P7_BATTERY_ENABLED) || \
@@ -85,7 +102,7 @@ enum {
 #ifdef SC64_P6_PACKED_IMPACT_SAVE
     RACE_IMPACT_SAVE_ROOM = (SC64_P6_IMPACT_PAD_BYTES - sizeof(Sc64ImpactSaveHeader)) /
                             sizeof(Sc64ImpactEvent),
-#elif defined(SC64_BUILDING_PAD_IMPACT_SAVE)
+#elif defined(SC64_BUILDING_PAD_IMPACT_SAVE) || defined(SC64_P10_PADDED_IMPACT_SAVE)
     RACE_IMPACT_SAVE_ROOM = RACE_IMPACT_ROWS,
 #else
     RACE_IMPACT_SAVE_ROOM = RACE_IMPACT_RAW_SAVE_ROOM,

@@ -297,7 +297,8 @@ queue_panel_tests(void)
           "the Firebat moves to the active slot");
     check(slot_empty(1) && queue_bar_fill() == 0, "the queue shortens and progress restarts");
 
-    /* A full queue fills all five slots; L removes the oldest. */
+    /* The full queue leaves the active Firebat in place when L removes
+     * the last waiting Marine. */
     train_type = U_MARINE;
     for (int i = 0; i < 6; i++) tap(KEY_A);
     check(b[barracks].queue_count == 5, "the queue holds five");
@@ -306,7 +307,8 @@ queue_panel_tests(void)
     tap(KEY_L);
     render();
     check(b[barracks].queue_count == 4 && slot_empty(4) && slot_filled(3), "L cancels into a shorter queue");
-    check(count_color(QUEUE_X, QUEUE_Y, QUEUE_SLOT, QUEUE_SLOT, C_ORANGE) == 0, "L removes the oldest unit");
+    check(count_color(QUEUE_X, QUEUE_Y, QUEUE_SLOT, QUEUE_SLOT, C_ORANGE) > 0 && slot_framed(0),
+          "the active Firebat remains in the first slot");
 
     /* A Command Center's queue is drawn the same way. */
     fixture();
@@ -688,7 +690,39 @@ selection_cover_tests(void)
     }
 }
 
-/* Selections are StarCraft ellipses at the actor's base, not boxes. */
+static void
+selection_geometry_tests(void)
+{
+    int same = 1;
+    for (int rx = 3; rx <= SELECTION_RX_MAX && same; ++rx) {
+        for (int ry = 2; ry <= SELECTION_RY_MAX && same; ++ry) {
+            int x = 120 + rx % 4, y = 60, d = 2 * ry + 1;
+            gfx_begin(C_BLACK);
+            draw_selection_ellipse(x, y, rx, ry, C_GREEN, SELECTION_RING, 0);
+            for (int dy = 0; dy <= ry && same; ++dy) {
+                int outer = rx, inner = 0;
+                while (outer * outer * d * d > rx * rx * (d * d - 4 * dy * dy))
+                    --outer;
+                if (dy < ry) {
+                    int next = dy + 1;
+                    inner = outer;
+                    while (inner * inner * d * d > rx * rx * (d * d - 4 * next * next))
+                        --inner;
+                    if (inner < outer) ++inner;
+                }
+                for (int dx = -rx; dx <= rx; ++dx) {
+                    int reach = dx < 0 ? -dx : dx;
+                    u8 color = reach >= inner && reach <= outer ? C_GREEN : C_BLACK;
+                    same &= gfx_test_pixel(x + dx, y + dy) == color &&
+                            gfx_test_pixel(x + dx, y - dy) == color;
+                }
+            }
+        }
+    }
+    check(same, "all selection ring radii match the direct ellipse equation");
+}
+
+/* Selection outlines follow the actor's base. */
 static void
 selection_circle_tests(void)
 {
@@ -719,6 +753,7 @@ selection_circle_tests(void)
     check(count_color(100, 61, 41, 20, C_GREEN) == 0 &&
           gfx_test_pixel(120, 54) == C_GREEN, "far arc stays above centre");
     selection_cover_tests();
+    selection_geometry_tests();
 
     fixture();
     int marine = slot_of(SIDE, U_MARINE);

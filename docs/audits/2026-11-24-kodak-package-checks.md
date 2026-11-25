@@ -757,6 +757,17 @@ A follow-up builds and morphs a third Sunken north at
 it at 278 HP, the two earlier Sunkens at 400 HP each
 and the Hatchery at 1,250 HP. The three-Sunken hold
 without further orders loses the Hatchery by 13,292.
+
+Two further fresh HOME loads reproduce the same frame-10,892
+world fingerprint and byte-identical SRAM. A coordinated order
+sends all 12 available fighters to (1350, 1500) by frame 10,977.
+At frame 13,177 the final friendly building has fallen, all 54
+enemy buildings remain, and the GBA mission stays active with
+16 friendly mobile units. Z7's campaign defeat predicate counts
+both buildings and mobile units. The equivalent native N64 state
+has yet to be observed. The readback and attack-input receipts have
+SHA-256 `a563b60e44bb0030fe7637a3852cebe888bc6261527519b11771f33119e403d1`
+and `c609f292712c3fd1d02c1f154f593935a7adc05e9963bc6dce32fccf531b9e1c`.
 Both branches retain 200 gas with no active gas source.
 Split the mobile defense and qualify mining through the
 raid before committing to further static defenses.
@@ -1064,6 +1075,108 @@ Marine completes during neutral updates and current supply
 rises to 7/26. The observations cover the paid production
 path on both systems. N64 displays the extra supply at
 queue time. These GBA observations read actual used supply.
+
+A fresh N64 process repeats the saved-game input sequence. Its first
+two frame hashes match the previous run, it renders the 50-mineral
+purchase and the immediate 5/26 to 6/26 supply change, and it shows
+the queue clear after the Marine appears. The SCV's subsequent trips
+lift the post-purchase bank from 206 to 246 with only neutral input.
+Input and output FlashRAM match. The current Terran release and the
+selection-ring candidate agree across four controller-only checkpoints.
+They start at 5/26 supply and 200 minerals, deduct 50 minerals at
+frame 69, and reach 6/26 supply and seven human units with the queue
+clear by frame 569. The bank stays at 150 over that interval. The
+native and GBA pre-purchase banks reflect different mining histories.
+
+Both current GBA framebuffer pages show 6/26 while the first Marine
+is in progress, matching the N64 display. The first-slot comparison
+above reads the GBA live-unit counter, which excludes production.
+In a second fresh N64 run the next Marine costs another 50 while the
+first is still in progress. The native HUD remains at 6/26 with two
+portraits visible, then reaches 7/26 after the first completes and
+the next starts. The current and candidate GBA ROMs charge the same
+50 for the second Marine but already show 7/26 with both Marines in
+the queue and neither finished. The N64 near-cap admission check
+still needs its own controller replay.
+
+A direct ares replay from the same FlashRAM image matches the first
+seven captures through the second order. Continued ordinary input then
+shows four Marine queue icons and 14 minerals. FlashRAM remains
+byte-identical. The final bank is below the 50-mineral Marine price,
+so this cut establishes four displayed entries.
+
+A later direct ares run lets the workers fund more orders. The fifth
+Marine brings the bank from 128 to 78 minerals. One active portrait
+and four waiting icons are displayed, the production selection
+disappears, and an immediate sixth press leaves the queue and bank
+unchanged. No Marine completes between the fifth and sixth attempts.
+The HUD stays at 6/26. Both the GBA producer and admission checks use
+a five-entry queue. The native local and global supply boundaries
+still need their own tests. This run uses the Android SDK's MoltenVK
+1.2.11 and leaves the original FlashRAM hash unchanged.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Fresh N64 purchase and completion | `c230e0cff5fe4a97fa91ed1250e6fb4a4ef8df4cae7dfdf4cd16e033ecb09654` |
+| Current GBA and renderer candidate checkpoints | `365ce8456c5b5aac9fea1dfcd89320845b53e50402395361dc06139f46230d6e` |
+| Fresh N64 with two paid Marines | `d786dcce4f3803430929313e7e8333b5c5545f729b606c62aa19aa490660b3ce` |
+| N64 four-icon capture and input commands | `bb046dfcc06be1f5919ae07d5d1c30d8258633071bb7737b1bc05c8c738ec313` / `bb763f9813988ab41af085c2ca775dad882eaccc7da7c55e2f8ed7a20aeab8ad` |
+| Funded N64 fifth and sixth attempts | `9fb15e7429b1cae83b895af360be48b9c674ef57f026124d03a2036d5176cd44` / `e15d3cc3a109f024d5166be7e2760f3a0b6a214dd465e72f9de3ea32f0bbceae` |
+| Funded native input commands | `3946c408ac7a9087d208bf6c4ee7ee078f642998de2a37b37e584ceeb713d54b` |
+| Current GBA and candidate with two paid Marines | `1a70b2021eb7563e260d322e1563096eb4f548458c7fcf29de123fec934d3e72` |
+
+#### Canceling the last queued unit
+
+A fresh N64 Backwater replay queues two Marines and highlights
+`CANCEL LAST` with the first still in production. A removes the
+waiting Marine and leaves the first progress bar and 6/26 supply.
+The mineral counter settles from 156 to 206 before the next mining
+delivery. Both FlashRAM copies agree. A second fresh run cancels
+the sole active Marine and returns the display to 5/26. An SCV
+delivery overlaps that refund, so the bank cannot isolate it.
+
+On the GBA release, a tap of L while the Barracks is selected refunds
+50 minerals and restarts progress on the remaining Marine. In the
+same controller test with the new queue rule, the first Marine has
+44 progress when the second is waiting and 48 after the cancel. The
+refund is 50 minerals and the on-screen supply stays at 6/26.
+The pause reload keeps the same active queue slot and 48 progress.
+The first Marine completes, and the fresh HOME re-export matches
+the input journal byte for byte. All regular ARM products link with
+their prior EWRAM and IWRAM endpoints.
+
+The combined collision and production changes repeat that result.
+Canceling the sole active Marine on the combined GBA image returns
+the display to 5/26, clears progress, and restores the 200-mineral
+starting bank. Both maps, each player race, and 1–3 CPU seats pass
+54 ordinary Custom Game opening and fresh continuation cases across
+the three products. Wasteland finishes at frame 10,120 and both its
+mid-mission and result journals survive fresh HOME. The Z10 late
+suffix wins at frame 63,523 with the same victory SRAM.
+
+Seven matched 160-update windows compare the combined build with
+the collision release. The captured worlds, camera, entity banks,
+palette, both framebuffers, pause SRAM and reload continuations
+agree throughout. Five isolated update boundaries differ in
+displayed page or pending flip. The Backwater replay separately
+verifies the displayed supply with a waiting order.
+
+The HUD includes the active training order from each producer. The
+admission ledger still includes all paid orders, the 200-supply cap,
+and existing special reservations. Near-cap admission still needs
+a separate native check.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| N64 cancellation and settled refund | `66d7bd3869a7700579f834cc3fdfd1bb96dafb2d563fa3e49263e27c0d4bc93a` |
+| GBA ordinary input, HUD and fresh load | `91cf28a95d5239edfea25618cfda67357015ca5d881b32e95cf86fd1bcf80c47` |
+| N64 sole active cancellation | `084ab0772f73cd01930e6330d5c7045e12cce44ab96bcdde04bf68ca2f1165a3` |
+| Combined GBA waiting cancellation | `a7b2e762ca8af2e9c1ad603d7842ed9e88e3063dbebbeca2199baf345181914d` |
+| Combined GBA sole active cancellation | `1fb17b88bec266989cd394ed8d1b77ce22c334309442ddb35c223dc867b30dee` |
+| Combined three-cartridge Custom Game matrix | `7dca9e278514f30bb2c46baa55ddb4169f6ed3f9d693d6c76c0d26c2eb4b11f3` |
+| Combined Wasteland victory and fresh loads | `e67b093d8a4f7b716d9267e325feea733f2ff35c414f795831962e42e8fd7397` |
+| Combined Z10 saved-game suffix victory | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
+| Combined 160-update campaign and skirmish pairs | `8ffb65b96ed79c3fe730f4002fc82e3304e262d38a5406dfcc245aad73a7cc11` |
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -1770,6 +1883,37 @@ Profile the current source's base projectile motion and raster
 work at this fixed camera position and after an ordinary-input
 pan to the visible fight. These are mGBA guest-cycle observations.
 
+#### Direct sprite entries on the Pylon release
+
+Read-only entry and return breakpoints sampled eight P10 panned Outpost
+updates at frames 11,174–11,181 and eight dense Z9 road updates at
+frames 27,562–27,569. The sampled clocks match the uninstrumented runs.
+
+P10 makes zero calls to the generic, packed, mapped and flipped blitter
+entries in this cut. Z9 calls the generic blitter twice in one frame.
+One 20×20 image has mismatched source and destination word alignment
+and costs 6,168 cycles, an upper bound of 771 cycles per sampled update
+for an alignment change. Z9 calls the packed entry 120 times at
+53,795 cycles per update. Of these, 112 come from the unit walk path
+and eight from completed buildings. These entry counts leave inlined
+and other compositors outside the sample.
+
+Instruction and call-stack sampling on the same eight P10 frames
+attributes 271,215 cycles per update to depth-ordered actors and
+221,332 of those to tracer parts, across about 61 calls. Within that
+work, raster calls account for 41,952 cycles and animation lookup takes
+21,227 self cycles. No unit-image calls are recorded. The instrumented
+and control runs match state, both pages, stage counts and clocks.
+Measure which raster guards return before the pixel path. Keep layer
+order, independent trails and current fog and clipping rules in
+subsequent comparisons.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z9 generic / packed entries | `b1de896e5e2b5814c2db8e0dfdfb7e439924b69e069874c468dba95b34b0b76d` / `7b5257302a58efbf051bdde3a068d7d519f1604687f70e88983df0215a8c4a7d` |
+| P10 generic / packed entries | `bee3bed5290e6b2d0a7d04de030a6a5c8ae1df969c57a7d2161cfe7c35a0f487` |
+| P10 instruction and call-stack attribution | `9cfc4d617f687493b6137bd7280e38fb704d2af3a8fa41c875d3ef2499d9208e` |
+
 #### Pan from the base to the Outpost fight
 
 Across three exact race-ROM runs, an ordinary R and D-pad hold
@@ -1820,6 +1964,27 @@ the two-VBlank budget. These measurements apply to the retained
 P10 pair. Qualify the current combined source against the other
 cartridges, campaign and Showcase, including save continuation,
 before promoting the renderer to the release builds.
+
+#### Screen-edge visibility in the whole-raster path
+
+The November 25 trial limits the whole-raster fog check to horizontally
+visible pixels while keeping the blitter's original source coordinates and
+stride. The sanitizer raster oracle confirms identical pixels at the left
+map edge and the right screen edge with hidden offscreen tiles. The four
+prepared ARM links retain their static memory endpoints.
+
+Seven 160-update pairs cover panned three-CPU Outpost for every race,
+three Blood Bath variations and an active Z9 campaign checkpoint. The
+sampled worlds, both video pages, palette, camera, pause SRAM and fresh
+continuation agree in all pairs. Seven sampled display-phase states differ.
+Mean loop time is flat or rises by up to 0.12%. The panned Outpost drawing
+means increase by 0.06–0.63%. The Z9 p95 improves from 1,877,834 to
+1,868,710 cycles while its mean loop time rises 0.05%. Budget overruns stay
+constant in all seven windows. Keep the current raster and use traces of
+the visible fight to identify a larger remaining cost.
+
+The local comparison receipt SHA-256 is
+`99b8ddef059b6d8ab32b9d66ac083c05c4e1b66da9a04df3a82fdacc9e27df96`.
 
 #### Blood Bath holdout and late skirmish journals
 
@@ -2038,6 +2203,35 @@ changing the default.
 | --- | --- |
 | Outpost stock / witness | `835e54c19a185059dbc188f28308e340b57e6cc7cb3b8e38a86c05cbb9b80bb4` / `1ddef2d373f6e25e4dbff3137add25478c81494c2f90369cd8c6dd2cac259db6` |
 | Blood Bath stock / witness | `c4f3e288b41471ef0ffba990bdb9da632da13295d2ac786a01d1a385aa46e716` / `ddc65b9d89773734f09343c63d6d04708e767137edd040effd244d85791f2ca8` |
+
+#### Witness use on the Pylon release
+
+The Pylon-enabled Terran release and the same build with the #805 witness
+flag entered an ordinary three-CPU Blood Bath match and advanced to update
+11,000. The rebuilt control ROM matches the release ROM byte for byte.
+The two builds match world, camera, palette, both framebuffer pages and
+selected page over the following 96 updates. Pause SRAM and fresh
+60-update continuations also match. The selected page at the last fresh
+continuation sample differs.
+
+Mean elapsed loop cycles rise from 889,816 to 893,722 with the witness
+flag (+0.44%). Read-only breakpoints count 419 eligible lookups, 406
+fallback probes and 13 hits, all from advancing origins. The ten updates
+containing hits save 402,004 cycles in total. The other 86 updates cost
+776,972 additional cycles, including any dispatch and linked-placement
+effects. The breakpoint run reproduces the uninstrumented candidate's
+world and cycle samples.
+
+The inputs and update range match the earlier overlap census. The
+boundary world now has 135 units, compared with 136 in that census.
+Keep the witness table off in the release. A later trial should
+measure a cheaper miss path on the same live states before changing
+retention or admission.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Control / witness | `7add620ea21a44d123b71404bc86f3b60b52a699ddadb4a25338a571aa1c42b2` / `2a80676d07d0552816592091f99dc86b36ac3e4d2bc31249e888efc8da28efa5` |
+| Witness breakpoint census | `706afea96e9c10eb2c03e393de11cbf80967d1efcfbbff3e9967d68e959aa89b` |
 
 ### Pylon lookup in dense missions and panned skirmishes
 
