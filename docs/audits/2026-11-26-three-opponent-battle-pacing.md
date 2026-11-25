@@ -64,3 +64,21 @@ same counter interval (VI serrate off). Every image hash differed. In 852
 of 999 successive pairs, no RGB channel changed by more than four levels.
 Exact image changes here include small color variation; they cannot identify
 the number of distinct world updates or physical display swaps.
+
+## Optimization trials
+
+On Protoss Blood Bath against two CPUs, building the initial actor heap
+bottom-up saved 0.046% across 512 updates with recorded controls. Removing
+a repeated enemy visibility check saved 0.041% in the same window. Both
+matched the five gameplay checks and endpoint fingerprint. In a separate
+2,048-update fixed-camera run, both matched both framebuffer pages, palette,
+display selection and the pause save at the tested checkpoints. Trimming
+transparent edges in the packed sprite compositor *increased* whole-run
+cycles by 1.27% on that workload.
+
+On Zerg Blood Bath against three Zerg CPUs, processing two entries per
+route-flood iteration changed total time by less than 0.001% over 1,000
+neutral updates from the battle save. Packing dense-point fields in aligned
+words saved 3.49% inside the flood in an 80-update instruction profile, but
+only 0.043% across 1,000 updates and added 344 bytes of IWRAM. Neither
+experiment warrants changing the shared engine on this evidence.
