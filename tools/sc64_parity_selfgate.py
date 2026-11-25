@@ -446,6 +446,9 @@ def gate(args: argparse.Namespace) -> int:
             "builds_differ": first["trace_compiled"] == 1 and second["trace_compiled"] == 1 and
                              without["trace_compiled"] == 0 and unrendered["trace_compiled"] == 0 and
                              same_configuration(builds["trace"], builds["plain"]),
+            "gas_delivery": scenario != "skirmish" or all(
+                r["gas_assigned"] == 1 and r["gas_pickup"] == 1 and r["gas_delivered"] == 1
+                for r in (first, second, without, unrendered)),
             "full_length": all(r["steps"] == args.steps and r["screen"] == 1
                                for r in (first, second, without, unrendered)),
             "render_on_off": first["render"] == 1 and second["render"] == 1 and without["render"] == 1 and

@@ -158,6 +158,7 @@ every build runs at about 1,000 updates per second.
 | trace on/off | a build with the emitter and hooks and one without give the same world hash and per-step chain |
 | route purity | `route_purity_hash()` is unchanged around every injector call, scenario query, emitter call and between updates (the runner aborts otherwise) |
 | render on/off | drawing after every update or not gives the same world hash and chain |
+| gas delivery | the Zerg scenario builds a completed Extractor, assigns a Drone, observes its pickup and requires the gas bank to rise after its return |
 
 Two guards keep a pass meaningful: every run must reach the requested step
 count still in play (`full_length`), and the traced builds must report the
@@ -166,9 +167,14 @@ counts only when its footer, step ids, event totals, command records and body
 hash all agree with the run's report, and a binary only when the input hashes
 recorded at its build still match the files and its own SHA-256.
 
-The world hash covers units and buildings by named field, minerals, fog,
-banks, supply, the clock, the outcome, campaign phase and the route state, so
-it can be compared across processes. Route state is hashed region by region
+The world hash covers units and buildings by named field, invincibility flags,
+Backwater trigger state, selected campaign controller fields, minerals, fog,
+banks, research, supply, the clock, the outcome and the route state. A startup
+regression toggles each invincibility array and requires the world hash and
+one-step chain to change, then restores the original state. This is a selected
+state digest, not a complete audit of every engine variable; equality does not
+prove all future simulation state is identical. It can be compared across
+processes. Route state is hashed region by region
 like `route_purity_hash()`, except that every 8-byte-aligned word pointing into
 route state is hashed as the region and offset it points to: route statics
 hold such pointers (the field table, the spare point plane, facility

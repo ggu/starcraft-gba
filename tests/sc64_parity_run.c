@@ -134,16 +134,49 @@ static uint64_t pr_world_hash(void)
     for (int i = 0; i < race_impact_count && i < RACE_IMPACT_CAPACITY; ++i)
         h = pr_mix(h, &race_impact_rows[i], sizeof(race_impact_rows[i]));
 #endif
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+    h = pr_mix(h, invincible_units, sizeof(invincible_units));
+    h = pr_mix(h, invincible_buildings, sizeof(invincible_buildings));
+    PR_FIELD(backwater.executed); PR_FIELD(backwater.switches);
+    for (int i = 0; i < 15; ++i) { PR_FIELD(backwater.timer[i]); PR_FIELD(backwater.phase[i]); }
+    PR_FIELD(backwater.outcome); PR_FIELD(backwater.objective);
+    PR_FIELD(backwater.spawn_trigger); PR_FIELD(backwater.spawn_remaining);
+#endif
     h = pr_mix(h, visible, sizeof(visible));
     h = pr_mix(h, explored, sizeof(explored));
-    for (int o = 0; o < 5; ++o) { PR_FIELD(race_minerals[o]); PR_FIELD(race_gas[o]); }
+    for (int o = 0; o < 5; ++o) { PR_FIELD(race_player[o]); PR_FIELD(race_minerals[o]); PR_FIELD(race_gas[o]); }
+    PR_FIELD(weapons_level); PR_FIELD(armor_level);
+    PR_FIELD(weapons_research); PR_FIELD(armor_research);
     PR_FIELD(minerals); PR_FIELD(gas); PR_FIELD(supply_used); PR_FIELD(supply_cap);
     PR_FIELD(frame); PR_FIELD(screen); PR_FIELD(won); PR_FIELD(lost); PR_FIELD(seed);
     PR_FIELD(selected_building);
     PR_FIELD(race_campaign.elapsed_frames); PR_FIELD(race_campaign.objective_flags);
-    PR_FIELD(race_campaign.phase); PR_FIELD(race_selected_mission); PR_FIELD(race_mode);
+    PR_FIELD(race_campaign.phase); PR_FIELD(race_campaign.mission);
+    PR_FIELD(race_campaign.objective_stage); PR_FIELD(race_campaign.rescue_unit);
+    PR_FIELD(race_campaign.chrysalis_unit); PR_FIELD(race_campaign.carrier_unit);
+    PR_FIELD(race_campaign.enemy_units_sent); PR_FIELD(race_campaign.enemy_wave);
+    PR_FIELD(race_selected_mission); PR_FIELD(race_mode);
     PR_FIELD(pr_route_hash());
     return h;
+}
+
+/* A regression run in every gate process: both world and immediate chain
+ * must change for either invincibility array, and restoring the bit restores
+ * the hash. The test runs after launch, before any scripted command. */
+static int pr_hash_selftest(void)
+{
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+    uint64_t before = pr_world_hash(), old_chain = pr_mix(1469598103934665603ull, &before, sizeof(before));
+    u8 *flags[] = { &invincible_units[0], &invincible_buildings[0] };
+    for (unsigned i = 0; i < sizeof(flags) / sizeof(flags[0]); ++i) {
+        *flags[i] ^= 1;
+        uint64_t changed = pr_world_hash();
+        uint64_t chain = pr_mix(1469598103934665603ull, &changed, sizeof(changed));
+        *flags[i] ^= 1;
+        if (changed == before || chain == old_chain || pr_world_hash() != before) return 0;
+    }
+#endif
+    return 1;
 }
 
 /* ---- Runner state ----------------------------------------------------- */
@@ -290,6 +323,7 @@ static int pr_due(PrPending *p, unsigned long step, int owner)
 static struct {
     int a, b2, spawned, enemy, worker0, worker1, worker2, producer;
     PrPending train, build;
+    int gas_builder, gas_worker, gas_started, gas_assigned, gas_picked_up, gas_delivered, gas_bank;
 } sc;
 
 static int pr_launch_t1(void)
@@ -422,6 +456,8 @@ static void pr_scenario_skirmish(unsigned long step)
         sc.a = sc64_pi_spawn(SIDE, U_ZERGLING, pr_clamp_x(hall->x + 40), pr_clamp_y(hall->y + 40));
         sc.b2 = sc64_pi_spawn(SIDE, U_ZERGLING, pr_clamp_x(hall->x + 48), pr_clamp_y(hall->y + 40));
         sc.enemy = sc64_pi_spawn(race_bot_owner_ids[0], U_MARINE, pr_clamp_x(hall->x + 120), pr_clamp_y(hall->y + 40));
+        sc.gas_builder = sc64_pi_spawn(SIDE, U_DRONE, pr_clamp_x(hall->x - 32), pr_clamp_y(hall->y + 40));
+        sc.gas_worker = sc64_pi_spawn(SIDE, U_DRONE, pr_clamp_x(hall->x - 48), pr_clamp_y(hall->y + 40));
         break;
     case 10: sc64_pi_move(sc.a, pr_clamp_x(u[sc.a].x + 24), u[sc.a].y); break;
     case 20: sc64_pi_harvest_minerals(sc.worker0, pr_nearest_patch(u[sc.worker0].x, u[sc.worker0].y)); break;
@@ -433,6 +469,31 @@ static void pr_scenario_skirmish(unsigned long step)
         else sc64_pi_attack_move(sc.a, pr_clamp_x(hall->x + 120), pr_clamp_y(hall->y + 40));
         break;
     default: break;
+    }
+    if (step >= 70 && !sc.gas_started && race_owner_minerals(SIDE) >= 50) {
+        int best = -1, distance = 0x7fffffff;
+        for (int i = 0; i < geyser_count; ++i) {
+            int x = geysers[i].x, y = geysers[i].y;
+            int d = dist2(hall->x, hall->y, x, y);
+            if (d < distance && race_build_request_valid(SIDE, sc.gas_builder, B_EXTRACTOR, &x, &y, 0)) {
+                best = i; distance = d;
+            }
+        }
+        if (best < 0) sc64_pi_fail("gas", "no usable geyser near the Hatchery");
+        else sc64_pi_build(SIDE, sc.gas_builder, B_EXTRACTOR, geysers[best].x, geysers[best].y);
+        sc.gas_started = 1;
+    }
+    if (sc.gas_started && !sc.gas_assigned) {
+        int refinery = pr_first_building(SIDE, B_EXTRACTOR);
+        if (refinery >= 0 && building_complete(refinery)) {
+            sc.gas_bank = race_owner_gas(SIDE);
+            if (sc64_pi_harvest_gas(sc.gas_worker, refinery) == 0) sc.gas_assigned = 1;
+        }
+    }
+    if (sc.gas_assigned && u[sc.gas_worker].alive && u[sc.gas_worker].order == ORDER_GAS) {
+        if (u[sc.gas_worker].carry > 0) sc.gas_picked_up = 1;
+        if (sc.gas_picked_up && !u[sc.gas_worker].carry && race_owner_gas(SIDE) > sc.gas_bank)
+            sc.gas_delivered = 1;
     }
     if (pr_due(&sc.train, step, SIDE)) { sc64_pi_train(SIDE, sc.producer, U_DRONE); sc.train.done = 1; }
     if (pr_due(&sc.build, step, SIDE)) {
@@ -498,6 +559,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "%s: menu launch failed (screen=%d page=%d)\n", scenario, screen, race_front.page);
         return 66;
     }
+    if (!pr_hash_selftest()) { fputs("parity world-hash mutation regression failed\n", stderr); return 67; }
     {
         uint64_t route = route_purity_hash();
         if (!(skirmish ? pr_setup_skirmish() : pr_setup_t1())) return 66;
@@ -536,6 +598,8 @@ int main(int argc, char **argv)
             fprintf(stderr, "route region %zu size %zu hash %016llx\n", r, route_pure_regions[r].size,
                     (unsigned long long)pr_mix(1469598103934665603ull, route_pure_regions[r].addr,
                                                route_pure_regions[r].size));
+    if (skirmish && !sc64_pi_status.failures && !sc.gas_delivered)
+        sc64_pi_fail("gas", "no gas delivery by step %lu (started=%d assigned=%d)", pr_steps, sc.gas_started, sc.gas_assigned);
     /* Every scripted command must have been issued, not left waiting. */
     if (!sc64_pi_status.failures && ((sc.train.armed && !sc.train.done) || (sc.build.armed && !sc.build.done)))
         sc64_pi_fail("scenario", "run ended at step %lu before the train or build command was issued", pr_steps);
@@ -552,6 +616,7 @@ int main(int argc, char **argv)
                "\"won\":%d,\"lost\":%d,\"world\":\"%016llx\",\"world_chain\":\"%016llx\","
                "\"route_checks_on\":%d,\"route_checks\":%lu,\"verb_route_checks\":%u,\"dispatch_route_checks\":%u,"
                "\"spawn_route_retirements\":%u,"
+               "\"gas_assigned\":%d,\"gas_pickup\":%d,\"gas_delivered\":%d,"
                "\"verbs\":%u,\"setup_failures\":%u,"
                "\"first_failure\":\"%s\",\"attack_mode\":\"%s\",\"wall_seconds\":%.6f,\"cpu_seconds\":%.6f,"
                "\"updates_per_cpu_second\":%.1f}\n",
@@ -565,6 +630,7 @@ int main(int argc, char **argv)
                (unsigned long long)world, (unsigned long long)pr_chain,
                pr_checks_on, pr_route_checks, sc64_pi_status.route_checks, sc64_pi_status.dispatch_checks,
                sc64_pi_status.route_retirements,
+               sc.gas_assigned, sc.gas_picked_up, sc.gas_delivered,
                sc64_pi_status.issued,
                sc64_pi_status.failures, sc64_pi_status.first_failure, sc64_pi_attack_mode(),
                t1 - t0, c1 - c0, c1 > c0 ? (double)pr_host_ticks / (c1 - c0) : 0.0);
