@@ -1,5 +1,6 @@
 #ifndef SC64_STATIC_KEY_H
 #define SC64_STATIC_KEY_H
+#include "sc64_field_geysers.h"
 
 #ifdef SC64_TERRAIN_FAST_VALIDATE
 /* Same generations from bit words instead of per-slot drawn fields. */
@@ -11,7 +12,7 @@
 static unsigned
 sc64_static_objects_key(void)
 {
-    enum { FIELDS = MAX_MINERALS * 4 + MAX_RACE_GEYSERS * 3 + MAX_BUILDINGS * 6
+    enum { FIELDS = MAX_MINERALS * 4 + SC64_FIELD_GEYSER_LIMIT * 3 + MAX_BUILDINGS * 6
 #ifdef SC64_T4_SCENARIO_RUNTIME
                     + 32 * 2
 #endif
@@ -61,14 +62,14 @@ sc64_static_objects_key(void)
             SC64_STATIC_FIELD(m[i].style);
         } else n += 3;
     }
-    for (int i = 0; i < MAX_RACE_GEYSERS; ++i) {
-        int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
-        int drawn = i < geyser_count && geyser_in_view(x, y) &&
-                    currently_visible(geysers[i].x, geysers[i].y);
+    for (int i = 0; i < SC64_FIELD_GEYSER_LIMIT; ++i) {
+        int x = field_geysers[i].x - camx, y = field_geysers[i].y - camy + 12;
+        int drawn = i < field_geyser_count && geyser_in_view(x, y) &&
+                    currently_visible(field_geysers[i].x, field_geysers[i].y);
         SC64_STATIC_FIELD(drawn);
         if (drawn) {
-            SC64_STATIC_FIELD(geysers[i].x);
-            SC64_STATIC_FIELD(geysers[i].y);
+            SC64_STATIC_FIELD(field_geysers[i].x);
+            SC64_STATIC_FIELD(field_geysers[i].y);
         } else n += 2;
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i) {

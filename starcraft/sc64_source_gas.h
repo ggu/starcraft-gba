@@ -4,14 +4,7 @@
 
 /* Save ordinals follow the source UNIT order. An occupied refinery and
  * the bare geyser revealed on its destruction share the same account. */
-enum { SC64_GAS_SITE_LIMIT = 2 * MAX_RACE_GEYSERS };
-typedef struct {
-    u16 x, y, initial;
-} Sc64GasSite;
-
-static Sc64GasSite sc64_gas_sites[SC64_GAS_SITE_LIMIT];
-static u16 sc64_geyser_consumed[SC64_GAS_SITE_LIMIT];
-static unsigned sc64_gas_site_count;
+static u16 sc64_geyser_consumed[SC64_FIELD_GEYSER_LIMIT];
 
 static int sc64_gas_source_site(int mode, int map_id, int mission,
                                 unsigned ordinal, Sc64GasSite *site)
@@ -60,7 +53,7 @@ static unsigned sc64_gas_site_capacity(int mode, int map_id, int mission,
 static void sc64_gas_rebuild_sites(void)
 {
     sc64_gas_site_count = 0;
-    while (sc64_gas_site_count < SC64_GAS_SITE_LIMIT &&
+    while (sc64_gas_site_count < SC64_FIELD_GEYSER_LIMIT &&
            sc64_gas_source_site(race_mode, race_skirmish_map, race_selected_mission,
                                 sc64_gas_site_count, &sc64_gas_sites[sc64_gas_site_count]))
         ++sc64_gas_site_count;
@@ -74,7 +67,7 @@ static void sc64_gas_start(void)
 
 static int sc64_gas_harvest(int x, int y)
 {
-    for (unsigned i = 0; i < sc64_gas_site_count; ++i) {
+    for (int i = 0; i < sc64_gas_site_count; ++i) {
         const Sc64GasSite *site = &sc64_gas_sites[i];
         if (site->x != x || site->y != y) continue;
         if (site->initial - sc64_geyser_consumed[i] >= 8) {

@@ -85,7 +85,7 @@ enum {
 _Static_assert(MAX_UNITS <= DEPTH_SLOT_MASK + 1 &&
                MAX_BUILDINGS <= DEPTH_SLOT_MASK + 1 &&
                MAX_MINERALS <= DEPTH_SLOT_MASK + 1 &&
-               MAX_RACE_GEYSERS <= DEPTH_SLOT_MASK + 1,
+               SC64_FIELD_GEYSER_LIMIT <= DEPTH_SLOT_MASK + 1,
                "painter keys must hold every actor slot");
 _Static_assert(DEPTH_STORM <= DEPTH_KIND_MASK, "painter keys must hold every kind");
 _Static_assert(DEPTH_MINERAL_WORK_BASE + MAX_UNITS <= DEPTH_SLOT_MASK + 1,
@@ -495,7 +495,7 @@ sc64_draw_mining_effect(const Unit *q)
 static void __attribute__((noinline))
 sc64_draw_depth_ordered_actors(void)
 {
-    u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + MAX_RACE_GEYSERS
+    u32 heap[MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS + SC64_FIELD_GEYSER_LIMIT
 #ifdef SC64_PROJECTILE_DEPTH
              + MAX_TRACERS * 2
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
@@ -527,10 +527,10 @@ sc64_draw_depth_ordered_actors(void)
             currently_visible(m[i].x, m[i].y))
             sc64_depth_push(heap, &size, 4, m[i].y, DEPTH_MINERAL, i);
     }
-    for (int i = 0; i < geyser_count; ++i) {
-        int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
-        if (geyser_in_view(x, y) && currently_visible(geysers[i].x, geysers[i].y))
-            sc64_depth_push(heap, &size, 4, geysers[i].y, DEPTH_GEYSER, (unsigned)i);
+    for (int i = 0; i < field_geyser_count; ++i) {
+        int x = field_geysers[i].x - camx, y = field_geysers[i].y - camy + 12;
+        if (geyser_in_view(x, y) && currently_visible(field_geysers[i].x, field_geysers[i].y))
+            sc64_depth_push(heap, &size, 4, field_geysers[i].y, DEPTH_GEYSER, (unsigned)i);
     }
     for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
         if (!b[i].alive) continue;
@@ -656,7 +656,7 @@ sc64_draw_depth_ordered_actors(void)
                 sc64_draw_mining_effect(&u[i - DEPTH_MINERAL_WORK_BASE]);
             break;
         case DEPTH_GEYSER:
-            draw_map_geyser_art(geysers[i].x - camx, geysers[i].y - camy + 12);
+            draw_map_geyser_art(field_geysers[i].x - camx, field_geysers[i].y - camy + 12);
             break;
         case DEPTH_BUILDING: {
             if (selected_building == (int)i) draw_world_building_ring(&b[i]);

@@ -1153,8 +1153,8 @@ static int race_build_request_valid(int owner, int worker, int type,
     if (type == B_REFINERY || type == B_EXTRACTOR || type == B_ASSIMILATOR) {
         int geyser = geyser_at(*x, *y);
         if (geyser < 0) return 0;
-        *x = geysers[geyser].x;
-        *y = geysers[geyser].y;
+        *x = field_geysers[geyser].x;
+        *y = field_geysers[geyser].y;
     }
     if (!r || !race_owner_fields_race(owner, r->race) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner ||
