@@ -112,7 +112,7 @@ measurement to Protoss 1–9, Terran 2, Zerg 3 and Zerg 10, including
 victory, result and briefing transitions. Its deepest main stack is
 Zerg 3 at 5,720 bytes, 128 under the Zerg bound and 1,696 above the
 relocated code, and the relinked low point equals the previous link's
-at all 5,313 readings.
+at all 6,708 readings.
 
 ## Measured cost
 
@@ -169,13 +169,14 @@ from −0.01% (Zerg 2) to −3.84% (Zerg 7); the lists were tuned on Custom
 Games.
 
 The [campaign replay audit](2026-11-25-iwram-hot-campaign-replays.md)
-replays the recorded routes on both links: 22 missions to victory
-(Terran 1–10, Zerg 1–6 and 8, Protoss 1, 6, 8, 9 and 10), four partial
-routes and three from pause saves, with saves, fresh reloads, victory
-records and next-mission deployments. 71 of 72 finished pairs match
+replays the recorded routes on both links for all 30 missions: 23 to
+victory (Terran 1–10, Zerg 1–8, Protoss 1, 6, 8, 9 and 10), four
+partial routes and three from pause saves, with saves, fresh reloads,
+victory records and next-mission deployments. 73 of 74 pairs match
 completely; the Protoss 4 tape, which no longer wins on the current
 ROM, is identical on both links up to the same driver error. Zerg 7
-was still running when this was written. The display control register
+runs 270,585 updates from HOME through all 206 checkpoints, and its
+victory save equals the packaged run's. The display control register
 differs at 49 of 15,860 samples, always while a queued page flip is
 pending; the page due on screen and both pages' pixels match
 throughout.
@@ -188,7 +189,7 @@ their veneers and the ROM offsets that follow.
 ## Limits
 
 These are emulator cycle counts. Hardware timing and hardware saves
-remain open, as does the Zerg 7 replay on the relinked ROM. The Showcase
+remain open. The Showcase
 ROM and the older mission ROMs keep `gba.ld`. The stack bound depends
 on the ELF's call-frame information, GCC's call graph and
 address-taken record, and the declared nesting of the two cycles per
