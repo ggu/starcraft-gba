@@ -131,9 +131,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mask is `0x38000000` (P8–P10). P3 also wins from HOME at frame 47,661
   and preserves its completion bit through a fresh-process save reload.
 
-  P4 still needs a winning route on this package. Its earlier inputs
-  first diverge by 100 minerals at input 18,000, and the regenerated
-  host controller loses at frame 111,670.
+  P4 also wins from HOME on this package at frame 81,129 after a
+  regenerated normal-input controller builds an escort and clears the
+  extraction area. Both required heroes survive. A fresh process restores
+  the victory and re-exports identical SRAM
+  (`2ee0921b6ed24c222ffaa55113ff65fb04f9a4908c80c11d5f5ec16c73814304`).
+  The earlier tape diverged by 100 minerals at input 18,000.
 
   P10 completes from HOME on the same Protoss10 package with a
   regenerated controller. The old tape first differs by 100 minerals at
