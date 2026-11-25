@@ -34,7 +34,7 @@ guest clock. The private Z7 battle SRAM SHA-256 is
 | Showcase scene 7 | 256 | 667,676 | 667,676 |
 
 Both recorded Z7 endpoints matched the authored replay. All 72 sampled
-world, camera/display, menu, palette and framebuffer observations agreed
+world, display-page, menu, palette and framebuffer observations agreed
 on the recorded window. The shorter pairs checked both framebuffer
 pages, displayed pixels, palette, camera and full actor-bank bytes every
 16 updates. Z7 and Z9 also saved during play, reloaded in a fresh
