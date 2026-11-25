@@ -113,11 +113,12 @@ code itself costs nothing measurable. The same three windows on base
 Every delivered ROM links and verifies: Terran, Z7, Z8, Z9, Z10, P7, P10 and
 Showcase. On the merged base:
 
-| ROM | `__bss_end` base → change | `__iwram_end` base → change | Hot-IWRAM stack check spare bytes base → change |
+| ROM | `__bss_end` base → change | `__iwram_end` base → change | Hot-IWRAM stack check, spare bytes base → change |
 | --- | --- | --- | --- |
 | Z10 | 0x020399a0 → 0x020399a0 | 0x030062d0 → 0x030062d0 | 592 → 588 |
 | Terran | 0x0203a7fc → 0x0203a800 | 0x03005c58 → 0x03005cf0 | 304 → 184 |
-| P10 | see the pull request | 0x030062a8 (change) | 444 (change) |
+| P10 | 0x0203b268 → 0x0203b26c | 0x03006190 → 0x030062a8 | 828 → 444 |
+| Showcase | 0x02038acc → 0x02038ad0 | 0x03005078 → 0x03005138 | no hot list |
 
 The growth is the Egg branch of the order loop and the Egg priority in target
 selection. In products without campaign actor tables the Custom Game Egg keeps
