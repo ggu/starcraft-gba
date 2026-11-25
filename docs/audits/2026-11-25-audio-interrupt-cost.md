@@ -299,6 +299,50 @@ change.
   cycles of setup against 2,300 for a music frame, so there is nothing
   to amortise.
 
+## Release checks with the race cartridges relinked
+
+On the #882 release layout, each race ran a late three-CPU battle in
+mGBA for 150 updates after ten warmup updates. A second run cycled
+friendly selections during combat to play speech alongside three effects.
+Both DMA buffers matched the previous mixer on every captured request
+timeline in all six candidate runs. The control ROMs passed the same
+check. Control and candidate spent different numbers of VBlanks in a
+window, so the cycle counts are workload means.
+
+| Race and map | Neutral IRQ cycles per VBlank, control → candidate | Candidate VBlanks with four voices | Four-voice IRQ cycles per VBlank, control → candidate | Main stack spare beyond 512-byte margin |
+| --- | ---: | ---: | ---: | ---: |
+| Terran Outpost | 24,567 → 13,848 | 38 | 28,585 → 16,555 | 304 bytes |
+| Zerg Blood Bath | 21,999 → 12,486 | 66 | 31,716 → 18,227 | 592 bytes |
+| Protoss Outpost | 24,459 → 13,790 | 37 | 29,032 → 16,573 | 828 bytes |
+
+The three build-time IRQ stack bounds fell from 304 to 264 bytes of
+416. Showcase retains the standard linker layout. On its title screen,
+334 consecutive VBlanks produced byte-identical DMA buffers between
+the two ROMs. The mean over 300 VBlanks after warmup fell from 6,505
+to 3,410 cycles.
+
+### Whole-game cost on the relinked candidate
+
+After ten warmup updates, the next 300 neutral updates from a late
+three-CPU save on each race cartridge gave the following guest cycles.
+The orders counter is part of the update cost. These are different
+battles and the counters include interrupts.
+
+| Race | Mean whole update and render | 95th percentile whole update and render | Mean orders | Mean draw |
+| --- | ---: | ---: | ---: | ---: |
+| Terran | 795,178 | 938,620 | 331,967 | 343,500 |
+| Zerg | 970,496 | 1,230,420 | 430,019 | 378,323 |
+| Protoss | 790,667 | 959,557 | 392,932 | 238,257 |
+
+The two-VBlank budget is 561,792 guest cycles. All three battle windows
+exceeded it on average. Across the longer 1,024-update comparisons on
+these saves, the audio change reduced total cycles by 1.82%, 0.99% and
+2.02%, respectively. Both framebuffer pages, the palette, sampled world
+and camera state, and the exported pause save matched each control.
+Showcase also matched in an early battle. In the Zerg 7 campaign's
+4,901-input battle window, all 72 sampled world and video checkpoints
+matched; throughput rose from 8.72 to 8.82 updates/s.
+
 ## Limits
 
 - Emulator measurements only. mGBA charges no extra time for CPU access
@@ -309,8 +353,5 @@ change.
   register holding 32 (zero for `LSR`, the sign for `ASR`) and a rotate
   by 0. mGBA implements them and the probe exercises them; no cartridge
   was tested.
-- No window had four voices at once, because nothing selects a unit in
-  these runs and the speech voice stays idle. Four voices are covered
-  by the host tests and the ARM probe, not by a capture.
 - The sound was not listened to. The claim is that the bytes reaching
   the two DMA buffers are the same.
