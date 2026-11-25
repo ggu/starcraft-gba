@@ -436,8 +436,12 @@ sc64_tile_background_done:
 #ifndef SC64_WORLD_DEPTH
     for (i = 0; i < MAX_BUILDINGS; i++)
 #ifdef SC64_IMPORTED_MISSION
-        if (b[i].alive)
+        if (b[i].alive) {
             draw_building_overlay(&b[i]);
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            sc64_shield_flash_draw_actor(MAX_UNITS + i);
+#endif
+        }
     sc64_building_cycles = gba_clock() - profile_stage_start;
     profile_stage_start = gba_clock();
 #else
@@ -445,6 +449,9 @@ sc64_tile_background_done:
             draw_building_far_arc(&b[i]);
             draw_building_art(&b[i]);
             draw_building_overlay(&b[i]);
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            sc64_shield_flash_draw_actor(MAX_UNITS + i);
+#endif
         }
 #endif
 #else
@@ -466,8 +473,12 @@ sc64_tile_background_done:
 	if (u[i].alive && u[i].selected)
 	    draw_unit_pass(&u[i], 1);
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive)
+	if (u[i].alive) {
 	    draw_unit(&u[i]);
+#ifdef SC64_SHIELD_FLASH_ENABLED
+            sc64_shield_flash_draw_actor(i);
+#endif
+        }
 #endif
 #ifndef SC64_DEATH_VFX_DISABLED
     draw_death_vfx(0);
@@ -477,7 +488,7 @@ sc64_tile_background_done:
     sc64_tracer_view = SC64_TRACER_VIEW_MAY_DRAW;
 #endif
 #ifdef SC64_SHIELD_FLASH_ENABLED
-    sc64_shield_flash_draw();
+    sc64_shield_flash_expire();
 #endif
 #if defined(SC64_SHARED_NUKE_PROBE) && !defined(SC64_WORLD_DEPTH)
     race_nuke_draw();

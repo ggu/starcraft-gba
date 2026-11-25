@@ -24,8 +24,7 @@
  * new hit replaces the oldest overlay.
  *
  * The experimental Q8 combat path commits shields elsewhere and shows none.
- * Interceptor, Yamato and trap hits use the facing fallback, and overlays
- * draw after every actor rather than in each actor's depth pass.
+ * Interceptor, Yamato and trap hits use the facing fallback.
  *
  * Mirroring follows OpenBW's get_image_lo_offset: a mirrored facing negates
  * the offset's x. The ROM's shield tables hold the same 32 offsets in every
@@ -181,7 +180,7 @@ sc64_shield_flash_hit(int target, int absorbed, int shield_left)
 /* After the units have been drawn: overlays on actors drawn this frame, then
  * the drawn marks are cleared for the next frame. */
 static void
-sc64_shield_flash_draw(void)
+sc64_shield_flash_draw_actor(int actor)
 {
     const Sc64WeaponSourceAnimation *init =
         sc64_weapon_source_animation_lookup(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u);
@@ -193,6 +192,7 @@ sc64_shield_flash_draw(void)
         if (!f->live) continue;
         age = sc64_weapon_source_vfx_source_tick((u16)((u16)frame - f->born));
         if (!sc64_shield_actor_live(f->actor, f->type) || age >= life) { f->live = 0; continue; }
+        if ((int)f->actor != actor) continue;
         if (f->actor < MAX_UNITS) {
             if (!(sc64_shield_drawn[f->actor >> 3] & (1u << (f->actor & 7)))) continue;
             ax = u[f->actor].x; ay = u[f->actor].y;
@@ -207,6 +207,14 @@ sc64_shield_flash_draw(void)
         if (sx < -64 || sx > 304 || sy < -52 || sy > 172) continue;
         sc64_weapon_source_vfx_draw_image(SC64_WEAPON_SOURCE_SHIELD_OVERLAY_IMAGE, 0u, age, 0u, x, y);
     }
+    if ((unsigned)actor < MAX_UNITS)
+        sc64_shield_drawn[actor >> 3] &= (u8)~(1u << (actor & 7));
+}
+
+static void
+sc64_shield_flash_expire(void)
+{
+    sc64_shield_flash_draw_actor(-1);
     memset(sc64_shield_drawn, 0, sizeof(sc64_shield_drawn));
 }
 
