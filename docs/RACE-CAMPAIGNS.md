@@ -47,8 +47,11 @@ Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` acc
 
 The default ROM targets are `build/StarCraft-Terran-Transport1-GBA.gba`, `build/StarCraft-Zerg-Z10-Transport1-GBA.gba`, and `build/StarCraft-Protoss-P10-Transport1-GBA.gba`. Explicit `protoss-p7` retains `build/StarCraft-Protoss-P7-Transport1-GBA.gba`, and explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. Terran uses `.local/play/terran-transport1`; default Protoss uses `.local/play/protoss-p10-transport1`; explicit P7 uses `.local/play/protoss-p7-transport1`; P6 uses `.local/play/protoss-p6`. Canonical Zerg and explicit Z10 use `.local/play/zerg-z10`; explicit Z9 keeps `.local/play/zerg-z9`; explicit Z7 uses `.local/play/zerg-z7-transport1`, explicit Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
-An experimental custom-game Egg service can be built explicitly after preparing
-its corresponding profile inputs. It stays off in the normal targets:
+Normal targets now produce Zerg units through Larva and Eggs in Custom Games
+([Custom Game Larva and Eggs](DEVELOPMENT.md#custom-game-larva-and-eggs)). The
+earlier experimental custom-game Egg service below predates that. It writes
+its own save tag, which the normal targets do not read, and it is kept only
+until it is retired:
 
 ```sh
 make custom-egg-preview-terran

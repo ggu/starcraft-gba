@@ -5,13 +5,18 @@
 /* Mechanics belong to the engine, not the selected mission or menu.
  * This contract is checked by game.c and by probes of real Make expansions.
  * Storage placement, asset banks and mission objectives are separate concerns.
- * The small initial set does not claim all historical mission services have
+ * The set does not claim all historical mission services have
  * already been made mode-independent; see docs/SHARED-ENGINE.md. */
 #define SC64_ENGINE_CAP_CONSTRUCTION_HP 1u
 #define SC64_ENGINE_CAP_SIEGE_SPLASH 2u
 #define SC64_ENGINE_CAP_BATTERY 4u
 #define SC64_ENGINE_CAP_BUNKER 8u
-#define SC64_ENGINE_CORE_EXPECTED 15u
+/* Custom Game Zerg production through Larva and Eggs. The flag is required
+ * of every production build; the header says where it takes effect. */
+#define SC64_ENGINE_CAP_CUSTOM_LARVA_EGGS 16u
+#define SC64_ENGINE_CORE_EXPECTED 31u
+
+#include "sc64_custom_larva_eggs.h"
 
 #if defined(SC64_SHARED_BATTERY) || defined(SC64_P7_BATTERY_ENABLED)
 #define SC64_BATTERY_SERVICE_ENABLED
@@ -40,8 +45,14 @@
 #else
 #define SC64_ENGINE_HAS_BUNKER 0u
 #endif
+#ifdef SC64_CUSTOM_LARVA_EGGS
+#define SC64_ENGINE_HAS_CUSTOM_LARVA_EGGS SC64_ENGINE_CAP_CUSTOM_LARVA_EGGS
+#else
+#define SC64_ENGINE_HAS_CUSTOM_LARVA_EGGS 0u
+#endif
 #define SC64_ENGINE_CORE_CAPABILITIES \
-    (SC64_ENGINE_HAS_CONSTRUCTION_HP | SC64_ENGINE_HAS_SIEGE_SPLASH | SC64_ENGINE_HAS_BATTERY | SC64_ENGINE_HAS_BUNKER)
+    (SC64_ENGINE_HAS_CONSTRUCTION_HP | SC64_ENGINE_HAS_SIEGE_SPLASH | SC64_ENGINE_HAS_BATTERY | SC64_ENGINE_HAS_BUNKER | \
+     SC64_ENGINE_HAS_CUSTOM_LARVA_EGGS)
 
 #ifdef SC64_ENGINE_CORE_REQUIRED
 #ifndef SC64_RACES

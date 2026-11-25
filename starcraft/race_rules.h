@@ -1,5 +1,6 @@
 #ifndef SC64_RACE_RULES_H
 #define SC64_RACE_RULES_H
+#include "sc64_custom_larva_eggs.h"
 
 #if defined(SC64_Z5_ACTORS) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
 #error "SC64_Z5_ACTORS requires SC64_ZP_CAMPAIGN_ACTORS"
@@ -23,6 +24,37 @@
 #ifdef SC64_T6_ENABLED
 #include "sc64_t6_actor_rules.h"
 #endif
+
+/* Where a product has no Z7 Egg identity the Egg is a new unit type. The
+ * staged previews put it at the first id past the legacy roster. The release
+ * puts it after every identity a product save can already hold, so no saved
+ * id moves. */
+#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
+#define SC64_EGG_ID_APPENDED 1
+#else
+#define SC64_EGG_ID_STAGED 1
+#endif
+#endif
+
+/* The staged previews give their Egg an eight-pixel collision radius, which
+ * switches products without campaign actor tables onto per-unit radii in the
+ * hot movement loops. The Custom Game Egg keeps the six-pixel fallback there,
+ * which leaves those loops, and their IWRAM placement, as they were. */
+#ifdef SC64_EGG_ID_STAGED
+#define SC64_EGG_COLLISION_RADIUS 1
+#endif
+
+/* The appended Egg identity is an ordinary row of these products' unit
+ * codecs. Authority is decided once, by the load preflight: only a Custom
+ * Game record may hold one. Where the Egg is the Z7 identity it is already a
+ * legacy row and the codecs need no extra admission. */
+#ifdef SC64_EGG_ID_APPENDED
+#define SC64_EGG_ROWS_DEFAULT 1
+#else
+#define SC64_EGG_ROWS_DEFAULT 0
+#endif
+
 
 #ifdef SC64_SHARED_NUKE_PROBE
 #if !defined(SC64_T4_RUNTIME) && !defined(SC64_Z5_ACTORS)
@@ -165,7 +197,7 @@ enum {
     U_GUARDIAN_STAGE,
 #endif
 #endif
-#if defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION)
+#ifdef SC64_EGG_ID_STAGED
 #ifdef SC64_GUARDIAN_COCOON_STAGE
     U_SHARED_EGG_STAGE,
 #else
@@ -173,7 +205,7 @@ enum {
 #endif
 #endif
 #ifdef SC64_NUKE_FALLBACK_GHOST
-#if defined(SC64_GUARDIAN_COCOON_STAGE) || (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
+#if defined(SC64_GUARDIAN_COCOON_STAGE) || defined(SC64_EGG_ID_STAGED)
     U_SHARED_GHOST,
 #else
     U_SHARED_GHOST = SC_RU_LEGACY_COUNT,
@@ -191,14 +223,24 @@ enum {
      * so none of their historical ids moves and saves of the staged builds keep loading. Where no staged
      * identity is compiled in (the P10 product) it takes the first id past the legacy ones. */
 #if defined(SC64_NUKE_ACTIVE_JOURNAL) || defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
-    (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
+    defined(SC64_EGG_ID_STAGED)
     U_SCARAB,
 #else
     U_SCARAB = SC_RU_LEGACY_COUNT,
 #endif
+#ifdef SC64_EGG_ID_APPENDED
+    /* The Custom Game Egg follows every identity a product save can hold. */
+    U_SHARED_EGG_STAGE,
+#endif
     SC_RU_COUNT
 #elif defined(SC64_NUKE_ACTIVE_JOURNAL) || defined(SC64_NUKE_FALLBACK_GHOST) || defined(SC64_GUARDIAN_COCOON_STAGE) || \
-    (defined(SC64_SHARED_EGG_WIRE_HOST_STAGE) && !defined(SC64_Z7_EGG_PRODUCTION))
+    defined(SC64_EGG_ID_STAGED)
+#ifdef SC64_EGG_ID_APPENDED
+    U_SHARED_EGG_STAGE,
+#endif
+    SC_RU_COUNT
+#elif defined(SC64_EGG_ID_APPENDED)
+    U_SHARED_EGG_STAGE = SC_RU_LEGACY_COUNT,
     SC_RU_COUNT
 #else
     SC_RU_COUNT = SC_RU_LEGACY_COUNT
@@ -240,7 +282,10 @@ _Static_assert(U_GUARDIAN_STAGE == SC_RU_LEGACY_COUNT + 1 && U_GUARDIAN_STAGE < 
 #define SC64_SHARED_EGG_TYPE U_Z7_EGG
 #else
 #define SC64_SHARED_EGG_TYPE U_SHARED_EGG_STAGE
-#ifdef SC64_GUARDIAN_COCOON_STAGE
+#ifdef SC64_EGG_ID_APPENDED
+_Static_assert(U_SHARED_EGG_STAGE == SC_RU_COUNT - 1 && U_SHARED_EGG_STAGE >= SC_RU_LEGACY_COUNT,
+               "the Custom Game Egg must stay the last unit identity");
+#elif defined(SC64_GUARDIAN_COCOON_STAGE)
 #ifdef SC64_GUARDIAN_DISTINCT_STAGE
 _Static_assert(U_SHARED_EGG_STAGE == SC_RU_LEGACY_COUNT + 2, "Egg must follow both Guardian identities");
 #else
