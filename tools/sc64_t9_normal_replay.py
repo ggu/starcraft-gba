@@ -662,10 +662,15 @@ def main():
         assert n("screen") == 3 and persisted() == loaded and n("selected_building") == -1
         g.rsp.export_sram()
         assert readback.read_bytes() == victory_path.read_bytes() == victory_image
+        # The result panel advances to the next chapter, or retries the finale.
+        g.tap(KEY_A)
+        next_mission = mission + 1 if chapter < 10 else mission
+        assert n("screen") == 1 and n("race_selected_mission") == next_mission
+        assert n("won") == n("lost") == 0 and n("race_completed") == 1 << mission
         require_unchanged(files, pins)
         result = dict(gameplay_calls=stop, cut=cut, briefing=briefing, dialogue=dialogue,
                       checkpoints=checkpoints, pause=pause, victory=victory,
-                      victory_selection=victory_selection,
+                      result_action_mission=next_mission, victory_selection=victory_selection,
                       victory_selected_units=final_state["controls"]["selected_units"],
                       timing=timing, sha256=pins)
         (args.out / "result.json").write_text(json.dumps(result, indent=2) + "\n")

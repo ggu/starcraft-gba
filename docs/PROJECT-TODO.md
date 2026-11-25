@@ -74,7 +74,22 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory on these exact ROM bytes, with a mid-mission pause and fresh
   HOME reload of each victory. Their terminal frames are 10,120, 29,366
   and 8,911 respectively. The earlier full T3 run on the same bytes
-  ends at frame 54,000. Continue with T5–T10 on this package.
+  ends at frame 54,000. T6, T7 and T10 also finish with fresh result
+  reloads at frames 23,536, 3,931 and 3,361 respectively.
+  On the same cartridge, all nine intermediate victory screens advance to
+  the expected next mission with A. After acknowledging opening dialogue,
+  each next mission can be paused, saved, and restored through HOME with
+  the same mission, frame, prior completion bit and byte-identical SRAM.
+  The T10 victory screen retries T10 with A and returns to the title with B.
+  The chapter-transition receipt SHA-256 is
+  `de52a012fd670f66f3a9b78d6c21c4c779777026b76358af128d4ba315011ebc`.
+  Each transition used an individual mission victory save.
+
+  On the packaged Protoss ROM, P1 reaches victory at frame 15,305 through
+  16 matched checkpoints. On the packaged Zerg ROM, Z2 reaches victory
+  at frame 10,209 with objective flags 17. Z2's input replay checks the
+  terminal objective state. Both victory saves reload byte for byte in a
+  fresh emulator process. Continue full campaign runs on the package.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
