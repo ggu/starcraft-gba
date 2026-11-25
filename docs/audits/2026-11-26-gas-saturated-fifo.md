@@ -171,3 +171,20 @@ The ARM stack checks passed on each of the three race cartridges.
 | Zerg Z10 | `0b9f5f766cab83c8a7032ae999e7ab14a8b159e1c9b2e713bba001df0bbb4972` |
 | Protoss P10 | `64b0d722b9eb7bc61af8c819bf4c4912cf723916b1bda6fc20b8e13fd7c75ffb` |
 | Showcase | `4ecd1e614a176ce8119b66f4c163247743640be417b65136e03e550674e8fb8a` |
+
+## Busy three-opponent matches on the trial cartridges
+
+Each row covers 512 ordinary input calls after a fresh pause-save load in a
+winning route. The debugger clock measures elapsed guest time. Visible
+changes resolve the displayed palette and pixels. Stage means use only
+world-advancing updates and the inclusive cartridge loop timer. These cuts
+use different battle states and establish no speedup versus release.
+
+| Human and map | World frames | Updates/s | Visible changes/s | Orders cycles | Actor draw cycles |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Terran Outpost | 13,379–13,878 | 18.52 | 17.66 | 301,006 | 127,038 |
+| Terran Blood Bath | 13,054–13,555 | 16.83 | 16.56 | 345,329 | 169,116 |
+| Zerg Outpost | 20,165–20,668 | 17.80 | 16.69 | 292,429 | 154,041 |
+| Zerg Blood Bath | 17,769–18,267 | 12.35 | 11.80 | 536,332 | 323,561 |
+| Protoss Outpost | 9,590–10,091 | 14.30 | 14.22 | 440,766 | 343,358 |
+| Protoss Blood Bath (start order 201) | 12,926–13,423 | 11.84 | 10.87 | 647,621 | 256,499 |

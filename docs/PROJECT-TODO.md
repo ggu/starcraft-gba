@@ -75,10 +75,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   P10. All 18 fully observed native visits lasted 37 guest ticks, including
   three starting with zero other waiters. Prioritize busy-frame pacing before
   tuning the shared timer.
-  Three-AI ARM tests covered both maps for all three races. The trial won
-  Zerg Blood Bath and Terran Outpost with the original plans and Protoss
-  Outpost with a different plan. Qualify winning routes for Zerg Outpost,
-  Terran Blood Bath and Protoss Blood Bath. Keep paired losses as baselines.
+  All six three-AI race/map cells now have cartridge wins with fresh pause
+  continuation and result reload. Keep paired losses as baselines and compare
+  identical starting positions: Blood Bath can draw different positions on
+  the two builds with the same lobby wait. Winning battle cuts still run at
+  11.84–18.52 updates/s. Orders and actor drawing remain priorities.
   [Paired skirmish results](audits/2026-11-26-gas-fifo-skirmishes.md).
   [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
