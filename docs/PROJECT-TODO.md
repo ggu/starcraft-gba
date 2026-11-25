@@ -578,6 +578,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   continuation checks matching. A third fresh HOME process reads
   the [victory journal](audits/2026-11-22-z7-route-observer-purity.md#full-normal-victory-on-the-steering-release)
   and re-exports identical SRAM.
+  [November 24 intercepts](audits/2026-11-24-kodak-package-checks.md#intercept-the-northern-and-eastern-approaches)
+  preserve the Hatchery at 730 HP through fresh HOME frame
+  12,492. Holding that order loses the base by 13,184.
+  Stage a second interception and sustain gas production.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages
@@ -1241,8 +1245,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   completes with four surviving Drones, then produces
   a fifth that brings in 72 minerals. Fresh HOME at frame
   76,885 retains the miner and both enemy Nexuses. A follow-up
-  Pool spends a Drone and the miner disappears. Defend the
-  recovered economy before restarting production. The native
+  Pool spends a Drone and the miner disappears. [Two guards and
+  a second Pool](audits/2026-11-12-z8-normal-physical.md#two-defenses-restore-the-pool-and-expose-the-next-defeat)
+  restore mineral deliveries and fresh-load at frame 80,708.
+  Trigger 17 makes the southern Dark Templar invincible
+  on entry and declares defeat at 80,798 after dialogue.
+  An earlier guard defeats the Templar by 80,636. Fresh
+  HOME at 80,900 retains 16 Hydralisks, five Overlords
+  and full-health Kerrigan. With no workers or buildings,
+  the force damages the eastern Nexus and fresh-loads at
+  frame 82,525 before losing on the neutral continuation.
+  Keep a separate guard while staging the next assault.
+  The native
   scenario permits Ventral Sacs for the alternate transport
   route. Qualify human Z8 research, boarding and fresh SRAM
   as one path. A builder can wait indefinitely at a disconnected
@@ -1278,13 +1292,24 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   destroys both halls. [Relocated workers](audits/2026-11-21-z10-current-full-circle.md#relocate-workers-and-restore-mineral-income)
   establish a full-health Hatchery and resume mineral
   deliveries at fresh HOME frame 24,934. The next Reavers
-  destroy the hall during passive play. Prepare an active
-  defense before they arrive.
+  destroy the hall during passive play. A [second relocation](audits/2026-11-21-z10-current-full-circle.md#second-relocation-and-worker-recovery)
+  restores the Hatchery and Pool, then adds an Overlord and
+  three paid Drones. Fresh HOME at frame 34,571 preserves
+  four Drones and 801 minerals. The attack arrives around
+  35,300. Complete the colony morph earlier or intercept the
+  attack before committing the workers.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense
-  power-check cost. Qualify the actual ROM frame and stack
-  budgets with dense and low-Pylon campaign and skirmish workloads.
+  power-check cost. [Canonical ROM pairs](audits/2026-11-24-kodak-package-checks.md#pylon-lookup-in-dense-missions-and-panned-skirmishes)
+  save 1.02–1.95% with 69 completed Pylons and under 0.1%
+  with nine in panned Outpost. Every measured frame exceeds
+  budget. P10 tail latency increases, and three samples stop
+  with different display pages. Keep this trial off pending the
+  stack and presentation checks. The P10 and Z10 panned
+  samples spend about 860,000 and 668,000 cycles on the
+  update respectively. Prioritize current measurements
+  of orders and movement within that shared cost.
   The [shared distance-first cursor queries](audits/2026-11-13-p10-field-cursor-cost.md#current-four-cartridge-candidate)
   save another 1.24% over the full P9 victory and reload and 1.33%
   over the P10 victory tail. The P9 mean reaches 12.31 emulated
@@ -2033,8 +2058,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mining. [Both Backwater Barracks](audits/2026-11-24-kodak-package-checks.md#backwater-marine-production)
   train a Marine for 50 minerals through ordinary controls.
   The N64 unit table gives both Raynor variants zero
-  supply. Qualify the corrected GBA total and existing saves,
-  and trace the native SCV's first target and order separately.
+  supply. [PR #837](https://github.com/ggu/starcraft-gba/pull/837)
+  applies it in the shared rule. All four product links
+  pass. Existing Wasteland and Backwater journals display
+  one fewer supply with their prior actors intact, and
+  Backwater trains a Marine for 50 minerals. Trace the
+  native SCV's first target and order separately.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
