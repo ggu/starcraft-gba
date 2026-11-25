@@ -49,8 +49,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all five completion bits (114,691). Each chapter victory re-exports
   byte for byte after loading it in a fresh emulator.
 
-  The earlier Z4–Z6 run independently reaches Z6 victory at frame
-  177,044 and reloads Z7 at frame 101 with those three completion bits.
+  The same save clears all 52 Z6 controller segments and wins at
+  frame 177,044. After a fresh load, Z1–Z6 remain marked complete
+  (245,763) and the re-exported SRAM hashes to
+  `f64dd51818b990c66e9c45d077d2ae89ee51049eea8af1f01045b9b21fc1f288`.
   The separate Z5 HOME recording remains active after 3,000 additional
   neutral inputs beyond the end of its tape.
 
