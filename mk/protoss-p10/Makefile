@@ -15,7 +15,7 @@ PROTOSS_P10_BASE_FLAGS = $(patsubst -I$(P9_FACT_V2_DIR),-I$(P10_FACT_V2_DIR),$(P
 # The product also carries the paid Scarab service (mk/paid-scarab/Makefile), which
 # has its own fact-table header; the staged fixtures keep the V2 one.
 # The packed coordinate scan can reject wide misses early in the IWRAM kernel.
-PROTOSS_P10_FLAGS = $(patsubst -I$(P10_FACT_V2_DIR),-I$(P10_SCARAB_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) $(PROTOSS_RESEARCH_FLAGS) $(PROTOSS_SCARAB_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS) \
+PROTOSS_P10_FLAGS = -DSC64_SOURCE_GAS $(patsubst -I$(P10_FACT_V2_DIR),-I$(P10_SCARAB_FACT_DIR),$(PROTOSS_P10_BASE_FLAGS)) $(PROTOSS_RESEARCH_FLAGS) $(PROTOSS_SCARAB_FLAGS) -DSC64_TYPED_UNIT_CHUNK_READER $(CENSUS_FLAGS) \
 	$(if $(filter 1,$(CANONICAL_CONTACT_COINCIDENT)),-DSC64_CONTACT_EARLY_AXIS_IWRAM_PROBE) \
 	$(if $(filter -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED,$(CFLAGS) $(PROTOSS_P10_BASE_FLAGS)),-DSC64_P7_DETECTOR_RANGE_CULL_PROBE)
 PROTOSS_P10_INPUTS = $(filter-out $(P9_FACT_V2_HEADER),$(PROTOSS_P9_INPUTS)) $(P10_FACT_V2_HEADER) $(P10_SCARAB_FACT_HEADER) $(P10_PLACED_HANGAR_HEADER) $(P10_SCENARIO_HEADER)
@@ -92,7 +92,7 @@ $(P10_FACT_V2_HEADER): $(P8_AVAILABILITY_HEADER) tools/sc64_fact_tables_gen.c $(
 	./build/sc64-p10-fact-v2-gen > $@.tmp
 	mv $@.tmp $@
 build/starcraft-protoss-p10.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_CONFIG) $(P10_BUILDING_WORD_HEADER) common/gba.ld Makefile mk/combat-perf/Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
-	$(CC) $(P10_BUILDING_WORD_FLAGS) $(CFLAGS) $(P10_PADDED_IMPACT_FLAGS) $(PROTOSS_P10_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10.map -lgcc -o $@
+	$(CC) -DSC64_REQUIRE_CURRENT_SKIRMISH_PACK $(P10_BUILDING_WORD_FLAGS) $(CFLAGS) $(P10_PADDED_IMPACT_FLAGS) $(PROTOSS_P10_FLAGS) $(CANONICAL_DEFENSE_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-P10-Transport1-GBA.gba: build/starcraft-protoss-p10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -158,9 +158,19 @@ test-sc64-p10-p7-normal-home: build/test-sc64-p10-p7-normal-home
 	mkdir -p "$(dir $(P10_P7_NORMAL_TRACE))"
 	./build/test-sc64-p10-p7-normal-home "$(P10_P7_NORMAL_TRACE)"
 
-# Carried P9 normal cartridge route with authored briefing and modal input.
-build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) mk/protoss-p10/Makefile | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P9_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL -DP9_CONTROLLER_PROFILE=\"PROTOSS_P10_FLAGS\" $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+# Carried P9 uses the shipped product settings also used by its match author.
+# Track the effective flags independently of the ARM toolchain so a host-only
+# build is rebuilt when a command-line product setting changes.
+P10_P9_CONTROLLER_FLAGS = $(filter -D% -U% -I%,$(CFLAGS)) $(CUSTOM_FULL_MATCH_FLAGS_protoss) \
+    $(if $(filter 1,$(SC64_STATIC_MINERAL_WORDS)),-DSC64_STATIC_MINERAL_WORDS -Ibuild/generated) \
+    $(if $(filter 1,$(CANONICAL_TERRAIN_DIRTY_CAPTURE)),-DSC64_TERRAIN_DIRTY_CAPTURE)
+.PHONY: force-p10-p9-controller-config
+build/p10-p9-controller-config: force-p10-p9-controller-config | build
+	@printf '%s\n' '$(subst ','"'"',$(P8_HOST_FLAGS) $(P10_P9_CONTROLLER_FLAGS))' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+# The controller includes common/gba.c itself.
+build/test-sc64-p10-p9-normal-home: tests/sc64_p9_campaign_run.c tests/sc64_controller_authored_pages.h tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_CONFIG) $(P10_BUILDING_WORD_HEADER) build/p10-p9-controller-config common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile mk/custom-full-match/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(P10_P9_CONTROLLER_FLAGS) -DSC64_P9_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL -DP9_CONTROLLER_PROFILE=\"PROTOSS_P10_FLAGS\" $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 
 # P10 ordinary-input qualification, built like the P8 and P9 ones.
 P10_ARM_DIR := build/p10-arm

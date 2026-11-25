@@ -731,6 +731,9 @@ race_campaign_init(void)
     reset_selection_gestures();
     memset(geysers, 0, sizeof(geysers));
     geyser_count = 0;
+#ifdef SC64_SOURCE_GAS
+    sc64_gas_start();
+#endif
     supply_used = 0;
     supply_cap = 0;
     frame = 0;

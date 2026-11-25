@@ -255,7 +255,7 @@ field_ui_site(int type, int *x, int *y)
 {
     if (ui_gas_building(type)) {
         int geyser = geyser_at(*x, *y);
-        if (geyser >= 0) { *x = geysers[geyser].x; *y = geysers[geyser].y; }
+        if (geyser >= 0) { *x = field_geysers[geyser].x; *y = field_geysers[geyser].y; }
         return;
     }
     *x = limit((*x + 4) & ~7, 8, WORLD_W - 8);

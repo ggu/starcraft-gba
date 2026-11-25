@@ -30,6 +30,9 @@ class BcPipelineTests(unittest.TestCase):
             yamato = Path(tmp) / dev.BC_YAMATO_HEADER
             yamato.parent.mkdir(parents=True)
             yamato.write_text('SC64_YAMATO_FRAME_COUNT sc64_yamato_pixels sc64_yamato_light_lut')
+            self.assertFalse(dev.bc_inputs_ready())  # stale skirmish cover
+            with (directory / 'sc64_skirmish_generated.h').open('a') as pack:
+                pack.write('#define SC64_SKIRMISH_PACK_REVISION 2\n')
             self.assertTrue(dev.bc_inputs_ready())
             (directory / 'sc64_races_generated.h').write_text('')
             self.assertFalse(dev.bc_inputs_ready())

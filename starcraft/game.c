@@ -822,7 +822,11 @@ _Static_assert((SC64_TRANSPORT_SAVE_VERSION & 0x40000000u) != 0,
 #include "sc64_races_generated.h"
 #include "sc64_frontend.h"
 #ifdef SC64_IMPORTED_SKIRMISH
+#ifdef SC64_REQUIRE_CURRENT_SKIRMISH_PACK
+#include "sc64_skirmish_pack_gate.h"
+#else
 #include "sc64_skirmish_generated.h"
+#endif
 _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
                "Skirmish menu and imported map pack disagree");
 #endif
@@ -1593,6 +1597,7 @@ static Geyser geysers[MAX_RACE_GEYSERS] = {{
     272, 192
 }
 };
+#include "sc64_field_geysers.h"
 static Tracer tracers[MAX_TRACERS];
 /* Presentation values derived from a tracer's packed identity and captured
  * endpoints, which stay fixed until add_tracer replaces the slot. Never saved:
@@ -3584,16 +3589,16 @@ static int
 geyser_at(int x, int y)
 {
     int i;
-    for (i = 0; i < geyser_count; i++) {
-        if (dist2(x, y, geysers[i].x, geysers[i].y) < 15 * 15)
+    for (i = 0; i < field_geyser_count; i++) {
+        if (dist2(x, y, field_geysers[i].x, field_geysers[i].y) < 15 * 15)
             return i;
 #if defined(SC64_RACES) && defined(SC64_HAS_SPRITES)
         /* Match the actual opaque geyser art. The crop is wider than the
          * 15-pixel center radius, and its canvas offset is asymmetric. */
         const Sc64SpriteFrame *sprite = mission_geyser_sprite();
         if (sprite && sprite->pixels && sprite->w && sprite->h) {
-            int left = geysers[i].x - sprite->canvas_w / 2 + sprite->offset_x;
-            int top = geysers[i].y - sprite->canvas_h / 2 + sprite->offset_y;
+            int left = field_geysers[i].x - sprite->canvas_w / 2 + sprite->offset_x;
+            int top = field_geysers[i].y - sprite->canvas_h / 2 + sprite->offset_y;
             if (x >= left && x < left + sprite->w &&
                 y >= top && y < top + sprite->h) {
                 int px = x - left, py = y - top;
@@ -3771,8 +3776,8 @@ can_place_except_worker(int type, int x, int y, int worker)
 #ifdef SC64_RACES
 	/* The cursor may be anywhere on the visible source geyser crop; keep the
 	 * placed race gas structure centered on the resource it will harvest. */
-	x = geysers[geyser].x;
-	y = geysers[geyser].y;
+	x = field_geysers[geyser].x;
+	y = field_geysers[geyser].y;
 #endif
 	for (i = 0; i < MAX_BUILDINGS; i++)
 	    if (b[i].alive
@@ -3796,8 +3801,8 @@ can_place_except_worker(int type, int x, int y, int worker)
     /* Reserve the geyser footprint before its Extractor/Assimilator exists.
        Adjacent 24px centers overlap the 18px navigation footprints and can
        seal a gas worker between its refinery and a new tech structure. */
-    for(i=0;i<geyser_count;i++)
-        if(dist2(x,y,geysers[i].x,geysers[i].y)<36*36)return 0;
+    for(i=0;i<field_geyser_count;i++)
+        if(dist2(x,y,field_geysers[i].x,field_geysers[i].y)<36*36)return 0;
     for(i=0;i<MAX_MINERALS;i++)
         if(m[i].amount>0&&dist2(x,y,m[i].x,m[i].y)<24*24)return 0;
 #endif
@@ -8146,6 +8151,9 @@ add_owner_resources(int owner, int ore, int vespene)
 }
 #endif
 
+#ifdef SC64_SOURCE_GAS
+#include "sc64_source_gas.h"
+#endif
 #include "sc64_worker_minerals.h"
 
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
@@ -8276,7 +8284,11 @@ race_update_resource_worker(Unit *q)
         if (q->carry <= 0) q->order = ORDER_IDLE;
 #endif
     } else {
+#ifdef SC64_SOURCE_GAS
+        q->carry = sc64_gas_harvest(tx, ty);
+#else
         q->carry = 8;
+#endif
 #ifdef SC64_WORKER_CARGO_KIND
         if (IS_WORKER(q->type)) q->flags = (q->flags & ~SC64_WORKER_CARGO_MASK) | SC64_WORKER_CARGO_GAS;
 #endif
@@ -9493,16 +9505,16 @@ target_lists_unavailable:
 		if (q->carry <= 0)
 		    q->order = ORDER_IDLE;
 	    } else {
-		/* OpenBW bwgame.h gather_resource: a normal gas trip carries 8,
-		 * like minerals; depleted geysers (not yet modelled here) yield 2. */
-		#ifdef SC64_RACES
-		q->carry = 8;
+#ifdef SC64_SOURCE_GAS
+                q->carry = sc64_gas_harvest(tx, ty);
+#elif defined(SC64_RACES)
+                q->carry = 8;
+#else
+                q->carry = 4;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
 #endif
-		#else
-		q->carry = 4;
-		#endif
 	    }
 	    continue;
 	}
@@ -12270,7 +12282,7 @@ draw_building_overlay(Building *q)
 static unsigned
 sc64_static_objects_key(void)
 {
-    enum { FIELDS = MAX_MINERALS * 5 + MAX_RACE_GEYSERS * 3 + 1 + MAX_BUILDINGS *
+    enum { FIELDS = MAX_MINERALS * 5 + SC64_FIELD_GEYSER_LIMIT * 3 + 1 + MAX_BUILDINGS *
 #ifdef SC64_T4_SCENARIO_RUNTIME
                     7
 #else
@@ -12299,15 +12311,15 @@ sc64_static_objects_key(void)
         values[n++] = m[i].style;
         values[n++] = in_bounds && currently_visible(m[i].x, m[i].y);
     }
-    values[n++] = geyser_count;
-    for (i = 0; i < MAX_RACE_GEYSERS; i++) {
-        values[n++] = geysers[i].x;
-        values[n++] = geysers[i].y;
+    values[n++] = field_geyser_count;
+    for (i = 0; i < SC64_FIELD_GEYSER_LIMIT; i++) {
+        values[n++] = field_geysers[i].x;
+        values[n++] = field_geysers[i].y;
         {
-            int x = geysers[i].x - camx;
-            int y = geysers[i].y - camy + 12;
-            int in_bounds = i < geyser_count && geyser_in_view(x, y);
-            values[n++] = in_bounds && currently_visible(geysers[i].x, geysers[i].y);
+            int x = field_geysers[i].x - camx;
+            int y = field_geysers[i].y - camy + 12;
+            int in_bounds = i < field_geyser_count && geyser_in_view(x, y);
+            values[n++] = in_bounds && currently_visible(field_geysers[i].x, field_geysers[i].y);
         }
     }
     for (i = 0; i < MAX_BUILDINGS; i++) {

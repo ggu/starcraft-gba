@@ -49,8 +49,11 @@ class LookupMakeTest(unittest.TestCase):
         flags = re.compile(r'TERRAN_ROM_FLAGS|ZERG_ROM_FLAGS|PROTOSS_(?:ROM_FLAGS|P7_CANONICAL_FLAGS)|'
                            r'SHOWCASE_FLAGS|SC64_WEAPON_SOURCE_BANK_HEADER|'
                            r'CONSTRUCTION_ARRIVAL_FLAGS_(?:terran|zerg-z6|protoss-p7)')
+        # Pack stamps preprocess only the selected skirmish header; they do
+        # not compile the game or consume the weapon lookup bank.
         consumers = [target for target, rule in rules.items()
-                     if any(flags.search(recipe) for recipe in rule['recipes'])]
+                     if any(flags.search(recipe) and '-include starcraft/sc64_skirmish_pack_gate.h' not in recipe
+                            for recipe in rule['recipes'])]
         self.assertGreater(len(consumers), 4)
         for target in consumers:
             with self.subTest(target=target):
@@ -59,6 +62,23 @@ class LookupMakeTest(unittest.TestCase):
                 self.assertTrue(reachable(rules, target, 'build/walk-pair-verified'), 'walk and facing must match')
         self.assertFalse(reachable(rules, 'build/starcraft.elf', INDEX))
         self.assertFalse(reachable(rules, 'build/starcraft.elf', CONFIG))
+
+    def test_shipped_products_and_match_authors_follow_lookup_mode(self):
+        vectors = ("TERRAN_ROM_FLAGS", "ZERG_Z10_RELEASE_FLAGS", "PROTOSS_P10_FLAGS",
+                   "SHOWCASE_FLAGS", "CUSTOM_FULL_MATCH_FLAGS_terran", "CUSTOM_FULL_MATCH_FLAGS_zerg",
+                   "CUSTOM_FULL_MATCH_FLAGS_protoss")
+        makefile = "".join(f"$(info {name}=$({name}))\n" for name in vectors)
+        makefile += ".PHONY: show-lookup\nshow-lookup:\n\t@:\n"
+        for mode in (0, 1):
+            result = subprocess.run(["make", "-s", "-f", "Makefile", "-f", "-",
+                                     f"CANONICAL_LOOKUP_INDEX={mode}", "show-lookup"],
+                                    cwd=ROOT, input=makefile, capture_output=True, text=True, check=True)
+            flags = dict(line.split("=", 1) for line in result.stdout.splitlines()
+                         if line.partition("=")[0] in vectors)
+            for name in vectors:
+                with self.subTest(vector=name, mode=mode):
+                    self.assertEqual('SC64_WEAPON_SOURCE_BANK_HEADER="sc64_weapon_source_indexed.h"'
+                                     in flags[name], bool(mode))
 
     def test_path_grid_flag_only_in_four_canonical_vectors(self):
         with tempfile.TemporaryDirectory() as directory:

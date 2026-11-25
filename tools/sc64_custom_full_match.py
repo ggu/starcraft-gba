@@ -36,6 +36,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -62,19 +63,30 @@ PRODUCTS = {
 }
 MAP_NAMES = {0: "Outpost", 1: "Blood Bath"}
 # PRODUCT:MAP:CPUS[:PLAN] lobbies whose tapes win and replay; see
-# docs/audits/2026-11-25-custom-game-full-matches.md.
+# docs/audits/2026-11-26-n64-gas-pickup.md.
 QUALIFIED: tuple[str, ...] = (
-    "terran:0:zpt:PRODUCERS=3",
+    "terran:0:z:PRODUCERS=3",
     "terran:0:tz",
-    "terran:1:zpt:LOBBY_WAIT=8",
+    "terran:0:zpt:PRODUCERS=3",
+    ("terran:1:z:LOBBY_WAIT=8,FIRST_ATTACK=7000,PRODUCERS=3,WORKERS=14,TECH_AFTER=2,"
+     "LAB_AFTER=3,ATTACK_MIN=6,ATTACK_RATIO=3,ATTACK_MARGIN=8"),
     "terran:1:pz:LOBBY_WAIT=8,FIRST_ATTACK=7000",
-    "zerg:0:tzp:WORKERS=10,LINE=38",
+    ("terran:1:zpt:LOBBY_WAIT=8,FIRST_ATTACK=7000,PRODUCERS=3,WORKERS=14,"
+     "TECH_AFTER=2,LAB_AFTER=3,ATTACK_MIN=6,ATTACK_RATIO=3,ATTACK_MARGIN=8"),
+    ("zerg:0:p:LINE=38,WORKERS=9,DEFENSES=2,PRODUCERS=2,FIRST_ATTACK=7000,"
+     "DEFENSE=146,DEFENSE_FRAME=2500,ATTACK_RATIO=1,ATTACK_MIN=6,ATTACK_MARGIN=0"),
     "zerg:0:pz:WORKERS=12,LINE=38",
-    "zerg:1:tz:LINE=38,PRODUCERS=1,LOBBY_WAIT=22",
-    "protoss:0:ptz:LINE=65,DEFENSE=162,DEFENSES=4",
-    "protoss:0:tz:WORKERS=14,PRODUCERS=3,LINE=66,DEFENSE=162,DEFENSES=8",
-    "protoss:1:tzp:LINE=66,TECH_FRAME=8000,LOBBY_WAIT=20",
-    "protoss:1:tz:LINE=65,TECH_FRAME=8000",
+    "zerg:0:tzp:WORKERS=10,LINE=38",
+    "zerg:1:p:LINE=38,WORKERS=12,PRODUCERS=1,FIRST_ATTACK=7000,LOBBY_WAIT=16",
+    "zerg:1:tz:LINE=38,WORKERS=12,PRODUCERS=1,FIRST_ATTACK=7000,LOBBY_WAIT=22",
+    "zerg:1:zzz:LOBBY_WAIT=4",
+    "protoss:0:t:LINE=66,WORKERS=12,DEFENSES=4,PRODUCERS=2,FIRST_ATTACK=7000,DEFENSE=162",
+    "protoss:0:tz:LINE=65,WORKERS=10,DEFENSE=162,DEFENSES=4,PRODUCERS=2,FIRST_ATTACK=7000",
+    "protoss:0:ptz:LINE=65,WORKERS=14,DEFENSE=162,DEFENSES=4,PRODUCERS=3,FIRST_ATTACK=7000",
+    "protoss:1:t:LINE=66,TECH_FRAME=8000,LOBBY_WAIT=18",
+    ("protoss:1:tz:LINE=65,TECH_FRAME=30000,WORKERS=12,PRODUCERS=3,"
+     "FIRST_ATTACK=3000,ATTACK_MIN=8,ATTACK_RATIO=1,ATTACK_MARGIN=0"),
+    "protoss:1:tzp:LINE=66,TECH_FRAME=8000,LOBBY_WAIT=18",
 )
 
 
@@ -292,6 +304,164 @@ def at_resume(game: PhysicalGame, trace: dict, label: str) -> None:
     problems = compare(trace["resume"], observe(game), ("frame", "hash"))
     if problems or game.u32("screen") != SCREEN_PLAY:
         raise MatchError(f"{label}: the resumed world differs from the trace: " + "; ".join(problems))
+
+
+def displayed_bitmap(game: PhysicalGame) -> bytes:
+    control = int.from_bytes(game.rsp.read(0x04000000, 2), "little")
+    if (control & 7) != 4 or control & 0x80 or not control & 0x0400:
+        raise MatchError("visible-page sampling requires an active Mode 4 bitmap")
+    page = 0x0600A000 if control & 16 else 0x06000000
+    pixels = game.rsp.read(page, 240 * 160)
+    palette = game.rsp.read(0x05000000, 512)
+    # Resolve indices so unused palette edits and duplicate colors do not count.
+    low, high = palette[::2], bytes(value & 0x7f for value in palette[1::2])
+    return hashlib.sha256(pixels.translate(low) + pixels.translate(high)).digest()
+
+
+PACE_COUNTERS = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
+                 "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
+TWO_VBLANK_CYCLES = 2 * 280896
+
+
+def pace_budget_report(rows):
+    """Validate each active sample once; preserve raw results if any disagree."""
+    stages, totals, errors = [], [], []
+    for row in rows:
+        try:
+            if type(row.get("world_advanced")) is not bool:
+                raise MatchError("pacing sample missing or invalid world_advanced")
+            if not row["world_advanced"]:
+                continue
+            missing = [key for key in ("cycles", *PACE_COUNTERS) if key not in row]
+            if missing:
+                raise MatchError(f"pacing sample missing counters: {', '.join(missing)}")
+            if any(type(row[key]) is not int or row[key] < 0 for key in ("cycles", *PACE_COUNTERS)):
+                raise MatchError("pacing sample has invalid cycle counters")
+            total, update, draw = (row[k] for k in ("cycles", "demo_update_cycles", "gfx_draw_cycles"))
+            orders, sight, other = (row[k] for k in ("sc64_orders_cycles", "sc64_sight_cycles", "sc64_other_cycles"))
+            background, actors, hud = (row[k] for k in ("sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles"))
+            stage = dict(orders=orders, sight=sight, other_simulation=other,
+                         remaining_simulation=update-orders-sight-other,
+                         map_background=background, actors=actors, hud=hud,
+                         remaining_render=draw-background-actors-hud,
+                         interval_less_update_and_draw=total-update-draw)
+            if any(value < 0 for value in stage.values()):
+                raise MatchError("pacing sample has inconsistent nested counters")
+            stages.append(stage)
+            totals.append(total)
+        except MatchError as exc:
+            errors.append(dict(host_tick=row.get("host_tick"), reason=str(exc)))
+    if errors:
+        return dict(available=False, invalid_samples=len(errors), offending_samples=errors)
+    if not stages:
+        return dict(available=False, invalid_samples=0, reason="the pacing window contains no simulation updates")
+    means = {key: statistics.mean(stage[key] for stage in stages) for key in stages[0]}
+    mean_total = statistics.mean(totals)
+    return dict(available=True, denominator="advancing world updates", samples=len(stages),
+                mean_total_cycles=mean_total, nominal_30_fps_cycles=GBA_HZ / 30,
+                two_vblank_cycles=TWO_VBLANK_CYCLES,
+                mean_deficit_to_nominal_30_fps=mean_total - GBA_HZ / 30,
+                mean_disjoint_cycles=means,
+                residual_note="interval less inclusive update and draw; timing boundaries may differ; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
+
+
+def disjoint_pace_budget(rows):
+    """Strict variant for callers that require a reconciled breakdown."""
+    report = pace_budget_report(rows)
+    if not report["available"]:
+        reason = report.get("reason") or report["offending_samples"][0]["reason"]
+        raise MatchError(reason)
+    return report
+
+
+def pace(args) -> dict:
+    """Time the recorded controls immediately after a qualified battle save."""
+    trace = load_trace(args.trace)
+    save = trace["save"]
+    if not save or args.updates < 1:
+        raise MatchError("pacing requires a recorded battle save and a positive update count")
+    first = trace["resume"]["host_tick"]
+    last = first + args.updates
+    if last >= trace["end"]:
+        raise MatchError("pacing window reaches the end of the match")
+    if not any(first < tick <= last for tick in trace["checks"]):
+        raise MatchError("pacing window contains no recorded gameplay checkpoint")
+    shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
+    counters = PACE_COUNTERS
+    if args.output.exists():
+        raise MatchError(f"{args.output} already exists")
+    args.output.mkdir(parents=True, exist_ok=False)
+    game = PhysicalGame(args.runner, args.rom, args.elf, args.output / "guest", save_input=args.save)
+    try:
+        require_home(game)
+        game.step(0, 2)
+        game.step(KEY_L)
+        if game.u32("screen") != SCREEN_PLAY or compare(save, observe(game), ("frame", "hash")):
+            raise MatchError("loaded battle differs from the recorded save")
+        seats = lobby(game, trace)
+        game.rsp.play_to(first - shift, inputs)
+        at_resume(game, trace, "pacing")
+        interval_address = game.sym.get("gba_present_intervals")
+        def present_counts():
+            data = game.rsp.read(interval_address, 32)
+            return [int.from_bytes(data[i:i+4], "little") for i in range(0, 32, 4)]
+        initial_counts = present_counts() if interval_address else []
+        clock = game.rsp.clock()
+        rows, checks = [], 0
+        previous_bitmap = displayed_bitmap(game) if args.video else None
+        world_frame = game.u32("frame")
+        for tick in range(first + 1, last + 1):
+            game.rsp.play_to(tick - shift, inputs)
+            now = game.rsp.clock()
+            next_frame = game.u32("frame")
+            if next_frame - world_frame not in (0, 1) or now <= clock:
+                raise MatchError(f"invalid game clock at update {tick}")
+            rows.append({"host_tick": tick, "cycles": now - clock, "frame": next_frame,
+                         "world_advanced": next_frame != world_frame,
+                         **{name: game.u32(name) for name in counters if name in game.sym}})
+            if args.video:
+                bitmap = displayed_bitmap(game)
+                rows[-1]["bitmap_changed"] = bitmap != previous_bitmap
+                previous_bitmap = bitmap
+            world_frame = next_frame
+            clock = now
+            if tick in trace["checks"]:
+                problems = compare(trace["checks"][tick], observe(game))
+                if problems:
+                    raise MatchError(f"pacing diverged at {tick}: " + "; ".join(problems))
+                checks += 1
+        intervals = [((after - before) & 0xffffffff) for before, after in
+                     zip(initial_counts, present_counts())] if initial_counts else []
+        final = observe(game)
+        if final["screen"] != SCREEN_PLAY:
+            raise MatchError("match left play during the pacing window")
+    finally:
+        game.close()
+    cycles = sorted(row["cycles"] for row in rows)
+    # Simulation stage timers keep their previous values on a command-menu tick.
+    active = [row for row in rows if row["world_advanced"]]
+    if not active:
+        raise MatchError("the pacing window contains no simulation updates")
+    averages = {name: statistics.mean(row[name] for row in active)
+                for name in counters if all(name in row for row in active)}
+    result = {"ok": True, "lobby": seats, "checks": checks, "updates": len(rows),
+              "updates_per_second": GBA_HZ / statistics.mean(cycles),
+              "p95_cycles": cycles[(95 * len(rows) + 99) // 100 - 1],
+              "over_two_fields": sum(c > TWO_VBLANK_CYCLES for c in cycles),
+              "active_updates": len(active), "mean_active_stage_cycles": averages,
+              "disjoint_budget": pace_budget_report(rows), "end_fingerprint": final["fingerprint"],
+              "sha256": {k: sha256(getattr(args, k)) for k in ("rom", "elf", "runner", "save", "trace")},
+              "samples": rows}
+    if intervals:
+        result["page_holds_in_vblanks"] = {str(i) if i < 7 else "7+": count
+                                           for i, count in enumerate(intervals)}
+        result["page_flips_per_second"] = sum(intervals) * GBA_HZ / sum(cycles)
+    if args.video:
+        changes = sum(row["bitmap_changed"] for row in rows)
+        result["bitmap_changes"] = changes
+        result["bitmap_changes_per_second"] = changes * GBA_HZ / sum(cycles)
+    (args.output / "pacing.json").write_text(json.dumps(result, indent=1) + "\n")
+    return result
 
 
 def replay(args) -> dict:
@@ -573,6 +743,12 @@ def main(argv=None) -> int:
     sub = commands.add_parser("replay", help="replay a trace on the ROM with save and reload checks")
     sub.add_argument("--trace", required=True, type=path)
     common(sub, False)
+    sub = commands.add_parser("pace", help="measure guest cycles while continuing a recorded battle")
+    sub.add_argument("--trace", required=True, type=path)
+    sub.add_argument("--save", required=True, type=path)
+    sub.add_argument("--updates", type=int, default=256)
+    sub.add_argument("--video", action="store_true", help="sample visible Mode 4 page and palette at update boundaries")
+    common(sub, False)
     common(commands.add_parser("run", help="author, then replay"), True)
     sub = commands.add_parser("matrix", help="run PRODUCT:MAP:CPUS[:PLAN] cases (default: the qualified list)")
     sub.add_argument("cases", nargs="*")
@@ -590,11 +766,11 @@ def main(argv=None) -> int:
             for row in rows:
                 print(json.dumps(row))
             return 0 if all(row["ok"] for row in rows) else 1
-        record = {"author": author, "replay": replay, "run": run}[args.command](args)
+        record = {"author": author, "replay": replay, "pace": pace, "run": run}[args.command](args)
     except (MatchError, OSError, RuntimeError, ValueError) as error:
         parser.exit(1, f"{error}\n")
     summary = {key: record[key] for key in ("ok", "result", "updates", "frame", "save", "continuation",
-                                            "victory_reload", "terminal", "start_order", "exit")
+                                            "victory_reload", "terminal", "start_order", "exit", "updates_per_second")
                if key in record}
     print(json.dumps(summary))
     return 0 if record.get("ok", args.command == "author") else 1

@@ -143,6 +143,11 @@ def choose_minerals(resources: list[dict], starts: list[tuple[int, int]]) -> tup
                       'policy': 'legacy start-patch indices first, then all remaining source placements'}
 
 
+def validate_pack_count(slug: str, path: str, minerals: list[dict]) -> None:
+    if slug == 'blood_bath' and len(minerals) != 56:
+        raise ValueError(f'{path} has {len(minerals)} mineral patches; expected 56 from the pinned source')
+
+
 def _emit_map(lines: list[str], index: int, slug: str, info, blocked: list[int],
               lookup: list[int], tiles: list[bytes], starts: list[tuple[int, int]],
               minerals: list[dict], geysers: list[dict]):
@@ -158,9 +163,9 @@ def _emit_map(lines: list[str], index: int, slug: str, info, blocked: list[int],
     lines.append(f'static const Sc64SkirmishMineral {prefix}_minerals[{len(mineral_rows)}] = {{\n')
     lines.extend(f"    {{{p['x']}u,{p['y']}u,{p['amount']}u,{p['style']}u}},\n" for p in mineral_rows)
     lines.append('};\n')
-    padded_geysers = geysers + [{'x': 0, 'y': 0}] * (MAX_GEYSERS - len(geysers))
+    padded_geysers = geysers + [{'x': 0, 'y': 0, 'amount': 0}] * (MAX_GEYSERS - len(geysers))
     lines.append(f'static const Sc64SkirmishGeyser {prefix}_geysers[{MAX_GEYSERS}] = {{\n')
-    lines.extend(f"    {{{g['x']}u,{g['y']}u}},\n" for g in padded_geysers)
+    lines.extend(f"    {{{g['x']}u,{g['y']}u,{g['amount']}u}},\n" for g in padded_geysers)
     lines.append('};\n')
     return f'    {{{info.width}u,{info.height}u,{prefix}_tiles,{prefix}_lookup,{prefix}_blocked,{{{",".join(str(x) for x, _ in starts)}}},{{{",".join(str(y) for _, y in starts)}}},{prefix}_minerals,{len(minerals)}u,{prefix}_geysers,{len(geysers)}u,"{info.name}"}},\n'
 
@@ -194,7 +199,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include
         f'#define SC64_SKIRMISH_IMPORTED_COUNT {len(MAPS)}\n',
         '#define SC64_SKIRMISH_MINERAL_TYPES 1\n',
         'typedef struct { unsigned short x,y,amount; unsigned char style; } Sc64SkirmishMineral;\n',
-        'typedef struct { unsigned short x,y; } Sc64SkirmishGeyser;\n',
+        'typedef struct { unsigned short x,y; unsigned int amount; } Sc64SkirmishGeyser;\n',
         'typedef struct { unsigned short width,height; const unsigned char (*tile_pixels)[256]; const unsigned short *tile_lookup; const unsigned char *blocked; unsigned short start_x[4],start_y[4]; const Sc64SkirmishMineral *minerals; unsigned char minerals_count; const Sc64SkirmishGeyser *geysers; unsigned char geyser_count; const char *title; } Sc64SkirmishMap;\n',
     ]
     reports = []
@@ -231,13 +236,15 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include
         starts = select_starts(blocked, info.width, info.height, raw_starts)
         neutral = [u for u in units if u['owner_raw'] == 11]
         minerals, mineral_report = choose_minerals([u for u in neutral if u['source_type'] in MINERAL_TYPES], starts)
-        source_geysers = [{'x': u['x_source_px'] // 2, 'y': u['y_source_px'] // 2}
+        source_geysers = [{'x': u['x_source_px'] // 2, 'y': u['y_source_px'] // 2,
+                           'amount': u['resources']}
                           for u in neutral if u['source_type'] == GEYSER_TYPE]
         if not source_geysers:
             raise ValueError(f'{path} has no source neutral geysers; refusing authored gas substitutions')
         if len(source_geysers) > MAX_GEYSERS:
             raise ValueError(f'{path} has {len(source_geysers)} geysers; runtime supports {MAX_GEYSERS} without truncation')
         geysers = source_geysers
+        validate_pack_count(slug, path, minerals)
         descriptors.append(_emit_map(lines, index, slug, info, blocked, lookup, pixels, starts, minerals, geysers))
         reports.append({'index': index + 1, 'path': path, 'title': info.name,
                         'dimensions': [info.width, info.height], 'tileset_id': tileset,
@@ -245,12 +252,13 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include
                         'source_start_count': len(raw_starts), 'source_mineral_count': mineral_report['source_count'],
                         'packed_mineral_count': len(minerals), 'mineral_selection': mineral_report,
                         'source_geyser_count': len(source_geysers), 'authored_geyser_count': 0,
-                        'geyser_policy': 'source neutral placements retained',
+                        'geyser_policy': 'source neutral placements and raw gas quantities retained',
                         'geysers': geysers,
                         'cells': len(tile_ids), 'unique_runtime_tiles': len(pixels),
                         'blocked_cells': sum(v & 1 for v in blocked),
                         'chk_sha1': hashlib.sha1(chk).hexdigest(),
                         'terrain_assets_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in sources.items()}})
+    lines.append('#define SC64_SKIRMISH_PACK_REVISION 2\n')
     lines.extend([f'static const Sc64SkirmishMap sc64_skirmish_maps[{len(MAPS)}] = {{\n', *descriptors, '};\n', '#endif /* SC64_SKIRMISH_GENERATED_H */\n'])
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)

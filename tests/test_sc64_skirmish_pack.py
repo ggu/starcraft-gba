@@ -1,6 +1,7 @@
 """Synthetic, asset-free checks for bounded skirmish map packing helpers."""
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,11 @@ SPEC.loader.exec_module(PACKER)
 
 
 class SkirmishPackTests(unittest.TestCase):
+    def test_blood_bath_revision_rejects_incomplete_source(self):
+        PACKER.validate_pack_count("blood_bath", "008/04F", [None] * 56)
+        with self.assertRaisesRegex(ValueError, "expected 56"):
+            PACKER.validate_pack_count("blood_bath", "008/04F", [None] * 32)
+
     def test_flood_fill_rejects_disconnected_spawn_areas(self):
         width = height = 8
         blocked = [0] * (width * height)
@@ -79,6 +85,18 @@ class SkirmishPackTests(unittest.TestCase):
         self.assertEqual(len(chosen), 25)
         self.assertEqual(report['new_patches_selected_per_start'], [7, 6, 6, 6])
         self.assertEqual(report['omitted_count'], 0)
+
+    def test_geyser_rows_preserve_zero_and_full_width_source_amounts(self):
+        lines = []
+        sites = [{'x': 8, 'y': 16, 'amount': 0}, {'x': 32, 'y': 48, 'amount': 100000}]
+        descriptor = PACKER._emit_map(lines, 0, 'fixture', SimpleNamespace(
+            width=1, height=1, name='fixture'), [0], [0], [bytes(256)],
+            [(0, 0)] * 4, [], sites)
+        rows = ''.join(lines).split('sc64_sk_fixture_geysers[4] = {\n', 1)[1]
+        self.assertEqual(rows.split('};', 1)[0].splitlines(),
+                         ['    {8u,16u,0u},', '    {32u,48u,100000u},',
+                          '    {0u,0u,0u},', '    {0u,0u,0u},'])
+        self.assertIn('sc64_sk_fixture_geysers,2u,', descriptor)
 
     def test_too_few_start_markers_fail_clearly(self):
         with self.assertRaisesRegex(ValueError, 'need 4'):

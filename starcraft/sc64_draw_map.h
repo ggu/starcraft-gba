@@ -60,8 +60,8 @@ draw_map_geyser_art(int x, int y)
 static inline void
 draw_map_geyser(int i)
 {
-    int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
-    if (geyser_in_view(x, y) && currently_visible(geysers[i].x, geysers[i].y))
+    int x = field_geysers[i].x - camx, y = field_geysers[i].y - camy + 12;
+    if (geyser_in_view(x, y) && currently_visible(field_geysers[i].x, field_geysers[i].y))
         draw_map_geyser_art(x, y);
 }
 
@@ -73,7 +73,7 @@ draw_map_static_objects(void)
 #ifndef SC64_WORLD_DEPTH
     int i;
     for (i = 0; i < MAX_MINERALS; i++) draw_map_mineral(i);
-    for (i = 0; i < geyser_count; i++) draw_map_geyser(i);
+    for (i = 0; i < field_geyser_count; i++) draw_map_geyser(i);
 #ifdef SC64_IMPORTED_MISSION
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive)
@@ -203,10 +203,10 @@ draw_map(void)
 #endif
                     }
                 }
-            for (i = 0; i < geyser_count; i++)
-                if (currently_visible(geysers[i].x, geysers[i].y)) {
-                    x = geysers[i].x - camx;
-                    y = geysers[i].y - camy + 12;
+            for (i = 0; i < field_geyser_count; i++)
+                if (currently_visible(field_geysers[i].x, field_geysers[i].y)) {
+                    x = field_geysers[i].x - camx;
+                    y = field_geysers[i].y - camy + 12;
                     if (x > 0 && x < 240 && y > 12 && y < 120)
                         gfx_diamond(x, y, 6, 4, C_GREEN);
                 }
@@ -588,8 +588,8 @@ sc64_tile_background_done:
         if (menu == B_REFINERY || menu == B_EXTRACTOR || menu == B_ASSIMILATOR) {
             int geyser = geyser_at(cx, cy);
             if (geyser >= 0) {
-                build_x = geysers[geyser].x;
-                build_y = geysers[geyser].y;
+                build_x = field_geysers[geyser].x;
+                build_y = field_geysers[geyser].y;
             }
         }
 #endif

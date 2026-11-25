@@ -1,5 +1,48 @@
 # Custom Game full matches on the three race cartridges
 
+## Zerg against three allied Zerg opponents
+
+On release source `b6b601f2`, a human Zerg won Blood Bath Melee against
+three allied Zerg CPUs using ordinary button input. The HOST author chose
+its commands from game state, but changed the game only through
+`game_update()`; the ARM replay used physical-button transport and read-only
+guest observation. The four-update Launch-row wait gives native Melee start
+order 114 on the cartridge. The author first probes the cartridge's actual
+order, then sets the HOST platform clock to that observed order; the replay
+uses only the recorded buttons and verifies the resolved order.
+
+The Z10 ROM was byte-identical to the current canonical Z10 product,
+SHA-256 `81cba01853582d0edd707883b8a483c561716a2b017cba1c5bd69185f4b3b7f2`.
+The HOST-authored tape has SHA-256
+`69edb3101d8a0b81a8ce7315152041edcc76b77cbc6588226fa4c606c0918773`.
+The full mGBA replay matched 678 checkpoints, won at update 69,900 / frame
+68,369, and ended with 119 human units and six buildings and no enemy actors
+or buildings. The pause at update 18,305 / frame 17,661 had 32 friendly and
+ten hostile units in view. A fresh load of that pause matched its saved
+fingerprint, matched 520 continuation checks, won, and produced identical
+victory SRAM. A fresh HOME load reopened RESULT with unchanged SRAM. The
+pause and victory SRAM SHA-256 values are
+`598d903c5bd0c2802bd594f296e21b416fe9d032d7be6657c0ed816df1c909da` and
+`eb0081af4dcedd2095fced8ab964364a6c03f5b3f72d63b475a862ef9fc271cc`.
+The full-run guest cycles give 14.90 emulated updates/s; this is not a
+hardware frame-rate measurement.
+
+With the prepared current standard and cover skirmish packs and Z10 build,
+run the same author, calibrated lobby probe and three ARM processes through
+normal matrix invocation (the output directory must not exist):
+
+```sh
+make check-sc64-custom-full-matches \
+  SC64_HEADLESS_REPLAY=/path/to/sc64-headless-replay \
+  CUSTOM_FULL_MATCH_CASES='zerg:1:zzz:LOBBY_WAIT=4' \
+  CUSTOM_FULL_MATCH_OUT=.local/sc64/zerg-three-zerg
+```
+
+This completes the count-based two-map, two- and three-CPU win matrix for
+each human race. It is a homogeneous CPU lineup: a Zerg win against the
+previously attempted mixed Terran/Zerg/Protoss alliance remains open.
+
+
 Whole Custom Game matches, from the lobby to RESULT, on the Terran, Zerg Z10
 and Protoss P10 cartridges. Every match is played with ordinary button
 input, won by the human, saved through the pause menu during a battle,
@@ -47,10 +90,11 @@ also fight each other); Blood Bath is Melee (the computers are allied).
 
 | Cartridge | Map | Opponents | Result | Cause or smallest reproduction |
 | --- | --- | --- | --- | --- |
-| Zerg Z10 | Blood Bath Melee | three | not won | No player win found. On the 56-patch layout 960 HOST plans across the 24 start orders lost (opening size, Zergling or Hydralisk line, one to three Hatcheries, Sunken Colonies, attack timing), after about 936 on the old layout. A typical loss: `SC64_CFM_START_ORDER=114 build/test-sc64-custom-full-match-zerg 1 z tzp trace.json` loses at update 15,938 to the allied computers' waves. The computers build, pay and attack normally in these HOST matches and nothing observed points at the engine; the losses were not replayed on ARM. This is a limit of the scripted player, not a recorded engine fault. |
+| Zerg Z10 | Blood Bath Melee | Terran, Zerg, Protoss | not won | No player win found against this mixed alliance. On the 56-patch layout 960 HOST plans across the 24 start orders lost (opening size, Zergling or Hydralisk line, one to three Hatcheries, Sunken Colonies, attack timing), after about 936 on the old layout. A typical loss: `SC64_CFM_START_ORDER=114 build/test-sc64-custom-full-match-zerg 1 z tzp trace.json` loses at update 15,938 to the allied computers' waves. The computers build, pay and attack normally in these HOST matches and nothing observed points at the engine; the losses were not replayed on ARM. This is a limit of the scripted player, not a recorded engine fault. |
 
-Every other cell of the brief (both maps, two and three computers, on all
-three cartridges) has one winning lineup in the results table. Other
+The count-based brief (both maps, two and three computers, on all three
+cartridges) now has one winning lineup per cell, including the three-Zerg
+case above. Other
 lineups of the same size are not all won: of 13 Terran Outpost lineups
 played with the default plan on HOST, 8 won; on Blood Bath, 61 of 96 Terran
 plans against two computers and 2 of 96 against three won.
@@ -110,7 +154,7 @@ Since [#887](https://github.com/ggu/starcraft-gba/pull/887) the Blood Bath
 tapes need the regenerated private skirmish pack in both places the
 cartridges read it. Terran and Protoss include the Battlecruiser folder's
 cover-encoded copy first; a stale copy there keeps the old 32-patch table
-with no build error. `tools/sc64_skirmish_pack.py` needs the pinned
+unless it is regenerated. Product builds reject old packs. `tools/sc64_skirmish_pack.py` needs the pinned
 `references/sc64-maps` checkout, and the cover copy needs CV5-cover
 Backwater assets (here generated into a scratch folder):
 
