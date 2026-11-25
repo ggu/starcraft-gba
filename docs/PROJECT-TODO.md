@@ -3965,7 +3965,7 @@ Other core rules to prioritize after this:
   morphs, and campaign adoption mission by mission with new replays.
   Z7's mission Eggs spawn the second unit of a pair inside the order loop
   without linking it into the target index; the Custom Game hatch now links
-  it ([validation](VALIDATION.md#custom-game-larva-and-eggs)), and the Z7
+  it ([audit](audits/2026-11-25-custom-larva-eggs.md)), and the Z7
   path should get the same fix with a new Z7 replay.
 - **Tech and combat:** finish cross-cartridge and AI research, then
   extend omitted spells and ammo, including Defiler, Scarabs and

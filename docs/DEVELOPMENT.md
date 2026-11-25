@@ -2950,7 +2950,7 @@ python3 tools/sc64_custom_larva_eggs_arm.py --runner RUNNER \
 It plays from a blank save with the physical buttons only: a Zerg human orders
 three Drones at once while a Zerg computer opponent has Eggs in progress,
 saves through the pause menu, and a fresh process loads and continues. See
-[Validation](VALIDATION.md#custom-game-larva-and-eggs) for results and limits.
+[the Larva and Egg audit](audits/2026-11-25-custom-larva-eggs.md) for results and limits.
 
 ### Experimental independent Z7 Egg production
 
