@@ -29,10 +29,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   without Zealots, could be saved and reloaded again. The 72 skirmish
   lobby combinations launched with the expected map, race and seats.
   The retained Protoss 7 late assault won at frame 80,810 and its
-  victory save survived a fresh load. In Zerg 10, the old controller
-  tape first differed at frame 8,354 and later restarted the mission.
-  Verify the full campaign route using inputs chosen for the new
-  battle state before promoting the change.
+  victory save survived a fresh load. Terran 9 matched all 51 prior
+  checkpoints from the Terran 8 victory handoff, won at frame 47,266
+  and reloaded its victory save byte for byte. Zerg 10 won from an old
+  frame-60,123 save on the cartridge in mGBA. Its old full-mission tape
+  first differed at frame 8,354 and later restarted the mission. A new
+  host controller run won at frame 198,954. Replay its ordinary inputs
+  on the cartridge and verify the crystal delivery and victory save
+  before promoting the change.
 
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
