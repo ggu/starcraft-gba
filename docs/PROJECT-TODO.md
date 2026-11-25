@@ -2153,10 +2153,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pass. Existing Wasteland and Backwater journals display
   one fewer supply with their prior actors intact, and
   Backwater trains a Marine for 50 minerals. Trace the
-  native SCV's first target and order separately. The fresh N64
-  purchase shows 6/26 as soon as the Marine queues, while the current
-  GBA shows 6/26 once the unit finishes. Verify how later queue slots
-  reserve supply before changing the shared HUD and admission rule.
+  native SCV's first target and order separately. Both current HUDs
+  show 6/26 with the first Marine in production. A second waiting
+  Marine raises the GBA HUD to 7/26 immediately. On N64 the HUD reaches
+  7/26 after the first unit completes and the second begins. Verify
+  N64 admission and cancellation near the cap before changing the
+  shared production rule.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and
