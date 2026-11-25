@@ -12,3 +12,12 @@ python3 tools/sc64_fifo_roster_matrix.py --runner "$runner" --rom "$fifo_rom" \
 ```
 
 The opening saves are before refinery contention; they do not test queue ordering or active-service persistence. Those have separate [continuation evidence](2026-11-26-gas-saturated-fifo.md#experimental-gba-save-continuation). These cases do not establish full match wins, every sparse seating layout, Melee combinations or physical hardware behavior. The [full-match matrix](2026-11-26-gas-fifo-small-skirmishes.md) has a different, longer scope.
+
+The same driver then completed 234/234 cases independently on each of the Terran and Z10 trial products. Every per-case check passed and each runner, ROM and ELF hash was unchanged across its run. Their JSON receipts are retained locally without game assets:
+
+| Trial product | ROM SHA-256 | ELF SHA-256 | Receipt SHA-256 |
+| --- | --- | --- | --- |
+| Terran | `be85a92d3554db7aaac0b2418cd4561c7f35e5af75d7304722bd37ef88a9a54d` | `2e81ec6ed94e4921bdf85436454e0c699c42dad3c5148a08e6ab43daeadb408a` | `953660041d83e3dde70d3bb410d2702b9e1a40b516baa2140b73bb74d4e8e4bb` |
+| Z10 | `0b9f5f766cab83c8a7032ae999e7ab14a8b159e1c9b2e713bba001df0bbb4972` | `f50e1965a1ad8733d3a8a972e1c7cc438bfd35acb86e263b5ef83e494fa60fe4` | `5a54b7d1c3e1b90bb023fcdbc61901b258af614212262406689d086f40578bf4` |
+
+All three products used the same runner hash listed above and the normal-mode, early-save scope of the P10 run. Showcase was not included in these matrices.
