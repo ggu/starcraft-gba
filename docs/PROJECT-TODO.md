@@ -72,7 +72,16 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   re-exported byte for byte with all five bits (0x1f0). The same save
   cleared T6 at frame 23,536, T7 at 3,931 and T8 at 139,216. Each
   victory reloaded and re-exported byte for byte. T8 retains all eight
-  flags (0xff0). Continue T9 and T10 from the cumulative save.
+  flags (0xff0). Starting with that T8 victory journal, T9 matched the
+  packaged physical reference through victory at frame 47,266. T10 then
+  matched all six checkpoints and won at frame 3,361. A fresh load
+  retained all ten Terran bits (0x3ff0) and reproduced the final SRAM
+  (SHA-256 `49c9e531cd692502487592025127543b57d6d7c2d692f69b648a7bc25865ce6a`).
+  Pressing A retried T10, and a frame-61 pause save reloaded with all ten
+  bits. This completes the continuous ten-mission runs on all three race
+  cartridges in package `5f758095`. T9 averaged 17.74 emulated updates/s
+  and T10 averaged 18.52, including presentation waits and menu input.
+  Late-campaign speed and hardware frame pacing remain priorities.
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
