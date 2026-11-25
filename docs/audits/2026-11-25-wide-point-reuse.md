@@ -110,3 +110,37 @@ In the recorded Z7 continuation, all 45 remaining checkpoints matched
 through victory at frame 267,585. The terminal SRAM and fresh reload were
 byte-identical to the release control (SHA-256
 `66fec8e5ac2dbd922de486cea21bd45784c92e3b22b741917640a3079d8fce0e`).
+
+## Current release Z10 trial
+
+The shared-store cache was applied to release `81e76943` with
+`SC64_WIDE_POINT_MEMO_PROBE` enabled only in a private Z10 build. Both
+builds used the same release Z10 compiler and hot-IWRAM flags, prepared
+audio bank and 56-mineral Blood Bath header. The rebuilt control ROM
+matched the existing audio-hot release byte for byte. No release flag was
+changed.
+
+The same ordinary-input Z7 battle save and 4,901-update tape were replayed
+on both ROMs. The control used 9,325,541,168 guest cycles (1,902,783 per
+update); the cache used 8,554,350,089 (1,745,430 per update), an 8.27%
+reduction. These are 8.82 and 9.61 emulated main-loop updates per second,
+including presentation waits and UI, not physical-device frame rates.
+Both matched the recorded start and end observations. At 72 sampled cuts,
+semantic summaries, both framebuffer page hashes, palette, display-page
+selection and menu state matched. These samples do not prove all transient
+state or full-campaign equivalence on this release.
+
+The candidate's EWRAM end was `0x0203b7e8`, 10,264 bytes below the
+`0x0203e000` guard; the control ended at `0x020399a0`, so the increase
+was 7,752 bytes. The candidate IWRAM stack checker passed: code ended at
+`0x030062d0`, with a 5,856-byte main stack bound, 512-byte margin and
+592 bytes spare; the IRQ bound was 264 of 416 bytes. These figures cover
+Z10 only. Other cartridges and ordinary-input wide-map campaigns still
+need current-release qualification before promotion.
+
+| Input | SHA-256 |
+| --- | --- |
+| Control Z10 ROM | `82bcc90a835449abd4ac636085830b132bf9926714f6757b3ff2611b09c3b6da` |
+| Candidate Z10 ROM | `1d3f8f098900371404523bc4d591f7ac568dddf4325cf9a4190e8c76526c38f6` |
+| Z7 battle save | `2879841d6fbe26a27c35ea1316302419d0271abbcc395177393c8f1723be9bf5` |
+| Recorded input trace | `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1` |
