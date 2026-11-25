@@ -60,9 +60,8 @@ their earlier record is placed by the test.
 ## Campaign missions
 
 The Z10 campaign controller (`build/test-sc64-z10-campaign-run`) writes a
-byte-identical input and checkpoint log on base `d39bd015` and on this branch
-merged with it: the
-mission is won at frame 49,302 in both. Its tape replay
+byte-identical input and checkpoint log on base `737c0caa` and on this branch:
+the mission is won at frame 49,302 in both. Its tape replay
 (`make test-sc64-z10-replay`) fails the same way on the base and here: the
 replayed match leaves the recorded one and restarts the mission. That failure
 is not caused by this change.
