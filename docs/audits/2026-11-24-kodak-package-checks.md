@@ -1099,11 +1099,19 @@ the next starts. The current and candidate GBA ROMs charge the same
 the queue and neither finished. The N64 near-cap admission check
 still needs its own controller replay.
 
+A direct ares replay from the same FlashRAM image matches the first
+seven captures through the second order. Continued ordinary input then
+shows four Marine queue icons and 14 minerals. FlashRAM remains
+byte-identical. The final bank is below the 50-mineral Marine price,
+so this cut establishes four displayed entries. Queue capacity and
+near-cap admission still need funded tests.
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | Fresh N64 purchase and completion | `c230e0cff5fe4a97fa91ed1250e6fb4a4ef8df4cae7dfdf4cd16e033ecb09654` |
 | Current GBA and renderer candidate checkpoints | `365ce8456c5b5aac9fea1dfcd89320845b53e50402395361dc06139f46230d6e` |
 | Fresh N64 with two paid Marines | `d786dcce4f3803430929313e7e8333b5c5545f729b606c62aa19aa490660b3ce` |
+| N64 four-icon capture and input commands | `bb046dfcc06be1f5919ae07d5d1c30d8258633071bb7737b1bc05c8c738ec313` / `bb763f9813988ab41af085c2ca775dad882eaccc7da7c55e2f8ed7a20aeab8ad` |
 | Current GBA and candidate with two paid Marines | `1a70b2021eb7563e260d322e1563096eb4f548458c7fcf29de123fec934d3e72` |
 
 #### Canceling the last queued unit
@@ -1864,6 +1872,37 @@ Profile the current source's base projectile motion and raster
 work at this fixed camera position and after an ordinary-input
 pan to the visible fight. These are mGBA guest-cycle observations.
 
+#### Direct sprite entries on the Pylon release
+
+Read-only entry and return breakpoints sampled eight P10 panned Outpost
+updates at frames 11,174–11,181 and eight dense Z9 road updates at
+frames 27,562–27,569. The sampled clocks match the uninstrumented runs.
+
+P10 makes zero calls to the generic, packed, mapped and flipped blitter
+entries in this cut. Z9 calls the generic blitter twice in one frame.
+One 20×20 image has mismatched source and destination word alignment
+and costs 6,168 cycles, an upper bound of 771 cycles per sampled update
+for an alignment change. Z9 calls the packed entry 120 times at
+53,795 cycles per update. Of these, 112 come from the unit walk path
+and eight from completed buildings. These entry counts leave inlined
+and other compositors outside the sample.
+
+Instruction and call-stack sampling on the same eight P10 frames
+attributes 271,215 cycles per update to depth-ordered actors and
+221,332 of those to tracer parts, across about 61 calls. Within that
+work, raster calls account for 41,952 cycles and animation lookup takes
+21,227 self cycles. No unit-image calls are recorded. The instrumented
+and control runs match state, both pages, stage counts and clocks.
+Measure which raster guards return before the pixel path. Keep layer
+order, independent trails and current fog and clipping rules in
+subsequent comparisons.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Z9 generic / packed entries | `b1de896e5e2b5814c2db8e0dfdfb7e439924b69e069874c468dba95b34b0b76d` / `7b5257302a58efbf051bdde3a068d7d519f1604687f70e88983df0215a8c4a7d` |
+| P10 generic / packed entries | `bee3bed5290e6b2d0a7d04de030a6a5c8ae1df969c57a7d2161cfe7c35a0f487` |
+| P10 instruction and call-stack attribution | `9cfc4d617f687493b6137bd7280e38fb704d2af3a8fa41c875d3ef2499d9208e` |
+
 #### Pan from the base to the Outpost fight
 
 Across three exact race-ROM runs, an ordinary R and D-pad hold
@@ -2153,6 +2192,35 @@ changing the default.
 | --- | --- |
 | Outpost stock / witness | `835e54c19a185059dbc188f28308e340b57e6cc7cb3b8e38a86c05cbb9b80bb4` / `1ddef2d373f6e25e4dbff3137add25478c81494c2f90369cd8c6dd2cac259db6` |
 | Blood Bath stock / witness | `c4f3e288b41471ef0ffba990bdb9da632da13295d2ac786a01d1a385aa46e716` / `ddc65b9d89773734f09343c63d6d04708e767137edd040effd244d85791f2ca8` |
+
+#### Witness use on the Pylon release
+
+The Pylon-enabled Terran release and the same build with the #805 witness
+flag entered an ordinary three-CPU Blood Bath match and advanced to update
+11,000. The rebuilt control ROM matches the release ROM byte for byte.
+The two builds match world, camera, palette, both framebuffer pages and
+selected page over the following 96 updates. Pause SRAM and fresh
+60-update continuations also match. The selected page at the last fresh
+continuation sample differs.
+
+Mean elapsed loop cycles rise from 889,816 to 893,722 with the witness
+flag (+0.44%). Read-only breakpoints count 419 eligible lookups, 406
+fallback probes and 13 hits, all from advancing origins. The ten updates
+containing hits save 402,004 cycles in total. The other 86 updates cost
+776,972 additional cycles, including any dispatch and linked-placement
+effects. The breakpoint run reproduces the uninstrumented candidate's
+world and cycle samples.
+
+The inputs and update range match the earlier overlap census. The
+boundary world now has 135 units, compared with 136 in that census.
+Keep the witness table off in the release. A later trial should
+measure a cheaper miss path on the same live states before changing
+retention or admission.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Control / witness | `7add620ea21a44d123b71404bc86f3b60b52a699ddadb4a25338a571aa1c42b2` / `2a80676d07d0552816592091f99dc86b36ac3e4d2bc31249e888efc8da28efa5` |
+| Witness breakpoint census | `706afea96e9c10eb2c03e393de11cbf80967d1efcfbbff3e9967d68e959aa89b` |
 
 ### Pylon lookup in dense missions and panned skirmishes
 
