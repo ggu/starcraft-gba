@@ -76,7 +76,7 @@ static int sc64_unit_bucket_step_clear_reference(const Unit *q, int nx, int ny, 
 
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_active(void);
-static int race_p6_combat_unit_burrowed(int slot);
+static int (race_p6_combat_unit_burrowed)(int slot);
 #endif
 
 /* Type-derived facts only; raw_type-specific burrow eligibility is resolved

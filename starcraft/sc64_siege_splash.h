@@ -157,6 +157,11 @@ static void race_siege_splash_attack(Unit *source,int primary,int base_damage) {
 #ifdef SC64_RACES
   if(primary<MAX_UNITS)u[primary].shield-=shield_loss;else b[primary-MAX_UNITS].shield-=shield_loss;
 #endif
+#ifdef SC64_SHIELD_FLASH_ENABLED
+  sc64_shield_hit_from(source->x,source->y,primary);
+  sc64_shield_flash_hit(primary,shield_loss,primary<MAX_UNITS?u[primary].shield:b[primary-MAX_UNITS].shield);
+  sc64_shield_hit_done();
+#endif
   hit_target_impl_ex(primary,hp_damage,source->type,source->owner,-1,flags);
 #endif
   return;
@@ -187,6 +192,11 @@ static void race_siege_splash_attack(Unit *source,int primary,int base_damage) {
 #ifdef SC64_RACES
   if(target<MAX_UNITS)u[target].shield-=shield_loss;
   else b[target-MAX_UNITS].shield-=shield_loss;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+  sc64_shield_hit_from(source->x,source->y,target);
+  sc64_shield_flash_hit(target,shield_loss,target<MAX_UNITS?u[target].shield:b[target-MAX_UNITS].shield);
+  sc64_shield_hit_done();
+#endif
 #endif
   hit_target_impl_ex(target,hp_damage,source->type,source->owner,-1,flags);
 #endif

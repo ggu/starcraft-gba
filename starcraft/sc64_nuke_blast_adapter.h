@@ -35,7 +35,8 @@ race_nuke_apply_blast(int x, int y, int owner, int missile_slot)
         int distance = sc64_siege_distance(raw, center_x, center_y, x, y);
         const Sc64StockUnitProfile *stock = sc64_stock_unit_profile(raw);
         if (distance < 0 || max_hp <= 0 || !stock) continue;
-        unsigned packet = sc64_nuke_damage_packet_q8((unsigned)max_hp, stock->shields,
+        unsigned packet = sc64_nuke_damage_packet_q8((unsigned)max_hp,
+                                                      target < MAX_UNITS && sc64_native_zealot(u[target].type,u[target].raw_type) ? sc64_race_unit_rules[U_ZEALOT].shields : stock->shields,
                                                       (unsigned)distance, buried);
         if (!packet || packet > INT_MAX) continue;
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
@@ -44,6 +45,9 @@ race_nuke_apply_blast(int x, int y, int owner, int missile_slot)
 #else
         hp_loss = sc64_siege_resolve(target, packet, &shield_loss);
         *shield -= shield_loss;
+#ifdef SC64_SHIELD_FLASH_ENABLED
+        SC64_SHIELD_DEBIT(target, shield_loss, *shield);
+#endif
         if (hp_loss)
             hit_target_impl_ex(target, hp_loss, -1, owner, SC64_STOCK_DMG_EXPLOSIVE,
                 SC64_HIT_PRECOMPUTED_HP | SC64_HIT_ALLOW_SPLASH_BURROW |

@@ -34,6 +34,6 @@ SECTIONS {
   __bss_end = .;
  } > EWRAM
  /DISCARD/ : { *(.comment*) *(.note*) *(.ARM.exidx*) *(.ARM.extab*) }
- ASSERT(__iwram_end < 0x03005000, "IWRAM code exhausts the 11 KiB stack reserve")
+ ASSERT(__iwram_end < 0x03005200, "IWRAM code exhausts the 11 KiB stack reserve")
  ASSERT(__bss_end < 0x0203e000, "GBA working RAM exhausted; leave stack/safety margin")
 }

@@ -76,28 +76,36 @@ static const Sc64StockUnitProfile *sc64_pr_q8_actor_stock(int target)
     }
     return sc64_stock_unit_profile(raw);
 }
+static unsigned sc64_pr_q8_shield_capacity(int target, const Sc64StockUnitProfile *stock)
+{
+    if (target < MAX_UNITS && sc64_native_zealot(u[target].type,u[target].raw_type)) return sc64_race_unit_rules[U_ZEALOT].shields;
+    return stock->shields;
+}
 static int sc64_pr_q8_actor_shield(int target,unsigned *out)
 {
     const Sc64StockUnitProfile *stock=sc64_pr_q8_actor_stock(target);
     int shield,phase;
+    unsigned capacity;
     if (!stock || !out) return 0;
-    if (!stock->shields) { *out=0; return 1; }
+    capacity=sc64_pr_q8_shield_capacity(target,stock);
+    if (!capacity) { *out=0; return 1; }
     if (target<MAX_UNITS) { shield=u[target].shield; phase=u[target].shield_remainder; }
     else { shield=b[target-MAX_UNITS].shield; phase=b[target-MAX_UNITS].shield_remainder; }
-    if (shield<0 || (unsigned)shield>stock->shields || phase<0 || phase>=1280 ||
-        ((unsigned)shield==stock->shields && phase)) return 0;
+    if (shield<0 || (unsigned)shield>capacity || phase<0 || phase>=1280 ||
+        ((unsigned)shield==capacity && phase)) return 0;
     *out=(unsigned)shield*256u+(unsigned)phase/5u; return 1;
 }
 static int sc64_pr_q8_commit_shield(int target,unsigned value)
 {
     const Sc64StockUnitProfile *stock=sc64_pr_q8_actor_stock(target);
-    unsigned previous,carry,whole,phase;
+    unsigned previous,carry,whole,phase,capacity;
     if (!stock || !sc64_pr_q8_actor_shield(target,&previous)) return 0;
-    if (!stock->shields) return value==0;
-    if (value>(unsigned)stock->shields*256u) return 0;
+    capacity=sc64_pr_q8_shield_capacity(target,stock);
+    if (!capacity) return value==0;
+    if (value>capacity*256u) return 0;
     carry=target<MAX_UNITS ? u[target].shield_remainder%5u : (unsigned)b[target-MAX_UNITS].shield_remainder%5u;
     whole=value/256u; phase=(value%256u)*5u+carry;
-    if (whole==(unsigned)stock->shields) phase=0;
+    if (whole==capacity) phase=0;
     if (target<MAX_UNITS) {u[target].shield=(int)whole;u[target].shield_remainder=(u16)phase;}
     else {b[target-MAX_UNITS].shield=(int)whole;b[target-MAX_UNITS].shield_remainder=(int)phase;}
     return 1;

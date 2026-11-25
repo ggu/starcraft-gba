@@ -18,7 +18,7 @@ an `#error`). `game.c` is unchanged.
 | `tests/sc64_parity_trace.h` | Trace emitter and the schema |
 | `tests/sc64_parity_run.c` | Runner: menu launch, scenario, trace, world hashes |
 | `tools/sc64_parity_selfgate.py` | Self-gates and throughput |
-| `mk/parity/Makefile` | Builds, included from `mk/skirmish-controller/Makefile` |
+| `mk/parity/Makefile` | Builds (shared with the table differ's `parity-tables`), included from `mk/padded-impact-save/Makefile` |
 
 ## Running
 

@@ -9,6 +9,28 @@ int main(void)
     assert(sc64_race_unit_rule(U_DRONE)->minerals == 50);
     assert(sc64_race_unit_rule(U_PROBE)->race == R_PROTOSS);
     assert(sc64_race_building_rule(B_GATEWAY)->prereq & SC_PR_PYLON);
+    { int hp=100, maxhp=100, shield=60;
+      assert(sc64_native_zealot(U_ZEALOT,65));
+      assert(sc64_native_zealot(U_ZEALOT,-1));
+      assert(!sc64_native_zealot(U_ZEALOT,77));
+      assert(!sc64_native_zealot(U_FENIX,77));
+      assert(sc64_native_zealot_restore(&hp,&maxhp,&shield,0));
+      assert(hp==80 && maxhp==80 && shield==80);
+      hp=70; maxhp=100; shield=25;
+      assert(sc64_native_zealot_restore(&hp,&maxhp,&shield,0));
+      assert(hp==70 && maxhp==80 && shield==25);
+      hp=70; maxhp=80; shield=75;
+      assert(sc64_native_zealot_restore(&hp,&maxhp,&shield,500));
+      assert(hp==70 && maxhp==80 && shield==75);
+      hp=101; maxhp=100; shield=60;
+      assert(!sc64_native_zealot_restore(&hp,&maxhp,&shield,0));
+      hp=90; maxhp=80; shield=61;
+      assert(!sc64_native_zealot_restore(&hp,&maxhp,&shield,0));
+      hp=100; maxhp=100; shield=60;
+      assert(!sc64_native_zealot_restore(&hp,&maxhp,&shield,1)); }
+    assert(sc64_race_unit_rule(U_ZEALOT)->hp == 80);
+    assert(sc64_race_unit_rule(U_ZEALOT)->shields == 80);
+    assert(sc64_race_unit_rule(U_FENIX)->hp == 240);
     assert(sc64_race_unit_damage_vs(U_ZEALOT, 0) == 8);
     assert(sc64_race_unit_hits_vs(U_ZEALOT, 0) == 2);
     assert(sc64_race_unit_damage_vs(U_FENIX, 0) == 20);
