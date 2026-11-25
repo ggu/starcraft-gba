@@ -66,6 +66,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. Prioritize those paths for
   the race cartridges.
+  [Linking the hottest ROM functions into the unused IWRAM stack
+  reserve](audits/2026-11-25-iwram-hot-placement.md) saves 6.87–8.46%
+  in five late three-CPU pairs and 2.95% in Protoss Blood Bath, with
+  matching state, pixels and saves. Each ROM's stack bound is checked
+  at build time. Late updates still exceed two VBlanks. Measure the
+  relinked ROMs on hardware and in full campaign replays.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
   and movement takes 161,711 within orders. The fogged viewport

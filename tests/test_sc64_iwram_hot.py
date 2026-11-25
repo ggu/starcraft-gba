@@ -1,0 +1,355 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Asset-free checks for tools/gba_iwram_hot.py and common/gba_hot.ld."""
+from pathlib import Path
+import re
+import sys
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+import gba_iwram_hot as hot  # noqa: E402
+
+
+def ci(frames, calls):
+    """.ci text: frames {title: bytes}, calls [(caller, callee)]."""
+    lines = ['graph: { title: "file.c"']
+    lines += [f'node: {{ title: "{name}" label: "{hot.symbol_of(name)}\\nfile.c:1:1\\n{size} bytes (static)" }}'
+              for name, size in frames.items()]
+    lines += [f'edge: {{ sourcename: "{a}" targetname: "{b}" label: "file.c:2:2" }}' for a, b in calls]
+    return "\n".join(lines + ["}"]) + "\n"
+
+
+def document(*records):
+    return "\n".join(['graph: { title: "file.c"', *records, "}"]) + "\n"
+
+
+def bound(frames, calls, taken=(), root="main", **options):
+    frames, edges, sites = hot.parse_callgraph([ci(frames, calls)])
+    return hot.stack_bound(frames, edges, set(taken), root, sites=sites, **options)
+
+
+def cycles(result, key):
+    return [(c["kind"], c["functions"]) for c in result[key]]
+
+
+def symtab(rows):
+    """`readelf -s -W` text from (address, size, type, bind, name) rows."""
+    head = "   Num:    Value  Size Type    Bind   Vis      Ndx Name\n"
+    return head + "".join(f"{i:6d}: {addr:08x} {size:5d} {kind:7s} {bind:6s} DEFAULT    1 {name}\n"
+                          for i, (addr, size, kind, bind, name) in enumerate(rows, 1))
+
+
+class ConfigTest(unittest.TestCase):
+    def test_parses_limit_names_cycles_and_comments(self):
+        config = hot.parse_config("# note\nlimit 0x03005dc0\n\nrecursion destroy* 2 0123abcd\n"
+                                  "callback-cycle dispatch 1 89abcdef\nmemset\nfoo_bar*  # clones\n")
+        self.assertEqual(config["limit"], 0x03005DC0)
+        self.assertEqual(config["names"], ["memset", "foo_bar*"])
+        self.assertEqual(config["recursion"], {"destroy*": (2, "0123abcd")})
+        self.assertEqual(config["callback-cycle"], {"dispatch": (1, "89abcdef")})
+
+    def test_rejects_bad_configs(self):
+        for text in ("memset\n",                               # no limit
+                     "limit 0x03005dc0\nlimit 0x03005dc0\n",   # two limits
+                     "limit 0x03005dc2\n",                     # not a word address
+                     "limit 0x03007e04\n",                     # above the stack top
+                     "limit 0x02000000\n",                     # not IWRAM
+                     "limit 0x03005dc0\nmemset\nmemset\n",     # listed twice
+                     "limit 0x03005dc0\n*(.text*)\n",          # not a function name
+                     "limit 0x03005dc0\na b\n",
+                     "limit 0x03005dc0\nrecursion f 0 0123abcd\n",   # a cycle is live at least once
+                     "limit 0x03005dc0\nrecursion f -1 0123abcd\n",
+                     "limit 0x03005dc0\nrecursion f 2\n",            # no fingerprint
+                     "limit 0x03005dc0\nrecursion f 2 XYZ\n",
+                     "limit 0x03005dc0\nrecursion f 2 0123abcd\nrecursion f 3 0123abcd\n"):
+            with self.assertRaises(hot.HotError, msg=text):
+                hot.parse_config(text)
+
+    def test_fragments_place_each_section_and_define_the_limit(self):
+        files = hot.fragments(0x03005DC0, ["memset", "foo*"])
+        self.assertIn("*(.text.memset)\n*(.text.foo*)\n", files[hot.SECTIONS_NAME])
+        self.assertIn("__iwram_hot_limit = 0x03005dc0;", files[hot.LIMIT_NAME])
+
+    def test_every_run_rewrites_both_fragments_limit_last(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp, "list.txt")
+            config.write_text("limit 0x03005dc0\nmemset\n")
+            out = Path(tmp, "out")
+            hot.write_fragments(config, out)
+            (out / hot.LIMIT_NAME).unlink()
+            config.write_text("limit 0x03005d80\nmemset\n")
+            hot.write_fragments(config, out)
+            self.assertEqual(sorted(p.name for p in out.iterdir()), sorted([hot.LIMIT_NAME, hot.SECTIONS_NAME]))
+            self.assertIn("0x03005d80", (out / hot.LIMIT_NAME).read_text())
+            self.assertGreaterEqual((out / hot.LIMIT_NAME).stat().st_mtime_ns,
+                                    (out / hot.SECTIONS_NAME).stat().st_mtime_ns)
+
+    def test_checked_in_lists_parse_and_declare_their_cycles(self):
+        lists = sorted((ROOT / "config" / "iwram-hot").glob("*.txt"))
+        self.assertTrue(lists)
+        for path in lists:
+            config = hot.parse_config(path.read_text())
+            self.assertTrue(config["names"], path)
+            self.assertLess(config["limit"], hot.STACK_TOP, path)
+            self.assertTrue(config["recursion"] and config["callback-cycle"], path)
+
+
+class BoundTest(unittest.TestCase):
+    def test_longest_direct_chain(self):
+        result = bound({"main": 96, "update": 100, "draw": 400, "leaf": 40},
+                       [("main", "update"), ("main", "draw"), ("draw", "leaf")])
+        self.assertEqual(result["bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
+        self.assertEqual([step["functions"][0]["name"] for step in result["chain"]], ["main", "draw", "leaf"])
+        self.assertEqual(result["undeclared"], [])
+
+    def test_titles_map_to_symbols_and_units(self):
+        self.assertEqual(hot.symbol_of("starcraft/game.c:foo.constprop.0"), "foo.constprop.0")
+        self.assertEqual(hot.unit_of("starcraft/game.c:foo.constprop.0"), "game.c")
+        self.assertEqual(hot.symbol_of("main"), "main")
+        self.assertIsNone(hot.unit_of("main"))
+
+    def test_pointer_call_reaches_every_taken_function(self):
+        frames = {"main": 10, "dispatch": 20, "small": 30, "big": 500, "unused": 9000}
+        calls = [("main", "dispatch"), ("dispatch", hot.INDIRECT)]
+        self.assertEqual(bound(frames, calls, taken={"small", "big"})["bytes"], 10 + 20 + 500 + hot.HELPER_BYTES)
+        # A function nobody calls and whose address nobody takes is unreachable.
+        self.assertEqual(bound(frames, calls)["bytes"], 10 + 20 + hot.HELPER_BYTES)
+
+    def test_callback_cycle_must_be_declared(self):
+        # save -> (pointer) -> callback -> validate -> (pointer) -> callback ...
+        frames = {"main": 10, "save": 100, "callback": 200, "validate": 50, "tail": 7}
+        calls = [("main", "save"), ("save", hot.INDIRECT), ("callback", "validate"),
+                 ("validate", hot.INDIRECT), ("validate", "tail")]
+        result = bound(frames, calls, taken={"callback"})
+        self.assertEqual(cycles(result, "undeclared"), [("callback-cycle", ["callback", "validate"])])
+        once = bound(frames, calls, taken={"callback"}, callback_cycles={"validate": 1})
+        self.assertEqual(once["undeclared"], [])
+        self.assertEqual(once["bytes"], 10 + 100 + (200 + 50) + 7 + hot.HELPER_BYTES)
+        twice = bound(frames, calls, taken={"callback"}, callback_cycles={"call*": 2})
+        self.assertEqual(twice["bytes"], 10 + 100 + 2 * (200 + 50) + 7 + hot.HELPER_BYTES)
+
+    def test_recursion_must_be_declared_and_multiplies_the_cycle(self):
+        frames = {"main": 10, "destroy.isra.0": 40, "detach": 24, "leaf": 8}
+        calls = [("main", "destroy.isra.0"), ("destroy.isra.0", "detach"), ("detach", "destroy.isra.0"),
+                 ("detach", "leaf")]
+        result = bound(frames, calls)
+        self.assertEqual(cycles(result, "undeclared"), [("recursion", ["destroy.isra.0", "detach"])])
+        twice = bound(frames, calls, recursion={"destroy*": 2})
+        self.assertEqual(twice["undeclared"], [])
+        self.assertEqual(twice["bytes"], 10 + 2 * (40 + 24) + 8 + hot.HELPER_BYTES)
+        self.assertEqual(bound(frames, calls, recursion={"detach": 3})["bytes"],
+                         10 + 3 * (40 + 24) + 8 + hot.HELPER_BYTES)
+        # A recursion declaration does not cover it as a callback cycle of another kind, and vice versa.
+        self.assertTrue(bound(frames, calls, callback_cycles={"detach": 1})["undeclared"])
+
+    def test_declared_cycle_that_changed_must_be_read_again(self):
+        frames = {"main": 10, "save": 100, "callback": 200, "validate": 50}
+        calls = [("main", "save"), ("save", hot.INDIRECT), ("callback", "validate"), ("validate", hot.INDIRECT)]
+        seen = bound(frames, calls, taken={"callback"})["cycles"][0]["fingerprint"]
+        ok = bound(frames, calls, taken={"callback"}, callback_cycles={"callback": (1, seen)})
+        self.assertEqual((ok["undeclared"], ok["changed"]), ([], []))
+        # A member gains a pointer call: the same declaration no longer covers it.
+        more = calls + [("callback", hot.INDIRECT)]
+        result = bound(frames, more, taken={"callback"}, callback_cycles={"callback": (1, seen)})
+        self.assertEqual(cycles(result, "changed"), [("callback-cycle", ["callback", "validate"])])
+        # So does a second pointer-call site in a member that already had one.
+        frames2, edges2, sites2 = hot.parse_callgraph([ci(frames, calls)])
+        sites2 = dict(sites2, validate=sites2["validate"] + 1)
+        result = hot.stack_bound(frames2, edges2, {"callback"}, "main", sites=sites2,
+                                 callback_cycles={"callback": (1, seen)})
+        self.assertEqual(len(result["changed"]), 1)
+        # And another address-taken function joining the cycle.
+        joined = dict(frames, other=5)
+        result = bound(joined, calls + [("other", "validate")], taken={"callback", "other"},
+                       callback_cycles={"callback": (1, seen)})
+        self.assertEqual(len(result["changed"]), 1)
+
+    def test_fingerprint_ignores_compiler_clone_suffixes(self):
+        a = hot.cycle_fingerprint("recursion", ["game.c:destroy.isra.0", "game.c:detach"], {}, set())
+        b = hot.cycle_fingerprint("recursion", ["game.c:destroy", "game.c:detach.constprop.0"], {}, set())
+        c = hot.cycle_fingerprint("recursion", ["game.c:destroy", "game.c:other"], {}, set())
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertRegex(a, hot.FINGERPRINT)
+
+    def test_pointer_call_back_into_a_recursion_group_needs_its_own_declaration(self):
+        frames = {"main": 10, "a": 40, "b": 24}
+        calls = [("main", "a"), ("a", "b"), ("b", "a")]
+        plain = bound(frames, calls, taken={"b"}, recursion={"a": 2})
+        self.assertEqual(plain["undeclared"], [])       # address taken, but nothing calls through a pointer
+        looped = bound(frames, calls + [("b", hot.INDIRECT)], taken={"b"}, recursion={"a": 2})
+        self.assertEqual(cycles(looped, "undeclared"), [("callback-cycle", ["a", "b"])])
+        both = bound(frames, calls + [("b", hot.INDIRECT)], taken={"b"}, recursion={"a": 2},
+                     callback_cycles={"b": 3})
+        self.assertEqual((both["undeclared"], both["bytes"]), ([], 10 + 2 * 3 * (40 + 24) + hot.HELPER_BYTES))
+
+    def test_self_recursion_is_recursion(self):
+        calls = [("main", "walk"), ("walk", "walk")]
+        self.assertTrue(bound({"main": 10, "walk": 16}, calls)["undeclared"])
+        self.assertEqual(bound({"main": 10, "walk": 16}, calls, recursion={"walk": 4})["bytes"],
+                         10 + 4 * 16 + hot.HELPER_BYTES)
+
+    def test_recursion_inside_a_callback_cycle_multiplies_both(self):
+        frames = {"main": 1, "a": 10, "b": 20, "c": 30}
+        calls = [("main", "a"), ("a", "b"), ("b", "a"), ("b", hot.INDIRECT), ("c", "a")]
+        result = bound(frames, calls, taken={"c"}, recursion={"a": 2}, callback_cycles={"c": 3})
+        self.assertEqual(result["undeclared"], [])
+        self.assertEqual(result["bytes"], 1 + 3 * (2 * 10 + 2 * 20 + 30) + hot.HELPER_BYTES)
+
+    def test_cycles_the_root_cannot_reach_need_no_declaration(self):
+        frames = {"main": 10, "leaf": 5, "x": 100, "y": 100}
+        calls = [("main", "leaf"), ("x", "y"), ("y", "x")]
+        result = bound(frames, calls)
+        self.assertEqual((result["bytes"], result["undeclared"]), (15 + hot.HELPER_BYTES, []))
+
+    def test_callee_without_a_frame_needs_a_known_cost(self):
+        with self.assertRaises(hot.HotError):
+            bound({"main": 10}, [("main", "mystery")])
+        result = bound({"main": 10}, [("main", "__aeabi_idiv")],
+                       frameless=lambda name: hot.LIBGCC_BYTES if hot.LIBGCC.match(name) else None)
+        self.assertEqual(result["bytes"], 10 + hot.LIBGCC_BYTES + hot.HELPER_BYTES)
+
+    def test_libgcc_and_veneer_names(self):
+        for name in ("__aeabi_uldivmod", "__aeabi_idiv", "__udivmoddi4", "__divsi3", "__clzdi2", "__ctzsi2",
+                     "__muldi3", "__gnu_thumb1_case_uhi"):
+            self.assertTrue(hot.LIBGCC.match(name), name)
+        for name in ("__sc64_private", "race_tc_prepare", "__aeabi", "memcpy"):
+            self.assertFalse(hot.LIBGCC.match(name), name)
+        for name in ("__memset_veneer", "__tick_combat_from_arm", "____aeabi_idiv_from_thumb"):
+            self.assertTrue(hot.VENEER.match(name), name)
+        self.assertFalse(hot.VENEER.match("memset"))
+
+    def test_pointer_call_sites_are_counted_per_function(self):
+        text = document(
+            'edge: { sourcename: "a" targetname: "__indirect_call" label: "f.c:10:3" }',
+            'edge: { sourcename: "a" targetname: "__indirect_call" label: "f.c:12:3" }',
+            'edge: { sourcename: "a" targetname: "__indirect_call" label: "f.c:12:3" }',
+            'edge: { sourcename: "b" targetname: "a" label: "f.c:20:1" }',
+            'edge: { sourcename: "c" targetname: "__aeabi_idiv" }')
+        _, edges, sites = hot.parse_callgraph([text])
+        self.assertEqual(sites, {"a": 2})
+        self.assertEqual(edges["c"], {"__aeabi_idiv"})
+
+    def test_dynamic_frames_are_refused(self):
+        text = document('node: { title: "f" label: "f\\nfile.c:1:1\\n64 bytes (dynamic,bounded)" }')
+        with self.assertRaises(hot.HotError):
+            hot.parse_callgraph([text])
+
+    def test_truncated_or_unparsed_call_graph_is_refused(self):
+        whole = ci({"main": 96, "draw": 400}, [("main", "draw")])
+        self.assertEqual(hot.parse_callgraph([whole])[0], {"main": 96, "draw": 400})
+        lines = whole.splitlines()
+        for broken in ("\n".join(lines[:-1]) + "\n",             # no closing brace
+                       "\n".join(lines[:-2]) + "\n",             # cut before the last edge
+                       "\n".join(lines[:-2] + [lines[-2][:30]]),  # cut inside a record
+                       "\n".join(lines[1:]) + "\n",              # no graph header
+                       "\n".join(lines[:1] + ["garbage"] + lines[1:]) + "\n",
+                       ""):
+            with self.assertRaises(hot.HotError, msg=broken):
+                hot.parse_callgraph([broken])
+
+    def test_declarations_do_not_hide_the_defining_frame(self):
+        frames, _, _ = hot.parse_callgraph([document(
+            'node: { title: "game_update" label: "game_update\\ncommon/gba.h:1:1" shape : ellipse }',
+            'node: { title: "game_update" label: "game_update\\ngame.c:9:1\\n72 bytes (static)" }')])
+        self.assertEqual(frames, {"game_update": 72})
+
+    def test_deep_chains_do_not_hit_the_recursion_limit(self):
+        frames = {f"f{i}": 4 for i in range(5000)}
+        calls = [(f"f{i}", f"f{i + 1}") for i in range(4999)]
+        self.assertEqual(bound(frames, calls, root="f0")["bytes"], 5000 * 4 + hot.HELPER_BYTES)
+
+
+class DumpTest(unittest.TestCase):
+    def test_address_taken_functions_only(self):
+        dump = """Initial Symbol table:
+
+race_tc_prepare/28710 (race_tc_prepare)
+  Type: function definition analyzed
+  Visibility: semantic_interposition
+  Address is taken.
+  References: scratch/9160 (addr)
+  Referring: race_worker_cargo_select/28711 (addr)
+update_orders/100 (update_orders)
+  Type: function definition analyzed
+  Visibility: semantic_interposition
+  Referring:
+  Called by: game_update/7
+table/9160 (table)
+  Type: variable definition analyzed
+  Address is taken.
+foo.constprop.0/5 (foo.constprop)
+  Type: function definition analyzed
+  Address is taken.
+"""
+        taken, defined = hot.parse_address_taken(dump.splitlines(keepends=True))
+        self.assertEqual(taken, {"race_tc_prepare", "foo.constprop.0"})
+        self.assertEqual(defined, {"race_tc_prepare", "update_orders", "foo.constprop.0"})
+
+    def test_symbols_keep_every_binding_and_skip_objects(self):
+        values, functions, files = hot.parse_symbols(symtab([
+            (0x08000101, 40, "FUNC", "LOCAL", "static_fn"),
+            (0x08000201, 12, "FUNC", "WEAK", "weak_fn"),
+            (0x08000301, 12, "FUNC", "GLOBAL", "global_fn"),
+            (0x08000400, 64, "OBJECT", "LOCAL", "table"),
+            (0x03005ae0, 0, "NOTYPE", "GLOBAL", "__iwram_end"),
+            (0, 0, "FILE", "LOCAL", "game.c")]) +
+            "     9: 00000000     0 FUNC    GLOBAL DEFAULT  UND missing\n")
+        self.assertEqual(files, {"game.c"})
+        self.assertEqual(values["__iwram_end"], 0x03005AE0)
+        self.assertEqual(functions, [(0x08000100, 40, "static_fn"), (0x08000200, 12, "weak_fn"),
+                                     (0x08000300, 12, "global_fn")])
+
+    def test_merged_function_resolves_to_the_frame_at_its_address(self):
+        frames, edges, _ = hot.parse_callgraph([ci({"main": 10, "game.c:census_p8": 300},
+                                                   [("main", "game.c:census_p10")])])
+        _, functions, _ = hot.parse_symbols(symtab([(0x08000101, 80, "FUNC", "LOCAL", "census_p8"),
+                                                 (0x08000101, 80, "FUNC", "LOCAL", "census_p10"),
+                                                 (0x08000201, 20, "FUNC", "GLOBAL", "main")]))
+        aliases = hot.resolve_aliases(frames, edges, functions)
+        self.assertEqual(aliases, {"game.c:census_p10": "game.c:census_p8"})
+        edges = {source: {aliases.get(t, t) for t in targets} for source, targets in edges.items()}
+        self.assertEqual(hot.stack_bound(frames, edges, set(), "main")["bytes"], 310 + hot.HELPER_BYTES)
+
+
+class LinkerScriptTest(unittest.TestCase):
+    """gba_hot.ld must stay gba.ld plus the hot section list."""
+
+    def setUp(self):
+        self.base = (ROOT / "common" / "gba.ld").read_text()
+        self.hot = (ROOT / "common" / "gba_hot.ld").read_text()
+
+    def test_memory_regions_match(self):
+        memory = re.compile(r"MEMORY \{.*?\n\}", re.S)
+        self.assertEqual(memory.search(self.base).group(0), memory.search(self.hot).group(0))
+
+    def test_every_input_pattern_and_symbol_is_kept(self):
+        patterns = set(re.findall(r"\*\([^)]*\)", self.base))
+        self.assertEqual(patterns - set(re.findall(r"\*\([^)]*\)", self.hot)), set())
+        symbols = set(re.findall(r"\b(__\w+) =", self.base))
+        self.assertEqual(symbols - set(re.findall(r"\b(__\w+) =", self.hot)), set())
+        self.assertIn("ASSERT(__bss_end < 0x0203e000", self.hot)
+
+    def test_hot_sections_come_before_the_rom_text(self):
+        self.assertLess(self.hot.index(f"INCLUDE {hot.SECTIONS_NAME}"), self.hot.index("*(.text*)"))
+        self.assertLess(self.hot.index("KEEP(*(.gbaheader))"), self.hot.index("__iwram_start"))
+        self.assertIn(f"INCLUDE {hot.LIMIT_NAME}", self.hot)
+
+    def test_every_interrupt_handler_in_the_sources_is_bounded(self):
+        stored = set()
+        for path in [*(ROOT / "common").glob("*.[ch]"), *(ROOT / "starcraft").glob("*.[ch]")]:
+            text = path.read_text(errors="replace")
+            stored.update(re.findall(r"0x03007ffc\s*=\s*\(u32\)\s*(\w+)", text, flags=re.I))
+            self.assertEqual(len(re.findall(r"0x03007ffc\s*=", text, flags=re.I)),
+                             len(re.findall(r"0x03007ffc\s*=\s*\(u32\)\s*\w+", text, flags=re.I)), path)
+        self.assertEqual(stored, set(hot.IRQ_HANDLERS))
+
+    def test_stack_pointers_match_the_reset_code(self):
+        start = (ROOT / "common" / "start.s").read_text()
+        self.assertEqual([int(v, 16) for v in re.findall(r"ldr sp, =(0x[0-9a-f]+)", start)],
+                         [hot.IRQ_STACK_TOP, hot.STACK_TOP])
+
+
+if __name__ == "__main__":
+    unittest.main()

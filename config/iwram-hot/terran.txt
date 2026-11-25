@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Functions the Terran cartridge runs from IWRAM instead of ROM, ordered by
+# measured cycles saved per byte in late three-computer Custom Games.
+# See mk/iwram-hot/Makefile and tools/gba_iwram_hot.py.
+#
+# `limit` is the linker's guard: the highest address the IWRAM code may reach.
+# Keep it at or below what `gba_iwram_hot.py check` reports for this ROM
+# (stack top, less the worst-case stack depth, less the margin). The build
+# runs that check on the linked ROM.
+limit 0x03005d80
+
+# Call cycles: how many activations of their functions can be live, and the
+# fingerprint of the cycle as it was read. When the check reports a changed
+# cycle, read the code again before replacing the fingerprint it prints.
+#
+# Recursion: destroying a building with an add-on destroys the add-on from
+# race_bc_parent_detach; the add-on has no add-on of its own.
+recursion destroy_building* 2 7ed2e2a7
+# The trigger and save layers call one another through ops tables: trigger
+# dispatch, count cache, then the mission's world functions; and save
+# selection, then record validators. Each table is bound once to the layer
+# below it, so no function here is entered while it is active. The cycle
+# exists only because the check lets a pointer call reach every function
+# whose address is taken.
+callback-cycle sc64_t6_dispatch_action 1 1ef64d7d
+
+# A trailing * also takes a function's .constprop/.isra clones.
+memset
+race_t6_unit_burrowed
+sc64_unit_stock_step
+sc64_contact_blocked_mask_uncached
+sc64_race_t4_actor_flags
+race_defense_custom_build_cells
+race_defense_target_from_custom_cells*
+gfx_frame_sides
+audio_mixer_sum
+sc64_unit_buckets_begin
+sc64_target_index_begin_owner_lists
+sc64_depth_projectile_child_part
