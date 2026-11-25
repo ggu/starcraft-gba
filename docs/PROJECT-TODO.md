@@ -3766,6 +3766,9 @@ save/source-owner and timing evidence; do not advertise unwired components.
   its shared Egg service applies to custom games, not Z8–Z10 production.
 - Campaign products retain Outpost/Blood Bath custom games, all human races
   and 1–3 independently raced AIs. Larger roster and behavior gaps remain below.
+  A [Zerg Blood Bath Melee win against three allied Zerg CPUs](audits/2026-11-25-custom-game-full-matches.md#zerg-against-three-allied-zerg-opponents)
+  completes one ordinary-input two- and three-opponent win per map and human
+  race on mGBA; a mixed Terran/Zerg/Protoss alliance remains unqualified.
 - The [repeat-command save audit](audits/2026-11-18-saved-repeat-command.md)
   traces a normal Terran Outpost reload that changed 22 attack-move orders
   to move orders. Preserving only the remembered command keeps selection
