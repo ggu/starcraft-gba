@@ -244,3 +244,13 @@ Outpost won at frame 35,394 (259 checkpoints and 172 after a fresh pause
 load). Blood Bath won at frame 44,163 (499 checkpoints and 345 after a
 fresh pause load). The pause saves and victory saves for both were
 byte-identical to the original trial. Both victories reloaded.
+
+### Returning to the previous release
+
+Keep a copy of the original SRAM before using a trial cartridge. On each of
+Terran, P10, Z10 and Showcase, the previous release loaded the original
+Blood Bath save at frame 10,257. After one trial pause save, the previous
+release still loaded frame 10,257 from the older journal bank. After a
+second ordinary trial save, the previous release stayed on HOME when L was
+pressed. Both banks then used the trial format. For rollback, restore the
+original backup alongside the previous ROM.
