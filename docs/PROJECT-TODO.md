@@ -95,9 +95,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   skirmish importer now keeps each source site’s full 32-bit gas quantity
   in both the map descriptor and private report. Regenerating Blood Bath
   preserved the four existing coordinates and recorded 10,000 gas at each.
-  The shared worker still awards eight gas per normal trip. Capture the
-  N64 depleted-trip yield, then implement remaining gas per map site and
-  preserve it through refinery destruction, rebuilding and save/load.
+  The shared worker still awards eight gas per normal trip. The
+  [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
+  pickups of eight while stocked and two below eight from authenticated N64
+  code; a live depleted trip remains to be captured. Implement remaining gas
+  per map site and preserve it through refinery destruction, rebuilding and
+  save/load.
 
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256
