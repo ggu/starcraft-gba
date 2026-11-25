@@ -6,7 +6,6 @@
  * candidate. These routines do not select tags, publish SRAM or validate the
  * reconstructed world. Decode/normalize failure may mutate detached inputs. */
 #include <stdint.h>
-#include <string.h>
 #include "sc64_impact_events.h"
 enum { SC64_P10_PI_ROWS=32, SC64_P10_PI_EMBED=180,
        SC64_P10_PI_PACKET=200, SC64_P10_PI_TAIL=20,
