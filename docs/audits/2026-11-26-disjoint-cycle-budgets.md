@@ -41,6 +41,26 @@ The matching indexed-lookup ROM is SHA-256 `84bb873c12a5e09a7ad115f94835a1d17528
 
 Current local receipts: `/private/tmp/sc64-z10-lookup-qualification/<case>-indexed/pacing.json`.
 
+## Replayed Outpost timing boundaries
+
+Both flagged windows were repeated using the indexed Zerg binary and original
+inputs above. The debugger measures elapsed time between input observations.
+The cartridge already records a separate loop timer (`demo_last_cycles`) from
+before reading the controls through the return from rendering. The latter
+interval contains the update and draw timers in the same iteration.
+
+| Outpost opponents | Input tick | Debugger interval | Cartridge loop | Update | Draw | Loop less update and draw |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| PZ | 12,569 | 792,283 | 798,183 | 377,730 | 420,067 | 386 |
+| TZP | 12,378 | 1,115,710 | 1,118,807 | 668,421 | 450,000 | 386 |
+
+All 508 PZ and 494 TZP advancing updates now reconcile, with mean cartridge
+loop durations of 860,619 and 1,405,508 cycles respectively. New reports use
+the cartridge loop for stage budgets and the debugger interval for elapsed
+throughput. Receipts captured without the loop timer retain their original
+interval-based analysis. This corrects attribution and does not change game
+speed or the historical tables above.
+
 ## Earlier Terran and Protoss windows
 
 Four earlier 256-call, three-AI battle windows recorded 2026-11-26 03:43 Hong Kong time (2026-11-25 UTC) use the recorded Terran and Protoss products. These are different saves, traces, windows and cartridge revisions from the Zerg table; the rows describe individual scenarios, not controlled race comparisons. All active samples satisfy the same nested-counter checks.

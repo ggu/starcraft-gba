@@ -29,6 +29,14 @@
 #ifdef SC64_AUDIO_IMPORTED
 #include "sc64_audio_generated.h"
 #endif
+/* Host parity traces (tests/sc64_parity_trace.h) record each sound the
+ * observer asks for, before the on-screen, budget and voice gates below drop
+ * it. Unless a host build defines it, the hook is empty and evaluates nothing. */
+#ifndef GAME_AUDIO_REQUEST
+#define GAME_AUDIO_REQUEST(kind, raw, slot, x, y) ((void)0)
+#elif !defined(GBA_HOST)
+#error "GAME_AUDIO_REQUEST is a host-only parity hook"
+#endif
 
 enum {
     GAME_AUDIO_ATTACK, GAME_AUDIO_DEATH, GAME_AUDIO_READY, GAME_AUDIO_WHAT,
@@ -165,6 +173,7 @@ static int game_audio_voice_free(void)
  * this race is silent and counts as done. */
 static int game_audio_alert(int line)
 {
+    GAME_AUDIO_REQUEST(GAME_AUDIO_ALERT, line, -1, -1, -1);
     if (!GAME_AUDIO_HEARD(line)) return 1;
     if (!game_audio_voice_free()) return 0;
     game_audio_advised = 1;
@@ -343,6 +352,8 @@ static void game_audio_advisor(int cue)
                                cue == TOAST_CUE_NO_BUILD ? GAME_AUDIO_ALERT_NO_BUILD : GAME_AUDIO_ALERT_NO_LAND);
         return;
     }
+    /* The energy, no-build and no-land cues above are alerts and record there. */
+    GAME_AUDIO_REQUEST(GAME_AUDIO_ADVISOR, cue, -1, -1, -1);
     game_audio_advised = 1;
 #ifdef GBA_HOST
     ++game_audio_events[GAME_AUDIO_ADVISOR];
@@ -469,13 +480,18 @@ static void game_audio_observe(void)
         if (q->alive && SC64_TRANSPORT_LOADED(q)) now |= GAME_AUDIO_SNAPSHOT_LOADED;
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
+                GAME_AUDIO_REQUEST(GAME_AUDIO_DEATH, game_audio_unit_raw(q), i, q->x, q->y);
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_unit_raw(q));
             } else if (!(prev & GAME_AUDIO_SNAPSHOT_ALIVE) && q->alive) {
-                if (q->owner == SIDE) game_audio_emit(GAME_AUDIO_READY, game_audio_unit_raw(q));
-            } else if (q->alive && cd > (prev & 0xffu) && !(prev & GAME_AUDIO_SNAPSHOT_LOADED) &&
-                       game_audio_on_screen(q->x, q->y)) {
-                game_audio_emit(GAME_AUDIO_ATTACK, game_audio_unit_raw(q));
+                if (q->owner == SIDE) {
+                    GAME_AUDIO_REQUEST(GAME_AUDIO_READY, game_audio_unit_raw(q), i, q->x, q->y);
+                    game_audio_emit(GAME_AUDIO_READY, game_audio_unit_raw(q));
+                }
+            } else if (q->alive && cd > (prev & 0xffu) && !(prev & GAME_AUDIO_SNAPSHOT_LOADED)) {
+                GAME_AUDIO_REQUEST(GAME_AUDIO_ATTACK, game_audio_unit_raw(q), i, q->x, q->y);
+                if (game_audio_on_screen(q->x, q->y))
+                    game_audio_emit(GAME_AUDIO_ATTACK, game_audio_unit_raw(q));
             }
         }
         snap[i] = (u16)now;
@@ -494,17 +510,22 @@ static void game_audio_observe(void)
                   (q->under_construction ? GAME_AUDIO_SNAPSHOT_CONSTRUCTING : 0) : 0;
         if (!fresh) {
             if ((prev & GAME_AUDIO_SNAPSHOT_ALIVE) && !q->alive) {
+                GAME_AUDIO_REQUEST(GAME_AUDIO_DEATH, game_audio_building_raw(q), MAX_UNITS + i, q->x, q->y);
                 if (game_audio_on_screen(q->x, q->y))
                     game_audio_emit(GAME_AUDIO_DEATH, game_audio_building_raw(q));
             }
             else if (q->alive && (prev & GAME_AUDIO_SNAPSHOT_ALIVE) &&
                      (prev & GAME_AUDIO_SNAPSHOT_CONSTRUCTING) && !q->under_construction && q->owner == SIDE) {
 #ifdef SC64_RACES
-                if (sc64_race_building_rule(q->type) && sc64_race_building_rule(q->type)->race == R_PROTOSS)
+                if (sc64_race_building_rule(q->type) && sc64_race_building_rule(q->type)->race == R_PROTOSS) {
+                    GAME_AUDIO_REQUEST(GAME_AUDIO_WARP_DONE, game_audio_building_raw(q), MAX_UNITS + i, q->x, q->y);
                     game_audio_emit(GAME_AUDIO_WARP_DONE, game_audio_building_raw(q));
-                else
+                } else
 #endif
+                {
+                    GAME_AUDIO_REQUEST(GAME_AUDIO_BUILT, game_audio_building_raw(q), MAX_UNITS + i, q->x, q->y);
                     game_audio_emit(GAME_AUDIO_BUILT, game_audio_building_raw(q));
+                }
             }
         }
         snap[MAX_UNITS + i] = (u16)now;
@@ -512,12 +533,16 @@ static void game_audio_observe(void)
     if (selected_building >= 0 && selected_building < MAX_BUILDINGS)
         selection = selection * 31u + 0x10000u + (u32)selected_building;
     if (!fresh && selection && selection != game_audio_selection) {
+        GAME_AUDIO_REQUEST(GAME_AUDIO_WHAT, first_selected >= 0 ? game_audio_unit_raw(&u[first_selected]) :
+                           game_audio_building_raw(&b[selected_building]),
+                           first_selected >= 0 ? first_selected : MAX_UNITS + selected_building, -1, -1);
         if (first_selected >= 0)
             game_audio_emit(GAME_AUDIO_WHAT, game_audio_unit_raw(&u[first_selected]));
         else
             game_audio_emit(GAME_AUDIO_WHAT, game_audio_building_raw(&b[selected_building]));
     } else if (!fresh && selection && orders != game_audio_orders && pressed &&
                first_selected >= 0) {
+        GAME_AUDIO_REQUEST(GAME_AUDIO_YES, game_audio_unit_raw(&u[first_selected]), first_selected, -1, -1);
         game_audio_emit(GAME_AUDIO_YES, game_audio_unit_raw(&u[first_selected]));
     }
     game_audio_selection = selection;
