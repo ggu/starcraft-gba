@@ -297,7 +297,8 @@ queue_panel_tests(void)
           "the Firebat moves to the active slot");
     check(slot_empty(1) && queue_bar_fill() == 0, "the queue shortens and progress restarts");
 
-    /* A full queue fills all five slots; L removes the oldest. */
+    /* The full queue leaves the active Firebat in place when L removes
+     * the last waiting Marine. */
     train_type = U_MARINE;
     for (int i = 0; i < 6; i++) tap(KEY_A);
     check(b[barracks].queue_count == 5, "the queue holds five");
@@ -306,7 +307,8 @@ queue_panel_tests(void)
     tap(KEY_L);
     render();
     check(b[barracks].queue_count == 4 && slot_empty(4) && slot_filled(3), "L cancels into a shorter queue");
-    check(count_color(QUEUE_X, QUEUE_Y, QUEUE_SLOT, QUEUE_SLOT, C_ORANGE) == 0, "L removes the oldest unit");
+    check(count_color(QUEUE_X, QUEUE_Y, QUEUE_SLOT, QUEUE_SLOT, C_ORANGE) > 0 && slot_framed(0),
+          "the active Firebat remains in the first slot");
 
     /* A Command Center's queue is drawn the same way. */
     fixture();

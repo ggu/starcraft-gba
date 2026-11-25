@@ -24,8 +24,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finish on the padded-journal Z10 build. The vitals build repeats the
   [full Z7 win](audits/2026-11-12-z7-normal-physical.md#november-25-vitals-release-replay)
   through all 206 named checkpoints and repeats the full Z8 route and
-  late Z10 suffix with identical victory journals. Complete the replay matrix on the combined Terran,
-  Zerg and Protoss package, and continue native parity and GBA SP timing.
+  late Z10 suffix with identical victory journals. The [selection-ring
+  release](audits/2026-11-12-z7-normal-physical.md#november-25-selection-ring-release-replay)
+  repeats all 206 Z7 checkpoints through victory. The combined collision
+  and production build repeats the full Z8 win and confirms a byte-identical
+  victory re-export from fresh HOME. Complete the replay matrix on the
+  combined Terran, Zerg and Protoss package, and continue
+  native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
@@ -2169,12 +2174,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pass. Existing Wasteland and Backwater journals display
   one fewer supply with their prior actors intact, and
   Backwater trains a Marine for 50 minerals. Trace the
-  native SCV's first target and order separately. Both current HUDs
-  show 6/26 with the first Marine in production. A second waiting
-  Marine raises the GBA HUD to 7/26 immediately. On N64 the HUD reaches
-  7/26 after the first unit completes and the second begins. Verify
-  N64 admission and cancellation near the cap before changing the
-  shared production rule.
+  native SCV's first target and order separately. The [Cancel Last
+  comparison](audits/2026-11-24-kodak-package-checks.md#canceling-the-last-queued-unit)
+  confirms a 50-mineral refund and uninterrupted first-Marine training
+  on N64 and the updated GBA build. The HUD stays at 6/26 while
+  a second Marine waits. Both versions return to 5/26 when the sole
+  active Marine is canceled. Verify N64 admission near the cap.
+  The GBA reserves all paid training slots for admission.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

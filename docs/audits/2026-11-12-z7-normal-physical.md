@@ -230,3 +230,20 @@ still need their own end-to-end observation.
 | Z10 ROM | `08675d363c0f832d55f319d8ad7f8d9669f7dbcdaba7a3a57bd1673f78bb2c16` |
 | Matching ELF | `fdfcfa7a83fb7eb3e47153dcfc229d37e9cc67df184d5f78119c2a106fce0b56` |
 | Full physical-button win receipt | `441e02d324ebe378571134408e89bc7269279719614069ec361e7b918d1bd3d3` |
+
+### November 25 selection-ring release replay
+
+The Z10 ROM from [#854](https://github.com/ggu/starcraft-gba/pull/854)
+replays the same normal-button tape from fresh HOME and wins at
+game frame 267,585. All 206 named checkpoints match. The terminal
+screen reports victory, seven enemy units, zero enemy buildings and
+zero adapter faults. Over 270,585 guest calls the mean cost is
+1,311,899 cycles, about 12.79 emulated main-loop updates/s with UI
+and presentation waits. Exact latest-composition replays and
+physical GBA SP timing remain open.
+
+| Input or receipt | SHA-256 |
+| --- | --- |
+| Z10 ROM | `a061a9bd503522b79019f71bc4d766a5985ef4d9455afc9792e6d1d246a57980` |
+| Matching ELF | `49980741d66e993a7732864cf5f7c3ea17825463a05baf1420bc2a773849b10e` |
+| Full physical-button win receipt | `f1743c62926265ace2eb9c7dfc4a36b4c7a61c5f2c040dadc924a77c8c802ca0` |
