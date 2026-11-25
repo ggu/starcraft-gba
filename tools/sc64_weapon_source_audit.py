@@ -196,6 +196,38 @@ def read_column(data: bytes, count: int, fmt: str, off: int, name: str):
     return [struct.unpack_from("<" + fmt, data, off + i * size)[0] for i in range(count)]
 
 
+# Column-major PC layouts. WEAPON_FIELDS is every weapons.dat field used in
+# the source table contract; FLINGY_FIELDS is the whole 15-byte flingy.dat row.
+WEAPON_FIELDS = (
+    ("label", "H"), ("flingy", "I"), ("unused", "B"), ("target", "H"),
+    ("min_range", "I"), ("max_range", "I"), ("upgrade", "B"),
+    ("damage_type", "B"), ("bullet_type", "B"), ("lifetime", "B"),
+    ("hit_type", "B"), ("inner", "H"), ("medium", "H"), ("outer", "H"),
+    ("damage", "H"), ("bonus", "H"), ("cooldown", "B"), ("count", "B"),
+    ("angle", "B"), ("head_offset", "b"), ("forward", "b"), ("upward", "b"),
+    ("error", "H"), ("icon", "H"),
+)
+FLINGY_FIELDS = (
+    ("sprite", "H"), ("top_speed", "i"), ("acceleration", "h"),
+    ("halt_distance", "i"), ("turn_radius", "B"), ("unused", "B"),
+    ("movement_control", "B"),
+)
+
+
+def column_offsets(fields, count: int) -> dict:
+    """Map each field of a column-major table to (byte offset, struct format)."""
+    out = {}; cursor = 0
+    for name, fmt in fields:
+        out[name] = (cursor, fmt); cursor += count * struct.calcsize("<" + fmt)
+    return out
+
+
+def parse_columns(data: bytes, count: int, fields, label: str) -> dict:
+    """Read every listed column of a column-major table into {field: [values]}."""
+    return {name: read_column(data, count, fmt, off, label + "." + name)
+            for name, (off, fmt) in column_offsets(fields, count).items()}
+
+
 def grp_path(gfi: int) -> str | None:
     if gfi == 0:
         return None
@@ -233,19 +265,8 @@ def generate(rom_path: Path, out_path: Path) -> dict:
     unit_air_weapon = read_column(units, UNIT_COUNT, "B", 6348, "units.air_weapon")
     weapon_flingy = read_column(weapons, WEAPON_COUNT, "I", 2*WEAPON_COUNT, "weapons.flingy")
     weapon_bullet = read_column(weapons, WEAPON_COUNT, "B", 2*WEAPON_COUNT+4*WEAPON_COUNT+1, "weapons.bullet")
-    # All weapons.dat fields used in the source table contract.
-    weapon_specs = [
-        ("label", "H"), ("flingy", "I"), ("unused", "B"), ("target", "H"),
-        ("min_range", "I"), ("max_range", "I"), ("upgrade", "B"),
-        ("damage_type", "B"), ("bullet_type", "B"), ("lifetime", "B"),
-        ("hit_type", "B"), ("inner", "H"), ("medium", "H"), ("outer", "H"),
-        ("damage", "H"), ("bonus", "H"), ("cooldown", "B"), ("count", "B"),
-        ("angle", "B"), ("head_offset", "b"), ("forward", "b"), ("upward", "b"),
-        ("error", "H"), ("icon", "H"),
-    ]
-    wo = {}; cursor = 0
-    for name, fmt in weapon_specs:
-        wo[name] = (cursor, fmt); cursor += WEAPON_COUNT * struct.calcsize("<" + fmt)
+    wo = column_offsets(WEAPON_FIELDS, WEAPON_COUNT)
+    cursor = sum(WEAPON_COUNT * struct.calcsize("<" + fmt) for _, fmt in WEAPON_FIELDS)
     if len(weapons) < cursor:
         raise ValueError("weapons.dat is shorter than parsed field layout")
     def wv(name, row):
