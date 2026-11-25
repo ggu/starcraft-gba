@@ -140,3 +140,22 @@ store twice the displayed units.
 | Idle Nexus warning after first attempted order | `8a6731ebd878d5068df06186dd420c3de6442546599e7ba7652a2a219bd4170f` |
 | GBA idle, waiting, and fresh-load receipt | `adf2b815ebcc0722aa87288c6741fd422b2c3a4329d9ee12feeab334b2f4b9c9` |
 | GBA Pylon construction and Probe resumption | `573ecd0fc0fdf6680c681fc42c65ea1e807a3bac12a44fc369ba8a377d9741d5` |
+
+### Close the native Nexus command card at the supply limit
+
+A paired native Challenger run starts from the same queued Nexus at
+9/9. The interactive observer exposes B as mask 512, using the mapping
+already shared with the actor observer. One run holds B for ten steps
+after step 13,370, then releases it. The control uses neutral input
+throughout that interval. Both observers reach step 13,470 with GPU
+ready and four captured frames. The pre-press images match byte for
+byte. Five B polls are pressed in the intervention, zero in the control.
+
+In the final control image the command card is open with Probe selected.
+In the B image it has closed and the field BUILD hint is visible. The
+selected Nexus, two waiting Probe icons, 162 minerals and 9/9 supply
+remain visible in both. Use an explicit cancel command for a future
+native refund comparison. The final raw image hashes are
+`75063a640617bb1d63068dd772b58a7f5bed9766eeedf79dc7043d6110384b2e`
+(control) and `ee672ffc29051f9c421b5fe0f26bc97f4a8ff7bcb58fc95b2fd96b8620f70661`
+(B).
