@@ -1832,6 +1832,27 @@ P10 pair. Qualify the current combined source against the other
 cartridges, campaign and Showcase, including save continuation,
 before promoting the renderer to the release builds.
 
+#### Screen-edge visibility in the whole-raster path
+
+The November 25 trial limits the whole-raster fog check to horizontally
+visible pixels while keeping the blitter's original source coordinates and
+stride. The sanitizer raster oracle confirms identical pixels at the left
+map edge and the right screen edge with hidden offscreen tiles. The four
+prepared ARM links retain their static memory endpoints.
+
+Seven 160-update pairs cover panned three-CPU Outpost for every race,
+three Blood Bath variations and an active Z9 campaign checkpoint. The
+sampled worlds, both video pages, palette, camera, pause SRAM and fresh
+continuation agree in all pairs. Seven sampled display-phase states differ.
+Mean loop time is flat or rises by up to 0.12%. The panned Outpost drawing
+means increase by 0.06–0.63%. The Z9 p95 improves from 1,877,834 to
+1,868,710 cycles while its mean loop time rises 0.05%. Budget overruns stay
+constant in all seven windows. Keep the current raster and use traces of
+the visible fight to identify a larger remaining cost.
+
+The local comparison receipt SHA-256 is
+`99b8ddef059b6d8ab32b9d66ac083c05c4e1b66da9a04df3a82fdacc9e27df96`.
+
 #### Blood Bath holdout and late skirmish journals
 
 The same P10 pair completes 120 Blood Bath Melee updates in each

@@ -1038,6 +1038,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   but records zero hits and raises p95. Z7 and Z9 checkpoint windows
   also record zero hits. Keep the current row memo and prioritize
   the uncached scan and visible actor drawing.
+  The [screen-edge raster trial](audits/2026-11-24-kodak-package-checks.md#screen-edge-visibility-in-the-whole-raster-path)
+  preserves both framebuffer pages across seven ARM windows, with
+  no reduction in budget overruns and slower drawing in all three
+  panned Outpost windows. Keep the current raster.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
