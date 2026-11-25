@@ -59,9 +59,10 @@ build/test-sc64-t5-shared-transport-positive: tests/sc64_t5_shared_transport_pos
 build/test-sc64-campaign-ventral-z7: tests/sc64_campaign_shared_ventral.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
 .PHONY: test-sc64-campaign-ventral
-test-sc64-campaign-ventral: build/test-sc64-campaign-ventral-z4 build/test-sc64-campaign-ventral-z7 build/test-sc64-campaign-ventral-z9 build/test-sc64-campaign-ventral-z10
+test-sc64-campaign-ventral: build/test-sc64-campaign-ventral-z4 build/test-sc64-campaign-ventral-z7 build/test-sc64-campaign-ventral-z8 build/test-sc64-campaign-ventral-z9 build/test-sc64-campaign-ventral-z10
 	./build/test-sc64-campaign-ventral-z4
 	./build/test-sc64-campaign-ventral-z7
+	./build/test-sc64-campaign-ventral-z8
 	./build/test-sc64-campaign-ventral-z9
 	./build/test-sc64-campaign-ventral-z10
 
@@ -73,3 +74,6 @@ build/test-sc64-campaign-ventral-z4: tests/sc64_campaign_shared_ventral.c tests/
 
 build/test-sc64-campaign-ventral-z10: tests/sc64_campaign_shared_ventral.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) -DTEST_CAMPAIGN_MISSION=21 $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+
+build/test-sc64-campaign-ventral-z8: tests/sc64_campaign_shared_ventral.c tests/sc64_save_candidate_fixture.h $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(ZERG_Z10_CANONICAL_FLAGS) -DTEST_CAMPAIGN_MISSION=19 $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
