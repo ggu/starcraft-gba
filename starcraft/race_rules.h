@@ -435,9 +435,8 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_MEDIC]     = { R_TER, 0, B_BARRACKS, 2, 50, 25, 450, 60, 0, 0 },
     [U_ZERGLING]  = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 50, 0, 420, 35, 0, SC_PR_SPAWNING_POOL },
     [U_HYDRALISK] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 2, 75, 25, 420, 80, 0, SC_PR_HYDRALISK_DEN },
-    /* Legacy Raynor is a scenario alias: its zero purchase price/time and
-       doubled supply policy are retained for the old early-mission loader. */
-    [U_RAYNOR]    = { R_TER, 0, B_BARRACKS, 2, 0, 0, 0,
+    /* Both stock identities of this early-mission Raynor alias use no supply. */
+    [U_RAYNOR]    = { R_TER, 0, B_BARRACKS, 0, 0, 0, 0,
 #ifdef SC64_T4_RUNTIME
         300,
 #else
