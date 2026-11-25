@@ -36,7 +36,7 @@ $(SHARED_SIGHT_HEADERS): $(SHARED_SIGHT_DIR)/%: build/generated/%
 	cp $< $@
 SHARED_SIGHT_ELFS := build/starcraft-terran.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf
 $(SHARED_SIGHT_ELFS): CFLAGS += -DSC64_SHARED_SIGHT_PACKED_ROWS -DSC64_SHARED_SIGHT_SPARSE_ROWS -I$(SHARED_SIGHT_DIR)
-$(SHARED_SIGHT_ELFS): $(SHARED_SIGHT_HEADERS) mk/late-zerg-sight/Makefile
+$(SHARED_SIGHT_ELFS) build/test-sc64-p10-p9-normal-home: $(SHARED_SIGHT_HEADERS) mk/late-zerg-sight/Makefile
 
 LATE_ZERG_SIGHT_STAMP := build/late-zerg-sight-config
 LATE_ZERG_SIGHT_KEY := $(LATE_ZERG_PACKED_SIGHT):$(LATE_ZERG_SPARSE_SIGHT)

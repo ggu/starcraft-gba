@@ -127,7 +127,7 @@ build/canonical-target-index-config: force-canonical-target-index-config | build
 	@printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
-build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z8-game: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
+build/test-sc64-z5-cloak-runtime build/test-sc64-z6-cloak-game build/test-sc64-z8-game build/test-sc64-p10-p9-normal-home: build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG)
 
 # Reconcile the existing collision buckets on all four normal products.
 CANONICAL_GAME_ELFS := build/starcraft-terran.elf build/starcraft-zerg-z10.elf build/starcraft-protoss-p10.elf build/starcraft-showcase.elf
