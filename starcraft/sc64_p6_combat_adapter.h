@@ -17,7 +17,7 @@ static int race_p6_active(void);
 static int race_p6_owners_hostile(int, int);
 static int race_p6_doodad_enabled_slot(int);
 static int race_p6_doodad_slot_bound(int);
-static int race_p6_combat_unit_burrowed(int);
+static int (race_p6_combat_unit_burrowed)(int);
 static void race_p6_note_unit_death(const Unit *);
 static void race_p6_note_building_death(const Building *);
 
@@ -340,7 +340,7 @@ race_p6_combat_target_size(int raw, int type)
 }
 
 static int __attribute__((noinline))
-race_p6_combat_unit_burrowed(int slot)
+(race_p6_combat_unit_burrowed)(int slot)
 {
     int raw;
     if (!race_p6_active() || slot < 0 || slot >= MAX_UNITS || !u[slot].alive)
