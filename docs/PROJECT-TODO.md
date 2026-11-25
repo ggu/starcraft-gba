@@ -50,7 +50,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fails the ground-connectivity test and needs transport-capable opponents.
 
 - **Gas depletion.** The owned Blood Bath scenario assigns 10,000 gas to
-  each of its four geysers. The current map descriptor keeps coordinates
+  each of its four geysers. In the N64 emulator, selecting a geyser in a
+  fresh Blood Bath game showed 10,000 gas. Selecting a nearby mineral
+  field after workers started harvesting showed 1,492 minerals. The
+  current GBA map descriptor keeps geyser coordinates
   only, and the worker code gives eight gas per normal trip. Capture the
   N64 depleted-trip yield, then implement remaining gas per map site and
   preserve it through refinery destruction, rebuilding and save/load.
