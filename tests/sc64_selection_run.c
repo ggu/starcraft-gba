@@ -240,9 +240,8 @@ drag_suppression_and_cancel_tests(void)
 static int
 queue_cancel_tests(void)
 {
-    /* Other friendly producers use the same paid queue. Cancellation is
-     * delivered on L release, refunds the front item once, and preserves
-     * the remaining ring entry. */
+    /* Other friendly producers use the same paid queue. L release refunds
+     * the last order once and keeps the active slot and training progress. */
     fixture();
     put_unit(0, SIDE, U_MARINE, 80, 80, 1, 1);
     b[0].owner = SIDE; b[0].type = B_COMMAND; b[0].alive = 1;
@@ -251,12 +250,13 @@ queue_cancel_tests(void)
     b[0].queue_progress = 5; selected_building = 0;
     input(KEY_L);
     if (b[0].queue_count != 2 || minerals != 500) return 20;
+    int progress = b[0].queue_progress;
     input(0);
-    if (b[0].queue_count != 1 || b[0].queue_head != 0 ||
-        b[0].queue[0] != U_SCV || b[0].queue_progress > 1 ||
+    if (b[0].queue_count != 1 || b[0].queue_head != 4 ||
+        b[0].queue[4] != U_SCV || b[0].queue_progress < progress ||
         minerals != 550 || selected_building != 0) {
         fprintf(stderr, "queue count=%d head=%d next=%d progress=%d minerals=%d selection=%d\n",
-                b[0].queue_count, b[0].queue_head, b[0].queue[0], b[0].queue_progress,
+                b[0].queue_count, b[0].queue_head, b[0].queue[4], b[0].queue_progress,
                 minerals, selected_building);
         return 21;
     }
