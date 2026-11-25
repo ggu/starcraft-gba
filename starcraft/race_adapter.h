@@ -2001,7 +2001,12 @@ static void race_skirmish_init(void)
         memset(m,0,sizeof(m));
         for(i=0;i<map->minerals_count&&i<MAX_MINERALS;i++){
             m[i].x=map->minerals[i].x;m[i].y=map->minerals[i].y;
-            m[i].amount=map->minerals[i].amount;m[i].style=176;
+            m[i].amount=map->minerals[i].amount;
+#ifdef SC64_SKIRMISH_MINERAL_TYPES
+            m[i].style=map->minerals[i].style;
+#else
+            m[i].style=SC64_RAW_MINERAL_FIELD_1;
+#endif
         }
         memset(geysers, 0, sizeof(geysers));
         geyser_count=map->geyser_count;
