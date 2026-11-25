@@ -178,6 +178,17 @@ class BoundTest(unittest.TestCase):
                        callback_cycles={"callback": (1, seen)})
         self.assertEqual(len(result["changed"]), 1)
 
+    def test_direct_call_added_inside_a_callback_cycle_changes_its_fingerprint(self):
+        frames = {"main": 10, "dispatch": 100, "callback": 200, "helper": 50}
+        calls = [("main", "dispatch"), ("dispatch", hot.INDIRECT), ("callback", "helper"),
+                 ("helper", hot.INDIRECT)]
+        seen = bound(frames, calls, taken={"callback"})["cycles"][0]["fingerprint"]
+        self.assertEqual(bound(frames, calls, taken={"callback"}, callback_cycles={"callback": (1, seen)})["changed"], [])
+        # helper now calls callback directly: same members, same pointer sites, new way to nest.
+        result = bound(frames, calls + [("helper", "callback")], taken={"callback"},
+                       recursion={"callback": 2}, callback_cycles={"callback": (1, seen)})
+        self.assertEqual(len(result["changed"]), 1)
+
     def test_fingerprint_ignores_compiler_clone_suffixes(self):
         a = hot.cycle_fingerprint("recursion", ["game.c:destroy.isra.0", "game.c:detach"], {}, set())
         b = hot.cycle_fingerprint("recursion", ["game.c:destroy", "game.c:detach.constprop.0"], {}, set())
@@ -468,6 +479,18 @@ class CheckTest(unittest.TestCase):
         report = self.report()
         self.assertEqual(report["stack_bound_bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
         self.assertEqual(report["edges_added_from_elf"], 2)
+
+    def test_branch_from_a_merged_body_is_charged_to_the_function_with_the_frame(self):
+        # The ELF lists the body under a twin's name first; the frame record is under "draw".
+        self.symbols.insert(1, (self.DRAW + 1, 64, "FUNC", "LOCAL", "a_twin_of_draw"))
+        self.calls = [("main", "file.c:draw"), ("main", "file.c:hot")]      # the dump lacks draw -> leaf
+        self.assertEqual(self.run_check(), 0)
+        self.assertEqual(self.report()["stack_bound_bytes"], 96 + 400 + 40 + hot.HELPER_BYTES)
+
+    def test_declared_cycle_that_is_not_there_fails(self):
+        self.config = "limit 0x03004200\nrecursion leaf 2 0123abcd\nhot\n"
+        self.assertEqual(self.run_check(), 1)
+        self.assertIn("matches no call cycle", self.report()["errors"][0])
 
     def test_undeclared_cycle_fails(self):
         self.calls.append(("file.c:leaf", "file.c:draw"))

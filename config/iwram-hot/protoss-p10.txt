@@ -21,7 +21,7 @@ recursion destroy_building* 2 c1c7a2ed
 # table is bound once to the layer below it, so no function here is entered
 # while it is active. The cycle exists only because the check lets a pointer
 # call reach every function whose address is taken.
-callback-cycle sc64_p8_world_action 1 c757dcc9
+callback-cycle sc64_p8_world_action 1 7cd37361
 
 # A trailing * also takes a function's .constprop/.isra clones.
 memset

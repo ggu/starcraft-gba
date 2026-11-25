@@ -234,25 +234,24 @@ def parse_address_taken(lines) -> tuple[set[str], set[str]]:
 
 def cycle_fingerprint(kind: str, group: list[str], sites: dict[str, int], taken: set[str],
                       edges: dict[str, set[str]] | None = None) -> str:
-    """What a reviewer read when declaring a cycle. For recursion, the member
-    functions and the direct calls among them. For a callback cycle, the
-    members that call through a pointer or have their address taken, with
-    their pointer-call site counts. Compiler clone suffixes are dropped so an
-    unrelated optimization does not change it."""
+    """What a reviewer read when declaring a cycle: the member functions and
+    the direct calls among them and, for a callback cycle, which members call
+    through a pointer (with their site counts) or have their address taken.
+    Compiler clone suffixes are dropped so that a new clone of the same
+    function does not change it."""
     def plain(title):
         return CLONE.sub("", symbol_of(title))
-    if kind == "recursion":
-        inside = set(group)
-        calls = sorted({(plain(m), plain(t)) for m in group for t in (edges or {}).get(m, ()) if t in inside})
-        items: list = [sorted({plain(m) for m in group}), [list(pair) for pair in calls]]
-    else:
+    inside = set(group)
+    calls = sorted({(plain(m), plain(t)) for m in group for t in (edges or {}).get(m, ()) if t in inside})
+    items: list = [sorted({plain(m) for m in group}), [list(pair) for pair in calls]]
+    if kind != "recursion":
         surface: dict[str, list] = {}
         for member in group:
             if sites.get(member) or member in taken:
                 entry = surface.setdefault(plain(member), [0, False])
                 entry[0] += sites.get(member, 0)
                 entry[1] = entry[1] or member in taken
-        items = sorted([name, *entry] for name, entry in surface.items())
+        items.append(sorted([name, *entry] for name, entry in surface.items()))
     return hashlib.sha256(json.dumps([kind, items]).encode()).hexdigest()[:8]
 
 
@@ -594,7 +593,8 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
         to = node_for(target, source[2])
         if to is None:
             continue
-        for title in titles.get(source[2], ()):
+        # The body may be listed under a merged twin's name: use every name at its address.
+        for title in sorted({t for name in names_at[source[0]] for t in titles.get(name, ())}):
             if to not in edges.setdefault(title, set()):
                 edges[title].add(to)
                 added += 1
@@ -648,7 +648,7 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
             continue
         for title in titles[name]:
             result = stack_bound(frames, edges, taken, title, **options)
-            irq.append({"name": name, "bytes": result["bytes"]})
+            irq.append({"name": name, "bytes": result["bytes"], "cycles": result["cycles"]})
             undeclared += [c for c in result["undeclared"] if c not in undeclared]
             changed += [c for c in result["changed"] if c not in changed]
     # A ROM without sampled audio or the VBlank counter installs no handler.
@@ -677,6 +677,13 @@ def check(elf: Path, dump_dir: Path, config_path: Path, *, margin: int, entry: s
         names = ", ".join(cycle["functions"][:6]) + (" ..." if len(cycle["functions"]) > 6 else "")
         errors.append(f"undeclared call cycle ({names}); add `{cycle['kind']} {cycle['functions'][0]} COUNT "
                       f"{cycle['fingerprint']}` to {config_path} once its nesting is known")
+    seen_cycles = main["cycles"] + [c for row in irq for c in row.get("cycles", ())]
+    for kind in CYCLE_KINDS:
+        for pattern in config[kind]:
+            if not any(c["kind"] == kind and any(matches(name, pattern) for name in c["functions"])
+                       for c in seen_cycles):
+                errors.append(f"`{kind} {pattern}` in {config_path} matches no call cycle in this ROM; the cycle "
+                              "is gone or the dumps are incomplete. Remove the line once you know which")
     for cycle in changed:
         names = ", ".join(cycle["functions"][:6]) + (" ..." if len(cycle["functions"]) > 6 else "")
         errors.append(f"call cycle ({names}) changed since it was declared; read it again and set its "

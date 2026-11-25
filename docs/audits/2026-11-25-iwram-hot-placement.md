@@ -58,11 +58,11 @@ for each.
   cache, world adapter, timed service), and their pointer calls go to
   the layer below or to game services.
 - Each declaration carries a fingerprint of the cycle as it was read:
-  the member functions and the calls among them for recursion; for a
-  dispatcher cycle, the
-  members that call through a pointer or have their address taken, with
-  their pointer-call site counts. An undeclared cycle fails the check,
-  and so does a declared one whose fingerprint no longer matches.
+  the member functions and the direct calls among them and, for a
+  dispatcher cycle, which members call through a pointer (with their
+  site counts) or have their address taken. An undeclared cycle fails
+  the check. So does a declared one whose fingerprint no longer
+  matches, and a declaration that matches no cycle.
 
 The build fails unless `__iwram_end` plus the bound plus a 512-byte
 margin stays at or below the stack top.

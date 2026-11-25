@@ -1544,7 +1544,10 @@ link fits. A new call cycle, or a change to a declared one, also fails the
 check. The message prints the `recursion` or `callback-cycle` line with the
 cycle's new fingerprint. Read the code first: the count on that line is how
 many activations of the cycle's functions can be live at once, and the check
-trusts it. Add a function only with a paired cycle measurement; short
+trusts it. `tools/sc64_setup_profile_build.py`, `sc64_render_profile_build.py`
+and `sc64_timing_profile_build.py` replay the cartridge link with a probe in
+place of `main`; their ELFs use the same placement but are not stack-checked
+and are for emulator measurement only. Add a function only with a paired cycle measurement; short
 functions that call back into ROM get slower. Method, measurements and limits
 are in [the placement audit](audits/2026-11-25-iwram-hot-placement.md).
 
