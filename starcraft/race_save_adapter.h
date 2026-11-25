@@ -3587,6 +3587,15 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
+#if !defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+        /* Raw legacy rows do not pass through the candidate decoder. Check
+         * the migration before touching live state, as compact rows do. */
+        if (sc64_native_zealot(RACE_U(i,type), RACE_U(i,raw_type))) {
+            int hp=RACE_U(i,hp), maxhp=RACE_U(i,maxhp), shield=RACE_U(i,shield);
+            if (!sc64_native_zealot_restore(&hp,&maxhp,&shield,
+                                             RACE_U(i,shield_remainder))) return 0;
+        }
+#endif
 #ifdef SC64_NATIVE_SKIRMISH_ELIMINATION
         int docked_interceptor = 0, queued_interceptors = 0;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED

@@ -578,6 +578,18 @@ int main(int argc, char **argv)
         assert(sc64_actor_max_shields(U_ZEALOT, 0) == 80);
         assert(sc64_stock_unit_profile(65)->hp == 100);
         assert(sc64_stock_unit_profile(65)->shields == 60);
+#if !defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+        /* Raw legacy rows must fail preflight before any world mutation. */
+        RaceLoadPlan plan = {0};
+        Unit before = u[z];
+        assert(race_save_game());
+        assert(race_load_preflight_candidate(&plan));
+        race_data.units[z][offsetof(Unit,hp)/sizeof(int)] = 100;
+        race_data.units[z][offsetof(Unit,maxhp)/sizeof(int)] = 101;
+        race_data.units[z][offsetof(Unit,shield)/sizeof(int)] = 60;
+        assert(!race_load_preflight_candidate(&plan));
+        assert(!memcmp(&u[z],&before,sizeof(before)));
+#endif
     }
     test_immediate_weapons();
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
