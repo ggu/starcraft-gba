@@ -71,6 +71,7 @@ QUALIFIED: tuple[str, ...] = (
     "zerg:0:tzp:WORKERS=10,LINE=38",
     "zerg:0:pz:WORKERS=12,LINE=38",
     "zerg:1:tz:LINE=38,PRODUCERS=1,LOBBY_WAIT=22",
+    "zerg:1:zzz:LOBBY_WAIT=4",
     "protoss:0:ptz:LINE=65,DEFENSE=162,DEFENSES=4",
     "protoss:0:tz:WORKERS=14,PRODUCERS=3,LINE=66,DEFENSE=162,DEFENSES=8",
     "protoss:1:tzp:LINE=66,TECH_FRAME=8000,LOBBY_WAIT=20",
