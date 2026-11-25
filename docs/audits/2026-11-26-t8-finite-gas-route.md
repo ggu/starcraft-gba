@@ -14,10 +14,16 @@ resource differences recorded reached another mismatch at update 125,000:
 14 hostile buildings expected, 13 observed. It is not a matching route;
 no wallet or objective differences are waived in the new physical replay.
 
-The author observes the HOST game to choose ordinary gamepad input; it does
-not establish physical cartridge behavior. The retained trace SHA-256 was
-`96e9ef4157fd53aadaaa32716d96bba328d6a3cc2555b1eb802ab37c72dd5cd4`.
-Physical replay, fresh result reload and carried campaign victory are pending.
+The author observes the HOST game to choose ordinary gamepad input. Its trace
+SHA-256 was `96e9ef4157fd53aadaaa32716d96bba328d6a3cc2555b1eb802ab37c72dd5cd4`.
+On the finite-gas Terran ROM (SHA-256
+`dc63f1e629bd5b4ccc416bca27493984a6da59220cace72ab2401c4af4c71f68`),
+mGBA replayed that tape from an actual retained T7 victory save. All 467
+distinct checkpoint ticks matched, including resources and objectives, with
+no exceptions. T8 won at frame 285,946 with the hero alive and completion
+mask `0xff0`. A fresh load restored the result and re-exported identical
+SRAM (SHA-256 `aa9f9c26027e3c1c5b4224dbbac8a394c7e8fd43b8d1ec1fe86c9c76f2ba4c4a`).
+The T9 and T10 continuation from this new T8 victory is still in progress.
 
 With the normal private Terran asset inputs prepared, regenerate the route:
 
