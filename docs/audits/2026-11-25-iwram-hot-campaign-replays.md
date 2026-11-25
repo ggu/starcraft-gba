@@ -9,22 +9,21 @@ every campaign route, checkpoint tape and pause save found on this
 machine on the previous-link ROM and the relinked ROM of each race,
 and compares the two runs.
 
-There is no blocking finding. 71 of the 72 finished pairs match
+There is no blocking finding. 73 of the 74 finished pairs match
 completely, and the remaining one, the Protoss 4 tape that no longer
 wins on the packaged ROM, is identical on both ROMs up to the same
-driver error. 22 missions replay in full from HOME or the previous
+driver error. 23 missions replay in full from HOME or the previous
 chapter's victory to victory, and every other mission with a route,
-checkpoint or pause save matches on the evidence it has. The Zerg 7
-route is still running at the time of writing and is reported when
-finished. No stack-tracked relinked run's main stack went above the
-bound of the stricter checker on PR #882 (Terran 7,792, Zerg 5,848,
-Protoss 5,940 bytes) or came within 512 bytes of `__iwram_end`. The
-closest to its bound is Zerg 3: 5,720 bytes, 128 under. The closest to
-the code is also Zerg 3, with 1,696 bytes free. The IRQ stack reached
-296 bytes, against its bound of 304 of 416. The relinked ROM's
-main-stack low-water equals the previous link's at every one of the
-6,708 marks taken. Stack tracking covered 641,900 updates of 38 pairs;
-the other routes are covered by the static bound the build checks.
+checkpoint or pause save matches on the evidence it has. No
+stack-tracked relinked run's main stack went above the bound of the
+stricter checker on PR #882 (Terran 7,792, Zerg 5,848, Protoss 5,940
+bytes) or came within 512 bytes of `__iwram_end`. The closest to its
+bound is Zerg 3: 5,720 bytes, 128 under. The closest to the code is
+also Zerg 3, with 1,696 bytes free. The IRQ stack reached 296 bytes,
+against its bound of 304 of 416. The relinked ROM's main-stack
+low-water equals the previous link's at every one of the 6,708 marks
+taken. Stack tracking covered 641,900 updates of 38 pairs; the other
+routes are covered by the static bound the build checks.
 
 ## ROM pairs
 
@@ -114,7 +113,7 @@ checkpoint continued to victory or a tape that ends before victory.
 | Zerg 4 | full replay | HOME blind tape to the frame-28,754 pause, then 8 blind segments | 70,793 | 12 | 742 | 12 | frame 64,147, victory | Zerg 5 at frame 401 | matched |
 | Zerg 5 | full replay | Zerg 4 victory save, A, then 14 blind segments | 24,360 | 17 | 293 | 17 | frame 18,974, victory | Zerg 6 at frame 91 | matched |
 | Zerg 6 | full replay | Zerg 5 victory save, A, then 52 blind segments | 178,582 | 55 | 1,929 | 55 | frame 177,044, victory | Zerg 7 at frame 401 | matched |
-| Zerg 7 | full replay | HOME, one blind trace | running | | | | | | still running |
+| Zerg 7 | full replay | HOME, one blind trace | 270,585 | 3 | 2,718 | 3 | frame 267,585, victory | Zerg 8 at frame 407 | matched |
 | Zerg 8 | full replay | HOME, one tape with text boxes acknowledged | 88,022 | 4 | 896 | 4 | frame 86,969, victory | Zerg 9 at frame 401 | matched |
 | Zerg 9 | save only | three pause saves (frames 101, 27,817 and about 60,000) continued | 8,442 | 6 | 102 | 6 | frame 62,860, mission active | none | matched |
 | Zerg 10 | partial replay | frame-60,123 pause save, tape suffix to victory | 3,597 | 6 | 62 | 6 | frame 63,523, victory | Zerg 10 at frame 401 (retry) | matched |
@@ -131,9 +130,9 @@ checkpoint continued to victory or a tape that ends before victory.
 
 "Route updates" counts the route's own pairs. Processes, samples and
 saves are per ROM and also include the handoff and briefing pairs.
-In all, the 72 finished pairs, routes, handoffs and briefings
-together, ran 1,570,047 updates in 328 emulator processes per ROM and
-compared 16,558 samples and 304 saves; every save written at the same
+In all, the 74 finished pairs, routes, handoffs and briefings
+together, ran 1,841,061 updates in 331 emulator processes per ROM and
+compared 19,276 samples and 307 saves; every save written at the same
 update by the two ROMs is byte-identical.
 
 Notes on individual missions:
@@ -177,7 +176,7 @@ Notes on individual missions:
 - Victory saves equal the packaged runs' where those were recorded:
   Terran 5 `0a327a1841ff`, Zerg 1 `6122561e55f2`, Zerg 2
   `b17ca47aef03`, Zerg 3 `277b5e01e2e8`, Zerg 4 `a74833e79d0b`,
-  Zerg 5 `bd4510087ba2`, Zerg 6 `58fe25565dfc`, Zerg 8
+  Zerg 5 `bd4510087ba2`, Zerg 6 `58fe25565dfc`, Zerg 7 `ad920008ce08`, Zerg 8
   `f0946a81d56c`, Zerg 10 `eb5b2035d881`, Protoss 1 `d28e7d5faff9`,
   Protoss 6 `b01855f7314b`, Protoss 7 `ad66dc354fd3`, Protoss 8
   `b8624a22d8e7`, Protoss 10 `4bb1ae15b1eb`.
@@ -199,7 +198,7 @@ hardware frames have passed since the previous flip. Whether the
 interrupt has run when a sample is taken depends on how many cycles
 the update took, which is what the relink changes. Raw DISPCNT
 therefore differs between the two ROMs at a few samples:
-53 of the 16,558 compared, all inside a pending flip.
+59 of the 19,276 compared, all inside a pending flip.
 
 The recorder compares the page due on screen instead: DISPCNT with
 the page bit flipped while `flip_pending` is set, and logs raw DISPCNT
