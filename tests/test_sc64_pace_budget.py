@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from sc64_custom_full_match import disjoint_pace_budget, MatchError, TWO_VBLANK_CYCLES
+from sc64_custom_full_match import disjoint_pace_budget, pace_budget_report, MatchError, TWO_VBLANK_CYCLES
 
 
 def row(**changes):
@@ -21,7 +21,7 @@ class BudgetTest(unittest.TestCase):
         b = disjoint_pace_budget([row()])
         self.assertEqual(b['mean_disjoint_cycles'], dict(orders=200, sight=50,
             other_simulation=100, remaining_simulation=50, map_background=100,
-            actors=200, hud=150, remaining_render=50, audio_present_and_loop=100))
+            actors=200, hud=150, remaining_render=50, interval_less_update_and_draw=100))
         self.assertEqual(sum(b['mean_disjoint_cycles'].values()), 1000)
         self.assertEqual(b['two_vblank_cycles'], 561792)
         self.assertEqual(TWO_VBLANK_CYCLES, 561792)
@@ -33,6 +33,14 @@ class BudgetTest(unittest.TestCase):
         self.assertEqual(b['mean_total_cycles'], 1000)
         with self.assertRaisesRegex(MatchError, 'no simulation updates'):
             disjoint_pace_budget([row(world_advanced=False)])
+
+    def test_optional_budget_preserves_bad_tick_diagnostics(self):
+        result = pace_budget_report([row(), row(host_tick=9, cycles=899)])
+        self.assertFalse(result['available'])
+        self.assertEqual(result['invalid_samples'], 1)
+        self.assertEqual(result['offending_samples'][0]['host_tick'], 9)
+        self.assertIn('inconsistent', result['offending_samples'][0]['reason'])
+        self.assertTrue(pace_budget_report([row()])['available'])
 
     def test_missing_invalid_and_inconsistent(self):
         r = row(); del r['world_advanced']

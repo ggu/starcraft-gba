@@ -348,7 +348,7 @@ def disjoint_pace_budget(rows):
                      remaining_simulation=update-orders-sight-other,
                      map_background=background, actors=actors, hud=hud,
                      remaining_render=draw-background-actors-hud,
-                     audio_present_and_loop=total-update-draw)
+                     interval_less_update_and_draw=total-update-draw)
         if any(value < 0 for value in stage.values()):
             raise MatchError(f"pacing sample has inconsistent nested counters at {row.get('host_tick', '?')}")
         stages.append(stage)
@@ -359,7 +359,25 @@ def disjoint_pace_budget(rows):
                 two_vblank_cycles=TWO_VBLANK_CYCLES,
                 mean_deficit_to_nominal_30_fps=statistics.mean(row["cycles"] for row in active) - GBA_HZ / 30,
                 mean_disjoint_cycles=means,
-                residual_note="audio, presentation wait and loop overhead are not separately measured")
+                residual_note="interval less inclusive update and draw; timing boundaries may differ; audio_update and present wait are not separately measured, and game_audio_observe is inside draw")
+
+
+def pace_budget_report(rows):
+    """Keep raw pacing usable when a stage breakdown cannot be reconciled."""
+    errors = []
+    for row in rows:
+        if row.get("world_advanced") is False:
+            continue
+        try:
+            disjoint_pace_budget([row])
+        except MatchError as exc:
+            errors.append(dict(host_tick=row.get("host_tick"), reason=str(exc)))
+    if errors:
+        return dict(available=False, invalid_samples=len(errors), offending_samples=errors)
+    try:
+        return dict(available=True, **disjoint_pace_budget(rows))
+    except MatchError as exc:
+        return dict(available=False, invalid_samples=0, reason=str(exc))
 
 
 def pace(args) -> dict:
@@ -381,9 +399,6 @@ def pace(args) -> dict:
     args.output.mkdir(parents=True, exist_ok=False)
     game = PhysicalGame(args.runner, args.rom, args.elf, args.output / "guest", save_input=args.save)
     try:
-        missing = [name for name in counters if name not in game.sym]
-        if missing:
-            raise MatchError(f"ELF lacks pacing counters: {', '.join(missing)}")
         require_home(game)
         game.step(0, 2)
         game.step(KEY_L)
@@ -409,7 +424,7 @@ def pace(args) -> dict:
                 raise MatchError(f"invalid game clock at update {tick}")
             rows.append({"host_tick": tick, "cycles": now - clock, "frame": next_frame,
                          "world_advanced": next_frame != world_frame,
-                         **{name: game.u32(name) for name in counters}})
+                         **{name: game.u32(name) for name in counters if name in game.sym}})
             if args.video:
                 bitmap = displayed_bitmap(game)
                 rows[-1]["bitmap_changed"] = bitmap != previous_bitmap
@@ -433,13 +448,14 @@ def pace(args) -> dict:
     active = [row for row in rows if row["world_advanced"]]
     if not active:
         raise MatchError("the pacing window contains no simulation updates")
-    averages = {name: statistics.mean(row[name] for row in active) for name in counters}
+    averages = {name: statistics.mean(row[name] for row in active)
+                for name in counters if all(name in row for row in active)}
     result = {"ok": True, "lobby": seats, "checks": checks, "updates": len(rows),
               "updates_per_second": GBA_HZ / statistics.mean(cycles),
               "p95_cycles": cycles[(95 * len(rows) + 99) // 100 - 1],
               "over_two_fields": sum(c > TWO_VBLANK_CYCLES for c in cycles),
               "active_updates": len(active), "mean_active_stage_cycles": averages,
-              "disjoint_budget": disjoint_pace_budget(rows), "end_fingerprint": final["fingerprint"],
+              "disjoint_budget": pace_budget_report(rows), "end_fingerprint": final["fingerprint"],
               "sha256": {k: sha256(getattr(args, k)) for k in ("rom", "elf", "runner", "save", "trace")},
               "samples": rows}
     if intervals:

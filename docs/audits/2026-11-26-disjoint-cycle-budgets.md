@@ -1,8 +1,8 @@
 # Disjoint custom-game cycle budgets
 
-Recorded 2026-11-26, 04:01–04:02 Hong Kong time (2026-11-25 UTC), using the existing ordinary-input Zerg cartridge replay receipts. The six 512-call windows resume saved battles; the table averages only world-advancing updates. They cover both maps and all three AI races, but the human and cartridge are Zerg throughout. They are not idle-game measurements, cross-cartridge coverage, or hardware measurements.
+Baseline (before indexed weapon lookup) recorded 2026-11-26, 04:01–04:02 Hong Kong time (2026-11-25 UTC), using the existing ordinary-input Zerg cartridge replay receipts. The six 512-call windows resume saved battles; the table averages only world-advancing updates. They cover both maps and all three AI races, but the human and cartridge are Zerg throughout. They are not idle-game measurements, cross-cartridge coverage, or hardware measurements.
 
-At 16,777,216 Hz, nominal 30 fps allows 559,241 cycles per update; two 280,896-cycle display fields allow 561,792 cycles (about 29.86 Hz). Each stage is an absolute upper bound on what eliminating that entire stage could save, not an achievable optimization estimate. Orders, other simulation, background, actors, HUD and remaining render/loop are disjoint. Present wait and audio are included in the final residual and are not separately timed.
+At 16,777,216 Hz, nominal 30 fps allows 559,241 cycles per update; two 280,896-cycle display fields allow 561,792 cycles (about 29.86 Hz). Each stage is an absolute upper bound on what eliminating that entire stage could save, not an achievable optimization estimate. Orders, other simulation, background, actors, HUD and remaining render/loop are disjoint. The residual subtracts the inclusive update and draw timers from the observed loop interval; those boundaries can differ. audio_update and present wait are not independently timed, and game_audio_observe is inside draw.
 
 | Map | AI | Active / calls | Total | Orders | Other simulation | Background | Actors | HUD | Render/loop residual |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -25,6 +25,21 @@ All six receipts use the same ROM SHA-256 `1573dc017a4d85e456afc060cda322dbde5a2
 | 1-p | `cfbd87abba2817478396c6fd2a8c213d0fe85884b01ae7b1b938609195cfcd1e` | `7c4c482fcce665649f46ab34f29ebd85141d648032050612fc0e4d86ed9b5fac` |
 | 1-tz | `042bdb9115c2e288ac632922be6690d2b1aceb75cdb28acf5e2a101a932b3c27` | `017a33869f5e9a091f33cf85e348e891f3e38569fa260a4f76373f98b57d2704` |
 | 1-zzz | `1d5334b685103822f79d6d2310950876c5506345d89935941c7459c60ecfac93` | `5438324244ff1cfbd9fc724a912973674e65132e24ee332d42f0940eb24a6363` |
+
+## Current Zerg cartridge with indexed weapon lookup
+
+The matching indexed-lookup ROM is SHA-256 `84bb873c12a5e09a7ad115f94835a1d17528765e7d8106960375dccf7ccfd2e0`; the same save and trace hashes above apply. The windows were recorded at 04:01–04:02 Hong Kong time on 2026-11-26. The Outpost PZ and TZP windows each contain one advancing sample where update plus draw exceeds the measured loop interval by 5,514 and 2,711 cycles respectively. Those samples are excluded below; the `pace` command retains the raw result and marks the optional disjoint breakdown unavailable with offending ticks. The discrepancy needs investigation before treating those two full-window decompositions as reliable, or interpreting the residual as a precise presentation or audio measurement.
+
+| Map | AI | Reconciled active / calls | Total | Orders | Other simulation | Background | Actors | HUD | Render/loop residual |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Outpost | P | 456 / 512 | 714,366 | 175,027 | 120,289 | 137,371 | 144,151 | 73,657 | 63,870 |
+| Outpost | PZ | 507 / 512 | 861,148 | 228,039 | 172,616 | 154,710 | 143,434 | 98,555 | 63,794 |
+| Outpost | TZP | 493 / 512 | 1,406,503 | 569,878 | 252,476 | 123,674 | 268,399 | 124,298 | 67,777 |
+| Blood Bath | P | 503 / 512 | 635,981 | 122,483 | 111,801 | 128,018 | 142,951 | 63,047 | 67,681 |
+| Blood Bath | TZ | 496 / 512 | 992,541 | 300,583 | 169,108 | 127,792 | 245,026 | 93,100 | 56,932 |
+| Blood Bath | ZZZ | 496 / 512 | 1,414,546 | 534,127 | 213,113 | 93,394 | 383,110 | 128,230 | 62,572 |
+
+Current local receipts: `/private/tmp/sc64-z10-lookup-qualification/<case>-indexed/pacing.json`.
 
 ## Earlier Terran and Protoss windows
 
