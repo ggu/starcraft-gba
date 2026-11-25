@@ -58,7 +58,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
   From the six-chapter save, Z7 also wins at frame 267,585 with all
   206 observations matching. A fresh load preserves all seven chapter
-  flags (507,907) and reproduces the victory SRAM byte for byte.
+  flags (507,907) and reproduces the victory SRAM byte for byte. The
+  same save then clears Z8 at frame 86,969, matching 36 checkpoints.
+  A fresh load preserves all eight completion flags (1,032,195) and
+  re-exports SRAM with SHA-256
+  `2b9cbe6a24cb73e26ebd42bf3da87b8b7c14f3f05bd6366a699ec698bcc88497`.
 
   Independently, Z7 wins from HOME on this ROM at frame 267,585 with all
   206 checkpoints matching. The fresh-loaded victory advances to Z8.
@@ -67,8 +71,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the packaged ROM. A Mutalisk diversion north of the return location
   let the Drone deliver the crystal from the south. Loading victory at
   frame 59,957 advances to Z10. The Z10 frame-101 pause save restores the
-  Z9 completion flag and re-exports byte for byte. Reproduce the Z9
-  opening and delivery on the continuous campaign save.
+  Z9 completion flag and re-exports byte for byte. Starting at that
+  Z9 victory, Full Circle plays through all 28 checkpoints to victory
+  at frame 63,523, with both final chapter flags (3,145,728) and zero
+  unsupported events. A fresh process restores the campaign and world,
+  re-exporting the same SRAM. A on the finale result retries Z10 and
+  keeps both flags through a pause save and fresh load. Reproduce the
+  Z9 opening and delivery on the continuous campaign save.
   Also qualify campaign Overlord transport. The authenticated Z9 scenario
   allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
   default costs). The release exposes that research only in Z6 and
@@ -94,8 +103,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Separately, the P1 save clears P2 and P3, with matching checkpoint
   observations and byte-identical victory readbacks. Its P4 frame-101
   field save restores the first three completion flags (4,194,316).
+  The same save then clears P4 at frame 81,129, P5 at frame 5,057
+  and P6 at frame 92,986. All three victory saves restore and re-export
+  byte for byte, carrying all previously completed chapters. The P6
+  readback SHA-256 is
+  `e3622fdc9c1796b205a5b44e1a4c4a6d72ecd1233d7e0427cabf0e11a8f46be1`.
   The P6–P7 save also clears P8 at frame 98,849. Its fresh-loaded
-  victory retains all three completion bits (234,881,024).
+  victory retains all three completion bits (234,881,024). Continuing
+  into P9 reproduces all 57 checkpoint observations and wins at frame
+  134,481. A fresh process restores P6–P9 complete.
 
   A regenerated P8 controller tape
   plays The Trial of Tassadar from HOME to victory on the packaged
@@ -115,9 +131,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   mask is `0x38000000` (P8–P10). P3 also wins from HOME at frame 47,661
   and preserves its completion bit through a fresh-process save reload.
 
-  P4 still needs a winning route on this package. Its earlier inputs
-  first diverge by 100 minerals at input 18,000, and the regenerated
-  host controller loses at frame 111,670.
+  P4 also wins from HOME on this package at frame 81,129 after a
+  regenerated normal-input controller builds an escort and clears the
+  extraction area. Both required heroes survive. A fresh process restores
+  the victory and re-exports identical SRAM
+  (`2ee0921b6ed24c222ffaa55113ff65fb04f9a4908c80c11d5f5ec16c73814304`).
+  The earlier tape diverged by 100 minerals at input 18,000.
 
   P10 completes from HOME on the same Protoss10 package with a
   regenerated controller. The old tape first differs by 100 minerals at
@@ -186,7 +205,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   preview on a second run starts a blue warp-in. The HUD still shows 9/9
   at step 14,330 and reads 10/17 by step 16,330 with no further orders.
   This agrees with the GBA check that paid waiting production resumes
-  on Pylon completion. Check the remaining queued Probe on native.
+  on Pylon completion. At step 17,330 the native HUD reads 11/17 after
+  the second waiting order. See the [native placement and recovery
+  observations](audits/2026-11-25-waiting-training-supply.md#restore-native-supply-with-a-pylon).
 
   The packaged Terran ROM at `5f758095` restores a retained pause and
   victory save from earlier builds for each of T1–T10 (20 fresh emulator
