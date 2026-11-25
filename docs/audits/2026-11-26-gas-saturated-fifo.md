@@ -151,3 +151,12 @@ intervals took 2.60 seconds; on one-AI Blood Bath (31–49 units), nine took
 2.48 seconds. For the busy three-AI P10 cut above, 16 complete intervals
 took 3.09 seconds. This variability with the same timer supports improving
 busy-frame pacing before shortening the service interval globally.
+
+The same ares field capture also distinguishes time spent in service from
+time between grants. With `--first-tick 24401 --grant-spacing`, 18 worker
+visits have both an observed entry to raw order 83 and an observed exit.
+All 18 lasted 37 native guest ticks. Three started with no other observed
+waiter at that site (128–140 VI fields, median 140). Fifteen started with
+waiters (121–151 VI fields, median 130). Visits already active at the
+window start or still active at its end are excluded. This measures one
+native battle; an empty queue at entry does not imply a lightly loaded map.

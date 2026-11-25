@@ -23,6 +23,15 @@ class GasFifoObservation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'consecutive'):
             analyze([rows[0], rows[2]], grant_spacing=True)
 
+    def test_duration_excludes_partial_jobs_and_counts_only_same_site_waiters(self):
+        rows = [(0, 8, [(1, 83, 'a'), (2, 82, 'a')]),
+                (1, 9, [(2, 83, 'a'), (3, 82, 'a'), (4, 82, 'b')]),
+                (2, 9, [(2, 83, 'a'), (3, 82, 'a'), (4, 82, 'b')]),
+                (3, 10, [(3, 83, 'a'), (4, 83, 'b')])]
+        self.assertEqual(analyze(rows, 9, grant_spacing=True)['service_durations'],
+                         [dict(site='a', fields=2, ticks=1, waiters_at_start=1)])
+        self.assertEqual(analyze(rows, 9, 9, grant_spacing=True)['service_durations'], [])
+
     def test_younger_waiter_and_duplicate_active_are_rejected(self):
         with self.assertRaisesRegex(ValueError, 'older waiter'):
             analyze([(0, 0, [(1, 82, 0)]), (1, 1, [(1, 82, 0), (2, 82, 0)]),

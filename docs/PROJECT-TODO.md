@@ -70,7 +70,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   first assault. Both fresh victory reloads passed. The old Z10 plan lost on
   the trial; qualify a revised ordinary-input Z10 route. Gas service already
   took 1.98 emulated seconds in the lighter Z1 sample, versus 3.09 in busy
-  P10. Prioritize busy-frame pacing before tuning the shared timer.
+  P10. All 18 fully observed native visits lasted 37 guest ticks, including
+  three starting with zero other waiters. Prioritize busy-frame pacing before
+  tuning the shared timer.
   Three-AI ARM tests covered both maps for all three races. The trial won
   Zerg Blood Bath and Terran Outpost with the original plans and Protoss
   Outpost with a different plan. Qualify winning routes for Zerg Outpost,
@@ -82,8 +84,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
   saves after both. The older P9 tape diverges on both sides of the gas
   change. [Route, SRAM hashes and repeatable check](audits/2026-11-26-protoss-finale-chain.md).
-  Terran cleared T9 and T10 from a retained T8 victory. Requalify T8 from T7:
-  its historical route first differs in the resource banks at frame 117,534.
+  The release Terran cartridge cleared T8, T9 and T10 from a retained T7
+  victory. All three results reloaded with identical SRAM.
+  [Linked Terran replay](audits/2026-11-26-t8-finite-gas-route.md).
 
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges

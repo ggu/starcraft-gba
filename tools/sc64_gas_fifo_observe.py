@@ -20,6 +20,8 @@ def analyze(rows, first_tick=None, last_tick=None, *, grant_spacing=False):
     grants = []
     previous_grant = {}
     intervals = []
+    service_starts = {}
+    service_durations = []
     peak = 0
     previous_field = previous_tick = -1
     for field, tick, actors in rows:
@@ -38,6 +40,13 @@ def analyze(rows, first_tick=None, last_tick=None, *, grant_spacing=False):
         in_window = (first_tick is None or tick >= first_tick) and (last_tick is None or tick <= last_tick)
         if in_window and any(n > 1 for n in sites.values()):
             raise ValueError(f'multiple active workers at field {field}')
+        if grant_spacing and in_window:
+            for key in prior_active - active:
+                start = service_starts.pop(key, None)
+                if start is not None:
+                    f, t, waiters = start
+                    service_durations.append(dict(site=key[1], fields=field-f,
+                                                  ticks=tick-t, waiters_at_start=waiters))
         for key in current:
             waiting.setdefault(key, field)
         for worker, site in active - prior_active:
@@ -54,6 +63,7 @@ def analyze(rows, first_tick=None, last_tick=None, *, grant_spacing=False):
                 raise ValueError(f'older waiter bypassed at field {field}')
             grants.append(tick)
             if grant_spacing:
+                service_starts[key] = (field, tick, len(candidates))
                 if site in previous_grant:
                     f, t = previous_grant[site]
                     intervals.append(dict(site=site, fields=field-f, ticks=tick-t))
@@ -67,6 +77,7 @@ def analyze(rows, first_tick=None, last_tick=None, *, grant_spacing=False):
     result = {'grants': grants, 'peak_waiters': peak}
     if grant_spacing:
         result['grant_intervals'] = intervals
+        result['service_durations'] = service_durations
     return result
 
 
@@ -76,7 +87,7 @@ def main():
     p.add_argument('--first-tick', type=int)
     p.add_argument('--last-tick', type=int)
     p.add_argument('--grant-spacing', action='store_true',
-                   help='report fields and guest ticks between observed grants at each site')
+                   help='report spacing between grants and duration of fully observed services')
     args = p.parse_args()
     with args.capture.open() as f:
         print(json.dumps(analyze((json.loads(line) for line in f if line.strip()),
