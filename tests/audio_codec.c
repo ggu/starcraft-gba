@@ -36,8 +36,31 @@ static int decode_matches(const u8 *stream, u32 bytes, const s8 *pcm, u32 n, u32
     }
     int ok = 1;
     for (u32 i = 0; i < n && ok; ++i) ok = pcm_get(out, i) == pcm[i];
-    free(exact);
     free(out);
+    /* The same stream as each column of a 2 to 4 wide table: the samples
+     * with their top bits flipped, four to a word, and nothing else
+     * written. The table is exactly sized too. */
+    for (u32 columns = 2; columns <= 4 && ok; ++columns) {
+        for (u32 column = 0; column < columns && ok; ++column) {
+            u32 halfwords = n / 2u * columns;
+            u16 *table = malloc(halfwords * sizeof *table + 2u);
+            if (!table) abort();
+            for (u32 i = 0; i < halfwords; ++i) table[i] = 0x5a5a;
+            audio_decoder_start(&d, exact);
+            for (u32 at = 0; at < n;) {
+                u32 step = chunk && chunk < n - at ? chunk : n - at;
+                audio_decoder_run_column(&d, (volatile u16 *)(table + at / 2u * columns + 2u * column), step, columns);
+                at += step;
+            }
+            for (u32 i = 0; i < halfwords && ok; ++i) {
+                u32 word = i / 2u / columns, lane = i / 2u % columns, sample = 4u * word + 2u * (i % 2u);
+                if (lane != column) ok = table[i] == 0x5a5a;
+                else ok = table[i] == (u16)(((u8)pcm[sample] | (u32)(u8)pcm[sample + 1u] << 8) ^ 0x8080u);
+            }
+            free(table);
+        }
+    }
+    free(exact);
     return ok;
 }
 

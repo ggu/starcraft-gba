@@ -28,3 +28,31 @@ build/StarCraft-Alert-Probe-$(1)-GBA.gba: build/starcraft-alert-probe-$(1).elf t
 alert-arm-probe-$(1): build/StarCraft-Alert-Probe-$(1)-GBA.gba
 endef
 $(eval $(call ALERT_ARM_PROBE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
+
+# The interrupt's two hand-written routines against their C references, on
+# the ARM7TDMI and over the whole private bank (tests/audio_codec_arm_probe.c).
+# Run the ROM in mGBA with -l 7; its decoder sum must equal the one
+# `make test-audio-bank` prints.
+build/audio-arm-probe.elf: tests/audio_codec_arm_probe.c common/audio_bank.S common/audio_codec.h common/audio_mixer.h common/gba.h common/start.s common/gba.ld $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_DIR)/sc64_audio_generated.bin $(SC64_AUDIO_BANK_CONFIG) | build
+	$(CC) $(CFLAGS) -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) '-DSC64_AUDIO_BLOB="$(SC64_AUDIO_DIR)/sc64_audio_generated.bin"' common/start.s common/audio_bank.S $< $(LDFLAGS) -Wl,-Map,build/audio-arm-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Audio-Probe-GBA.gba: build/audio-arm-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC AUDIO PRB' SCDP
+.PHONY: audio-arm-probe
+audio-arm-probe: build/StarCraft-Audio-Probe-GBA.gba
+
+# Replays a request timeline through the mixer with the private bank and
+# writes the bytes the interrupt leaves in the two DMA buffers
+# (tests/audio_bank_timeline.c).
+build/test-audio-bank-timeline: tests/audio_bank_timeline.c common/audio_mixer.h common/audio_codec.h common/gba.h $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_BANK_CONFIG) | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) $< -o $@
+
+# Plays the whole private bank through the mixer against a plain model
+# (tests/audio_bank_mix.c); part of test-audio-bank.
+build/test-audio-bank-mix: tests/audio_bank_mix.c common/audio_mixer.h common/audio_codec.h common/gba.h $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_BANK_CONFIG) | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) $< -o $@
+.PHONY: test-audio-bank-mix
+test-audio-bank-mix: build/test-audio-bank-mix
+	./build/test-audio-bank-mix $(SC64_AUDIO_DIR)/sc64_audio_generated.bin
+test-audio-bank: test-audio-bank-mix
