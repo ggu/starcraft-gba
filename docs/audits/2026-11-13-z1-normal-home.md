@@ -37,3 +37,29 @@ winning route and does not cover fresh save reload or GBA hardware.
 - ELF SHA-256: `74c4b2394c4aee619bf2ea0549c31de7987827a915c32c5c50e7a4fec58ad6c1`.
 - Retained HOST tape SHA-256: `68e1d10ab6b12a9a7baedf5b65c39deca7e9cc7952354e761584b4512aeb3efc`.
 - Full physical receipt SHA-256: `e56afd192433ab6fc1af7f2f24be5a8c06781524633cf7c4a09e86b4f2c170f3`.
+
+## November 26 standard cartridge
+
+The standard Z10 ROM after #913 (SHA-256
+`2d1d00751fbc9e82a012823ec54fedda54dd3a55b0cf5d1a001be2de268fe7fe`)
+cleared Z1 from blank SRAM. All 50 periodic checkpoints and the final
+observation matched the newly generated HOST trace. The Chrysalis survived,
+30 Hydralisks remained and the victory occurred at frame 50,669. The 50,856
+main-loop updates averaged 27.04 Hz including UI and presentation waits.
+
+The command above now exports the victory, reloads it from HOME in a new
+emulator process, compares the live world and objectives, re-exports both
+SRAM banks unchanged, and advances to Z2 at frame zero. The result SHA-256
+was `8941d1f93e685690f88f84d1ad23c878206e97a4e373abcc4b42178a201c6c8d`.
+
+From this exact victory a separately retained physical-button route cleared
+Z2 at frame 10,209. The Chrysalis carrier was slot 18, the objective flags
+were 17 and both mission completion bits were set. The fresh Z2 victory
+re-export was `393a8325d5cc34625aec5a3e8de6e5d5dd9630195421aa95f4589b6ae30fc9e4`.
+The repository command above reproduces the Z1 win and Z2 handoff. The Z2
+victory used the locally retained recording.
+
+A second Z1 route started from blank SRAM on the same ROM, paused at frame
+984, and continued through 17 physical-button segments to victory at frame
+49,270. That result also reloaded and re-exported byte for byte (SHA-256
+`5245f01d0add6695c44ad0ece21156e0ee7f7c1668376a30cbdde6d0611c1091`).

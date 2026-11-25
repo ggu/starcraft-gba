@@ -3,8 +3,8 @@
 """Replay a retained Z1 HOME tape, reading briefing and authored messages normally."""
 
 import argparse
+import hashlib
 import json
-import shutil
 import struct
 import subprocess
 from pathlib import Path
@@ -96,7 +96,14 @@ def main():
     }
 
     args.out.mkdir()
-    g = PhysicalGame(args.runner, args.rom, args.elf, args.out / "guest")
+    def open_game(name, **sram):
+        folder = args.out / name
+        folder.mkdir()
+        (folder / "headless.log").symlink_to("/dev/null")
+        return PhysicalGame(args.runner, args.rom, args.elf, folder, **sram)
+
+    victory = args.out / "victory.sav"
+    g = open_game("guest", save_output=victory)
     r = g.rsp
 
     def n(k, field=None):
@@ -178,8 +185,6 @@ def main():
         assert n("race_selected_mission") == 0 and n("frame") == 0
         briefing_extra = r.completed - 7
         for tick in range(7, stop):
-            if tick % 1000 == 0 and shutil.disk_usage(args.out).free < 4 << 30:
-                raise RuntimeError("disk guard")
             step(trans.get(tick, r.held))
             for _ in range(48):
                 count, page, armed, row = modal()
@@ -244,7 +249,6 @@ def main():
             and min(final[k] for k in ("hydras", "extractors", "pools", "dens")) > 0
         ), final
         assert n("race_campaign", "objective_flags") & 3 == 3
-        require_unchanged(files, pins)
         proof = dict(
             status="won",
             tape_calls=stop,
@@ -260,6 +264,31 @@ def main():
                 before, timing_snapshot(r, g.sym, g.sizes), r.completed
             ),
         )
+        world = g.state()
+        r.export_sram()
+    finally:
+        g.close()
+
+    readback = args.out / "victory-readback.sav"
+    g = open_game("fresh-result", save_input=victory, save_output=readback)
+    r = g.rsp
+    try:
+        assert n("screen") == n("frame") == g.front_field("page") == 0
+        g.step(512)
+        assert (n("screen"), n("race_mode"), n("race_selected_mission"),
+                n("race_completed"), n("won"), n("lost")) == (3, 0, 0, proof["completion"], 1, 0)
+        restored = observe()
+        assert restored == {k: final[k] for k in restored} and g.state() == world
+        assert n("race_campaign", "objective_flags") == proof["objective_flags"]
+        r.export_sram()
+        assert readback.read_bytes() == victory.read_bytes()
+        g.step(0)
+        g.step(1)
+        assert (n("screen"), n("race_selected_mission"), n("race_completed"), n("frame")) == (
+            1, 1, proof["completion"], 0)
+        proof["victory_sha256"] = hashlib.sha256(readback.read_bytes()).hexdigest()
+        proof["advanced_to"] = "Z2"
+        require_unchanged(files, pins)
         (args.out / "result.json").write_text(json.dumps(proof, indent=2) + "\n")
         print("won", final, proof["timing"], flush=True)
     finally:
