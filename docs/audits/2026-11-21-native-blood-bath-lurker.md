@@ -283,3 +283,45 @@ the two identical private per-field captures each have SHA-256
 `472f35d8f31a5ab2ec111afc1e3bc4429abb6bb1d79257745a67eb697f81e44d`.
 The same frontend and neutral input method as the preceding observation were
 used. State files, capture rows and retail inputs remain private.
+
+## Observed clock intervals on N64 and GBA
+
+The per-field same-Hatchery witness above also permits a video-field
+measurement. The GBA comparison is a different ordinary skirmish and does
+not control map, actors or rendering load. It is useful for identifying the
+observed stages and elapsed emulated time, not for assigning the difference
+to an intrinsic production timer.
+
+| Scene and actor | Egg first seen → raw Hydralisk first seen | Raw Hydralisk → completed | Egg → completed |
+| --- | --- | --- | --- |
+| N64 Blood Bath slot 765 | 1,648 fields; 438 guest-counter increments; about 27.47 s | 56 fields; 15 increments; about 0.93 s | 1,704 fields; about 28.40 s |
+| N64 Blood Bath slot 776 | 1,607 fields; 438 guest-counter increments; about 26.78 s | 53 fields; 15 increments; about 0.88 s | 1,660 fields; about 27.67 s |
+| GBA Z10 Outpost CPU slot 23 | 525 game updates, 295,083,979 guest cycles; 17.5884 s | No separate completion stage observed | 17.5884 s |
+
+N64 seconds use a nominal 60 video fields per second; the captured field
+counts are the primary measurements. GBA seconds divide emulated guest
+cycles by 16,777,216 Hz. The raw-Hydralisk stage was observed about 9.20–9.88
+seconds later in the two native scenes than in this GBA scene, and native
+completion followed raw appearance by about 0.88–0.93 seconds. The GBA Egg
+changes in place directly to a Hydralisk; its runtime has no equivalent
+native completion flag. These are emulator observations, not hardware timing.
+
+For GBA, the integrated Z10 cartridge booted from an ordinary physical-input
+Outpost save with a Zerg human and one Zerg computer. With neutral input, a
+computer-owned Hydralisk Egg appeared in slot 23 at frame 6,096 with timer
+525 and 3,284,962,382 elapsed guest cycles. Its timer decreased by one on
+every subsequent observed frame; at frame 6,621 and 3,580,046,361 cycles the
+same slot was a Hydralisk. Two fresh replays of that save produced
+byte-identical 542-row per-frame records. The native field captures also
+matched on independent repeat. The N64 per-field source and its limitations
+are described immediately above.
+
+The integrated Z10 ROM SHA-256 is
+`2d1d00751fbc9e82a012823ec54fedda54dd3a55b0cf5d1a001be2de268fe7fe`;
+its ELF is `385fc0c27721eac8f3a245165a04373c7aca3cc3e97b7b518d444bdbb09f0ea9`.
+The ordinary save is `5cea47aca0cb045def31bcfd8dff9122966f9212dd1b7ddea788fee2b3adf3dc`,
+and both private GBA observations hash to
+`a663f1961720eb5bce202d4b539fc1ee99f2d3866eeb6b6dacf29336e24a9d01`.
+The GBA runner SHA-256 is
+`050e5e7dcab772798780a11d1c6c3b4b84135e4b681aa11e08f666738ebaa9bf`.
+No game assets or private captures are included in the source tree.

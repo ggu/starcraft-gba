@@ -1207,6 +1207,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   payment, or conversion to GBA updates. A [later witness](audits/2026-11-21-native-blood-bath-lurker.md#concurrent-eggs-referencing-one-hatchery)
   sees two overlapping Eggs whose actor records both point to one Hatchery;
   verify that field’s meaning and capture the issuing commands and payment.
+  [Measured emulator clocks](audits/2026-11-21-native-blood-bath-lurker.md#observed-clock-intervals-on-n64-and-gba)
+  show 26.78–27.47 s to raw Hydralisk plus 0.88–0.93 s to native completion,
+  versus 17.59 s on GBA in a different Outpost scene. Reproduce with matched
+  workloads and clocks before attributing or changing production duration.
   The [normal CPU Drone comparison](audits/2026-11-21-native-blood-bath-lurker.md#cpu-drone-production-and-fresh-home-continuation)
   follows a native Larva, Egg and Drone in the same slot, and a
   current GBA Hatchery debit, queue and new-slot Drone through
