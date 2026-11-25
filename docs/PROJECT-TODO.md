@@ -113,8 +113,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and site amounts from the new pause save. Relative to release, the linked
   race ROM code grew by 856–992 bytes, Showcase by 896, and static EWRAM by
   64–200 bytes across the four profiles. IWRAM section sizes held steady.
-  Check normal placement after a preplaced campaign refinery is destroyed
-  and measure busy-frame timing before activation.
+  Eight paired, 2,048-update continuations from the same three-AI saves
+  changed elapsed emulated cycles by at most 0.020%. At 64 sample points
+  per case, actor arrays, world summaries, both video pages and the palette
+  matched release. Showcase Outpost displayed the other page once, and its
+  two pages contained different images. The candidate ran at 16.76–24.08
+  simulation updates/s across these cases. Check normal placement after a
+  preplaced campaign refinery is destroyed before activation.
   The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual
