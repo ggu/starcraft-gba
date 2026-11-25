@@ -16,6 +16,14 @@ endif
 ifneq ($(filter $(CANONICAL_TERRAN_BUILDING_WORDS),0 1),$(CANONICAL_TERRAN_BUILDING_WORDS))
 $(error CANONICAL_TERRAN_BUILDING_WORDS must be 0 or 1)
 endif
+# Opt in to packed Protoss base structures on Terran, P10 and Showcase.
+CANONICAL_PROTOSS_BASE_BUILDING_WORDS ?= 0
+ifneq ($(words $(filter 0 1,$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS))),1)
+$(error CANONICAL_PROTOSS_BASE_BUILDING_WORDS must be 0 or 1)
+endif
+ifneq ($(filter $(CANONICAL_PROTOSS_BASE_BUILDING_WORDS),0 1),$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS))
+$(error CANONICAL_PROTOSS_BASE_BUILDING_WORDS must be 0 or 1)
+endif
 sc64_defines = $(filter -D$(1) -D$(1)=%,$(2))
 sc64_can_pack_building_words = $(and $(call sc64_defines,SC64_UNIT_WORD_SPRITES,$(1)),$(if $(call sc64_defines,SC64_TILE_RENDERER,$(1)),,1))
 
