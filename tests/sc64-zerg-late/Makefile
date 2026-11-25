@@ -123,7 +123,7 @@ Z10_TERRAN_BUILDING_WORD_INCLUDE := $(if $(and $(Z10_BUILDING_WORDS_FLAGS),$(fil
 Z10_SELECTED_BUILDING_WORD_HEADER := $(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),$(Z10_TERRAN_BUILDING_WORD_HEADER),$(SC64_BUILDING_WORDS_HEADER))
 Z10_BUILDING_WORDS_KEY := $(Z10_BUILDING_WORDS)$(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),-terran)
 Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS_KEY)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
-ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS $(ZERG_Z10_PADDED_IMPACT_FLAGS)
+ZERG_Z10_RELEASE_FLAGS = $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
 # The standard Z10 cartridge can use the qualified custom Carrier journal.
 # Keep a reversible stock comparison with an independent fact-table cache.
@@ -135,6 +135,7 @@ $(error Z10_CARRIER_RELEASE must be 0 or 1)
 endif
 endif
 Z10_CARRIER_FLAGS := $(if $(filter 1,$(Z10_CARRIER_RELEASE)),$(SC64_CARRIER_RELEASE_FLAGS))
+Z10_PADDED_IMPACT_FLAGS = $(if $(and $(Z10_CARRIER_FLAGS),$(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS))),-DSC64_BUILDING_PAD_IMPACT_SAVE)
 Z10_CARRIER_SOURCES := $(if $(Z10_CARRIER_FLAGS),$(P7_INTERCEPTOR_FLIGHT_SOURCES))
 # Preserve the qualified layout with the order model before motion and codec.
 Z10_PROJECTILE_SOURCES := $(filter starcraft/sc64_interceptor_%.c,$(STARCRAFT))
@@ -173,7 +174,7 @@ build/z10-facts-config: force-z10-facts-config | build
 	@printf '%s\n' '$(Z10_FACT_SIGNATURE)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(Z10_ARM_SOURCES) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(Z10_SELECTED_BUILDING_WORD_HEADER)) build/z10-facts-config $(Z10_FACT_CONFIG) $(if $(Z10_FACT_FLAGS),$(Z10_FACT_HEADER)) | build
-	$(CC) $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(Z10_FACT_FLAGS) $(Z10_CARRIER_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(Z10_ARM_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+	$(CC) $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(Z10_FACT_FLAGS) $(Z10_CARRIER_FLAGS) $(Z10_PADDED_IMPACT_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(Z10_ARM_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@

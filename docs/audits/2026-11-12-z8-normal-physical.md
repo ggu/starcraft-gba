@@ -1451,6 +1451,29 @@ and keep the remote force away from the next raid.
 | Second interception SRAM and input trace | `414f59b93bdc2a3ee58726a0b71f947389418e4ab529a809093195499b6497e5` / `5e34029068edea79d4fcf255f323744fa432400a5c3d95937f108401e95e1e67` |
 | Fresh HOME continuation | `b5e408227077d6081213f0c1835263037b427d13a183cf6309f8d63ef654fc39` |
 
+#### Keep the replacement economy through both southern raids
+
+An alternate continuation from frame 78,389 keeps the two
+Hydralisk defenses while moving live Overlords to (1293, 1620)
+and (1304, 1916). Kerrigan's explicit attack kills the first
+Templar. Fresh HOME at 80,910 restores a full-health Hatchery,
+a 674-HP Pool, a 16-HP Drone and full-health Kerrigan.
+
+The same branch moves its two Overlords and Kerrigan to the
+previously verified second interception position. Waiting for
+Kerrigan to reach that position makes the later attack order
+reach the revealed Templar. Fresh HOME at 82,409 retains the
+Hatchery, Pool, Drone, full-health Kerrigan and both 200-HP
+Overlords. No Templar remains in the active field. The SRAM
+readback is byte-identical. This keeps production available
+while preparing the Nexus attack.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| First interception with workers, SRAM and fresh HOME | `fd0e0059756d6d3ffe7d8d715f031c1bc71a8873dcae71df84002727ace8a83c` / `34e76bc4a76e7f8a831332103317d9edaeca5df61972211b44a3f040473dabf1` |
+| Second interception inputs | `b130dc853943bcfc1881b5767a9d73c7361243d88b0a6d59b31d45b30015728b` |
+| Second interception SRAM and fresh HOME | `95c1f34dd3dcb92a67437b9d83dbfd8060b75466b595dfed10c23629d6edce8f` / `005ee812924030550a655c0692d120d07f7857a3fa6d7182016f88e57016d442` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

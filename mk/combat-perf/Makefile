@@ -95,14 +95,13 @@ endif
 endif
 CANONICAL_CONTACT_ROM_AXIS_FLAGS = $(if $(filter 1,$(CANONICAL_CONTACT_ROM_AXIS)),-DSC64_CONTACT_EARLY_AXIS_ROM_PROBE)
 # New Z10 campaign journal for bursts beyond the legacy eight rows.
-CANONICAL_Z10_PADDED_IMPACTS ?= 0
+CANONICAL_Z10_PADDED_IMPACTS ?= 1
 ifneq ($(CANONICAL_Z10_PADDED_IMPACTS),0)
 ifneq ($(CANONICAL_Z10_PADDED_IMPACTS),1)
 $(error CANONICAL_Z10_PADDED_IMPACTS must be 0 or 1)
 endif
 endif
-ZERG_Z10_PADDED_IMPACT_FLAGS = $(if $(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS)),-DSC64_BUILDING_PAD_IMPACT_SAVE)
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):$(CANONICAL_Z10_PADDED_IMPACTS):batch-dirty
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):batch-dirty$(if $(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS)),:z10-padded-impacts)
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:
