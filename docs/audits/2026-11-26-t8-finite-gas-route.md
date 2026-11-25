@@ -23,7 +23,16 @@ distinct checkpoint ticks matched, including resources and objectives, with
 no exceptions. T8 won at frame 285,946 with the hero alive and completion
 mask `0xff0`. A fresh load restored the result and re-exported identical
 SRAM (SHA-256 `aa9f9c26027e3c1c5b4224dbbac8a394c7e8fd43b8d1ec1fe86c9c76f2ba4c4a`).
-The T9 and T10 continuation from this new T8 victory is still in progress.
+The actual T8 victory save then entered T9 using the ordinary advance button.
+A new finite-gas HOST T9 tape was replayed on the cartridge: all 54
+checkpoint ticks matched without wallet or objective exceptions, Kerrigan
+survived, and T9 won at frame 49,486 with mask `0x1ff0`. Its freshly
+reloaded victory save then entered T10. All six T10 checkpoints matched,
+and the finale won at frame 3,361 with all ten Terran bits (`0x3ff0`).
+Both victories survived a fresh HOME load and re-exported identical SRAM;
+the final SRAM SHA-256 was
+`9638f2c8ea8dd5887cf9a41b34a17d2a34ec8511f737c7da904bf1b49dc9ef5b`.
+This is a carried T7-victory-to-T10 segment, not a new T1-to-T10 run.
 
 With the normal private Terran asset inputs prepared, regenerate the route:
 
