@@ -5718,11 +5718,11 @@ The linear-predictor streams now decode in a 460-byte hand-written ARM loop
 in IWRAM, two to four voices are summed from one interleaved table by a
 hand-written Thumb loop, and a frame without voices is written once per
 buffer half. The format, the bank, the voice policy and the bytes written to
-the two DMA buffers are unchanged. In mGBA the interrupt takes 3,047–3,409
-cycles per VBlank with only music (5,723–6,466 before) and at most 14,776 in
-late three-computer Custom Games (26,702 before); six paired late-battle runs
-match in world state, pixels and saves with 0.99–4.52% fewer cycles per
-update. `common/gba.ld` keeps IWRAM code below `0x03005200`, an 11,264-byte
+the two DMA buffers are unchanged. In mGBA its mean over a window is
+3,047–3,409 cycles per VBlank with only music (5,723–6,466 before) and up to
+14,776 in late three-computer Custom Games (26,702 before), and its longest
+single run is 16,885 (29,793 before); six paired late-battle runs match in
+world state, pixels and saves with 0.99–4.52% fewer cycles per update. `common/gba.ld` keeps IWRAM code below `0x03005200`, an 11,264-byte
 main stack reserve. Tables, the proofs of unchanged output, the stack bound
 and the rejected alternatives are in the
 [audit](audits/2026-11-25-audio-interrupt-cost.md). Limits: emulator

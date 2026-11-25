@@ -46,7 +46,7 @@ audio-arm-probe: build/StarCraft-Audio-Probe-GBA.gba
 check-audio-arm-probe: build/StarCraft-Audio-Probe-GBA.gba build/test-audio-bank tools/sc64_audio_arm_probe.py
 	@if [ -z "$(AUDIO_ARM_RUNNER)" ]; then echo "set AUDIO_ARM_RUNNER to the headless mGBA runner"; exit 2; fi
 	./build/test-audio-bank $(SC64_AUDIO_DIR)/sc64_audio_generated.bin $(SC64_AUDIO_DIR)/sc64_audio_manifest.json > build/audio-arm-probe-host.txt
-	$(PYTHON) tools/sc64_audio_arm_probe.py build/StarCraft-Audio-Probe-GBA.gba build/audio-arm-probe.elf $(AUDIO_ARM_RUNNER) build/audio-arm-probe-host.txt
+	$(PYTHON) tools/sc64_audio_arm_probe.py build/StarCraft-Audio-Probe-GBA.gba build/audio-arm-probe.elf "$(AUDIO_ARM_RUNNER)" build/audio-arm-probe-host.txt
 
 # Replays a request timeline through the mixer with the private bank and
 # writes the bytes the interrupt leaves in the two DMA buffers

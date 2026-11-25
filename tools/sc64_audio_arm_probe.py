@@ -7,11 +7,13 @@ usage: sc64_audio_arm_probe.py ROM ELF RUNNER HOST_OUT
 ROM and ELF are build/StarCraft-Audio-Probe-GBA.gba and build/audio-arm-probe.elf
 (tests/audio_codec_arm_probe.c). RUNNER is the port-free mGBA runner the other ARM
 checks use. HOST_OUT is the output of build/test-audio-bank for the same bank; its
-"linear-predictor sample sum" line is the host decode of every stream.
+"linear-predictor sample sum" line is the host decode of every stream the
+hand-written decoder handles, with their number and their samples.
 
 The ROM is run to audio_probe_done and audio_probe_result is read from memory. The
 check passes when the ROM reports no difference between its hand-written routines
-and their C references and its running sum of all decoded samples equals the host's.
+and their C references and it decoded the same streams and samples to the same
+running sum as the host.
 Game memory is read, never written. Emulator evidence only."""
 import os
 import re
@@ -26,28 +28,31 @@ WORDS = ("status", "streams", "linear", "samples", "sum_low", "sum_high", "decod
 PASS, RUN_SECONDS = 1, 1800
 
 
-def host_sum(text: str) -> tuple[int, int]:
-    """The two sum words test-audio-bank printed."""
-    match = re.search(r"^audio bank: linear-predictor sample sum ([0-9a-f]{8}) ([0-9a-f]{8})$", text, re.M)
+def host_sum(text: str) -> tuple[int, int, int, int]:
+    """What test-audio-bank printed for the linear-predictor streams: the two
+    sum words, the number of streams and the number of samples."""
+    match = re.search(r"^audio bank: linear-predictor sample sum ([0-9a-f]{8}) ([0-9a-f]{8}) "
+                      r"over ([0-9]+) streams, ([0-9]+) samples$", text, re.M)
     if not match:
         raise ValueError("the host output has no linear-predictor sample sum")
-    return int(match.group(1), 16), int(match.group(2), 16)
+    return int(match.group(1), 16), int(match.group(2), 16), int(match.group(3)), int(match.group(4))
 
 
-def verdict(result: dict[str, int], host: tuple[int, int]) -> list[str]:
+def verdict(result: dict[str, int], host: tuple[int, int, int, int]) -> list[str]:
     """Reasons the probe result fails; empty when it passes."""
     reasons = []
     if result["status"] != PASS:
         reasons.append(f"the ROM reported status {result['status']}")
-    if not result["streams"] or result["linear"] != result["streams"]:
-        reasons.append(f"{result['linear']} of {result['streams']} streams ran through the hand-written decoder")
+    if not host[2] or (result["linear"], result["samples"]) != host[2:] or result["streams"] < result["linear"]:
+        reasons.append(f"the ROM decoded {result['linear']} of {result['streams']} streams and {result['samples']} "
+                       f"samples; the host decoded {host[2]} streams and {host[3]} samples")
     if result["decoder_bad"]:
         reasons.append(f"{result['decoder_bad']} decoded frames differ from the C reference")
     if result["mixer_bad"]:
         reasons.append(f"{result['mixer_bad']} voice-sum tables differ from the C reference")
-    if (result["sum_low"], result["sum_high"]) != host:
+    if (result["sum_low"], result["sum_high"]) != host[:2]:
         reasons.append("the decoded sample sum %08x %08x differs from the host's %08x %08x" %
-                       (result["sum_low"], result["sum_high"], *host))
+                       (result["sum_low"], result["sum_high"], *host[:2]))
     return reasons
 
 
@@ -64,7 +69,7 @@ def run(rom: Path, elf: Path, runner: Path) -> dict[str, int]:
             raise RuntimeError(f"{elf} has no {name}")
     with tempfile.TemporaryDirectory(prefix="audio-arm-probe-") as home:
         env = dict(os.environ, HOME=home, XDG_CONFIG_HOME=home + "/.config", TMPDIR=home)
-        proc = subprocess.Popen([str(runner), str(rom), "--physical"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        proc = subprocess.Popen([str(runner.resolve()), str(rom.resolve()), "--physical"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, text=True, bufsize=1, env=env)
 
         def command(text: str, seconds: int = 60) -> str:
@@ -99,7 +104,7 @@ def main(argv: list[str]) -> int:
     rom, elf, runner, host_out = map(Path, argv[1:])
     host = host_sum(host_out.read_text(encoding="utf-8"))
     result = run(rom, elf, runner)
-    print("audio arm probe: {streams} streams, {samples} samples, sum {sum_low:08x} {sum_high:08x}, "
+    print("audio arm probe: {linear} of {streams} streams, {samples} samples, sum {sum_low:08x} {sum_high:08x}, "
           "{decoder_bad} decoder and {mixer_bad} voice-sum differences".format(**result))
     reasons = verdict(result, host)
     for reason in reasons:

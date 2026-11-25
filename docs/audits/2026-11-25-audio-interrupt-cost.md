@@ -1,11 +1,13 @@
 # Cost of the sampled-audio interrupt
 
 The VBlank interrupt that decodes and mixes the StarCraft 64 sound bank
-runs on every video frame in every mode. On `7316734e` it took 5,700 to
-6,500 CPU cycles per VBlank with only music playing and up to 26,700 in
-late three-computer Custom Games, where an update spans three to four
-VBlanks. This change brings that to 3,000–3,400 and at most 14,800
-cycles, with the same bytes written to the two Direct Sound buffers.
+runs on every video frame in every mode. On `7316734e` its mean over a
+window was 5,700 to 6,500 CPU cycles per VBlank with only music playing
+and up to 26,700 in late three-computer Custom Games, where an update
+spans three to four VBlanks. This change brings those means to
+3,000–3,400 and up to 14,800 cycles, and the longest single run from
+29,800 to 16,900, with the same bytes written to the two Direct Sound
+buffers.
 
 All figures are from mGBA with an instruction-level cycle profiler in a
 private runner. Nothing here was measured on hardware or listened to.
@@ -125,7 +127,8 @@ Every update in these windows is still over the 561,792-cycle budget.
   Its running sum of the decoded samples, `c18b8cd4 bb236693`, equals
   the one the host test prints. 400 pseudo-random bit streams (704,000
   samples) agree as well; they reach reserved width codes and other
-  input the pack tool never writes. The voice sum agrees on 3,000
+  input the pack tool never writes, and two of them are the longest a
+  stream can be. The voice sum agrees on 3,000
   tables, in which 115,514 words hold a sample at either limit. A
   deliberately broken clamp and a broken refill both fail the probe.
 - **ARM, the twelve windows.** A capture records, at every VBlank since

@@ -18,7 +18,8 @@
  * - Pseudo-random words are decoded the same way. Any bit sequence is a
  *   stream, so these reach what the pack tool never writes: reserved width
  *   codes, width 0 on a moving second-order stream, long runs of 32-bit
- *   fields.
+ *   fields. The last two spell out width 8 in every block, the most bits a
+ *   stream can take, and no stream pointer may pass the end of the words.
  * - The voice sum runs on pseudo-random tables for 2, 3 and 4 voices, half
  *   of them built from extreme bytes so that lanes clip in both directions.
  *
@@ -87,6 +88,8 @@ static u32 rng(void)
 __attribute__((noinline)) void audio_probe_done(void) { __asm__ volatile(""); }
 
 static u32 sum_low, sum_high, decoder_bad, samples_done, layouts_used;
+/* When set, no decoder may leave its stream pointer past this address. */
+static const u8 *stream_limit;
 
 /* Both decoders over one stream, frame by frame. */
 static void decode_stream(u32 stream, const u8 *start, u32 samples)
@@ -102,6 +105,7 @@ static void decode_stream(u32 stream, const u8 *start, u32 samples)
         audio_decoder_linear(&a, (volatile u16 *)(table_asm + column), n, columns);
         audio_decoder_linear_reference(&r, (volatile u16 *)(table_ref + column), n, columns);
         u32 bad = a.next != r.next || a.acc != r.acc || a.state != r.state || a.x != r.x;
+        if (stream_limit && a.next > stream_limit) bad = 1;
         for (u32 i = 0; i < AUDIO_VOICES * SUM_WORDS; ++i) bad |= table_asm[i] != table_ref[i];
         if (bad && !decoder_bad++) {
             out_text("audio arm probe: decoder differs, stream "); out_num(stream);
@@ -142,7 +146,20 @@ int main(void)
             random_words[i] = w;
         }
         random_words[0] = (random_words[0] & ~3u) | (round & 1u);  /* the predictor */
+        if (round >= RANDOM_STREAMS - 2u) {
+            /* The longest a stream can be: every block spells its width out
+             * as 8 ("111", then 0001 lowest bit first) before 64 residual
+             * bits. RANDOM_SAMPLES of it must fit the buffer. */
+            u32 at = 2;
+            for (u32 block = 0; block < RANDOM_SAMPLES / AUDIO_CODEC_BLOCK; ++block, at += 71u)
+                for (u32 bit = 0; bit < 7u; ++bit) {
+                    u32 mask = 1u << ((at + bit) & 31u), *w = &random_words[(at + bit) >> 5];
+                    *w = bit == 3u || bit == 4u || bit == 5u ? *w & ~mask : *w | mask;
+                }
+        }
+        stream_limit = (const u8 *)(random_words + RANDOM_WORDS);
         decode_stream(SC64_AUDIO_SAMPLE_COUNT + SC64_AUDIO_MUSIC_TRACKS + round, (const u8 *)random_words, RANDOM_SAMPLES);
+        stream_limit = 0;
     }
     out_text("audio arm probe: random streams="); out_num(RANDOM_STREAMS); out_text(" samples="); out_num(samples_done - bank_samples);
     out_text(" mismatches="); out_num(decoder_bad - bank_bad); out_flush();
@@ -171,6 +188,10 @@ int main(void)
         }
         if (bad && !mixer_bad++) { out_text("audio arm probe: voice sum differs, table "); out_num(round); out_flush(); }
     }
+    /* No words: nothing is read or written. */
+    sum_asm[0] = 0x5a5a5a5au;
+    audio_mixer_sum((volatile u32 *)sum_asm, table_asm, 4, 0);
+    if (sum_asm[0] != 0x5a5a5a5au && !mixer_bad++) { out_text("audio arm probe: voice sum wrote for no words"); out_flush(); }
     out_text("audio arm probe: mixer tables="); out_num(SUM_TABLES); out_text(" words_at_a_limit="); out_num(clipped);
     out_text(" mismatches="); out_num(mixer_bad); out_flush();
 
