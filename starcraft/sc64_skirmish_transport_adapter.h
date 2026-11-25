@@ -6,17 +6,21 @@
  * units while it researches; the job binds the exact slot and owner. */
 static int race_sk_transport_producer_valid(int slot, int owner)
 {
-    return race_mode && slot >= 0 && slot < MAX_BUILDINGS && owner >= 0 &&
+    return (race_mode || (owner == SIDE && race_human == R_ZERG &&
+            sc64_campaign_transport_allowed(race_selected_mission))) && slot >= 0 && slot < MAX_BUILDINGS && owner >= 0 &&
         owner < 5 && race_player[owner] == R_ZERG && b[slot].alive &&
         b[slot].hp > 0 && b[slot].owner == owner &&
         (b[slot].type == B_LAIR || b[slot].type == B_HIVE) &&
         (b[slot].raw_type < 0 || b[slot].raw_type == sc64_race_raw_building(b[slot].type)) &&
-        !b[slot].under_construction;
+        !b[slot].under_construction &&
+        (race_mode || (sc64_campaign_transport_source_owner_valid(race_selected_mission, b[slot].raw_owner) &&
+         sc64_campaign_transport_producer_allowed(race_selected_mission,
+             b[slot].raw_type < 0 ? sc64_race_raw_building(b[slot].type) : b[slot].raw_type)));
 }
 
 static int race_sk_transport_job_uses(int slot)
 {
-    if (!race_mode || slot < 0 || slot >= MAX_BUILDINGS) return 0;
+    if (slot < 0 || slot >= MAX_BUILDINGS) return 0;
     for (int i = 0; i < SC64_SK_TRANSPORT_OWNERS; ++i)
         if (race_skirmish_transport_tech.owner[i].producer_plus_one == slot + 1)
             return 1;
@@ -60,7 +64,7 @@ static int race_sk_transport_research_menu(void)
 static void race_sk_transport_research_tick(void)
 {
     static const int owners[SC64_SK_TRANSPORT_OWNERS] = {0, 1, 3, 4};
-    if (!race_mode) return;
+    if (!race_mode && !sc64_campaign_transport_allowed(race_selected_mission)) return;
     for (int i = 0; i < SC64_SK_TRANSPORT_OWNERS; ++i) {
         Sc64SkTransportJob *job = &race_skirmish_transport_tech.owner[i];
         if (!job->remaining) continue;
@@ -80,7 +84,7 @@ static void race_sk_transport_research_tick(void)
 static void race_sk_transport_producer_destroyed(int slot)
 {
     static const int owners[SC64_SK_TRANSPORT_OWNERS] = {0, 1, 3, 4};
-    if (!race_mode) return;
+    if (!race_mode && !sc64_campaign_transport_allowed(race_selected_mission)) return;
     for (int i = 0; i < SC64_SK_TRANSPORT_OWNERS; ++i)
         if (race_skirmish_transport_tech.owner[i].producer_plus_one == slot + 1)
             (void)race_sk_transport_cancel_owner(owners[i], 1);
