@@ -32,7 +32,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Continue the exact-package Zerg and Protoss campaigns and physical
   cartridge timing.
 
-- **Z5 campaign progression.** Starting at a genuine Z4 victory on the
+- **Zerg campaign progression.** Z1 now wins from HOME on the packaged
+  Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
+  controller segments load saves made in this run. Victory at frame
+  49,270 re-exports byte for byte on fresh HOME and matches the earlier
+  victory journal (`6122561e55f2ab688b55a6217f09b22188b53fe826113860bdfff04bd90992eb`).
+  Advancing to Z2, saving and reloading preserves the Z1 bit at frame 101.
+
+  Starting at a genuine Z4 victory on the
   packaged Zerg ROM, A enters Z5. The 14 recorded input segments clear
   Z5 at frame 18,974 and fresh HOME restores the result. All 14 release
   saves match the historical stage bytes, including the victory SRAM
@@ -47,7 +54,19 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z5 input chain from this new Z4 result wins at frame 18,974 with both
   completion bits set (98,304). Fresh readback SHA-256:
   `bd4510087ba2ad7b109ed11194fe93faf602d08a1b17b48dc81d8f0e2aa7aba3`.
-  Carry this save forward through Z6.
+  From this Z5 save, 52 controller segments complete Z6 at frame 177,044.
+  Each segment loads the preceding save from this run. Fresh HOME restores
+  all three completion bits (229,376) and re-exports the same victory SRAM
+  (`58fe25565dfcda760b1d8af07c8d938f77354b22abd8e2bf0874ac3b6702b0e6`).
+  Advancing into Z7 and reloading at frame 101 preserves all three bits.
+
+  Independently, Z7 wins from HOME on this ROM at frame 267,585 with all
+  206 checkpoints matching. The fresh-loaded victory advances to Z8.
+  The Z8 field save restores at frame 107 with the Z7 completion bit and
+  re-exports byte for byte. Z9 is the remaining intermediate Zerg handoff.
+  The current Z9 recovery produces a crystal and a full-health carrier on
+  the southern approach, but defenders kill it before delivery. The next
+  run should clear the delivery area before committing the carrier.
 
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
@@ -129,7 +148,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   fresh emulator process. All nine intermediate Protoss chapter transitions
   also reach the expected next mission on this package. Each following
   mission saves and reloads with the same frame and completion mask.
-  Z1–Z6 and Z8 pass the corresponding transitions. The three finales retry
+  Z1–Z8 pass the corresponding transitions. The three finales retry
   the final chapter with A and preserve its completion bit through a new
   pause save. The new T5 victory also advances into T6 and reloads at
   frame 101. On T9 the strict historical comparison first diverges at
@@ -139,16 +158,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   replay recorded the differing checkpoints and kept the terminal objective
   and save checks active. Repeat these checks from retained victory SRAM with
   `python3 tools/sc64_chapter_transition.py --help` for the required paths.
-  Continue Z7 and Z9 transitions and full campaign runs. Recorded P2, Z4
-  and Z5 inputs currently leave the mission active, and the historical Z3
-  cursor checkpoint diverges at input 7,269.
+  Continue Z9 and the remaining opening-to-victory routes. The original
+  P2 inputs leave the mission active, and the historical Z3 cursor
+  checkpoint diverges at input 7,269.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
   start at 29.85–29.92 emulated updates/s across six three-CPU cases
   and fall to 14.14–17.90 in the last measured window. Every sampled
   busy update exceeds two VBlanks. The exact Protoss 10 late sample
   spends 396,340 guest cycles per update on depth-ordered actor
-  drawing and 152,204 on movement orders. Prioritize those paths for
+  drawing and 152,204 on movement orders. The full packaged Z7 replay
+  averages 12.83 emulated main-loop updates/s over 270,585 inputs,
+  including presentation waits and UI. Physical GBA timing remains open. Prioritize those paths for
   the race cartridges.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
