@@ -85,3 +85,13 @@ build/test-sc64-source-gas-$(1): tests/sc64_source_gas_game.c $$(CUSTOM_FULL_MAT
 	$$(CLANG) $$(CUSTOM_FULL_MATCH_HOST_FLAGS) -DSC64_SOURCE_GAS $$(CUSTOM_FULL_MATCH_FLAGS_$(1)) $$< common/gba.c $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) -o $$@
 endef
 $(foreach product,terran zerg protoss,$(eval $(call SOURCE_GAS_GAME_TEST,$(product))))
+
+# Isolated source-gas queue trial. The shipped products retain their rules.
+define SOURCE_GAS_QUEUE_TEST
+.PHONY: check-sc64-gas-service-$(1)
+check-sc64-gas-service-$(1): build/test-sc64-gas-service-$(1)
+	./$$<
+build/test-sc64-gas-service-$(1): tests/sc64_gas_service_game.c $$(CUSTOM_FULL_MATCH_ELF_$(1)) $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CUSTOM_FULL_MATCH_INPUTS_$(1)) common/gba.c $$(COMMON_HEADERS) mk/custom-full-match/Makefile | build
+	$$(CLANG) $$(CUSTOM_FULL_MATCH_HOST_FLAGS) -DSC64_SOURCE_GAS -DSC64_GAS_SERVICE_TRIAL $$(CUSTOM_FULL_MATCH_FLAGS_$(1)) $$< common/gba.c $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) -o $$@
+endef
+$(foreach product,terran zerg protoss,$(eval $(call SOURCE_GAS_QUEUE_TEST,$(product))))

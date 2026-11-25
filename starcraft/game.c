@@ -8154,6 +8154,9 @@ add_owner_resources(int owner, int ore, int vespene)
 #ifdef SC64_SOURCE_GAS
 #include "sc64_source_gas.h"
 #endif
+#ifdef SC64_GAS_SERVICE_TRIAL
+#include "sc64_gas_service_runtime.h"
+#endif
 #include "sc64_worker_minerals.h"
 
 #if defined(SC64_NEAREST_RESOURCE_DEPOT) || defined(SC64_WORKER_CARGO_KIND)
@@ -9235,6 +9238,9 @@ target_lists_unavailable:
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
 #endif
     SC64_PSC_WORLD_TICK();
+#ifdef SC64_GAS_SERVICE_TRIAL
+    sc64_gas_service_begin();
+#endif
 #if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     if (mineral_fifo_enabled) worker_mineral_fifo_begin();
 #endif

@@ -52,7 +52,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   occupying each gas site at a time. The packaged GBA Blood Bath game showed
   up to three workers counting down concurrently at one building. Qualify
   single occupancy, wait order, cancellation, destruction, saved trips and
-  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
+  economy impact across products. In the shared queue trial, a P10 replay of
+  Blood Bath frames 10,257–10,656 reduced simultaneous advancing gas workers
+  at three buildings from 2/3/3 to 1/1/1. Separate sites worked in parallel
+  on all 399 measured transitions. The 16 complete timer intervals (release:
+  24) show why campaign economy and paid production need fresh replays.
+  The trial still needs authenticated save/reload of the waiting order, ARM
+  stack and performance measurements, and cross-product match qualification.
+  [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result

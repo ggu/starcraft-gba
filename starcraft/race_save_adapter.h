@@ -5853,6 +5853,9 @@ static int race_load_game(void) {
     if (mineral_fifo_enabled) mineral_fifo = race_fifo_candidate;
     else memset(&mineral_fifo, 0, sizeof(mineral_fifo));
 #endif
+#ifdef SC64_GAS_SERVICE_TRIAL
+    sc64_gas_service_migrate_legacy();
+#endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
 #endif
