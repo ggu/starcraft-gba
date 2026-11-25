@@ -186,6 +186,13 @@ def load_t3_trace(path, stop):
     if tuple(final[k] for k in ("elapsed", "remaining", "outcome", "won", "lost", "objective")) != (
             stop, 0, 1, 1, 0, 0):
         raise ValueError("T3 requires a countdown victory")
+    if "terminal_checkpoint" in reference:
+        terminal = reference["terminal_checkpoint"]
+        if (not isinstance(terminal, dict) or terminal.get("tick") != launch + stop
+                or any(type(terminal.get(k)) is not int for k in T3_FIELDS)
+                or any(terminal[k] != value for k, value in final.items() if k != "kind")):
+            raise ValueError("T3 terminal checkpoint disagrees with the countdown result")
+        final.update({key: terminal[key] for key in T3_FIELDS})
     observations = {row["tick"] - launch: row for row in rows}
     observations[0] = dict(kind="start", elapsed=0, remaining=stop, outcome=0, screen=1)
     observations[stop] = final
