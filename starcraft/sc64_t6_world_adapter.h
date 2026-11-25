@@ -83,7 +83,7 @@ sc64_t6_owners_hostile(int a, int other)
 }
 
 static int
-race_t6_unit_burrowed(int slot)
+(race_t6_unit_burrowed)(int slot)
 {
     return race_t6_active() && slot >= 0 && slot < MAX_UNITS && u[slot].alive &&
            sc64_t6_burrowed_get(&race_t6, (unsigned)slot);
