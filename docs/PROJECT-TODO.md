@@ -1013,13 +1013,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   keeps the RAM guards and repeats the campaign and skirmish
   startup and save checks, including the single-CPU active Terran
   win. Confirm local release integration, hardware pacing and
-  active multi-CPU results. The [current P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
-  rejects nine impacts and keeps the earlier journal intact.
+  active multi-CPU results. The [installed P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
+  rejects nine impacts and keeps the earlier journal intact. The
+  [expanded P10 journal](IMPACT-EVENTS.md#typed-p10-layout) accepts
+  that exact save and fresh-loads its ordered queue. It also passes
+  a constructed campaign replay and the maximum 32-event ARM save.
+  Measure the longer pause-save operation on a GBA SP.
   The [Z10 campaign journal](IMPACT-EVENTS.md#z10-campaign-with-the-carrier-cartridge-layout)
   saves the exact Z3 12-impact burst and restores all 32
-  rows in the maximum fixture. The [P10 layout prototype](IMPACT-EVENTS.md#typed-p10-layout)
-  fits both shots, transport and research in the same slot.
-  Integrate and qualify P10's typed journal and real replay.
+  rows in the maximum fixture.
   The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
   restores Terran recovery in three cases across the race
   profiles. Qualify busy ARM matches and address the six
@@ -2024,6 +2026,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The ground push destroys the Pool. A combined defense with
   a distant attack order also loses the Hydralisks and Drones.
   Try a closer ground hold before sending the intercept north.
+  The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
+  preserve the economy at frame 87,554 and hold the Pool with four
+  Hydralisks through frame 89,195. Protect the forward detector before
+  pushing the Nexus. The [Z10 relocated-base replay](audits/2026-11-21-z10-current-full-circle.md#hold-at-the-relocated-hatchery)
+  verifies three Hydralisks and a new mining Drone at frame 35,958.
+  Establish the defense earlier from frame 34,723 to survive the raid.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second

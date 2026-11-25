@@ -102,7 +102,7 @@ $(error CANONICAL_Z10_PADDED_IMPACTS must be 0 or 1)
 endif
 endif
 # Expanded typed journals use the same full queue as the combat engine.
-CANONICAL_P10_PADDED_IMPACTS ?= 0
+CANONICAL_P10_PADDED_IMPACTS ?= 1
 ifneq ($(CANONICAL_P10_PADDED_IMPACTS),0)
 ifneq ($(CANONICAL_P10_PADDED_IMPACTS),1)
 $(error CANONICAL_P10_PADDED_IMPACTS must be 0 or 1)

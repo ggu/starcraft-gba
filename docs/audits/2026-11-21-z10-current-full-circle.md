@@ -249,3 +249,20 @@ mobile-defense starting point.
 | --- | --- |
 | Den and Hydralisk production trace | `e1c478e09985587793a3a6dfd8e7fc512fd95ec09e2417342956a8ff040223de` |
 | Frame 34,723 SRAM and fresh HOME | `16ab2580cd5d70016b4887b0aaac0d716882ec802b3eeea7a8ef16dc03c0f0c9` / `2483c0ec0597d5b2864dedf1174b3820ea856ebb53b17191b02853d3b652a8d9` |
+
+### Hold at the relocated Hatchery
+
+From the Hydra production checkpoint, the Hatchery produces a paid Drone.
+At frame 35,958, fresh HOME and a byte-identical SRAM export confirm the
+full-health Hatchery, three Hydralisks, one mining Drone, and 200 minerals
+and 600 gas. Enemy units are attacking the Den and the Pool. Two Hydralisks
+queued after this point arrive too late to protect the base. A second
+Drone raises the bank to 254 minerals before both Drones die. Evacuation
+preserves the original Drone past frame 38,087 with only 149 minerals
+after the Hatchery falls. The earlier frame-34,723 save gives more time
+to place defenders or reposition workers before the attackers arrive.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Frame 35,958 inputs | `4c1fd9baf8569077b67e3558db8dbc9db857c15b3efe3a65be666a2890b97d25` |
+| Frame 35,958 SRAM and fresh HOME | `dd4cae3b8320fdc9261ba63473e0a8eb6ed911e54dcacc8f79ae876523d39627` / `d00cb96ed2f8be2d462c496c70e5eb4d36f77a28538f735da1c421466e93b349` |
