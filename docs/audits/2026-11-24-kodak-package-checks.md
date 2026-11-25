@@ -1106,6 +1106,34 @@ still needs its own controller replay.
 | Fresh N64 with two paid Marines | `d786dcce4f3803430929313e7e8333b5c5545f729b606c62aa19aa490660b3ce` |
 | Current GBA and candidate with two paid Marines | `1a70b2021eb7563e260d322e1563096eb4f548458c7fcf29de123fec934d3e72` |
 
+#### Canceling the last queued unit
+
+A fresh N64 Backwater replay queues two Marines and highlights
+`CANCEL LAST` with the first still in production. A removes the
+waiting Marine and leaves the first progress bar and 6/26 supply.
+The mineral counter settles from 156 to 206 before the next mining
+delivery. Both FlashRAM copies agree.
+
+On the GBA release, a tap of L while the Barracks is selected refunds
+50 minerals and restarts progress on the remaining Marine. In the
+same controller test with the new queue rule, the first Marine has
+44 progress when the second is waiting and 48 after the cancel. The
+refund is 50 minerals and the on-screen supply stays at 6/26.
+The pause reload keeps the same active queue slot and 48 progress.
+The first Marine completes, and the fresh HOME re-export matches
+the input journal byte for byte. All regular ARM products link with
+their prior EWRAM and IWRAM endpoints.
+
+The HUD includes the active training order from each producer. The
+admission ledger still includes all paid orders, the 200-supply cap,
+and existing special reservations. Near-cap admission and cancellation
+of the sole active order still need separate native checks.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| N64 cancellation and settled refund | `66d7bd3869a7700579f834cc3fdfd1bb96dafb2d563fa3e49263e27c0d4bc93a` |
+| GBA ordinary input, HUD and fresh load | `91cf28a95d5239edfea25618cfda67357015ca5d881b32e95cf86fd1bcf80c47` |
+
 | Local receipt | SHA-256 |
 | --- | --- |
 | N64 opening | `fdbebbcc391be9fc9ce15bde03896f2b540c1504c1d9164b1079d2a84b963f62` |

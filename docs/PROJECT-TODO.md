@@ -2169,12 +2169,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pass. Existing Wasteland and Backwater journals display
   one fewer supply with their prior actors intact, and
   Backwater trains a Marine for 50 minerals. Trace the
-  native SCV's first target and order separately. Both current HUDs
-  show 6/26 with the first Marine in production. A second waiting
-  Marine raises the GBA HUD to 7/26 immediately. On N64 the HUD reaches
-  7/26 after the first unit completes and the second begins. Verify
-  N64 admission and cancellation near the cap before changing the
-  shared production rule.
+  native SCV's first target and order separately. The [Cancel Last
+  comparison](audits/2026-11-24-kodak-package-checks.md#canceling-the-last-queued-unit)
+  confirms a 50-mineral refund and uninterrupted first-Marine training
+  on N64 and the updated GBA build. The HUD stays at 6/26 while
+  a second Marine waits. Verify near-cap admission and cancellation
+  of the sole active order on N64. The GBA continues to reserve
+  all paid training slots for admission.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.
   The USA N64 ROM uses 1.30 MiB for the whole slideshow bank and

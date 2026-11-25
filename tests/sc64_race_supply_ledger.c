@@ -37,6 +37,8 @@ int main(void)
     u[1].owner = b[1].owner = 0;
     terran = race_owner_supply_ledger(0, R_TER);
     assert(terran.used == 4 && terran.queued == 4 && terran.provided == 20);
+    Sc64RaceSupplyLedger training = race_owner_supply_ledger_for_queue(0, R_TER, 0);
+    assert(training.used == 4 && training.queued == 2 && training.provided == 20);
     assert(race_owner_supply_ledger(3, R_TER).provided == 0);
 
     Sc64RaceSupplyLedger zerg = race_owner_supply_ledger(0, R_ZERG);

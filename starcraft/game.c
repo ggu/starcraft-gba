@@ -9863,10 +9863,10 @@ update_exploration(void)
 static void
 cancel_queue(int building)
 {
-    int type;
-    if (building < 0 || building >= MAX_BUILDINGS || !b[building].queue_count)
-	return;
-    type = b[building].queue[b[building].queue_head];
+    if (building < 0 || building >= MAX_BUILDINGS) return;
+    Building *q = &b[building];
+    if (!q->queue_count) return;
+    int type = q->queue[(q->queue_head + q->queue_count - 1) % 5];
     minerals += unit_cost(type);
     gas += unit_gas_cost(type);
 #ifdef SC64_RACES
@@ -9874,13 +9874,14 @@ cancel_queue(int building)
      * Egg is a separate actor with its own cancellation path. */
     {
         const Sc64RaceUnitRule *rule = sc64_race_unit_rule(type);
-        if (rule && (rule->flags & SC_RACE_F_LARVA) && b[building].larva < 3)
-            ++b[building].larva;
+        if (rule && (rule->flags & SC_RACE_F_LARVA) && q->larva < 3)
+            ++q->larva;
     }
 #endif
-    b[building].queue_head = (b[building].queue_head + 1) % 5;
-    b[building].queue_count--;
-    b[building].queue_progress = 0;
+    if (--q->queue_count == 0) {
+        q->queue_head = (q->queue_head + 1) % 5;
+        q->queue_progress = 0;
+    }
     toast(0);
 }
 
@@ -12544,7 +12545,7 @@ draw_hud_resources(void)
 {
 #ifdef SC64_RACES
     int faction = race_command_race();
-    Sc64RaceSupplyLedger ledger = race_owner_supply_ledger(SIDE, faction);
+    Sc64RaceSupplyLedger ledger = race_owner_supply_ledger_for_queue(SIDE, faction, 0);
     int used = race_supply_ledger_reserved(ledger) / 2;
     int cap = sc64_supply_limit(ledger.provided) / 2;
 #else
@@ -12643,9 +12644,9 @@ draw_hud_commands_body(void)
             gfx_text(65, 126, unit_name(train_type), C_WHITE);
             gfx_text(125, 126, "Q", C_CYAN);
             gfx_num(137, 126, q->queue_count, C_GOLD);
-            gfx_text(5, 137, "A TRAIN L CANCEL R TYPE", C_GOLD);
+            gfx_text(5, 137, "A TRAIN L CANCEL LAST R TYPE", C_GOLD);
 	} else if (q->type == B_COMMAND)
-	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL QUEUE", C_GOLD);
+	    gfx_text(5, 137, "A TRAIN SCV  L CANCEL LAST", C_GOLD);
 	else if (q->type == B_REFINERY)
 	    gfx_text(5, 137, "A ASSIGN WORKER TO GAS", C_CYAN);
     } else if (n) {
@@ -12916,7 +12917,7 @@ sc64_hud_changed(void)
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive && b[i].owner == SIDE) {
         if (b[i].type == B_BARRACKS) values[13] = 1;
 #ifdef SC64_RACES
-        race_supply_count_building(&ledger, &b[i], supply_faction);
+        race_supply_count_building(&ledger, &b[i], supply_faction, 0);
 #endif
     }
     if (selected_building >= 0 && b[selected_building].alive) {

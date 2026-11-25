@@ -220,6 +220,22 @@ game_self_test(void)
     if (b[3].queue_count || supply_used != 28)
         return 12;
 
+    /* Cancel the newest product through a wrapped queue, keeping the
+     * active product and its elapsed training time. */
+    b[3].queue_head = 4;
+    b[3].queue_count = 2;
+    b[3].queue[4] = U_MARINE;
+    b[3].queue[0] = U_FIREBAT;
+    b[3].queue_progress = 9;
+    int ore_before_cancel = minerals, gas_before_cancel = gas;
+    cancel_queue(3);
+    if (b[3].queue_count != 1 || b[3].queue_head != 4 ||
+        b[3].queue[4] != U_MARINE || b[3].queue_progress != 9 ||
+        minerals != ore_before_cancel + unit_cost(U_FIREBAT) ||
+        gas != gas_before_cancel + unit_gas_cost(U_FIREBAT))
+        return 28;
+    cancel_queue(3);
+
     /* Attack-move keeps advancing to its destination once nearby foes are gone. */
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
