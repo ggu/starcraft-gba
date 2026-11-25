@@ -2046,8 +2046,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   rule. Verify the equivalent state on N64 when a matching campaign
   checkpoint is available.
   The [regenerated Z7 winning input tape](audits/2026-11-12-z7-normal-physical.md#november-25-rendered-controller-recovery)
-  wins on the prepared HOST build and matches the first 166 checks on
-  the current Z10 ARM build. Verify the remaining normal replay.
+  wins on the padded-journal ARM build at frame 267,585 after
+  matching all 206 named checks from empty HOME. This brings recent
+  normal build coverage to 28 of 30. Verify the latest combined package
+  and the two remaining Z8 and Z10 routes.
   The [Z8 Den and defense replays](audits/2026-11-12-z8-normal-physical.md#rebuilt-den-and-a-defensive-checkpoint)
   preserve the economy at frame 87,554 and hold the Pool with four
   Hydralisks through frame 89,195. Protect the forward detector before
@@ -2057,8 +2059,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   verifies three Hydralisks and a new mining Drone at frame 35,958.
   Establish the defense earlier from frame 34,723 to survive the raid.
   The [new Z10 controller replay](audits/2026-11-21-z10-current-full-circle.md#november-25-controller-replay-on-the-padded-journal-build)
-  wins on HOST. The ARM continuation first differs at frame 8,518.
-  Inspect the controller's macro inputs between frames 6,021 and 8,518.
+  wins on HOST. Rendering every HOST input produces a new winning
+  tape and takes the padded ARM build past the first mismatch. The
+  rendered route now first differs at call 63,553 and ARM frame
+  61,207. Diagnose that late interval before qualifying the victory.
   The T5 escort
   regroups through the south corridor and fresh-loads at frame
   21,884 with both heroes and seven full-health Marines. A second
@@ -2088,7 +2092,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reinforces, removes the remaining production and clears the
   last depots at frame 170,041. Fresh HOME restores RESULT
   and identical victory SRAM. A advances into Terran 6.
-  Finish Z7, Z8 and Z10 on this package and qualify GBA SP timing.
+  Qualify the remaining routes on the latest combined package and
+  measure GBA SP timing.
   [Native Wasteland](audits/2026-11-24-kodak-package-checks.md#wasteland-opening-on-n64-and-kodak)
   reaches the base with Raynor at 270 HP through ordinary controls.
   The first FlashRAM slot reloads at the base, and the second

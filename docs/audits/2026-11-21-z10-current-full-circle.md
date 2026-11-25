@@ -38,6 +38,21 @@ a current ARM win.
 | Current HOST controller tape | `c9c4b76362e3bb389a16068b02fc48c52ebb6b82c5477cb6ba71e396434353b9` |
 | Padded ARM prefix and first differing checkpoint | `6653dd78b0f46b910899ec9d972ee157fe35ccc918b31f713a0eb44226d06de4` |
 
+A second scratch HOST controller calls `game_render()` after each logical
+input, as in the rendered Z7 qualification. It produces a different winning
+tape of 65,594 calls, reaching frame 63,523. The padded ARM ROM matches
+the selected field observations at 26 checkpoints and advances far past
+the earlier mismatch. At call 63,553, the ARM is at frame 61,207 and HOST
+is at frame 61,554. Counts, bank and cursor have diverged. Both sides
+are still active with zero scheduler faults and 129 enemy buildings.
+This bounds the remaining mismatch in the rendered route. Check the
+controller and modal or pause inputs before that checkpoint.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Rendered HOST winning tape | `7ed5ef9774299acc9efb4b01986938fe1af30db3088094fc389b595b516fd7b0` |
+| Rendered tape ARM checkpoints and late mismatch | `66fd8fa1f49792a7afe339d4bc159403547353f0557fdcd15425e470afb18099` |
+
 ## All three current finales
 
 Ordinary controller tapes also completed the finales on the exact T10 and
