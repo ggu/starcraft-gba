@@ -19,6 +19,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Zealot native vitals.** The shared ordinary Zealot uses 80 HP and 80
+  shields. Campaign CHKs use defaults and a retained native CUnit confirms
+  the values; broader native runtime and gameplay comparisons remain to run.
+  Old-save migration moves HP over 80 into available shields.
+
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
   3,000. The original pack stopped after assigning eight patches per

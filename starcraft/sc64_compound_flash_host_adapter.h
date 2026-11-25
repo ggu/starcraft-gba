@@ -78,8 +78,10 @@ static int sc64_cf_validate(RaceLoadPlan *p)
         if(q.owner==SIDE && c!=SC64_ZL_HUMAN_SLOT)return 0;
         raw=q.raw_type>=0?q.raw_type:sc64_race_raw_unit(q.type);
         stock=sc64_stock_unit_profile(raw);if(!stock)return 0;
-        if(stock->shields && (q.shield<0 || (unsigned)q.shield>stock->shields ||
-           q.shield_remainder>=1280 || ((unsigned)q.shield==stock->shields && q.shield_remainder)))return 0;
+        unsigned shield_capacity=sc64_native_zealot(q.type,raw) ?
+            sc64_race_unit_rules[U_ZEALOT].shields : stock->shields;
+        if(shield_capacity && (q.shield<0 || (unsigned)q.shield>shield_capacity ||
+           q.shield_remainder>=1280 || ((unsigned)q.shield==shield_capacity && q.shield_remainder)))return 0;
         if(raw==83) {
             Sc64ScarabParentFields f;int child_count=0;
             if(q.owner!=ENEMY || c>=8 || sc64_cf_town(m,c)<0 ||

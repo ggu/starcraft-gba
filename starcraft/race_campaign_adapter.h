@@ -903,8 +903,8 @@ race_campaign_init(void)
              * stock capacities before applying scenario percentages. */
             const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
             if (stock) {
-                u[slot].hp=u[slot].maxhp=(int)stock->hp;
-                u[slot].shield=(int)stock->shields;
+                u[slot].hp=u[slot].maxhp=sc64_native_zealot(type, raw) ? sc64_race_unit_rules[type].hp : (int)stock->hp;
+                u[slot].shield=sc64_native_zealot(type, raw) ? sc64_race_unit_rules[type].shields : (int)stock->shields;
                 u[slot].armor=(u8)stock->armor;
             }
             if (src->hp_percent && src->hp_percent <= 100)
