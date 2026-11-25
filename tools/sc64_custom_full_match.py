@@ -318,6 +318,50 @@ def displayed_bitmap(game: PhysicalGame) -> bytes:
     return hashlib.sha256(pixels.translate(low) + pixels.translate(high)).digest()
 
 
+PACE_COUNTERS = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
+                 "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
+TWO_VBLANK_CYCLES = 2 * 280896
+
+
+def disjoint_pace_budget(rows):
+    """Mean non-overlapping guest-cycle stages, only for advancing world ticks.
+
+    Update and draw timers are inclusive; their children must not be summed
+    twice. Present wait is part of the residual, not independently measured.
+    """
+    if any(type(row.get("world_advanced")) is not bool for row in rows):
+        raise MatchError("pacing sample missing or invalid world_advanced")
+    active = [row for row in rows if row["world_advanced"]]
+    if not active:
+        raise MatchError("the pacing window contains no simulation updates")
+    stages = []
+    for row in active:
+        missing = [key for key in ("cycles", *PACE_COUNTERS) if key not in row]
+        if missing:
+            raise MatchError(f"pacing sample missing counters: {', '.join(missing)}")
+        if any(type(row[key]) is not int or row[key] < 0 for key in ("cycles", *PACE_COUNTERS)):
+            raise MatchError("pacing sample has invalid cycle counters")
+        total, update, draw = (row[k] for k in ("cycles", "demo_update_cycles", "gfx_draw_cycles"))
+        orders, sight, other = (row[k] for k in ("sc64_orders_cycles", "sc64_sight_cycles", "sc64_other_cycles"))
+        background, actors, hud = (row[k] for k in ("sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles"))
+        stage = dict(orders=orders, sight=sight, other_simulation=other,
+                     remaining_simulation=update-orders-sight-other,
+                     map_background=background, actors=actors, hud=hud,
+                     remaining_render=draw-background-actors-hud,
+                     audio_present_and_loop=total-update-draw)
+        if any(value < 0 for value in stage.values()):
+            raise MatchError(f"pacing sample has inconsistent nested counters at {row.get('host_tick', '?')}")
+        stages.append(stage)
+    means = {key: statistics.mean(stage[key] for stage in stages) for key in stages[0]}
+    return dict(denominator="advancing world updates", samples=len(active),
+                mean_total_cycles=statistics.mean(row["cycles"] for row in active),
+                nominal_30_fps_cycles=GBA_HZ / 30,
+                two_vblank_cycles=TWO_VBLANK_CYCLES,
+                mean_deficit_to_nominal_30_fps=statistics.mean(row["cycles"] for row in active) - GBA_HZ / 30,
+                mean_disjoint_cycles=means,
+                residual_note="audio, presentation wait and loop overhead are not separately measured")
+
+
 def pace(args) -> dict:
     """Time the recorded controls immediately after a qualified battle save."""
     trace = load_trace(args.trace)
@@ -331,13 +375,15 @@ def pace(args) -> dict:
     if not any(first < tick <= last for tick in trace["checks"]):
         raise MatchError("pacing window contains no recorded gameplay checkpoint")
     shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
-    counters = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
-                "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
+    counters = PACE_COUNTERS
     if args.output.exists():
         raise MatchError(f"{args.output} already exists")
     args.output.mkdir(parents=True, exist_ok=False)
     game = PhysicalGame(args.runner, args.rom, args.elf, args.output / "guest", save_input=args.save)
     try:
+        missing = [name for name in counters if name not in game.sym]
+        if missing:
+            raise MatchError(f"ELF lacks pacing counters: {', '.join(missing)}")
         require_home(game)
         game.step(0, 2)
         game.step(KEY_L)
@@ -391,8 +437,9 @@ def pace(args) -> dict:
     result = {"ok": True, "lobby": seats, "checks": checks, "updates": len(rows),
               "updates_per_second": GBA_HZ / statistics.mean(cycles),
               "p95_cycles": cycles[(95 * len(rows) + 99) // 100 - 1],
-              "over_two_fields": sum(c > 561792 for c in cycles),
-              "active_updates": len(active), "mean_active_stage_cycles": averages, "end_fingerprint": final["fingerprint"],
+              "over_two_fields": sum(c > TWO_VBLANK_CYCLES for c in cycles),
+              "active_updates": len(active), "mean_active_stage_cycles": averages,
+              "disjoint_budget": disjoint_pace_budget(rows), "end_fingerprint": final["fingerprint"],
               "sha256": {k: sha256(getattr(args, k)) for k in ("rom", "elf", "runner", "save", "trace")},
               "samples": rows}
     if intervals:

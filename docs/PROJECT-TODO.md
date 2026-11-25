@@ -19,6 +19,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Disjoint cycle budgets.** Measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
+
 - **Busy three-opponent performance.** The release's six recorded battle
   windows measured 11.29–16.73 loop updates/s. The original controls and
   camera are reproducible from the match traces. Prioritize ground orders
