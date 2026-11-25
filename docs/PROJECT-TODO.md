@@ -210,7 +210,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   player's unit count stays at 69 and the observed enemy count falls
   from 158 to 157. This is the slowest adjacent checkpoint pair with
   at least 1,000 updates and at least 98% simulation advancement.
-  Profile this interval and verify the same endpoint after optimization.
+  A fresh SRAM restore of this interval identified repeated integer division
+  while drawing the command panel border. Sampling its border incrementally
+  reduced mean guest cycles from 1,963,913 to 1,113,925 on the four open-menu
+  updates in the first 64. The other 60 averaged 1,606,884 before and 1,609,231
+  after. Over all 4,901 updates the improvement was 0.22% (8.221 to 8.240
+  emulated updates/s). Both builds reached the same endpoint and matched at
+  all 72 sampled world and video checkpoints. Paired pause screens matched
+  across all four products, as did victory screens on the three race builds.
+  Prioritize route expansion and movement on this save for sustained pacing.
   Physical GBA timing remains open.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
