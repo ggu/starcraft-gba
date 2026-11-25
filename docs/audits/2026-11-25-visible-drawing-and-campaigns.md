@@ -252,3 +252,33 @@ Input tape SHA-256
 `1de47b5e4a163ee86686864d145bce50322768ab28a2de6c4be6496140eab205`.
 This observes payment and waiting admission. Check waiting-order
 activation at the local limit separately from the global 200 limit.
+
+## Drawing matching one-pixel selection edges
+
+The P7 profile attributes 143,802 cycles per update to the
+row rasterizer and 25,277 to ellipse setup and other selection
+work. A trial that looks up common ellipse widths saves just
+0.15% of P7 frame cycles. Keep the existing width calculation.
+When both spans on an outline row are one pixel wide and on
+screen, they occupy the same byte lane in their two halfwords.
+Resolve the lane mask once and preserve the other byte in
+both writes. The clipped and wider rows use the existing spans.
+
+Against the exact row-blitter release, the ARM candidate saves
+0.91% mean cycles over 96 P7 army updates and 0.96% over 96 Z9
+road-assault updates. Three 120-update Showcase scenes with
+ordinary selection improve 0.33%, 0.51%, and 0.48%. The other
+Z9 sample and panned Z10, both P10 Custom Game frames, and the
+fixed and panned Terran samples match the prior timings.
+The paired worlds, both framebuffer pages and palettes match.
+One P7 sample shows a different display-page selection. The
+tested ordinary Custom Game pause journals and fresh
+continuations match. All four production links retain identical
+IWRAM/EWRAM endpoints; the host field UI and tile/bitmap shape
+oracles pass. Dense scenes still exceed the two-VBlank budget.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P7 visible army | `d8d3e4a3f7a744d9e9bd5dead44d78c279f7f1677d11ebc8e41c440ecd80456b` |
+| Z9 road assault | `a2d01f9b9b83e9ebd3ce651e16d58ea8fa130a56093403b6685070e6e036b63b` |
+| Showcase scenes 0, 5 and 7 | `af2207672ca2ed2fa57e16c32f61c36b7f033b503f0530debafaa8f7e7d54021` / `3c550689a971a284c8e74bc2b8a3fcce8ad1c81da8916171b7ebd243ce9f7de8` / `1448676dc4179d99b1c8c71c9475775afee3226068b4b67a8cfe1d132e05773a` |

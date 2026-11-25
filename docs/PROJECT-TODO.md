@@ -64,6 +64,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reduces tracer drawing to 20,305. Focus on the orders path in
   this cut and capture a separate visible three-CPU fight before
   choosing a tracer change.
+  [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
+  lowers the visible P7 and Z9 frame means by about 0.9–1.0%
+  with matching pixels. Keep profiling larger draw and order
+  costs in the dense matches.
   The [November 25 selection-ring builds](audits/2026-11-21-current-skirmish-matrix.md#november-25-selection-ring-release)
   pass 54 physical-button Custom Game starts, pause saves, and fresh
   continuations. Full-match and hardware measurements remain open.

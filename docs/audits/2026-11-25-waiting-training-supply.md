@@ -63,3 +63,15 @@ The three race builds pass all 54 ordinary Custom Game openings,
 pause saves and fresh HOME continuations across both maps, each
 human race and one to three opponents. Matrix receipt SHA-256
 `ba26d4c025bf52e1a98e8aa1ac5fbf96971611415ef584d2efcf47b3cc7b5669`.
+
+On the first qualified supply build, Wasteland replays from
+the campaign menu and wins at frame 10,120, with an ordinary
+pause and load during the route. Zerg 2 wins at frame 10,209
+and restores its result from fresh HOME. The retained Protoss 7
+assault repeats its victory at frame 80,828 and fresh result load.
+
+| Campaign receipt | SHA-256 |
+| --- | --- |
+| Wasteland | `21e6e26c309bcde56f99d9cd78378b35f71f3b9ee99644b255b7eda8e563a30c` |
+| Zerg 2 | `1de85ded0493783be910cb36dc31fc71e831ffdc975da4d207bef0701429bd29` |
+| Protoss 7 assault | `600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf` |
