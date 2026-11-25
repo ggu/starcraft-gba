@@ -109,6 +109,37 @@ Terran 7, 8 and 10 are 0.06–0.15% slower. The `p10-p7victory` save does
 not resume into play (the runner's `screen == 1` check fails on the base
 ROM too), so 19 of the 20 campaign saves were run.
 
+## On the base after #882 and #884
+
+Pull requests #882 (hot functions in IWRAM, with a build-time stack
+check) and #884 (audio interrupt) merged while this was measured. The
+branch was merged with `codex/source-release` at `81e76943` and the
+whole set was run again against a fresh build of that base. All 28
+pairs matched as above. The saving is smaller where #882 already moved
+part of the chain into IWRAM.
+
+| Save | Base | Changed | Saved | % |
+| --- | ---: | ---: | ---: | ---: |
+| Terran Outpost | 683,164 | 661,331 | 21,833 | 3.20% |
+| Terran Blood Bath | 789,638 | 775,075 | 14,563 | 1.84% |
+| Terran opening | 561,945 | 561,945 | 0 | 0.00% |
+| Zerg Outpost | 980,165 | 971,667 | 8,498 | 0.87% |
+| Zerg Blood Bath | 918,110 | 916,184 | 1,926 | 0.21% |
+| Zerg opening | 562,011 | 562,011 | 0 | 0.00% |
+| Protoss Outpost | 874,086 | 857,220 | 16,866 | 1.93% |
+| Protoss Blood Bath | 963,112 | 962,481 | 631 | 0.07% |
+| Protoss opening | 561,556 | 561,556 | 0 | 0.00% |
+
+The 19 campaign saves range from 549 slower (Terran 10) to 19,937
+faster (the Protoss cartridge's selected-mission save).
+
+The stack check from #882 passes on all three race ROMs with no warning:
+stack bound 7,800 / 5,856 / 5,940 bytes (Terran / Zerg / Protoss) and
+IWRAM spare 256 / 584 / 828 bytes. Against that base, `__iwram_end`
+grows 48 bytes on Terran (0x03005C58 → 0x03005C88), 8 bytes on Zerg
+(0x030062D0 → 0x030062D8) and not at all on Protoss; `__bss_end` is
+unchanged on all three.
+
 ## Where the saving comes from
 
 Per-function profile over 32 updates from each Outpost save (calls and
@@ -216,9 +247,8 @@ rerun on the base worktree.
 - Hardware: none of this was measured on a Game Boy Advance.
 - The `p10-p7victory` campaign save (it does not resume into play).
 - `verify-sc64` and `verify-campaign` ROMs (inputs missing).
-- The build-time IWRAM stack check from pull request #882, which has
-  not merged. No list on that branch names `tick_combat`, which this
-  change renames to `tick_combat_from`. Its Terran list names
-  `race_t6_unit_burrowed`, which keeps its name; in Custom Games it is
-  now called about 5 times per update instead of 201, so the IWRAM
-  placement gains less from it there.
+- The older ROMs and the host suites were not rerun after the merge
+  with #882 and #884; the host changes in this pull request do not
+  depend on either. #882's Terran list names `race_t6_unit_burrowed`,
+  which keeps its name; in Custom Games it is now called about 5 times
+  per update instead of 201.
