@@ -49,16 +49,17 @@ def sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_trace(path: pathlib.Path) -> dict:
-    """Strictly validate a P8 controller trace."""
+def load_trace(path: pathlib.Path, *, mission: int | None = None) -> dict:
+    """Validate the selected campaign controller trace."""
+    expected_mission = MISSION if mission is None else mission
     transitions: list[tuple[int, int]] = []
     held_before, final, save, meta = 0, None, None, None
     for number, text in enumerate(path.read_text().splitlines(), 1):
         row = json.loads(text)
         kind = row.get("kind")
         if kind == "metadata":
-            if meta is not None or row.get("mission") != MISSION:
-                raise ValueError(f"trace needs one {PREFIX} metadata record")
+            if meta is not None or row.get("mission") != expected_mission:
+                raise ValueError(f"trace needs one metadata record for mission {expected_mission}")
             meta = row
         elif kind == "input":
             tick, held, pressed = row.get("call_index"), row.get("held"), row.get("pressed")
