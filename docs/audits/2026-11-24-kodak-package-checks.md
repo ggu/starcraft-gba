@@ -1103,8 +1103,17 @@ A direct ares replay from the same FlashRAM image matches the first
 seven captures through the second order. Continued ordinary input then
 shows four Marine queue icons and 14 minerals. FlashRAM remains
 byte-identical. The final bank is below the 50-mineral Marine price,
-so this cut establishes four displayed entries. Queue capacity and
-near-cap admission still need funded tests.
+so this cut establishes four displayed entries.
+
+A later direct ares run lets the workers fund more orders. The fifth
+Marine brings the bank from 128 to 78 minerals. One active portrait
+and four waiting icons are displayed, the production selection
+disappears, and an immediate sixth press leaves the queue and bank
+unchanged. No Marine completes between the fifth and sixth attempts.
+The HUD stays at 6/26. Both the GBA producer and admission checks use
+a five-entry queue. The native local and global supply boundaries
+still need their own tests. This run uses the Android SDK's MoltenVK
+1.2.11 and leaves the original FlashRAM hash unchanged.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -1112,6 +1121,8 @@ near-cap admission still need funded tests.
 | Current GBA and renderer candidate checkpoints | `365ce8456c5b5aac9fea1dfcd89320845b53e50402395361dc06139f46230d6e` |
 | Fresh N64 with two paid Marines | `d786dcce4f3803430929313e7e8333b5c5545f729b606c62aa19aa490660b3ce` |
 | N64 four-icon capture and input commands | `bb046dfcc06be1f5919ae07d5d1c30d8258633071bb7737b1bc05c8c738ec313` / `bb763f9813988ab41af085c2ca775dad882eaccc7da7c55e2f8ed7a20aeab8ad` |
+| Funded N64 fifth and sixth attempts | `9fb15e7429b1cae83b895af360be48b9c674ef57f026124d03a2036d5176cd44` / `e15d3cc3a109f024d5166be7e2760f3a0b6a214dd465e72f9de3ea32f0bbceae` |
+| Funded native input commands | `3946c408ac7a9087d208bf6c4ee7ee078f642998de2a37b37e584ceeb713d54b` |
 | Current GBA and candidate with two paid Marines | `1a70b2021eb7563e260d322e1563096eb4f548458c7fcf29de123fec934d3e72` |
 
 #### Canceling the last queued unit

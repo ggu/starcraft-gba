@@ -31,6 +31,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   victory re-export from fresh HOME. The [adaptive Pylon builds](VALIDATION.md#qualification-with-the-queue-and-contact-changes)
   repeat full Terran 2 and Protoss 5 wins with fresh save and result loads,
   a full Zerg 8 win with fresh victory readback, and the late Zerg 10 win.
+  Wasteland and Desperate Alliance also pass full runs on the Pylon
+  release, including fresh pause and result loads.
+  The [fogged-viewport build](audits/2026-11-25-fogged-tracer-viewport.md)
+  repeats Terran 1–4, Protoss 1 and 5, and Zerg 2 and 8 from HOME,
+  with fresh victory readbacks on all eight runs.
   Use the retained ordinary-input tapes to qualify the rest of the
   combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.
@@ -161,10 +166,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   finds only one misaligned generic sprite draw in eight dense Z9 updates
   and none in eight panned P10 updates. Dense Z9 spends about 53.8k cycles
   per update in the packed path, mostly unit walk frames. Prioritize
-  packed walk draws in Z9 and tracer preparation in P10. The same P10
-  sample spends 221.3k cycles per update in tracer parts, including 21.2k
-  in projectile animation selection. Trace the raster exit reasons and
-  benchmark earlier exact rejection and cheaper timeline lookup.
+  packed walk draws in Z9 and tracer preparation in P10. In the same
+  P10 cut the camera sees zero visible tiles and all 264 sampled
+  rasters exit through fog. [Skipping source tracer drawing in that viewport](audits/2026-11-25-fogged-tracer-viewport.md)
+  brings panned P10 and Z10 mean costs down by 15.48% and 18.12%.
+  The camera sweep into and out of fog matches both pages and tracer
+  state on every update. Visible battles remain above budget. Profile
+  tracer preparation and packed walk frames while units are in view.
   The [Outpost camera holdout](audits/2026-11-24-kodak-package-checks.md#pan-from-the-base-to-the-outpost-fight)
   moves the same battle into view. Zerg and Protoss now use 325–391k
   tracer cycles per update, roughly half of those inside the watched
@@ -2188,8 +2196,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   confirms a 50-mineral refund and uninterrupted first-Marine training
   on N64 and the updated GBA build. The HUD stays at 6/26 while
   a second Marine waits. Both versions return to 5/26 when the sole
-  active Marine is canceled. A fresh N64 run displays four queued
-  Marines. Verify a funded queue limit and admission near the supply cap.
+  active Marine is canceled. A funded N64 Backwater run confirms one
+  active and four waiting Marines, matching the GBA queue size.
+  Verify admission near the local and global supply limits separately.
   The GBA reserves all paid training slots for admission.
   [Measured ROM headroom](audits/2026-11-24-kodak-package-checks.md#rom-space-available-for-cutscenes)
   leaves 1.96–2.81 MiB per race cartridge for all future content.

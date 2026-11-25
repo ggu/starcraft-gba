@@ -14,6 +14,18 @@
 #endif
 #endif
 
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(GBA_SCENE_CLIP) && \
+    !defined(SC64_DISABLE_EMPTY_TRACER_VIEW)
+#define SC64_TRACER_EMPTY_VIEW 1
+enum {
+    SC64_TRACER_VIEW_MAY_DRAW,
+    SC64_TRACER_VIEW_UNCHECKED,
+    SC64_TRACER_VIEW_HIDDEN
+};
+static u8 sc64_tracer_view;
+static int sc64_tracer_view_is_hidden(void);
+#endif
+
 
 static void __attribute__((noinline))
 draw_tracer_parts(int i, unsigned parts
@@ -112,6 +124,14 @@ draw_tracer_parts(int i, unsigned parts
         diag_cull+=gba_clock()-dt; dt=gba_clock();
 #endif
         int age=sc64_tracer_duration(i)-tracers[i].life;
+#ifdef SC64_TRACER_EMPTY_VIEW
+        /* Preserve the slot and duration preparation above. The source
+         * painter and independent trail children obey fog in this clip. */
+        if (sc64_tracer_view == SC64_TRACER_VIEW_UNCHECKED)
+            sc64_tracer_view = sc64_tracer_view_is_hidden()
+                ? SC64_TRACER_VIEW_HIDDEN : SC64_TRACER_VIEW_MAY_DRAW;
+        if (sc64_tracer_view == SC64_TRACER_VIEW_HIDDEN) return;
+#endif
         sc64_weapon_source_vfx_draw_trace_parts(key,profile,
             tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
             tracers[i].life,(unsigned)(age<0?0:age),prepared,parts,actor_x,actor_y,trail);

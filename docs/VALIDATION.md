@@ -8585,3 +8585,17 @@ difference in the remaining exact-trio campaign sweep.
 | Zerg 8 paired pause and fresh continuation | `b93255432e03c068871e2af443d2afeca761fdb15aa230c1681d0ac9d1d4ef75` |
 | Zerg 8 next-checkpoint divergence after ordinary reselection | `2e62c3556f15f4f65bde83530a533e15bb322c75ef221107311041800811aa07` |
 | Zerg 10 late checkpoint through victory | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
+
+The same Terran ROM also passes the full Wasteland and Desperate Alliance
+replays, including fresh pause loads at frames 6,214 and 26,993 and fresh
+victory readback at frames 10,120 and 54,000. Wasteland reproduces its
+prior pause and victory journals byte for byte. Desperate Alliance
+matches all 56 observations and all 11 attack waves. The local replay
+receipts are `660c5cacbd2d4fedb4d90484f1aae6a6d3e6817df4c6815a25d74b61508d987e`
+and `66ca99c96eb73b650e504424568a39eb27eb83e6d3eaff6b11f013f68e3c1095`.
+
+### Source tracers in a fully fogged viewport
+
+The [viewport audit](audits/2026-11-25-fogged-tracer-viewport.md) records
+the shared draw change, paired frame timing, the campaign and skirmish
+checks, and the local receipts.
