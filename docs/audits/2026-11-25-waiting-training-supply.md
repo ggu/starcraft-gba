@@ -94,3 +94,12 @@ display selection and fresh save continuation match.
 | Wasteland through victory | `c5800bfd69336926e6a540665fc8d4fb564a4419d35214a3e8845a2f21aaef29` |
 | Zerg 2 through fresh HOME result | `4aac302030605d3d7de2d47d6d4f34aa3aef3f19ea792c7f83b2e9887e311a9e` |
 | P7 repeated assault, victory and fresh HOME result | `600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf` |
+
+## Native Protoss follow-up
+
+An ordinary N64 Challenger Custom Game starts Protoss at 4/9 supply.
+The Nexus accepts successive Probe orders and reaches 7/9 with one
+Probe active and one waiting. The Custom Game Load/Save screen
+shows Save This Game disabled. Renderer capture fails before the
+9/9 transition. Verify Protoss cap admission and recovery from a
+native campaign checkpoint or a working continuous capture.

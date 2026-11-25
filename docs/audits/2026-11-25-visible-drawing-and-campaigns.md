@@ -282,3 +282,149 @@ oracles pass. Dense scenes still exceed the two-VBlank budget.
 | P7 visible army | `d8d3e4a3f7a744d9e9bd5dead44d78c279f7f1677d11ebc8e41c440ecd80456b` |
 | Z9 road assault | `a2d01f9b9b83e9ebd3ce651e16d58ea8fa130a56093403b6685070e6e036b63b` |
 | Showcase scenes 0, 5 and 7 | `af2207672ca2ed2fa57e16c32f61c36b7f033b503f0530debafaa8f7e7d54021` / `3c550689a971a284c8e74bc2b8a3fcce8ad1c81da8916171b7ebd243ce9f7de8` / `1448676dc4179d99b1c8c71c9475775afee3226068b4b67a8cfe1d132e05773a` |
+
+## Paired rows in visible selection outlines
+
+With the full ellipse inside the active clip, the center half
+width bounds all rows. Read the inner and outer widths once for
+each pair of rows, preserve the edge lanes, and keep the flat
+top and bottom spans. The clipped path remains active at the
+screen and HUD edges.
+
+Against the thin-edge release, combined frame cycles fall
+1.55% in the P7 visible army and 1.68% in the Z9 road assault
+over 96 updates each. Three Showcase scenes with ordinary
+selection save 0.63–0.86% over 120 updates each. The worlds,
+both framebuffer pages and palettes match. One Showcase sample
+selects the other display page. The tested Z9 save and fresh
+continuation match. The other Z9 sample and panned Z10 Custom
+Game are flat. All four ARM builds keep their memory endpoints.
+The sampled busy scenes remain over the two-VBlank deadline.
+
+The independent host oracle compares 4,836 ellipses against
+individual pixel draws, including full rings, clipped corners,
+flat caps, both destination phases, zero-color aliasing, and the
+tile renderer's dirty, draw and art masks.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P7 visible army | `4c9f8bfbfe6731ddaedc0a806ab4026c4bf103b1b47a4c7b680a14bfcb7d58a1` |
+| Z9 road assault | `fb5c457ebe4db01e8d620d50abf3e6c075056b0577e7ec5cc8f35a0698fd298c` |
+| Showcase scenes 0, 5 and 7 | `e1b088b7422890a95255154865f0c0c805ce70efcf816bb02edf7742e443a3cf` / `9b214756c3f406643c11dee947f33708581f7153c00543e54484c79d0ec879a2` / `f4e3ee896231ece5bd72ba84f36215a8f0554b42b2609a379df41edcc6a7a3ee` |
+
+## Combined supply and paired-outline qualification
+
+The control is the released supply build at `2ea65bcd`. Recovered
+and retained build inputs reproduce all four control ROMs byte for
+byte. The toolchain doctor, default build and full asset-free suite
+pass on the combined code. The Python batch runs 1,183 tests with
+35 skips. All four candidate links retain their IWRAM and EWRAM
+endpoints and pass the existing memory guards. The three race candidates pass
+144 ordinary Custom Game opening, pause and fresh continuation
+cases across both maps, each human race and one to three opponents.
+The additional 90 cases cover the four occupied seat patterns absent
+from the 54-case matrix, two Protoss opponents, and three Zerg opponents.
+
+| Workload | Updates | Control mean cycles | Candidate mean cycles | Reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Protoss 7 visible army | 96 | 2,334,416 | 2,298,367 | 1.54% |
+| Zerg 9 road assault | 96 | 1,611,413 | 1,587,077 | 1.51% |
+| Protoss 10 fixed three-CPU Outpost | 96 | 1,063,343 | 1,063,343 | 0.00% |
+| Zerg 10 panned three-CPU Outpost | 96 | 950,723 | 950,723 | 0.00% |
+| Showcase scene 0 | 120 | 1,284,174 | 1,276,185 | 0.62% |
+| Showcase scene 5 | 120 | 1,476,984 | 1,464,197 | 0.87% |
+| Showcase scene 7 | 120 | 1,221,954 | 1,211,712 | 0.84% |
+
+The sampled worlds, both framebuffer pages and palettes match. Two
+Z9 and two Showcase samples select the other display page. The Z9
+and Custom Game pause exports and fresh continuations match. Every
+update in the four race workloads exceeds the 561,792-cycle budget.
+
+On the released supply build, the Terran 5 ordinary-input continuation
+from frame 88,779 replenishes the Wraith wing and clears the 11 remaining
+enemy buildings. The result at frame 143,281 restores via fresh HOME
+with Raynor at 45 HP and Kerrigan at 250 HP. Its victory journal
+re-exports byte for byte. Pressing A advances to Terran 6, where an
+ordinary pause save and a fresh HOME load agree at frame 101. The
+T5 receipt covers the late checkpoint through victory. Replaying
+its physical buttons in the 13 recorded fresh-HOME stages on the
+paired-outline build produces all 13 identical journals and the
+same fresh victory readback. The older October T3 tape first differs
+in enemy minerals at input tick 993 on the released supply build.
+On the paired-outline build, replay its unchanged ordinary inputs
+from HOME, save and load at frame 26,993, and win at frame 54,000.
+Mission and objective checkpoints agree, and the victory journal
+re-exports byte for byte. Enemy minerals, actor counts and raid
+counts differ from the October observations at 53 checkpoints.
+
+On the paired-outline build, the full Z8 HOME replay wins at frame
+86,969. The late Z10 route from the retained frame-60,123 pause wins
+at frame 63,523. The recovered P7 assault wins at frame 80,828 with
+all three required heroes alive. The three fresh HOME loads restore
+their terminal state and re-export identical victory SRAM.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Candidate 54-case Custom Game matrix | `bd7203166664b38dfc15c9b66f24f744fec1f37745b5e7e27199fd9461c5ded6` |
+| Candidate 90 additional CPU-seat cases | `23ae317befef5cdd0ca2d65104900ac0cf5d9881be840e37643e974991bacb67` |
+| P7 paired-outline sample | `b6713d4193aac41cc5c9a40af04576c8768b3310488dc82ef6172c4d1aca0e30` |
+| Z9 paired-outline sample | `b5f52fc0fb5cb7e33f1a37f1c971b93210ff604833c2a483034d75b4d7744f55` |
+| Showcase paired comparisons | `a589ade01d5af32323944fd9cd6c187dacd9bae68cfb587bdc5c79c7328c0542` |
+| T5 continuation input and readback manifest | `e39669f66e90d0cde3e0462e157790e25b2ed64772af3f13ccefe442c78fae69` |
+| T5 victory journal | `88888faa6e886d23d31c777584c591c06f0c99a71ef32c43bf446eb489a792b1` |
+| Candidate T5 13-stage ordinary replay and fresh readback | `6576785904adf125f8971166fe3214b38caf6f66f38d23dad250b97304d47fb2` |
+| T6 pause and fresh HOME journal | `adc89cbe03df68f46c6dd7b33e9c7d4c10690b8f7ad02b479f71ae3ae0b288cc` |
+| Candidate T3 HOME replay, pause and victory readback | `8d64b25b17863fa83800e7f5ed0573562e573bf743d73a570a56883728c94ef1` |
+| T3 historical battle-stat differences | `7c233fa3de3e4ed65071760e55755cfe1e565232cb8124eeba27eafb6720d412` |
+| Z8 victory journal | `f0946a81d56cf77f0f034d735544cc130217051b4531eabf6714bf3d5882f2f9` |
+| Z10 victory input receipt | `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
+| P7 victory input receipt | `600890be9e06d27a14d1f2c9f020ffa27c356923157390204f36ab6aab3352bf` |
+
+### Visible Terran three-CPU combat on the supply release
+
+A normal Blood Bath save with Terran, Zerg and Protoss opponents
+reaches a visible attack at the human base. A worker falls from
+36 to 28 HP during the 32 measured updates. The two runs match
+full/update/orders/draw cycles, world fingerprint, both video
+pages, palette, display and camera. Across frames 11,183–11,214,
+mean total cost is 807,142 cycles, including 389,193 in orders and
+290,045 in draw. Every update exceeds the 561,792-cycle budget.
+
+Separate read-only entry/return watches for the first eight updates
+match the same uninstrumented clocks and outputs. `move_toward`
+costs 235,488 inclusive cycles per update across 98.25 calls.
+`sc64_target_nearest` costs 9,885 across 42 calls, and
+`draw_tracer_parts` costs 12,406 across 6.125 calls. Weapon-range
+movement is not reached in this cut. The uncached contact mask
+accounts for 76,356 cycles per update across 18.25 calls, and the
+monotone route step for 33,646 across 4.125 calls. Costs are inclusive
+and the figures from independently watched functions can overlap.
+
+The mover-origin and map-dimension reuse from [#828](https://github.com/ggu/starcraft-gba/pull/828)
+keeps all 32 sampled worlds and video outputs. On this cut, the
+uncached mask costs 320 more cycles per update and the whole frame
+costs 327 more. Leave the source change out of the released builds.
+
+Adding the draft [monotone route witness](https://github.com/ggu/starcraft-gba/pull/805)
+to the same release increases linked BSS by 352 bytes. The 32 visible
+updates match their sampled world and video outputs. Mean frame
+cost falls from 807,142 to 788,972 cycles (2.25%). The largest
+individual cost increase is 30,062 cycles. All 32 still exceed the
+budget. A read-only replay counts 63 witness hits in 124 monotone
+queries. A separate 96-update P10 Outpost pair lowers mean cycles
+from 1,063,343 to 1,057,178 (0.58%) with matching worlds, video and
+byte-identical fresh save continuation. The Z10 release does not
+build the monotone probe. Adding only the witness flag there
+reproduces the original Z10 ROM byte for byte.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| 32 matched visible combat updates | `25ad0aa1996e75ae4c7f1fc33db9cc3371884e3e560ca0b27d09163e400f7777` |
+| Movement attribution | `4ab32781df8179ab0790e0584cd9b7f40c41e0c019b4bdcf26dab0d3b3592cdb` |
+| Automatic target attribution | `3362602767464d449c42d1c33e2f341e9038a0c979fe122e7250509d105c08b0` |
+| Tracer attribution | `0f957a5c39827e07536c3ba2228011e6d23aacceca0162ab612dc41c3bbfb7f9` |
+| Uncached contact mask attribution | `b5f73869b67b6ba3fe6b89aab81d3a7279373131efadfcf022849a4649a7d021` |
+| Monotone route attribution | `29c69f0f452168193bf40b57063a130fcac200b709f1ac907e956cc92b99d6a8` |
+| Contact reuse candidate, 32 visible updates | `4091d35d8c47039fbcdfb4249e0eaa7dc80556bfda97bdca55aa585e3f5473d4` |
+| Monotone witness candidate, 32 visible updates | `6f97555edf180785c0569ff1ef7921004b663ab90ce672d06f66a951cb59f52d` |
+| Monotone witness P10 Outpost, 96 updates and fresh save | `bd602673f9df39cbb7fe220b13ddeecb2b31bf53a397520a83309e2f04292538` |
