@@ -21,9 +21,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
-  finish on the padded-journal Z10 build. On the latest vitals build,
-  Z8 repeats the full route and Z10 repeats the late suffix with identical
-  victory journals. Complete the replay matrix on the combined Terran,
+  finish on the padded-journal Z10 build. The vitals build repeats the
+  [full Z7 win](audits/2026-11-12-z7-normal-physical.md#november-25-vitals-release-replay)
+  through all 206 named checkpoints and repeats the full Z8 route and
+  late Z10 suffix with identical victory journals. Complete the replay matrix on the combined Terran,
   Zerg and Protoss package, and continue native parity and GBA SP timing.
 
 - **Busy match pacing.** The [November 24 KODAK builds](audits/2026-11-24-kodak-package-checks.md#three-cpu-cartridge-pacing)
@@ -1068,7 +1069,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The meter-build profile still spends 46,596 cycles per frame in
   Pylon power queries on the dense Z9 sample. Requalify the existing
   [adaptive Pylon buckets](https://github.com/ggu/starcraft-gba/pull/834)
-  on the merged engine, including stack margin and sparse Custom Game.
+  on the merged engine before activation. With the row renderer, the
+  paired option reduces mean loop cycles by 1.95% and 1.10% in two
+  69-Pylon Z9 windows. Both framebuffer pages, state and save continuation
+  match. The sparse pairs change which page is presented on isolated
+  updates. All four links retain their RAM endpoints. The Z10/P10
+  defense-call path uses 56 more static stack bytes. Keep activation
+  pending the composed validation and stack measurement.
   The [actual contact inputs](audits/2026-11-24-kodak-package-checks.md#contact-queries-in-those-outpost-windows)
   favor the guarded early axis check in the placed ROM kernel
   fixture. The [opt-in](https://github.com/ggu/starcraft-gba/pull/839)
