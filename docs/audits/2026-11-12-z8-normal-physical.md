@@ -1428,6 +1428,29 @@ its modifier transition.
 | Frame 80,900 SRAM and fresh HOME | `7ce37160254ba79d9138a2ace0dd76f385c1bb54aa06e2ecff48236998a1e9bc` / `0d18303a860d089194ad54ee4c29d94e252dc94f63cfa5d6c31af5aac61ca0ec` |
 | Eastern Nexus damage SRAM and fresh HOME | `7d5ceeddddcc3a899a3ece7ad34a0448d3b168726408d592d5d5e1660ded454c` / `8250a2b61fe483bca7151668f977f84d6ccf6e39b5abdaba376500803f66582a` |
 
+#### Intercept the second southern raid
+
+The frame-80,900 save positions detectors at (1448, 1620)
+and (1448, 1770), with Kerrigan near (1428, 1688). An
+explicit attack kills the second hero Dark Templar. Fresh
+HOME at 82,409 restores Kerrigan at 400 HP, seven eastern
+Hydralisks and five remote Hydralisks. Both Nexuses still
+have full health and shields. There are no workers or
+friendly buildings.
+
+A continuation survives through frame 82,750, past the
+second raid. The eastern force reduces shields to 653,
+then loses all seven attackers. An attempt to recall them
+from the interception save reaches an empty selection box.
+The force is already moving and all seven die by 82,597.
+Recall or redirect them earlier in the interception route
+and keep the remote force away from the next raid.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Second interception SRAM and input trace | `414f59b93bdc2a3ee58726a0b71f947389418e4ab529a809093195499b6497e5` / `5e34029068edea79d4fcf255f323744fa432400a5c3d95937f108401e95e1e67` |
+| Fresh HOME continuation | `b5e408227077d6081213f0c1835263037b427d13a183cf6309f8d63ef654fc39` |
+
 ### Native Overlord research permission
 
 The retained native Z8 scenario matches the recorded source

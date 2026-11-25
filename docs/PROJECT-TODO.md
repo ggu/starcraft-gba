@@ -580,8 +580,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and re-exports identical SRAM.
   [November 24 intercepts](audits/2026-11-24-kodak-package-checks.md#intercept-the-northern-and-eastern-approaches)
   preserve the Hatchery at 730 HP through fresh HOME frame
-  12,492. Holding that order loses the base by 13,184.
-  Stage a second interception and sustain gas production.
+  12,492. [East, west and north Sunkens](audits/2026-11-24-kodak-package-checks.md#sunken-coverage-on-three-approaches)
+  fresh-load with the Hatchery at full health. Three
+  static defenses still lose the base. Split mobile defenders
+  between the approaches and sustain gas production.
   The refreshed [Z10 late-chapter tape](audits/2026-11-22-cloak-query-cost.md#combined-with-the-missile-trail-release)
   restores the frame-2,526 pause and wins at frame 63,523 on both
   combined builds. All 25 checked world fingerprints, indexed pages
@@ -1011,7 +1013,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   keeps the RAM guards and repeats the campaign and skirmish
   startup and save checks, including the single-CPU active Terran
   win. Confirm local release integration, hardware pacing and
-  active multi-CPU results. The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
+  active multi-CPU results. The [current P10 pause probe](audits/2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save)
+  rejects nine impacts and keeps the earlier journal intact.
+  The proposed padded codec is incompatible with the actual
+  Z10 Carrier profile and P10's typed research layout.
+  Prioritize an authenticated layout for the complete queues.
+  The [depot-raid fix](SKIRMISH-AI.md#depot-raid-recovery)
   restores Terran recovery in three cases across the race
   profiles. Qualify busy ARM matches and address the six
   remaining host failures, including one new mineral-float
@@ -1032,7 +1039,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The [combined renderer and collision pair](audits/2026-11-24-kodak-package-checks.md#compose-the-renderer-and-rom-collision-option)
   saves another 1.03% of mean time in the panned Z10 fight
   with a higher p95. Keep the collision option off by default.
-  Qualify active fights and GBA SP frame delivery.
+  The [current contact and movement census](audits/2026-11-24-contact-axis-bias.md#current-paired-frames-and-contact-attribution)
+  measures 1.05–2.70% gains in four busy changed-ROM
+  windows. Three-CPU frames remain above budget and
+  individual slower frames occur. Both pages and paired
+  worlds agree. Confirm GBA SP frame delivery before
+  enabling it by default. P10 spends 131,466 cycles per
+  sampled update in direct nearest-target queries and
+  36,473 in rebuilding the target index. Test conservative
+  per-row occupancy and retain stable entity ties.
   Keep a one-CPU Blood Bath tail check, where a near-budget
   mean masks 25–77 overruns per 120 updates.
   Prioritize repeated contact work and safe reuse across the two
@@ -1255,7 +1270,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and full-health Kerrigan. With no workers or buildings,
   the force damages the eastern Nexus and fresh-loads at
   frame 82,525 before losing on the neutral continuation.
-  Keep a separate guard while staging the next assault.
+  A [second guarded interception](audits/2026-11-12-z8-normal-physical.md#intercept-the-second-southern-raid)
+  fresh-loads at frame 82,409 with Kerrigan and 12 Hydralisks.
+  The eastern group falls on the continued attack. Redirect
+  that group earlier and stage it with the remote force.
   The native
   scenario permits Ventral Sacs for the alternate transport
   route. Qualify human Z8 research, boarding and fresh SRAM
@@ -1296,8 +1314,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   restores the Hatchery and Pool, then adds an Overlord and
   three paid Drones. Fresh HOME at frame 34,571 preserves
   four Drones and 801 minerals. The attack arrives around
-  35,300. Complete the colony morph earlier or intercept the
-  attack before committing the workers.
+  35,300. A [separate production branch](audits/2026-11-21-z10-current-full-circle.md#hydralisks-before-the-raid)
+  trains an Overlord and three Hydralisks before the raid,
+  with fresh HOME at 34,723. The first mobile intercept
+  loses all three. Test a closer defense with reinforcement.
   [Z9 phase measurements](audits/2026-11-13-z9-normal-physical.md#opening-frame-cost)
   average 19.15–20.46 emulated updates per second. A sparse-aware
   Pylon row grouping trial roughly halves the authored dense

@@ -54,6 +54,20 @@ three images permits an all-Closed lobby and keeps it on the setup
 screen on A at Launch. Reopening the third row as Zerg allows play.
 The Outpost result covers the authored GBA map.
 
+A fresh ares replay of the Melee route finishes 6,310
+steps. The three setup captures match the retained hashes,
+including the two sides of the Right press. The launch
+capture differs from the prior run. The current contact
+candidates independently repeat the lobby route on all
+three GBA race ROMs. Each keeps CPU mask 4 and resolves
+the opponent to Zerg, then advances from frame 1 to 9.
+The lobby check covers this transition and the launch.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Native replay status and captured frames | `baaebfa6aa69b582ae8de6cbabfc0f66e8f5d93bf1cec9319d8ee98c20607709` / `d52874e6555e515d5acfde4cc0956b675c565a17ca019ddbeb88cac6637c15af` |
+| Current three-cartridge ordinary lobby | `40c23b07f415d8101f329d5d1183922ed65171226621cd87b92fb56f105682fb` |
+
 Separate reset replays extend the same sequence in the reverse
 direction. The N64 first shows Random, then D-pad Right changes the
 last open row to Zerg, and D-pad Left returns it to Random while the
@@ -727,6 +741,60 @@ These routes cannot isolate a change in engine behavior.
 | Eastern attack-move SRAM and fresh HOME | `b38dad35b64d8443b59efb3865303196d0fd49009212d573ea000129448e7ef8` |
 | Closer intercept inputs | `7f612c63e5b5098ec9190a5b970097473eebd3e2a57d927627e4f4ef848b4732` |
 | Closer intercept SRAM and fresh HOME | `023e457d3c81b98928ac611cbe2bd1c44ced7a2446f1938b2dcfd3568ca41b5e` / `51de3267559c8f325254de06ba7d679fdd46baa319509807797794e37d01906e` |
+
+#### Sunken coverage on three approaches
+
+The alternate frame-8,851 opening grows a second Sunken
+on the east at (1240, 1696), paired with the western
+Sunken at (1008, 1632). Fresh HOME at frame 9,886
+restores both at 400 HP and the Hatchery at 1,250 HP.
+The eastern colony falls by frame 12,086 and the
+Hatchery by 13,386. Moving all defenders east leaves
+the west exposed and ends the hold by frame 12,394.
+
+A follow-up builds and morphs a third Sunken north at
+(1192, 1616). Fresh HOME at frame 10,892 preserves
+it at 278 HP, the two earlier Sunkens at 400 HP each
+and the Hatchery at 1,250 HP. The three-Sunken hold
+without further orders loses the Hatchery by 13,292.
+Both branches retain 200 gas with no active gas source.
+Split the mobile defense and qualify mining through the
+raid before committing to further static defenses.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| East and west Sunken SRAM and inputs | `bbd8e26eeaae481a8d646495c2281d4457623d4aaef27f0b70283e066074868c` / `1f60e3cfe69ffe95022346372ef3a08a0c11e1445b2b326480dc3d66fc9794e3` |
+| Three Sunken SRAM and fresh HOME hold | `bb10d558b61d96eb0fa668dcc482a9fe016a03b2cf64b5175942449ebba7fdda` / `cfbc2a19f2fefb0a84cd9787b20cbec405bcc2fee2afa2bcdf77151127c40632` |
+
+### Pending impacts can reject an ordinary Protoss pause save
+
+The current P10 ROM loads the Outpost three-CPU journal
+at frame 11,001. After a normal camera pan and neutral
+updates, a B save from the pause screen at frame 11,334
+returns failure in the pending-impact guard. The queue has
+nine events and the record admits eight. The original
+journal stays byte-identical and fresh HOME falls back to
+frame 11,001. Saves at frames 11,332, 11,333 and 11,335
+have eight events and succeed. Paired P10 ROMs built with
+both collision settings are byte-identical and reproduce
+the same condition.
+
+The exact current Z10 Carrier-profile build rejects the
+[proposed padded codec](https://github.com/ggu/starcraft-gba/pull/818)
+at its compatibility guard. The codec also excludes P10's
+typed building rows and research journal. Its synthetic
+32-impact qualification does not establish either product
+path. P10's typed building rows expose 100 padding bytes,
+with 12 occupied by the research levels. Those rows alone
+cannot contain 192 event bytes. Treat layout, journal
+authentication and recovery of the last valid slot together.
+Preserve active projectiles, research, Yamato and transport
+state when extending the relevant record formats.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Exact P10 pause return, queue count and unchanged SRAM | `7286a0975b84e83922fc3ad61f2ca190bc0f31c5d68c0e48f82363bc6be88b4c` |
+| Prior and adjacent journal fresh HOME plus 60 updates | `f0267b6fe1256b2b5dedd9185d4c5658f4acc2f71918d2d34c1c70cbea6cd8bb` |
 
 ### Wasteland opening on N64 and KODAK
 

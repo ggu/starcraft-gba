@@ -193,3 +193,75 @@ measure emulated cycles rather than GBA SP frame delivery.
 | Canonical Terran skirmish pairs | `f815ac0165f94bf524f2a087a18a906c7a61c79b4a3b2b8eb372b23666ec457c` |
 | Canonical Z10 skirmish pairs | `4a99b3085809b11f2f2aecb32ef1a7ce846bba1fd5c41fc8c1c2a28f495276a3` |
 | Byte-identical P10 and Showcase links | `faa1ca7b9588c287f57ec72abdbda5f4734d47231509d4f888b205124c5c7fc6` |
+
+### Current paired frames and contact attribution
+
+The exact `d22c591f` release inputs link all four canonical
+profiles with the option off and on. P10 and Showcase
+are byte-identical between settings. The IWRAM and EWRAM
+endpoints are unchanged in every profile. Both Terran
+kernel prologues reserve 176 bytes. Z10 reserves 184 bytes
+with the option off and 192 with it on. Sampled entry
+stack pointers match in all five Terran and Z10 pairs.
+The lowest is `0x03007af8` in Terran. These are kernel
+entry and prologue measurements.
+
+Each pair records 160 advancing frames after an ordinary
+HOME load, with a camera pan before the Outpost windows.
+Eight read-only contact cuts per side match the corresponding
+uninstrumented cycles, world, entities, palette and pages.
+All recorded contact call counts and masks match.
+
+| Race and view | Whole-frame mean off → on | p95 off → on | Mean contact cycles off → on |
+| --- | ---: | ---: | ---: |
+| Terran Outpost, three CPUs, panned | 1,029,640 → 1,016,068 | 1,292,755 → 1,268,368 | 125,450 → 102,655 |
+| Z10 Outpost, three CPUs, panned | 1,177,966 → 1,165,539 | 1,404,329 → 1,396,701 | 102,881 → 86,944 |
+| P10 Outpost, three CPUs, panned | 1,351,639 → 1,351,639 | 1,568,384 → 1,568,384 | 60,106 → 60,106 |
+| Terran Blood Bath, one CPU | 560,883 → 560,977 | 604,463 → 591,448 | 81,393 → 67,280 |
+| Terran Blood Bath, three CPUs | 841,712 → 831,322 | 1,003,329 → 995,178 | 87,656 → 74,467 |
+| Z10 Blood Bath, three CPUs | 944,372 → 918,853 | 1,170,428 → 1,141,954 | 124,069 → 96,745 |
+
+World state, entity banks, palette and both framebuffer
+pages agree throughout the pairs. Four sample boundaries
+differ in displayed page or pending flip. All five Terran
+and Z10 journals and 60-update continuations agree. The
+P10 journal pair retains the same earlier save after
+[a pre-existing record-capacity failure](2026-11-24-kodak-package-checks.md#pending-impacts-can-reject-an-ordinary-protoss-pause-save).
+The one-CPU Blood Bath case still overruns 72 times in
+160 updates. Every three-CPU frame overruns. In the
+five changed-ROM cases, individual slower frames range
+from four to 34 per 160. The largest increase is 30,522
+cycles on one-CPU Terran Blood Bath. A default-on trial
+needs pacing measurements on the GBA SP.
+
+A separate set of eight matched contact-on cuts per race
+attributes the panned Outpost work to the named routines.
+These are inclusive timings. A call may include another
+row's work.
+
+| Profile | Orders mean over 160 frames | `move_toward` | Weapon approach | Point route |
+| --- | ---: | ---: | ---: | ---: |
+| Terran | 477,200 | 230,100 | 13,807 | 20,558 |
+| Z10 | 472,224 | 199,302 | 2,712 | 11,053 |
+| P10 | 659,046 | 181,670 | 20,884 | 11,346 |
+
+Eight full call-stack cuts reconcile with the same
+uninstrumented cycles and outputs. Among direct children
+of `update_orders`, P10 spends 131,466 cycles per update
+on `sc64_target_nearest`, ahead of the direct
+`move_toward` calls at 121,445 and `tick_combat` at
+99,246. Target index rebuild adds 36,473 cycles. Z10
+spends 96,482 on the nearest-target function and
+36,124 on the rebuild. P10 and Z10 respectively record
+520 and 463 direct nearest-target calls over the cuts.
+Optimize that search before extending point-route caches
+for this workload. Compare nearest results, stable tie
+order and rebuild cost alongside whole frames.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| Exact four-product links | `498b5a2195f36beec52071860a7105dfb33e650bd65e97e7b2434e8cf21d3cbe` |
+| Six frame pairs and matched contact cuts | `542303123ef48e42c2e1b01388b86e948ab0d815e6b9e867c1c871d57542a14f` |
+| Contact entry stack pointers | `42b40f8ab603f9327faa3d8821029a0225143020a5f2e97347f4016a998d444b` |
+| Movement attribution versus matching ordinary frames | `1638228bc22134cc473f65f3069e26e2e264c1060502679dd923c26dc8e759ba` |
+| Matched full orders call-stack cuts | `f205053de6244a9fefcd9a5e7c9020c639051fba4286d508ee35a61211daa82d` |
