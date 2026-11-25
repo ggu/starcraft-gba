@@ -59,8 +59,15 @@ static void sc64_gas_rebuild_sites(void)
         ++sc64_gas_site_count;
 }
 
+#ifdef SC64_GAS_SERVICE_TRIAL
+static void sc64_gas_service_reset(void);
+#endif
+
 static void sc64_gas_start(void)
 {
+#ifdef SC64_GAS_SERVICE_TRIAL
+    sc64_gas_service_reset();
+#endif
     memset(sc64_geyser_consumed, 0, sizeof(sc64_geyser_consumed));
     sc64_gas_rebuild_sites();
 }

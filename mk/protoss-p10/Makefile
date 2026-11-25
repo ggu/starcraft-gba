@@ -186,8 +186,11 @@ $(P10_ARM_TRACE): build/test-sc64-p10-campaign-run
 test-sc64-p10-controller: $(P10_ARM_TRACE)
 # The normal cartridge proof carries briefing and authored text inputs in the
 # tape. Keep it separate from the replacement-main and save-resume fixtures.
-build/test-sc64-p10-normal-home: tests/sc64_p10_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) -DSC64_P10_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+# The single-worker refinery trial can supply a 40-unit first assault while
+# its original 60-unit controller can stall waiting for more supply.
+build/test-sc64-p10-gas-service-home: P10_HOME_POLICY := -DSC64_GAS_SERVICE_TRIAL -DP10_ATTACK_ARMY=40
+build/test-sc64-p10-normal-home build/test-sc64-p10-gas-service-home: tests/sc64_p10_campaign_run.c tests/sc64_route_purity.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P10_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile mk/protoss-p9/Makefile mk/protoss-p10/Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P10_FLAGS) $(P10_HOME_POLICY) -DSC64_P10_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 
 $(P10_ARM_DIR)/sc64_p10_tape_generated.h: $(P10_ARM_TRACE) tools/sc64_p8_arm_replay.py mk/protoss-p10/Makefile
 	$(P10_REPLAY_TOOL) tape $< $@

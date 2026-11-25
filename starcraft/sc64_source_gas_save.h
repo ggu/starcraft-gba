@@ -6,6 +6,12 @@
  * upper bits. The authenticated RaceSave size and trailer remain unchanged. */
 #ifdef SC64_SOURCE_GAS
 #define SC64_GAS_SAVE_MARKER 0x10000u
+#ifdef SC64_GAS_SERVICE_TRIAL
+#define SC64_GAS_QUEUE_SAVE_MARKER 0x20000u
+#define SC64_GAS_SAVE_KNOWN_MARKERS (SC64_GAS_SAVE_MARKER | SC64_GAS_QUEUE_SAVE_MARKER)
+#else
+#define SC64_GAS_SAVE_KNOWN_MARKERS SC64_GAS_SAVE_MARKER
+#endif
 typedef unsigned (*Sc64GasSiteCapacity)(int, int, int, unsigned);
 _Static_assert(sizeof(int) == sizeof(u32), "gas save words must be 32 bits");
 
@@ -15,11 +21,11 @@ static inline int sc64_gas_save_coordinate(int word)
 }
 static inline int sc64_gas_save_count(int word)
 {
-    return (int)((unsigned)word & ~SC64_GAS_SAVE_MARKER);
+    return (int)((unsigned)word & ~SC64_GAS_SAVE_KNOWN_MARKERS);
 }
 static inline int sc64_gas_save_count_valid(int word)
 {
-    unsigned count = (unsigned)word & ~SC64_GAS_SAVE_MARKER;
+    unsigned count = (unsigned)word & ~SC64_GAS_SAVE_KNOWN_MARKERS;
     return count <= MAX_RACE_GEYSERS;
 }
 

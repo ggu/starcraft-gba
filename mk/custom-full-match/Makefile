@@ -85,3 +85,30 @@ build/test-sc64-source-gas-$(1): tests/sc64_source_gas_game.c $$(CUSTOM_FULL_MAT
 	$$(CLANG) $$(CUSTOM_FULL_MATCH_HOST_FLAGS) -DSC64_SOURCE_GAS $$(CUSTOM_FULL_MATCH_FLAGS_$(1)) $$< common/gba.c $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) -o $$@
 endef
 $(foreach product,terran zerg protoss,$(eval $(call SOURCE_GAS_GAME_TEST,$(product))))
+
+# Isolated source-gas queue trial. The shipped products retain their rules.
+define SOURCE_GAS_QUEUE_TEST
+.PHONY: check-sc64-gas-service-$(1)
+check-sc64-gas-service-$(1): build/test-sc64-gas-service-$(1)
+	./$$<
+build/test-sc64-gas-service-$(1): tests/sc64_gas_service_game.c $$(CUSTOM_FULL_MATCH_ELF_$(1)) $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CUSTOM_FULL_MATCH_INPUTS_$(1)) common/gba.c $$(COMMON_HEADERS) mk/custom-full-match/Makefile | build
+	$$(CLANG) $$(CUSTOM_FULL_MATCH_HOST_FLAGS) -DSC64_SOURCE_GAS -DSC64_GAS_SERVICE_TRIAL $$(CUSTOM_FULL_MATCH_FLAGS_$(1)) $$< common/gba.c $$(CUSTOM_FULL_MATCH_SOURCES_$(1)) -o $$@
+endef
+$(foreach product,terran zerg protoss,$(eval $(call SOURCE_GAS_QUEUE_TEST,$(product))))
+
+.PHONY: check-sc64-gas-service-journal
+check-sc64-gas-service-journal: build/test-sc64-gas-service-journal
+	./$<
+build/test-sc64-gas-service-journal: tests/sc64_gas_service_journal_game.c tests/sc64_guardian_journal_shim.c $(CUSTOM_FULL_MATCH_ELF_zerg) $(CUSTOM_FULL_MATCH_SOURCES_zerg) $(STARCRAFT) $(wildcard starcraft/*.h) $(CUSTOM_FULL_MATCH_INPUTS_zerg) common/gba.c $(COMMON_HEADERS) mk/custom-full-match/Makefile | build
+	$(CLANG) $(CUSTOM_FULL_MATCH_HOST_FLAGS) -DSC64_SOURCE_GAS -DSC64_GAS_SERVICE_TRIAL $(CUSTOM_FULL_MATCH_FLAGS_zerg) $< tests/sc64_guardian_journal_shim.c $(CUSTOM_FULL_MATCH_SOURCES_zerg) -o $@
+
+# Optional ordinary-input Z10 author for the shared gas FIFO experiment.
+# Match the cartridge preprocessor option order, including target-specific
+# collision, contact-axis and melee flags. The controller includes common/gba.c.
+Z10_NORMAL_FIFO_FLAGS = $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(Z10_FACT_FLAGS) $(Z10_CARRIER_FLAGS) $(Z10_PADDED_IMPACT_FLAGS) $(filter -D% -U% -I%,$(CFLAGS)) $(CUSTOM_FULL_MATCH_ELF_FLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) -DSC64_GAS_SERVICE_TRIAL -DSC64_GAS_SERVICE_QUEUE_SAVE -DSC64_ZERG_LATE_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL
+.PHONY: force-z10-normal-fifo-config
+build/z10-normal-fifo-config: force-z10-normal-fifo-config | build
+	@printf '%s\n' '$(subst ','"'"',$(CUSTOM_FULL_MATCH_HOST_FLAGS) $(Z10_NORMAL_FIFO_FLAGS))' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+build/test-sc64-z10-normal-home-gas-fifo: tests/sc64_z10_campaign_run.c tests/sc64_zerg_late_controller.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(CUSTOM_FULL_MATCH_INPUTS_zerg) $(CUSTOM_FULL_MATCH_SOURCES_zerg) build/z10-normal-fifo-config build/canonical-target-index-config common/gba.c $(COMMON_HEADERS) Makefile mk/custom-full-match/Makefile | build
+	$(CLANG) $(filter-out -Icommon,$(CUSTOM_FULL_MATCH_HOST_FLAGS)) $(Z10_NORMAL_FIFO_FLAGS) $< $(CUSTOM_FULL_MATCH_SOURCES_zerg) -o $@

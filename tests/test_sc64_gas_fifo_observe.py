@@ -12,6 +12,26 @@ class GasFifoObservation(unittest.TestCase):
                 (3, 3, [(3, 83, 'a')])]
         self.assertEqual(analyze(rows)['grants'], [2, 2, 3])
 
+    def test_grant_spacing_stays_within_site_and_window(self):
+        rows = [(0, 0, [(1, 82, 'a'), (2, 82, 'b')]),
+                (1, 1, [(1, 83, 'a'), (2, 82, 'b'), (3, 82, 'a')]),
+                (2, 1, [(1, 83, 'a'), (2, 83, 'b'), (3, 82, 'a')]),
+                (3, 2, [(3, 83, 'a')])]
+        intervals = analyze(rows, grant_spacing=True)['grant_intervals']
+        self.assertEqual(intervals, [dict(site='a', fields=2, ticks=1)])
+        self.assertEqual(analyze(rows, 2, 2, grant_spacing=True)['grant_intervals'], [])
+        with self.assertRaisesRegex(ValueError, 'consecutive'):
+            analyze([rows[0], rows[2]], grant_spacing=True)
+
+    def test_duration_excludes_partial_jobs_and_counts_only_same_site_waiters(self):
+        rows = [(0, 8, [(1, 83, 'a'), (2, 82, 'a')]),
+                (1, 9, [(2, 83, 'a'), (3, 82, 'a'), (4, 82, 'b')]),
+                (2, 9, [(2, 83, 'a'), (3, 82, 'a'), (4, 82, 'b')]),
+                (3, 10, [(3, 83, 'a'), (4, 83, 'b')])]
+        self.assertEqual(analyze(rows, 9, grant_spacing=True)['service_durations'],
+                         [dict(site='a', fields=2, ticks=1, waiters_at_start=1)])
+        self.assertEqual(analyze(rows, 9, 9, grant_spacing=True)['service_durations'], [])
+
     def test_younger_waiter_and_duplicate_active_are_rejected(self):
         with self.assertRaisesRegex(ValueError, 'older waiter'):
             analyze([(0, 0, [(1, 82, 0)]), (1, 1, [(1, 82, 0), (2, 82, 0)]),

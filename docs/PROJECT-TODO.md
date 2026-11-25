@@ -54,18 +54,37 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   deliver a whole-frame gain while preserving every direction, secondary
   query, topology invalidation and memory guard.
 
-- **Gas refinery service.** Per-field N64 observations found one tracked worker
-  occupying each gas site at a time. The packaged GBA Blood Bath game showed
-  up to three workers counting down concurrently at one building. Qualify
-  single occupancy, wait order, cancellation, destruction, saved trips and
-  economy impact across products. [Native and GBA measurements](audits/2026-11-26-n64-gas-pickup.md#gas-service-at-one-building); [saturated service-order checker](audits/2026-11-26-gas-saturated-fifo.md).
+- **Refinery economy and native timing.** The opt-in FIFO service admits one
+  worker per site, serves separate sites concurrently and restores queue order
+  from SRAM on all four products. All 18 race/map/opponent-count cells have
+  ordinary-input cartridge wins with fresh pause continuations and result
+  reloads. With identical starting positions and controller strategies, all
+  three release Blood Bath wins became losses on the trial. Native service
+  lasted 37 guest ticks across 18 fully observed visits. The GBA timer took
+  1.98 emulated seconds in a light Z1 sample and 3.09 in busy P10. Improve
+  busy-frame pacing and compare native elapsed time before enabling the
+  change by default. Back up pretrial SRAM for rollback. [Native and GBA
+  timings](audits/2026-11-26-gas-saturated-fifo.md), [three-opponent
+  battles](audits/2026-11-26-gas-fifo-skirmishes.md), [one- and two-opponent
+  battles](audits/2026-11-26-gas-fifo-small-skirmishes.md).
+
+- **Campaign playthroughs with the trial economy.** All 30 retained victories
+  advanced or restarted their finales and reloaded new pause saves. A blank
+  Terran campaign cleared T1–T2. Carry that actual save through T3–T7 to
+  connect it to the separately verified T7-victory→T8→T9→T10 segment.
+  P9→P10 and Z10 also cleared from retained predecessor victories. Track
+  first sustained divergences from the release plans as the earlier missions
+  are played. [Terran](audits/2026-11-26-fifo-terran-campaign.md),
+  [Protoss](audits/2026-11-26-gas-saturated-fifo.md),
+  [Zerg](audits/2026-11-26-z10-fifo-normal.md).
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
   saves after both. The older P9 tape diverges on both sides of the gas
   change. [Route, SRAM hashes and repeatable check](audits/2026-11-26-protoss-finale-chain.md).
-  Terran cleared T9 and T10 from a retained T8 victory. Requalify T8 from T7:
-  its historical route first differs in the resource banks at frame 117,534.
+  The release Terran cartridge cleared T8, T9 and T10 from a retained T7
+  victory. All three results reloaded with identical SRAM.
+  [Linked Terran replay](audits/2026-11-26-t8-finite-gas-route.md).
 
 - **Custom Game pack correction.** The `b206b062` race binaries used an
   older 32-patch Blood Bath pack; Showcase used 56. All four cartridges

@@ -13,6 +13,18 @@ class GasClockTest(unittest.TestCase):
         result = summarize(trip())
         self.assertEqual((result['intervals'], result['frame_spans']), (1, [59]))
 
+    def test_stacked_timers_and_independent_sites(self):
+        def workers(a, b, c):
+            return [(0, 7, 0, 9, a, 0), (1, 7, 0, 9, b, 0), (2, 7, 0, 15, c, 0)]
+        rows = [(1, 1, workers(12, 15, 0)), (2, 2, workers(11, 15, 59))]
+        result = summarize(rows)
+        self.assertEqual(result['peak_countdowns'], {9: 2, 15: 1})
+        self.assertEqual(result['peak_advancing'], {9: 1, 15: 1})
+        self.assertEqual(result['parallel_site_frames'], 1)
+        rows.append((3, 3, workers(10, 14, 58)))
+        self.assertEqual(summarize(rows)['peak_advancing'][9], 2)
+        self.assertFalse(summarize([rows[0], rows[2]])['peak_advancing'])
+
     def test_discontinuity_cannot_complete_old_trip(self):
         for change in ('absent', 'owner', 'site', 'timer', 'gap', 'kind'):
             rows = trip()

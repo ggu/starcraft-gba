@@ -392,7 +392,11 @@ def pace(args) -> dict:
     if not any(first < tick <= last for tick in trace["checks"]):
         raise MatchError("pacing window contains no recorded gameplay checkpoint")
     shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
-    counters = (*PACE_COUNTERS, "demo_last_cycles")
+    # These additional timers exist only in diagnostic cartridges. Keep
+    # inclusive order timers out of the disjoint whole-loop budget.
+    counters = (*PACE_COUNTERS, "demo_last_cycles", "sc64_order_setup_cycles",
+                "sc64_order_query_cycles", "sc64_order_move_cycles", "sc64_setup_buckets",
+                "sc64_setup_lists", "sc64_setup_index", "sc64_setup_arbiter")
     if args.output.exists():
         raise MatchError(f"{args.output} already exists")
     args.output.mkdir(parents=True, exist_ok=False)
