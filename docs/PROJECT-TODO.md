@@ -85,11 +85,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   `71e4d60f9e6a6f99c84ce3a7fb00d31a77c0fa6e8eba7e3af252c52e150e4b97`).
   Z10 resumed at frame 101 with all nine prior flags (2,080,771).
   Finish Z10 with those flags and verify finale retry.
-  On the older packaged build, track campaign Overlord transport separately. The authenticated Z9 scenario
-  allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
-  default costs). The release exposes that research only in Z6 and
-  custom games. Verify mission permissions, paid research, cargo, and
-  SRAM continuation before relying on an airlift for this objective.
+  The authenticated Z9 scenario allows player 3 to research Ventral
+  Sacs. On the newer source merged in #874, Z9 passed paid research,
+  mid-job reload, boarding, loaded-cargo reload and unloading in mGBA.
+  The continuous campaign run above used the earlier package and a
+  ground delivery.
 
 - **Packaged Protoss campaign.** P2 now wins from HOME on the packaged
   Protoss10 ROM with regenerated controller inputs. The 38,435-input run
