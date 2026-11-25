@@ -187,13 +187,13 @@ static inline s32 audio_clip8(s32 s)
  * (4 * 255 < 65536). Unclipped words repack in a few operations; only a
  * word with a clipping lane is clamped lane by lane.
  *
- * ARM builds run a hand-written Thumb body with one loop per n and every
- * constant in a register; the compiler's version of the C below reloaded
- * three constants from ROM for each word. It is an ordinary function in
- * its own .text section, so a link may place it in ROM or in IWRAM. The C
- * function is the reference and runs in host builds;
+ * ROMs that link the bank run a hand-written Thumb body with one loop per n
+ * and every constant in a register; the compiler's version of the C below
+ * reloaded three constants from ROM for each word. It is an ordinary
+ * function in its own .text section, so a link may place it in ROM or in
+ * IWRAM. The C function is the reference and runs in host builds;
  * tests/audio_codec_arm_probe.c compares the two. */
-#if defined(__arm__) && !defined(GBA_HOST)
+#ifdef AUDIO_CODEC_HAND_WRITTEN
 /* The rare word with a clipping lane, kept out of the loop's section. It is
  * part of audio_mixer_sum, with that loop's registers and no stack, not a C
  * function. In: r2, r3 the rebiased lanes, r10 and r11 as below. Out: r2
@@ -341,8 +341,8 @@ audio_mixer_sum(volatile u32 *dst, const u32 *src, u32 n, u32 words)
 #undef AUDIO_SUM_ASM_TAIL
 #undef AUDIO_SUM_ASM_VOICE
 #endif
-#if !defined(__arm__) || defined(GBA_HOST) || defined(AUDIO_CODEC_REFERENCE)
-#if defined(__arm__) && !defined(GBA_HOST)
+#if !defined(AUDIO_CODEC_HAND_WRITTEN) || defined(AUDIO_CODEC_REFERENCE)
+#ifdef AUDIO_CODEC_HAND_WRITTEN
 #define AUDIO_MIXER_SUM audio_mixer_sum_reference
 #else
 #define AUDIO_MIXER_SUM audio_mixer_sum

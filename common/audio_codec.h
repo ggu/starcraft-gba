@@ -244,14 +244,21 @@ static void AUDIO_CODEC_SIZE_OPT __attribute__((noinline, unused)) audio_decoder
  * word j (samples 4j..4j+3) goes to out + 2 * columns * j halfwords. The
  * mixer sums such a table with one pointer.
  *
- * ARM builds run the loop as ARM code from IWRAM, where an instruction
- * costs one cycle instead of the two a Thumb instruction costs from ROM,
- * and a rotate or an add with a shifted operand is one instruction. Its
- * body is written by hand: the compiler's version of the C below needs
- * twice the code and spills half its values. The C function is the
- * reference and runs in host builds; tests/audio_codec_arm_probe.c compares
- * the two on the whole bank. samples is a nonzero multiple of 8 there. */
-#if defined(__arm__) && !defined(GBA_HOST)
+ * ROMs that link the bank run the loop as ARM code from IWRAM, where an
+ * instruction costs one cycle instead of the two a Thumb instruction costs
+ * from ROM, and a rotate or an add with a shifted operand is one
+ * instruction. Its body is written by hand: the compiler's version of the
+ * C below needs twice the code and spills half its values. The C function
+ * is the reference and runs in host builds; tests/audio_codec_arm_probe.c
+ * compares the two on the whole bank. samples is a nonzero multiple of 8
+ * there.
+ *
+ * Only ROMs that link the bank get the hand-written code, so every other
+ * object, the default ROM's included, is what it was without it. */
+#if defined(__arm__) && !defined(GBA_HOST) && defined(SC64_AUDIO_IMPORTED)
+#define AUDIO_CODEC_HAND_WRITTEN 1
+#endif
+#ifdef AUDIO_CODEC_HAND_WRITTEN
 /*   r0  bits in half a block (4 * width)   r7  x1 (low byte)
  *   r1  out                                r8  x1 - x2 (low byte)
  *   r2  end of this run's output           r9  residual word
@@ -379,8 +386,8 @@ audio_decoder_linear(AudioDecoder *dec, volatile u16 *out, u32 samples, u32 colu
 #undef AUDIO_CODEC_ASM_FIRST
 #undef AUDIO_CODEC_ASM_BIT
 #endif
-#if !defined(__arm__) || defined(GBA_HOST) || defined(AUDIO_CODEC_REFERENCE)
-#if defined(__arm__) && !defined(GBA_HOST)
+#if !defined(AUDIO_CODEC_HAND_WRITTEN) || defined(AUDIO_CODEC_REFERENCE)
+#ifdef AUDIO_CODEC_HAND_WRITTEN
 #define AUDIO_CODEC_LINEAR audio_decoder_linear_reference
 #else
 #define AUDIO_CODEC_LINEAR audio_decoder_linear

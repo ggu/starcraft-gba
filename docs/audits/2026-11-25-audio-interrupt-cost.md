@@ -143,6 +143,19 @@ Every update in these windows is still over the 561,792-cycle budget.
   screens the timing is the same, and the two ROMs' captures are
   byte-identical for all 474 or 475 VBlanks.
 
+## Other builds and the merged tree
+
+Only ROMs that link the sound bank compile the hand-written routines.
+The default original-art ROM is byte-identical with and without this
+change (SHA-256 `cc7340a7…5aed177cda`).
+
+The tables above are from `7316734e` with this change. The branch was
+then merged with `codex/source-release` at `9f6efc04`. On the three
+ROMs built from the merge the twelve captures were repeated: every byte
+again equals the replay through the previous mixer and decoder, the
+three title captures equal those of the `7316734e` ROMs, and each
+window's mean is within 3 cycles of the table.
+
 ## IWRAM and the stack
 
 The decoder needs 460 bytes of IWRAM. On `7316734e` the three ROMs had
