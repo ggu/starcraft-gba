@@ -515,6 +515,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   by 8 bytes. It also bypasses point-field cache insertion on successful
   probe misses. Review the resulting route behavior before enabling it.
   Keep targeting as a separate priority for Outpost.
+  The [qualified Z10 Blood Bath win against three Zerg CPUs](audits/2026-11-26-z10-triple-zerg-pacing.md)
+  spends 296,616 cycles per advancing update in orders, its largest
+  single measured stage; actors take 180,057. The overall 920,546-cycle
+  mean exceeds the nominal 30 fps budget by 361,305 cycles. Prioritize
+  collision and movement inside orders and actor drawing; the measured
+  depot-validation inlining trial saves only 0.356% over its 512-update
+  window and needs broader verification.
   [Sharing the byte lane across thin selection edges](audits/2026-11-25-visible-drawing-and-campaigns.md#drawing-matching-one-pixel-selection-edges)
   lowers the visible P7 and Z9 frame means by about 0.9–1.0%
   with matching pixels. [Pairing opposite rows on the supply release](audits/2026-11-25-visible-drawing-and-campaigns.md#combined-supply-and-paired-outline-qualification)
