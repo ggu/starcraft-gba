@@ -33,6 +33,13 @@ int main(void)
             desired[y*128+x] = !(y & 1) || x == (y & 2 ? 0 : 127);
     build_path_grid();
     check_memo_goal(1);
+    check_memo_goal(2);
+    assert(sc64_wide_memo.diff[0].count > 1);
+    sc64_wide_memo.write_at = sizeof(sc64_wide_memo.packets) - 1;
+    check_memo_goal(3);
+    assert(!sc64_wide_memo.diff[0].reached);
+    assert(sc64_wide_memo.diff[1].offset == 0);
+    check_memo_goal(2);
     for (int i = 2; i < 40; ++i) {
         check_memo_goal(i);
         check_memo_goal(1);

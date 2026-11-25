@@ -609,7 +609,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   reduced Z7 guest cycles by 7.80% on that window after #885, reaching
   8.98 emulated updates/s. A paired ordinary-input Z7 continuation also
   reached victory and reloaded its identical terminal SRAM in fresh
-  processes. Additional wide-map campaigns and EWRAM headroom remain the
+  processes on the initial cache implementation. Sharing 1,536 bytes
+  of packet storage trimmed the cache from 9,272 to 7,756 bytes, with
+  1,867,971 cycles/update on the same 4,901-update replay. Repeat the
+  terminal save check on the revised cache. Additional wide-map campaigns and EWRAM headroom remain the
   promotion priorities; the two current Custom Game maps are 64×64 and do
   not exercise this cache.
   Physical GBA timing remains open.
