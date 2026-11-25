@@ -1,6 +1,6 @@
 # StarCraft GBA goal and prioritized TODOs
 
-Updated: 2026-11-25. This is the living backlog for the race-ROM/N64-parity goal.
+Updated: 2026-11-26. This is the living backlog for the race-ROM/N64-parity goal.
 Historical audits remain evidence snapshots; they are not the current task list.
 
 ## Goal and completion rules
@@ -38,7 +38,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Zerg cartridge replayed its 202,274 button updates, matched all 97
   checkpoints, delivered the crystal and won at frame 198,954. A fresh
   HOME load restored the victory and re-exported identical SRAM. The
-  previous Zerg 9 victory handoff is being checked separately.
+  same route from a retained Zerg 9 victory matched all 97 checkpoints,
+  retained all ten Zerg completion bits and reloaded byte for byte.
+  Separately, all 30 retained campaign victories advanced to the next
+  chapter or retried their finale. Each resulting pause save reloaded
+  in a fresh mGBA process with the same state and SRAM bytes.
 
 - **Blood Bath resource layout.** Repacking the verified N64 map restores
   56 mineral patches, with 32 containing 1,500 minerals and 24 containing
