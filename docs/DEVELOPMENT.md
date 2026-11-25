@@ -3647,3 +3647,10 @@ and pre-research-save checks on prepared P10 inputs. `PR_BASE_TREE` is the
 checkout whose build writes the genuine older save; without it that last check
 is skipped. See the [audit](audits/2026-11-11-protoss-research-sram/README.md)
 for scope, integer rounding and what is not covered.
+
+Imported skirmish products require current standard and CV5-cover map packs.
+If a build reports `Stale skirmish pack`, regenerate both using the commands in
+[the Custom Game audit](audits/2026-11-25-custom-game-full-matches.md#reproduce).
+The compiler checks the header selected by its actual include order, including
+the cover directory that can shadow the standard pack. Restart the product
+build after regeneration so its ROM and ELF are rebuilt.

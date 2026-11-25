@@ -174,7 +174,7 @@ build/z10-facts-config: force-z10-facts-config | build
 	@printf '%s\n' '$(Z10_FACT_SIGNATURE)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 build/starcraft-zerg-z10.elf: $(COMMON) $(COMMON_HEADERS) $(Z10_ARM_SOURCES) $(wildcard starcraft/*.h) $(ZERG_Z10_CANONICAL_INPUTS) common/gba.ld Makefile mk/combat-perf/Makefile mk/carrier-release/flags/Makefile tests/sc64-zerg-late/Makefile build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) $(if $(Z10_BUILDING_WORDS_FLAGS),$(Z10_SELECTED_BUILDING_WORD_HEADER)) build/z10-facts-config $(Z10_FACT_CONFIG) $(if $(Z10_FACT_FLAGS),$(Z10_FACT_HEADER)) | build
-	$(CC) $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(Z10_FACT_FLAGS) $(Z10_CARRIER_FLAGS) $(Z10_PADDED_IMPACT_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(Z10_ARM_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
+	$(CC) -DSC64_REQUIRE_CURRENT_SKIRMISH_PACK $(Z10_TERRAN_BUILDING_WORD_INCLUDE) $(Z10_FACT_FLAGS) $(Z10_CARRIER_FLAGS) $(Z10_PADDED_IMPACT_FLAGS) $(CFLAGS) $(ZERG_Z10_RELEASE_FLAGS) $(Z10_BUILDING_WORDS_FLAGS) $(CANONICAL_TARGET_INDEX_FLAGS) $(CANONICAL_TARGET_POLICY_FLAGS) $(COMMON) $(Z10_ARM_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z10.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z10-Transport1-GBA.gba: build/starcraft-zerg-z10.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@

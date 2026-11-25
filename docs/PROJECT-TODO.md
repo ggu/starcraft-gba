@@ -19,6 +19,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Custom Game pack correction.** The `b206b062` race binaries used an
+  older 32-patch Blood Bath pack; Showcase used 56. All four cartridges
+  regenerated from `d39bd015` use 56 source patches (styles 176/177/178:
+  19/17/20). Tested older saves restored and matched for 512 updates; 72
+  lobby combinations and all 30 saved-result transitions passed. The product
+  build gate checks the header actually selected by include precedence.
+  Hardware pacing remains open.
+
 - **Zealot native vitals.** All 30 original campaign maps select the
   ordinary Zealot defaults. Two completed Zealots in retained native
   Blood Bath states had 80 HP and 80 shields. The shared rule uses
@@ -87,9 +95,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   skirmish importer now keeps each source site’s full 32-bit gas quantity
   in both the map descriptor and private report. Regenerating Blood Bath
   preserved the four existing coordinates and recorded 10,000 gas at each.
-  The shared worker still awards eight gas per normal trip. Capture the
-  N64 depleted-trip yield, then implement remaining gas per map site and
-  preserve it through refinery destruction, rebuilding and save/load.
+  The shared worker still awards eight gas per normal trip. The
+  [native gas audit](audits/2026-11-26-n64-gas-pickup.md) identifies base
+  pickups of eight while stocked and two below eight from authenticated N64
+  code; a live depleted trip remains to be captured. Implement remaining gas
+  per map site and preserve it through refinery destruction, rebuilding and
+  save/load.
 
 - **Packaged Terran campaign.** All ten missions now have individual
   opening-to-victory runs on Terran10 `5f758095` (ROM SHA-256

@@ -823,7 +823,11 @@ _Static_assert((SC64_TRANSPORT_SAVE_VERSION & 0x40000000u) != 0,
 #include "sc64_races_generated.h"
 #include "sc64_frontend.h"
 #ifdef SC64_IMPORTED_SKIRMISH
+#ifdef SC64_REQUIRE_CURRENT_SKIRMISH_PACK
+#include "sc64_skirmish_pack_gate.h"
+#else
 #include "sc64_skirmish_generated.h"
+#endif
 _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
                "Skirmish menu and imported map pack disagree");
 #endif
