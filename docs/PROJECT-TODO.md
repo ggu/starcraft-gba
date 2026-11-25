@@ -225,6 +225,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   T7-victory-to-T10 segment is documented in the [finite-gas T8 audit](audits/2026-11-26-t8-finite-gas-route.md).
   Late-campaign speed and hardware frame pacing remain priorities.
 
+- **Zerg campaign after the Custom Game Larva merge.** Z1 cleared by two
+  ordinary routes from blank SRAM on the standard Z10 cartridge. The
+  continuous HOST-matched route handed its actual victory to Z2, which
+  delivered the Chrysalis and reloaded with both completion bits. Carry
+  that result into Z3. [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
+
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
   controller segments load saves made in this run. Victory at frame
