@@ -36,6 +36,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -303,6 +304,94 @@ def at_resume(game: PhysicalGame, trace: dict, label: str) -> None:
     problems = compare(trace["resume"], observe(game), ("frame", "hash"))
     if problems or game.u32("screen") != SCREEN_PLAY:
         raise MatchError(f"{label}: the resumed world differs from the trace: " + "; ".join(problems))
+
+
+def displayed_bitmap(game: PhysicalGame) -> bytes:
+    control = int.from_bytes(game.rsp.read(0x04000000, 2), "little")
+    if (control & 7) != 4 or control & 0x80:
+        raise MatchError("visible-page sampling requires an active Mode 4 bitmap")
+    page = 0x0600A000 if control & 16 else 0x06000000
+    pixels = game.rsp.read(page, 240 * 160)
+    palette = game.rsp.read(0x05000000, 512)
+    # Resolve indices so unused palette edits and duplicate colors do not count.
+    low, high = palette[::2], bytes(value & 0x7f for value in palette[1::2])
+    return hashlib.sha256(pixels.translate(low) + pixels.translate(high)).digest()
+
+
+def pace(args) -> dict:
+    """Time the recorded controls immediately after a qualified battle save."""
+    trace = load_trace(args.trace)
+    save = trace["save"]
+    if not save or args.updates < 1:
+        raise MatchError("pacing requires a recorded battle save and a positive update count")
+    first = trace["resume"]["host_tick"]
+    last = first + args.updates
+    if last >= trace["end"]:
+        raise MatchError("pacing window reaches the end of the match")
+    shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
+    counters = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
+                "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
+    if args.output.exists():
+        raise MatchError(f"{args.output} already exists")
+    args.output.mkdir(parents=True, exist_ok=False)
+    game = PhysicalGame(args.runner, args.rom, args.elf, args.output / "guest", save_input=args.save)
+    try:
+        require_home(game)
+        game.step(0, 2)
+        game.step(KEY_L)
+        if game.u32("screen") != SCREEN_PLAY or compare(save, observe(game), ("frame", "hash")):
+            raise MatchError("loaded battle differs from the recorded save")
+        seats = lobby(game, trace)
+        game.rsp.play_to(first - shift, inputs)
+        at_resume(game, trace, "pacing")
+        clock = game.rsp.clock()
+        rows, checks = [], 0
+        previous_bitmap = displayed_bitmap(game) if args.video else None
+        world_frame = game.u32("frame")
+        for tick in range(first + 1, last + 1):
+            game.rsp.play_to(tick - shift, inputs)
+            now = game.rsp.clock()
+            next_frame = game.u32("frame")
+            if next_frame - world_frame not in (0, 1) or now <= clock:
+                raise MatchError(f"invalid game clock at update {tick}")
+            rows.append({"host_tick": tick, "cycles": now - clock, "frame": next_frame,
+                         "world_advanced": next_frame != world_frame,
+                         **{name: game.u32(name) for name in counters}})
+            if args.video:
+                bitmap = displayed_bitmap(game)
+                rows[-1]["bitmap_changed"] = bitmap != previous_bitmap
+                previous_bitmap = bitmap
+            world_frame = next_frame
+            clock = now
+            if tick in trace["checks"]:
+                problems = compare(trace["checks"][tick], observe(game))
+                if problems:
+                    raise MatchError(f"pacing diverged at {tick}: " + "; ".join(problems))
+                checks += 1
+        final = observe(game)
+        if final["screen"] != SCREEN_PLAY:
+            raise MatchError("match left play during the pacing window")
+    finally:
+        game.close()
+    cycles = sorted(row["cycles"] for row in rows)
+    # Simulation stage timers keep their previous values on a command-menu tick.
+    active = [row for row in rows if row["world_advanced"]]
+    if not active:
+        raise MatchError("the pacing window contains no simulation updates")
+    averages = {name: statistics.mean(row[name] for row in active) for name in counters}
+    result = {"ok": True, "lobby": seats, "checks": checks, "updates": len(rows),
+              "updates_per_second": GBA_HZ / statistics.mean(cycles),
+              "p95_cycles": cycles[(95 * len(rows) + 99) // 100 - 1],
+              "over_two_fields": sum(c > 561792 for c in cycles),
+              "active_updates": len(active), "mean_active_stage_cycles": averages, "end_fingerprint": final["fingerprint"],
+              "sha256": {k: sha256(getattr(args, k)) for k in ("rom", "elf", "runner", "save", "trace")},
+              "samples": rows}
+    if args.video:
+        changes = sum(row["bitmap_changed"] for row in rows)
+        result["bitmap_changes"] = changes
+        result["bitmap_changes_per_second"] = changes * GBA_HZ / sum(cycles)
+    (args.output / "pacing.json").write_text(json.dumps(result, indent=1) + "\n")
+    return result
 
 
 def replay(args) -> dict:
@@ -584,6 +673,12 @@ def main(argv=None) -> int:
     sub = commands.add_parser("replay", help="replay a trace on the ROM with save and reload checks")
     sub.add_argument("--trace", required=True, type=path)
     common(sub, False)
+    sub = commands.add_parser("pace", help="measure guest cycles while continuing a recorded battle")
+    sub.add_argument("--trace", required=True, type=path)
+    sub.add_argument("--save", required=True, type=path)
+    sub.add_argument("--updates", type=int, default=256)
+    sub.add_argument("--video", action="store_true", help="sample visible Mode 4 page and palette at update boundaries")
+    common(sub, False)
     common(commands.add_parser("run", help="author, then replay"), True)
     sub = commands.add_parser("matrix", help="run PRODUCT:MAP:CPUS[:PLAN] cases (default: the qualified list)")
     sub.add_argument("cases", nargs="*")
@@ -601,11 +696,11 @@ def main(argv=None) -> int:
             for row in rows:
                 print(json.dumps(row))
             return 0 if all(row["ok"] for row in rows) else 1
-        record = {"author": author, "replay": replay, "run": run}[args.command](args)
+        record = {"author": author, "replay": replay, "pace": pace, "run": run}[args.command](args)
     except (MatchError, OSError, RuntimeError, ValueError) as error:
         parser.exit(1, f"{error}\n")
     summary = {key: record[key] for key in ("ok", "result", "updates", "frame", "save", "continuation",
-                                            "victory_reload", "terminal", "start_order", "exit")
+                                            "victory_reload", "terminal", "start_order", "exit", "updates_per_second")
                if key in record}
     print(json.dumps(summary))
     return 0 if record.get("ok", args.command == "author") else 1
