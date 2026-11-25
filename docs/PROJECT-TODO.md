@@ -25,7 +25,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   windows measured 11.29–16.73 loop updates/s. The original controls and
   camera are reproducible from the match traces. Prioritize ground orders
   and depth-sorted actor drawing in the slow Zerg windows, then measure the
-  other races on both maps. Compare total guest cycles, actual bitmap
+  other races on both maps. Reusing the HUD supply counts across six
+  256-update battle replays saved at most 0.20% of total cycles and cost
+  0.08% in Zerg Outpost. Both bitmap pages and the palette matched at all
+  1,542 samples. Keep the existing HUD and prioritize orders and drawing.
+  Compare total guest cycles, actual bitmap
   changes, save continuation and on-device pacing. See the
   [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
 
