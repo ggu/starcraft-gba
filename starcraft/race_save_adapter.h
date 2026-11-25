@@ -236,7 +236,7 @@ static int race_scarab_stage_wire;
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME) || defined(SC64_WORKER_CARGO_KIND)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME) || defined(SC64_WORKER_CARGO_KIND) || defined(SC64_GAS_SERVICE_TRIAL)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
@@ -527,7 +527,7 @@ race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsi
 #ifdef SC64_WORKER_CARGO_KIND
 #include "sc64_worker_cargo_save.h"
 #endif
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || defined(SC64_SHARED_TRANSPORT)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || defined(SC64_SHARED_TRANSPORT) || defined(SC64_GAS_SERVICE_TRIAL)
 static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
 {
@@ -2081,6 +2081,61 @@ static int race_fifo_write_ranks(void)
 }
 #endif
 
+#ifdef SC64_GAS_SERVICE_TRIAL
+#ifndef SC64_SOURCE_GAS
+#error "gas service journal requires finite gas save support"
+#endif
+#include "sc64_race_save_unit_edit.h"
+#include "sc64_gas_service_save.h"
+/* Detached scratch belongs to the selected candidate, never the live world. */
+static Sc64GasServiceQueue race_gas_service_candidate;
+typedef struct { RaceSave *save; unsigned width, height; } Sc64GasSaveContext;
+static int race_gas_save_read(void *opaque, unsigned slot, Sc64GasQueueSaveRow *row)
+{
+    Sc64GasSaveContext *ctx = opaque; Unit unit;
+    if (!race_save_decode_unit(ctx->save, slot, ctx->width, ctx->height, &unit)) return 0;
+    *row = (Sc64GasQueueSaveRow){unit.alive, IS_WORKER(unit.type), unit.order == ORDER_GAS,
+                                  unit.target, unit.carry, unit.work_timer};
+    return 1;
+}
+static int race_gas_save_write(void *opaque, unsigned slot, int carry)
+{
+    Sc64GasSaveContext *ctx = opaque; Unit unit;
+    if (!race_save_decode_unit(ctx->save, slot, ctx->width, ctx->height, &unit)) return 0;
+    unit.carry = carry;
+    return race_save_encode_unit(ctx->save, slot, ctx->width, ctx->height, &unit);
+}
+static int race_gas_save_eligible(void *opaque, unsigned slot, unsigned site,
+                                  const Sc64GasQueueSaveRow *row)
+{
+    Sc64GasSaveContext *ctx = opaque; Unit unit; Building depot;
+    if (!race_save_decode_unit(ctx->save, slot, ctx->width, ctx->height, &unit) ||
+        !race_save_decode_building(ctx->save, site, &depot)) return 0;
+    unit.carry = row->carry;
+    if (
+#ifdef SC64_WORKER_CARGO_KIND
+        !sc64_worker_cargo_state_valid(&unit) ||
+#endif
+        sc64_worker_cargo_matches_order(&unit) || !depot.alive || depot.under_construction || !ui_gas_building(depot.type) ||
+        depot.owner != unit.owner || dist2(unit.x, unit.y, depot.x, depot.y) > 24 * 24) return 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    if (unit.build == -2 && !sc64_worker_gather_pending(&unit)) return 0;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!ctx->save->state[0] && ctx->save->state[2] == SC64_T6_GLOBAL_ID &&
+        sc64_t6_burrowed_get(&ctx->save->t6, slot)) return 0;
+#endif
+#ifdef SC64_P6_COMBAT_ENABLED
+    if (!ctx->save->state[0] && ctx->save->state[2] == SC64_P6_GLOBAL_ID &&
+        (unit.flags & 2u)) {
+        int raw = race_p6_combat_raw_unit(&unit);
+        if (raw == 37 || raw == 38 || raw == SC64_P6_RAW_INFESTED_TERRAN) return 0;
+    }
+#endif
+    return 1;
+}
+#endif
+
 static int race_save_game(void) {
 #ifdef SC64_ROUTE_POINT_TAIL_PROBE
     /* Everything that writes the route/save union comes through this entry
@@ -3178,6 +3233,14 @@ static int race_save_game(void) {
             break;
         }
 #endif
+#ifdef SC64_GAS_SERVICE_TRIAL
+    {
+        Sc64GasSaveContext gas_ctx = {&race_data, WORLD_W, WORLD_H};
+        if (!sc64_gas_queue_save_encode(&gas_ctx, &gas_service,
+                race_gas_save_read, race_gas_save_write, race_gas_save_eligible)) return 0;
+        race_data.state[16] |= SC64_GAS_QUEUE_SAVE_MARKER;
+    }
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_PACKED_MINERAL_FIFO
@@ -3231,6 +3294,9 @@ _Static_assert(SC64_PR_PAD_TUPLE_VALID(MAX_BUILDINGS,SC64_PR_ROW_WIDTH,SC64_PR_U
 /* Candidate-only load outputs live outside the route/save scratch union. */
 typedef struct {
     int building_damage_marker;
+#ifdef SC64_GAS_SERVICE_TRIAL
+    int gas_queue_tagged;
+#endif
 #ifdef SC64_PACKED_MINERAL_FIFO
     Sc64StageSaveAuth mineral_fifo_auth;
 #endif
@@ -3512,6 +3578,14 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
                                    0,
 #endif
                                    v[2], sc64_gas_site_capacity)) return 0;
+#endif
+#ifdef SC64_GAS_SERVICE_TRIAL
+    plan->gas_queue_tagged = ((unsigned)v[16] & SC64_GAS_QUEUE_SAVE_MARKER) != 0;
+    if (plan->gas_queue_tagged) {
+        Sc64GasSaveContext gas_ctx = {&race_data, (unsigned)width * 16u, (unsigned)height * 16u};
+        if (!sc64_gas_queue_save_decode(&gas_ctx, &race_gas_service_candidate,
+                race_gas_save_read, race_gas_save_write, race_gas_save_eligible)) return 0;
+    }
 #endif
 #ifdef SC64_PACKED_MINERAL_FIFO
     if ((plan->mineral_fifo_auth.features & SC64_STAGE_SAVE_MINERAL_FIFO) &&
@@ -5854,7 +5928,10 @@ static int race_load_game(void) {
     else memset(&mineral_fifo, 0, sizeof(mineral_fifo));
 #endif
 #ifdef SC64_GAS_SERVICE_TRIAL
-    sc64_gas_service_migrate_legacy();
+    if (plan.gas_queue_tagged) {
+        sc64_gas_service_reset();
+        gas_service = race_gas_service_candidate;
+    } else sc64_gas_service_migrate_legacy();
 #endif
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
