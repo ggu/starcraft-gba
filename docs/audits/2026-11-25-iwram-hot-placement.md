@@ -106,9 +106,13 @@ Zerg 1, 2 and 4–9, and Protoss 10.
 | Protoss 10 | 4 | 5,016 | drawing in late Outpost | 2,640 |
 
 The IRQ stack reaches 296 bytes in these runs, 8 below its bound. The numbers are the same
-before and after the relink. Protoss 1–9, Terran 2, Zerg 3 and Zerg 10
-pause saves were not available for this measurement; the static bound
-covers them.
+before and after the relink. The [campaign replay
+audit](2026-11-25-iwram-hot-campaign-replays.md) extends the
+measurement to Protoss 1–9, Terran 2, Zerg 3 and Zerg 10, including
+victory, result and briefing transitions. Its deepest main stack is
+Zerg 3 at 5,720 bytes, 128 under the Zerg bound and 1,696 above the
+relocated code, and the relinked low point equals the previous link's
+at all 5,313 readings.
 
 ## Measured cost
 
@@ -164,6 +168,18 @@ with matching state, pixels and final saves. Their cycle change ranges
 from −0.01% (Zerg 2) to −3.84% (Zerg 7); the lists were tuned on Custom
 Games.
 
+The [campaign replay audit](2026-11-25-iwram-hot-campaign-replays.md)
+replays the recorded routes on both links: 22 missions to victory
+(Terran 1–10, Zerg 1–6 and 8, Protoss 1, 6, 8, 9 and 10), four partial
+routes and three from pause saves, with saves, fresh reloads, victory
+records and next-mission deployments. 71 of 72 finished pairs match
+completely; the Protoss 4 tape, which no longer wins on the current
+ROM, is identical on both links up to the same driver error. Zerg 7
+was still running when this was written. The display control register
+differs at 49 of 15,860 samples, always while a queued page flip is
+pending; the page due on screen and both pages' pixels match
+throughout.
+
 `make` with `SC64_IWRAM_HOT=0` reproduces the `71937af5` Zerg and
 Protoss ROMs byte for byte and the Terran ROM's code and data. The
 relinked ROMs differ from them in the placement of the listed functions,
@@ -171,8 +187,8 @@ their veneers and the ROM offsets that follow.
 
 ## Limits
 
-These are emulator cycle counts. Hardware timing, hardware saves and
-full campaign replays on the relinked ROMs remain open. The Showcase
+These are emulator cycle counts. Hardware timing and hardware saves
+remain open, as does the Zerg 7 replay on the relinked ROM. The Showcase
 ROM and the older mission ROMs keep `gba.ld`. The stack bound depends
 on the ELF's call-frame information, GCC's call graph and
 address-taken record, and the declared nesting of the two cycles per
