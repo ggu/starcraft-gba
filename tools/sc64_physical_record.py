@@ -41,6 +41,11 @@ page at a sample depends on cycle timing, which a relink changes. The compared
 `flip_pending` are logged beside it. A flip that never lands is still caught:
 `gfx_begin` waits for it before drawing, so the frame stops and later samples
 differ.
+
+The recorder assumes a cooperative driver: one that talks to the runner
+through the transport's methods (`set_keys`, `_advance`, `play_to`,
+`export_sram`, `read`). It flags commands written to the runner's text
+stream outside those methods, but not bytes written to its binary buffer.
 """
 from __future__ import annotations
 
@@ -67,6 +72,7 @@ PIXELS = ("display",) + tuple(name for name, _, _ in VIDEO)
 UNCOMPARED_FIELDS = ("sp", "label", "dispcnt", "flip_pending")
 UNCOMPARED_ROWS = ("end", "tool_error")
 READ_TIMEOUT = 120
+FORMAT = 2  # 2: start rows carry the format, end rows the process's export count
 
 
 def sha(data: bytes) -> str:
@@ -134,14 +140,14 @@ class Recorder:
                     # recorded methods may send them; anything else bypasses the record.
                     if not recorder.inside:
                         for line in str(text).splitlines():
-                            if line[:1] in ("K", "U", "c", "s"):
+                            if line[:1] in ("K", "U", "c", "s") or line == "SP":
                                 recorder.emit({"t": "bypass", "proc": rsp._rec["proc"], "command": line[:1]})
                     return stream(text, *args, **kwargs)
                 proc.stdin.write = watched
                 recorder.emit({"t": "start", "proc": rsp._rec["proc"], "label": Path(out).name,
                                "save_in": sha(Path(save_input).read_bytes()) if save_input else None,
                                "saves_out": save_output is not None, "sp": rsp._rec["sp"],
-                               "every": recorder.every})
+                               "every": recorder.every, "format": FORMAT})
                 # Tools end a process by closing stdin or by terminating it: sample before either.
                 for owner, name in ((proc.stdin, "close"), (proc, "terminate"), (proc, "kill")):
                     def ending(*args, _original=getattr(owner, name), **kwargs):
@@ -169,7 +175,12 @@ class Recorder:
         def recorded_advance(self, count):
             while count:
                 n = min(count, recorder.every - self.completed % recorder.every)
-                advance(self, n)
+                try:
+                    advance(self, n)
+                except BaseException as exc:  # the runner may have run part of it
+                    recorder.emit({"t": "advance_error", "proc": self._rec["proc"],
+                                   "at": self.completed, "error": repr(exc)[:300]})
+                    raise
                 count -= n
                 if self.completed % recorder.every == 0:
                     recorder.sample(self, "periodic")
@@ -361,7 +372,11 @@ def gaps(rows: list[dict], every: int | None = None, pixels: tuple[str, ...] = P
         last = ends[0]["at"]
         if closes[0]["at"] != last or mine[-1] is not ends[0] or mine[-2] is not closes[0]:
             problems.append(f"process {proc} final sample is not its last row")
-        if ends[0].get("exports", sum(r["t"] == "sram" for r in mine)) != sum(r["t"] == "sram" for r in mine):
+        if any(r["t"] == "advance_error" for r in mine):
+            problems.append(f"process {proc} failed an advance")
+        # Format-2 records must carry the export count; earlier records did not have it.
+        legacy = sum(r["t"] == "sram" for r in mine) if start.get("format", 1) < 2 else None
+        if ends[0].get("exports", legacy) != sum(r["t"] == "sram" for r in mine):
             problems.append(f"process {proc} lacks rows for some of its exports")
         if any(r["t"] == "bypass" for r in mine):
             problems.append(f"process {proc} was sent commands around the recorder")

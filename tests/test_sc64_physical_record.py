@@ -107,7 +107,7 @@ class FakeReplay(physical.PhysicalReplay):
             return "OK"
         if command[0] == "U":
             count = int(command[1:].split(",")[0])
-            self.ticks += count  # the transport itself advances `completed` from this answer
+            self.ticks += count + getattr(self, "counter_fault", False)  # the transport itself advances `completed` from this answer
             self.history += self.held * count
             return f"STEPS {count} {self.ticks} 0"
         if command == "c":
@@ -311,15 +311,26 @@ class TestPhysicalRecord(unittest.TestCase):
     def test_commands_sent_around_the_recorder_make_the_record_incomplete(self):
         with tempfile.TemporaryDirectory() as tmp:
             sends = [f"rsp.cmd({c!r})" for c in ("K2", "U5,0,0", "c", "s")]
-            sends += ["rsp.cmd(command='c')", "proc.stdin.write('s\\n'); proc.stdout.readline()"]
+            sends += ["rsp.cmd(command='c')", "proc.stdin.write('s\\n'); proc.stdout.readline()",
+                      "rsp.cmd('SP')"]
             for i, send in enumerate(sends):
-                command = send.split("'")[1][0]
+                command = "SP" if "SP" in send else send.split("'")[1][0]
                 with self.subTest(send=send):
                     rows = self.play(Path(tmp) / str(i), ending=f"{send}; proc.stdin.close()")
                     self.assertIn({"t": "bypass", "proc": 0, "command": command[0]}, rows)
                     result = record.compare(rows, rows)
                     self.assertFalse(result["match"])
                     self.assertIn("process 0 was sent commands around the recorder", result["gaps"][0])
+
+    def test_failed_advance_makes_the_record_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = self.play(Path(tmp) / "a", ending=(
+                "rsp.counter_fault = True\ntry:\n    rsp._advance(5)\nexcept RuntimeError:\n    pass\n"
+                "proc.stdin.close()"))
+        self.assertTrue(any(r["t"] == "advance_error" for r in rows))
+        result = record.compare(rows, rows)
+        self.assertFalse(result["match"])
+        self.assertIn("process 0 failed an advance", result["gaps"][0])
 
     def test_emulator_left_running_by_the_tool_is_sampled_and_reaped(self):
         FakeReplay.made.clear()
