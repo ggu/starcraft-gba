@@ -119,14 +119,16 @@ class Matrix(unittest.TestCase):
                     match.matrix(self.args(cases, folder))
             self.assertFalse((Path(folder) / "out").exists())
 
-    def test_the_default_matrix_is_not_empty(self):
-        self.assertTrue(match.QUALIFIED)
-        with tempfile.TemporaryDirectory() as folder:
-            for case in match.QUALIFIED:
-                product, map_id, cpus, *plan = case.split(":")
-                self.assertIn(product, match.PRODUCTS)
-                self.assertIn(map_id, ("0", "1"))
-                match.parse_plan(plan[0] if plan else "")
+    def test_default_matrix_covers_each_race_map_and_opponent_count(self):
+        expected = {(product, map_id, count) for product in match.PRODUCTS
+                    for map_id in match.MAP_NAMES for count in (2, 3)}
+        covered = set()
+        for case in match.QUALIFIED:
+            product, map_id, cpus, *plan = case.split(":")
+            self.assertTrue(all(race in match.RACES for race in cpus))
+            match.parse_plan(plan[0] if plan else "")
+            covered.add((product, int(map_id), len(cpus)))
+        self.assertEqual(covered, expected)
 
 
 class Author(unittest.TestCase):

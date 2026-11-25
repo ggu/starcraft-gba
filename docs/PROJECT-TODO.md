@@ -102,10 +102,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   budgets are verified. Terran 10, Protoss 10, Zerg 7 and Zerg 10 all reached victory
   with finite reserves and fresh-loaded their results. The four candidate
   cartridge builds and their HOST match authors now enable the same rule.
-  Four full custom matches have verified pause continuations and fresh
-  victory loads on the candidate. Finish the remaining lineup checks,
-  including requalifying the Terran three-CPU and Zerg two-CPU Blood Bath
-  openings that lost with their previous controller plans.
+  The four Terran matches and both Zerg Outpost matches have verified
+  pause continuations and fresh victory loads on the candidate. Complete
+  the Protoss and Zerg Blood Bath checks and both Protoss Outpost checks.
+  Add full one-opponent matches on both maps for each human race.
   The conditional native AI bonus still needs an observed qualifying case.
 
 - **Packaged Terran campaign.** All ten missions now have individual

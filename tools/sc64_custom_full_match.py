@@ -66,7 +66,8 @@ MAP_NAMES = {0: "Outpost", 1: "Blood Bath"}
 QUALIFIED: tuple[str, ...] = (
     "terran:0:zpt:PRODUCERS=3",
     "terran:0:tz",
-    "terran:1:zpt:LOBBY_WAIT=8",
+    ("terran:1:zpt:LOBBY_WAIT=8,FIRST_ATTACK=7000,PRODUCERS=3,WORKERS=14,"
+     "TECH_AFTER=2,LAB_AFTER=3,ATTACK_MIN=6,ATTACK_RATIO=3,ATTACK_MARGIN=8"),
     "terran:1:pz:LOBBY_WAIT=8,FIRST_ATTACK=7000",
     "zerg:0:tzp:WORKERS=10,LINE=38",
     "zerg:0:pz:WORKERS=12,LINE=38",
