@@ -1255,8 +1255,48 @@ static inline void gfx_outline_span(volatile u16 *row,int y,int left,int right,u
     if (left < right) *dst = (*dst & 0xff00u) | (u8)color;
 }
 
-/* Draw a full unobstructed outline with one clipping pass. The caller
- * supplies the outer half width of each row, including the two flat ends. */
+static void gfx_outline_symmetric(int x, int y, const u8 *half, int ry, u16 pair)
+{
+    volatile u16 *above = pixels + y * 120;
+    volatile u16 *below = above;
+    int outer = half[0], inner = half[1] + 1;
+    if (inner > outer) inner = outer;
+    gfx_outline_span(above, y, x - outer, x - inner + 1, pair);
+    gfx_outline_span(above, y, x + inner, x + outer + 1, pair);
+    for (int dy = 1; dy < ry; ++dy) {
+        above -= 120;
+        below += 120;
+        outer = half[dy];
+        inner = half[dy + 1] + 1;
+        int left = x - outer, right = x + outer;
+        if (inner >= outer) {
+            GFX_TILE_TOUCH(left, y - dy, left + 1, y - dy + 1);
+            GFX_TILE_TOUCH(right, y - dy, right + 1, y - dy + 1);
+            GFX_TILE_TOUCH(left, y + dy, left + 1, y + dy + 1);
+            GFX_TILE_TOUCH(right, y + dy, right + 1, y + dy + 1);
+            unsigned shift = (left & 1) * 8;
+            unsigned keep = 0xffffu ^ (255u << shift);
+            unsigned ink = (unsigned)(u8)pair << shift;
+            int first = left >> 1;
+            int last = first + outer;
+            above[first] = (above[first] & keep) | ink;
+            above[last] = (above[last] & keep) | ink;
+            below[first] = (below[first] & keep) | ink;
+            below[last] = (below[last] & keep) | ink;
+            continue;
+        }
+        gfx_outline_span(above, y - dy, left, x - inner + 1, pair);
+        gfx_outline_span(above, y - dy, x + inner, right + 1, pair);
+        gfx_outline_span(below, y + dy, left, x - inner + 1, pair);
+        gfx_outline_span(below, y + dy, x + inner, right + 1, pair);
+    }
+    outer = half[ry];
+    gfx_outline_span(above - 120, y - ry, x - outer, x + outer + 1, pair);
+    gfx_outline_span(below + 120, y + ry, x - outer, x + outer + 1, pair);
+}
+
+/* Draw a full unobstructed outline with one clipping pass. The center
+ * half width bounds the other rows, including the two flat ends. */
 void gfx_ellipse_outline_rows(int x,int y,const u8 *half,int ry,int top,int bottom,u8 color)
 {
 #ifdef GBA_SCENE_CLIP
@@ -1271,6 +1311,11 @@ void gfx_ellipse_outline_rows(int x,int y,const u8 *half,int ry,int top,int bott
     if (top >= bottom) return;
     color = GFX_TILE_COLOR(color);
     const u16 pair = color | ((u16)color << 8);
+    if (ry > 0 && top == y - ry && bottom == y + ry + 1 &&
+        x >= half[0] && x + half[0] < 240) {
+        gfx_outline_symmetric(x, y, half, ry, pair);
+        return;
+    }
     volatile u16 *row = pixels + top * 120;
     for (int py = top; py < bottom; ++py, row += 120) {
         int dy = py < y ? y - py : py - y;

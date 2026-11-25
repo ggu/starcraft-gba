@@ -282,3 +282,32 @@ oracles pass. Dense scenes still exceed the two-VBlank budget.
 | P7 visible army | `d8d3e4a3f7a744d9e9bd5dead44d78c279f7f1677d11ebc8e41c440ecd80456b` |
 | Z9 road assault | `a2d01f9b9b83e9ebd3ce651e16d58ea8fa130a56093403b6685070e6e036b63b` |
 | Showcase scenes 0, 5 and 7 | `af2207672ca2ed2fa57e16c32f61c36b7f033b503f0530debafaa8f7e7d54021` / `3c550689a971a284c8e74bc2b8a3fcce8ad1c81da8916171b7ebd243ce9f7de8` / `1448676dc4179d99b1c8c71c9475775afee3226068b4b67a8cfe1d132e05773a` |
+
+## Paired rows in visible selection outlines
+
+With the full ellipse inside the active clip, the center half
+width bounds all rows. Read the inner and outer widths once for
+each pair of rows, preserve the edge lanes, and keep the flat
+top and bottom spans. The clipped path remains active at the
+screen and HUD edges.
+
+Against the thin-edge release, combined frame cycles fall
+1.55% in the P7 visible army and 1.68% in the Z9 road assault
+over 96 updates each. Three Showcase scenes with ordinary
+selection save 0.63–0.86% over 120 updates each. The worlds,
+both framebuffer pages and palettes match. One Showcase sample
+selects the other display page. The tested Z9 save and fresh
+continuation match. The other Z9 sample and panned Z10 Custom
+Game are flat. All four ARM builds keep their memory endpoints.
+The sampled busy scenes remain over the two-VBlank deadline.
+
+The independent host oracle compares 4,836 ellipses against
+individual pixel draws, including full rings, clipped corners,
+flat caps, both destination phases, zero-color aliasing, and the
+tile renderer's dirty, draw and art masks.
+
+| Local receipt | SHA-256 |
+| --- | --- |
+| P7 visible army | `4c9f8bfbfe6731ddaedc0a806ab4026c4bf103b1b47a4c7b680a14bfcb7d58a1` |
+| Z9 road assault | `fb5c457ebe4db01e8d620d50abf3e6c075056b0577e7ec5cc8f35a0698fd298c` |
+| Showcase scenes 0, 5 and 7 | `e1b088b7422890a95255154865f0c0c805ce70efcf816bb02edf7742e443a3cf` / `9b214756c3f406643c11dee947f33708581f7153c00543e54484c79d0ec879a2` / `f4e3ee896231ece5bd72ba84f36215a8f0554b42b2609a379df41edcc6a7a3ee` |

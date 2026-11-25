@@ -101,6 +101,7 @@ void gfx_pixel(int x,int y,u8 color);
 void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif
 void gfx_rect(int x,int y,int w,int h,u8 color);
+/* half[0..ry] contains nonincreasing outer half widths from the center out. */
 void gfx_ellipse_outline_rows(int x,int y,const u8 *half,int ry,int top,int bottom,u8 color);
 /* Opaque meter row with a black divider at the first pixel of each cell. */
 void gfx_meter_row(int x,int y,int width,int fill,u8 filled,u8 empty);
