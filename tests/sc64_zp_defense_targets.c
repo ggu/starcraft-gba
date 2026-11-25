@@ -493,6 +493,36 @@ static void spatial_boundaries_and_ties(void)
 }
 #endif
 
+#if defined(SC64_DEFENSE_PYLON_ROSTER) && defined(SC64_DEFENSE_PYLON_BUCKET_PROBE)
+/* Compare the actual adaptive lookup across its transition and row wrap,
+ * including negative coordinates, owner separation and incomplete Pylons. */
+static void adaptive_pylon_power_matches_scalar(void)
+{
+    static const int counts[] = {0, 1, 23, 24, 25, 69};
+    for (unsigned c = 0; c < sizeof(counts) / sizeof(counts[0]); ++c) {
+        for (int round = 0; round < 12; ++round) {
+            clear_world();
+            for (int i = 0; i < counts[c]; ++i) {
+                b[i] = (Building){ .x=(int)(rnd()%1801)-900,
+                    .y=(int)(rnd()%2401)-1200, .owner=i%5,
+                    .type=B_PYLON, .alive=1, .hp=300, .maxhp=300 };
+            }
+            b[MAX_BUILDINGS-1] = (Building){ .x=0, .y=0, .owner=SIDE,
+                .type=B_PYLON, .alive=1, .under_construction=1 };
+            RaceDefensePylons pylons; pylons.count = -1;
+            for (int i = 0; i < 600; ++i) {
+                int slot = counts[c] ? (int)(rnd() % counts[c]) : MAX_BUILDINGS-1;
+                Building q = { .x=b[slot].x+(int)(rnd()%301)-150,
+                    .y=b[slot].y+(int)(rnd()%201)-100,
+                    .owner=(i%3) ? b[slot].owner : i%5 };
+                assert(race_defense_powered(&pylons, &q) ==
+                       race_site_powered(q.owner, q.x, q.y));
+            }
+        }
+    }
+}
+#endif
+
 #ifdef SC64_DEFENSE_PYLON_ROSTER
 static void pylon_slot_state_at_defense_boundary(void)
 {
@@ -583,6 +613,9 @@ int main(void)
 #endif
 #ifdef SC64_DEFENSE_PYLON_ROSTER
     pylon_slot_state_at_defense_boundary();
+#ifdef SC64_DEFENSE_PYLON_BUCKET_PROBE
+    adaptive_pylon_power_matches_scalar();
+#endif
 #endif
 #if defined(SC64_DEFENSE_SPATIAL_PROBE) && defined(SC64_DEFENSE_PYLON_ROSTER) && \
     defined(SC64_IMPACT_EVENTS)

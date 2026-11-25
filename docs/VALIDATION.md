@@ -8480,3 +8480,43 @@ simulation step, so each mission plays out identically with boxes compiled in or
 tapes didn't change, and `__bss_end` and `__iwram_end` are unchanged in all nine products. These
 are host and mGBA results, not physical hardware results. Commands, per-mission results and what
 didn't run are in [the audit](audits/2026-11-04-text-boxes/README.md).
+
+### Adaptive defense Pylon lookup (2026-11-25)
+
+The defense pass keeps one list per owner for fewer than 24 complete Pylons;
+at 24 it partitions that snapshot into eight hashed 128-pixel rows. Exact
+power geometry still decides the result. The snapshot is rebuilt for each
+pass, after production and mission mutations. `CANONICAL_DEFENSE_PYLON_BUCKETS`
+defaults to 1 for the four imported production products, and may be set to 0
+for paired comparisons. It participates in the canonical build stamp.
+
+On the `d6b2d9880c382a42a4d8495a206ff0dc875de48c` release tree, all four
+control ROMs were rebuilt byte-identically from their recorded ARM command
+vectors, then rebuilt with only the bucket define added. Both variants passed
+the unchanged link guards. IWRAM ends were `0x03004b20` (Terran),
+`0x03004f70` (Z10), `0x03004ea8` (P10), and `0x03004e38` (Showcase),
+with unchanged BSS ends. A host ASan/UBSan differential exercised 43,200
+queries against the scalar rule at Pylon counts 0, 1, 23, 24, 25 and 69,
+including negative coordinates and incomplete Pylons. ARM text increased by
+296, 288, 280, and 304 bytes,
+respectively. For Z10 and P10, byte-identical `-fstack-usage` recompilations
+show the lookup frame increasing from 32 to 56 bytes and its defense callers
+by 32 bytes. This is not a whole-program stack high-water or IRQ bound.
+
+Paired emulator samples of 160 advancing frames each used two dense Z9 saves
+with 69 completed Pylons and two nine-Pylon Z10/P10 Custom Game saves. Mean
+frame cycles fell 1.95%, 1.08%, 0.052%, and 0.042%, respectively. World,
+object, both framebuffer pages and palette hashes matched; saved SRAM and
+fresh-process reloads matched. Display-register sampling differed in two Z10
+frames and one P10 frame. All sampled frames exceeded the 561,792-cycle
+budget. Three Showcase scenes matched state, page and cycle samples over 120
+frames each. A Terran three-CPU Custom Game matched state, pages, saves and
+reloads in stationary and panned 120-frame samples, with one active display
+page timing difference in the panned sample. These bounded windows do not
+establish full-campaign completion, whole-program stack high-water or physical
+hardware performance.
+
+The paired Z9/Z10/P10 receipt SHA-256 is
+`e594eec948eba3f96cdb287aca0c42cf434a64206e913e9efa9d33779ddb6355`;
+the Showcase receipt SHA-256 is
+`92d62710516aa40ef00adc07573ad213c1ca4b3927a2c643a557f3f6ce717fc1`.

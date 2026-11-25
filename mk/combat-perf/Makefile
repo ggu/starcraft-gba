@@ -43,6 +43,8 @@ CANONICAL_PATH_GRID_UPDATE_FLAGS ?= -DSC64_PATH_GRID_INCREMENTAL
 # target lists can also restrict target searches to nearby spatial cells.
 CANONICAL_DEFENSE_CUSTOM_CELLS ?= 1
 CANONICAL_ZP_DEFENSE_OWNER_MASK ?= 1
+# Partition dense Pylon rosters; set to 0 for paired baseline builds.
+CANONICAL_DEFENSE_PYLON_BUCKETS ?= 1
 ifneq ($(CANONICAL_DEFENSE_CUSTOM_CELLS),0)
 ifneq ($(CANONICAL_DEFENSE_CUSTOM_CELLS),1)
 $(error CANONICAL_DEFENSE_CUSTOM_CELLS must be 0 or 1)
@@ -53,11 +55,17 @@ ifneq ($(CANONICAL_ZP_DEFENSE_OWNER_MASK),1)
 $(error CANONICAL_ZP_DEFENSE_OWNER_MASK must be 0 or 1)
 endif
 endif
+ifneq ($(CANONICAL_DEFENSE_PYLON_BUCKETS),0)
+ifneq ($(CANONICAL_DEFENSE_PYLON_BUCKETS),1)
+$(error CANONICAL_DEFENSE_PYLON_BUCKETS must be 0 or 1)
+endif
+endif
 DEFENSE_SPATIAL_FLAGS = -DSC64_DEFENSE_SPATIAL_PROBE -DSC64_DEFENSE_PYLON_ROSTER
 DEFENSE_CUSTOM_CELL_FLAGS = $(DEFENSE_SPATIAL_FLAGS) -DSC64_DEFENSE_CUSTOM_CELLS_PROBE
 CANONICAL_DEFENSE_FLAGS = $(DEFENSE_SPATIAL_FLAGS) \
 	$(if $(filter 1,$(CANONICAL_DEFENSE_CUSTOM_CELLS)),-DSC64_DEFENSE_CUSTOM_CELLS_PROBE) \
-	$(if $(filter 1,$(CANONICAL_ZP_DEFENSE_OWNER_MASK)),-DSC64_DEFENSE_ZP_OWNER_MASK_PROBE)
+	$(if $(filter 1,$(CANONICAL_ZP_DEFENSE_OWNER_MASK)),-DSC64_DEFENSE_ZP_OWNER_MASK_PROBE) \
+	$(if $(filter 1,$(CANONICAL_DEFENSE_PYLON_BUCKETS)),-DSC64_DEFENSE_PYLON_BUCKET_PROBE)
 
 # Exact target-index rebuild and list insertion for the four shipped imported ROMs.
 # Set to 0 for a baseline comparison with the same imported inputs.
@@ -110,7 +118,7 @@ $(error CANONICAL_P10_PADDED_IMPACTS must be 0 or 1)
 endif
 endif
 P10_PADDED_IMPACT_FLAGS = $(if $(filter 1,$(CANONICAL_P10_PADDED_IMPACTS)),-DSC64_P10_PADDED_IMPACT_SAVE)
-CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):batch-dirty$(if $(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS)),:z10-padded-impacts)$(if $(filter 1,$(CANONICAL_P10_PADDED_IMPACTS)),:p10-padded-impacts)
+CANONICAL_TARGET_SETTINGS = $(CANONICAL_TARGET_INDEX):$(CANONICAL_TARGET_POLICY):$(CANONICAL_DEFENSE_CUSTOM_CELLS):$(CANONICAL_ZP_DEFENSE_OWNER_MASK):$(CANONICAL_ARMED_TYPE_TABLE):$(CANONICAL_CONTACT_ROM_AXIS):$(CANONICAL_DEFENSE_PYLON_BUCKETS):batch-dirty$(if $(filter 1,$(CANONICAL_Z10_PADDED_IMPACTS)),:z10-padded-impacts)$(if $(filter 1,$(CANONICAL_P10_PADDED_IMPACTS)),:p10-padded-impacts)
 CANONICAL_TARGET_INDEX_CONFIG := $(if $(shell test -f build/canonical-target-index-config && printf '%s\n' '$(CANONICAL_TARGET_SETTINGS)' | cmp -s - build/canonical-target-index-config && printf matched),,force-canonical-target-index-rebuild)
 .PHONY: force-canonical-target-index-config force-canonical-target-index-rebuild
 force-canonical-target-index-config:
