@@ -34,8 +34,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Wasteland and Desperate Alliance also pass full runs on the Pylon
   release, including fresh pause and result loads.
   The [fogged-viewport build](audits/2026-11-25-fogged-tracer-viewport.md)
-  repeats Terran 1–4 and Protoss 1 and 5 from HOME, with fresh
-  victory readbacks on all six runs.
+  repeats Terran 1–4, Protoss 1 and 5, and Zerg 2 and 8 from HOME,
+  with fresh victory readbacks on all eight runs.
   Use the retained ordinary-input tapes to qualify the rest of the
   combined Terran, Zerg and Protoss package.
   Continue native parity and GBA SP timing.

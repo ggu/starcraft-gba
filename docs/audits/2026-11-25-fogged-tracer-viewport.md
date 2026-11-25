@@ -43,13 +43,17 @@ aligned bytes in Terran and Protoss and stays the same in Zerg and
 Showcase. Setting `SC64_DISABLE_EMPTY_TRACER_VIEW` in the otherwise
 unchanged Protoss compile regenerates the control ROM byte for byte.
 
-The first four Terran missions and Protoss 1 and 5 win from HOME on the
-updated ROMs. Their sampled campaign states and fresh result readbacks
-match earlier successful runs. Terran 1–4 and Protoss 5 also reproduce
-their fresh pause loads. Zerg 10 repeats its late save through victory
-at frame 63,523, with the same input observations and identical fresh
-result readback. The all-mission replay on one release trio and
-physical handheld timing remain open.
+The first four Terran missions, Protoss 1 and 5, and Zerg 2 and 8 win
+from HOME on the updated ROMs. Their sampled campaign states and
+fresh result readbacks match earlier successful runs. Terran 1–4
+and Protoss 5 also reproduce their fresh pause loads. Zerg 2 uses
+the route that wins at frame 10,209 and checks the final and loaded
+states. Zerg 8 matches all 36 checkpoints and wins at frame 86,969.
+Its separate pause-route divergence from the prior release remains
+open. Zerg 10 repeats its late save through victory at frame 63,523,
+with the same input observations and identical fresh result readback.
+The all-mission replay on one release trio and physical handheld
+timing remain open.
 
 | Local receipt | SHA-256 |
 | --- | --- |
@@ -62,3 +66,5 @@ physical handheld timing remain open.
 | Terran 1 full run and Zerg 10 late win | `26c304ac8ca038b042c1191c2f4af6dad48c52bb7b2b5a2da52d4cabd0b12c08` / `9e1d9486d993f9276b40946d8d0a7de0488820b136b1d6ba0f3e6c21ea2fc2c0` |
 | Terran 2, 3 and 4 full runs | `c88c9c0867e8245596832bc37e5b457381baae2d230021342c1747fec2209f27` / `5ecc24e8d777cec49b569eb27141b95b0f86cbffdd46dc7e2f8bffefd0dac422` / `4cf0873db2dd7e384c6b7ffb9803bd931103dd0d06385a0bbbd2cf17edb7f1e8` |
 | Protoss 1 and 5 full runs | `89aa078b92c14a49b0adc9af02daf2c0d684f2928f0783b6855eae92ffad7700` / `dc7ac582d52e5852048015f4f15e7deba707a8ffc6a2441ba44649d53cf4b13e` |
+| Zerg 2 full run | `ef72a9573654cab10a68d3d3f2f0423be7a65e664e9d0f2fe89636de3e527fb6` |
+| Zerg 8 full run and fresh readback | `5d82f90fe1721e3e908e8ce2ca888db0040cee57894deee5166017507242ed0d` / `503a69301237f4d326964f74d76ffb0c53479b0b53428f2f7e4a3fd5778e8ed9` |
