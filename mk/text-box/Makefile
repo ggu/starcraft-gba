@@ -13,3 +13,4 @@ build/test-sc64-text-box: tests/sc64_text_box.c starcraft/sc64_text_box.h common
 test-sc64-text-box: build/test-sc64-text-box
 	./build/test-sc64-text-box
 test-starcraft: test-sc64-text-box
+include mk/ares-capture/Makefile
