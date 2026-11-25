@@ -63,6 +63,23 @@ class LookupMakeTest(unittest.TestCase):
         self.assertFalse(reachable(rules, 'build/starcraft.elf', INDEX))
         self.assertFalse(reachable(rules, 'build/starcraft.elf', CONFIG))
 
+    def test_shipped_products_and_match_authors_follow_lookup_mode(self):
+        vectors = ("TERRAN_ROM_FLAGS", "ZERG_Z10_RELEASE_FLAGS", "PROTOSS_P10_FLAGS",
+                   "SHOWCASE_FLAGS", "CUSTOM_FULL_MATCH_FLAGS_terran", "CUSTOM_FULL_MATCH_FLAGS_zerg",
+                   "CUSTOM_FULL_MATCH_FLAGS_protoss")
+        makefile = "".join(f"$(info {name}=$({name}))\n" for name in vectors)
+        makefile += ".PHONY: show-lookup\nshow-lookup:\n\t@:\n"
+        for mode in (0, 1):
+            result = subprocess.run(["make", "-s", "-f", "Makefile", "-f", "-",
+                                     f"CANONICAL_LOOKUP_INDEX={mode}", "show-lookup"],
+                                    cwd=ROOT, input=makefile, capture_output=True, text=True, check=True)
+            flags = dict(line.split("=", 1) for line in result.stdout.splitlines()
+                         if line.partition("=")[0] in vectors)
+            for name in vectors:
+                with self.subTest(vector=name, mode=mode):
+                    self.assertEqual('SC64_WEAPON_SOURCE_BANK_HEADER="sc64_weapon_source_indexed.h"'
+                                     in flags[name], bool(mode))
+
     def test_path_grid_flag_only_in_four_canonical_vectors(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = Path(directory) / 'vectors.mk'
