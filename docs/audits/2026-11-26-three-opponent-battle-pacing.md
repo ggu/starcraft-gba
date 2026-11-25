@@ -23,6 +23,8 @@ depth renderer. These stages sit inside the simulation and drawing totals.
 Bitmap changes count successive changes to the displayed Mode 4 bitmap,
 resolved through the active palette, sampled at input boundaries. They do
 not count scans of the same bitmap, object overlays or physical LCD response.
+The sampler requires BG2 enabled and forced blank off. It reads untransformed
+bitmap pixels before any affine, window or blending effects.
 
 In the Zerg Blood Bath window, 256 of 256 updates exceeded the 561,792-cycle
 two-VBlank budget. Prioritize orders and actor drawing together. A reduction

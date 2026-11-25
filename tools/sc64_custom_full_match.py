@@ -308,7 +308,7 @@ def at_resume(game: PhysicalGame, trace: dict, label: str) -> None:
 
 def displayed_bitmap(game: PhysicalGame) -> bytes:
     control = int.from_bytes(game.rsp.read(0x04000000, 2), "little")
-    if (control & 7) != 4 or control & 0x80:
+    if (control & 7) != 4 or control & 0x80 or not control & 0x0400:
         raise MatchError("visible-page sampling requires an active Mode 4 bitmap")
     page = 0x0600A000 if control & 16 else 0x06000000
     pixels = game.rsp.read(page, 240 * 160)
@@ -328,6 +328,8 @@ def pace(args) -> dict:
     last = first + args.updates
     if last >= trace["end"]:
         raise MatchError("pacing window reaches the end of the match")
+    if not any(first < tick <= last for tick in trace["checks"]):
+        raise MatchError("pacing window contains no recorded gameplay checkpoint")
     shift, inputs = continuation_tail(trace["inputs"], save["host_tick"])
     counters = ("demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles", "sc64_sight_cycles",
                 "sc64_other_cycles", "sc64_background_cycles", "sc64_unit_draw_cycles", "sc64_hud_cycles")
