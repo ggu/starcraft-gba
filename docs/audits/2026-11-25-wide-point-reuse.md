@@ -41,6 +41,18 @@ pages, displayed pixels, palette, camera and full actor-bank bytes every
 process and matched the control for 256 more updates, including identical
 SRAM. Z9 used the ordinary northern flank save for this check.
 
+The same paired products also continued Z7 from the ordinary battle SRAM
+at replay tick 136,697 to victory at tick 270,585 using physical-button
+inputs. All 45 subsequent host observations and the paired semantic-world
+fingerprints matched. Both ended at frame 267,585 with victory, no loss or
+scenario fault, and no enemy buildings. The terminal SRAM images were
+identical (SHA-256
+`66fec8e5ac2dbd922de486cea21bd45784c92e3b22b741917640a3079d8fce0e`).
+Fresh processes loaded those images through the title-screen L input and
+reproduced the victory state and semantic-world fingerprint, with unchanged
+SRAM on export. These fingerprints cover selected persisted world fields,
+not every transient byte; this is one Z7 continuation, not every campaign.
+
 An earlier build of the probe kept a walkability snapshot. Its
 neutral-input Z7 comparison caught a different display-page bit at update
 496. Both pages, palette and visible pixels matched at that update, and
@@ -53,7 +65,8 @@ linked with the option enabled. P10 has the smallest remaining space below
 the existing EWRAM safety boundary, 2,672 bytes. The branch does not enable
 the probe in release builds. Run `make test-sc64-wide-point-memo` for
 the scalar direction, discovery count, buffer boundary and grid-edit checks.
-Before promotion, qualify longer ordinary-input wide-map campaign runs and the remaining
-memory budget. Both current Custom Game maps are 64×64, outside this
-cache. Keep their ordinary game and save paths in the product checks.
+Before promotion, qualify additional ordinary-input wide-map campaigns and
+the remaining memory budget. Both current Custom Game maps are 64×64,
+outside this cache. Keep their ordinary game and save paths in the product
+checks.
 Physical GBA pacing remains unmeasured.
