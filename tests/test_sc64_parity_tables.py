@@ -313,22 +313,28 @@ class EngineSourceTest(unittest.TestCase):
             (repo / 'private' / 'other.json').write_text('x\n')
             (repo / 'private' / 'link.json').symlink_to(repo / 'private' / 'other.json')
             with self.assertRaises(ValueError):  # any symlink destination: refused
-                pt.write_private(repo, repo / 'private' / 'link.json', 'derived\n')
+                pt.write_private(repo, {repo / 'private' / 'link.json': 'derived\n'})
             self.assertTrue((repo / 'private' / 'link.json').is_symlink())
             with self.assertRaises(ValueError):  # link into a tracked file: refused
-                pt.write_private(repo, repo / 'private' / 'rom-table-diff.json', 'derived\n')
+                pt.write_private(repo, {repo / 'private' / 'rom-table-diff.json': 'derived\n'})
             self.assertEqual((repo / 'tracked.c').read_text(), 'keep\n')
             (repo / 'private' / 'rom-table-diff.json').unlink()
             (repo / 'private' / 'rom-table-diff.json').hardlink_to(repo / 'tracked.c')
-            pt.write_private(repo, repo / 'private' / 'rom-table-diff.json', 'derived\n')
+            pt.write_private(repo, {repo / 'private' / 'rom-table-diff.json': 'derived\n'})
             self.assertEqual((repo / 'tracked.c').read_text(), 'keep\n')  # entry replaced
             self.assertEqual((repo / 'private' / 'rom-table-diff.json').read_text(), 'derived\n')
             (repo / 'linked').symlink_to(repo / 'src', target_is_directory=True)
             (repo / 'src').mkdir()
             with self.assertRaises(ValueError):
-                pt.write_private(repo, repo / 'linked' / 'rom-table-diff.json', 'derived\n')
+                pt.write_private(repo, {repo / 'linked' / 'rom-table-diff.json': 'derived\n'})
             with self.assertRaises(ValueError):
                 pt.check_private(ROOT, repo / 'src' / 'out')
+            # A refused second destination leaves the first report unwritten.
+            (repo / 'private' / 'a.json').write_text('old\n')
+            with self.assertRaises(ValueError):
+                pt.write_private(repo, {repo / 'private' / 'a.json': 'new\n',
+                                        repo / 'private' / 'link.json': 'new\n'})
+            self.assertEqual((repo / 'private' / 'a.json').read_text(), 'old\n')
 
     def test_missing_inputs_skip_cleanly(self):
         with tempfile.TemporaryDirectory() as temp:

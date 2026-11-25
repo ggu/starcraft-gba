@@ -52,11 +52,17 @@ NONE_WEAPON, NONE_UNIT = 130, 228
 PROVENANCE = 'rom-table'
 SCHEMA = 1
 
-# Release ROM flag sets (Makefile variables) whose race rules are compared.
+# Release ROMs whose race rules are compared, as the flag variables their ELF
+# recipes pass to the compiler (mk/terran-normal, tests/sc64-zerg-late,
+# mk/protoss-p10); art-only word flags are left out.
 PROFILES = (
-    ('terran', 'TERRAN_ROM_FLAGS'),
-    ('zerg-z10', 'ZERG_Z10_RELEASE_FLAGS'),
-    ('protoss-p10', 'PROTOSS_P10_FLAGS'),
+    ('terran', ('TERRAN_CARRIER_FLAGS', 'TERRAN_ROM_FLAGS', 'CANONICAL_DEFENSE_FLAGS',
+                'CANONICAL_TARGET_INDEX_FLAGS', 'CANONICAL_TARGET_POLICY_FLAGS')),
+    ('zerg-z10', ('Z10_FACT_FLAGS', 'Z10_CARRIER_FLAGS', 'Z10_PADDED_IMPACT_FLAGS',
+                  'ZERG_Z10_RELEASE_FLAGS', 'CANONICAL_TARGET_INDEX_FLAGS',
+                  'CANONICAL_TARGET_POLICY_FLAGS')),
+    ('protoss-p10', ('P10_PADDED_IMPACT_FLAGS', 'PROTOSS_P10_FLAGS', 'CANONICAL_DEFENSE_FLAGS',
+                     'CANONICAL_TARGET_INDEX_FLAGS', 'CANONICAL_TARGET_POLICY_FLAGS')),
 )
 
 # units.dat, PC Brood War column-major layout (228 rows, 19,876 bytes).
@@ -314,7 +320,10 @@ LAUNCHED_WEAPON = {83: 85, 81: 85}  # Reaver, Warbringer -> Scarab
 DEDICATED_ATTACK = {
     13: ('sc64_t5_mine_adapter.h', ('SC64_T5_RUNTIME',)),
     50: ('sc64_p6_combat_adapter.h', ('SC64_P6_COMBAT_ENABLED',)),
-    73: ('sc64_p7_projectile_adapter.h', ('SC64_P7_BATTERY_ENABLED', 'SC64_CUSTOM_CARRIER_PROBE')),
+    # game.c includes the projectile adapter under SC64_P7_BATTERY_ENABLED or
+    # SC64_CUSTOM_CARRIER_PROBE, which it defines from either Carrier probe.
+    73: ('sc64_p7_projectile_adapter.h', ('SC64_P7_BATTERY_ENABLED', 'SC64_CUSTOM_CARRIER_PROBE',
+                                          'SC64_TERRAN_CARRIER_PROBE', 'SC64_ZERG_CARRIER_PROBE')),
     85: ('sc64_paid_scarab.h', ('SC64_PAID_SCARAB',)),
 }
 
@@ -682,8 +691,9 @@ def profile_flags(root: Path) -> dict:
     # $(info) prints through make itself, so flags holding shell quotes (the
     # audio blob define does) cannot break the command line.
     recipe = 'include Makefile\n.PHONY: parity-print-flags\nparity-print-flags:\n'
-    for name, variable in PROFILES:
-        recipe += f"\t@: $(info parity-flags:{name}=$({variable}))\n"
+    for name, variables in PROFILES:
+        joined = ' '.join(f'$({v})' for v in variables)
+        recipe += f"\t@: $(info parity-flags:{name}={joined})\n"
     output = subprocess.run(['make', '--no-print-directory', '-s', '-f', '-', 'parity-print-flags'],
                             input=recipe, text=True, cwd=root, capture_output=True, check=True).stdout
     flags = {}
@@ -693,11 +703,26 @@ def profile_flags(root: Path) -> dict:
         name, _, value = line[len('parity-flags:'):].partition('=')
         if name in dict(PROFILES):
             # The compiler sees these through a shell: split with its quoting.
-            flags[name] = [x for x in shlex.split(value) if x.startswith('-D')]
+            # Keep defines and forced includes (the Carrier release selector
+            # is one); include paths and code-generation flags do not matter.
+            tokens, kept = shlex.split(value), []
+            for i, token in enumerate(tokens):
+                if token.startswith('-D'):
+                    kept.append(token)
+                elif token == '-include' and i + 1 < len(tokens):
+                    kept += ['-include', str((root / tokens[i + 1]).resolve())]
+            flags[name] = kept
     missing = [name for name, _ in PROFILES if not flags.get(name)]
     if missing:
         raise ValueError('empty profile flags: ' + ', '.join(missing))
     return flags
+
+
+def profile_defines(root: Path, flags: list) -> set:
+    """Every macro the profile defines, forced includes included."""
+    out = subprocess.check_output(['clang', '-dM', '-E', '-x', 'c', *flags, '/dev/null'],
+                                  cwd=root, text=True)
+    return {line.split()[1].split('(')[0] for line in out.splitlines() if line.startswith('#define ')}
 
 
 def enum_names_header(root: Path, flags: list, path: Path) -> None:
@@ -780,7 +805,7 @@ def read_engine(root: Path, work: Path) -> dict:
         enum_names_header(root, flags, names)
         lines = compile_and_run(root, work, name, ['-DPARITY_RULES', f'-DPARITY_NAMES="{names}"', *flags])
         profiles[name] = parse_rule_lines(lines)
-        profiles[name]['defines'] = {x[2:].split('=', 1)[0] for x in flags}
+        profiles[name]['defines'] = profile_defines(root, flags)
         profiles[name]['flags_sha256'] = hashlib.sha256(' '.join(flags).encode()).hexdigest()
     constants = read_constants(root)
     research = engine_research(stock, root, constants)
@@ -837,24 +862,30 @@ def check_private(root: Path, path: Path) -> None:
                 raise ValueError(f'{path} is not ignored by git; ROM-derived output must stay private')
 
 
-def write_private(root: Path, path: Path, text: str) -> None:
-    """Write through a fresh temporary file and rename it into place.
+def write_private(root: Path, outputs: dict) -> None:
+    """Write {path: text} through fresh temporary files renamed into place.
 
-    os.replace swaps the directory entry, so an existing symlink or hard link
-    at the destination is replaced rather than written through."""
-    parent = path.parent.resolve()
-    entry = parent / path.name
-    if entry.is_symlink():
-        raise ValueError(f'{entry} is a symlink; refusing to replace it')
-    check_private(root, parent)
-    # The unresolved entry is what os.replace overwrites; git check-ignore
-    # never reports a tracked entry as ignored, so a tracked one is refused.
-    check_private(root, entry)
-    with tempfile.NamedTemporaryFile('w', dir=path.parent, prefix='.' + path.name + '.',
-                                     delete=False) as f:
-        f.write(text)
-        temp = Path(f.name)
-    os.replace(temp, path)
+    Every destination is validated before any is written, so a refusal leaves
+    the earlier reports untouched. Files are created and renamed inside the
+    resolved directory; os.replace swaps the directory entry, so a hard link at
+    the destination is replaced rather than written through."""
+    planned = []
+    for path, text in outputs.items():
+        parent = path.parent.resolve()
+        entry = parent / path.name
+        if entry.is_symlink():
+            raise ValueError(f'{entry} is a symlink; refusing to replace it')
+        check_private(root, parent)
+        # The unresolved entry is what os.replace overwrites; git check-ignore
+        # never reports a tracked entry as ignored, so a tracked one is refused.
+        check_private(root, entry)
+        planned.append((parent, entry, text))
+    for parent, entry, text in planned:
+        with tempfile.NamedTemporaryFile('w', dir=parent, prefix='.' + entry.name + '.',
+                                         delete=False) as f:
+            f.write(text)
+            temp = Path(f.name)
+        os.replace(temp, entry)
 
 
 def report_lines(result: dict) -> list[str]:
@@ -944,8 +975,8 @@ def run(args) -> int:
         'schema': SCHEMA, 'provenance': PROVENANCE, 'tool': 'tools/sc64_parity_tables.py',
         'engine_commit': commit, 'rom_sha1': EXPECTED_ROM_SHA1,
         'table_sha256': {name: digest for name, (_, digest) in TABLES.items()},
-        'profiles': {name: {'variable': var, 'flags_sha256': engine['profiles'][name]['flags_sha256']}
-                     for name, var in PROFILES},
+        'profiles': {name: {'variables': list(variables), 'flags_sha256': engine['profiles'][name]['flags_sha256']}
+                     for name, variables in PROFILES},
         'normalisation': ['turret weapons from subunit rows', 'hp 8.8 fixed point (integer part)',
                           'shields gated by shield-enable', 'speed = flingy top speed * 4 (Q10)',
                           'times in source frames; engine ticks inverted from (x*5+3)/4'],
@@ -954,8 +985,8 @@ def run(args) -> int:
     }
     for name in engine['profiles']:
         engine['profiles'][name].pop('defines', None)
-    write_private(root, out_dir / 'rom-table-diff.json', json.dumps(document, indent=1) + '\n')
-    write_private(root, out_dir / 'rom-table-diff.txt', '\n'.join(lines) + '\n')
+    write_private(root, {out_dir / 'rom-table-diff.json': json.dumps(document, indent=1) + '\n',
+                         out_dir / 'rom-table-diff.txt': '\n'.join(lines) + '\n'})
     print(f'wrote {out_dir / "rom-table-diff.json"}', file=sys.stderr)
     return 1 if args.fail_on_diff and result['diffs'] else 0
 
