@@ -151,11 +151,12 @@ change (SHA-256 `cc7340a7…5aed177cda`).
 
 The tables above are from `7316734e` with this change. The branch was
 then merged with `codex/source-release`, which by then included the
-IWRAM placement lists. The three race ROMs built from that merge link
-through `common/gba_hot.ld`, pass its stack check (304, 592 and 828
-bytes spare; IRQ stack 264 of 416 bytes) and were captured again in the
-six late windows: every byte equals the replay through the previous
-mixer and decoder, and the means are within 40 cycles of the table in
+IWRAM placement lists. The three race ROMs built from that merge are
+covered in
+[Release checks with the race cartridges relinked](#release-checks-with-the-race-cartridges-relinked).
+Captured again in all six late windows, every byte equals the replay
+through the previous mixer and decoder, and the means are within 40
+cycles of the table in
 [With the IWRAM placement lists](#with-the-iwram-placement-lists).
 
 Every other ROM that links the bank was linked from the merge:
