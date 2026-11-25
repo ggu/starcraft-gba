@@ -84,8 +84,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   each of its four geysers. In the N64 emulator, selecting a geyser in a
   fresh Blood Bath game showed 10,000 gas. Selecting a nearby mineral
   field after workers started harvesting showed 1,492 minerals. The
-  current GBA map descriptor keeps geyser coordinates
-  only, and the worker code gives eight gas per normal trip. Capture the
+  skirmish importer now keeps each source site’s full 32-bit gas quantity
+  in both the map descriptor and private report. Regenerating Blood Bath
+  preserved the four existing coordinates and recorded 10,000 gas at each.
+  The shared worker still awards eight gas per normal trip. Capture the
   N64 depleted-trip yield, then implement remaining gas per map site and
   preserve it through refinery destruction, rebuilding and save/load.
 
