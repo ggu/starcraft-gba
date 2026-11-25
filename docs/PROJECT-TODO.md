@@ -82,6 +82,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Protoss](audits/2026-11-26-gas-saturated-fifo.md),
   [Zerg](audits/2026-11-26-z10-fifo-normal.md).
 
+- **Terran campaign after the Custom Game Larva merge.** The standard
+  cartridge cleared T1–T4 from blank SRAM with ordinary result advances,
+  a fresh mid-mission load in each chapter and identical victory re-exports.
+  Continue T5 from this T4 victory and retain it through T10. The T4
+  main loop averaged 24.60 Hz on this route.
+  [Replay commands, hashes and timing](audits/2026-11-26-terran-linked-opening.md).
+
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
   saves after both. The older P9 tape diverges on both sides of the gas
