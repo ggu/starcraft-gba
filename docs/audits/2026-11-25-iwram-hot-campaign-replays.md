@@ -9,23 +9,22 @@ every campaign route, checkpoint tape and pause save found on this
 machine on the previous-link ROM and the relinked ROM of each race,
 and compares the two runs.
 
-There is no blocking finding. 70 of the 71 finished pairs match
+There is no blocking finding. 71 of the 72 finished pairs match
 completely, and the remaining one, the Protoss 4 tape that no longer
 wins on the packaged ROM, is identical on both ROMs up to the same
-driver error. 21 missions replay in full from HOME or the previous
+driver error. 22 missions replay in full from HOME or the previous
 chapter's victory to victory, and every other mission with a route,
 checkpoint or pause save matches on the evidence it has. The Zerg 7
-and Protoss 9 routes are still running at the time of writing and are
-reported when finished. No stack-tracked relinked run's main stack
-went above the bound of the stricter checker on PR #882 (Terran 7,792,
-Zerg 5,848, Protoss 5,940 bytes) or came within 512 bytes of
-`__iwram_end`. The closest to its bound is Zerg 3: 5,720 bytes, 128
-under. The closest to the code is also Zerg 3, with 1,696 bytes free.
-The IRQ stack reached 296 bytes, against its bound of 304 of 416. The
-relinked ROM's main-stack low-water equals the previous link's at
-every one of the 6,698 marks taken. Stack tracking covered 641,471
-updates of 37 pairs; the other routes are covered by the static bound
-the build checks.
+route is still running at the time of writing and is reported when
+finished. No stack-tracked relinked run's main stack went above the
+bound of the stricter checker on PR #882 (Terran 7,792, Zerg 5,848,
+Protoss 5,940 bytes) or came within 512 bytes of `__iwram_end`. The
+closest to its bound is Zerg 3: 5,720 bytes, 128 under. The closest to
+the code is also Zerg 3, with 1,696 bytes free. The IRQ stack reached
+296 bytes, against its bound of 304 of 416. The relinked ROM's
+main-stack low-water equals the previous link's at every one of the
+6,708 marks taken. Stack tracking covered 641,900 updates of 38 pairs;
+the other routes are covered by the static bound the build checks.
 
 ## ROM pairs
 
@@ -127,14 +126,14 @@ checkpoint continued to victory or a tape that ends before victory.
 | Protoss 6 | full replay | HOME tape to victory, fresh reload at call 65,803 | 94,434 | 6 | 1,251 | 5 | frame 92,986, victory | Protoss 7 at frame 93 | matched |
 | Protoss 7 | partial replay | frame-76,682 pause save, 905 recorded input runs to victory | 6,289 | 6 | 89 | 6 | frame 80,828, victory | Protoss 8 at frame 343 | matched |
 | Protoss 8 | full replay | HOME, one blind tape | 100,641 | 4 | 1,022 | 4 | frame 98,849, victory | Protoss 9 at frame 401 | matched |
-| Protoss 9 | full replay | Protoss 8 victory save, A, then one blind tape | 137,977 | 4 | 1,396 | 4 | frame 134,481, victory | none | matched; handoff still running |
+| Protoss 9 | full replay | Protoss 8 victory save, A, then one blind tape | 137,977 | 6 | 1,406 | 6 | frame 134,481, victory | Protoss 10 at frame 97 | matched |
 | Protoss 10 | full replay | HOME tape to victory, fresh reload at call 31,887 | 54,502 | 5 | 563 | 5 | frame 53,225, victory | Protoss 10 at frame 97 (retry) | matched |
 
 "Route updates" counts the route's own pairs. Processes, samples and
 saves are per ROM and also include the handoff and briefing pairs.
-In all, the 71 finished pairs, routes, handoffs and briefings
-together, ran 1,569,618 updates in 326 emulator processes per ROM and
-compared 16,548 samples and 302 saves; every save written at the same
+In all, the 72 finished pairs, routes, handoffs and briefings
+together, ran 1,570,047 updates in 328 emulator processes per ROM and
+compared 16,558 samples and 304 saves; every save written at the same
 update by the two ROMs is byte-identical.
 
 Notes on individual missions:
@@ -200,7 +199,7 @@ hardware frames have passed since the previous flip. Whether the
 interrupt has run when a sample is taken depends on how many cycles
 the update took, which is what the relink changes. Raw DISPCNT
 therefore differs between the two ROMs at a few samples:
-53 of the 16,548 compared, all inside a pending flip.
+53 of the 16,558 compared, all inside a pending flip.
 
 The recorder compares the page due on screen instead: DISPCNT with
 the page bit flipped while `flip_pending` is set, and logs raw DISPCNT
@@ -247,7 +246,7 @@ Zerg 10; Zerg 9 and Protoss 10 are here as well:
 | Protoss 6 | `p6`, `p6-export`, `p6-export-next` | 123,505 | 2,720 | 5,760 | 5,016 | 5,016 | 5,760 | `gfx_blit_sprite_mapped` | 296 | 180 | 1,896 |
 | Protoss 7 | `p7`, `p7-next`, `p7-brief` | 7,302 | 2,720 | 5,736 | 5,000 | 5,736 | 5,736 | `gfx_blit_sprite` | 296 | 204 | 1,920 |
 | Protoss 8 | `p8`, `p8-next` | 101,058 | 2,720 | 5,736 | 4,968 | 5,736 | 5,736 | `gfx_blit_sprite` | 296 | 204 | 1,920 |
-| Protoss 9 | `p9`, `p9-brief` | 138,545 | 2,720 | 5,760 | 4,968 | 5,736 | 5,760 | `gfx_blit_sprite_mapped` | 296 | 180 | 1,896 |
+| Protoss 9 | `p9`, `p9-next`, `p9-brief` | 138,974 | 2,720 | 5,760 | 4,968 | 5,736 | 5,760 | `gfx_blit_sprite_mapped` | 296 | 180 | 1,896 |
 | Protoss 10 | `p10-next` | 429 | 2,720 | 4,960 | 4,920 | n/a | 4,960 | `gfx_blit_sprite` | 296 | 980 | 2,696 |
 
 Byte counts. Terran 2 is the one Terran mission tracked here; the
@@ -256,7 +255,7 @@ The deepest points are drawing (sprite blitters, weapon effects and
 selection ellipses) and the pause save's `memcpy`. The previous link
 reached the same low-water at every mark. At each process end the
 recorder also finds the lowest non-zero byte between `__iwram_end`
-and the stack top. In all 105 processes it lies at or above the
+and the stack top. In all 107 processes it lies at or above the
 tracked low-water, by 0–68 bytes where the deepest words pushed were
 zero, so the tracked figure is the deeper of the two.
 
