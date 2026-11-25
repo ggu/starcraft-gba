@@ -61,6 +61,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The current Z9 recovery produces a crystal and a full-health carrier on
   the southern approach, but defenders kill it before delivery. The next
   run should clear the delivery area before committing the carrier.
+  Also qualify campaign Overlord transport. The authenticated Z9 scenario
+  allows player 3 to research Ventral Sacs (maximum 1, starting level 0,
+  default costs). The release exposes that research only in Z6 and
+  custom games. Verify mission permissions, paid research, cargo, and
+  SRAM continuation before relying on an airlift for this objective.
 
 - **Combined campaign qualification.** All 30 original missions now have
   ordinary-input victories on recent normal ARM builds. Z7, Z8 and Z10
@@ -111,7 +116,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Native Protoss supply](audits/2026-11-25-waiting-training-supply.md#native-protoss-follow-up)
   now has paired idle refusal and paid waiting at 9/9. The packaged
   P10 build repeats idle refusal, fresh-load queue persistence and
-  resumption after Pylon completion. Verify native Pylon recovery.
+  resumption after Pylon completion. On native Challenger, selecting a
+  Probe at 9/9 exposes its Build command. Verify Pylon placement and
+  recovery from this state.
 
   The packaged Terran ROM at `5f758095` restores a retained pause and
   victory save from earlier builds for each of T1–T10 (20 fresh emulator
@@ -163,8 +170,15 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   spends 396,340 guest cycles per update on depth-ordered actor
   drawing and 152,204 on movement orders. The full packaged Z7 replay
   averages 12.83 emulated main-loop updates/s over 270,585 inputs,
-  including presentation waits and UI. Physical GBA timing remains open. Prioritize those paths for
-  the race cartridges.
+  including presentation waits and UI. For a reproducible campaign
+  performance target, use input ticks 136,697–141,598. Both endpoints
+  are in play and the simulation advances on 4,866 of 4,901 updates.
+  Mean cost is 2,106,169 guest cycles/update (7.97 updates/s); the
+  player's unit count stays at 69 and the observed enemy count falls
+  from 158 to 157. This is the slowest adjacent checkpoint pair with
+  at least 1,000 updates and at least 98% simulation advancement.
+  Profile this interval and verify the same endpoint after optimization.
+  Physical GBA timing remains open.
   On the sprite-row release's paired three-CPU P10 Outpost cut,
   automatic targeting takes 131,032 inclusive cycles per update
   and movement takes 161,711 within orders. The fogged viewport
