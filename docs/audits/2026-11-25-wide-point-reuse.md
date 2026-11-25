@@ -10,7 +10,9 @@ The optional `SC64_WIDE_POINT_MEMO_PROBE` keeps a private full field and
 up to eight exact differences from it. A normal full flood supplies
 each admitted result and its discovery count. A difference packet
 records a byte offset, length and replacement bytes for each run.
-Its maximum size is 384 bytes. Failed admission leaves existing entries
+Each packet is at most 384 bytes. The eight descriptors share a 1,536-byte
+store. A new packet invalidates older descriptors only where their byte
+ranges overlap, or when it replaces their descriptor. Failed admission leaves existing entries
 intact. Rebuilding the walkability grid or resetting routes discards the
 entries. The private cache leaves logical slot selection and eviction
 in the existing route code.
@@ -69,8 +71,8 @@ the bit agreed again on the next update. The rendering code queues a page
 and the VBlank interrupt presents it. Keep checking both page contents and
 visible pixels when comparing execution times.
 
-The current probe adds 9,272 EWRAM bytes on Z10. All four normal products
-linked with the option enabled. P10 has the smallest remaining space below
+The initial fixed-packet probe added 9,272 EWRAM bytes on Z10. All four normal products
+linked with the option enabled. P10 had the smallest remaining space below
 the existing EWRAM safety boundary, 2,672 bytes. The branch does not enable
 the probe in release builds. Run `make test-sc64-wide-point-memo` for
 the scalar direction, discovery count, buffer boundary and grid-edit checks.
@@ -79,3 +81,21 @@ the remaining memory budget. Both current Custom Game maps are 64×64,
 outside this cache. Keep their ordinary game and save paths in the product
 checks.
 Physical GBA pacing remains unmeasured.
+
+
+## Shared packet storage
+
+Nine smaller fixed layouts preserved the 72 sampled world states and both
+framebuffer contents in the 4,901-update Z7 replay. The fastest of them
+used six 256-byte packets and averaged 1,883,507 guest cycles per update.
+The five-by-320 layout presented the opposite completed page at update 34,
+so its visible pixels differed at that sample.
+
+Keeping eight descriptors and sharing 1,536 bytes across their variable
+length packets used 7,756 bytes for the cache and averaged 1,867,971 cycles
+per update. All 72 sampled worlds, both framebuffer pages, selected visible
+pixels, palettes and menus matched. A 1,024-byte store averaged 1,958,789.
+A 2,048-byte store averaged 1,867,956, with a different visible page at two
+samples. The host oracle forces a packet wrap over a live descriptor and
+compares subsequent requests to scalar BFS. It also checks that a change
+of grid dimensions and invalid dimensions each clear a populated cache.
