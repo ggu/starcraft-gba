@@ -479,8 +479,14 @@ SCENARIOS.update(FIELD_SCENARIOS)
 
 LAB_FIELDS = MOVE_FIELDS
 LAB_HP_FIELDS = MOVE_FIELDS + ['unit.hp']
-LAB_ACCEL_FRACTION = 0.9     # acceleration ends at the first 4-frame chord this close to cruise
-LAB_ACCEL_CHORD = 4
+LAB_ACCEL_FRACTION = 0.9     # acceleration ends at the first chord this close to cruise
+LAB_ACCEL_CHORD = 4          # shortest chord, source frames
+LAB_ACCEL_GRID_STEPS = 2     # a chord spans at least this many GBA position steps at cruise:
+LAB_GBA_GRID = 2.0           # N64 px per GBA pixel. A slow mover (an Overlord, 0.84 px a frame)
+                             # moves one GBA pixel every 3-4 frames, so a 4-frame chord holds one
+                             # step or two by phase alone and its reading swung 3 -> 7 -> 11 when
+                             # the start moved a few frames. The N64 side picks the chord from its
+                             # cruise and records it in the golden; the GBA side uses the same one.
 LAB_RANGE_TOLERANCE = 8.0    # N64 px: one GBA pixel each way per axis, plus a movement step's overshoot
 LAB_SETTLE = 20              # source frames a leg must stay still before its end
 LAB_STILL = 8.0              # N64 px a non-subject human unit of the subject's type may drift
@@ -492,23 +498,55 @@ def lab_command_frames(series, marks, names):
     return [n64_command_frame(series, marks[name]) for name in names]
 
 
-def lab_leg(series, uid, t0, t1):
-    """Movement of one leg: from its command frame t0 to the next command (or the end)."""
+def lab_accel_chord(cruise):
+    """Chord length (source frames) for the acceleration reading at this cruise speed."""
+    if cruise <= 0:
+        return LAB_ACCEL_CHORD
+    chord = max(LAB_ACCEL_CHORD, math.ceil(LAB_ACCEL_GRID_STEPS * LAB_GBA_GRID / cruise))
+    # Rounding can leave the product a hair short of two steps: lengthen until it is not.
+    while chord > LAB_ACCEL_CHORD and lab_accel_floor(cruise, chord) < LAB_ACCEL_GRID_STEPS * LAB_GBA_GRID:
+        chord += 1
+    return chord
+
+
+def lab_accel_floor(cruise, chord):
+    """Whole GBA grid steps (N64 px) a constant-speed mover at this cruise covers in a chord."""
+    return LAB_GBA_GRID * math.floor(cruise * chord / LAB_GBA_GRID)
+
+
+def lab_leg(series, uid, t0, t1, chord=None, floor_px=None):
+    """Movement of one leg: from its command frame t0 to the next command (or the end).
+    chord: the acceleration chord in source frames (default: from this leg's cruise);
+    floor_px: the reference's whole-step distance for a lengthened chord (default: this leg's)."""
     points = [p for p in track(series, uid, t0) if t1 is None or p[0] <= t1]
     m = movement(points)
     if m is None:
         return None
-    # Acceleration: first LAB_ACCEL_CHORD-frame chord from the start reaching the cruise fraction.
+    if chord is None:
+        chord = lab_accel_chord(m['cruise'])
+    # Acceleration: first chord from the start reaching the cruise fraction. In a lengthened
+    # (slow mover's) chord a constant-speed mover on the GBA grid covers at least its cruise
+    # distance rounded down to whole grid steps, so that cutoff never asks for more than that;
+    # the shortest chord keeps its plain cutoff and every faster lab reads as before.
+    # The allowance comes from the reference (N64) cruise, so a slightly slower GBA cruise
+    # estimate cannot lower the cutoff to one grid step.
+    need = LAB_ACCEL_FRACTION * m['cruise'] * chord
+    if floor_px is None:
+        floor_px = lab_accel_floor(m['cruise'], chord)
+    if chord > LAB_ACCEL_CHORD:
+        need = min(need, floor_px)
     by_sf = {sf: (x, y) for sf, x, y in points}
     accel = None
-    for sf in range(m['start'] - 1, m['arrive'] - LAB_ACCEL_CHORD + 1):
-        a, b = by_sf.get(sf), by_sf.get(sf + LAB_ACCEL_CHORD)
+    for sf in range(m['start'] - 1, m['arrive'] - chord + 1):
+        a, b = by_sf.get(sf), by_sf.get(sf + chord)
         if a is None or b is None:
             continue
-        if math.hypot(b[0] - a[0], b[1] - a[1]) / LAB_ACCEL_CHORD >= LAB_ACCEL_FRACTION * m['cruise']:
-            accel = sf + LAB_ACCEL_CHORD - m['start']
+        if math.hypot(b[0] - a[0], b[1] - a[1]) >= need:
+            accel = sf + chord - m['start']
             break
     m['accel'] = accel
+    m['accel_chord'] = chord
+    m['accel_floor'] = floor_px
     m['latency'] = m['start'] - t0
     # The subject must be observed alive to the end of the leg, or its settling is unknown.
     end = t1 if t1 is not None else series['frames'][-1]['sf']
@@ -535,15 +573,19 @@ def lab_subject(series, t0, subject_type, human, kind='moved'):
     return movers[0], None
 
 
-def lab_move_measure(series, uid, frames, targets):
+def lab_move_measure(series, uid, frames, targets, chord=None, floor_px=None):
     """targets: the point each leg's order was given at (N64 px). A leg counts only when it
-    settles within LAB_ARRIVE_TOLERANCE of it, so a stop anywhere else never reads as arrival."""
+    settles within LAB_ARRIVE_TOLERANCE of it, so a stop anywhere else never reads as arrival.
+    chord, floor_px: the acceleration chord and whole-step floor for every leg (default: the
+    first leg's, from its cruise)."""
     if len(targets) != len(frames):
         return None, 'one target per leg is needed'
     legs = []
     for k, t0 in enumerate(frames):
         t1 = frames[k + 1] if k + 1 < len(frames) else None
-        leg = lab_leg(series, uid, t0, t1)
+        leg = lab_leg(series, uid, t0, t1, chord, floor_px)
+        if leg is not None and chord is None:
+            chord, floor_px = leg['accel_chord'], leg['accel_floor']
         if leg is None:
             return None, f'leg {k}: the subject never moved after frame {t0}'
         if not leg['observed_to_end']:
@@ -551,7 +593,9 @@ def lab_move_measure(series, uid, frames, targets):
         end = leg['settled_until']   # settling counts only through the last sample seen
         if end - leg['arrive'] < LAB_SETTLE:
             return None, f'leg {k}: the subject was still moving {end - leg["arrive"]} frames before the leg ended'
-        if leg['accel'] is None:
+        if k == 0 and leg['cruise'] <= 0:
+            return None, f'leg {k}: the subject never held a cruise speed'
+        if leg['accel'] is None and k == 0:   # only the first leg's reading gates
             return None, f'leg {k}: the subject never reached {LAB_ACCEL_FRACTION:.0%} of its cruise speed'
         miss = math.hypot(leg['end'][0] - targets[k][0], leg['end'][1] - targets[k][1])
         if miss > LAB_ARRIVE_TOLERANCE:
@@ -559,10 +603,18 @@ def lab_move_measure(series, uid, frames, targets):
                           f'{tuple(targets[k])} (allowed {LAB_ARRIVE_TOLERANCE})')
         leg['target_miss'] = round(miss, 2)
         legs.append(leg)
+    # The cruise band spans the legs that held a cruise: a later leg too short to (one that
+    # settles after a few moving frames reads cruise 0 or never reaches the cruise fraction)
+    # is left out, so it cannot drop the band's lower bound. Leg 0 always counts (gated above).
+    band = [leg for leg in legs if leg['cruise'] > 0 and leg['accel'] is not None]
     result = {'legs': [{k: (list(v) if isinstance(v, tuple) else v) for k, v in leg.items()} for leg in legs],
               'cruise': legs[0]['cruise'], 'accel': legs[0]['accel'], 'duration': legs[0]['duration'],
               'latency': legs[0]['latency'],
-              'cruise_min': min(leg['cruise'] for leg in legs), 'cruise_max': max(leg['cruise'] for leg in legs)}
+              'cruise_min': min(leg['cruise'] for leg in band), 'cruise_max': max(leg['cruise'] for leg in band),
+              'accel_chord': chord, 'accel_floor': floor_px}
+    left_out = [k for k, leg in enumerate(legs) if not (leg['cruise'] > 0 and leg['accel'] is not None)]
+    if left_out:
+        result['cruise_left_out'] = left_out
     if len(legs) > 1:
         # The turn costs whatever the reversal adds to the start latency; input lag cancels.
         result['turn_cost'] = legs[1]['latency'] - legs[0]['latency']
@@ -575,10 +627,12 @@ def lab_move_observations(m, name):
     obs = [
         observation('lab.cruise_speed', name, m['cruise'], m['cruise_min'] * (1 - MOVE_SPEED_TOLERANCE),
                     m['cruise_max'] * (1 + MOVE_SPEED_TOLERANCE), f'N64 range over both legs widened by '
-                    f'{MOVE_SPEED_TOLERANCE:.0%}', True, LAB_FIELDS, unit='N64 px per source frame'),
+                    f'{MOVE_SPEED_TOLERANCE:.0%}' + (
+                        f'; leg {", ".join(map(str, m["cruise_left_out"]))} left out: it never held a cruise speed'
+                        if m.get('cruise_left_out') else ''), True, LAB_FIELDS, unit='N64 px per source frame'),
         observation('lab.accel_frames', name, m['accel'], m['accel'] - t, m['accel'] + t, f'+-{t} source frames', True,
-                    LAB_FIELDS, unit=f'source frames from the first movement to a {LAB_ACCEL_CHORD}-frame chord at '
-                    f'{LAB_ACCEL_FRACTION:.0%} of cruise'),
+                    LAB_FIELDS, unit=f'source frames from the first movement to a {m.get("accel_chord", LAB_ACCEL_CHORD)}'
+                    f'-frame chord at {LAB_ACCEL_FRACTION:.0%} of cruise'),
         observation('lab.leg_duration', name, m['duration'], m['duration'] - t, m['duration'] + t, f'+-{t} source frames',
                     True, LAB_FIELDS, unit='source frames from the first movement to arrival, first leg'),
         observation('lab.start_latency', name, m['latency'], m['latency'] - t, m['latency'] + t,
@@ -642,6 +696,7 @@ def lab_move_n64(spec):
             else:
                 cmds.append([step, 0, px // 2, py // 2])
         gba = {'scenario': spec['runner'], 'profile': spec['profile'], 'at_step': steps[0], 'cmds': cmds,
+               'accel_chord': m['accel_chord'], 'accel_floor': m['accel_floor'],
                'steps': steps[-1] + int((m['legs'][-1]['latency'] + m['legs'][-1]['duration'] + 60) * 5 / 4) + 10}
         if spec.get('relative'):
             gba['subject_raw'] = spec['subject_type']
@@ -672,7 +727,28 @@ def lab_move_gba(spec):
         if any(len(entry) < 6 for entry in issued):
             return None, 'the runner did not report where it issued its orders'
         targets = [(2 * entry[4], 2 * entry[5]) for entry in issued]
-        m, err = lab_move_measure(series, uid, frames, targets)
+        # The N64 side's chord. Goldens from decoder revision 1 predate it and used the
+        # shortest; a later golden must carry a valid one.
+        params = golden['gba']
+        revision = golden.get('decoder_revision', 1)
+        if type(revision) is not int or revision < 1:
+            return None, f'the golden has a malformed decoder revision ({revision!r})'
+        if revision == 1 and 'accel_chord' not in params and 'accel_floor' not in params:
+            chord, floor_px = LAB_ACCEL_CHORD, 0.0   # the shortest chord never uses the floor
+        else:
+            chord, floor_px = params.get('accel_chord'), params.get('accel_floor')
+        if type(chord) is not int or not LAB_ACCEL_CHORD <= chord <= 10000:
+            return None, f'the golden has no valid acceleration chord ({chord!r})'
+        # A lengthened chord's floor is whole grid steps covering at least two of them, as
+        # lab_accel_chord guarantees; anything less would let one step pass for cruise.
+        floor_ok = (type(floor_px) in (int, float) and -1 < floor_px < 1e6 and
+                    math.isfinite(floor_px) and floor_px >= 0)
+        if floor_ok and chord > LAB_ACCEL_CHORD:
+            steps = floor_px / LAB_GBA_GRID
+            floor_ok = steps == int(steps) and steps >= LAB_ACCEL_GRID_STEPS
+        if not floor_ok:
+            return None, f'the golden has no valid acceleration floor ({floor_px!r})'
+        m, err = lab_move_measure(series, uid, frames, targets, chord, float(floor_px))
         if err:
             return None, err
         values = {'lab.cruise_speed': m['cruise'], 'lab.accel_frames': m['accel'], 'lab.leg_duration': m['duration'],
@@ -979,6 +1055,9 @@ for _spec in LAB_SPECS:
     # run of a bundle must agree on them (tools/parity_decode.py write_golden).
     SCENARIOS[_spec['id']] = {'title': _spec['title'], 'measure_n64': _make[0](_spec), 'measure_gba': _make[1](_spec),
                               'profile': _spec['profile'], 'runner': _spec['runner'], 'world_points': True}
+    if _spec['kind'] == 'move':
+        # 2: the acceleration chord spans two GBA position steps at the N64 cruise (gba.accel_chord).
+        SCENARIOS[_spec['id']]['decoder_revision'] = 2
 
 
 # ---- passive train and build lab (Blood Bath computers) ---------------------
