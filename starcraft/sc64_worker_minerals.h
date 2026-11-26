@@ -4,6 +4,18 @@
 
 enum { SC64_MINERAL_SEARCH_RADIUS = 192 };
 
+/* Engine updates a worker spends at a mineral field before it holds cargo.
+ * StarCraft 64 keeps a worker in its mining order for 82 source frames on
+ * most trips (Blood Bath parity capture bb-income: 84 of 117 Drone and SCV
+ * trips, the rest 76-85), from a 75-tick native timer plus order polling.
+ * 102 updates are 81.6 source frames at 5 updates per 4 frames. The
+ * original-art profile keeps its own 45-update pace. */
+#ifdef SC64_IMPORTED_MISSION
+enum { SC64_MINERAL_GATHER_UPDATES = 102 };
+#else
+enum { SC64_MINERAL_GATHER_UPDATES = 45 };
+#endif
+
 #ifdef SC64_MINERAL_PATCH_CONTENTION_PROBE
 /* Slot plus one, rebuilt for each order pass. Multiple partial timers can
  * exist in older saves. The lowest eligible slot takes the patch first;
@@ -126,7 +138,7 @@ worker_gather_ready(Unit *q)
         *claim = (u8)(slot + 1u);
     }
 #endif
-    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? 45 : 60;
+    if (!q->work_timer) q->work_timer = q->order == ORDER_MINE ? SC64_MINERAL_GATHER_UPDATES : 60;
     return --q->work_timer == 0;
 }
 

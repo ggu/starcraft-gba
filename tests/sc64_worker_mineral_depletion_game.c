@@ -22,7 +22,7 @@ static void continuation_scene(int race, int worker_type, int depot_type)
     assert(u[w].order == ORDER_MINE && u[w].target == 3);
     assert(m[3].amount == 24 && minerals == 5);
     u[w].x = 216; u[w].y = 200;
-    for (int tick = 0; tick < 80 && !u[w].carry; ++tick) one_tick();
+    for (int tick = 0; tick < SC64_MINERAL_GATHER_UPDATES + 35 && !u[w].carry; ++tick) one_tick();
     assert(u[w].carry == 8 && m[3].amount == 16);
     /* A deliberate Stop never restarts work. */
     u[w].selected = 1;

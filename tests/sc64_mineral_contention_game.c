@@ -60,7 +60,7 @@ static void held_and_waiting(void)
     tick();
     assert(u[incumbent].carry == 8 && u[waiter].work_timer == 0);
     tick();
-    assert(u[waiter].work_timer == 44);
+    assert(u[waiter].work_timer == SC64_MINERAL_GATHER_UPDATES - 1);
 
     reset_scene();
     incumbent = miner(0, 2);
@@ -85,7 +85,7 @@ static void held_and_waiting(void)
     incumbent = miner(0, 0);
     waiter = miner(0, 0);
     tick();
-    assert(u[incumbent].work_timer == 44 && u[waiter].work_timer == 0);
+    assert(u[incumbent].work_timer == SC64_MINERAL_GATHER_UPDATES - 1 && u[waiter].work_timer == 0);
 }
 
 static void free_reachable_alternate(void)
