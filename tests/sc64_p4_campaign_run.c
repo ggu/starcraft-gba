@@ -1403,8 +1403,11 @@ int main(int argc, char **argv)
                 for (int i = 0; i < MAX_UNITS; ++i)
                     if (u[i].alive && owners_hostile(SIDE, u[i].owner) &&
                         dist2(u[i].x, u[i].y, escape_x, escape_y) < 400 * 400) ++exit_hostiles;
+                /* A hostile outside the escort's reach can stay inside the
+                 * scan indefinitely. Once the escort is in position late in
+                 * the mission, use the existing safe route for the heroes. */
                 if (dist2(army_x, army_y, escape_x, escape_y) <= 360 * 360 &&
-                    !exit_hostiles && frame >= next_solo_hero_order) {
+                    (!exit_hostiles || frame >= 64000) && frame >= next_solo_hero_order) {
                     int force = !heroes_final_advance;
                     heroes_final_advance = 1;
                     int moved_t = issue_hero_escape_segment(tassadar, force);

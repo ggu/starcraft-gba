@@ -13,7 +13,7 @@ import struct
 from sc64_carrier_release_physical import slot
 from sc64_p8_physical_save import P10_CARGO_TAGS, SLOT_SIZE
 from sc64_races_profile import dwarf_struct_layout
-from sc64_skirmish_sram_continuation import KEY_B, KEY_L, KEY_START, PhysicalGame, entity_rows
+from sc64_skirmish_sram_continuation import KEY_A, KEY_B, KEY_L, KEY_START, PhysicalGame, entity_rows
 from sc64_z7_normal_replay import input_hashes, require_unchanged
 
 
@@ -72,6 +72,10 @@ def plan(trace, pages, mission):
 
 def run(args):
     names = ("trace", "pages", "rom", "elf", "runner")
+    require(bool(args.linked_seed) == bool(args.linked_seed_sha256),
+            "linked replay needs a seed and its SHA-256")
+    if args.linked_seed:
+        names += ("linked_seed",)
     files = tuple(getattr(args, k) for k in names) + (Path(__file__),)
     hashes = input_hashes(files)
     for name, path in zip(names, files):
@@ -80,6 +84,7 @@ def run(args):
     stop, edges, checks, briefs, modals = plan(json.loads(args.trace.read_text()), args.pages.read_text(), mission)
     cut = args.fresh_save_call
     if cut is not None:
+        require(args.linked_seed is None, "pause cut requires a HOME-start replay")
         require(mission in (23, 25) and cut in checks and checks[cut]["screen"] == 1
                 and checks[cut]["mode"] == 0 and checks[cut]["kind"] == "periodic"
                 and all(not tick <= cut <= tick + 2 for tick in modals)
@@ -107,12 +112,17 @@ def run(args):
         return PhysicalGame(args.runner, args.rom, args.elf, directory, **save)
 
     save_path = args.out / "saved.sav"
-    g = open_game("guest", save_output=save_path if cut is not None else None)
+    victory_path = args.out / "victory.sav"
+    if args.linked_seed:
+        g = open_game("guest", save_input=args.linked_seed, save_output=victory_path)
+    else:
+        g = open_game("guest", save_output=save_path if cut is not None else None)
     r = g.rsp
     observations = []
     briefing_seen, dialogue_seen = [], []
     timing_start = r.clock()
     prior_cycles, offset, journal = 0, 0, None
+    carried = 0
 
     def scalar(name):
         return int.from_bytes(r.read(g.sym[name], g.sizes[name]), "little")
@@ -173,6 +183,26 @@ def run(args):
             modal_edges[tick + phase].append((phase, row))
     try:
         require(scalar("screen") == scalar("frame") == g.front_field("page") == 0, "not fresh HOME")
+        if args.linked_seed:
+            for key in (0, 0, KEY_L, 0):
+                g.step(key)
+            carried = scalar("race_completed")
+            require(scalar("screen") == 3 and scalar("won") == 1 and scalar("lost") == 0
+                    and scalar("race_selected_mission") == mission - 1
+                    and carried & (1 << (mission - 1)),
+                    "linked seed did not restore the preceding campaign victory")
+            g.step(KEY_A)
+            require(scalar("screen") == 1 and scalar("frame") == 0
+                    and scalar("race_selected_mission") == mission,
+                    "RESULT A did not enter the target mission at frame zero")
+            first = min(checks)
+            require(checks[first]["frame"] == 1
+                    and dict(edges).get(first - 2) == KEY_A
+                    and dict(edges).get(first - 1) == 0,
+                    "HOME tape has no matching final briefing input")
+            offset = r.completed - (first - 1)
+            edges = [(tick + offset, key) for tick, key in edges if tick >= first - 1]
+            caps -= set(briefs)
         for tick in sorted(caps):
             require(shutil.disk_usage(args.out).free >= int(4.15 * 2**30), "disk floor")
             r.play_to(tick + offset, edges)
@@ -243,19 +273,43 @@ def run(args):
         require(terminal["screen"] == 3 and terminal["won"] == 1 and terminal["lost"] == 0
                 and terminal["completed"] & (1 << mission) and terminal["mission"] == mission
                 and terminal["campaign_mission"] == mission and terminal["unsupported"] == 0
-                and terminal["phase"] == 3 and len(briefing_seen) == len(briefs)
+                and terminal["phase"] == 3 and terminal["completed"] & carried == carried
+                and (args.linked_seed or len(briefing_seen) == len(briefs))
                 and len(dialogue_seen) == len(modals), f"incomplete terminal state: {terminal}")
+        cycles = prior_cycles + r.clock() - timing_start
+        calls = stop + offset if args.linked_seed else stop
+        if args.linked_seed:
+            expected = persisted_world()
+            g.step(0)
+            r.export_sram()
+            image = victory_path.read_bytes()
+            require(len(image) == 32768, "victory SRAM has the wrong length")
+            g.close()
+            g = None
+            readback = args.out / "readback.sav"
+            g = open_game("fresh-victory", save_input=victory_path, save_output=readback)
+            r = g.rsp
+            require(scalar("screen") == scalar("frame") == g.front_field("page") == 0,
+                    "victory reload did not start at fresh HOME")
+            g.step(KEY_L)
+            require(persisted_world() == expected and scalar("race_completed") == terminal["completed"],
+                    "fresh HOME L changed the winning world, controls, runtime or completion")
+            g.step(0)
+            r.export_sram()
+            require(readback.read_bytes() == image, "victory readback SRAM changed")
+            terminal["victory_readback_sha256"] = hashlib.sha256(image).hexdigest()
         require_unchanged(files, hashes)
         if cut is not None:
             require(journal and hashlib.sha256(save_path.read_bytes()).hexdigest() == journal["sha256"],
                     "SRAM changed during continuation")
-        cycles = prior_cycles + r.clock() - timing_start
-        result = dict(result="won", mission=mission, calls=stop, cycles=cycles, updates_per_second=stop*16777216/cycles,
+        result = dict(result="won", mission=mission, calls=calls, cycles=cycles, updates_per_second=calls*16777216/cycles,
                       observations=observations, terminal=terminal, briefing=briefing_seen, dialogue=dialogue_seen, sha256=hashes)
+        if args.linked_seed:
+            result.update(tape_calls=stop, carried_completed=carried)
         if journal is not None:
             result["fresh_save"] = journal
         (args.out / "result.json").write_text(json.dumps(result, indent=2) + "\n")
-        return dict(calls=stop, checks=len(observations), briefing=len(briefs), dialogue=len(modals), rate=result["updates_per_second"])
+        return dict(calls=calls, checks=len(observations), briefing=len(briefing_seen), dialogue=len(dialogue_seen), rate=result["updates_per_second"])
     except Exception as exc:
         (args.out / "divergence.json").write_text(json.dumps(dict(call=locals().get("tick"), error=str(exc),
             sha256=hashes, observations=observations, briefing=briefing_seen, dialogue=dialogue_seen), indent=2)+"\n")
@@ -272,6 +326,8 @@ if __name__ == "__main__":
         cli.add_argument("--" + name, type=Path, required=True)
         cli.add_argument("--" + name + "-sha256", required=True)
     cli.add_argument("--out", type=Path)
+    cli.add_argument("--linked-seed", type=Path, help="preceding chapter's winning SRAM")
+    cli.add_argument("--linked-seed-sha256")
     cli.add_argument("--plan", action="store_true")
     cli.add_argument("--fresh-save-call", type=int, help="pause, save, and reload at a neutral P4 or P6 checkpoint")
     cli.add_argument("--quiet-guest", action="store_true", help="discard emulator log chatter")
