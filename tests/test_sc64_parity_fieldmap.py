@@ -262,6 +262,12 @@ class TableAnchor(unittest.TestCase):
         self.assertEqual(found[0]['status'], 'ambiguous')
         found = fm.anchor_columns(copy + struct.pack('>2H', 1, 2) + b'\0' * 4, columns)
         self.assertEqual((found[0]['status'], found[0]['address']), ('equal', f'{fm.RAM_BASE:08x}'))
+        # Two copies tie through the look-ahead and differ later: the rest stays unresolved.
+        columns5 = columns + [('t.c', 'B', 4, bytes([8, 9, 10, 11])), ('t.d', 'B', 4, bytes([1, 1, 1, 1])),
+                              ('t.e', 'B', 4, bytes([2, 2, 2, 2]))]
+        head = struct.pack('>2H', 1, 2) + bytes([4, 5, 6, 7, 8, 9, 10, 11, 1, 1, 1, 1])
+        found = fm.anchor_columns(head + bytes([2] * 4) + head + bytes([3] * 4), columns5)
+        self.assertEqual([f['status'] for f in found], ['ambiguous'] + ['unresolved'] * 4)
         # A decoy too close to the end of RAM for the rest of the table never wins.
         found = fm.anchor_columns(copy + b'\xEE' * 4 + struct.pack('>2H', 1, 2) + bytes([4, 5]), columns)
         self.assertEqual(found[0]['address'], f'{fm.RAM_BASE:08x}')
@@ -410,6 +416,8 @@ class ExtraJoin(unittest.TestCase):
         self.assertFalse(capture.budget_acknowledged('pokes=0 output_written=5\n', 8589934592))
         self.assertFalse(capture.budget_acknowledged('x output_budget=8589934592\npokes=0 output_budget=1\n', 8589934592))
         self.assertFalse(capture.budget_acknowledged('pokes=0 output_budget=1 output_budget=8589934592\n', 8589934592))
+        self.assertFalse(capture.budget_acknowledged('pokes=0 output_written=8589934593 output_budget=8589934592\n',
+                                                     8589934592))
 
     def test_fog_needs_one_region_of_its_size(self):
         with tempfile.TemporaryDirectory() as d:

@@ -539,15 +539,22 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
     def next_matches(name, at):
         return corroboration(name, at, 1) == 1
 
+    unresolved = set()   # tables whose base two spots could hold equally
     for name, fmt, rows, raw in columns:
         table = name.split('.')[0]
         size = len(raw)
+        if table in unresolved:
+            out.append({'column': name, 'status': 'unresolved', 'address': None,
+                        'note': 'the table base is ambiguous'})
+            continue
         expected = previous.get(table)
         # Columns that pack u16 halves (placement, addon, dimensions: 'I' and 'Q') may be stored
         # per u16; every other column only as big-endian values.
         candidates = (('be', big_endian(fmt, raw)),) + ((('u16', per_u16(raw)),) if name in PACKED_U16 else ())
         found = None
         hint = hints.get(name) if expected is None else None
+        if hint is not None and hint + suffix[name] > len(ram):
+            hint = None   # the whole table must fit at the layout's base
         if hint is not None and next_matches(name, align(hint + size)):
             expected = hint   # the next column confirms the layout's base: judge this column there
         if expected is not None:
@@ -557,6 +564,8 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                           if ram[expected:expected + size] == blob), None)
         else:
             hint = hints.get(name)
+            if hint is not None and hint + suffix[name] > len(ram):
+                hint = None
             for enc, blob in candidates:
                 if hint is not None and ram[hint:hint + size] == blob:
                     found = (enc, hint, ram.count(blob))
@@ -578,6 +587,8 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
             encoding, at, count = found[:3]
             # A base two equally corroborated spots could hold is not a clean match.
             status = 'ambiguous' if 'ambiguous' in found[3:] else 'equal'
+            if status == 'ambiguous':
+                unresolved.add(table)   # later columns of this table cannot be placed either
             out.append({'column': name, 'address': f'{RAM_BASE + at:08x}', 'status': status, 'encoding': encoding,
                         'occurrences': count})
             previous[table] = align(at + size)
@@ -893,8 +904,9 @@ def t3_measure_n64(cap, marks):
     ticks = [r for r in cap.ticks if r['table']]
     clock = tick_clock(ticks)
     bullet_pool = cap.layout.pool('bullet', gating=False)
-    bullet_index = next((i for i, (a, n) in enumerate(cap.regions)
-                         if n == bullet_pool['records'] * bullet_pool['record_bytes']), None)
+    want = (int(bullet_pool['address'], 16), bullet_pool['records'] * bullet_pool['record_bytes'])
+    bullet_index = [i for i, region in enumerate(cap.regions) if tuple(region) == want]
+    bullet_index = bullet_index[0] if len(bullet_index) == 1 else None   # exactly the layout's pool
     player_index = next((i for i, (a, n) in enumerate(cap.regions) if a == PLAYER_REGION), None)
     if bullet_index is None or player_index is None:
         raise SystemExit('t3-opening: the capture does not record the bullet pool and the player arrays')

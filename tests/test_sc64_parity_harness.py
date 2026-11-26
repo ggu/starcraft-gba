@@ -306,6 +306,17 @@ class Golden(unittest.TestCase):
             rows = sc64_parity.judge('t1-move', partial, {'move.cruise_speed': 4.0}, {}, {}, parity_decode.Layout(added))
             self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
 
+    def test_pool_reads_need_the_current_chain_format(self):
+        layout = parity_decode.Layout()
+        obs = {'check': 'x.a', 'subject': 's', 'value': 1, 'lo': 0, 'hi': 2, 'gating': True, 'n_runs': 2,
+               'provenance': 'n64-ram', 'tolerance': '1', 'layout_fields': ['pool.fog_tiles'],
+               'layout_reads': ['pool.fog_tiles'], 'layout_proven': ['pool.fog_tiles'],
+               'layout_fields_sha256': layout.fields_digest(['pool.fog_tiles'])}
+        old = {'bundle': {}, 'observations': [obs]}
+        new = {'bundle': {'chain_format': 2}, 'observations': [obs]}
+        self.assertEqual(sc64_parity.judge('demo', old, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'STALE-GOLDEN')
+        self.assertEqual(sc64_parity.judge('demo', new, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'PASS')
+
     def test_staged_tag_reaches_each_row(self):
         golden = {'tags': ['n64-staged'], 'observations': [
             {'check': 'x.a', 'subject': 's', 'value': 1, 'lo': 0, 'hi': 2, 'gating': True, 'n_runs': 2,

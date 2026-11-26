@@ -187,6 +187,9 @@ def stale(obs, golden, layout):
     if layout is None:
         return False
     want = obs.get('layout_fields_sha256')
+    if any(k.startswith('pool.') for k in obs.get('layout_reads', [])) and \
+            golden.get('bundle', {}).get('chain_format') != 2:
+        return True   # extra-region decoding needs the chain that binds regions and table offsets
     if want is None or 'layout_reads' not in obs or (obs.get('gating') and 'layout_proven' not in obs):
         # Before per-field digests, or before they covered every read: the whole layout must match.
         return golden.get('layout_sha256') != layout.sha256
