@@ -423,7 +423,8 @@ static int sc64_range_route_usable_slots(void);
 #endif
 #if defined(SC64_FACILITY_FRONTIERS_PROBE) && defined(SC64_DEPOT_BOUNDED) && \
     defined(SC64_ROUTE_ACTIVE_STRIDE) && defined(SC64_GRID_SET) && \
-    !defined(SC64_ROUTE_FACILITY_FIFO_PROBE) && \
+    (!defined(SC64_ROUTE_FACILITY_FIFO_PROBE) || \
+     defined(SC64_ROUTE_FACILITY_FIFO_WIDE_ONLY)) && \
     SC64_ROUTE_GRID_CELLS_PER_BYTE == 8
 #define SC64_FACILITY_FRONTIERS 1
 #if defined(SC64_Z7_RUNTIME) && !defined(SC64_Z8_RUNTIME)
