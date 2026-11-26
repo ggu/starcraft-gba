@@ -666,6 +666,7 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         'gba': result['gba'], 'notes': result.get('notes', []) + ([note] if note else []),
         # A capture that wrote guest memory ("poke", owner decision 2026-11-26) is staged evidence.
         'tags': ['n64-staged'] if staged else [],
+        'decoder_revision': spec.get('decoder_revision', 1),
         'bundle': {
             'runs': [c.run.name for c in caps], 'chain': caps[0].chain, 'seed': caps[0].seed(),
             'run_ids': [c.manifest['run_id'] for c in caps],

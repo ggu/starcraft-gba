@@ -316,6 +316,15 @@ class Golden(unittest.TestCase):
         new = {'bundle': {'chain_format': 2}, 'observations': [obs]}
         self.assertEqual(sc64_parity.judge('demo', old, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'STALE-GOLDEN')
         self.assertEqual(sc64_parity.judge('demo', new, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'PASS')
+        legacy = dict(obs)
+        for key in ('layout_reads', 'layout_proven', 'layout_fields_sha256'):
+            del legacy[key]
+        whole = {'layout_sha256': layout.sha256, 'bundle': {}, 'observations': [legacy]}
+        self.assertEqual(sc64_parity.judge('demo', whole, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'STALE-GOLDEN')
+        # A golden from an older decoder revision of its scenario is stale.
+        self.assertEqual(metrics.SCENARIOS['t3-opening']['decoder_revision'], 2)
+        older = {'bundle': {'chain_format': 2}, 'decoder_revision': 1, 'observations': [obs]}
+        self.assertEqual(sc64_parity.judge('t3-opening', older, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'STALE-GOLDEN')
 
     def test_staged_tag_reaches_each_row(self):
         golden = {'tags': ['n64-staged'], 'observations': [

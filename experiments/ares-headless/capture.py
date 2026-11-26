@@ -138,7 +138,9 @@ def budget_acknowledged(status_text, budget):
     field = lambda name: [w.split('=', 1)[1] for w in lines[0].split() if w.startswith(name + '=')]
     budgets, written = field('output_budget'), field('output_written')
     # Exactly one budget, the requested one, and a total that stayed within it.
-    return budgets == [str(budget)] and len(written) == 1 and written[0].isdigit() and int(written[0]) <= budget
+    if budgets != [str(budget)] or len(written) != 1 or not re.fullmatch('[0-9]{1,20}', written[0]):
+        return False
+    return int(written[0]) <= budget
 
 
 def main():

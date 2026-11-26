@@ -501,6 +501,7 @@ def big_endian(fmt: str, raw: bytes) -> bytes:
 
 
 PACKED_U16 = {'units.placement', 'units.addon', 'units.dimensions'}   # columns of u16 pairs or quads
+SPOT_CAP = 64   # aligned candidate spots the anchor scans for one first column
 
 
 def per_u16(raw: bytes) -> bytes:
@@ -518,6 +519,7 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
     align = lambda a: (a + 3) & ~3
     out, previous = [], {}
     hints = {k: int(v, 16) - RAM_BASE for k, v in (base_hint or {}).items() if isinstance(v, str) and v.startswith('0x')}
+    hints = {k: v for k, v in hints.items() if 0 <= v < len(ram)}   # a hint outside the dump is no hint
     position = {c[0]: k for k, c in enumerate(columns)}
     suffix = {}   # bytes from a column's start to its table's end, 4-byte aligned per column
     for k in range(len(columns) - 1, -1, -1):
@@ -571,7 +573,7 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                     found = (enc, hint, ram.count(blob))
                     break
                 spots, at = [], ram.find(blob)
-                while at >= 0 and len(spots) < 64:
+                while at >= 0 and len(spots) <= SPOT_CAP:
                     if at % 4 == 0 and at + suffix[name] <= len(ram):   # the rest of the table must fit
                         spots.append(at)
                     at = ram.find(blob, at + 1)
@@ -580,7 +582,9 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                     # corroborated spots is reported as ambiguous.
                     scores = {a: corroboration(name, align(a + size)) for a in spots}
                     best = max(spots, key=lambda a: (scores[a], -a))
-                    ambiguous = scores[best] > 0 and sum(1 for a in spots if scores[a] == scores[best]) > 1
+                    # More candidates than the scan keeps: some may tie unseen, so the base is unresolved.
+                    ambiguous = len(spots) > SPOT_CAP or (
+                        scores[best] > 0 and sum(1 for a in spots if scores[a] == scores[best]) > 1)
                     found = (enc, best, ram.count(blob)) + (('ambiguous',) if ambiguous else ())
                     break
         if found:
@@ -1027,10 +1031,12 @@ def t3_measure_gba(series, golden, report):
 FIELD_SCENARIOS = {
     't1-fields': {'title': 'T1 Wasteland: the first Move of five Marines, with order, fog and animation fields',
                   'measure_n64': fields_measure_n64, 'measure_gba': fields_measure_gba,
-                  'profile': 'terran', 'runner': 'move'},
+                  'profile': 'terran', 'runner': 'move',
+                  'decoder_revision': 2},   # 2: pool decoders read the layout's field definitions
     't3-opening': {'title': 'T3 Desperate Alliance opening, no human input: research, bullets, timeline (report only)',
                    'measure_n64': t3_measure_n64, 'measure_gba': t3_measure_gba, 'parse_gba': t3_parse_gba,
-                   'profile': 'terran', 'runner': 'census', 'tick_skips_ok': True},
+                   'profile': 'terran', 'runner': 'census', 'tick_skips_ok': True,
+                   'decoder_revision': 2},   # 2: the bullet pool is the layout's address and size
 }
 
 
