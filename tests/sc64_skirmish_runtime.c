@@ -475,8 +475,40 @@ static void reaver_service_unavailable(void)
         race_skirmish_product_available,&factory)!=83);
 }
 
+static void custom_result_controls(void)
+{
+    start_race(R_TER);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].owner == SIDE) b[i].alive = 0;
+    frame = 120;
+    race_skirmish_outcome();
+    assert(screen == SCREEN_RESULT && lost && !custom_defeat_overview);
+    game_update(KEY_A, KEY_A);
+    assert(screen == SCREEN_RESULT && lost && custom_defeat_overview);
+    assert(frame == 120 && minerals == 5000 && gas == 5000);
+    game_update(KEY_A, 0);
+    assert(screen == SCREEN_RESULT && custom_defeat_overview);
+    game_render();
+#if defined(SC64_HUD_PAGE_BANDS)
+    assert(sc64_hud_page_version[gfx_backbuffer_index()][1] == ~0u);
+#elif defined(SC64_HUD_BAND_REUSE)
+    assert(sc64_hud_buffer_dirty[gfx_backbuffer_index()] & 2);
+#endif
+
+    game_update(0, 0);
+    game_update(KEY_A, KEY_A);
+    assert(screen == SCREEN_PLAY && frame == 0 && race_mode && !lost && !custom_defeat_overview);
+
+    /* A custom win uses its existing first-A retry path. */
+    race_skirmish_outcome();
+    assert(screen == SCREEN_RESULT && won && !lost);
+    game_update(KEY_A, KEY_A);
+    assert(screen == SCREEN_PLAY && frame == 0 && race_mode && !won && !custom_defeat_overview);
+}
+
 int main(void)
 {
+    custom_result_controls();
     reaver_service_unavailable();
     busy_selected_worker();
     terran_construction_and_addon();
