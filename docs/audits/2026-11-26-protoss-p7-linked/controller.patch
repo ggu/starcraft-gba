@@ -1,0 +1,49 @@
+--- a/tests/sc64_p7_campaign_run.c
++++ b/tests/sc64_p7_campaign_run.c
+@@ -18 +18 @@
+-static unsigned host_tick;
++static unsigned host_tick, completed_game_tick;
+@@ -106 +106 @@
+-static void input(u16 held)
++static void input_raw(u16 held)
+@@ -109,0 +110,5 @@
++#ifdef PX_TAPE_TRACE
++    /* A replay ROM ends at the deciding call, so its tape stops there too. The
++     * maintained trace keeps its neutral release after the win. */
++    if (screen==SCREEN_RESULT || won || lost) return;
++#endif
+@@ -112 +117,6 @@
+-    if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);
++    /* Draw after every update like common/main.c and the PX replay: selection
++     * picks read the facing and stride state that drawing advances. */
++    if (screen!=SCREEN_RESULT && !won && !lost) {
++        game_update(held,pressed); game_render();
++        completed_game_tick = call_index + 1;
++    }
+@@ -120,0 +131,21 @@
++static void input(u16 held)
++{
++#if defined(SC64_TEXT_BOXES) && defined(SC64_TEXT_BOX_HOST_MODAL)
++    /* The cartridge consumes input while an authored transmission is
++     * open. Acknowledge all its pages before sending the field command. */
++    for (unsigned pages = 0; sc64_text_box_count(); ++pages) {
++        if (pages == 100) {
++            fprintf(stderr, "P7 authored dialogue did not close\n");
++            exit(2);
++        }
++        u16 previous = prior;
++        u16 acknowledge = (previous & KEY_A) ? KEY_START : KEY_A;
++        fprintf(stderr, "%u %d %u %u %u %u\n", host_tick, frame,
++                sc64_text_box_front(), sc64_text_box_page(), previous, acknowledge);
++        input_raw(previous | acknowledge);
++        input_raw(previous);
++    }
++#endif
++    input_raw(held);
++}
++
+@@ -738,2 +769,2 @@
+-    fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,\"units\":%d,\"side_units\":%d,\"buildings\":%d,\"heroes_alive\":%d,\"nexuses\":%d,\"force1_nexuses_raw4\":%d,\"force2_nexuses_raw0\":%d,\"force1_military\":%d,\"force2_military\":%d,\"nexus_hp\":%d,\"army_center\":[%d,%d],\"cursor\":[%d,%d],\"mode\":%d,\"selected\":%d,\"target\":%d,\"target_xy\":[%d,%d],\"bank\":[%d,%d],\"supply\":[%d,%d],\"probes\":%d,\"probe_orders\":[%d,%d,%d],\"probe_carry\":%d,\"gateways\":%d,\"complete_gateways\":%d,\"gateway_queue\":%d,\"nexus_queue\":%d,\"pylons\":%d,\"outcome\":%d,\"runtime_fault\":%u,\"switch_bits\":%u,\"cursor_force1\":%u,\"cursor_force2\":%u,\"cursor_victory\":%u}\n",
+-        label,(unsigned)frame,screen,won,lost,live_units(-1),live_units(SIDE),live_buildings(-1),heroes_alive(),nexuses,
++    fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"call_index\":%u,\"frame\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,\"units\":%d,\"side_units\":%d,\"buildings\":%d,\"heroes_alive\":%d,\"nexuses\":%d,\"force1_nexuses_raw4\":%d,\"force2_nexuses_raw0\":%d,\"force1_military\":%d,\"force2_military\":%d,\"nexus_hp\":%d,\"army_center\":[%d,%d],\"cursor\":[%d,%d],\"mode\":%d,\"selected\":%d,\"target\":%d,\"target_xy\":[%d,%d],\"bank\":[%d,%d],\"supply\":[%d,%d],\"probes\":%d,\"probe_orders\":[%d,%d,%d],\"probe_carry\":%d,\"gateways\":%d,\"complete_gateways\":%d,\"gateway_queue\":%d,\"nexus_queue\":%d,\"pylons\":%d,\"outcome\":%d,\"runtime_fault\":%u,\"switch_bits\":%u,\"cursor_force1\":%u,\"cursor_force2\":%u,\"cursor_victory\":%u}\n",
++        label,completed_game_tick,(unsigned)frame,screen,won,lost,live_units(-1),live_units(SIDE),live_buildings(-1),heroes_alive(),nexuses,
