@@ -584,6 +584,37 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual((m['hits'], m['gaps']), (2, [15]))   # the hatch itself is no hit
         self.assertEqual(list(m['victims']), ['2.1'])
 
+    def test_a_hatch_is_no_kill_and_same_frame_drops_sort(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35) if t <= sf]) for sf in range(0, 80)}
+        egg = {sf: 200.0 for sf in range(0, 80)}   # an unrelated Egg hatches at 28
+        series = walk(pos, hp={1: marine, 2: ling, 3: egg},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, 36, 4, 900, 100)])
+        for frame in series['frames']:
+            if frame['sf'] >= 28:
+                frame['units'][3] = (metrics.ZERGLING, 4, 900, 100)
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [15])
+        # Two credited drops on one frame, one on a later lifetime of its row: the hits still sort.
+        ling2 = {sf: (30.0 if sf < 10 else 35.0 - 6 * len([t for t in (20,) if t <= sf])) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling, 4: ling2},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (4, metrics.DRONE, 4, 160, 100)])
+        for frame in series['frames']:
+            if frame['sf'] >= 10:
+                frame['units'][4] = (metrics.ZERGLING, 4, 160, 100)
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual(sorted(m['victims']), ['2', '4.1'])
+
+    def test_a_replaced_subject_is_not_the_subject(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: (40.0 if sf < 30 else 60.0) for sf in range(0, 80)}   # row 1 becomes an SCV at 30
+        series = walk(pos, hp={1: marine}, others=[])
+        for frame in series['frames']:
+            if frame['sf'] >= 30:
+                frame['units'][1] = (metrics.SCV, 1, 100, 100)
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual(m['death'], 25)   # its lifetime ended at 30: never 60 hit points
+
     def test_a_gba_building_removal_event_splits_the_timing(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: 40.0 for sf in range(0, 80)}
@@ -693,6 +724,13 @@ class LabMeasureTest(unittest.TestCase):
             change_steps = {50: 99, 51: 200, 52: 105}
             change_reads = [(99, 50), (102, 51), (105, 52), (200, 51)]
         self.assertEqual(metrics.n64_order_after(Restarted, 9, 103, metrics.ORDER_MOVE)[0], 6)
+
+        class Hidden(Cap):   # tick 52 after the press was never read: it could have held another order
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 50, 3), (103, 51, 3), (109, 53, 6))]
+            change_reads = [(99, 50), (102, 51), (105, 52), (108, 53)]
+        ok, seen = metrics.n64_order_after(Hidden, 9, 103, metrics.ORDER_MOVE)
+        self.assertIsNone(ok)
+        self.assertIn('a tick between the press and this read was not read', seen)
 
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},

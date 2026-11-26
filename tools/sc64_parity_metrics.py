@@ -697,20 +697,30 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     reads = getattr(cap, 'change_reads', None)
     if reads is None:
         reads = [(at, t) for t, at in getattr(cap, 'change_steps', {}).items()]
+    def paired(record):
+        # The change read this follow-up belongs to: the latest one of its tick before it.
+        own = [(at, t) for at, t in reads if t == record['tick'] and at < record['step']]
+        return max(own) if own else None
     began = [(at, t) for at, t in reads if at <= step]
-    if began and max(began)[1] != tick0:
+    if began and max(began) != paired(before[-1]):
         return None, ['the order at the press was not read']
     seen = []
+    followed = set()
     for record in cap.ticks:
         if record['step'] - 1 <= step:
             continue
         if (record['tick'] - tick0) & 0xFFFFFFFF > window:
             break
+        followed.add(paired(record))
         if row not in record['rows']:
             continue
         order = cap.unit(record['rows'][row], 'order')
         seen.append(order)
         if order != prior:
+            # Every tick from the press to this read must have been read: an unread tick in
+            # between could have held another first order.
+            if any((at, t) not in followed for at, t in reads if step < at < record['step']):
+                return None, seen + ['a tick between the press and this read was not read']
             return (order if order in expect else None), seen
     return None, seen
 
@@ -791,11 +801,18 @@ def cartridge_type(frame, vid, unit_raw=None):
 
 def unit_lifetimes(series, t0, keep):
     """The series from frame t0 with each row split into lifetimes: a row that reappears after
-    a gap, or changes type or owner (an Egg hatching, a slot reused by a new unit), continues
-    under a new key "ROW.N", so no drop, type or track spans two units. `keep` (the subject)
-    keeps its own key throughout."""
-    frames, life, last = [], {}, {}
+    a gap, changes type or owner (an Egg hatching, a slot reused by a new unit), or is reborn
+    in a GBA birth record, continues under a new key, so no drop, type or track spans two units.
+    Keys are strings ("ROW", then "ROW.N"), except the subject's first lifetime, which keeps
+    `keep`. series['lifetime_end'] says why a lifetime ended early: 'changed' when the row went
+    on as another unit (not a death)."""
+    births = {}
+    for ev in series.get('events', []):
+        if ev[0] == '+U':   # GBA: a unit born in this slot at this step
+            births.setdefault((ev[1] or 0) * 4 // 5, set()).add(ev[2])
+    frames, life, last, ended = [], {}, {}, {}
     previous = set()
+    name = lambda vid, n: (keep if n == 0 else f'{vid}.{n}') if vid == keep else (str(vid) if n == 0 else f'{vid}.{n}')
     for frame in series['frames']:
         if frame['sf'] < t0:
             continue
@@ -803,17 +820,21 @@ def unit_lifetimes(series, t0, keep):
         names = {}
         for vid, unit in frame['units'].items():
             ident = (unit[0], unit[1], etype.get(vid))
-            if vid != keep and (vid not in previous or last.get(vid) != ident) and vid in last:
-                life[vid] = life.get(vid, 0) + 1
+            if vid in last:
+                changed = vid in previous and (last[vid] != ident or vid in births.get(frame['sf'], ()))
+                if changed or vid not in previous:
+                    if changed:
+                        ended[name(vid, life.get(vid, 0))] = 'changed'
+                    life[vid] = life.get(vid, 0) + 1
             last[vid] = ident
-            names[vid] = vid if vid == keep or not life.get(vid) else f'{vid}.{life[vid]}'
+            names[vid] = name(vid, life.get(vid, 0))
         previous = set(frame['units'])
         out = dict(frame)
         for key in ('units', 'hp', 'shield', 'etype'):
             if key in frame:
-                out[key] = {names.get(k, k): v for k, v in frame[key].items() if k in names or key != 'units'}
+                out[key] = {names[k]: v for k, v in frame[key].items() if k in names}
         frames.append(out)
-    return dict(series, frames=frames)
+    return dict(series, frames=frames, lifetime_end=ended)
 
 
 def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
@@ -921,7 +942,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
             continue
         track_ = hp_track(series, vid, t0, end)
         events = [b[0] for a, b in zip(track_, track_[1:]) if a[1] > 0 >= b[1]]   # killing drops only
-        if track_ and track_[-1][0] < end and track_[-1][1] > 0:
+        if track_ and track_[-1][0] < end and track_[-1][1] > 0 and \
+                series['lifetime_end'].get(vid) != 'changed':   # a hatch or a morph is no kill
             events.append(track_[-1][0] + 1)   # a GBA row removed by a hit the trace never shows
         # Every kill splits the timing, the subject's own included: the killing hit is never in
         # the hit list (see hits), so an interval across it, or touching it, would skip a shot.
@@ -1074,6 +1096,8 @@ def lab_attack_n64(spec):
         m, err = lab_attack_measure(series, uid, t0, spec['foe_type'])
         if err or not m['hits']:
             raise SystemExit(f'{spec["id"]}: {err or "the subject hit nothing"}')
+        if not any(obs['gating'] for obs in lab_attack_observations(m, spec['name'], spec['foe'])):
+            raise SystemExit(f'{spec["id"]}: no gating check: the fight gave no attributable value')
         if len(m['damage_values']) > 1 or len(m['shield_values']) > 1:
             raise SystemExit(f'{spec["id"]}: the subject\'s hits differ ({m["damage_values"]}, shields '
                              f'{m["shield_values"]}); one weapon expected')
