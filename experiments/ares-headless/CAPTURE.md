@@ -41,7 +41,9 @@ write would pass the budget or leave less than the reserve free (free space is
 measured again every 16 MiB written) the run stops with exit code 10, so the
 manifest's `ok` is false and the capture is incomplete (like other failure
 exits, no `status.log` is written). A run that finishes records
-`output_written` and `output_budget` in `status.log`. Counted: every log and
+`output_written` and `output_budget` in `status.log` (`output_written` excludes
+`status.log` itself and a flushed cartridge save, which are checked before
+they are written but not added to the total). Counted: every log and
 data file the frontend writes (`*.csv`, `tap.bin`, `extra.bin`,
 `ticks.raw`, dumps, states, frames) and the polls it writes at the end. The
 check runs before every command, every 64 steps, before each tap record,
