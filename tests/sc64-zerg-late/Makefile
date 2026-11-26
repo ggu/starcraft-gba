@@ -123,7 +123,19 @@ Z10_TERRAN_BUILDING_WORD_INCLUDE := $(if $(and $(Z10_BUILDING_WORDS_FLAGS),$(fil
 Z10_SELECTED_BUILDING_WORD_HEADER := $(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),$(Z10_TERRAN_BUILDING_WORD_HEADER),$(SC64_BUILDING_WORDS_HEADER))
 Z10_BUILDING_WORDS_KEY := $(Z10_BUILDING_WORDS)$(if $(Z10_TERRAN_BUILDING_WORD_INCLUDE),-terran)
 Z10_BUILDING_WORDS_CONFIG := $(if $(shell test -f build/z10-building-words-config && printf '%s\n' '$(Z10_BUILDING_WORDS_KEY)' | cmp -s - build/z10-building-words-config && printf matched),,force-z10-building-words-rebuild)
-ZERG_Z10_RELEASE_FLAGS = -DSC64_SOURCE_GAS $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
+# Keep complete 128x128 route fields in the Z10 work RAM budget.
+Z10_WIDE_POINT_MEMO ?= 1
+ifneq ($(filter $(Z10_WIDE_POINT_MEMO),0 1),$(Z10_WIDE_POINT_MEMO))
+$(error Z10_WIDE_POINT_MEMO must be 0 or 1)
+endif
+Z10_WIDE_POINT_MEMO_FLAGS = $(if $(filter 1,$(Z10_WIDE_POINT_MEMO)),-DSC64_WIDE_POINT_MEMO_PROBE)
+ZERG_Z10_RELEASE_FLAGS = -DSC64_SOURCE_GAS $(ZERG_Z10_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS $(Z10_WIDE_POINT_MEMO_FLAGS)
+
+.PHONY: force-z10-wide-point-memo-config
+build/z10-wide-point-memo-config: force-z10-wide-point-memo-config | build
+	@printf '%s\n' '$(Z10_WIDE_POINT_MEMO)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
+build/starcraft-zerg-z10.elf: build/z10-wide-point-memo-config
 ZERG_Z10_CANONICAL_INPUTS = $(filter-out $(ZERG_Z9_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z9_CANONICAL_INPUTS)) $(ZERG_Z10_BANK)/sc64_race_sprites_generated.h $(Z10_PROGRAM_HEADER)
 # The standard Z10 cartridge can use the qualified custom Carrier journal.
 # Keep a reversible stock comparison with an independent fact-table cache.

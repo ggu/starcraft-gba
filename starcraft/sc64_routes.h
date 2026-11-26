@@ -2441,10 +2441,11 @@ static int __attribute__((noinline)) sc64_route_fill(int slot, int goal)
     if ((MAP_COLS == SC64_LINEAR_COLS || MAP_COLS == SC64_LINEAR_WIDE_COLS) &&
         MAP_ROWS > 0 && MAP_ROWS <= SC64_LINEAR_MAX_ROWS) {
 #ifdef SC64_WIDE_POINT_MEMO_PROBE
-        tail = sc64_route_fill_wide_cached(sc64_route_field[slot], goal);
-#else
-        tail = sc64_route_fill_linear(sc64_route_field[slot], goal);
+        if (MAP_COLS == SC64_MEMO_SIDE && MAP_ROWS == SC64_MEMO_SIDE)
+            tail = sc64_route_fill_wide_cached(sc64_route_field[slot], goal);
+        else
 #endif
+            tail = sc64_route_fill_linear(sc64_route_field[slot], goal);
         if (tail >= 0) goto fill_finished;
         tail = 0;
     }
