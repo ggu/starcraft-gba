@@ -59,6 +59,30 @@ profile limits.
 
 Do not fetch or generate private game inputs just to complete a default-profile task. If an optional check cannot run because its local inputs are absent, say so in the handoff and report the default checks completed.
 
+## Clean up scratch data when the work is done
+
+Builds, emulator runs and replays here leave ROM copies, saves and traces of
+about 1 GB per run. Many agents share this machine, and leftover runs once
+filled its disk. Every agent is responsible for removing the scratch data it
+created:
+
+- Put scratch runs in folders that are clearly yours, named after your branch
+  or task, for example `/tmp/sc64-<branch>-<what>`. Do not write into another
+  agent's folder.
+- When your task ends (the PR is merged or closed, the work is handed off or
+  abandoned, or a run is superseded), delete what you created: your
+  `/tmp`/`/private/tmp` and system temp folders, extra build trees and ROM
+  copies, and large run folders under your worktree's `.local/` and `build/`.
+  Keep only what a reviewer still needs, and say in the handoff where it is.
+- Delete only what you created. Never remove another agent's folders, the
+  shared emulator runners (`/tmp/sc64-headless-mgba-*`), the main checkout's
+  `.local/` inputs, or anything a running process still uses. Remember that a
+  worktree's `.local/` can hold symlinks into other checkouts: delete the
+  link, never what it points to.
+- Check free space (`df -h /System/Volumes/Data`) before a large matrix or
+  replay batch. If the disk is nearly full, stop, clean up your own data, and
+  tell the user, rather than retrying.
+
 ## Local verification and Actions usage
 
 - Run normal source-boundary, doctor, build and test checks on the local machine.
