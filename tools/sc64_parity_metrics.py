@@ -1209,6 +1209,11 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             before_step = at_frame.get(sf - 1, {}).get('step')
             reborn = any(slot_b == target and (before_step is None or step_b > before_step) and step_b <= step_
                          for slot_b, step_b in born_in + changed_in)
+            # A turnover in the hit's own step leaves open whether the hit came before it (on the
+            # old occupant) or after (on the new): unresolved, and it splits the timing.
+            if any(slot_b == target and step_b == step_ for slot_b, step_b in born_in + changed_in):
+                nearby_ambiguous.add(sf)
+                continue
             k = None
             for s_ in ((sf,) if reborn else (sf - 1, sf)):
                 k = next((k for k in at_frame.get(s_, {}).get('units', {}) if slot_of(k) == target), None)

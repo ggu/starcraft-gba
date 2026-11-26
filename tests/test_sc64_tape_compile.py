@@ -1102,6 +1102,19 @@ class LabMeasureTest(unittest.TestCase):
         series['max_units'] = 100
         m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
         self.assertEqual((m['damage_values'], m['gaps']), ([6], []))
+        # Two hits on a Drone in the step its slot is refilled by a friendly unit (a type and
+        # owner change record in that step): their target is unknown, and they split the timing.
+        # (the Drone in the subject's reach, out of the Zergling's)
+        series = as_gba(walk(pos, hp={1: marine, 2: ling, 4: {sf: 40.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 150, 100), (4, metrics.DRONE, 4, -150, 100)]))
+        for frame in series['frames']:
+            if frame['sf'] >= 28:
+                frame['units'][4] = (metrics.DRONE, 1, -150, 100)
+        series['events'] = [('OU', 35, 4, 4, 1)]
+        series['hits'] = [(26, 2, 6, 0, 0), (35, 4, 6, 0, 0), (35, 4, 6, 0, 0), (66, 2, 6, 0, 0)]
+        series['max_units'] = 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['nearby_ambiguous'], m['gaps']), (True, [16]))
         # Two records on a distant ally between the subject's hits split nothing.
         series = as_gba(walk(pos, hp={1: marine, 2: ling, 6: {sf: 40.0 for sf in range(0, 80)}},
                              others=[(2, metrics.ZERGLING, 4, 150, 100), (6, metrics.MARINE, 1, 900, 100)]))
