@@ -283,6 +283,20 @@ def expected_checkpoints(run, allow_load=False, planned_end=None):
             completed = int(words[2]) if len(words) > 2 else 0   # later steps are numbered from STEP
         elif words[0] == 'mode' and allow_load:
             continue
+        elif words[0] == 'pulse':
+            # `pulse ADDR BYTES OP VALUE STEPS ...` runs exactly STEPS steps.
+            # The frontend reads STEPS with `>>`: an optional sign and leading zeros, 1..10,000,000.
+            if len(words) < 6 or not re.fullmatch(r'\+?[0-9]+', words[5]) or len(words[5].lstrip('+0')) > 8:
+                return None
+            count = int(words[5].lstrip('+0') or '0')
+            if not 1 <= count <= 10000000:
+                return None
+            if every:
+                due = range((completed // every + 1) * every, completed + count + 1, every)
+                if len(steps) + len(due) > limit:
+                    return None
+                steps += due
+            completed += count
         elif words[0] in ('until', 'untilw', 'load', 'mode'):
             return None
     seen, keys = collections.Counter(), set()

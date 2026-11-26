@@ -348,7 +348,7 @@ class Capture:
         self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0,
                        'skipped_ticks': 0, 'unexplained_skips': 0, 'interior_missing': 0}
         skips = []   # (record index, skipped tick values) for ticks that began and ended inside one step
-        change = {}
+        change, change_all = {}, []
         chain = hashlib.sha256()
         last_tick = None
         self.regions, self.extra, extra_faults, joined = [], {}, 0, set()
@@ -372,6 +372,7 @@ class Capture:
                 # The change record a follow-up read belongs to is the latest one
                 # for its tick (a tick value can repeat if the counter restarts).
                 change[head['tick']] = head
+                change_all.append(head)   # every one, in capture order, for the leading-read check
                 continue
             if not head['flags'] & FLAG_ROWS:
                 continue
@@ -385,6 +386,10 @@ class Capture:
                     # A backward step or a long jump cannot be explained by change-step reads.
                     self.faults['unexplained_skips'] += 1
             last_tick = tick
+            if not self.ticks:
+                # The change reads as they stood at the first follow-up: a later repeat of a tick
+                # value (counter restart) must not move the leading-read checks below.
+                change_at_first = dict(change)
             paused = change.get(tick, head)['pause'] != 0
             record = {'tick': tick, 'step': head['step'], 'paused': paused, 'selector': head['selector'],
                       'seconds': head['seconds'], 'table': bool(head['flags'] & FLAG_TABLE),
@@ -439,14 +444,44 @@ class Capture:
                 nxt = change.get((value + 1) & 0xFFFFFFFF)
                 if value not in change or nxt is None or nxt['step'] != change[value]['step'] + 1:
                     self.faults['unexplained_skips'] += 1
-                elif change[value]['pause'] == 0:
+                elif change[value]['pause'] == 0 and change[value]['flags'] & FLAG_TABLE:
+                    # Its own change read says it ran in mission and unpaused.
                     extra.setdefault(index, []).append(change[value]['step'])
+        # A capture can also start on a tick that ran inside one step, before any follow-up
+        # read: the same proof (the next tick's change read on the very next step) admits it.
+        if self.ticks:
+            early = change_at_first
+            leading, nxt = [], early.get(self.ticks[0]['tick'])
+            lead = (self.ticks[0]['tick'] - 1) & 0xFFFFFFFF
+            while nxt is not None and lead in early and nxt['step'] == early[lead]['step'] + 1:
+                leading.insert(0, early[lead])   # walk back through contiguous change-only ticks
+                nxt, lead = early[lead], (lead - 1) & 0xFFFFFFFF
+            # An earlier in-mission change read not contiguous with them cannot be placed: any
+            # in-mission change read before the first follow-up's tick that the walk did not
+            # join, however many ticks back (a missing read between them breaks the chain).
+            first = early.get(self.ticks[0]['tick'])
+            first_step = first['step'] if first is not None else self.ticks[0]['step']
+            joined_lead = {id(head) for head in leading}
+            # Every change record in capture order: a tick value repeated by a counter restart
+            # before the first follow-up is counted, not hidden behind its later twin.
+            self.faults['unexplained_skips'] += sum(
+                1 for head in change_all
+                if head['flags'] & FLAG_TABLE and head['step'] < first_step and id(head) not in joined_lead)
+            for head in leading:
+                self.faults['skipped_ticks'] += 1
+                if head['pause'] == 0 and head['flags'] & FLAG_TABLE:
+                    extra.setdefault(0, []).append(head['step'])
+            if leading:
+                extra[0] = sorted(extra.get(0, []))
         # Unpaused clock: one source frame per tick whose change-step read
         # showed no pause; numbered from the first in-mission (table) tick.
+        # Tick -> frontend step of its change read, for order windows anchored on the press.
+        self.change_steps = {t: h['step'] for t, h in change.items()}
+        self.change_reads = [(h['step'], h['tick']) for h in change_all]   # every one, capture order
         clock = -1
         self.skipped_frames = []   # (frontend step of the change read, source frame) of skipped ticks
         for index, record in enumerate(self.ticks):
-            if record['table'] and clock >= 0:
+            if record['table']:
                 for step in extra.get(index, []):
                     clock += 1
                     self.skipped_frames.append((step, clock))

@@ -24,27 +24,39 @@
   },
   {
    "key": "lab-hydralisk-zealot:lab.cooldown:Hydralisk",
-   "gba": -999999
+   "gba": -999998
   },
   {
    "key": "lab-hydralisk-zealot:lab.range_first:Hydralisk on Zealot",
-   "gba": -999999
+   "gba": -999998
   },
   {
    "key": "lab-hydralisk-zealot:lab.shield_damage:Hydralisk on Zealot",
-   "gba": -999999
+   "gba": -999998
   },
   {
    "key": "lab-hydralisk-zealot:lab.survival:Hydralisk",
-   "gba": 66
+   "gba": -999999
+  },
+  {
+   "key": "lab-marine-move:lab.turn_cost:Marine",
+   "gba": 0
+  },
+  {
+   "key": "lab-marine-zergling:lab.cooldown:Marine",
+   "gba": -999999
   },
   {
    "key": "lab-marine-zergling:lab.counter_damage:Zergling on Marine",
    "gba": -999999
   },
   {
+   "key": "lab-marine-zergling:lab.damage:Marine on Zergling",
+   "gba": -999999
+  },
+  {
    "key": "lab-marine-zergling:lab.range_first:Marine on Zergling",
-   "gba": 127.2635
+   "gba": -999999
   },
   {
    "key": "lab-marine-zergling:lab.survival:Marine",

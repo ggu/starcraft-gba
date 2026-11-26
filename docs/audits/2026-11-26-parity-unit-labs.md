@@ -61,7 +61,7 @@ input only (`n64-ram`).
 | `lab-overlord-move` | air | Blood Bath, human Zerg | Overlord | n64-ram |
 | `lab-mutalisk-move` | air | Z2 | Mutalisk | n64-staged |
 | `lab-vulture-move` | hover | T3 | Vulture | n64-staged |
-| `lab-marine-zergling` | weapon, death | T1 | Marine against a Zergling pair | n64-ram |
+| `lab-marine-zergling` | weapon, death | T1 | Marine against one Zergling | n64-ram |
 | `lab-hydralisk-zealot` | weapon, shields | Z2 | Hydralisk against a Zealot | n64-staged |
 | `bb-train` | train and build | S4 Blood Bath captures (passive) | computer workers and buildings | n64-ram |
 
@@ -72,8 +72,7 @@ Bath, where start corners are shuffled, as the only human unit of its id
 with the orders given as offsets) and gives the same orders at the same
 source-frame offsets: the point each order used is the world point under
 the N64 cursor at the press, read from the capture's verified `watch.csv`
-(a single unit ends exactly there except when another unit holds the spot;
-the Marine's second leg stops 11 px short).
+(a single unit ends exactly there except when another unit holds the spot).
 
 ## Results
 
@@ -87,11 +86,11 @@ reverse), so a GBA change that makes the event happen is judged afresh.
 
 | Subject | Cruise N64 / GBA | Acceleration | First leg | Turn cost | Start latency (report) |
 | --- | --- | --- | --- | --- | --- |
-| Marine | 3.92 / 4.03 PASS | 3 / 4 PASS | 85 / 85 PASS | 2 / 0 PASS | 6 / 1 |
+| Marine | 3.92 / 4.03 PASS | 3 / 4 PASS | 85 / 85 PASS | **3 / 0** | 7 / 1 |
 | SCV | 4.30 / 4.85 PASS | **17 / 3** | **115 / 80** | 1 / 0 PASS | 5 / 1 |
 | Hydralisk | 3.64 / 3.61 PASS | 3 / 3 PASS | **83 / 79** | −1 / 0 PASS | 7 / 1 |
 | Siege Tank | 3.84 / 4.00 PASS | 3 / 3 PASS | **56 / 40** | 0 / 0 PASS | 7 / 1 |
-| Overlord | 0.825 / 0.839 PASS | 3 / 3 PASS | **239 / 232** | **−3 / 0** | 8 / 3 |
+| Overlord | 0.825 / 0.839 PASS | 4 / 4 PASS (5-frame chord) | **239 / 232** | **−3 / 0** | 8 / 3 |
 | Mutalisk | 6.22 / 6.54 PASS | **20 / 3** | **57 / 38** | −1 / 0 PASS | 7 / 1 |
 | Vulture | 5.76 / 5.85 PASS | **14 / 3** | **49 / 42** | 2 / 0 PASS | 5 / 1 |
 
@@ -108,15 +107,15 @@ pad-to-game input lag, so it is reported, not judged.
 
 | Check | N64 | GBA | Verdict |
 | --- | --- | --- | --- |
-| Marine damage on Zergling | 6 (5 of 5 hits) | 6 (13 of 13) | PASS |
-| Marine cooldown | 14 (gaps 13, 14, 14, 17) | 15 (15–16; 30 and 77 between targets) | PASS |
-| Marine range at first hit (centre distance) | 84.4 | 127.3 | KNOWN |
-| Zergling damage on Marine | 5 (7 of 7 hits) | absent | KNOWN |
-| Marine survival from first hit taken to 0 HP | 55 | absent | KNOWN |
-| Hydralisk shield damage on Zealot | 10 (3 of 3 hits; HP untouched) | absent | KNOWN |
-| Hydralisk cooldown | 14.5 (gaps 12, 17) | absent | KNOWN |
-| Damage the Hydralisk took | 8 (median of 20, 8, 8, 20, 8, 8: Zealot blades and a second attacker) | 20 (from the building it fights) | REPORT (two hit sizes) |
-| Hydralisk survival | 39 | 66 | KNOWN |
+| Marine damage on Zergling | 6 (5 of 5 hits) | absent | KNOWN |
+| Marine cooldown | 16 (gaps 13, 17, 17, 15) | absent | KNOWN |
+| Marine range at first hit (centre distance) | 79.2 | absent | KNOWN |
+| Zergling damage on Marine | 5 (7 of 7 hits, one Zergling in reach) | absent | KNOWN |
+| Marine survival from first hit taken to 0 HP | 58 | absent | KNOWN |
+| Hydralisk shield damage on Zealot | 10 (HP untouched) | off-target | KNOWN |
+| Hydralisk cooldown | 15 (the two hits credited to it; 8 more had an idle Hydralisk 273 px from the Zealot) | off-target | KNOWN |
+| Damage the Hydralisk took | 8 (10 of 10 hits, Zealot blades) | off-target | REPORT (the Zealot's Pylon is also in reach) |
+| Hydralisk survival | 112 | absent | KNOWN |
 
 A hit that brings a unit to 0 is left out of the hit lists on both
 engines: the N64 row then shows only the points that were left, and the GBA
@@ -126,16 +125,20 @@ between samples (no more left than one tick of regeneration per elapsed
 frame) times a hit but gives no exact damage. Damage taken gates only when
 every hit had the same size, since N64 hits carry no source.
 
-On the N64 the Marine's attack-move meets a Zergling pair on its way round
-a ridge; they charge, so its first hit lands at 84 px, and they kill it 55
-frames after their first hit. The GBA Marine, given the same attack-move,
-kills two Zerglings and wounds a third at full range (127 px) and is never
-hit: the GBA Zerglings do not react to being shot. On the N64 the Hydralisk's
-attack-move meets the Zealot (and a second attacker) and dies 39 frames
-after the first hit it takes; on the GBA it stops at a building, trades
-hits with it (10 dealt, 20 taken per hit) and dies 66 frames after the
-first hit it takes, never reaching the Zealot. Hits on buildings are
-outside this unit-row measure, so the GBA lands no measured hit.
+Both attack labs are single-attacker setups (re-recorded after #984, see
+the follow-up section). The T1 Marine attack-moves round a ridge to
+(873,1350), 262 px short of a Zergling pair whose second Zergling stays
+more than 288 px away. On the N64 the near Zergling comes out to meet it:
+the Marine's first shot lands at 79 px, and the Zergling kills it 58 frames
+after its first bite. The GBA Marine walks the same route, passes 168 px
+from the pair and stops at the point; neither Zergling moves and no shot
+is fired. The Z2 Hydralisk attack-moves to (1002,1100), south-west of a
+Zealot and away from that Zealot's Photon Cannon. On the N64 the Zealot
+comes out, the Hydralisk opens fire at 128 px, and the Zealot kills it 112
+frames after its first hit. On the GBA the Hydralisk reaches the point, 245
+px from the Zealot, which never moves; the Hydralisk shoots a Protoss
+building 156 px away instead (10 shield damage about every 15 frames), so
+its Zealot checks read `off-target`: it fought, but only another enemy.
 
 N64 rows outlive their hit points: the Marine's row stays 16 frames after
 its HP reaches 0. A GBA row goes in the step of the killing hit, so the
@@ -186,19 +189,24 @@ a KNOWN line in `tools/parity/baseline.json`.
 3. **Overlord flight path and turn.** N64 path 210 px for a 198 px offset,
    leg 239 vs 232; reversal starts 3 frames sooner than the first move on
    the N64 (turn cost −3), 0 on the GBA.
-4. **T1 Zerglings do not retaliate.** N64: the pair charges, hits for 5 and
-   kills the Marine 55 frames after its first hit; GBA: no hit taken. The
-   Marine's first shot then comes at 127 px instead of 84.
-5. **Hydralisk attack-move picks a building instead of the Zealot.** N64:
-   10 shield damage per hit, cooldown 14.5, killed 39 frames after its
-   first hit taken; GBA: no unit hit, killed by the building after 66.
+4. **Computer guards do not come out to a nearby enemy.** On the N64 a
+   guarding Zergling (T1) and Zealot (Z2) walk out to a human unit that
+   stops 245–262 px away, and the fight follows (Marine: 6 per hit, cooldown
+   16, first hit at 79 px, killed after 58; Hydralisk: 10 shield damage per
+   hit, cooldown 15, killed after 112). On the GBA neither guard moves, even
+   with the Marine passing at 168 px, so neither lab has a GBA hit on its
+   foe (the GBA Hydralisk shoots a nearby Protoss building instead).
+5. **No turn delay on reversal.** A Marine Move reversed back along its
+   path starts 3 frames later than its first move on the N64 (turn cost 3)
+   and 0 on the GBA. Every GBA subject shows 0; the N64 ranges from −3 to 3
+   (defect 3 is the Overlord's).
 6. **Construction ends 2–3 frames early.** Supply Depot 599.2 vs 602,
    Barracks 1,199.2 vs 1,202 (N64 timers 600 and 1,200 complete 2 frames
    after reaching 0).
 
-The cooldown checks pass, but the N64 gaps vary (Marine 13–15) where the
-GBA's are fixed at 15 (16 when a frame boundary falls between), which
-suggests a randomised cooldown on the cartridge. One lab cannot confirm it.
+The N64 Marine's gaps vary (13–17), where the GBA's were fixed at 15 (16
+when a frame boundary falls between) in the #984 recording, which suggests
+a randomised cooldown on the cartridge. One lab cannot confirm it.
 
 ## Coverage
 
@@ -230,6 +238,9 @@ Not covered, and why:
 - **Size-scaled hit-point damage** (explosive on small, concussive on
   large). The Hydralisk never got through the Zealot's shields; a lab with
   a longer fight or a shieldless target is the next step.
+- **Zealot damage as a gating check.** Every Z2 Zealot stands next to a
+  Pylon or Photon Cannon, so the hits the Hydralisk takes never have a
+  single enemy in reach and stay report-only.
 - **Sound timing (WP13).** The capture frontend does not record audio and
   no N64 sound-request field is located. The GBA trace's `A` records are
   ready for the comparison once one is.
@@ -264,7 +275,8 @@ frontend builds made the captures: `capture-ce3c72e8` (this work's `untilw`
 alone; T1 move labs, Blood Bath, the compiled T1 move) and `capture-8b81284d`
 (the field-map frontend's `poke`, `pulse` and `region` plus `untilw`; the
 staged missions and every lab that dismisses text boxes). Both sources are
-pinned in the private home. This branch's `capture.cpp` (the field-map
+pinned in the private home. The three labs re-recorded after #984 were made
+with `capture-d8175bff`. This branch's `capture.cpp` (the field-map
 commands, their later output budget, and `untilw`) builds `d8175bff`; the
 emulation code the captures ran is the same. `./dev parity` needs only the
 goldens.
@@ -276,3 +288,45 @@ re-decoded there against the merged layout; `./dev parity` then exits 0
 with 24 PASS, 34 KNOWN, 24 REPORT and 17 SKIP (skirmish goldens this branch
 has no measurement code for), and no STALE-GOLDEN, REGRESSION or IMPROVED
 line.
+
+## Follow-up (after #984)
+
+Rules tightened after review, with their effect on these goldens:
+
+- A hit counts for the subject only with a verified single attacker (no other living human row
+  within 288 N64 px of the victim). In the Hydralisk–Zealot lab two of the three N64 hits had
+  other Hydralisks in reach, so one hit is credited and the cooldown check is gone (shield
+  damage 10, range and survival remain).
+- Damage taken gates only when exactly one enemy row was within 288 px of the subject at every
+  hit. Both Zerglings were in reach of the T1 Marine, so its damage taken (5) is now report-only.
+- Each press is checked against the subject's order byte. The Marine lab's return press gave an
+  attack-move (C-Right with the cursor over the other Marines), and the GBA replayed that leg as
+  an attack-move.
+
+The three labs these rules affected were then re-recorded (two fresh captures each, identical
+hash chains, goldens written to a private `SC64_PARITY_HOME` until this lands):
+
+| Lab | Change to the tape | Verdict change |
+| --- | --- | --- |
+| `lab-marine-move` | Return press at (320,188) on open ground: both presses are now Move | turn cost N64 2 → 3, GBA 0: PASS → KNOWN (defect 5) |
+| `lab-marine-zergling` | Marine row 10 attack-moves to (873,1350): one Zergling in reach | damage taken gates again (5, KNOWN); damage, cooldown and range KNOWN (absent on the GBA, defect 4); survival KNOWN (absent) |
+| `lab-hydralisk-zealot` | Hydralisk row 37 attack-moves to (1002,1100): away from the Zealot's Photon Cannon, idle Hydralisks out of reach at the credited hits | cooldown gates again (15, KNOWN); shield damage and range stay KNOWN; survival 66 → absent, still KNOWN (defect 4). The GBA run fights a Protoss building, so cooldown, shield damage and range read the `off-target` marker, not absent |
+
+Review then hardened the attack measure further, with every lab golden regenerating
+byte-identical: a hit needs the sole human attacker in reach on both samples around the drop
+(GBA buildings of the human included); damage taken needs one enemy of the foe's id on both
+samples; a row that hatches, changes owner or is reused is a new unit (on the GBA every
+in-place change is a removal); kills of any enemy, destroyed GBA buildings and drops on other
+nearby enemies split cooldown intervals; an unresolved earlier hit withholds the first-hit
+range; a GBA fight with the foe that leaves a check without a value reads REGRESSION ("not
+measured"), never the absent marker, and so does a run that ended early or lost its subject;
+a GBA subject that fought only other enemies (drops or kills in its reach, GBA buildings
+included, burning excepted) reads the `off-target` marker, which only the same marker in the
+baseline accepts; and an order check is refused when a tick around the press, or the
+subject row itself, was not observed.
+
+Both new tapes give the selected row (`row`) and no longer need `legacy_selection`. Attempts
+that did not give a single attacker: the lone T1 Zergling at (67,1143) (the Marine's route
+round the ridge meets the pair first) and Hydralisk points (1000,1200) and (1000,1250)
+(no fight, or one hit before the Cannon killed it).
+
