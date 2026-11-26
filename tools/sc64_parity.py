@@ -240,6 +240,12 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                  'provenance': '-', 'gating': False, 'n_runs': 0, 'tolerance': '-',
                  'verdict': 'REPORT' if allow_stale else 'STALE-GOLDEN', 'stale': True,
                  'why': 'the golden has no observations; ' + STALE_WHY}]
+    if metrics.SCENARIOS.get(scenario_id, {}).get('require_gating') and \
+            not any(obs['gating'] for obs in golden['observations']):
+        # A lab whose golden holds report-only rows would pass without checking parity.
+        return [{'key': f'{scenario_id}:golden:-', 'check': 'golden', 'subject': '-', 'n64': None, 'gba': None,
+                 'provenance': '-', 'gating': True, 'n_runs': 0, 'tolerance': '-', 'verdict': 'REGRESSION',
+                 'why': 'the golden has no gating check; re-record the lab'}]
     for obs in golden['observations']:
         gating = obs['gating']
         # A scenario with several subjects per check keys its values by (check, subject).

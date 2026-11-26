@@ -507,6 +507,17 @@ class LabMeasureTest(unittest.TestCase):
         for check in ('lab.damage', 'lab.cooldown', 'lab.counter_damage'):
             self.assertNotIn(check, result['values'])
 
+    def test_an_attack_golden_without_a_gating_check_fails(self):
+        import sc64_parity
+        golden = {'observations': [metrics.observation('lab.first_hit', 'Marine on Zergling', 40, 38, 42, 'report',
+                                                       False, [], provenance='n64-ram', n_runs=2)], 'decoder_revision': 2}
+        rows = sc64_parity.judge('lab-marine-zergling', golden, {'lab.first_hit': 40}, {}, {})
+        self.assertEqual([r['verdict'] for r in rows], ['REGRESSION'])
+        golden['observations'].append(metrics.observation('lab.damage', 'Marine on Zergling', 6, 6, 6, 'exact', True, [],
+                                                          provenance='n64-ram', n_runs=2))
+        rows = sc64_parity.judge('lab-marine-zergling', golden, {'lab.first_hit': 40, 'lab.damage': 6}, {}, {})
+        self.assertEqual(sorted(r['verdict'] for r in rows), ['PASS', 'REPORT'])
+
     def test_a_fight_without_a_usable_value_is_judged_afresh(self):
         import sc64_parity
         obs = [metrics.observation('lab.cooldown', 'Marine', 15, 14, 16, '+-1', True, [], provenance='n64-ram', n_runs=2),
@@ -613,7 +624,12 @@ class LabMeasureTest(unittest.TestCase):
             if frame['sf'] >= 30:
                 frame['units'][1] = (metrics.SCV, 1, 100, 100)
         m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
-        self.assertEqual(m['death'], 25)   # its lifetime ended at 30: never 60 hit points
+        # Its lifetime ended at 30 without a death: never 60 hit points, and no survival either.
+        self.assertEqual((m['death'], m['survival'], m['subject_changed']), (None, None, True))
+        # A GBA birth record in the slot means the subject was removed first: that is a death.
+        series['events'] = [('+U', 38, 1, 0, 0)]   # GBA step 38 = source frame 30
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['death'], m['subject_changed']), (25, False))
 
     def test_a_gba_building_removal_event_splits_the_timing(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
@@ -685,7 +701,7 @@ class LabMeasureTest(unittest.TestCase):
 
             @staticmethod
             def unit(row, name):
-                return row
+                return row if name == 'order' else 0   # type and owner stay the same
         self.assertEqual(metrics.n64_order_after(Cap, 9, 101, metrics.ORDER_ATTACK_MOVE)[0], 14)
         self.assertEqual(metrics.n64_order_after(Cap, 9, 101, (metrics.ORDER_MOVE, metrics.ORDER_ATTACK_MOVE))[0], 14)
         ok, seen = metrics.n64_order_after(Cap, 9, 101, metrics.ORDER_MOVE)
@@ -731,6 +747,13 @@ class LabMeasureTest(unittest.TestCase):
         ok, seen = metrics.n64_order_after(Hidden, 9, 103, metrics.ORDER_MOVE)
         self.assertIsNone(ok)
         self.assertIn('a tick between the press and this read was not read', seen)
+
+        class Replaced(Cap):   # the row is gone for a tick, then a replacement shows Move
+            ticks = [{'step': s, 'tick': t, 'rows': r} for s, t, r in
+                     ((100, 50, {9: 3}), (103, 51, {9: 3}), (106, 52, {}), (109, 53, {9: 6}))]
+        ok, seen = metrics.n64_order_after(Replaced, 9, 103, metrics.ORDER_MOVE)
+        self.assertIsNone(ok)
+        self.assertIn('the subject row was gone or replaced before its order changed', seen)
 
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},

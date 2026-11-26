@@ -689,6 +689,7 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     if not before:
         return None, []
     prior, tick0 = cap.unit(before[-1]['rows'][row], 'order'), before[-1]['tick']
+    identity = (cap.unit(before[-1]['rows'][row], 'type'), cap.unit(before[-1]['rows'][row], 'owner'))
     # The window starts at the last tick that began at or before the press. When that tick has
     # no follow-up read (it began and ended inside one step), the order at the press is not
     # observed: a change in that tick could pass for the press, so the check is inconclusive.
@@ -712,8 +713,11 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
         if (record['tick'] - tick0) & 0xFFFFFFFF > window:
             break
         followed.add(paired(record))
-        if row not in record['rows']:
-            continue
+        # The subject must stay the same unit until its order changes: a row that vanished or
+        # went on as another unit could show a replacement's order.
+        if row not in record['rows'] or \
+                (cap.unit(record['rows'][row], 'type'), cap.unit(record['rows'][row], 'owner')) != identity:
+            return None, seen + ['the subject row was gone or replaced before its order changed']
         order = cap.unit(record['rows'][row], 'order')
         seen.append(order)
         if order != prior:
@@ -805,7 +809,8 @@ def unit_lifetimes(series, t0, keep):
     in a GBA birth record, continues under a new key, so no drop, type or track spans two units.
     Keys are strings ("ROW", then "ROW.N"), except the subject's first lifetime, which keeps
     `keep`. series['lifetime_end'] says why a lifetime ended early: 'changed' when the row went
-    on as another unit (not a death)."""
+    on in place as another unit (a hatch or an owner change: not a death), 'reborn' when a GBA
+    birth record reused the slot (the old unit was removed: a death)."""
     births = {}
     for ev in series.get('events', []):
         if ev[0] == '+U':   # GBA: a unit born in this slot at this step
@@ -821,10 +826,11 @@ def unit_lifetimes(series, t0, keep):
         for vid, unit in frame['units'].items():
             ident = (unit[0], unit[1], etype.get(vid))
             if vid in last:
-                changed = vid in previous and (last[vid] != ident or vid in births.get(frame['sf'], ()))
-                if changed or vid not in previous:
-                    if changed:
-                        ended[name(vid, life.get(vid, 0))] = 'changed'
+                reborn = vid in previous and vid in births.get(frame['sf'], ())
+                changed = vid in previous and last[vid] != ident and not reborn
+                if changed or reborn or vid not in previous:
+                    if changed or reborn:
+                        ended[name(vid, life.get(vid, 0))] = 'changed' if changed else 'reborn'
                     life[vid] = life.get(vid, 0) + 1
             last[vid] = ident
             names[vid] = name(vid, life.get(vid, 0))
@@ -851,9 +857,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         return None, 'the subject has no hit points after the command'
     death = None
     last_sf = series['frames'][-1]['sf']
-    if own[-1][0] < last_sf or own[-1][1] <= 0:
+    # The subject's row going on in place as another unit (an owner change) is no death: the
+    # fight is measured up to it and survival is left unmeasured.
+    subject_changed = series['lifetime_end'].get(uid) == 'changed' and own[-1][1] > 0
+    if not subject_changed and (own[-1][0] < last_sf or own[-1][1] <= 0):
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
-    end = death if death is not None else last_sf
+    end = death if death is not None else (own[-1][0] if subject_changed else last_sf)
     window = [f for f in series['frames'] if t0 <= f['sf'] <= end]
     # Every row seen during the fight, with the first frame it was seen on: a unit born after
     # the command (a spawned enemy) is a victim, a barrier and a rival like any other.
@@ -1032,6 +1041,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # Evidence that a fight happened: any drop or kill of the foe, or any hit on the subject
         # (its death included). With it, a check left without a value is inconclusive, never absent.
         'combat': bool(victims_all or shielded_all or foe_kills or hits(own, lethal=True) or death is not None),
+        'subject_changed': subject_changed,
         # A dying N64 row outlives its hit points (16 frames for a Marine); a GBA row goes in
         # the step of the killing hit, so that hit leaves no hit-point record there. A victim
         # counts as killed when its points reach 0 or its row is gone before the end.
@@ -1171,7 +1181,7 @@ def lab_attack_gba(spec):
         if m is not None and m['combat']:
             # Survival is the one check whose absence is an outcome: the subject did not die.
             inconclusive = {obs['check'] for obs in golden['observations']} - set(values)
-            if m['death'] is None:
+            if m['death'] is None and not m['subject_changed']:
                 inconclusive.discard('lab.survival')
         inconclusive &= {obs['check'] for obs in golden['observations']}
         measured['inconclusive'] = sorted(inconclusive)
@@ -1225,7 +1235,9 @@ for _spec in LAB_SPECS:
     SCENARIOS[_spec['id']] = {'title': _spec['title'], 'measure_n64': _make[0](_spec), 'measure_gba': _make[1](_spec),
                               'profile': _spec['profile'], 'runner': _spec['runner'], 'world_points': True,
                               # 2: order-byte checks, single-attacker hits, observed-order replay.
-                              'decoder_revision': 2}
+                              'decoder_revision': 2,
+                              # An attack golden must check something (tools/sc64_parity.py judge).
+                              'require_gating': _spec['kind'] == 'attack'}
 
 
 # ---- passive train and build lab (Blood Bath computers) ---------------------
