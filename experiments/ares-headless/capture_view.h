@@ -2,7 +2,8 @@
 #ifndef SC64_CAPTURE_VIEW_H
 #define SC64_CAPTURE_VIEW_H
 /* Pure helpers for the capture spike frontend: a line-wise cache-aware range
- * reader, the 14-bit pad mask, and unit-table locate, link and record checks.
+ * reader, the 14-bit pad mask, unit-table locate, link and record checks,
+ * closed-loop tape conditions and run-directory file names.
  * Nothing here touches the emulator; every guest access goes through the
  * caller's read-only callbacks. */
 #include <cstddef>
@@ -144,6 +145,91 @@ inline unsigned sc64_capture_live_rows(const std::uint8_t *table, std::vector<st
         ++live;
     }
     return live;
+}
+
+/* Big-endian value of a 1, 2 or 4-byte guest field; other widths read 0. */
+inline std::uint32_t sc64_capture_be(const std::uint8_t *p, unsigned bytes) {
+    if (bytes == 1) return p[0];
+    if (bytes == 2) return std::uint32_t(p[0]) << 8 | p[1];
+    if (bytes == 4) return sc64_capture_be32(p);
+    return 0;
+}
+
+/* Closed-loop tape conditions ("until"): compare a guest field read after a
+ * step with a target. "changed" compares with the value read before the first
+ * step; "set"/"clear" test that every target bit is set or clear. */
+enum class Sc64UntilOp { invalid, eq, ne, ge, lt, changed, set, clear };
+constexpr Sc64UntilOp sc64_capture_until_op(const char *name) {
+    struct Entry { const char *name; Sc64UntilOp op; };
+    constexpr Entry table[] = {
+        {"eq", Sc64UntilOp::eq}, {"ne", Sc64UntilOp::ne}, {"ge", Sc64UntilOp::ge}, {"lt", Sc64UntilOp::lt},
+        {"changed", Sc64UntilOp::changed}, {"set", Sc64UntilOp::set}, {"clear", Sc64UntilOp::clear},
+    };
+    for (const auto &entry : table) if (sc64_capture_name_is(name, entry.name)) return entry.op;
+    return Sc64UntilOp::invalid;
+}
+constexpr bool sc64_capture_until_met(Sc64UntilOp op, std::uint32_t value, std::uint32_t target,
+                                      std::uint32_t start) {
+    switch (op) {
+    case Sc64UntilOp::eq: return value == target;
+    case Sc64UntilOp::ne: return value != target;
+    case Sc64UntilOp::ge: return value >= target;
+    case Sc64UntilOp::lt: return value < target;
+    case Sc64UntilOp::changed: return value != start;
+    case Sc64UntilOp::set: return (value & target) == target;
+    case Sc64UntilOp::clear: return (value & target) == 0;
+    default: return false;
+    }
+}
+
+/* Hex text of 1 to 8 digits, with an optional 0x, as a 32-bit value. */
+constexpr bool sc64_capture_hex32(const char *text, std::uint32_t *out) {
+    if (!text || !out) return false;
+    if (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) text += 2;
+    std::uint32_t value = 0;
+    unsigned n = 0;
+    for (; text[n]; ++n) {
+        char c = text[n];
+        unsigned digit = c >= '0' && c <= '9' ? unsigned(c - '0') : c >= 'a' && c <= 'f' ? unsigned(c - 'a' + 10)
+                       : c >= 'A' && c <= 'F' ? unsigned(c - 'A' + 10) : 16u;
+        if (digit > 15 || n >= 8) return false;
+        value = value << 4 | digit;
+    }
+    if (!n) return false;
+    *out = value;
+    return true;
+}
+/* A guest data address: a physical RDRAM offset, or its KSEG0 (0x80…) or KSEG1 (0xA0…)
+ * alias. Anything else is refused rather than folded into RDRAM. */
+constexpr bool sc64_capture_guest_offset(std::uint32_t address, std::uint32_t *offset) {
+    std::uint32_t physical = address;
+    if ((address & 0xE0000000u) == 0x80000000u || (address & 0xE0000000u) == 0xA0000000u) physical = address & 0x1FFFFFFFu;
+    else if (address & 0xE0000000u) return false;
+    if (physical >= SC64_CAPTURE_RAM) return false;
+    if (offset) *offset = physical;
+    return true;
+}
+
+/* A plain decimal of 1 to 9 digits (tap's raw stride); signs, spaces and words are not. */
+constexpr bool sc64_capture_decimal_ok(const char *text) {
+    if (!text || !*text) return false;
+    unsigned n = 0;
+    for (; text[n]; ++n) if (text[n] < '0' || text[n] > '9' || n >= 9) return false;
+    return true;
+}
+
+/* Names of files the frontend writes or loads in its run directory: one plain
+ * component of at most 64 characters from [A-Za-z0-9._-], not starting with '.'. */
+constexpr bool sc64_capture_file_name_ok(const char *name) {
+    if (!name || !*name || *name == '.') return false;
+    unsigned n = 0;
+    for (; name[n]; ++n) {
+        char c = name[n];
+        bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                  c == '.' || c == '_' || c == '-';
+        if (!ok || n >= 64) return false;
+    }
+    return true;
 }
 
 /* FNV-1a, used only to localise a full-RAM hash difference to a 64 KiB region. */
