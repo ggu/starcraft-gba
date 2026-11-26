@@ -233,7 +233,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                  'why': 'the golden has no observations; ' + STALE_WHY}]
     for obs in golden['observations']:
         gating = obs['gating']
-        unproven = []
+        # A scenario with several subjects per check keys its values by (check, subject).
+        value = values.get((obs['check'], obs['subject']), values.get(obs['check']))
         unproven = []
         if gating and layout is not None:
             unproven = [k for k in obs.get('layout_proven', obs.get('layout_fields', [])) if layout.status(k) != 'proven']
@@ -244,7 +245,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         if stale(obs, golden, layout) or unproven or old_decoder:
             key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
             row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
-                   'n64': obs['value'], 'gba': values.get(obs['check']), 'provenance': provenance(obs, golden),
+                   'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden),
                    'gating': False, 'n_runs': obs['n_runs'], 'tolerance': obs['tolerance']}
             # A stale golden fails unless recording work asks for it (--allow-stale); either way it never gates.
             # So does a gating check whose fields the layout no longer proves.
@@ -256,8 +257,6 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             rows.append(row)
             continue
         key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
-        # A scenario with several subjects per check keys its values by (check, subject).
-        value = values.get((obs['check'], obs['subject']), values.get(obs['check']))
         row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden), 'gating': obs['gating'],
                'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}

@@ -410,7 +410,8 @@ class Capture:
         taps = [w for w in metrics.frontend_lines((self.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape'))
                 if w[0] == 'tap']
         first_rec = next((i for i, w in enumerate(taps) if 'rec' in w[1:]), None)
-        if first_rec is not None and any('rec' not in w[1:] for w in taps[first_rec + 1:]):
+        # Any later tap line restarts the tick tracking, which can hide a follow-up read.
+        if first_rec is not None and taps[first_rec + 1:]:
             problems.append('the tape stops or changes recording after it starts (tap.bin covers part of the run)')
         # commands.csv places tape marks (S5); it must be the log the capture wrote.
         commands = self.run / 'commands.csv'

@@ -263,17 +263,16 @@ Private home: `.local/parity-harness/labs` in the main checkout
 frontend builds made the captures: `capture-ce3c72e8` (this work's `untilw`
 alone; T1 move labs, Blood Bath, the compiled T1 move) and `capture-8b81284d`
 (the field-map frontend's `poke`, `pulse` and `region` plus `untilw`; the
-staged missions and every lab that dismisses text boxes). Built from this
-branch, which sits on the field-map PR, `capture.cpp` gives `8b81284d`
-byte for byte. `./dev parity` needs only the goldens.
+staged missions and every lab that dismisses text boxes). Both sources are
+pinned in the private home. This branch's `capture.cpp` (the field-map
+commands, their later output budget, and `untilw`) builds `d8175bff`; the
+emulation code the captures ran is the same. `./dev parity` needs only the
+goldens.
 
-The fixture home is shared by every worktree and each branch decodes
-goldens with its own layout file, so sessions working in parallel keep
-re-decoding `t1-move` and `bb-income` with their own revisions. This branch
-was verified against a private copy (`home-verify/`: the ten lab goldens
-plus those two re-decoded with this layout): `./dev parity --home` passes
-there with 23 PASS, 24 KNOWN and 16 REPORT, and against the shared home
-(whose `t1-move` and `bb-income` read REPORT as decoded with another
-layout, and whose other sessions' goldens read SKIP) with 21 PASS, 19 KNOWN. After the parity branches merge,
-every golden needs one `parity_decode.py golden` pass against the merged
-layout (each golden lists its runs), then one `--accept`.
+The fixture home is shared by every worktree, and each golden records the
+layout fields its measurement read. After this branch was rebased onto the
+field-map PR, the nine `lab-*` goldens, `bb-train`, `t1-move` and `bb-income` were
+re-decoded there against the merged layout; `./dev parity` then exits 0
+with 24 PASS, 34 KNOWN, 24 REPORT and 17 SKIP (skirmish goldens this branch
+has no measurement code for), and no STALE-GOLDEN, REGRESSION or IMPROVED
+line.
