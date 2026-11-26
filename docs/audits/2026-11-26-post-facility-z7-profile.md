@@ -17,8 +17,8 @@ Direct function costs sum to all 237,656,037 cycles in the sample.
 | Nearest-target search | 4.44% |
 
 The ordinary 4,901-input window provides the comparison below. All trial
-game-state samples matched the release. The baseline's 95th percentile is
-2,878,551 cycles and its maximum is 19,998,355.
+game-state samples matched the release. Across all inputs, the nearest-rank 95th percentile is
+2,877,393 cycles and the maximum is 20,000,839.
 
 | Direction packing trial | Whole-window cycles | Change vs release |
 | --- | ---: | ---: |
@@ -33,3 +33,41 @@ The last trial leaves 152 bytes above the required stack margin, down from
 different unit mixes. Keep the release memory layout while qualifying changes
 with a larger benefit on ordinary campaign or three-CPU custom play. The
 full-window figures include time spent waiting for presentation.
+
+## Bunker release comparison
+
+On the Zerg ROM from #978 (SHA-256
+`003efc93f25bff19ce62a1e230eb0242535f5d2df7ff712d37f159b1c2619948`),
+the same save and controller tape reproduced every one of the 4,901
+debugger intervals and both captured stage timers from the preceding build.
+All 72 sampled gameplay and video records matched, including both indexed
+pages, the displayed page and the palette. The battle still averages 10.64
+input updates per emulated second. Three intervals fit 559,241 cycles.
+
+### Where the 30 Hz budget goes
+
+Of the 4,901 controller inputs, 4,866 advanced the world. That gives **10.56
+simulation updates per second** including time spent in the other 35 inputs.
+The cartridge loop timer and its nested counters reconciled for every advancing
+update. Mean cost was 1,580,966 cycles, compared with a nominal 559,241-cycle
+budget. The simulation alone exceeded the entire budget on every advancing
+update.
+
+| Stage | Mean cycles per advancing update |
+| --- | ---: |
+| Orders | 879,273 |
+| Sight | 70,047 |
+| Other simulation, including remaining update time | 207,654 |
+| Map background | 184,786 |
+| Actors | 55,245 |
+| HUD | 101,539 |
+| Remaining render and loop | 82,422 |
+
+At the longest debugger interval, input 136,791, the route-build counter
+increased by 28 and orders took 19,100,900 cycles. That spike is reproducible,
+but most time accumulates elsewhere. Among the 4,865 advancing inputs with an
+observed preceding counter, 1,973 built two to seven routes and averaged
+1,273,900 order cycles. Another 1,703 built one route and averaged 709,615.
+Even the 1,185 inputs with zero new builds averaged 435,642 order cycles and
+1,133,956 total loop cycles. Prioritize the repeated one-to-seven-build updates
+and identify the remaining cost of movement and contacts on zero-build inputs.
