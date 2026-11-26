@@ -109,3 +109,16 @@ a fresh load. The hard IWRAM guard leaves 432 bytes beyond the required
 margin. These are mGBA measurements. The dense battle still advances at
 about 10 updates/s. On the release build, the slowest 49 updates account for
 3.85% of all cycles in the window.
+
+Two systematic profiles of the release sampled every 67th input, starting
+at offsets 1 and 34 in the 4,901-input window. All 147 individual clock
+totals matched the normal runner. Of 264,994,911 sampled cycles, facility
+routing accounted for 14.13% directly (10.28% and 17.75% per sample) and
+linear point expansion for 8.68%. These were the top two functions in each
+sample. Contact queries accounted for another 5.32%. The facility FIFO in
+#896 is a higher-priority trial than further tuning the copy loop. Recheck
+its effect on 64×64 custom maps as well as its 128×128 campaign gains.
+
+The updated Zerg ROM also restored all ten archived chapter victories with
+matching handoffs. Both custom maps passed 27 fixed-lobby and 18 sparse or
+random seat tests, including fresh SRAM loads and continued gameplay.
