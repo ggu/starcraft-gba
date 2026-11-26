@@ -248,7 +248,9 @@ int main(int argc, char** argv) {
       std::error_code error;
       auto space = std::filesystem::space(out, error);
       if(error) { outputStop = true; return false; }
-      outputAvailable = space.available; outputMeasuredAt = written; outputMeasured = true;
+      // Bytes still in memory (the polls log, written at the end) are not on disk yet, so they
+      // count against the free space measured now as well.
+      outputAvailable = space.available; outputMeasuredAt = written - pollLog.size(); outputMeasured = true;
     }
     if(!sc64_capture_budget_ok(written, bytes, outputBudget, outputAvailable, written - outputMeasuredAt, outputReserve)) {
       outputStop = true; return false;
@@ -524,6 +526,8 @@ int main(int argc, char** argv) {
   std::cout << "READY" << std::endl;
   std::string line;
   while(std::getline(std::cin, line)) {
+    // Commands that run no step (hash, peek, dump ...) write too: check before each one.
+    if(!charge(0)) { std::cerr << "output budget or free-space reserve reached; the capture is incomplete\n"; return 10; }
     if(line.empty() || line[0] == '#') continue;
     // An embedded NUL would let c_str()-based checks see only a prefix of a token.
     if(line.find('\0') != std::string::npos) { std::cerr << "invalid command: embedded NUL\n"; return 7; }
@@ -841,6 +845,7 @@ int main(int argc, char** argv) {
       // Write the cartridge save (FlashRAM) through the core, as desktop ares does on unload.
       // The pinned mia save reports success even when it cannot write, so the file is read
       // back and must equal the cartridge's FlashRAM (host-endian words, written big-endian).
+      if(!charge(ares::Nintendo64::cartridge.flash.size)) { std::cerr << "output budget or free-space reserve reached\n"; return 10; }
       root->save();
       if(!p.gamePak->save(p.gamePak->location)) { std::cerr << "flash save failure\n"; return 5; }
       const auto& flash = ares::Nintendo64::cartridge.flash;
@@ -882,6 +887,8 @@ int main(int argc, char** argv) {
     std::cout << "OK " << completed << ' ' << (elapsedMs() - runStarted) << ' ' << (threadCpuUs() - cpuStarted) / 1000 << std::endl;
     {std::lock_guard lock(p.mutex); if(p.failed) { std::cerr << "renderer failure: " << p.failure << "\n"; return 6; }}
   }
+  // Finalization writes status.log and polls.bin: they must fit too.
+  if(!charge(64 * 1024)) { std::cerr << "output budget or free-space reserve reached; the capture is incomplete\n"; return 10; }
   const auto totalMs = elapsedMs();
   const bool cpuJit = cpu.recompiler.enabled, rspJit = rsp.recompiler.enabled;
   root->unload(); root.reset();

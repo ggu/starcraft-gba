@@ -187,7 +187,8 @@ def stale(obs, golden, layout):
     if layout is None:
         return False
     want = obs.get('layout_fields_sha256')
-    if want is None:
+    if want is None or 'layout_reads' not in obs:
+        # Before per-field digests, or before they covered every read: the whole layout must match.
         return golden.get('layout_sha256') != layout.sha256
     return want != layout.fields_digest(obs.get('layout_reads', obs.get('layout_fields', [])))
 
@@ -199,7 +200,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         unproven = []
         unproven = []
         if gating and layout is not None:
-            unproven = [k for k in obs.get('layout_fields', []) if layout.status(k) != 'proven']
+            unproven = [k for k in obs.get('layout_proven', obs.get('layout_fields', [])) if layout.status(k) != 'proven']
             if layout.doc['unit_table'].get('status') != 'proven':
                 unproven.append('unit_table')
         if stale(obs, golden, layout) or unproven:

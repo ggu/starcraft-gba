@@ -78,7 +78,7 @@ class Layout:
         self.doc = json.loads(self.raw)
         self.name = self.doc['layout']
         self.sha256 = hashlib.sha256(self.raw).hexdigest()
-        self.used = set()
+        self.used, self.used_gating = set(), set()
 
     def unit_field(self, name, gating):
         field = self.doc['unit_fields'].get(name)
@@ -162,6 +162,8 @@ class Layout:
             raise LayoutError(f'{self.name}: {key} is {field.get("status")!r}, not proven; '
                               'it cannot back a gating check')
         self.used.add(key)
+        if gating:
+            self.used_gating.add(key)
         return field
 
 
@@ -526,8 +528,22 @@ TAP_CONTRACT = {('clock', 'tick_counter'): '0x800B1E84', ('clock', 'pause_halfwo
 TAP_BANKS, TAP_RNG, TAP_ROWS = '0x800B1D44', '0x800EFF20', (900, 312)
 
 
+# The capture-time format as tap.bin holds it: the clock fields' addresses and widths, the
+# unit table locator, row size and liveness rule, and the recorded bank and RNG blocks (their
+# array offsets are decoded later and may change). Fixed by the frontend, not by the layout.
+TAP_FORMAT_SHA256 = 'b4a6b23491008b47eb7d4583e0a26d6352cc15297ad2a49d4246072fadc59c20'
+
+
+def tap_format(layout):
+    doc = layout.doc
+    return semantic({'clock': {k: doc['clock'][k] for k in ('tick_counter', 'pause_halfword', 'seconds', 'selector')},
+                     'unit_table': doc['unit_table'],
+                     'banks': {k: doc['globals']['banks'][k] for k in ('address', 'players', 'type')},
+                     'rng': doc['globals']['rng']})
+
+
 def check_tap_contract(layout):
-    """Raise LayoutError when the layout reads a recorded field somewhere the frontend did not."""
+    """Raise LayoutError when the layout describes recorded fields other than tap.bin holds them."""
     doc = layout.doc
     wrong = [f'{a}.{b}' for (a, b), address in TAP_CONTRACT.items()
              if int(doc[a][b]['address'], 16) != int(address, 16)]
@@ -540,13 +556,18 @@ def check_tap_contract(layout):
     if wrong:
         raise LayoutError(f'{layout.name}: {", ".join(wrong)} moved from where the capture frontend records them; '
                           'tap.bin holds the old addresses, so capture again with a frontend that reads the new ones')
+    digest = hashlib.sha256(json.dumps(tap_format(layout), sort_keys=True).encode()).hexdigest()
+    if digest != TAP_FORMAT_SHA256:
+        raise LayoutError(f'{layout.name}: the clock, unit table, bank or RNG definitions differ from the format the '
+                          'capture frontend records (TAP_FORMAT_SHA256); tap.bin holds the old reads, so capture again '
+                          'with a frontend that records the new ones')
 
 
 def write_golden(scenario_id, runs, home, layout, note=None):
     if scenario_id not in metrics.SCENARIOS:
         raise SystemExit(f'unknown scenario {scenario_id}; known: {", ".join(metrics.SCENARIOS)}')
     check_tap_contract(layout)
-    layout.used = set()   # the fields this measurement reads, recorded with each observation
+    layout.used, layout.used_gating = set(), set()   # the fields this measurement reads, recorded with each observation
     caps = [Capture(run, layout) for run in runs]
     if len(caps) < 2:
         raise SystemExit('a golden bundle needs two fresh-process captures')
@@ -575,6 +596,9 @@ def write_golden(scenario_id, runs, home, layout, note=None):
             layout.require_all(obs['layout_fields'])
         # Every field the measurement read (qualification checks included) joins the digest.
         obs['layout_reads'] = sorted(set(obs['layout_fields']) | layout.used)
+        if obs['gating']:
+            # Every field read under the proven rule must stay proven for the check to gate.
+            obs['layout_proven'] = sorted(set(obs['layout_fields']) | layout.used_gating)
         obs['layout_fields_sha256'] = layout.fields_digest(obs['layout_reads'])
         if staged:
             obs['tags'] = sorted(set(obs.get('tags', [])) | {'n64-staged'})

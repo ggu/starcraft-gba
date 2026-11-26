@@ -279,6 +279,25 @@ class Golden(unittest.TestCase):
                 parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home2', parity_decode.Layout(moved))
             rows = sc64_parity.judge('t1-move', golden, {'move.cruise_speed': 4.0}, {}, {}, parity_decode.Layout(moved))
             self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
+            # Same addresses, another width or liveness rule: tap.bin still holds the old reads.
+            for edit in (lambda d: d['clock']['pause_halfword'].update(type='u32'),
+                         lambda d: d['unit_table'].update(live_rule='rows with nonzero hit points')):
+                doc = json.loads(parity_decode.LAYOUT.read_text())
+                edit(doc)
+                other = temp / 'other.json'
+                other.write_text(json.dumps(doc))
+                with self.assertRaises(parity_decode.LayoutError):
+                    parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home3', parity_decode.Layout(other))
+            # A per-field golden from before layout_reads needs the whole layout to match.
+            partial = json.loads(json.dumps(golden))
+            for obs in partial['observations']:
+                del obs['layout_reads']
+            doc = json.loads(parity_decode.LAYOUT.read_text())
+            doc['unit_fields']['brand_new'] = {'offset': '0x99', 'type': 'u8', 'status': 'candidate', 'evidence': 'x'}
+            added = temp / 'added.json'
+            added.write_text(json.dumps(doc))
+            rows = sc64_parity.judge('t1-move', partial, {'move.cruise_speed': 4.0}, {}, {}, parity_decode.Layout(added))
+            self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
 
     def test_staged_tag_reaches_each_row(self):
         golden = {'tags': ['n64-staged'], 'observations': [

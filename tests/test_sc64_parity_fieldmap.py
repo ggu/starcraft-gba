@@ -197,6 +197,28 @@ class CensusClasses(unittest.TestCase):
         r = fm.census_compare([unit(100, 900), unit(108, 1200)], [row(101, 1200), row(107, 900)], {})
         self.assertEqual(sorted((d['chk'], d['n64']) for d in r['amount_differs']), [(900, 1200), (1200, 900)])
 
+    def test_assignment_is_optimal(self):
+        import itertools
+        import random
+        rng = random.Random(7)
+        for _ in range(200):
+            rows, cols = rng.randint(1, 5), rng.randint(1, 5)
+            w = [[rng.choice([0, 0, rng.randint(1, 50)]) for _ in range(cols)] for _ in range(rows)]
+            got = sum(w[i][j] for i, j in fm.assignment(w))
+            best = 0
+            for perm in itertools.permutations(range(max(rows, cols)), rows):
+                best = max(best, sum(w[i][j] for i, j in enumerate(perm) if j < cols))
+            self.assertEqual(got, best)
+
+    def test_large_groups_keep_the_priorities(self):
+        unit = lambda x, a: {'type': 176, 'owner': 11, 'x': x, 'y': 10, 'resources': a, 'section': 'UNIT'}
+        row = lambda x, a: {'type': 176, 'owner': 11, 'x': x, 'y': 10, 'resource_amount': a}
+        chk = [unit(100, 900), unit(106, 1200)] + [unit(118 + 12 * k, 7) for k in range(5)]
+        live = [row(101, 1200), row(114, 900)] + [row(124 + 12 * k, 7) for k in range(5)]
+        for rows in (live, live[::-1]):
+            r = fm.census_compare(chk, rows, {})
+            self.assertEqual(len(r['amount_differs']), 2)   # nearest pairs: the swapped amounts show
+
     def test_reowned_resource_amounts(self):
         chk = [{'type': 176, 'owner': 11, 'x': 5, 'y': 5, 'resources': 900, 'section': 'UNIT'}]
         same = fm.census_compare(chk, [{'type': 176, 'owner': 3, 'x': 5, 'y': 5, 'resource_amount': 900}], {})

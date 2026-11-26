@@ -84,17 +84,12 @@ def mission_chk(label: str, maps, extractor) -> dict:
 
 def max_pairs(left: list, right: list, fits) -> list:
     """A best one-to-one pairing of left and right items that fit, as [(left, right)] in left
-    order: the most pairs, then the most exact positions, then the least total distance,
-    then the most equal resource amounts (minerals and geysers only). Searched exhaustively (at
-    most EXHAUSTIVE_GROUP placements per connected group of candidates); larger groups fall back
-    to augmenting paths."""
+    order: the most pairs, then the most exact positions, then the least total distance, then
+    the most equal resource amounts (minerals and geysers only). Solved exactly per connected
+    group of candidates as a maximum-weight assignment whose integer weights keep those
+    priorities strictly ordered."""
     near = lambda a, b: abs(a['x'] - b['x']) + abs(a['y'] - b['y'])
     resource = lambda a: a['type'] in MINERALS + (GEYSER,)
-    score = lambda a, b: (1, near(a, b) == 0, -near(a, b),
-                          resource(a) and a.get('resources', 0) == b.get('resource_amount', 0))
-    chosen = {}
-    # Connected groups of candidates (left i and right j joined when they fit): each is searched
-    # on its own, so isolated placements never enlarge a search.
     parent = {}
 
     def find(x):
@@ -113,52 +108,62 @@ def max_pairs(left: list, right: list, fits) -> list:
         groups[find(('L', i))][0].append(i)
     for j in range(len(right)):
         groups[find(('R', j))][1].append(j)
+    chosen = {}
     for li, ri in groups.values():
         if not li or not ri:
             continue
-        if len(li) > EXHAUSTIVE_GROUP or len(ri) > EXHAUSTIVE_GROUP:
-            for x, y in _augmenting_pairs([left[i] for i in li], [right[j] for j in ri], fits, near):
-                chosen[next(i for i in li if left[i] is x)] = next(j for j in ri if right[j] is y)
-            continue
-        best = (None, {})
-
-        def search(k, taken, total, pairs):
-            nonlocal best
-            if k == len(li):
-                if best[0] is None or total > best[0]:
-                    best = (total, dict(pairs))
-                return
-            search(k + 1, taken, total, pairs)
-            a = left[li[k]]
-            for j in ri:
-                if j not in taken and fits(a, right[j]):
-                    gain = score(a, right[j])
-                    pairs[li[k]] = j
-                    search(k + 1, taken | {j}, tuple(x + y for x, y in zip(total, gain)), pairs)
-                    del pairs[li[k]]
-        search(0, frozenset(), (0, 0, 0, 0), {})
-        chosen.update(best[1])
+        n = max(len(li), len(ri))
+        dmax = 1 + max((near(left[i], right[j]) for i in li for j in ri if fits(left[i], right[j])), default=0)
+        unit_d = n + 1                      # the amount terms of n pairs stay below one distance step
+        unit_e = (n * dmax + 1) * unit_d    # all distance terms stay below one exact position
+        unit_c = (n + 1) * unit_e           # all exact terms stay below one more pair
+        weight = [[unit_c + (near(left[i], right[j]) == 0) * unit_e + (dmax - near(left[i], right[j])) * unit_d
+                   + (resource(left[i]) and left[i].get('resources', 0) == right[j].get('resource_amount', 0))
+                   if fits(left[i], right[j]) else 0 for j in ri] for i in li]
+        for a, b in assignment(weight):
+            if fits(left[li[a]], right[ri[b]]):
+                chosen[li[a]] = ri[b]
     return [(left[i], right[chosen[i]]) for i in sorted(chosen)]
 
 
-EXHAUSTIVE_GROUP = 6
-
-
-def _augmenting_pairs(left: list, right: list, fits, near) -> list:
-    options = [sorted((j for j, b in enumerate(right) if fits(a, b)), key=lambda j: near(a, right[j])) for a in left]
-    owner = {}
-
-    def augment(i, seen):
-        for j in options[i]:
-            if j not in seen:
-                seen.add(j)
-                if j not in owner or augment(owner[j], seen):
-                    owner[j] = i
-                    return True
-        return False
-    for i in range(len(left)):
-        augment(i, set())
-    return [(left[i], right[j]) for j, i in sorted(owner.items(), key=lambda p: p[1])]
+def assignment(weight: list) -> list:
+    """Maximum-weight assignment of a rows x columns weight matrix (Hungarian algorithm, exact
+    integers), as [(row, column)]; rows or columns may stay unassigned (weight 0)."""
+    rows, cols = len(weight), len(weight[0]) if weight else 0
+    n = max(rows, cols)
+    top = max((w for line in weight for w in line), default=0)
+    cost = [[top - (weight[i][j] if i < rows and j < cols else 0) for j in range(n)] for i in range(n)]
+    u, v, match, way = [0] * (n + 1), [0] * (n + 1), [0] * (n + 1), [0] * (n + 1)
+    for i in range(1, n + 1):
+        match[0], j0 = i, 0
+        minv, used = [None] * (n + 1), [False] * (n + 1)
+        while True:
+            used[j0] = True
+            i0, delta, j1 = match[j0], None, 0
+            for j in range(1, n + 1):
+                if not used[j]:
+                    cur = cost[i0 - 1][j - 1] - u[i0] - v[j]
+                    if minv[j] is None or cur < minv[j]:
+                        minv[j], way[j] = cur, j0
+                    if delta is None or minv[j] < delta:
+                        delta, j1 = minv[j], j
+            for j in range(n + 1):
+                if used[j]:
+                    u[match[j]] += delta
+                    v[j] -= delta
+                else:
+                    minv[j] -= delta
+            j0 = j1
+            if match[j0] == 0:
+                break
+        while True:
+            j1 = way[j0]
+            match[j0] = match[j1]
+            j0 = j1
+            if j0 == 0:
+                break
+    return sorted((match[j] - 1, j - 1) for j in range(1, n + 1)
+                  if match[j] and match[j] - 1 < rows and j - 1 < cols)
 
 
 def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
@@ -521,10 +526,10 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
 
     def next_matches(name, at):
         nxt = following.get(name)
-        if nxt is None:
+        if nxt is None or at < 0:
             return False
-        blob = big_endian(nxt[1], nxt[3])
-        return ram[at:at + len(blob)] == blob
+        blobs = [big_endian(nxt[1], nxt[3])] + ([per_u16(nxt[3])] if nxt[1] in ('I', 'Q') else [])
+        return any(ram[at:at + len(blob)] == blob for blob in blobs)
 
     for name, fmt, rows, raw in columns:
         table = name.split('.')[0]
@@ -887,7 +892,7 @@ def t3_measure_n64(cap, marks):
             if owner == T3_COMPUTER and kind == HYDRALISK:
                 hydras += 1
             if research_start is None and owner == T3_COMPUTER and cap.unit(row, 'order') == RESEARCH_TECH \
-                    and row[0xC4] == BURROWING:
+                    and cap.unit(row, 'research_tech') == BURROWING:
                 research_start = t
                 if previous_bank is not None:
                     debit = (previous_bank[0] - bank[0], previous_bank[1] - bank[1])
