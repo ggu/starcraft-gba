@@ -1024,12 +1024,29 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         units = at_frame.get(sf, {}).get('units', {})
         me, v = units.get(uid), units.get(vid)
         return me is not None and v is not None and math.hypot(v[2] - me[2], v[3] - me[3]) <= LAB_REACH
+    # Damage the subject may have dealt off the foe: drops and kills of other enemies in reach of
+    # it, and of GBA enemy buildings (their hit points are in the trace's building rows). They
+    # split the timing, and they are evidence of a fight, so a check they leave without a value
+    # is unmeasured, not absent.
+    nearby = set()
     for vid in seen:
         if not any_enemy(vid) or enemy(vid):
             continue
         for key in ('hp', 'shield'):
             track_ = hp_track(series, vid, t0, end, key=key)
-            unclear.update(sf for sf, _ in hits(track_, lethal=True) if near_subject(sf, vid) or near_subject(sf - 1, vid))
+            nearby.update(sf for sf, _ in hits(track_, lethal=True) if near_subject(sf, vid) or near_subject(sf - 1, vid))
+
+    def building_near(frame, b):
+        me = frame.get('units', {}).get(uid)
+        return me is not None and math.hypot(b[1] - me[2], b[2] - me[3]) <= LAB_REACH
+    for before_, after_ in zip(window, window[1:]):
+        for k, b in before_.get('buildings', {}).items():
+            a = after_.get('buildings', {}).get(k)
+            if b[0] == human or b[0] >= 8 or a is None or len(b) < 5 or len(a) < 5 or a[0] != b[0]:
+                continue
+            if (b[3] - a[3] >= 0.5 or b[4] - a[4] >= 0.5) and (building_near(before_, b) or building_near(after_, b)):
+                nearby.add(after_['sf'])
+    unclear |= nearby
     foe_kills = set()
     for vid in seen:
         if not any_enemy(vid):
@@ -1044,15 +1061,27 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         barriers.update(events)
         if enemy(vid):
             foe_kills.update(events)
+        else:
+            nearby.update(sf for sf in events if near_subject(sf - 1, vid) or near_subject(sf, vid))
     # GBA buildings carry no hit points in the series: an enemy building that disappears
     # during the fight was destroyed, and splits the timing too.
     for before_, after_ in zip(window, window[1:]):
         for k, b in before_.get('buildings', {}).items():
             if b[0] != human and b[0] < 8 and k not in after_.get('buildings', {}):
                 barriers.add(after_['sf'])
+                if building_near(before_, b):
+                    nearby.add(after_['sf'])
     # A building destroyed and replaced in its slot inside one source frame shows only in the
     # trace's removal events (GBA steps, 5 to 4 source frames).
-    barriers.update((step or 0) * 4 // 5 for _, step, *_ in removed if t0 <= (step or 0) * 4 // 5 <= end)
+    for _, step, slot, *_ in removed:
+        sf = (step or 0) * 4 // 5
+        if not t0 <= sf <= end:
+            continue
+        barriers.add(sf)
+        # Where it stood: its last sample before the removal.
+        last = next((f for f in reversed(window) if f['sf'] < sf and slot in f.get('buildings', {})), None)
+        if last is not None and last['buildings'][slot][0] != human and building_near(last, last['buildings'][slot]):
+            nearby.add(sf)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims_all, shielded_all = victims, shielded
@@ -1123,9 +1152,11 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # its first hit taken is the death itself, as on the N64.
         'survival': (death - (first_taken if first_taken is not None else death)) if death is not None else None,
         'death': (death - t0) if death is not None else None,
-        # Evidence that a fight happened: any drop or kill of the foe, or any hit on the subject
-        # (its death included). With it, a check left without a value is inconclusive, never absent.
-        'combat': bool(victims_all or shielded_all or foe_kills or hits(own, lethal=True) or death is not None),
+        # Evidence that a fight happened: any drop or kill of the foe, any drop or kill of another
+        # enemy or enemy building in reach of the subject, or any hit on the subject (its death
+        # included). With it, a check left without a value is inconclusive, never absent.
+        'combat': bool(victims_all or shielded_all or foe_kills or nearby or hits(own, lethal=True)
+                       or death is not None),
         'subject_changed': subject_changed,
         # A dying N64 row outlives its hit points (16 frames for a Marine); a GBA row goes in
         # the step of the killing hit, so that hit leaves no hit-point record there. A victim
@@ -1262,8 +1293,10 @@ def lab_attack_gba(spec):
         # Combat that happened but could not be attributed is not combat that never happened:
         # those checks get no value (a gating REGRESSION, "not measured"), never ABSENT, which
         # a baseline recording no fight would otherwise accept.
+        # A subject that changed owner or type ended the observation early: what it did not
+        # reach is unmeasured too, survival included.
         inconclusive = set()
-        if m is not None and m['combat']:
+        if m is not None and (m['combat'] or m['subject_changed']):
             # Survival is the one check whose absence is an outcome: the subject did not die.
             inconclusive = {obs['check'] for obs in golden['observations']} - set(values)
             if m['death'] is None and not m['subject_changed']:

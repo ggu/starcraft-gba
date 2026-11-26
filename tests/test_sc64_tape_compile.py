@@ -348,6 +348,7 @@ class LabRunnerArgsTest(unittest.TestCase):
         self.assertEqual(series['frames'][1]['units'][3][2:], (202, 100))
         self.assertIn(('+U', 1, 3, 7, 1), series['events'])
         self.assertIn(('B', 1, 2, 0, 1, 0, 1, 1, 0), series['events'])
+        self.assertEqual(series['frames'][0]['buildings'][2], (1, 600, 600, 1500, 0))   # owner, x, y, hp, shields
 
 
 class LabMeasureTest(unittest.TestCase):
@@ -684,6 +685,74 @@ class LabMeasureTest(unittest.TestCase):
         result, _ = metrics.lab_attack_gba(spec)(calm, golden, report)
         verdicts = {r['check']: r['verdict'] for r in sc64_parity.judge('lab-x', golden, result['values'], {}, baseline)}
         self.assertEqual(set(verdicts.values()), {'KNOWN'})
+
+    def test_damage_off_the_foe_near_the_subject_is_a_fight(self):
+        import sc64_parity
+        obs = [metrics.observation(c, 'Marine', v, v - 1, v + 1, '+-1', True, [], provenance='n64-ram', n_runs=2)
+               for c, v in (('lab.cooldown', 15), ('lab.damage', 6), ('lab.survival', 50))]
+        golden = {'observations': obs}
+        baseline = {f'lab-x:{o["check"]}:{o["subject"]}': {'gba': metrics.ABSENT} for o in obs}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        calm_ling = {sf: 35.0 for sf in range(0, 80)}
+        report = {'subject': 1, 'lab': [[5, 4, 1, -1]]}
+        spec = {'foe_type': metrics.ZERGLING}
+
+        def verdicts(series):
+            result, _ = metrics.lab_attack_gba(spec)(series, golden, report)
+            return {r['check']: r['verdict'] for r in sc64_parity.judge('lab-x', golden, result['values'], {}, baseline)}
+        fought = {'lab.cooldown': 'REGRESSION', 'lab.damage': 'REGRESSION', 'lab.survival': 'KNOWN'}
+        # The Zergling is far and untouched, the Marine takes nothing: a wounded Drone in reach,
+        wounded = {sf: 40.0 - 6 * (sf >= 28) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: calm_ling, 4: wounded},
+                      others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)])
+        self.assertEqual(verdicts(series), fought)
+        # a killed one,
+        killed = {sf: 40.0 for sf in range(0, 28)}
+        series = walk(pos, hp={1: marine, 2: calm_ling, 4: killed},
+                      others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)])
+        self.assertEqual(verdicts(series), fought)
+
+        def with_building(rows):
+            series = walk(pos, hp={1: marine, 2: calm_ling}, others=[(2, metrics.ZERGLING, 4, 900, 100)])
+            for frame in series['frames']:
+                b = rows(frame['sf'])
+                frame['buildings'] = {7: b} if b else {}
+            return series
+        # a GBA building in reach that loses hit points or shields, or is destroyed,
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500 - 6 * (sf >= 28), 0))), fought)
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500, 100 - 6 * (sf >= 28)))), fought)
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500, 0) if sf < 28 else None)), fought)
+        # or one destroyed and replaced in its slot inside a frame (only the removal record shows it).
+        series = with_building(lambda sf: (4, 200, 100, 500, 0))
+        series['events'] = [('-B', 35, 7, 0, 4)]   # GBA step 35 = source frame 28
+        self.assertEqual(verdicts(series), fought)
+        # The controls: the same damage out of reach of the subject, or to a friendly building,
+        # keeps the no-fight baseline.
+        series = walk(pos, hp={1: marine, 2: calm_ling, 4: wounded},
+                      others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 700, 100)])
+        self.assertEqual(set(verdicts(series).values()), {'KNOWN'})
+        self.assertEqual(set(verdicts(with_building(lambda sf: (4, 700, 100, 500 - 6 * (sf >= 28), 0))).values()), {'KNOWN'})
+        self.assertEqual(set(verdicts(with_building(lambda sf: (1, 200, 100, 500 - 6 * (sf >= 28), 0))).values()), {'KNOWN'})
+
+    def test_a_changed_subject_leaves_its_checks_unmeasured(self):
+        import sc64_parity
+        obs = [metrics.observation(c, 'Marine', v, v - 1, v + 1, '+-1', True, [], provenance='n64-ram', n_runs=2)
+               for c, v in (('lab.damage', 6), ('lab.survival', 50))]
+        golden = {'observations': obs}
+        baseline = {f'lab-x:{o["check"]}:{o["subject"]}': {'gba': metrics.ABSENT} for o in obs}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        # No damage anywhere; the subject's row changes owner in place at 30 (a Mind Control).
+        series = walk(pos, hp={1: {sf: 40.0 for sf in range(0, 80)}, 2: {sf: 35.0 for sf in range(0, 80)}},
+                      others=[(2, metrics.ZERGLING, 4, 900, 100)])
+        for frame in series['frames']:
+            if frame['sf'] >= 30:
+                frame['units'][1] = (metrics.MARINE, 2, 100, 100)
+        result, _ = metrics.lab_attack_gba({'foe_type': metrics.ZERGLING})(series, golden, {'subject': 1, 'lab': [[5, 4, 1, -1]]})
+        self.assertTrue(result['measured']['subject_changed'])
+        self.assertEqual(result['measured']['inconclusive'], ['lab.damage', 'lab.survival'])
+        verdicts = {r['check']: r['verdict'] for r in sc64_parity.judge('lab-x', golden, result['values'], {}, baseline)}
+        self.assertEqual(verdicts, {'lab.damage': 'REGRESSION', 'lab.survival': 'REGRESSION'})
 
     def test_spawned_enemies_and_buildings_split_the_timing(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}

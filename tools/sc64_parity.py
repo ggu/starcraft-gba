@@ -78,7 +78,7 @@ def gba_series(trace_path):
     (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
     [(sf, cell, visible, explored)]}, cells col + row * cols)."""
     units, hp, shield, etype, banks, frames = {}, {}, {}, {}, {}, []
-    buildings = {}   # slot -> (owner, x, y) in N64 px, for the labs' single-enemy check
+    buildings = {}   # slot -> (owner, x, y in N64 px, hp, shields), for the labs' enemy checks
     orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
     keyframe = {}
     # Births and building rows with engine type ids, for the passive train and build lab
@@ -139,7 +139,8 @@ def gba_series(trace_path):
             elif tag == 'B':
                 raw_owner = int(words[5])
                 buildings[int(words[1])] = (raw_owner if raw_owner >= 0 else int(words[4]),
-                                            2 * int(words[6]), 2 * int(words[7]))
+                                            2 * int(words[6]), 2 * int(words[7]),
+                                            int(words[8]), max(0, int(words[10])))
                 # slot, engine type, owner, under construction, queue count, queue progress, queue head
                 events.append(('B', step, int(words[1]), int(words[2]), int(words[4]), int(words[11]),
                                int(words[14]), int(words[15]), int(words[16])))
