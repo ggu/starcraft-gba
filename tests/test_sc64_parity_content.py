@@ -439,6 +439,19 @@ class SkippedComparisonTest(unittest.TestCase):
         looping = self.Fake({'Walking': playfram(17) + wait(1) + playfram(34) + wait(1) + goto(0)}, True)
         self.assertEqual(pc.compare_walk(looping, entry)['verdict'], 'match')
 
+    def test_walk_matches_frames_and_waits_at_the_same_rotation(self):
+        program = playfram(17) + wait(2) + playfram(34) + wait(3) + \
+            playfram(17) + wait(4) + playfram(34) + wait(5) + goto(0)
+        looping = self.Fake({'Walking': program}, True)
+        entry = {'unit_id': 0, 'image_id': 1, 'cycle_ticks': 14,
+                 'steps': [{'tick': t, 'pose': p} for t, p in [(0, 1), (4, 2), (9, 1), (11, 2)]]}
+        match = pc.compare_walk(looping, entry)
+        self.assertEqual((match['verdict'], match['note']), ('match', 'engine cycle starts at ROM step 2'))
+
+        entry['steps'][-1]['tick'] = 12
+        mismatch = pc.compare_walk(looping, entry)
+        self.assertEqual((mismatch['verdict'], mismatch['note']), ('differs', 'per-frame wait differs'))
+
     def test_death_duration_counts_from_the_first_frame_and_honours_waitrand(self):
         actor = {'image_id': 1, 'layers': [{'image_id': 1, 'start': 0, 'end': 5, 'remnant': False}]}
         images = {1: {'source_frames': [0, 1]}}

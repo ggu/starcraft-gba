@@ -990,14 +990,15 @@ def compare_walk(scripts: Scripts, entry: dict) -> dict:
     # The engine cycle may start at another step of the same loop.
     rotations = [k for k in range(len(rom_frames))
                  if rom_frames[k:] + rom_frames[:k] == row['engine_frames']]
+    matching = next((k for k in rotations if rom_waits[k:] + rom_waits[:k] == eng_waits), None)
     if not rotations:
         row.update(verdict='differs', note='frame order differs')
-    elif rom_waits[rotations[0]:] + rom_waits[:rotations[0]] != eng_waits:
+    elif matching is None:
         row.update(verdict='differs', note='per-frame wait differs')
     else:
         row['verdict'] = 'match'
-        if rotations[0]:
-            row['note'] = f'engine cycle starts at ROM step {rotations[0]}'
+        if matching:
+            row['note'] = f'engine cycle starts at ROM step {matching}'
     return row
 
 
