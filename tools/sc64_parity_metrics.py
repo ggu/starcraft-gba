@@ -952,15 +952,29 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # A GBA row vanishes on its killing hit, so a missing row is a death, unless the trace's
     # removal record shows the subject left with hit points (loaded, or removed by the mission):
     # then it is lost, and survival is left unmeasured.
-    step_at = {f['sf']: f.get('step') for f in series['frames']}
+    frame_at = {f['sf']: f for f in series['frames']}
+    born_in = [(ev[2], ev[1] or 0) for ev in series.get('events', []) if ev[0] == '+U']
 
-    def removal_after(slot, last_sf):
+    def removal_after(vid, slot, last_sf):
         # The removal of the unit last sampled at last_sf: after the engine step of that sample
-        # (two steps can share a source frame, so an earlier occupant's removal can share it too).
-        floor = step_at.get(last_sf)
-        return next((r for r in series.get('removals', []) if r[0] == 'U' and r[2] == slot and
-                     (r[1] or 0) * 4 // 5 >= last_sf and (floor is None or (r[1] or 0) > floor)), None)
-    gone = removal_after(uid, own[-1][0]) if own[-1][1] > 0 else None
+        # (two steps can share a source frame, so an earlier occupant's removal can share it too),
+        # with no birth in the slot before it, and of the same unit: its owner and type. A
+        # successor's removal never stands for the unit's own end.
+        frame = frame_at.get(last_sf, {})
+        unit, floor = frame.get('units', {}).get(vid), frame.get('step')
+        for r in series.get('removals', []):
+            step_ = r[1] or 0
+            if r[0] != 'U' or r[2] != slot or step_ * 4 // 5 < last_sf or (floor is not None and step_ <= floor):
+                continue
+            if any(s_ == slot and (floor is None or step_b > floor) and step_b <= step_ for s_, step_b in born_in):
+                return None
+            raw, etype_ = (list(r[9:11]) + [None, None])[:2]
+            same = unit is None or (r[3] == unit[1] and (
+                raw == unit[0] if raw is not None and raw >= 0 and unit[0] >= 0 else
+                etype_ is None or frame.get('etype', {}).get(vid) in (None, etype_)))
+            return r if same else None
+        return None
+    gone = removal_after(uid, uid, own[-1][0]) if own[-1][1] > 0 else None
     subject_lost = not subject_changed and own[-1][0] < last_sf and gone is not None and gone[6] > 0
     if not subject_changed and not subject_lost and (own[-1][0] < last_sf or own[-1][1] <= 0):
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
@@ -1131,7 +1145,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             # A GBA row removed by a hit the trace never shows, unless its removal record shows
             # hit points left (a mission script, a transport): that is no kill.
             slot = vid if isinstance(vid, int) else int(str(vid).split('.')[0])
-            left = removal_after(slot, track_[-1][0])
+            left = removal_after(vid, slot, track_[-1][0])
             if left is None or left[6] <= 0:
                 events.append(track_[-1][0] + 1)
         # Every kill splits the timing, the subject's own included: the killing hit is never in

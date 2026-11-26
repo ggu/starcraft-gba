@@ -824,6 +824,16 @@ class LabMeasureTest(unittest.TestCase):
                         [('U', 20, 2, 4, 900, 100, -3, None, 40, metrics.DRONE, 0, None, None),
                          ('U', 22, 2, 4, 900, 100, 35, None, 35, metrics.ZERGLING, 0, None, None)])
         self.assertEqual(verdicts(series), calm)
+        # A foe killed while its slot is refilled in the same step: the successor leaving with hit
+        # points in the next step (the same source frame) does not stand for the foe's end.
+        for refill in ([('+U', 20, 2, 0, 4)], []):
+            series = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 16)}},
+                                 others=[(2, metrics.ZERGLING, 4, 900, 100)]),
+                            [('U', 21, 2, 4, 900, 100, 40, None, 40, metrics.DRONE, 0, None, None)])
+            series['events'] = refill
+            self.assertEqual(verdicts(series), fought)
+            result, _ = metrics.lab_attack_gba(spec)(series, golden, report)
+            self.assertTrue(result['measured']['foe_combat'])
         # A foe removed with hit points left (a mission script) was not killed.
         series = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 28)}},
                              others=[(2, metrics.ZERGLING, 4, 900, 100)]),
