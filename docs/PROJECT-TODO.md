@@ -99,7 +99,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   acknowledgement exposed victory immediately before the recorded neutral
   release. A fresh boot loaded the same world and re-exported identical SRAM
   (`a5183059b513536784634e374ce4ab56cba0ecca3abdbe38037ea46415ae7475`).
-  Continue P2 from that save. Use
+  P2 carried that save to victory at frame 39,217. Its 42 checkpoints
+  and fresh cartridge reload passed. Continue from P2 into P3.
+  [P2 replay and evidence](audits/2026-11-26-protoss-opening-continuation.md).
+  Use
   [the pinned-input verifier](../tools/sc64_early_protoss_home_replay.py)
   to reproduce the HOME-to-result and fresh-load checks.
 
