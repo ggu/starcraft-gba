@@ -246,8 +246,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Zerg campaign after the Custom Game Larva merge.** Z1 cleared by two
   ordinary routes from blank SRAM on the standard Z10 cartridge. The
   continuous HOST-matched route handed its actual victory to Z2, which
-  delivered the Chrysalis and reloaded with both completion bits. Carry
-  that result into Z3. [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
+  delivered the Chrysalis and reloaded with both completion bits. The linked
+  Z3 paid route won at frame 68,639, with the Chrysalis at 170 HP. A fresh
+  boot re-exported identical SRAM and A advanced to Z4 with all three bits.
+  Continue the same save through Z4–Z10.
+  [Z3 route and victory](audits/2026-11-26-zerg-linked-middle.md). [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
