@@ -519,7 +519,8 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
     align = lambda a: (a + 3) & ~3
     out, previous = [], {}
     hints = {k: int(v, 16) - RAM_BASE for k, v in (base_hint or {}).items() if isinstance(v, str) and v.startswith('0x')}
-    hints = {k: v for k, v in hints.items() if 0 <= v < len(ram)}   # a hint outside the dump is no hint
+    # A hint outside the dump, or off the 4-byte column alignment, is no hint.
+    hints = {k: v for k, v in hints.items() if 0 <= v < len(ram) and v % 4 == 0}
     position = {c[0]: k for k, c in enumerate(columns)}
     suffix = {}   # bytes from a column's start to its table's end, 4-byte aligned per column
     for k in range(len(columns) - 1, -1, -1):
@@ -583,8 +584,7 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                     scores = {a: corroboration(name, align(a + size)) for a in spots}
                     best = max(spots, key=lambda a: (scores[a], -a))
                     # More candidates than the scan keeps: some may tie unseen, so the base is unresolved.
-                    ambiguous = len(spots) > SPOT_CAP or (
-                        scores[best] > 0 and sum(1 for a in spots if scores[a] == scores[best]) > 1)
+                    ambiguous = len(spots) > SPOT_CAP or sum(1 for a in spots if scores[a] == scores[best]) > 1
                     found = (enc, best, ram.count(blob)) + (('ambiguous',) if ambiguous else ())
                     break
         if found:

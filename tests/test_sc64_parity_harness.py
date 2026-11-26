@@ -324,7 +324,11 @@ class Golden(unittest.TestCase):
         # A golden from an older decoder revision of its scenario is stale.
         self.assertEqual(metrics.SCENARIOS['t3-opening']['decoder_revision'], 2)
         older = {'bundle': {'chain_format': 2}, 'decoder_revision': 1, 'observations': [obs]}
-        self.assertEqual(sc64_parity.judge('t3-opening', older, {'x.a': 1}, {}, {}, layout)[0]['verdict'], 'STALE-GOLDEN')
+        row = sc64_parity.judge('t3-opening', older, {'x.a': 1}, {}, {}, layout)[0]
+        self.assertEqual(row['verdict'], 'STALE-GOLDEN')
+        self.assertIn('decoder revision 1', row['why'])
+        empty = sc64_parity.judge('t3-opening', {'bundle': {}, 'observations': []}, {}, {}, {}, layout)
+        self.assertEqual([r['verdict'] for r in empty], ['STALE-GOLDEN'])
 
     def test_staged_tag_reaches_each_row(self):
         golden = {'tags': ['n64-staged'], 'observations': [

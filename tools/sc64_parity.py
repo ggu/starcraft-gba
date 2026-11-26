@@ -198,6 +198,13 @@ def stale(obs, golden, layout):
 
 def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False):
     rows = []
+    revision = metrics.SCENARIOS.get(scenario_id, {}).get('decoder_revision', 1)
+    if not golden.get('observations'):
+        # A golden that checks nothing never passes quietly.
+        return [{'key': f'{scenario_id}:golden:-', 'check': 'golden', 'subject': '-', 'n64': None, 'gba': None,
+                 'provenance': '-', 'gating': False, 'n_runs': 0, 'tolerance': '-',
+                 'verdict': 'REPORT' if allow_stale else 'STALE-GOLDEN',
+                 'why': 'the golden has no observations; ' + STALE_WHY}]
     for obs in golden['observations']:
         gating = obs['gating']
         unproven = []
@@ -207,8 +214,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             if layout.doc['unit_table'].get('status') != 'proven':
                 unproven.append('unit_table')
         # A golden measured by an older revision of its scenario's decoder is stale too.
-        revision = metrics.SCENARIOS.get(scenario_id, {}).get('decoder_revision', 1)
-        if stale(obs, golden, layout) or unproven or golden.get('decoder_revision', 1) != revision:
+        old_decoder = golden.get('decoder_revision', 1) != revision
+        if stale(obs, golden, layout) or unproven or old_decoder:
             key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
             row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                    'n64': obs['value'], 'gba': values.get(obs['check']), 'provenance': provenance(obs, golden),
@@ -216,8 +223,9 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # A stale golden fails unless recording work asks for it (--allow-stale); either way it never gates.
             # So does a gating check whose fields the layout no longer proves.
             row['verdict'] = 'REPORT' if allow_stale else 'STALE-GOLDEN'
-            row['why'] = (STALE_WHY if not unproven else STALE_WHY + '; the layout no longer proves '
-                          + ', '.join(unproven)) + (' (--allow-stale)' if allow_stale else '')
+            row['why'] = STALE_WHY + (f'; the layout no longer proves {", ".join(unproven)}' if unproven else '') + \
+                (f'; measured by decoder revision {golden.get("decoder_revision", 1)}, the scenario is at {revision}'
+                 if old_decoder else '') + (' (--allow-stale)' if allow_stale else '')
             rows.append(row)
             continue
         key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'

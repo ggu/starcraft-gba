@@ -271,9 +271,18 @@ class TableAnchor(unittest.TestCase):
         # A hint below RAM's start is ignored, never read as a slice from the end.
         found = fm.anchor_columns(copy, columns, {'t.a': f'0x{fm.RAM_BASE - 8:08X}'})
         self.assertEqual(found[0]['address'], f'{fm.RAM_BASE:08x}')
-        # More candidates than the scan keeps: unresolved, never a guessed base.
-        found = fm.anchor_columns(copy * (fm.SPOT_CAP + 2), columns)
+        # More candidates than the scan keeps: unresolved, never a guessed base, even when the
+        # only corroborated copy comes after the cap.
+        decoy = struct.pack('>2H', 1, 2) + b'\0' * 4
+        found = fm.anchor_columns(decoy * (fm.SPOT_CAP + 1) + copy, columns)
         self.assertEqual(found[0]['status'], 'ambiguous')
+        # Two aligned copies with nothing after them to tell them apart: unresolved.
+        found = fm.anchor_columns(decoy + decoy, columns)
+        self.assertEqual(found[0]['status'], 'ambiguous')
+        # An unaligned hint is ignored in favour of the aligned table.
+        found = fm.anchor_columns(b'\0' * 2 + struct.pack('>2H', 1, 2) + b'\0' * 2 + copy, columns,
+                                  {'t.a': f'0x{fm.RAM_BASE + 2:08X}'})
+        self.assertEqual(found[0]['address'], f'{fm.RAM_BASE + 8:08x}')
         # A decoy too close to the end of RAM for the rest of the table never wins.
         found = fm.anchor_columns(copy + b'\xEE' * 4 + struct.pack('>2H', 1, 2) + bytes([4, 5]), columns)
         self.assertEqual(found[0]['address'], f'{fm.RAM_BASE:08x}')
