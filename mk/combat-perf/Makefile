@@ -350,6 +350,12 @@ test-sc64-route-point-warm-blocked-gap: build/test-sc64-route-point-warm-blocked
 	./$< --point-certificate-only
 
 ROUTE_POINT_COMPOSED_TEST_FLAGS = $(ROUTE_POINT_RESERVE_FLAGS) $(POINT_PREFIX_COMPOSED_FLAGS)
+build/test-sc64-wide-point-memo: tests/sc64_wide_point_memo.c $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_wide_memo.h | build
+	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) -DSC64_WIDE_POINT_MEMO_PROBE $< -o $@
+.PHONY: test-sc64-wide-point-memo
+test-sc64-wide-point-memo: build/test-sc64-wide-point-memo
+	./$<
+
 build/test-sc64-route-composed: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
 	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) $< -o $@
 build/test-sc64-route-composed-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) mk/combat-perf/Makefile | build
