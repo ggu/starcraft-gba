@@ -558,6 +558,41 @@ class LabMeasureTest(unittest.TestCase):
         m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertEqual((m['hits'], m['range_first'], m['first_hit']), (2, None, None))
 
+    def test_an_unresolved_first_hit_still_sizes_the_replay(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        series['frames'][20]['units'][5] = (metrics.MARINE, 1, 200, 100)
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual(m['first_landed'], 30)
+        checks = [o['check'] for o in metrics.lab_attack_observations(m, 'Marine', 'Zergling')]
+        self.assertIn('lab.damage', checks)
+        self.assertNotIn('lab.range_first', checks)
+        self.assertNotIn('lab.first_hit', checks)
+
+    def test_a_hatched_or_reused_row_is_a_new_unit(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        # Row 2 is an Egg until 30, then the Zergling that hatched from it; the Marine hits it at 40 and 55.
+        ling = {sf: (200.0 if sf < 30 else 35.0 - 6 * len([t for t in (40, 55) if t <= sf])) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, 36, 4, 150, 100)])
+        for frame in series['frames']:
+            if frame['sf'] >= 30:
+                frame['units'][2] = (metrics.ZERGLING, 4, 150, 100)
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['hits'], m['gaps']), (2, [15]))   # the hatch itself is no hit
+        self.assertEqual(list(m['victims']), ['2.1'])
+
+    def test_a_gba_building_removal_event_splits_the_timing(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35) if t <= sf]) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [15])
+        series['events'] = [('-B', 35, 7, 0, 0), ('+B', 35, 7, 0, 0)]   # GBA step 35 = source frame 28
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
+
     def test_damage_taken_across_a_type_change(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: 40.0 - 5 * len([t for t in (20, 30) if t <= sf]) for sf in range(0, 80)}
@@ -652,6 +687,12 @@ class LabMeasureTest(unittest.TestCase):
             ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 0xFFFFFFFF, 3), (106, 1, 6))]
             change_steps = {0xFFFFFFFF: 99, 0: 102, 1: 105}
         self.assertIsNone(metrics.n64_order_after(WrappedUnread, 9, 103, metrics.ORDER_MOVE)[0])
+
+        class Restarted(Cap):   # tick 51 repeats after a counter restart: the read at the press stands
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 50, 3), (103, 51, 3), (106, 52, 6))]
+            change_steps = {50: 99, 51: 200, 52: 105}
+            change_reads = [(99, 50), (102, 51), (105, 52), (200, 51)]
+        self.assertEqual(metrics.n64_order_after(Restarted, 9, 103, metrics.ORDER_MOVE)[0], 6)
 
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},

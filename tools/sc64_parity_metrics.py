@@ -692,8 +692,12 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     # The window starts at the last tick that began at or before the press. When that tick has
     # no follow-up read (it began and ended inside one step), the order at the press is not
     # observed: a change in that tick could pass for the press, so the check is inconclusive.
-    # The latest change read by frontend step, not by tick value (the counter can wrap).
-    began = [(at, t) for t, at in getattr(cap, 'change_steps', {}).items() if at <= step]
+    # The latest change read by frontend step, not by tick value (the counter can wrap or
+    # restart): every change record in capture order.
+    reads = getattr(cap, 'change_reads', None)
+    if reads is None:
+        reads = [(at, t) for t, at in getattr(cap, 'change_steps', {}).items()]
+    began = [(at, t) for at, t in reads if at <= step]
     if began and max(began)[1] != tick0:
         return None, ['the order at the press was not read']
     seen = []
@@ -785,11 +789,40 @@ def cartridge_type(frame, vid, unit_raw=None):
     return unit_raw[engine] if engine is not None and 0 <= engine < len(unit_raw) else None
 
 
+def unit_lifetimes(series, t0, keep):
+    """The series from frame t0 with each row split into lifetimes: a row that reappears after
+    a gap, or changes type or owner (an Egg hatching, a slot reused by a new unit), continues
+    under a new key "ROW.N", so no drop, type or track spans two units. `keep` (the subject)
+    keeps its own key throughout."""
+    frames, life, last = [], {}, {}
+    previous = set()
+    for frame in series['frames']:
+        if frame['sf'] < t0:
+            continue
+        etype = frame.get('etype', {})
+        names = {}
+        for vid, unit in frame['units'].items():
+            ident = (unit[0], unit[1], etype.get(vid))
+            if vid != keep and (vid not in previous or last.get(vid) != ident) and vid in last:
+                life[vid] = life.get(vid, 0) + 1
+            last[vid] = ident
+            names[vid] = vid if vid == keep or not life.get(vid) else f'{vid}.{life[vid]}'
+        previous = set(frame['units'])
+        out = dict(frame)
+        for key in ('units', 'hp', 'shield', 'etype'):
+            if key in frame:
+                out[key] = {names.get(k, k): v for k, v in frame[key].items() if k in names or key != 'units'}
+        frames.append(out)
+    return dict(series, frames=frames)
+
+
 def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     """The subject's hits on enemy units and theirs on it, from the command to its death or the end.
 
     With foe_type, only enemy units of that cartridge id are victims: hits on any other row,
     buildings included (the N64 table holds them, the GBA unit series does not), never count."""
+    removed = [ev for ev in series.get('events', []) if ev[0] == '-B']
+    series = unit_lifetimes(series, t0, uid)
     first = next(f for f in series['frames'] if f['sf'] >= t0)
     human = first['units'][uid][1]
     own = hp_track(series, uid, t0)
@@ -901,6 +934,9 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         for k, b in before_.get('buildings', {}).items():
             if b[0] != human and b[0] < 8 and k not in after_.get('buildings', {}):
                 barriers.add(after_['sf'])
+    # A building destroyed and replaced in its slot inside one source frame shows only in the
+    # trace's removal events (GBA steps, 5 to 4 source frames).
+    barriers.update((step or 0) * 4 // 5 for _, step, *_ in removed if t0 <= (step or 0) * 4 // 5 <= end)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims_all, shielded_all = victims, shielded
@@ -963,6 +999,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         'shield_damage': statistics.median(round(d) for d in shield_exact) if shield_exact else None,
         'cooldown': statistics.median(gaps) if gaps else None, 'gaps': gaps,
         'range_first': rng, 'first_hit': sf0 - t0 if sf0 is not None else None,
+        # The first credited hit, resolved or not (sizes the GBA replay).
+        'first_landed': landed[0][0] - t0 if landed else None,
         'taken': len(taken), 'counter_values': sorted({d for _, d in taken}), 'taken_single': taken_single,
         'counter_damage': statistics.median(d for _, d in taken) if taken else None,
         # A GBA row goes in the step of the killing hit, so a one-shot death shows no hit at all:
@@ -992,14 +1030,16 @@ def lab_attack_observations(m, name, foe):
         obs.append(observation('lab.shield_damage', f'{name} on {foe}', m['shield_damage'], m['shield_damage'],
                                m['shield_damage'], 'exact', True, LAB_HP_FIELDS + ['unit.shields'],
                                unit='shield points per hit while shields last (median)'))
-    obs += [
-        observation('lab.range_first', f'{name} on {foe}', m['range_first'], m['range_first'] - LAB_RANGE_TOLERANCE,
-                    m['range_first'] + LAB_RANGE_TOLERANCE, f'+-{LAB_RANGE_TOLERANCE} N64 px', True, LAB_HP_FIELDS,
-                    unit='centre distance from the subject to its target at the first hit, N64 px'),
-        observation('lab.first_hit', f'{name} on {foe}', m['first_hit'], m['first_hit'] - MOVE_TIME_TOLERANCE,
-                    m['first_hit'] + MOVE_TIME_TOLERANCE, 'report only: includes the walk and the N64 input lag',
-                    False, LAB_HP_FIELDS, unit='source frames from the command to the first hit'),
-    ]
+    # Withheld when an earlier foe drop or kill was unresolved (it may have been the first shot).
+    if m['range_first'] is not None:
+        obs.append(observation('lab.range_first', f'{name} on {foe}', m['range_first'],
+                               m['range_first'] - LAB_RANGE_TOLERANCE, m['range_first'] + LAB_RANGE_TOLERANCE,
+                               f'+-{LAB_RANGE_TOLERANCE} N64 px', True, LAB_HP_FIELDS,
+                               unit='centre distance from the subject to its target at the first hit, N64 px'))
+    if m['first_hit'] is not None:
+        obs.append(observation('lab.first_hit', f'{name} on {foe}', m['first_hit'], m['first_hit'] - MOVE_TIME_TOLERANCE,
+                               m['first_hit'] + MOVE_TIME_TOLERANCE, 'report only: includes the walk and the N64 input lag',
+                               False, LAB_HP_FIELDS, unit='source frames from the command to the first hit'))
     if m['cooldown'] is not None:
         obs.append(observation('lab.cooldown', name, m['cooldown'], m['cooldown'] - 1, m['cooldown'] + 1,
                                '+-1 source frame', True, LAB_HP_FIELDS,
@@ -1048,7 +1088,7 @@ def lab_attack_n64(spec):
         gba = {'scenario': spec['runner'], 'profile': spec['profile'], 'at_step': step,
                'subject': [start[2] // 2, start[3] // 2], 'cmds': [[step, 1, px // 2, py // 2]],
                # Long enough for a slower GBA approach: 400 frames past the later of the first hit and the death.
-               'steps': step + int((max(m['death'] or 0, m['first_hit']) + 400) * 5 / 4) + 10}
+               'steps': step + int((max(m['death'] or 0, m['first_landed']) + 400) * 5 / 4) + 10}
         if 'mission' in spec:
             gba['mission'] = spec['mission']
         notes = [f'human owner {human}; subject row {uid}; attack-move at ({px},{py}); victims ' +

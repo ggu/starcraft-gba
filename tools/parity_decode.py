@@ -307,6 +307,10 @@ class Capture:
                     # A backward step or a long jump cannot be explained by change-step reads.
                     self.faults['unexplained_skips'] += 1
             last_tick = tick
+            if not self.ticks:
+                # The change reads as they stood at the first follow-up: a later repeat of a tick
+                # value (counter restart) must not move the leading-read checks below.
+                change_at_first = dict(change)
             paused = change.get(tick, head)['pause'] != 0
             record = {'tick': tick, 'step': head['step'], 'paused': paused, 'selector': head['selector'],
                       'seconds': head['seconds'], 'table': bool(head['flags'] & FLAG_TABLE),
@@ -367,15 +371,16 @@ class Capture:
         # A capture can also start on a tick that ran inside one step, before any follow-up
         # read: the same proof (the next tick's change read on the very next step) admits it.
         if self.ticks:
-            leading, nxt = [], change.get(self.ticks[0]['tick'])
+            early = change_at_first
+            leading, nxt = [], early.get(self.ticks[0]['tick'])
             lead = (self.ticks[0]['tick'] - 1) & 0xFFFFFFFF
-            while nxt is not None and lead in change and nxt['step'] == change[lead]['step'] + 1:
-                leading.insert(0, change[lead])   # walk back through contiguous change-only ticks
-                nxt, lead = change[lead], (lead - 1) & 0xFFFFFFFF
+            while nxt is not None and lead in early and nxt['step'] == early[lead]['step'] + 1:
+                leading.insert(0, early[lead])   # walk back through contiguous change-only ticks
+                nxt, lead = early[lead], (lead - 1) & 0xFFFFFFFF
             # An earlier in-mission change read not contiguous with them cannot be placed: any
             # in-mission change read before the first follow-up's tick that the walk did not
             # join, however many ticks back (a missing read between them breaks the chain).
-            first = change.get(self.ticks[0]['tick'])
+            first = early.get(self.ticks[0]['tick'])
             first_step = first['step'] if first is not None else self.ticks[0]['step']
             joined_lead = {id(head) for head in leading}
             # Every change record in capture order: a tick value repeated by a counter restart
@@ -393,6 +398,7 @@ class Capture:
         # showed no pause; numbered from the first in-mission (table) tick.
         # Tick -> frontend step of its change read, for order windows anchored on the press.
         self.change_steps = {t: h['step'] for t, h in change.items()}
+        self.change_reads = [(h['step'], h['tick']) for h in change_all]   # every one, capture order
         clock = -1
         self.skipped_frames = []   # (frontend step of the change read, source frame) of skipped ticks
         for index, record in enumerate(self.ticks):
