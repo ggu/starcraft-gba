@@ -77,16 +77,20 @@ def gba_series(trace_path):
     changes (series['walks'][slot] = [(sf, walk, anim)]) and the human fog sets
     (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
     [(sf, cell, visible, explored)]}, cells col + row * cols)."""
-    units, banks, frames = {}, {}, []
+    units, hp, shield, etype, banks, frames = {}, {}, {}, {}, {}, []
     orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
     keyframe = {}
+    # Births and building rows with engine type ids, for the passive train and build lab
+    # (the runner reports each profile's engine -> cartridge id maps).
+    events = []
     step, complete = None, False
 
     def flush():
         if step is None:
             return
         sf = step * 4 // 5
-        frame = {'sf': sf, 'step': step, 'units': dict(units),
+        frame = {'sf': sf, 'step': step, 'units': dict(units), 'hp': dict(hp), 'shield': dict(shield),
+                 'etype': dict(etype),
                  'banks': {o: (v, None) for o, v in banks.items()}}
         if frames and frames[-1]['sf'] == sf:
             frames[-1] = frame
@@ -119,8 +123,20 @@ def gba_series(trace_path):
                     strides = walks.setdefault(slot, [])
                     if not strides or strides[-1][1:] != walk:
                         strides.append(((step or 0) * 4 // 5,) + walk)
+                hp[slot] = float(int(words[8]))
+                shield[slot] = float(max(0, int(words[10])))
+                etype[slot] = int(words[2])   # engine type: the runner's unit_raw map gives its cartridge id
             elif tag == '-U':
                 units.pop(int(words[1]), None)
+                hp.pop(int(words[1]), None)
+                shield.pop(int(words[1]), None)
+                etype.pop(int(words[1]), None)
+            elif tag in ('+U', '+B', '-B'):
+                events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
+            elif tag == 'B':
+                # slot, engine type, owner, under construction, queue count, queue progress, queue head
+                events.append(('B', step, int(words[1]), int(words[2]), int(words[4]), int(words[11]),
+                               int(words[14]), int(words[15]), int(words[16])))
             elif tag == 'P':
                 banks[int(words[1])] = int(words[2])
             elif tag in ('FV', 'FE') and len(words) == 4:
@@ -140,7 +156,8 @@ def gba_series(trace_path):
     flush()
     if not complete:
         raise ValueError(f'{trace_path}: incomplete trace (no clean Z line)')
-    return {'source': 'gba', 'scale': 2, 'frames': frames, 'orders': orders, 'walks': walks, 'fog': fog}
+    return {'source': 'gba', 'scale': 2, 'frames': frames, 'orders': orders, 'walks': walks, 'fog': fog,
+            'events': events}
 
 
 def gba_command(scenario_id, golden, trace):
@@ -161,6 +178,18 @@ def gba_command(scenario_id, golden, trace):
         cmd += ['--unit', f'{int(x)},{int(y)}']
     if 'target' in params:
         cmd += ['--target', f'{int(params["target"][0])},{int(params["target"][1])}']
+    # Unit-class labs: the subject (an exact point, or a cartridge unit id) and timed orders,
+    # passed only to the lab runners that take them.
+    if not spec['runner'].startswith('lab-'):
+        return binary, cmd
+    if 'subject' in params:
+        cmd += ['--subject', f'{int(params["subject"][0])},{int(params["subject"][1])}']
+    if spec['runner'] == 'lab-mission':
+        cmd += ['--mission', str(int(params['mission']))]
+    if 'subject_raw' in params:
+        cmd += ['--subject-raw', str(int(params['subject_raw']))]
+    for entry in params.get('cmds', []):
+        cmd += ['--cmd', ','.join(str(int(v)) for v in entry[:4])]
     return binary, cmd
 
 
@@ -207,7 +236,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                  'why': 'the golden has no observations; ' + STALE_WHY}]
     for obs in golden['observations']:
         gating = obs['gating']
-        unproven = []
+        # A scenario with several subjects per check keys its values by (check, subject).
+        value = values.get((obs['check'], obs['subject']), values.get(obs['check']))
         unproven = []
         if gating and layout is not None:
             unproven = [k for k in obs.get('layout_proven', obs.get('layout_fields', [])) if layout.status(k) != 'proven']
@@ -218,7 +248,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         if stale(obs, golden, layout) or unproven or old_decoder:
             key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
             row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
-                   'n64': obs['value'], 'gba': values.get(obs['check']), 'provenance': provenance(obs, golden),
+                   'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden),
                    'gating': False, 'n_runs': obs['n_runs'], 'tolerance': obs['tolerance']}
             # A stale golden fails unless recording work asks for it (--allow-stale); either way it never gates.
             # So does a gating check whose fields the layout no longer proves.
@@ -230,7 +260,6 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             rows.append(row)
             continue
         key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
-        value = values.get(obs['check'])
         row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden), 'gating': obs['gating'],
                'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}
@@ -247,7 +276,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['why'] = 'recorded on the GBA only; the N64 capture has no such event'
             rows.append(row)
             continue
-        if obs['value']:
+        if obs['value'] and value != metrics.ABSENT:
             row['ratio'] = round(value / obs['value'], 3)
         gap = outside(value, obs['lo'], obs['hi'])
         known = baseline.get(key)
@@ -258,6 +287,11 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         elif known is None:
             row['verdict'] = 'REGRESSION'
             row['why'] = 'outside the band and not in the baseline'
+        elif (value == metrics.ABSENT) != (known['gba'] == metrics.ABSENT):
+            # An event the GBA now produces, or no longer produces, is never the known gap.
+            row['verdict'] = 'REGRESSION'
+            row['why'] = ('the event is absent on the GBA; the baseline holds a measurement' if value == metrics.ABSENT
+                          else 'the baseline records the event as absent on the GBA; it is now measured outside the band')
         else:
             was = outside(known['gba'], obs['lo'], obs['hi'])
             slack = max((obs['hi'] - obs['lo']) / 2, 1e-9)
@@ -296,7 +330,8 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     result = {'id': scenario_id, 'golden': str(golden_path), 'golden_sha256': hashlib.sha256(golden_path.read_bytes()).hexdigest()}
     if spec is None:
         return {**result, 'status': 'SKIP', 'why': 'no measurement code for this scenario id'}
-    if not metrics.gba_boundary_ok(int(golden['gba']['at_step'])):
+    if not all(metrics.gba_boundary_ok(int(step)) for step in
+               [golden['gba']['at_step']] + [entry[0] for entry in golden['gba'].get('cmds', [])]):
         return {**result, 'status': 'ERROR', 'why': f'GBA command step {golden["gba"]["at_step"]} shares a source frame '
                 'with its pre-command step'}
     with tempfile.TemporaryDirectory(prefix=f'sc64-parity-{scenario_id}-') as temp:
@@ -419,6 +454,8 @@ def fixture_hash(goldens):
 def fmt(v):
     if v is None:
         return '-'
+    if v == metrics.ABSENT:
+        return 'absent'
     if isinstance(v, float):
         return f'{v:.4g}'
     return str(v)

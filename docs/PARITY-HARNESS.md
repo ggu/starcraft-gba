@@ -17,13 +17,14 @@ main checkout's `.local/parity`. Only code, the layout file and the baseline
 
 | Stage | File | What it does |
 | --- | --- | --- |
+| Tape | `tools/sc64_tape_compile.py` | Compiles a scenario description into a closed-loop tape ([below](#tape-compiler)) |
 | Capture | `experiments/ares-headless/capture.py` | Runs a tape in a fresh process; `tap tick rec` writes `tap.bin` |
 | Layout | `tools/parity/sc64-usa-v1.json` | Guest RAM fields, each `proven`, `candidate` or `unknown`, with evidence |
 | Decode | `tools/parity_decode.py` | Reads `tap.bin` (and `extra.bin` regions) against the layout; per-tick records, unpaused clock, hash chain; fog, image, order decoders |
 | Field map | `tools/sc64_parity_fieldmap.py` | Mission-launch censuses against the CHK, the `.dat` table anchor, player upgrade and tech arrays, opening timelines ([audit](audits/2026-11-26-parity-field-map.md)) |
 | Golden | `tools/parity_decode.py golden` | Two agreeing captures become `$SC64_PARITY_HOME/golden/<id>.json` |
 | Measure | `tools/sc64_parity_metrics.py` | One measurement per check, used for both engines |
-| GBA run | `tests/sc64_parity_run.c` (`move`, `income`) | The same scenario through the injector and trace emitter |
+| GBA run | `tests/sc64_parity_run.c` (`move`, `income`, `lab-t1`, `lab-bb`, `lab-mission`) | The same scenario through the injector and trace emitter |
 | Judge | `tools/sc64_parity.py` | Verdicts against the band and the baseline; scorecard |
 | Loop | `./dev parity` (`make parity`) | Table differ plus every golden scenario, in parallel |
 
@@ -39,10 +40,17 @@ pause halfword clear, numbered from the first tick with a unit table. GBA time
 is simulation steps × 4/5. One unpaused N64 tick is taken as one source frame
 at any speed selector (the selector paces wall time, not ticks).
 
+A tick that begins and ends inside one frontend step leaves a change-step
+read but no follow-up record; it still counts in the unpaused clock when that
+read shows it unpaused, and its frame is simply not sampled.
+
 The hash chain is SHA-256 over each record's tick, globals and rows in order.
 A bundle is golden only when two fresh-process captures of the same tape,
 binary, ROM and CPU mode give the same chain at every tick and neither
-capture reported a cache-alias conflict or a bad table link.
+capture reported a cache-alias conflict or a bad table link. Both must
+report the same read faults, and every interior tick without a follow-up
+record must be a skipped tick with its change-step read (the first tick
+after the tap starts and the last tick may lack one).
 
 ## Layout gate
 
@@ -143,9 +151,73 @@ the map mode halfword `0x800A5AB4` reads 3, and dismisses text boxes with
 30 launch results are described in the
 [field-map audit](audits/2026-11-26-parity-field-map.md).
 
+## Unit-class labs
+
+Each lab gives one human subject timed orders: on the N64 from a compiled
+tape that loads a lab state (saved once, after the mission's opening
+transmissions), on the GBA through the injector at the same source-frame
+offsets. The subject and the human player are found by cartridge unit id,
+never by position, so tracked code holds no placements. The runner's
+`lab-*` scenarios join the subject by its halved N64 position (`--subject`)
+or, where start positions are shuffled (Blood Bath), as the only human unit
+of its id (`--subject-raw`) with orders given as offsets. Results and
+coverage are in
+[`audits/2026-11-26-parity-unit-labs.md`](audits/2026-11-26-parity-unit-labs.md).
+
+| Kind | Measures (both engines, `tools/sc64_parity_metrics.py`) | Band |
+| --- | --- | --- |
+| Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a 4-frame chord at 90% of cruise), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
+| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death | exact; ±1 frame; ±8 px; exact; ±4 frames |
+| Train and build (passive) | Blood Bath computers: N64 rows born with the status bit clear until it sets; GBA queue progress 1 to the unit's birth, and a building's birth to its completion | ±2 frames |
+
+Hit points are the 8.8 field at `+0x08`, divided by 256. A capture whose
+tape writes guest memory (`poke`) is labelled `n64-staged`.
+
+## Tape compiler
+
+`tools/sc64_tape_compile.py SCENARIO.json -o TAPE` turns a scenario file
+into a tape. Scenario files and compiled tapes hold cartridge coordinates,
+so both stay in the private fixture home; the compiler and its tests
+(`tests/test_sc64_tape_compile.py`) are tracked and asset-free.
+
+```json
+{"format": "sc64-tape-scenario/1", "id": "example-move",
+ "start": {"load": "lab.state", "step": 5000}, "camera": [0, 0], "map": [2048, 2048],
+ "program": [{"op": "guard"}, {"op": "tap"}, {"op": "select", "at": [300, 200]},
+  {"op": "order", "kind": "move", "at": [500, 300], "mark": "command"}, {"op": "wait", "steps": 450},
+  {"op": "order", "kind": "move", "at": [320, 210], "mark": "turn"}, {"op": "wait", "steps": 450}]}
+```
+
+| Op | Tape |
+| --- | --- |
+| `start` | `{"load": NAME.state, "step": N}`, `{"boot": "t1"}`, `{"boot": {"lobby": "blood-bath", "human": R, "computer": R}}` or `{"boot": {"episode": R, "mission": N}}` (the progress-byte guest edit; staged) |
+| `select`, `cursor` | Cursor onto a world point (panning with Z first when needed), A, and a check that the selection list is not empty |
+| `box` | A held while the cursor drags to the second corner |
+| `order` | `move` (C-Right), `attack` (B), `hold` (C-Left), `stop` (C-Down) at the point under the cursor; `"mark": NAME` puts `# mark NAME` right before the issuing press |
+| `boxes N` | Wait for each text box and pulse Start until the pause halfword clears |
+| `wait`, `"dismiss": true` | Idle steps; with `dismiss`, Start is pulsed only while a box is open (`pulse`) |
+| `guard`, `tap`, `save`, `shot`, `peek`, `until`, `hold`, `press`, `poke` | One frontend line each, validated |
+
+`select` takes an optional `"row"`, the KSEG0 address of the subject's unit
+row, and then requires the selection list to hold exactly that row. `poke`
+(and the episode boot that uses it) and `wait` with `dismiss` (`pulse`)
+compile only when the scenario lists them in `"frontend_commands"`, an
+explicit opt-in: `poke` writes guest memory, and captures made with
+either before both reached the tracked frontend used the field-map build.
+
+World points are reached with `untilw` lines from a fixed side (fast to a
+point short of the target, then slowly onto it), so the direction never
+depends on where the cursor or camera was. Pans aim the centred cursor at
+the point; their coarse 40/48-px steps and 2–3 steps of lag only change how
+far the cursor then travels. Before any press, four one-step `untilw`
+checks require the world point under the cursor to be within 12 px of the
+target, and a `guard` requires no open text box, so a tape that drifts
+stops with exit 9 instead of ordering the wrong unit.
+
 ## Adding a scenario
 
-1. Write a tape that reaches the situation with ordinary input, turns on
+1. Write a scenario file and compile it with `tools/sc64_tape_compile.py`
+   (or write a tape by hand) that reaches the situation, turns on
    `tap tick rec`, and marks the command step with `# mark command`. A
    tape may start from a state file (`load`) and wait on guest fields
    (`until`); marks then resolve through the run's `commands.csv`, so they

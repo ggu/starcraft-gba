@@ -11,6 +11,82 @@
    "gba": 0.308
   },
   {
+   "key": "bb-train:train.duration:Barracks",
+   "gba": 1199.2
+  },
+  {
+   "key": "bb-train:train.duration:Supply Depot",
+   "gba": 599.2
+  },
+  {
+   "key": "lab-hydralisk-move:lab.leg_duration:Hydralisk",
+   "gba": 79
+  },
+  {
+   "key": "lab-hydralisk-zealot:lab.cooldown:Hydralisk",
+   "gba": -999999
+  },
+  {
+   "key": "lab-hydralisk-zealot:lab.range_first:Hydralisk on Zealot",
+   "gba": -999999
+  },
+  {
+   "key": "lab-hydralisk-zealot:lab.shield_damage:Hydralisk on Zealot",
+   "gba": -999999
+  },
+  {
+   "key": "lab-hydralisk-zealot:lab.survival:Hydralisk",
+   "gba": 66
+  },
+  {
+   "key": "lab-marine-zergling:lab.counter_damage:Zergling on Marine",
+   "gba": -999999
+  },
+  {
+   "key": "lab-marine-zergling:lab.range_first:Marine on Zergling",
+   "gba": 127.2635
+  },
+  {
+   "key": "lab-marine-zergling:lab.survival:Marine",
+   "gba": -999999
+  },
+  {
+   "key": "lab-mutalisk-move:lab.accel_frames:Mutalisk",
+   "gba": 3
+  },
+  {
+   "key": "lab-mutalisk-move:lab.leg_duration:Mutalisk",
+   "gba": 38
+  },
+  {
+   "key": "lab-overlord-move:lab.leg_duration:Overlord",
+   "gba": 232
+  },
+  {
+   "key": "lab-overlord-move:lab.turn_cost:Overlord",
+   "gba": 0
+  },
+  {
+   "key": "lab-scv-move:lab.accel_frames:SCV",
+   "gba": 3
+  },
+  {
+   "key": "lab-scv-move:lab.leg_duration:SCV",
+   "gba": 80
+  },
+  {
+   "key": "lab-tank-move:lab.leg_duration:Siege Tank",
+   "gba": 40
+  },
+  {
+   "key": "lab-vulture-move:lab.accel_frames:Vulture",
+   "gba": 3
+  },
+  {
+   "key": "lab-vulture-move:lab.leg_duration:Vulture",
+   "gba": 42
+  },
+  {
    "key": "t1-fields:anim.walk_cycle:Marine",
    "gba": 6.0
   },

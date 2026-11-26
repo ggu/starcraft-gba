@@ -10,6 +10,9 @@
  *                   [--no-render] [--no-chain] [--no-route-checks] [--profile NAME]
  *   sc64_parity_run --scenario move --unit X,Y [--unit X,Y ...] --target X,Y --at STEP ...
  *   sc64_parity_run --scenario income ...
+ *   sc64_parity_run --scenario lab-t1|lab-bb --subject X,Y|--subject-raw ID
+ *                   --cmd STEP,KIND,X,Y [--cmd ...] ...
+ *   sc64_parity_run --scenario lab-mission --mission ID --subject ... --cmd ...
  *
  * move and income are the N64 parity scenarios (tools/sc64_parity.py passes
  * their parameters from a golden file). move launches T1 and gives the
@@ -17,6 +20,14 @@
  * to --target at step --at. income launches Blood Bath, human Zerg against
  * one Terran computer, and gives no command: the skirmish starts the human's
  * Drones mining, as the cartridge does.
+ *
+ * lab-t1 (T1), lab-bb (Blood Bath, human Zerg against one Terran computer)
+ * and lab-mission (catalog mission ID, single-race campaign products) are
+ * the unit-class labs: one human subject, joined by its exact
+ * position (--subject) or as the only human unit of a cartridge unit id
+ * (--subject-raw), gets each --cmd order before step STEP. KIND is 0 move,
+ * 1 attack-move (what the cartridge makes of B at a fogged point) or 2 stop,
+ * plus 16 when X,Y is an offset from the subject's starting point.
  *
  *   sc64_parity_run --scenario census --mission ID|skirmish --trace PATH [--steps N]
  *                   [--profile NAME]
@@ -609,6 +620,88 @@ static void pr_scenario_income(unsigned long step)
     (void)step; /* the human stays passive */
 }
 
+/* lab: one subject and up to PR_LAB_CAP timed orders. */
+enum { PR_LAB_CAP = 8, PR_LAB_MOVE = 0, PR_LAB_ATTACK = 1, PR_LAB_STOP = 2, PR_LAB_RELATIVE = 16 };
+static struct {
+    int by_raw, raw, x, y, slot, start_x, start_y, n;
+    unsigned long step[PR_LAB_CAP];
+    int kind[PR_LAB_CAP], tx[PR_LAB_CAP], ty[PR_LAB_CAP], target[PR_LAB_CAP], done[PR_LAB_CAP];
+    int ix[PR_LAB_CAP], iy[PR_LAB_CAP]; /* the point each order was issued at, after clamping */
+} lab = { .slot = -1, .x = -1 };
+
+static int pr_setup_lab(void)
+{
+    int found = -1;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE) continue;
+        if (lab.by_raw ? sc64_unit_art_raw(&u[i]) != lab.raw : (u[i].x != lab.x || u[i].y != lab.y)) continue;
+        if (found >= 0) {
+            fprintf(stderr, "lab: two human units match the subject (slots %d and %d)\n", found, i);
+            return 0;
+        }
+        found = i;
+    }
+    if (found < 0) {
+        int near = lab.by_raw ? -1 : pr_nearest_unit(lab.x, lab.y, -1, -1);
+        fprintf(stderr, "lab: no human subject %s %d,%d (nearest unit: slot %d at %d,%d)\n", lab.by_raw ? "of raw id" : "at",
+                lab.by_raw ? lab.raw : lab.x, lab.y, near, near >= 0 ? u[near].x : -1, near >= 0 ? u[near].y : -1);
+        return 0;
+    }
+    lab.slot = found;
+    lab.start_x = u[found].x;
+    lab.start_y = u[found].y;
+    for (int k = 0; k < lab.n; ++k) lab.target[k] = -1;
+    return lab.n > 0;
+}
+
+static void pr_scenario_lab(unsigned long step)
+{
+    for (int k = 0; k < lab.n; ++k) {
+        int x, y, kind = lab.kind[k] & ~PR_LAB_RELATIVE;
+        if (lab.step[k] != step || lab.done[k]) continue;
+        lab.done[k] = 1;
+        if (!pr_command_step) pr_command_step = step;
+        x = lab.tx[k] + (lab.kind[k] & PR_LAB_RELATIVE ? lab.start_x : 0);
+        y = lab.ty[k] + (lab.kind[k] & PR_LAB_RELATIVE ? lab.start_y : 0);
+        x = pr_clamp_x(x);
+        y = pr_clamp_y(y);
+        lab.ix[k] = x;
+        lab.iy[k] = y;
+        if (!u[lab.slot].alive) { sc64_pi_fail("lab", "the subject died before command %d", k); continue; }
+        if (kind == PR_LAB_MOVE) sc64_pi_move(lab.slot, x, y);
+        else if (kind == PR_LAB_STOP) sc64_pi_stop(lab.slot);
+        else {
+            /* The N64 lab presses B at a point under fog, which the cartridge turns into an
+             * attack-move (order 14): the same order here, to the same point. */
+            lab.target[k] = pr_nearest_unit(x, y, SIDE, -1);
+            sc64_pi_attack_move(lab.slot, x, y);
+        }
+    }
+}
+
+static int pr_parse_cmd(const char *text)
+{
+    long v[4];
+    const char *at = text;
+    char *end;
+    if (lab.n >= PR_LAB_CAP) return 0;
+    for (int k = 0; k < 4; ++k) {
+        v[k] = strtol(at, &end, 10);
+        if (end == at || (k < 3 ? *end != ',' : *end != 0)) return 0;
+        at = end + 1;
+    }
+    if (v[0] < 2 || v[0] > 1000000 || (v[1] & ~PR_LAB_RELATIVE) > PR_LAB_STOP || v[1] < 0 ||
+        v[2] < -65535 || v[2] > 65535 || v[3] < -65535 || v[3] > 65535)
+        return 0;
+    if (lab.n && (unsigned long)v[0] <= lab.step[lab.n - 1]) return 0; /* increasing steps, one order each */
+    lab.step[lab.n] = (unsigned long)v[0];
+    lab.kind[lab.n] = (int)v[1];
+    lab.tx[lab.n] = (int)v[2];
+    lab.ty[lab.n] = (int)v[3];
+    ++lab.n;
+    return 1;
+}
+
 static int pr_parse_point(const char *text, int *x, int *y)
 {
     char *end;
@@ -706,7 +799,7 @@ int main(int argc, char **argv)
 {
     const char *scenario = 0, *trace_path = 0, *profile = "unnamed", *mission_arg = 0;
     unsigned long limit = 3000;
-    int skirmish, kind, steps_given = 0, steps_ok = 1, move_args = 0;
+    int skirmish, kind, steps_given = 0, steps_ok = 1, move_args = 0, lab_args = 0, lab_mission = -1;
     double t0, t1, c0, c1;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--scenario") && i + 1 < argc) scenario = argv[++i];
@@ -727,6 +820,14 @@ int main(int argc, char **argv)
                  pr_parse_point(argv[i + 1], &pr_group_x[pr_group_n], &pr_group_y[pr_group_n])) { ++pr_group_n; ++i; move_args = 1; }
         else if (!strcmp(argv[i], "--target") && i + 1 < argc && pr_parse_point(argv[i + 1], &pr_target_x, &pr_target_y)) { ++i; move_args = 1; }
         else if (!strcmp(argv[i], "--at") && i + 1 < argc && (pr_at_step = strtoul(argv[++i], 0, 10)) >= 2) move_args = 1;
+        else if (!strcmp(argv[i], "--subject") && i + 1 < argc && pr_parse_point(argv[i + 1], &lab.x, &lab.y)) { ++i; lab_args = 1; }
+        else if (!strcmp(argv[i], "--subject-raw") && i + 1 < argc) {
+            char *end = 0;
+            long raw = strtol(argv[++i], &end, 10);
+            if (!*argv[i] || *end || raw < 0 || raw > 255) { scenario = 0; break; }
+            lab.by_raw = 1; lab.raw = (int)raw; lab_args = 1;
+        }
+        else if (!strcmp(argv[i], "--cmd") && i + 1 < argc && pr_parse_cmd(argv[i + 1])) { ++i; lab_args = 1; }
         else { scenario = 0; break; }
     }
     for (const char *c = profile; *c; ++c)
@@ -734,21 +835,33 @@ int main(int argc, char **argv)
             scenario = 0; /* the name goes into JSON and the trace header unescaped */
             break;
         }
-    if (scenario && !strcmp(scenario, "census") && mission_arg && steps_ok && !move_args)
+    if (scenario && !strcmp(scenario, "census") && mission_arg && steps_ok && !move_args && !lab_args)
         return pr_census(mission_arg, trace_path, profile, steps_given ? limit : 0ul);
-    /* kind: 0 t1, 1 skirmish, 2 move, 3 income */
+    /* kind: 0 t1, 1 skirmish, 2 move, 3 income, 4 lab-t1, 5 lab-bb */
     kind = !scenario ? -1 : !strcmp(scenario, "t1") ? 0 : !strcmp(scenario, "skirmish") ? 1 :
-           !strcmp(scenario, "move") ? 2 : !strcmp(scenario, "income") ? 3 : -1;
-    if (kind < 0 || !limit || mission_arg || (kind == 2 && (!pr_group_n || pr_target_x < 0))) {
+           !strcmp(scenario, "move") ? 2 : !strcmp(scenario, "income") ? 3 :
+           !strcmp(scenario, "lab-t1") ? 4 : !strcmp(scenario, "lab-bb") ? 5 :
+           !strcmp(scenario, "lab-mission") ? 6 : -1;
+    if (kind == 6) {
+        char *end = 0;
+        long v = mission_arg ? strtol(mission_arg, &end, 10) : -1;
+        if (!mission_arg || !*mission_arg || *end || v < 0 || v >= SC64_BASE_MISSION_COUNT) kind = -1;
+        else lab_mission = (int)v;
+    }
+    if (kind < 0 || !limit || !steps_ok || (mission_arg && kind != 6) || (kind == 2 && (!pr_group_n || pr_target_x < 0)) ||
+        (lab_args && kind < 4) ||
+        (kind >= 4 && (pr_group_n || pr_target_x >= 0 || !lab.n || (!lab.by_raw) == (lab.x < 0)))) {
         fprintf(stderr, "usage: %s --scenario t1|skirmish [--steps N] [--trace PATH] [--no-render] [--no-chain]\n"
                 "       [--no-route-checks] [--profile NAME]\n"
                 "       %s --scenario move --unit X,Y [--unit X,Y ...] --target X,Y [--at STEP] ...\n"
                 "       %s --scenario income [--at STEP] ...\n"
+                "       %s --scenario lab-t1|lab-bb --subject X,Y|--subject-raw ID --cmd STEP,KIND,X,Y ...\n"
+                "       %s --scenario lab-mission --mission ID --subject X,Y|--subject-raw ID --cmd ...\n"
                 "       %s --scenario census --mission ID|skirmish --trace PATH [--steps N] [--profile NAME]\n",
-                argv[0], argv[0], argv[0], argv[0]);
+                argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 64;
     }
-    skirmish = kind == 1 || kind == 3;
+    skirmish = kind == 1 || kind == 3 || kind == 5;
 #ifdef SC64_PARITY_TRACE
     sc64_pt_route_checks = pr_checks_on;
     if (trace_path) {
@@ -761,14 +874,15 @@ int main(int argc, char **argv)
     if (trace_path) { fprintf(stderr, "this build has no trace emitter (SC64_PARITY_TRACE)\n"); return 64; }
 #endif
     t0 = pr_now(); c0 = pr_cpu();
-    if (!(skirmish ? pr_launch_skirmish(R_ZERG, R_TER) : pr_launch_t1())) {
+    if (!(skirmish ? pr_launch_skirmish(R_ZERG, R_TER) : kind == 6 ? pr_launch_mission(lab_mission) : pr_launch_t1())) {
         fprintf(stderr, "%s: menu launch failed (screen=%d page=%d)\n", scenario, screen, race_front.page);
         return 66;
     }
     if (!pr_hash_selftest()) { fputs("parity world-hash mutation regression failed\n", stderr); return 67; }
     {
         uint64_t route = route_purity_hash();
-        if (!(kind == 0 ? pr_setup_t1() : kind == 1 ? pr_setup_skirmish() : kind == 2 ? pr_setup_move() : pr_setup_income()))
+        if (!(kind == 0 ? pr_setup_t1() : kind == 1 ? pr_setup_skirmish() : kind == 2 ? pr_setup_move() :
+              kind == 3 ? pr_setup_income() : pr_setup_lab()))
             return 66;
         ++pr_route_checks;
         if (route_purity_hash() != route) { fputs("parity runner: scenario setup changed route state\n", stderr); abort(); }
@@ -791,7 +905,8 @@ int main(int argc, char **argv)
             if (kind == 0) pr_scenario_t1(dispatched);
             else if (kind == 1) pr_scenario_skirmish(dispatched);
             else if (kind == 2) pr_scenario_move(dispatched);
-            else pr_scenario_income(dispatched);
+            else if (kind == 3) pr_scenario_income(dispatched);
+            else pr_scenario_lab(dispatched);
             if (pr_checks_on) {
                 ++pr_route_checks;
                 sc64_pi_route_expect_end("during the scenario");
@@ -812,15 +927,39 @@ int main(int argc, char **argv)
     /* Every scripted command must have been issued, not left waiting. */
     if (kind == 2 && !sc64_pi_status.failures && !pr_command_step)
         sc64_pi_fail("scenario", "run ended at step %lu before the command step %lu", pr_steps, pr_at_step);
+    for (int k = 0; kind >= 4 && k < lab.n && !sc64_pi_status.failures; ++k)
+        if (!lab.done[k]) sc64_pi_fail("lab", "run ended at step %lu before command %d (step %lu)", pr_steps, k, lab.step[k]);
     if (!sc64_pi_status.failures && ((sc.train.armed && !sc.train.done) || (sc.build.armed && !sc.build.done)))
         sc64_pi_fail("scenario", "run ended at step %lu before the train or build command was issued", pr_steps);
     {
         uint64_t world = pr_world_hash();
-        char movers[PR_GROUP_CAP * 8 + 1] = "";
+        char movers[PR_GROUP_CAP * 8 + 1] = "", lab_json[4096] = "";
         /* The command goes in before step pr_command_step, so the last state
          * without it is that of the step before. */
         unsigned long command_sf = pr_command_step ? (pr_command_step - 1) * 4ul / 5ul : 0;
-        for (int k = 0; kind >= 2 && k < pr_group_n; ++k)
+        if (kind >= 4) {
+            /* Each order's last state without it: the step before its own. */
+            snprintf(lab_json, sizeof(lab_json), ",\"subject\":%d,\"subject_start\":[%d,%d],\"lab\":[", lab.slot,
+                     lab.start_x, lab.start_y);
+            for (int k = 0; k < lab.n; ++k)
+                snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "%s[%lu,%lu,%d,%d,%d,%d]",
+                         k ? "," : "", lab.step[k], (lab.step[k] - 1) * 4ul / 5ul, lab.kind[k], lab.target[k],
+                         lab.ix[k], lab.iy[k]);
+            snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "]");
+        }
+        /* Engine type -> cartridge unit id, so traces whose rows carry no raw ids
+         * (zerg-z10) can still be measured by cartridge id. */
+        snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), ",\"unit_raw\":[");
+        for (int t = 0; t < SC_RU_COUNT; ++t)
+            snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "%s%d", t ? "," : "",
+                     sc64_race_raw_unit(t));
+        snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "],\"building_raw\":[");
+        for (int t = 0; t < SC_RB_COUNT; ++t)
+            snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "%s%d", t ? "," : "",
+                     sc64_race_raw_building(t));
+        snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "]");
+        if (strlen(lab_json) + 1 >= sizeof(lab_json)) { fputs("parity runner: report buffer too small\n", stderr); return 74; }
+        for (int k = 0; (kind == 2 || kind == 3) && k < pr_group_n; ++k)
             snprintf(movers + strlen(movers), sizeof(movers) - strlen(movers), "%s%d", k ? "," : "", pr_group_slot[k]);
 #ifdef SC64_PARITY_TRACE
         if (pr_trace) {
@@ -836,7 +975,7 @@ int main(int argc, char **argv)
                "\"gas_assigned\":%d,\"gas_pickup\":%d,\"gas_delivered\":%d,"
                "\"verbs\":%u,\"setup_failures\":%u,\"command_step\":%lu,\"command_sf\":%lu,\"human_owner\":%d,\"movers\":[%s],"
                "\"first_failure\":\"%s\",\"attack_mode\":\"%s\",\"wall_seconds\":%.6f,\"cpu_seconds\":%.6f,"
-               "\"updates_per_cpu_second\":%.1f}\n",
+               "\"updates_per_cpu_second\":%.1f%s}\n",
                profile, scenario,
 #ifdef SC64_PARITY_TRACE
                1,
@@ -851,7 +990,7 @@ int main(int argc, char **argv)
                sc64_pi_status.issued,
                sc64_pi_status.failures, pr_command_step, command_sf, SIDE, movers,
                sc64_pi_status.first_failure, sc64_pi_attack_mode(),
-               t1 - t0, c1 - c0, c1 > c0 ? (double)pr_host_ticks / (c1 - c0) : 0.0);
+               t1 - t0, c1 - c0, c1 > c0 ? (double)pr_host_ticks / (c1 - c0) : 0.0, lab_json);
     }
     return sc64_pi_status.failures ? 3 : 0;
 }

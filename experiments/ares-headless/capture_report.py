@@ -283,7 +283,7 @@ def expected_checkpoints(run, allow_load=False, planned_end=None):
             completed = int(words[2]) if len(words) > 2 else 0   # later steps are numbered from STEP
         elif words[0] == 'mode' and allow_load:
             continue
-        elif words[0] in ('until', 'load', 'mode'):
+        elif words[0] in ('until', 'untilw', 'load', 'mode'):
             return None
     seen, keys = collections.Counter(), set()
     for step in steps:
@@ -1356,11 +1356,11 @@ def s3(run):
 def throughput(run):
     # Pair each run command with its tap mode and CPU mode from the tape order in bridge.log replies.
     rows = read_csv(run / 'commands.csv')
-    # Pad commands answer "OK step wall cpu"; "until" answers "UNTIL..." and is not timed here.
+    # Pad commands answer "OK step wall cpu"; "until"/"untilw" answer "UNTIL..."/"UNTILW..." and are not timed here.
     replies = [l.split() for l in open(run / 'bridge.log')
-               if (l.startswith('OK ') and len(l.split()) == 4) or l.startswith(('UNTIL ', 'UNTILMISS '))]
+               if (l.startswith('OK ') and len(l.split()) == 4) or l.startswith(('UNTIL ', 'UNTILMISS ', 'UNTILW ', 'UNTILWMISS ', 'PULSE '))]
     tape = (run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape') if (run / 'tape.txt').is_file() else ''
-    if not tape or (len(replies) != len(rows) and not any(r[0] == 'UNTILMISS' for r in replies)):
+    if not tape or (len(replies) != len(rows) and not any(r[0] in ('UNTILMISS', 'UNTILWMISS') for r in replies)):
         print(f'throughput: {len(replies)} timed replies for {len(rows)} commands; tape copy present={bool(tape)}')
         return
     import json
@@ -1369,11 +1369,11 @@ def throughput(run):
     index = 0
     for words in frontend_lines(tape):
         word = words[0]
-        if word == 'until':
-            if index >= len(replies) or replies[index][0] not in ('UNTIL', 'UNTILMISS'):
+        if word in ('until', 'untilw', 'pulse'):
+            if index >= len(replies) or replies[index][0] not in ('UNTIL', 'UNTILMISS', 'UNTILW', 'UNTILWMISS', 'PULSE'):
                 print('throughput: replies do not follow the tape; no report')
                 return
-            if replies[index][0] == 'UNTILMISS':
+            if replies[index][0] in ('UNTILMISS', 'UNTILWMISS'):
                 break   # the frontend exited at the miss
             index += 1
         elif word == 'mode':

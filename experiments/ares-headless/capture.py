@@ -5,7 +5,7 @@
 The tape is passed to the child's stdin line by line. Lines are frontend
 commands ("steps mask x y", "hash", "every N", "tap off|tick|step [raw [K]] [rec]",
 "verify N branch|same [full]", "mode jit|interp", "watch ADDR BYTES|off",
-"until ADDR BYTES OP VALUE MAX MASK X Y [HOLD GAP]", "save NAME.state",
+"until ADDR BYTES OP VALUE MAX MASK X Y [HOLD GAP]", "untilw x|y OP VALUE MAX MASK X Y", "save NAME.state",
 "load NAME [STEP]",
 "flush", "peek ADDR N", "dump NAME", "shot NAME", "quit"); see CAPTURE.md.
 State files given with --state-input are copied into the run's input/
@@ -303,7 +303,10 @@ def main():
         pokes = [line.split(',', 2)[2] for line in (events.read_text().split('\n')[1:] if events.is_file() else [])
                  if line.split(',', 2)[1:2] == ['poke']]
         manifest['pokes'] = len(pokes)
-        if pokes or staged_inputs:
+        # A compiled tape whose start state came from a staged run carries a `# n64-staged` line
+        # (tools/sc64_tape_compile.py): the run, and any state it saves, stays staged.
+        marked = any(line.startswith(b'# n64-staged') for line in tape_copy.read_bytes().split(b'\n'))
+        if pokes or staged_inputs or marked:
             manifest['n64_staged'] = True
         if staged_inputs:
             manifest['n64_staged_inputs'] = staged_inputs

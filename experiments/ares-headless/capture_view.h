@@ -182,6 +182,25 @@ constexpr bool sc64_capture_until_met(Sc64UntilOp op, std::uint32_t value, std::
     }
 }
 
+/* World point under the cursor on one axis ("untilw"): the camera word (s32,
+ * world pixels of the screen's top-left corner) plus the cursor (u16, screen
+ * units), as a signed value (S6). Only eq, ne, ge and lt apply, signed. */
+constexpr std::int64_t sc64_capture_world(std::uint32_t camera, std::uint32_t cursor) {
+    return std::int64_t(std::int32_t(camera)) + std::int64_t(cursor & 0xFFFFu);
+}
+constexpr bool sc64_capture_world_op_ok(Sc64UntilOp op) {
+    return op == Sc64UntilOp::eq || op == Sc64UntilOp::ne || op == Sc64UntilOp::ge || op == Sc64UntilOp::lt;
+}
+constexpr bool sc64_capture_world_met(Sc64UntilOp op, std::int64_t value, std::int64_t target) {
+    switch (op) {
+    case Sc64UntilOp::eq: return value == target;
+    case Sc64UntilOp::ne: return value != target;
+    case Sc64UntilOp::ge: return value >= target;
+    case Sc64UntilOp::lt: return value < target;
+    default: return false;
+    }
+}
+
 /* Hex text of 1 to 8 digits, with an optional 0x, as a 32-bit value. */
 constexpr bool sc64_capture_hex32(const char *text, std::uint32_t *out) {
     if (!text || !out) return false;
