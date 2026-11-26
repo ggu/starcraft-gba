@@ -300,16 +300,16 @@ test-sc64-route-point-certificate: build/test-sc64-route-point-certificate build
 	./$< --emit build/route-point-certificate-candidate.ref
 	cmp build/route-point-certificate-reference.ref.state build/route-point-certificate-candidate.ref.state
 
-ROUTE_POINT_FAR_TEST_FLAGS = $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ
-ROUTE_POINT_FAR_TEST_DEPS = tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h starcraft/sc64_route_point_far_read.h
-build/test-sc64-route-point-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) | build
-	$(CLANG) $(ROUTE_POINT_FAR_TEST_FLAGS) $< -o $@
-build/test-sc64-route-point-far-read-without-monotone-movement: $(ROUTE_POINT_FAR_TEST_DEPS) | build
-	$(CLANG) $(filter-out -DSC64_ROUTE_MONOTONE_PROBE,$(ROUTE_POINT_FAR_TEST_FLAGS)) -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
-.PHONY: test-sc64-route-point-far-read
-test-sc64-route-point-far-read: build/test-sc64-route-point-far-read build/test-sc64-route-point-far-read-without-monotone-movement
+ROUTE_POINT_RANGE_TEST_FLAGS = $(ROUTE_POINT_PREFIX_TEST_FLAGS) -DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS
+ROUTE_POINT_RANGE_TEST_DEPS = tests/sc64_range_copy_alignment.c $(filter-out tests/sc64_route_keep_fields.c,$(ROUTE_KEEP_TEST_DEPS)) starcraft/sc64_range_work.h starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h
+build/test-sc64-route-point-range-planes: $(ROUTE_POINT_RANGE_TEST_DEPS) | build
+	$(CLANG) $(ROUTE_POINT_RANGE_TEST_FLAGS) $< -o $@
+build/test-sc64-route-point-range-planes-composed: $(ROUTE_POINT_RANGE_TEST_DEPS) mk/combat-perf/Makefile | build
+	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS $< -o $@
+.PHONY: test-sc64-route-point-range-planes
+test-sc64-route-point-range-planes: build/test-sc64-route-point-range-planes build/test-sc64-route-point-range-planes-composed
 	./$<
-	./build/test-sc64-route-point-far-read-without-monotone-movement
+	./build/test-sc64-route-point-range-planes-composed
 
 ROUTE_POINT_RESERVE_FLAGS = $(filter-out -DSC64_ROUTE_MONOTONE_PROBE,$(ROUTE_POINT_PREFIX_TEST_FLAGS)) \
 	-DSC64_ROUTE_POINT_SECOND_EXACT_HIT -DSC64_ROUTE_POINT_COLD_CERTIFICATE \
@@ -358,10 +358,8 @@ test-sc64-wide-point-memo: build/test-sc64-wide-point-memo
 
 build/test-sc64-route-composed: $(ROUTE_KEEP_TEST_DEPS) starcraft/sc64_route_point_prefix_probe.h starcraft/sc64_route_point_certificate.h | build
 	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) $< -o $@
-build/test-sc64-route-composed-far-read: $(ROUTE_POINT_FAR_TEST_DEPS) mk/combat-perf/Makefile | build
-	$(CLANG) $(ROUTE_POINT_COMPOSED_TEST_FLAGS) -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_ROUTE_POINT_FAR_READ -DSC64_TEST_FAR_READ_WITHOUT_MONOTONE_MOVEMENT $< -o $@
 .PHONY: test-sc64-route-composed
-test-sc64-route-composed: build/test-sc64-route-composed build/test-sc64-route-composed-far-read
+test-sc64-route-composed: build/test-sc64-route-composed build/test-sc64-route-point-range-planes-composed
 	./$< --point-prefix-compaction-only
 	./$< --point-component-only
 	./$< --point-certificate-only
@@ -369,7 +367,7 @@ test-sc64-route-composed: build/test-sc64-route-composed build/test-sc64-route-c
 	./$< --point-near-demand-only
 	./$< --sparse-linear-only
 	./$< --small-component-only
-	./build/test-sc64-route-composed-far-read
+	./build/test-sc64-route-point-range-planes-composed
 
 build/test-sc64-route-linear-word-pack: $(ROUTE_KEEP_TEST_DEPS) | build
 	$(CLANG) $(ROUTE_LINEAR_TEST_FLAGS) $(ROUTE_LINEAR_CANDIDATE_FLAGS) -DSC64_ROUTE_LINEAR_WORD_PACK_PROBE $< -o $@
@@ -429,3 +427,20 @@ build/test-sc64-depot-cell-point-diff: tests/sc64_depot_cell_point_diff.c starcr
 test-sc64-depot-cell-point-diff: build/test-sc64-depot-cell-point-diff
 	./build/test-sc64-depot-cell-point-diff
 test-starcraft: test-sc64-depot-cell-point-diff
+
+# The route field count changes speed and memory, never play: custom games
+# with 12 fields must match the 14-field build update by update, through the
+# first offensives (from about update 10,600).
+# This file is included before the profile inputs are defined; the 14-field
+# build carries them, so the 12-field build follows it.
+build/test-sc64-route-size-zerg-12: build/test-sc64-skirmish-ai-progress-zerg tests/sc64_skirmish_ai_progress.c $(wildcard starcraft/*.c starcraft/*.h) mk/combat-perf/Makefile
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(CANONICAL_ZERG_PROFILE_FLAGS) -DSC64_ROUTE_FIXED_SLOTS=12 tests/sc64_skirmish_ai_progress.c common/gba.c starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-sc64-route-cache-size
+test-sc64-route-cache-size: build/test-sc64-skirmish-ai-progress-zerg build/test-sc64-route-size-zerg-12
+	@set -e; for map in 0 1; do for human in t z p; do \
+	  for build in skirmish-ai-progress-zerg route-size-zerg-12; do \
+	    TRACE_OUT=build/route-size-$$map-$$human-$$build.bin ./build/test-sc64-$$build \
+	      --map $$map --human $$human --bots tzp --mirror --ticks 14000 --every 100000 > /dev/null; \
+	  done; \
+	  cmp build/route-size-$$map-$$human-skirmish-ai-progress-zerg.bin build/route-size-$$map-$$human-route-size-zerg-12.bin; \
+	done; done; echo "PASS 12 and 14 route fields play six custom games identically"
