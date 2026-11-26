@@ -6,6 +6,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = importlib.util.spec_from_file_location("sc64_parity_selfgate", ROOT / "tools" / "sc64_parity_selfgate.py")
@@ -26,14 +27,19 @@ class ParitySelfgateTest(unittest.TestCase):
 
     def test_dependency_file_lists_each_path_once(self):
         with tempfile.TemporaryDirectory() as scratch:
-            dep = Path(scratch) / "run.d"
+            root = Path(scratch).resolve() / "repo"
+            root.mkdir()
+            inputs = root.parent / "private-inputs"
+            inputs.mkdir()
+            (root / ".local").symlink_to(inputs, target_is_directory=True)
+            dep = root / "run.d"
             dep.write_text("build/parity/x: tests/sc64_parity_run.c \\\n"
                            "  starcraft/game.c .local/sc64/a/generated/h.h \\\n"
-                           "  starcraft/game.c\n")
-            paths = selfgate.dependency_paths(dep)
-        names = [str(p.relative_to(ROOT)) for p in paths]
-        self.assertEqual(names, ["tests/sc64_parity_run.c", "starcraft/game.c",
-                                 ".local/sc64/a/generated/h.h"])
+                           "  starcraft/game.c ../private-inputs/sc64/a/generated/h.h\n")
+            with patch.object(selfgate, "ROOT", root):
+                paths = selfgate.dependency_paths(dep)
+            self.assertEqual(paths, [root / "tests/sc64_parity_run.c", root / "starcraft/game.c",
+                                     inputs / "sc64/a/generated/h.h"])
 
     def test_record_shapes(self):
         self.assertTrue(selfgate.record_ok(b"S 1 0 6 1 1 0 0 0 1 -1 0"))
