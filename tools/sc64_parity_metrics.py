@@ -482,9 +482,10 @@ SCENARIOS.update(FIELD_SCENARIOS)
 # both engines. Subjects and the human player are found by cartridge unit id,
 # never by position, so no placement is written into tracked code.
 
-# The labs read the subject's order byte and gate on its Move and AttackMove values.
+# The labs read the subject's order byte and gate on the order values they accept: Move or
+# AttackMove for a move lab, AttackMove alone for an attack lab.
 LAB_FIELDS = MOVE_FIELDS + ['unit.order', 'order.6', 'order.14']
-LAB_HP_FIELDS = LAB_FIELDS + ['unit.hp']
+LAB_HP_FIELDS = MOVE_FIELDS + ['unit.order', 'order.14', 'unit.hp']
 LAB_ACCEL_FRACTION = 0.9     # acceleration ends at the first chord this close to cruise
 LAB_ACCEL_CHORD = 4          # shortest chord, source frames
 LAB_ACCEL_GRID_STEPS = 2     # a chord spans at least this many GBA position steps at cruise:

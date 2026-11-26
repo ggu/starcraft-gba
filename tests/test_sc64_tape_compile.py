@@ -890,6 +890,14 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(metrics.n64_order_after(HeldRead, 9, 101, (metrics.ORDER_MOVE, metrics.ORDER_ATTACK_MOVE)), (6, [6]))
         self.assertIsNone(metrics.n64_order_after(HeldRead, 9, 101, metrics.ORDER_ATTACK_MOVE)[0])
 
+        class PressSkip(Cap):   # tick 51 began at the press step and ended inside it, unread: it
+            # could have held the press's first order, so a later Move is no evidence
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 50, 3), (103, 52, 6))]
+            change_reads = [(99, 50), (101, 51), (102, 52)]
+        ok, seen = metrics.n64_order_after(PressSkip, 9, 101, metrics.ORDER_MOVE)
+        self.assertIsNone(ok)
+        self.assertIn('the order at the press was not read', seen)
+
         class Wrapped(Cap):   # the counter wraps between the read pre-press tick and the press
             ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 0xFFFFFFFF, 3), (103, 0, 3), (106, 1, 6))]
             change_steps = {0xFFFFFFFF: 99, 0: 102, 1: 105}
