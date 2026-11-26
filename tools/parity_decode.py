@@ -531,15 +531,26 @@ TAP_BANKS, TAP_RNG, TAP_ROWS = '0x800B1D44', '0x800EFF20', (900, 312)
 # The capture-time format as tap.bin holds it: the clock fields' addresses and widths, the
 # unit table locator, row size and liveness rule, and the recorded bank and RNG blocks (their
 # array offsets are decoded later and may change). Fixed by the frontend, not by the layout.
-TAP_FORMAT_SHA256 = 'b4a6b23491008b47eb7d4583e0a26d6352cc15297ad2a49d4246072fadc59c20'
+TAP_FORMAT_SHA256 = '131ffcd2fc7d0c7c766b75613b64c5403ef58639be236ba6d7db00fb31f127fb'
 
 
 def tap_format(layout):
     doc = layout.doc
-    return semantic({'clock': {k: doc['clock'][k] for k in ('tick_counter', 'pause_halfword', 'seconds', 'selector')},
-                     'unit_table': doc['unit_table'],
-                     'banks': {k: doc['globals']['banks'][k] for k in ('address', 'players', 'type')},
-                     'rng': doc['globals']['rng']})
+
+    def norm(value):   # hex spellings compare by value
+        if isinstance(value, dict):
+            return {k: norm(v) for k, v in value.items()}
+        if isinstance(value, str) and value[:2].lower() == '0x':
+            try:
+                return f'0x{int(value, 16):08X}'
+            except ValueError:
+                return value
+        return value
+    return norm(semantic({'clock': {k: doc['clock'][k] for k in ('tick_counter', 'pause_halfword', 'seconds', 'selector',
+                                                                 'record_rule')},
+                          'unit_table': doc['unit_table'],
+                          'banks': {k: doc['globals']['banks'][k] for k in ('address', 'players', 'type')},
+                          'rng': doc['globals']['rng']}))
 
 
 def check_tap_contract(layout):

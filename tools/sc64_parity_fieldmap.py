@@ -127,27 +127,32 @@ def max_pairs(left: list, right: list, fits) -> list:
 
 
 def assignment(weight: list) -> list:
-    """Maximum-weight assignment of a rows x columns weight matrix (Hungarian algorithm, exact
-    integers), as [(row, column)]; rows or columns may stay unassigned (weight 0)."""
+    """Maximum-weight assignment of a rows x columns weight matrix (Hungarian algorithm on the
+    rectangular matrix, smaller side as rows, exact integers), as [(row, column)]; a pair of
+    weight 0 counts as unassigned."""
     rows, cols = len(weight), len(weight[0]) if weight else 0
-    n = max(rows, cols)
-    top = max((w for line in weight for w in line), default=0)
-    cost = [[top - (weight[i][j] if i < rows and j < cols else 0) for j in range(n)] for i in range(n)]
-    u, v, match, way = [0] * (n + 1), [0] * (n + 1), [0] * (n + 1), [0] * (n + 1)
+    if not rows or not cols:
+        return []
+    if rows > cols:
+        return sorted((i, j) for j, i in assignment([list(column) for column in zip(*weight)]))
+    n, m = rows, cols
+    top = max(w for line in weight for w in line)
+    cost = [[top - weight[i][j] for j in range(m)] for i in range(n)]
+    u, v, match, way = [0] * (n + 1), [0] * (m + 1), [0] * (m + 1), [0] * (m + 1)
     for i in range(1, n + 1):
         match[0], j0 = i, 0
-        minv, used = [None] * (n + 1), [False] * (n + 1)
+        minv, used = [None] * (m + 1), [False] * (m + 1)
         while True:
             used[j0] = True
             i0, delta, j1 = match[j0], None, 0
-            for j in range(1, n + 1):
+            for j in range(1, m + 1):
                 if not used[j]:
                     cur = cost[i0 - 1][j - 1] - u[i0] - v[j]
                     if minv[j] is None or cur < minv[j]:
                         minv[j], way[j] = cur, j0
                     if delta is None or minv[j] < delta:
                         delta, j1 = minv[j], j
-            for j in range(n + 1):
+            for j in range(m + 1):
                 if used[j]:
                     u[match[j]] += delta
                     v[j] -= delta
@@ -162,8 +167,7 @@ def assignment(weight: list) -> list:
             j0 = j1
             if j0 == 0:
                 break
-    return sorted((match[j] - 1, j - 1) for j in range(1, n + 1)
-                  if match[j] and match[j] - 1 < rows and j - 1 < cols)
+    return sorted((match[j] - 1, j - 1) for j in range(1, m + 1) if match[j] and weight[match[j] - 1][j - 1] > 0)
 
 
 def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
@@ -506,6 +510,9 @@ def big_endian(fmt: str, raw: bytes) -> bytes:
     return b''.join(raw[i:i + size][::-1] for i in range(0, len(raw), size))
 
 
+PACKED_U16 = {'units.placement', 'units.addon', 'units.dimensions'}   # columns of u16 pairs or quads
+
+
 def per_u16(raw: bytes) -> bytes:
     return b''.join(raw[i:i + 2][::-1] for i in range(0, len(raw), 2))
 
@@ -528,7 +535,7 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
         nxt = following.get(name)
         if nxt is None or at < 0:
             return False
-        blobs = [big_endian(nxt[1], nxt[3])] + ([per_u16(nxt[3])] if nxt[1] in ('I', 'Q') else [])
+        blobs = [big_endian(nxt[1], nxt[3])] + ([per_u16(nxt[3])] if nxt[0] in PACKED_U16 else [])
         return any(ram[at:at + len(blob)] == blob for blob in blobs)
 
     for name, fmt, rows, raw in columns:
@@ -537,7 +544,7 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
         expected = previous.get(table)
         # Columns that pack u16 halves (placement, addon, dimensions: 'I' and 'Q') may be stored
         # per u16; every other column only as big-endian values.
-        candidates = (('be', big_endian(fmt, raw)),) + ((('u16', per_u16(raw)),) if fmt in ('I', 'Q') else ())
+        candidates = (('be', big_endian(fmt, raw)),) + ((('u16', per_u16(raw)),) if name in PACKED_U16 else ())
         found = None
         hint = hints.get(name) if expected is None else None
         if hint is not None and next_matches(name, align(hint + size)):

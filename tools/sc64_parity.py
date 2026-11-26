@@ -187,7 +187,7 @@ def stale(obs, golden, layout):
     if layout is None:
         return False
     want = obs.get('layout_fields_sha256')
-    if want is None or 'layout_reads' not in obs:
+    if want is None or 'layout_reads' not in obs or (obs.get('gating') and 'layout_proven' not in obs):
         # Before per-field digests, or before they covered every read: the whole layout must match.
         return golden.get('layout_sha256') != layout.sha256
     return want != layout.fields_digest(obs.get('layout_reads', obs.get('layout_fields', [])))

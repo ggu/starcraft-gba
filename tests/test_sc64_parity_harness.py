@@ -281,13 +281,20 @@ class Golden(unittest.TestCase):
             self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
             # Same addresses, another width or liveness rule: tap.bin still holds the old reads.
             for edit in (lambda d: d['clock']['pause_halfword'].update(type='u32'),
-                         lambda d: d['unit_table'].update(live_rule='rows with nonzero hit points')):
+                         lambda d: d['unit_table'].update(live_rule='rows with nonzero hit points'),
+                         lambda d: d['clock'].update(record_rule='the change-step read')):
                 doc = json.loads(parity_decode.LAYOUT.read_text())
                 edit(doc)
                 other = temp / 'other.json'
                 other.write_text(json.dumps(doc))
                 with self.assertRaises(parity_decode.LayoutError):
                     parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home3', parity_decode.Layout(other))
+            # Hex spelling does not matter.
+            doc = json.loads(parity_decode.LAYOUT.read_text())
+            doc['clock']['pause_halfword']['address'] = '0x800f0c20'
+            lower = temp / 'lower.json'
+            lower.write_text(json.dumps(doc))
+            parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home4', parity_decode.Layout(lower))
             # A per-field golden from before layout_reads needs the whole layout to match.
             partial = json.loads(json.dumps(golden))
             for obs in partial['observations']:

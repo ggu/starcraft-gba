@@ -210,6 +210,11 @@ class CensusClasses(unittest.TestCase):
                 best = max(best, sum(w[i][j] for i, j in enumerate(perm) if j < cols))
             self.assertEqual(got, best)
 
+    def test_rectangular_groups_stay_small(self):
+        w = [[5] * 900]
+        self.assertEqual(fm.assignment(w), [(0, 0)])
+        self.assertEqual(fm.assignment([[0, 3], [4, 0], [0, 0]]), [(0, 1), (1, 0)])
+
     def test_large_groups_keep_the_priorities(self):
         unit = lambda x, a: {'type': 176, 'owner': 11, 'x': x, 'y': 10, 'resources': a, 'section': 'UNIT'}
         row = lambda x, a: {'type': 176, 'owner': 11, 'x': x, 'y': 10, 'resource_amount': a}
