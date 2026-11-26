@@ -33,7 +33,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The newer `c23009f8` package passed 30 result loads and all four binaries
   have 27 checked Custom Game launches, save loads and continuations apiece.
   Prioritize ground orders in P4 and crowded three-AI windows. In P6,
-  measure burrow lookup and release first, then campaign trigger and trap work.
+  the merged burrow optimization raised the full mission replay from 15.55 to
+  16.92 updates/s. Prioritize campaign triggers, validation and trap work.
+  Direct reads of door and trap state saved only about 2,000 cycles/update.
   Retest visible combat at input 17,341, where actor drawing also peaks.
   See the [P6 campaign measurements](audits/2026-11-26-p6-cycle-budgets.md).
   [Mission coverage, pacing and reproduction](audits/2026-11-26-packaged-campaign-results.md).
