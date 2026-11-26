@@ -1037,6 +1037,42 @@ class LabMeasureTest(unittest.TestCase):
         m = quiet([(35, 1, 5, 3, 3)])
         self.assertEqual((m['foe_combat'], m['inconclusive']), (True, ['lab.cooldown', 'lab.damage']))
 
+    def test_weapon_hit_records_on_the_foe_and_killing_hits(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+
+        def measure(hits_, removals=(), drone=None):
+            hp = {1: marine, 2: ling, **({4: drone} if drone else {})}
+            others = [(2, metrics.ZERGLING, 4, 150, 100)] + ([(4, metrics.DRONE, 4, 160, 100)] if drone else [])
+            series = as_gba(walk(pos, hp=hp, others=others), removals)
+            series['hits'], series['max_units'] = hits_, 100
+            return metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        steps = {sf: (5 * sf + 4) // 4 for sf in (20, 27, 35, 50)}
+        matched = [(steps[sf], 2, 6, 0, 0) for sf in (20, 35, 50)]
+        m = measure(matched)
+        self.assertEqual((m['gaps'], m['range_first'] is not None), ([15, 15], True))
+        # A hit on the foe at 27 that no sampled drop shows may be a shot of the subject's: the
+        # interval across it goes, and so does the first hit's range when it comes first.
+        m = measure(matched + [(steps[27], 2, 6, 0, 0)])
+        self.assertEqual(m['gaps'], [15])
+        m = measure(matched + [(steps[20] - 8, 2, 6, 0, 0)])
+        self.assertEqual((m['range_first'], m['first_hit']), (None, None))
+        # A hit in the pre-command frame is not evidence of a fight after the command.
+        quiet = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 80)}},
+                            others=[(2, metrics.ZERGLING, 4, 900, 100)]))
+        quiet['hits'], quiet['max_units'] = [((5 * 5 + 4) // 4, 1, 5, 3, 3)], 100
+        self.assertFalse(metrics.lab_attack_measure(quiet, 1, 5, metrics.ZERGLING)[0]['combat'])
+        # A killing hit on a Drone in reach is credited through its removal record (the Drone's
+        # last position), not left ambiguous because the Drone is gone from the next sample.
+        gone = {sf: 40.0 for sf in range(0, 28)}
+        series = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 80)}, 4: gone},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)]),
+                        [('U', 35, 4, 4, 160, 100, -2, None, 40, metrics.DRONE, 0, None, None)])
+        series['hits'], series['max_units'] = [(35, 4, 6, 0, 0)], 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['combat'], m['foe_combat'], m['nearby_ambiguous']), (True, False, False))
+
     def test_neutral_removals_and_interval_endpoints(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: 40.0 for sf in range(0, 80)}

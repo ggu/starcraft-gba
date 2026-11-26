@@ -1189,10 +1189,14 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     def slot_of(k):
         return k if isinstance(k, int) else int(str(k).split('.')[0])
     struck_by_record, foe_hit_by_record = False, set()
+    removed_at = {(r[2], r[1]) for r in series.get('removals', []) if r[0] == 'U'}
     for step_, target, *_ in series.get('hits', []) if max_units is not None else ():
         sf = (step_ or 0) * 4 // 5
-        if not t0 <= sf <= end:
+        # After the pre-command sample: a hit in its frame may come before the command.
+        if not t0 < sf <= end:
             continue
+        if target < max_units and (target, step_) in removed_at and target != uid:
+            continue   # a killing hit: its removal record, with the victim's last position, counts it
         if target < max_units:
             for s_ in (sf - 1, sf):   # the row as last sampled before the hit, or after it
                 k = next((k for k in at_frame.get(s_, {}).get('units', {}) if slot_of(k) == target), None)
@@ -1203,7 +1207,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             if k == uid:
                 struck_by_record = True
             elif enemy(k):
-                foe_hit_by_record.add(sf)
+                foe_hit_by_record.add((sf, k))
             elif any_enemy(k) and (near_subject(sf, k) or near_subject(sf - 1, k)):
                 credit(sf, sole_attacker(sf, k) and sole_attacker(sf - 1, k))
         else:
@@ -1216,8 +1220,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                 continue
             if point_near(sf, b[1], b[2]):
                 credit(sf, sole_at(sf, b[1], b[2]) and sole_at(sf - 1, b[1], b[2]))
-    # The foe's records are evidence only: its credited drops time the cooldown themselves.
-    unclear |= nearby | nearby_ambiguous
+    # A weapon hit on the foe that no sampled drop of that foe shows in its frame (a unit hit
+    # before its first sample, a hit absorbed in the same frame) may be one of the subject's shots:
+    # it splits the timing and withholds the first hit's range. Matched ones time themselves.
+    drops_seen = {(sf, vid) for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got}
+    foe_unmatched = {sf for sf, k in foe_hit_by_record if (sf, k) not in drops_seen}
+    unclear |= nearby | nearby_ambiguous | foe_unmatched
     foe_kills = set()
     for vid in seen:
         if not any_enemy(vid):
@@ -1299,7 +1307,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # been the subject's first shot.
     foe_unclear = {sf for vid, got in list(victims_all.items()) + list(shielded_all.items())
                    for sf, _ in got if not ours(sf, vid)}
-    earlier = min(foe_unclear | foe_kills, default=None)
+    earlier = min(foe_unclear | foe_kills | foe_unmatched, default=None)
     if landed and (earlier is None or earlier > landed[0][0]):
         sf0, v0, _ = landed[0]
         # Two hits in the first hit's frame leave its victim unknown (row order is no time
