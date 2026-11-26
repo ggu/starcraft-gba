@@ -15,12 +15,13 @@ GBA defect, not an accepted gap.
 | Free-for-all | Human Terran against computer Zerg, Terran and Protoss, two seeds |
 | Goldens | 17, each from two fresh-process captures with identical hash chains and identical `watch.csv` |
 | Start corners | The GBA, given the N64 seed, put every player of all 17 lobbies in the N64 corner (38 of 38 `start.corner` checks pass) |
-| Gated checks | 564 differ (now baseline lines, GBA values only), 764 pass; 178 report-only |
+| Gated checks | 524 differ (baseline lines, GBA values only), 804 pass; 178 report-only. Before the N64 mining time and rule tables (#986, #989) 564 differed; see *Re-run on the N64 mining time and rule tables* |
 | Wrong-variant test | The same lobbies launched on the GBA with a seed 333 ms off fail 3–17 gated checks each, `start.corner` among them; the right seed fails none |
-| `./dev parity` | 19 scenarios and the table differ in about two minutes; exit 0 against the baseline |
+| `./dev parity` | Exit 0 against the baseline |
 
-The largest defects: every GBA economy gathers about twice as fast as the
-N64's (computers 2.0–2.6x, up to 4.1x against the rushing Zerg; the passive human 1.8–2.2x); each computer race
+The largest defects: every GBA economy still gathers faster than the N64's
+(the passive human 1.2–1.5x, computers 1.3–1.7x at 2,000 frames, up to 2.7x
+against the rushing Zerg; before #986 it was about 2x); each computer race
 follows a different build order; the N64 Zerg computer has a 9-pool rush
 that the GBA never plays; and in 12 of the 16 N64 matches that ended in the
 human's defeat, the GBA human was still standing when the N64 match ended.
@@ -177,18 +178,18 @@ milliseconds since power-on at launch.
 | --- | ---: | ---: | ---: | ---: |
 | `sk-tvt-w0` | 97,835 | 10,076 | never | 298 |
 | `sk-tvz-w0` | 96,834 | 4,000 | never | 129 |
-| `sk-tvz-w37` | 97,451 | 15,253 | 14,715 | 430 |
-| `sk-tvz-w101` | 98,518 | 17,857 | 14,674 | 171 |
+| `sk-tvz-w37` | 97,451 | 15,253 | 14,640 | 430 |
+| `sk-tvz-w101` | 98,518 | 17,857 | 14,678 | 171 |
 | `sk-tvp-w0` | 98,835 | 9,084 | never | 291 |
 | `sk-tvp-w37` | 99,453 | 9,177 | never | 224 |
 | `sk-tvp-w101` | 100,521 | 9,022 | never | 250 |
 | `sk-zvt-w0` | 100,837 | 10,262 | never | 1 |
 | `sk-zvt-w37` | 101,455 | 10,572 | never | 0 |
 | `sk-zvt-w101` | 102,523 | 9,921 | never | 1 |
-| `sk-zvz-w0` | 99,837 | 17,609 | 14,488 | 0 |
+| `sk-zvz-w0` | 99,837 | 17,609 | 14,453 | 0 |
 | `sk-zvp-w0` | 101,839 | 9,084 | never | 1 |
 | `sk-pvt-w0` | 98,835 | 10,138 | never | 283 |
-| `sk-pvz-w0` | 97,835 | 16,679 | 14,599 | 362 |
+| `sk-pvz-w0` | 97,835 | 16,679 | 14,542 | 362 |
 | `sk-pvp-w0` | 99,837 | 8,929 | never | 252 |
 | `sk-ffa-w0` | 91,828 | 3,566 | never | 93 |
 | `sk-ffa-w37` | 92,446 | never (Protoss computer defeated at 4,775) | never | 158 |
@@ -204,32 +205,36 @@ range over the captured seeds against the GBA range:
 
 | Computer | Type | N64 | GBA |
 | --- | --- | ---: | ---: |
-| Terran (7 matches) | Barracks | 1,292–1,504 | 1,599–1,644 |
-| | Supply Depot | 1,796–2,114 | 694–759 |
-| | Refinery | 2,834–3,172 | 2,201–2,228 |
-| | Marine | 2,855–3,118 | 3,162–3,239 |
-| | Academy | 4,772–5,159 | 3,459–3,503 |
+| Terran (7 matches) | Barracks | 1,292–1,504 | 1,676–1,705 |
+| | Supply Depot | 1,796–2,114 | 844–950 |
+| | Refinery | 2,834–3,172 | 2,264–2,390 |
+| | Marine | 2,855–3,118 | 3,239–3,290 |
+| | Academy | 4,772–5,159 | 3,557–3,674 |
 | | Medic | 6,432–6,939 | never |
-| | Bunker | 7,059–7,397 | 7,084–7,111 |
-| | Firebat | 7,376–7,741 | 5,120–5,159 |
-| | Factory | 9,035–9,667 | 7,583–7,607, or never |
-| Protoss (7 matches) | Pylon | 1,247–1,518 (2,811 once) | 493–584 |
-| | Gateway | 1,992–2,291 | 1,575–1,648 |
-| | Shield Battery | 3,866–4,145 | 4,105–6,273 |
-| | Zealot | 3,879–4,193 | 3,095–3,172 |
-| | Assimilator | 5,949–6,313 | 4,201–6,224 |
-| | Cybernetics Core, Dragoon | never | every 1v1 |
-| Zerg, late pool (4 matches) | Spawning Pool | 3,178–3,243 | 1,388–1,391 |
-| | Extractor | 3,509–3,597 | 2,423–2,450 |
-| | Sunken Colony | 4,870–4,999 | 4,224–4,454 |
-| | Hydralisk Den | 6,345–6,468 | 4,855–4,925 |
+| | Bunker | 7,059–7,397 | 7,070–7,501 |
+| | Firebat | 7,376–7,741 | 5,197–5,312 |
+| | Factory | 9,035–9,667 | 7,582–7,604, or never |
+| Protoss (7 matches) | Pylon | 1,247–1,518 (2,811 once) | 656–714 |
+| | Gateway | 1,992–2,291 | 1,794–1,849 |
+| | Shield Battery | 3,866–4,145 | 4,144–4,445 |
+| | Zealot | 3,879–4,193 | 3,312–3,364 |
+| | Assimilator | 5,949–6,313 | 4,195–4,490 |
+| | Cybernetics Core | never | 4,194–4,896 (all but `sk-ffa-w0`) |
+| | Dragoon | never | 6,397–7,012 (every 1v1) |
+| | Stargate | never | 5,698–5,943 (every 1v1) |
+| | Fleet Beacon, Scout | never | Fleet Beacon in two, Scouts in two (8,610–8,648) |
+| Zerg, late pool (4 matches) | Spawning Pool | 3,178–3,243 | 1,388–1,428 |
+| | Extractor | 3,509–3,597 | 2,452–2,538 |
+| | Creep Colony | 3,840–3,902 | 4,089–4,131 |
+| | Sunken Colony | 4,870–4,999 | 4,454 |
+| | Hydralisk Den | 6,345–6,468 | 5,840–5,959 |
 | | Zergling | 6,809–6,954 | 3,223 |
-| | Lair | 7,547–7,643 | 5,260–5,606 |
-| | Hydralisk | 7,716–7,850 | 5,949–6,717 |
+| | Lair | 7,547–7,643 | 7,104–7,641 |
+| | Hydralisk | 7,716–7,850 | 7,639–8,215 |
 | | Lurker | 11,034–11,207 | never |
 | | Queen's Nest | 14,805–17,459 | never |
-| | Spire, Mutalisk | never | Spire in all four, Mutalisks in two |
-| Zerg, 9-pool rush (3 matches) | Spawning Pool | 738–857 | 1,388–1,404 |
+| | Spire | never | 8,869–9,328 (all four) |
+| Zerg, 9-pool rush (3 matches) | Spawning Pool | 738–857 | 1,428–1,449 |
 | | Zergling | 2,495–2,530 | 3,223 |
 | | First wave | 2,952–3,174 (human or the Protoss computer) | never |
 
@@ -244,68 +249,142 @@ the rush happened from corners 1 and 2 and the late pool from corners 1 and
 
 | Player | Minerals gathered at 2,000 frames, N64 | GBA | GBA/N64 |
 | --- | ---: | ---: | ---: |
-| Passive human, 4 workers (17 matches) | 280–360 | 608–672 | 1.8–2.2 |
-| Terran computer | 392–456 | 960–1,056 | 2.2–2.6 |
-| Protoss computer | 408–528 | 1,000–1,112 | 2.1–2.6 |
-| Zerg computer | 264–520 | 1,016–1,128 | 2.0–4.1 |
+| Passive human, 4 workers (17 matches) | 280–360 | 408–440 | 1.2–1.5 |
+| Terran computer | 392–456 | 608–672 | 1.4–1.6 |
+| Protoss computer | 408–528 | 632–672 | 1.3–1.6 |
+| Zerg computer, late pool | 488–520 | 704–736 | 1.4–1.5 |
+| Zerg computer, 9-pool rush | 264–304 | 704–712 | 2.3–2.7 |
 
-Minerals per frame by worker count (WP9 curves, report only) show the same
-ratio at every count: with 4 workers the passive human gathers 0.153–0.185
-per frame on the N64 and 0.309–0.344 on the GBA; a computer with 8 workers
-0.238–0.344 against 0.573–0.704. The S4 Blood Bath measure (GBA/N64 1.75 over
-2,000 frames, first delivery 59 against 154 frames) is the same defect.
+Minerals per frame by worker count (WP9 curves, report only) show a similar
+ratio: with 4 workers the passive human gathers 0.154–0.185 per frame on the
+N64 and 0.213–0.229 on the GBA; a computer with 8 workers 0.238–0.344
+against 0.339–0.417. The S4 Blood Bath measure (first delivery 105 against
+154 frames, rate 0.212 against 0.176) is the same defect. Late in the match
+the gap narrows for the late-pool Zerg (1.1–1.2x at 6,000–8,000 frames) and
+stays at 1.5–1.8x for the Terran and Protoss computers, which have more
+workers than the N64's.
 
-Workers at 2,000 frames: N64 Terran computers 8 and Protoss 7–9, GBA 10. The
-GBA Zerg computer holds 8 Drones through 4,000 frames in every match; the
-N64's late-pool Zerg has 9 at 2,000 and 12 at 4,000. Doubled supply used at 2,000 frames: N64
-Terran 16–18, GBA 22; Protoss 14–20 against 22; Zerg 8–18 against 18.
-Supply provided runs ahead on the GBA (an earlier Depot or Pylon).
+Workers at 2,000 frames: N64 Terran computers 8 and Protoss 7–9, GBA 9–10
+and 9. The GBA Zerg computer has 8 Drones at 1,000 frames (N64 7 in the
+late-pool games, 3 when rushing), 9 at 2,000 and 4,000 (N64 9 and 12) and
+10–11 at 6,000 (N64 15), with fewer Overlords (supply provided 38 against
+52 at 6,000). Doubled supply used at 2,000 frames: N64 Terran 16–18, GBA
+20–22; Protoss 14–20 against 20; Zerg 8–18 against 20. Supply provided runs
+ahead on the GBA for Terran and Protoss (an earlier Depot or Pylon).
 
 ### First wave
 
 | Computer | N64 | GBA |
 | --- | ---: | ---: |
-| Terran (1v1) | 9,492–10,051 | 10,268–10,295, or never within the N64 match |
-| Protoss | 8,464–8,741 | 8,848–9,039 |
-| Zerg, late pool | 14,906–17,537 | 14,129–14,420 |
+| Terran (1v1) | 9,492–10,051 | 10,084–10,309, or never within the N64 match |
+| Protoss | 8,464–8,741 | 8,847–9,043 |
+| Zerg, late pool | 14,906–17,537 | 14,040–14,320 |
+
+## Re-run on the N64 mining time and rule tables
+
+The goldens were first judged against the engine before #986 (workers hold
+at the minerals for the N64 mining time of 102 updates; construction frames
+hold for iscript waits) and #989 (the N64 rule-table values, among them a
+150-mineral Spawning Pool, a 200-mineral Academy, a 600-frame Dragoon and
+an 80/80 Zealot). Both change skirmish play, so all 17 scenarios were run
+again on the merged engine. The N64 side did not change: re-decoding all 34
+captures with the merged decoder into a private home gives goldens identical
+to the shared ones, and none is stale.
+
+| Family | Lines before | Now pass | Narrowed | Unchanged | Widened | New | Lines now |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `econ.gathered@T` | 166 | 6 | 160 | 0 | 0 | 0 | 160 |
+| `build.first.<Type>` | 153 | 9 | 80 | 29 | 35 | 13 | 157 |
+| `supply.used@T` | 77 | 22 | 21 | 19 | 15 | 11 | 66 |
+| `supply.cap@T` | 64 | 15 | 7 | 37 | 5 | 0 | 49 |
+| `workers@T` | 78 | 16 | 12 | 33 | 17 | 4 | 66 |
+| `attack.first_wave` | 13 | 0 | 3 | 3 | 7 | 0 | 13 |
+| `result.human_defeated` | 13 | 0 | 0 | 11 | 2 | 0 | 13 |
+| All | 564 | 68 | 283 | 132 | 81 | 28 | 524 |
+
+"Narrowed" and "widened" compare the distance from the N64 band; the two
+attack lines that changed outcome count by which side of the band they
+moved to (`sk-tvt-w0`'s Terran now attacks at 10,084, closer than never;
+`sk-zvt-w0`'s no longer attacks within the N64 run). Every mineral total
+moved toward the N64, as expected of the mining time, and the human's
+supply and worker lines already passed.
+
+Reverting one change at a time on the merged tree splits the movement:
+#986 alone fixes 67 lines and accounts for 92 of the 95 regressions; #989
+alone fixes none and moves 22 lines out (16 regressions), mainly the first
+Dragoon, now 150 frames earlier with the 600-frame N64 build time, and the
+late-pool Zerg's economy and attack after the cheaper Pool. Each widened or
+new line was checked against its golden before the baseline accepted it.
+None is a measurement change (the goldens and the measurement code are
+unchanged): every one is a GBA behaviour the N64 captures contradict. The
+109 widened or new lines, by defect:
+
+- **Protoss tech (defects 3 and 6), 24 lines:** with slower income the GBA
+  Protoss reaches its Cybernetics Core and Assimilator earlier and adds a
+  Stargate in all five 1v1s, a Fleet Beacon in two and Scouts in two; the N64
+  Protoss builds none of these within the run. It also has more Probes and
+  supply after 6,000 frames (15 lines).
+- **Terran opening (defect 2), 17 lines:** the Depot-first order makes the
+  Barracks and first Marine wait longer for 150 minerals (12), and the
+  Bunker and Factory move a few frames further out (5). The GBA Terran also
+  has more SCVs and supply after 6,000 frames (13 lines).
+- **Zerg Drones and Overlords (defects 4 and 5), 31 lines:** one Drone more
+  and more supply used at 1,000–2,000 frames (16), fewer Drones and
+  Overlords at 6,000 and later (8), the Creep Colony later (4) and the Pool
+  3–40 frames further out (3).
+- **Timings (defects 8 and 9), 9 lines:** Protoss and Terran waves 10–80
+  frames later than before (and `sk-zvt-w0`'s Terran no longer attacks
+  within the run), the late-pool Zerg's 60–90 frames earlier, and two human
+  defeats 35–60 frames earlier.
 
 ## Defects
 
 Each line is a GBA defect against the N64 ROM, with its numbers above. All
 are baseline lines (`tools/parity/baseline.json`, GBA values).
 
-1. **Mining rate about 2x (all races, all players).** Minerals gathered at
-   every checkpoint and the per-worker-count rates run 1.8–2.6x the N64's
-   (up to 4.1x against the rushing Zerg, which mines with fewer Drones). The
-   S4 first-delivery gap (59 against 154 frames) is part of it.
-2. **Terran build order.** The GBA builds the Supply Depot first (694–759)
-   and the Barracks second; the N64 builds the Barracks first (1,292–1,504)
-   and the Depot at 1,796–2,114. The GBA's Academy and Firebats come about
-   1,300 and 2,300 frames early; it never trains a Medic (N64 6,432–6,939).
-3. **Protoss build order.** The GBA places its first Pylon 2.5x earlier (about
-   500 against 1,247–1,518), its Gateway 350–700 and its first Zealot
-   700–1,100 frames early, and builds a Cybernetics Core and Dragoons that the N64
-   computer never builds before the human falls.
+1. **Mining rate 1.2–1.7x (all races, all players).** Minerals gathered at
+   every checkpoint and the per-worker-count rates run 1.2–1.5x the N64's
+   for the passive human and 1.3–1.7x for the computers (up to 2.7x against
+   the rushing Zerg, which mines with fewer Drones). The S4 first delivery
+   comes at 105 against 154 frames. Before the N64 mining time (#986) the
+   ratio was 1.8–2.6x.
+2. **Terran build order.** The GBA builds the Supply Depot first (844–950)
+   and the Barracks second (1,676–1,705); the N64 builds the Barracks first
+   (1,292–1,504) and the Depot at 1,796–2,114. With slower income the GBA
+   Barracks now comes 200–410 frames and the first Marine 160–420 frames
+   after the N64's (both later than before #986). The GBA's Academy and
+   Firebats come 1,100–1,600 and 2,100–2,500 frames early; it never trains a
+   Medic (N64 6,432–6,939).
+3. **Protoss build order.** The GBA places its first Pylon about 2x earlier
+   (656–714 against 1,247–1,518), its Gateway 190–490, its first Zealot
+   550–860 and its Assimilator 1,750–2,120 frames early, and
+   builds a Cybernetics Core, Dragoons and a Stargate that the N64 computer
+   never builds before the human falls (two matches also reach a Fleet
+   Beacon and two train Scouts).
 4. **Zerg openings.** The GBA has no 9-pool rush: its Pool always comes at
-   about 1,390 (N64: 738–857 when rushing, 3,178–3,243 otherwise). In the
-   late-pool games the GBA reaches each tech step 400–3,600 frames early,
-   never makes a Lurker or Queen's Nest (the engine has no Lurker), and goes
-   Spire and Mutalisks instead.
-5. **Zerg Drone count.** The GBA Zerg computer holds 8 Drones through 4,000
-   frames; the N64's late-pool Zerg has 9 by 2,000 frames and 12 by 4,000.
+   1,388–1,449 (N64: 738–857 when rushing, 3,178–3,243 otherwise). In the
+   late-pool games the GBA reaches most tech steps early (Pool 1,750–1,860,
+   Extractor 970–1,130, Hydralisk Den 390–630 frames), its Creep Colony
+   190–290 frames late, never makes a Lurker or Queen's Nest (the engine has no
+   Lurker), and builds a Spire instead.
+5. **Zerg Drones and Overlords.** The GBA Zerg computer has one Drone more
+   than the N64's late-pool Zerg at 1,000 frames, then stops at 9 through
+   4,000 frames and has 10–11 at 6,000 (N64 12 and 15), with fewer
+   Overlords at 6,000 (supply provided 38 against 52).
 6. **GBA-only types.** Within the N64 run the GBA builds types the N64
-   computer never makes: Cybernetics Core and Dragoons (all five 1v1s
-   against Protoss), Spire (four Zerg games) and Mutalisks, Machine Shop,
-   Vulture and Starport (Terran), and early Creep Colonies and Extractors
-   against the rush openings.
+   computer never makes: Cybernetics Core, Dragoons and Stargates (all five
+   1v1s against Protoss; the Core also in `sk-ffa-w37`), Fleet Beacons and
+   Scouts (two matches each), Spire (four Zerg games), Machine Shop, Vulture
+   and Starport (Terran), and early Creep Colonies and Extractors against
+   the rush openings.
 7. **Supply.** Used and provided supply at the checkpoints follow the build
    orders; the passive human's `supply.cap` passes at all 78 checkpoints.
-8. **Attack timing.** The GBA Terran attacks later (or not within the N64
-   match), the Protoss 280–430 frames later, the late-pool Zerg 500–3,300
-   frames earlier.
+8. **Attack timing.** The GBA Terran attacks 260–550 frames later or not
+   within the N64 match, the Protoss 290–450 frames later, the late-pool
+   Zerg 600–3,200 frames earlier.
 9. **Outcome.** In 12 of the 16 N64 matches that ended in the human's
    defeat, the GBA human survived to the end of the N64 run; in the other 4
-   (late-pool Zerg) the GBA defeat came 500–3,200 frames early.
+   (late-pool Zerg) the GBA defeat came 600–3,200 frames early.
 
 ## Coverage
 
@@ -348,7 +427,7 @@ marks the skirmish goldens stale, and an unrelated edit does not.
 | --- | --- |
 | N64 captures | 34 (17 pairs), 18,222–66,570 frontend steps, 78–500 s wall each under load; about 300 MB of tap.bin per whole match before compression |
 | Private data kept | 516 MB of run directories (taps as `tap.bin.zst`, ROM and lobby state hard-linked to the master copies), 17 golden files |
-| GBA side | One match runs in 6–8 s of CPU (`--no-route-checks`, render on); `./dev parity` judges 19 scenarios and the table differ in about 2 minutes |
+| GBA side | One match runs in 6–8 s of CPU (`--no-route-checks`, render on); the 17 skirmish scenarios take about 2 minutes of `./dev parity` |
 | Shipped ROMs | `StarCraft-GBA`, Terran, Zerg Z10, Protoss P10 and Showcase Transport1 ROMs are byte-identical with and without this change's `game.c` |
 
 Every capture held the shared native lock, so none ran beside another
