@@ -184,11 +184,12 @@ int main(int argc, char** argv) {
 
   std::ofstream checkpoints(out / "checkpoints.csv"), regions(out / "regions.csv"), commands(out / "commands.csv"),
                 ticks(out / "ticks.csv"), verifyLog(out / "verify.csv"), events(out / "events.csv");
-  std::ofstream rawRows;
+  std::ofstream rawRows, recFile;
   // Required logs are checked whether or not they opened; the raw file only once requested.
   auto outputsOk = [&] {
     for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events}) { stream->flush(); if(!*stream) return false; }
     if(rawRows.is_open()) { rawRows.flush(); if(!rawRows) return false; }
+    if(recFile.is_open()) { recFile.flush(); if(!recFile) return false; }
     return (bool)std::cout;
   };
   checkpoints << "step,tick,sha256,cached_lines,dual_hits,dual_differ\n";
@@ -203,7 +204,7 @@ int main(int argc, char** argv) {
   std::vector<std::uint8_t> full(SC64_CAPTURE_RAM), table(SC64_UNIT_TABLE_BYTES), rows, previousRows, rawTable(SC64_UNIT_TABLE_BYTES);
   long long every = 0;
   // Tap state: 0 off, 1 on tick change plus one follow-up step, 2 every step.
-  int tapMode = 0; bool tapRaw = false;
+  int tapMode = 0; bool tapRaw = false, tapRec = false;
   bool haveTable = false; std::uint32_t tableOffset = 0; long long lastScan = -1000000;
   std::uint32_t lastTick = 0; bool haveTick = false; unsigned phase = 0; bool follow = false;
   unsigned long long tickChanges = 0, tapReads = 0, tapDual = 0, tapDualDiffer = 0, tapRawDiffers = 0,
@@ -235,7 +236,7 @@ int main(int argc, char** argv) {
   // Reads the tapped regions through the cache-aware view. Returns false when no table is loaded.
   struct Sample { bool table = false; unsigned live = 0; Sc64CaptureLinkStats links; Sc64CaptureReadStats stats;
                   bool rawDiffers = false; std::uint32_t seconds = 0, pause = 0, selector = 0, running = 0, countdown = 0;
-                  std::string globalsSha; };
+                  std::uint8_t globals[kBanksBytes + kRngBytes]{}; std::string globalsSha; };
   auto locate = [&]() {
     if(haveTable) {
       std::uint8_t header[16];
@@ -252,13 +253,13 @@ int main(int argc, char** argv) {
   };
   auto sample = [&](std::vector<std::uint8_t>& liveRows) -> Sample {
     Sample s;
-    std::uint8_t globals[kBanksBytes + kRngBytes], half[2]{};
+    std::uint8_t *globals = s.globals, half[2]{};
     guest_view(kPause, 2, half, &s.stats); s.pause = (std::uint32_t)half[0] << 8 | half[1];
     s.seconds = guest32(kSeconds, &s.stats); s.selector = guest32(kSelector, &s.stats);
     std::uint8_t running = 0; guest_view(kRunning, 1, &running, &s.stats); s.running = running;
     s.countdown = guest32(kCountdown, &s.stats);
     guest_view(kBanks, kBanksBytes, globals, &s.stats); guest_view(kRng, kRngBytes, globals + kBanksBytes, &s.stats);
-    s.globalsSha = sha256(globals, sizeof globals);
+    s.globalsSha = sha256(globals, kBanksBytes + kRngBytes);
     liveRows.clear();
     locate();
     if(!haveTable) return s;
@@ -364,6 +365,22 @@ int main(int argc, char** argv) {
           << s.running << ',' << s.countdown << ',' << (haveTable ? tableOffset : 0) << ',' << s.live << ',' << s.links.bad << ','
           << s.links.asymmetric << ',' << s.stats.dual_hits << ',' << s.stats.dual_differ << ',' << s.rawDiffers << ','
           << rowsSha << ',' << s.globalsSha << '\n';
+    if(tapRec) {
+      // tap.bin record (format in capture_view.h): clocks and the bank and RNG
+      // globals on every tapped read; live rows only on the follow-up read, the
+      // one a tick's record is taken from.
+      const bool withRows = !changed && phase == 1;
+      std::uint32_t flags = (withRows ? 1u : 0u) | (haveTable ? 2u : 0u) | (s.stats.dual_differ ? 4u : 0u) |
+                            ((s.links.bad || s.links.asymmetric) ? 8u : 0u);
+      std::uint32_t head[SC64_TAP_HEADER_WORDS] = {(std::uint32_t)completed, tick, phase, s.live, s.seconds, s.pause,
+                                                   s.selector, s.running, s.countdown, haveTable ? tableOffset : 0u, flags,
+                                                   withRows ? s.live : 0u};
+      std::uint8_t bytes[sizeof head];
+      for(unsigned w = 0; w < SC64_TAP_HEADER_WORDS; ++w) sc64_capture_put_le32(bytes + w * 4, head[w]);
+      recFile.write(reinterpret_cast<const char*>(bytes), sizeof bytes);
+      recFile.write(reinterpret_cast<const char*>(s.globals), kBanksBytes + kRngBytes);
+      if(withRows) recFile.write(reinterpret_cast<const char*>(rows.data()), (std::streamsize)rows.size());
+    }
     if(tapRaw && (changed || !same)) {
       std::uint32_t head[4] = {(std::uint32_t)completed, tick, phase, s.live};
       rawRows.write(reinterpret_cast<const char*>(head), sizeof head);
@@ -391,12 +408,22 @@ int main(int argc, char** argv) {
     if(word == "tap") {
       std::string mode; in >> mode;
       if(mode == "off") tapMode = 0; else if(mode == "tick") tapMode = 1; else if(mode == "step") tapMode = 2; else return 7;
-      std::string extra; tapRaw = false;
-      if(in >> extra) {
-        if(extra != "raw") return 7;
-        if(!rawRows.is_open()) rawRows.open(out / "ticks.raw", std::ios::binary);
-        if(!rawRows) { std::cerr << "output open failure: ticks.raw\n"; return 5; }
-        tapRaw = true;
+      std::string extra; tapRaw = false; tapRec = false;
+      while(in >> extra) {
+        if(extra == "raw") {
+          if(!rawRows.is_open()) rawRows.open(out / "ticks.raw", std::ios::binary);
+          if(!rawRows) { std::cerr << "output open failure: ticks.raw\n"; return 5; }
+          tapRaw = true;
+        } else if(extra == "rec") {
+          if(!recFile.is_open()) {
+            recFile.open(out / "tap.bin", std::ios::binary);
+            if(!recFile) { std::cerr << "output open failure: tap.bin\n"; return 5; }
+            std::uint8_t header[SC64_TAP_FILE_HEADER_BYTES];
+            sc64_capture_tap_file_header(header, kBanksBytes + kRngBytes);
+            recFile.write(reinterpret_cast<const char*>(header), sizeof header);
+          }
+          tapRec = true;
+        } else return 7;
       }
       haveTick = false; follow = false; ticks.flush();
       branch.active = false; branch.pads.clear(); branch.changeAt = 0;  // a pending branch never spans a tap change
@@ -492,5 +519,6 @@ int main(int argc, char** argv) {
   if(!outputsOk() || !status || !pollFile) { std::cerr << "output write failure\n"; return 5; }
   for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events}) { stream->close(); if(!*stream) return 5; }
   if(rawRows.is_open()) { rawRows.close(); if(!rawRows) return 5; }
+  if(recFile.is_open()) { recFile.close(); if(!recFile) return 5; }
   return p.failed ? 6 : 0;
 }

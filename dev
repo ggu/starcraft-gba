@@ -1264,6 +1264,10 @@ def status(profile: str, *, include_built: bool = True) -> int:
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["parity"] and not {"-h", "--help"} & set(sys.argv[2:3]):
+        # Options go to tools/sc64_parity.py unchanged (argparse would take --accept as its own).
+        return subprocess.run([sys.executable, str(ROOT / "tools" / "sc64_parity.py"), *sys.argv[2:]],
+                              cwd=ROOT, check=False).returncode
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     doctor_parser = commands.add_parser("doctor", help="check required build/test tools; report optional mGBA")
@@ -1276,6 +1280,10 @@ def main() -> int:
     sc64.add_argument("action", choices=("prepare", "prepare-bc", "status", "build", "test", "play"))
     sc64.add_argument("--rom", type=Path, help="user-supplied USA N64 ROM (or ZIP) for prepare")
     sc64.add_argument("--profile", choices=SC64_PROFILES, default="unified")
+    parity = commands.add_parser(
+        "parity", help="N64 parity: ROM-table differ and captured scenarios (tools/sc64_parity.py)",
+        description="Thin wrapper over tools/sc64_parity.py; options are passed through (--accept, --explain ID, --keep DIR).")
+    parity.add_argument("rest", nargs=argparse.REMAINDER, help="options for tools/sc64_parity.py")
     release = commands.add_parser(
         "release", help="check, package, copy and verify release ROMs (tools/sc64_release.py)",
         description="Thin wrapper over tools/sc64_release.py; options after the action are passed through.")
@@ -1286,6 +1294,9 @@ def main() -> int:
         if args.command == "release":
             return subprocess.run([sys.executable, str(ROOT / "tools" / "sc64_release.py"),
                                    args.action, *args.rest], cwd=ROOT, check=False).returncode
+        if args.command == "parity":
+            return subprocess.run([sys.executable, str(ROOT / "tools" / "sc64_parity.py"), *args.rest],
+                                  cwd=ROOT, check=False).returncode
         if args.command == "doctor":
             return doctor(args.emulator)
         if args.command == "build":

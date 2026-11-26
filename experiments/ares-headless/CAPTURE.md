@@ -56,11 +56,12 @@ A tape is one command per line:
 | `STEPS MASK X Y` | Run `STEPS` frontend steps (one `root->run()` each) with the pad held |
 | `every N` | Hash the full 8 MiB view every `N` steps (`checkpoints.csv`, `regions.csv`) |
 | `hash` | Hash the full view now |
-| `tap off\|tick\|step [raw]` | Read rows and clocks on each tick change and the step after it, or every step; `raw` also writes live rows to `ticks.raw` |
+| `tap off\|tick\|step [raw] [rec]` | Read rows and clocks on each tick change and the step after it, or every step; `raw` also writes live rows to `ticks.raw`; `rec` writes `tap.bin` (clocks, the four bank arrays and RNG words on every read, live rows on the follow-up read; format in `capture_view.h`, decoded by `tools/parity_decode.py`) |
 | `verify N branch\|same [full]` | Every `N` tick changes, replay the next tick in the other CPU mode (`branch`) or round-trip the state in the same mode (`same`) and compare |
 | `mode jit\|interp` | Switch CPU mode through an in-process state round trip |
 | `rawcheck` | Check the direct RDRAM copy against the core's own debugger read for all 8 MiB |
 | `peek ADDR N`, `dump NAME`, `shot NAME`, `quit` | Diagnostics |
+| `# ...` | Comment; parity tapes mark the command step with `# mark command` |
 
 Pad mask bits: A 1, Start 2, Down 4, C-Left 8, D-pad Right 16, R 32,
 C-Right 64, C-Up 128, C-Down 256, B 512, Z 1024, L 2048, D-pad Up 4096,

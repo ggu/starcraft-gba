@@ -1,0 +1,451 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""N64 parity comparator and developer loop (`./dev parity`).
+
+Runs the ROM-table differ (tools/sc64_parity_tables.py) and every scenario
+that has a golden file under $SC64_PARITY_HOME/golden, in parallel. Each
+scenario runs its GBA host binary (build/parity/<profile>-fast-trace, from
+mk/parity/Makefile) with the parameters its golden file gives, measures the
+trace with the same code that measured the N64 capture
+(tools/sc64_parity_metrics.py), and judges every observation:
+
+  PASS        inside the N64 band
+  KNOWN       outside the band, listed in the baseline, and not further out
+              than the baseline recorded
+  REGRESSION  outside the band and not in the baseline, or further out than
+              the baseline recorded; the only verdict that fails the run
+  IMPROVED    in the baseline but now inside the band (notice)
+  STALE       a baseline line whose observation no longer exists (notice)
+  REPORT      a non-gating observation (never fails)
+  SKIP        a scenario that could not run because private inputs are absent
+
+`--accept` rewrites the baseline (tools/parity/baseline.json) from this run:
+every gating observation outside its band becomes a KNOWN line with its GBA
+value; IMPROVED and STALE lines are dropped. The baseline holds only GBA
+values and verdict keys; N64 numbers stay in the private fixture home.
+
+The scorecard prints, per observation, the first divergent source frame (for
+checks with an N64 curve), the band, the GBA value and the provenance, then the
+fixture-set hash: a SHA-256 over the golden files it judged against. A run
+that skips everything while .local/sc64 exists exits non-zero, so a broken
+private setup never reads as a pass.
+"""
+import argparse
+import concurrent.futures
+import hashlib
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'tools'))
+import parity_decode  # noqa: E402
+import sc64_parity_metrics as metrics  # noqa: E402
+
+BASELINE = ROOT / 'tools' / 'parity' / 'baseline.json'
+PARITY_DIR = ROOT / 'build' / 'parity'
+FAILING = {'REGRESSION'}
+
+
+def default_home():
+    env = os.environ.get('SC64_PARITY_HOME')
+    if env:
+        return pathlib.Path(env)
+    out = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+                         capture_output=True, text=True)
+    base = pathlib.Path(out.stdout.strip()).parent if out.returncode == 0 and out.stdout.strip() else ROOT
+    return base / '.local' / 'parity'
+
+
+# ---- GBA trace --------------------------------------------------------------
+
+def gba_series(trace_path):
+    """Normalise a sc64-parity-trace/1 file: last row per source frame, N64 pixels."""
+    units, banks, frames = {}, {}, []
+    step, complete = None, False
+
+    def flush():
+        if step is None:
+            return
+        sf = step * 4 // 5
+        frame = {'sf': sf, 'step': step, 'units': dict(units),
+                 'banks': {o: (v, None) for o, v in banks.items()}}
+        if frames and frames[-1]['sf'] == sf:
+            frames[-1] = frame
+        else:
+            frames.append(frame)
+
+    with open(trace_path) as handle:
+        first = handle.readline()
+        if not first.startswith('#sc64-parity-trace 1'):
+            raise ValueError(f'{trace_path}: not a sc64-parity-trace/1 file')
+        for line in handle:
+            words = line.split()
+            if not words:
+                continue
+            tag = words[0]
+            if tag == 'S':
+                flush()
+                step = int(words[1])
+            elif tag == 'U':
+                # The cartridge's ids: raw_type, and raw_owner where the profile has one.
+                slot, raw_type, owner, raw_owner = int(words[1]), int(words[3]), int(words[4]), int(words[5])
+                x, y = int(words[6]), int(words[7])
+                units[slot] = (raw_type, raw_owner if raw_owner >= 0 else owner, 2 * x, 2 * y)
+            elif tag == '-U':
+                units.pop(int(words[1]), None)
+            elif tag == 'P':
+                banks[int(words[1])] = int(words[2])
+            elif tag == 'Z':
+                fields = dict(w.split('=', 1) for w in words[1:] if '=' in w)
+                complete = fields.get('overflow') == '0' and fields.get('write_errors') == '0'
+    flush()
+    if not complete:
+        raise ValueError(f'{trace_path}: incomplete trace (no clean Z line)')
+    return {'source': 'gba', 'scale': 2, 'frames': frames}
+
+
+def gba_command(scenario_id, golden, trace):
+    """The runner command. Binary and runner scenario come from SCENARIOS, never
+    from the golden file; the golden supplies only integers."""
+    spec = metrics.SCENARIOS[scenario_id]
+    params = golden['gba']
+    binary = PARITY_DIR / f'{spec["profile"]}-fast-trace'
+    ints = [int(params['steps']), int(params['at_step'])]
+    cmd = [str(binary), '--scenario', spec['runner'], '--steps', str(ints[0]), '--trace', str(trace),
+           '--no-route-checks', '--profile', spec['profile'], '--at', str(ints[1])]
+    for x, y in params.get('units', []):
+        cmd += ['--unit', f'{int(x)},{int(y)}']
+    if 'target' in params:
+        cmd += ['--target', f'{int(params["target"][0])},{int(params["target"][1])}']
+    return binary, cmd
+
+
+# ---- judging ------------------------------------------------------------------
+
+def outside(value, lo, hi):
+    """How far a value lies outside [lo, hi]; 0 inside."""
+    return lo - value if value < lo else value - hi if value > hi else 0
+
+
+def first_divergence(n64, gba, tolerance):
+    for k, (a, b) in enumerate(zip(n64, gba)):
+        if abs(a - b) > tolerance:
+            return k
+    if len(gba) < len(n64):
+        return len(gba)
+    return None
+
+
+def judge(scenario_id, golden, values, curves, baseline, layout=None):
+    rows = []
+    for obs in golden['observations']:
+        gating = obs['gating']
+        unproven = []
+        if gating and layout is not None:
+            unproven = [k for k in obs.get('layout_fields', []) if layout.status(k) != 'proven']
+            if layout.doc['unit_table'].get('status') != 'proven':
+                unproven.append('unit_table')
+        key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
+        value = values.get(obs['check'])
+        row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
+               'n64': obs['value'], 'gba': value, 'provenance': obs['provenance'], 'gating': obs['gating'],
+               'n_runs': obs['n_runs'], 'tolerance': obs['tolerance']}
+        if unproven:
+            # The layout no longer proves a field this check read: it cannot gate.
+            gating = row['gating'] = False
+            row['why'] = 'reads fields the current layout does not prove: ' + ', '.join(unproven)
+        if value is None:
+            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
+            row['why'] = 'not measured on the GBA'
+            rows.append(row)
+            continue
+        if isinstance(value, float):
+            row['gba'] = round(value, 4)
+        if obs['value']:
+            row['ratio'] = round(value / obs['value'], 3)
+        gap = outside(value, obs['lo'], obs['hi'])
+        known = baseline.get(key)
+        if not gating:
+            row['verdict'] = 'REPORT'
+        elif gap == 0:
+            row['verdict'] = 'IMPROVED' if known else 'PASS'
+        elif known is None:
+            row['verdict'] = 'REGRESSION'
+            row['why'] = 'outside the band and not in the baseline'
+        else:
+            was = outside(known['gba'], obs['lo'], obs['hi'])
+            slack = max((obs['hi'] - obs['lo']) / 2, 1e-9)
+            if gap > was + slack:
+                row['verdict'] = 'REGRESSION'
+                row['why'] = f'further outside the band than the baseline ({known["gba"]})'
+            else:
+                row['verdict'] = 'KNOWN'
+                row['baseline'] = known['gba']
+        for name, curve in golden.get('curves', {}).items():
+            # A curve belongs to the checks it explains: arrival for the move, rate for income.
+            explains = {'move.remaining': ('move.arrival_first', 'move.arrival_last'),
+                        'income.gathered': ('income.rate', 'income.first_delivery')}.get(name, ())
+            if obs['check'] in explains and name in curves:
+                k = first_divergence(curve['n64'], curves[name], curve['tolerance'])
+                row['first_divergent_frame'] = k
+                row['curve'] = name
+        rows.append(row)
+    return rows
+
+
+def run_scenario(scenario_id, golden_path, baseline, keep):
+    golden = json.loads(golden_path.read_text())
+    spec = metrics.SCENARIOS.get(scenario_id)
+    result = {'id': scenario_id, 'golden': str(golden_path), 'golden_sha256': hashlib.sha256(golden_path.read_bytes()).hexdigest()}
+    if spec is None:
+        return {**result, 'status': 'SKIP', 'why': 'no measurement code for this scenario id'}
+    if not metrics.gba_boundary_ok(int(golden['gba']['at_step'])):
+        return {**result, 'status': 'ERROR', 'why': f'GBA command step {golden["gba"]["at_step"]} shares a source frame '
+                'with its pre-command step'}
+    with tempfile.TemporaryDirectory(prefix=f'sc64-parity-{scenario_id}-') as temp:
+        trace = pathlib.Path(keep or temp) / f'{scenario_id}.trace'
+        binary, cmd = gba_command(scenario_id, golden, trace)
+        if not binary.exists():
+            return {**result, 'status': 'ERROR', 'why': f'{binary} is missing; build it with make (mk/parity/Makefile)'}
+        run = subprocess.run(cmd, capture_output=True, text=True)
+        if run.returncode != 0:
+            return {**result, 'status': 'ERROR', 'why': f'GBA run exited {run.returncode}: {run.stderr.strip()[-400:]}',
+                    'command': cmd}
+        report = json.loads(run.stdout.strip().splitlines()[-1])
+        series = gba_series(trace)
+    report['movers'] = [int(x) for x in report.get('movers', [])] if isinstance(report.get('movers'), list) else []
+    measured, err = spec['measure_gba'](series, golden, report)
+    if err:
+        return {**result, 'status': 'ERROR', 'why': 'GBA measurement: ' + err}
+    layout = parity_decode.Layout()
+    rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout)
+    if golden.get('layout_sha256') != layout.sha256:
+        # Decoded against another layout revision: offsets may have moved, so nothing gates.
+        for row in rows:
+            if row['gating']:
+                row['gating'] = False
+                row['verdict'] = 'REPORT'
+                row['why'] = 'golden decoded with another layout revision; re-run parity_decode.py golden'
+    return {**result, 'status': 'RUN', 'rows': rows, 'gba_measured': measured.get('measured'),
+            'gba_cpu_seconds': report.get('cpu_seconds'), 'command': cmd}
+
+
+def build_binaries(goldens):
+    """Build the GBA parity binaries the goldens name; {profile: error text or None}."""
+    profiles = sorted({metrics.SCENARIOS[g.stem]['profile'] for g in goldens if g.stem in metrics.SCENARIOS})
+    if not profiles:
+        return {}
+    cmd = ['make', '-s']
+    descriptor = ROOT / '.local' / 'build' / 'z9-inputs' / 'z8-descriptor.json'
+    if descriptor.exists():
+        cmd.append(f'Z8_DESCRIPTOR={descriptor.relative_to(ROOT)}')  # as the Zerg Z10 ROM is built
+    cmd += [f'build/parity/{p}-fast-trace' for p in profiles]
+    run = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+    if run.returncode == 0:
+        return {p: None for p in profiles}
+    # Never fall back to an older binary: every profile of a failed build is an error.
+    errors = [line for line in (run.stdout + run.stderr).splitlines() if ' error: ' in line or 'Error ' in line]
+    text = ('make failed: ' + ' | '.join(errors[-3:] or [(run.stderr or run.stdout).strip()[-300:]]))[-400:]
+    return {p: text for p in profiles}
+
+
+def run_tables(home):
+    """The ROM-table differ: report-only scorecard lines (counts by class)."""
+    # A private directory per invocation, so concurrent runs never share a report.
+    home.mkdir(parents=True, exist_ok=True)
+    out = pathlib.Path(tempfile.mkdtemp(prefix='tables-', dir=home))
+    cmd = [sys.executable, str(ROOT / 'tools' / 'sc64_parity_tables.py'), '--out', str(out)]
+    run = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        return tables_result(run, out)
+    finally:
+        for f in out.iterdir():
+            f.unlink()
+        out.rmdir()
+
+
+def tables_result(run, out):
+    if run.returncode != 0:
+        return {'id': 'tables', 'status': 'ERROR', 'why': run.stderr.strip()[-400:]}
+    if 'SKIP' in run.stderr and not (out / 'rom-table-diff.json').exists():
+        return {'id': 'tables', 'status': 'SKIP', 'why': 'private ROM inputs absent'}
+    doc = json.loads((out / 'rom-table-diff.json').read_text())
+    counts = doc['counts']
+    return {'id': 'tables', 'status': 'RUN', 'rows': [
+        {'key': 'tables:diff:gameplay', 'check': 'tables.diff', 'subject': 'gameplay cells', 'gba': counts['total gameplay'],
+         'provenance': 'rom-table', 'verdict': 'REPORT', 'gating': False},
+        {'key': 'tables:diff:all', 'check': 'tables.diff', 'subject': 'all cells', 'gba': counts['total'],
+         'provenance': 'rom-table', 'verdict': 'REPORT', 'gating': False},
+        {'key': 'tables:absent', 'check': 'tables.absent', 'subject': 'ROM rows the engine lacks', 'gba': counts['absent'],
+         'provenance': 'rom-table', 'verdict': 'REPORT', 'gating': False}]}
+
+
+def load_baseline(path):
+    if not path.exists():
+        return {}
+    doc = json.loads(path.read_text())
+    for line in doc.get('known', []):
+        if not isinstance(line.get('gba'), (int, float)) or isinstance(line.get('gba'), bool):
+            raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no numeric GBA value')
+    return {line['key']: line for line in doc.get('known', [])}
+
+
+def write_baseline(path, results, old):
+    known = []
+    seen = set()
+    for result in results:
+        for row in result.get('rows', []):
+            seen.add(row['key'])
+            if row['gating'] and row['verdict'] in ('REGRESSION', 'KNOWN'):
+                if not isinstance(row['gba'], (int, float)):
+                    raise ValueError(f'{row["key"]}: no GBA value to accept')
+                line = {'key': row['key'], 'gba': row['gba']}
+                note = old.get(row['key'], {}).get('note')
+                if note:
+                    line['note'] = note
+                known.append(line)
+    # Lines of scenarios that did not run this time are kept as they were.
+    ran = {r['id'] for r in results if r.get('status') == 'RUN'}
+    for key, line in old.items():
+        if key.split(':')[0] not in ran and key not in seen:
+            known.append(line)
+    known.sort(key=lambda line: line['key'])
+    doc = {'format': 'sc64-parity-baseline/1',
+           'about': 'Known GBA/N64 parity gaps: GBA values only (N64 bands stay in the private fixture home). '
+                    'Rewritten by ./dev parity --accept.', 'known': known}
+    path.write_text(json.dumps(doc, indent=1) + '\n')
+
+
+def fixture_hash(goldens):
+    digest = hashlib.sha256()
+    for path in sorted(goldens):
+        digest.update(path.name.encode() + b'\0' + hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def fmt(v):
+    if v is None:
+        return '-'
+    if isinstance(v, float):
+        return f'{v:.4g}'
+    return str(v)
+
+
+def scorecard(results, home, goldens):
+    lines = []
+    counts = {}
+    for result in results:
+        if result['status'] != 'RUN':
+            lines.append(f'{result["status"]:<10} {result["id"]}: {result.get("why", "")}')
+            counts[result['status']] = counts.get(result['status'], 0) + 1
+            continue
+        for row in result['rows']:
+            counts[row['verdict']] = counts.get(row['verdict'], 0) + 1
+            band = f'band [{fmt(row.get("lo"))}, {fmt(row.get("hi"))}]' if 'lo' in row else ''
+            extra = []
+            if row.get('ratio') is not None and row['verdict'] not in ('PASS',):
+                extra.append(f'GBA/N64 {row["ratio"]}')
+            if row.get('first_divergent_frame') is not None:
+                extra.append(f'first divergent source frame {row["first_divergent_frame"]}')
+            if row.get('why'):
+                extra.append(row['why'])
+            lines.append(f'{row["verdict"]:<10} {row["key"]:<44} gba {fmt(row.get("gba")):>9} '
+                         f'n64 {fmt(row.get("n64")):>9} {band:<27} {row["provenance"]}'
+                         + (f'  ({"; ".join(extra)})' if extra else ''))
+    summary = ', '.join(f'{k} {v}' for k, v in sorted(counts.items()))
+    lines.append(f'parity: {summary or "nothing ran"}')
+    lines.append(f'fixture set {fixture_hash(goldens)[:16]} ({len(goldens)} golden files in {home})')
+    return lines, counts
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--home', type=pathlib.Path, default=None, help='fixture home (default $SC64_PARITY_HOME)')
+    parser.add_argument('--baseline', type=pathlib.Path, default=BASELINE)
+    parser.add_argument('--accept', action='store_true', help='rewrite the baseline from this run')
+    parser.add_argument('--only', action='append', help='run only these scenario ids (repeatable)')
+    parser.add_argument('--no-tables', action='store_true', help='skip the ROM-table differ')
+    parser.add_argument('--keep', type=pathlib.Path, help='keep GBA traces in this directory')
+    parser.add_argument('--json', type=pathlib.Path, help='also write the full results here')
+    parser.add_argument('--explain', metavar='ID', help='print the full measurements of one scenario')
+    parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--no-build', action='store_true', help='use the GBA binaries as they are')
+    args = parser.parse_args(argv)
+    home = args.home or default_home()
+    baseline = load_baseline(args.baseline)
+    goldens = sorted((home / 'golden').glob('*.json')) if (home / 'golden').is_dir() else []
+    if args.only:
+        goldens = [g for g in goldens if g.stem in args.only]
+    if args.explain:
+        goldens = [g for g in goldens if g.stem == args.explain]
+    if args.keep:
+        args.keep.mkdir(parents=True, exist_ok=True)
+    built = {} if args.no_build else build_binaries(goldens)
+    broken = {p: why for p, why in built.items() if why}
+    jobs = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        if not args.no_tables and not args.explain and not args.only:
+            jobs.append(pool.submit(run_tables, home))
+        for path in goldens:
+            profile = metrics.SCENARIOS.get(path.stem, {}).get('profile')
+            if profile in broken:
+                jobs.append(pool.submit(lambda p=path, why=broken[profile]: {'id': p.stem, 'status': 'ERROR', 'why': why}))
+            else:
+                jobs.append(pool.submit(run_scenario, path.stem, path, baseline, args.keep))
+        results = [job.result() for job in jobs]
+    ran_ids = {r['id'] for r in results if r['status'] == 'RUN'}
+    seen = {row['key'] for r in results for row in r.get('rows', [])}
+    stale = [{'key': key, 'check': key.split(':')[1], 'subject': key.split(':', 2)[2], 'gba': line.get('gba'),
+              'provenance': '-', 'verdict': 'STALE', 'gating': False, 'why': 'baseline line with no observation'}
+             for key, line in sorted(baseline.items()) if key.split(':')[0] in ran_ids and key not in seen]
+    if stale:
+        results.append({'id': 'baseline', 'status': 'RUN', 'rows': stale})
+    if not goldens:
+        results.append({'id': 'scenarios', 'status': 'SKIP',
+                        'why': f'no golden files in {home / "golden"} (private N64 captures; see docs/PARITY-HARNESS.md)'})
+    if args.explain:
+        print(json.dumps(results, indent=1, default=str))
+        return 0 if results and all(r['status'] == 'RUN' for r in results) else 1
+    lines, counts = scorecard(results, home, goldens)
+    print('\n'.join(lines))
+    if args.json:
+        args.json.write_text(json.dumps({'results': results, 'fixture_set': fixture_hash(goldens)}, indent=1, default=str) + '\n')
+    if args.accept:
+        if any('another layout revision' in row.get('why', '') for r in results for row in r.get('rows', [])):
+            print('parity: not accepting while a golden was decoded with another layout revision; '
+                  'regenerate it first. The baseline is unchanged', file=sys.stderr)
+            return 1
+        if any(r['status'] == 'ERROR' for r in results):
+            print('parity: not accepting a run with errors; the baseline is unchanged', file=sys.stderr)
+            return 1
+        try:
+            write_baseline(args.baseline, results, baseline)
+        except ValueError as error:
+            print(f'parity: not accepting: {error}; the baseline is unchanged', file=sys.stderr)
+            return 1
+        print(f'baseline rewritten: {args.baseline}')
+    code = exit_code(results, counts, (ROOT / '.local' / 'sc64').exists(), args.accept)
+    if code and not any(r['status'] in ('RUN', 'ERROR') for r in results):
+        print('parity: every check skipped while .local/sc64 exists; prepare the fixture home or fix the inputs',
+              file=sys.stderr)
+    return code
+
+
+def exit_code(results, counts, private_inputs, accept=False):
+    """1 on any ERROR, on a REGRESSION (unless accepting) or when everything
+    skipped although private inputs exist; else 0."""
+    if any(r['status'] == 'ERROR' for r in results):
+        return 1
+    if not any(r['status'] == 'RUN' for r in results):
+        return 1 if private_inputs else 0
+    if accept:
+        return 0
+    return 1 if any(counts.get(v) for v in FAILING) else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

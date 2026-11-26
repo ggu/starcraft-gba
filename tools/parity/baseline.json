@@ -1,0 +1,26 @@
+{
+ "format": "sc64-parity-baseline/1",
+ "about": "Known GBA/N64 parity gaps: GBA values only (N64 bands stay in the private fixture home). Rewritten by ./dev parity --accept.",
+ "known": [
+  {
+   "key": "bb-income:income.first_delivery:human workers x4",
+   "gba": 59
+  },
+  {
+   "key": "bb-income:income.rate:human workers x4",
+   "gba": 0.308
+  },
+  {
+   "key": "t1-move:move.arrival_first:Marine x5",
+   "gba": 65
+  },
+  {
+   "key": "t1-move:move.arrival_last:Marine x5",
+   "gba": 100
+  },
+  {
+   "key": "t1-move:move.group_spread:Marine x5",
+   "gba": 23.013
+  }
+ ]
+}

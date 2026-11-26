@@ -5,9 +5,16 @@
 # output only under $(SC64_PARITY_HOME) (default: .local/parity in the main
 # checkout); they print a skip line and succeed when the inputs are absent.
 
-.PHONY: parity-tables
+.PHONY: parity-tables parity
 parity-tables:
 	$(PYTHON) tools/sc64_parity_tables.py
+
+# The developer loop (./dev parity): the table differ plus every captured N64
+# scenario with a golden file under $(SC64_PARITY_HOME)/golden, judged on the
+# GBA (tools/sc64_parity.py, docs/PARITY-HARNESS.md). Skips cleanly with no
+# private inputs.
+parity:
+	$(PYTHON) tools/sc64_parity.py
 
 # GBA side of the N64 parity harness (WP2): host-only command injector and
 # trace emitter (tests/sc64_parity_inject.h, tests/sc64_parity_trace.h) and a
