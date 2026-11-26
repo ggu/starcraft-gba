@@ -57,8 +57,125 @@ The cartridges were built from this branch with `codex/source-release` at
 cost, [#891](https://github.com/ggu/starcraft-gba/pull/891) weapon-art
 extraction, [#889](https://github.com/ggu/starcraft-gba/pull/889) parity
 tooling) touch only audio, linker and tooling sources, not the game or
-skirmish code, and were not replayed. The same work on the earlier
-`7316734e` cartridges is kept [below](#earlier-build-7316734e).
+skirmish code, and were not replayed then. #884 did change four Blood Bath
+outcomes through the Launch draw; see
+[What changed the lobbies after #890](#what-changed-the-lobbies-after-890).
+The same work on the earlier `7316734e` cartridges is kept
+[below](#earlier-build-7316734e).
+
+## Current base (`d8c535a2`)
+
+On `codex/source-release` at `d8c535a2` (Larva and Eggs, finite gas and
+native Zealot vitals all merged), all 19 lobbies of this change's `QUALIFIED`
+win from the lobby with physical buttons on the cartridges built from that
+commit: main's 18, plus the Protoss Outpost plan below, which this change
+adds (on `d8c535a2` itself, pass it in `CUSTOM_FULL_MATCH_CASES`). Each
+continues from its mid-battle pause save in a fresh process to the same
+result and victory SRAM, and its victory save reopens RESULT without changing
+SRAM. The private standard and cover skirmish packs were regenerated with the
+commit's `tools/sc64_skirmish_pack.py` first (see [Reproduce](#reproduce)).
+
+Eighteen plans are the ones #913 qualified. Their victory frames, pause
+frames, units on screen and checks after the save all match the Larva and
+Egg audit's table, and the three-Zerg tape is byte-identical to its recorded
+SHA-256. Protoss on Outpost against Terran and Zerg, one of the original 11
+lobbies, has a new plan (`WORKERS=14,PRODUCERS=2,LINE=66,DEFENSE=162,DEFENSES=4`).
+4 of 48 HOST plans won. Their traces have identical events apart from the
+recorded plan, because the `DEFENSES` and `FIRST_ATTACK` values they vary
+never changed a decision. The table hash is the trace
+of the plan in `QUALIFIED`. Every one of the 11 lobbies qualified by #890
+therefore wins again.
+
+| Cartridge | Map | Opponents | Victory frame | Checks | Pause save (frame, units on screen) | Checks after the save | Emulated updates/s | Trace SHA-256 (prefix) |
+| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |
+| Terran | Outpost | Zerg | 32,082 | 251 | 17,744 (33 own, 14 hostile) | 116 | 21.19 | `e2de5626fd11e394` |
+| Terran | Outpost | Terran, Zerg | 27,308 | 214 | 14,085 (52 own, 10 hostile) | 82 | 20.91 | `811f7b619c7d36db` |
+| Terran | Outpost | Zerg, Protoss, Terran | 29,794 | 233 | 13,746 (61 own, 7 hostile) | 111 | 21.52 | `1594fd213fb82cbe` |
+| Terran | Blood Bath | Zerg | 22,769 | 251 | 17,939 (32 own, 6 hostile) | 68 | 19.34 | `a3cca1db9987dcfb` |
+| Terran | Blood Bath | Protoss, Zerg | 43,822 | 520 | 11,379 (11 own, 21 hostile) | 382 | 15.32 | `03a1a57ed061675d` |
+| Terran | Blood Bath | Zerg, Protoss, Terran | 31,471 | 358 | 14,272 (9 own, 13 hostile) | 203 | 18.22 | `54fc8d5f4cdfc3c8` |
+| Zerg Z10 | Outpost | Protoss | 16,051 | 174 | 11,857 (16 own, 8 hostile) | 41 | 24.49 | `3806d98033282f87` |
+| Zerg Z10 | Outpost | Protoss, Zerg | 23,645 | 225 | 21,749 (12 own, 6 hostile) | 20 | 22.03 | `202adc17f08a3ed4` |
+| Zerg Z10 | Outpost | Terran, Zerg, Protoss | 30,019 | 240 | 18,896 (14 own, 5 hostile) | 72 | 20.91 | `c42b896ae5775ca5` |
+| Zerg Z10 | Blood Bath | Protoss | 13,621 | 157 | 9,401 (8 own, 9 hostile) | 57 | 26.43 | `0b45ec3de6d22f47` |
+| Zerg Z10 | Blood Bath | Terran, Zerg | 27,388 | 322 | 12,762 (21 own, 10 hostile) | 186 | 18.83 | `6f65a7ed732ae186` |
+| Zerg Z10 | Blood Bath | Zerg, Zerg, Zerg | 61,183 | 750 | 9,044 (15 own, 14 hostile) | 649 | 15.40 | `38a6a8e03ebbf660` |
+| Protoss P10 | Outpost | Terran | 27,278 | 211 | 12,863 (10 own, 24 hostile) | 106 | 21.80 | `50dd0b9cec3487e6` |
+| Protoss P10 | Outpost | Terran, Protoss | 33,629 | 246 | 14,239 (23 own, 6 hostile) | 139 | 22.30 | `df02a7dc5e576a2e` |
+| Protoss P10 | Outpost | Terran, Zerg | 35,745 | 249 | 16,523 (25 own, 15 hostile) | 134 | 21.74 | `262155cdfc29ceff` |
+| Protoss P10 | Outpost | Protoss, Terran, Zerg | 41,845 | 297 | 9,556 (24 own, 6 hostile) | 212 | 20.75 | `23f95e626740ef6e` |
+| Protoss P10 | Blood Bath | Terran | 28,291 | 307 | 14,553 (56 own, 12 hostile) | 137 | 17.28 | `28b44360e75ed0a6` |
+| Protoss P10 | Blood Bath | Terran, Zerg | 21,804 | 213 | 15,544 (27 own, 5 hostile) | 50 | 18.46 | `001477c3a2e83f00` |
+| Protoss P10 | Blood Bath | Terran, Zerg, Protoss | 28,246 | 290 | 8,716 (19 own, 8 hostile) | 203 | 16.31 | `722a8c969f6f42df` |
+
+Opponents are in seat order. "Checks" counts the gameplay checkpoints the
+whole replay matched; emulated updates/s is the guest cycle clock over the
+whole replay, not hardware frame rate. Zerg on Blood Bath against the mixed
+Terran, Zerg and Protoss alliance stays open ([What remains open](#what-remains-open)).
+
+| Input | SHA-256 |
+| --- | --- |
+| Terran ROM | `17f3b4ce1d02e4619cb82828d283bdd523df9e2fe8afe9d12613bfaa41ea86e7` |
+| Zerg Z10 ROM | `2d1d00751fbc9e82a012823ec54fedda54dd3a55b0cf5d1a001be2de268fe7fe` |
+| Protoss P10 ROM | `967e2b35152df87ac05f98d4ee0ccd81f3c1634066503306257eb7450296d4ff` |
+| Terran ELF | `58260a64f442681e039008add27c7025c8d9f53f82cb19c10d06cd8b35dd743b` |
+| Zerg Z10 ELF | `84e66a661f7c49b23e6f33f33cb53c477bf5d0e5c0f50f6deeebbdbd0ef31d65` |
+| Protoss P10 ELF | `da99f1161c1ae6271f7cbb5dba805d28077938f2e12e2ccf3aa2f876c451d43a` |
+| Standard skirmish pack | `67039b6d0dd99228e39c8d09f8cb35f38fe4428fa845de2457dcb4c1cc0af463` |
+| Cover skirmish pack | `7b8076a0415db070e3a360e8961a104e6921c52cc0196eb975f66d810801f562` |
+| Port-free mGBA backend | `10189afccbaa815dc9eb98eaf08bf871622210ab0b85e752d72e8a45a92aad15` |
+
+The Zerg Z10 ROM is byte-identical to the integrated #913 cartridge.
+
+### What changed the lobbies after #890
+
+On `d39bd015`, 6 of #890's 11 plans no longer won: Terran on Blood Bath
+against Zerg, Protoss and Terran; Zerg on Blood Bath against Terran and Zerg;
+and all four Protoss lobbies. Each first-parent merge from #890's merge to `d39bd015` was rebuilt
+with both packs regenerated by its own tool, and each plan was re-authored
+with the HOST player and the cartridge's own lobby probe:
+
+| Merge | Plans that lose | Change |
+| --- | --- | --- |
+| `77818875` (#890 merged) | Terran Blood Bath `zpt`; Zerg Blood Bath `tz`; Protoss Blood Bath `tzp` and `tz` | Already on #890's merge: [#884](https://github.com/ggu/starcraft-gba/pull/884) moved the Blood Bath start draw. |
+| `45b3a466` ([#893](https://github.com/ggu/starcraft-gba/pull/893), can-attack skip) | same | All 11 HOST traces byte-identical to `77818875`. |
+| `b206b062` ([#892](https://github.com/ggu/starcraft-gba/pull/892), native Zealot vitals) | adds Protoss Outpost `ptz` and `tz` | Every lobby with a Protoss side changes trace; the two lobbies without one are byte-identical. |
+| `d39bd015` ([#894](https://github.com/ggu/starcraft-gba/pull/894), skirmish geyser source) | same | All 11 HOST traces byte-identical to `b206b062`. |
+
+- [#884](https://github.com/ggu/starcraft-gba/pull/884) (audio interrupt
+  cost) merged into the base just before #890 and was not replayed there.
+  It is the only merge between #890's tested commit and `77818875` that
+  changes cartridge source: [#889](https://github.com/ggu/starcraft-gba/pull/889)
+  adds parity make rules, and [#891](https://github.com/ggu/starcraft-gba/pull/891)
+  changes no file under `common/`, `starcraft/` or `mk/`. The attribution
+  rests on that, not on a build of each merge. Melee start orders are drawn from `gba_elapsed_milliseconds()` at Launch.
+  That clock counts cartridge cycles since `gba_init()` started its timer,
+  including time spent in VBlank interrupts. #884 reduced that work, so the same key sequence reaches Launch
+  at a different millisecond. The same Launch-row wait now resolves
+  different orders on the cartridge: 57 → 54 (Terran `zpt`), 7 → 6 (Zerg
+  `tz`), 141 → 135 (Protoss `tzp`) and 24 → 27 (Protoss `tz`); Terran `pz`
+  keeps order 11 and still wins. The plans were tuned for one start layout.
+  With the old order 7 forced on the HOST player, `d39bd015` reproduces the
+  #890 Zerg tape byte for byte (`eddd30ecbc76dd06`). With the old order 57
+  the Terran plan still loses, because #892 also changes that match, which
+  has a Protoss computer.
+- [#892](https://github.com/ggu/starcraft-gba/pull/892) moves Zealots from
+  100 HP / 60 shields to the native 80 / 80 on purpose. Shields absorb
+  damage before HP armor applies, so HP armor now covers 20 fewer Zealot
+  points. The human Protoss sides lose their mid-game fights. On Outpost
+  against Protoss, Terran and Zerg the human's units, workers included, fall
+  from 30 to 10 between updates 18,000 and 21,000 (32 → 24 before), and the
+  match is lost at update 114,129. Against Terran and Zerg they fall from 38
+  to 0 between updates 18,000 and 27,000 (38 → 23 before).
+- [#894](https://github.com/ggu/starcraft-gba/pull/894) changes only the
+  generated geyser table; it changes no outcome.
+
+Both changes are intended: a time-seeded draw and the native Zealot values.
+No engine fault was found and no engine code changed here. The plans in
+`QUALIFIED` were re-authored for them during the finite-gas qualification
+([gas audit](2026-11-26-n64-gas-pickup.md#custom-matches-with-finite-reserves-enabled))
+and by [#913](https://github.com/ggu/starcraft-gba/pull/913), plus the
+Protoss Outpost plan above.
 
 ## Since Larva and Eggs
 
