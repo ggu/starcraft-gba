@@ -27,6 +27,12 @@ python3 tools/sc64_z3_linked_victory.py --rom "$Z10_ROM" --elf "$Z10_ELF" \
   --runner "$RUNNER" --previous-victory "$Z2_SAVE" --out "$OUT"
 ```
 
+The independent replay matched all 32 expected save hashes. Across 69,243
+runner updates, the emulator measured 49,415,530,907 guest cycles, or
+23.51 updates/s at the GBA clock rate. This average covers the recorded
+inputs, including menu and reload inputs; it does not measure displayed
+frame changes or physical-device pacing.
+
 ## Z4 from the Z3 result
 
 A fresh instance loaded that Z3 result and advanced to Z4 at frame zero.
