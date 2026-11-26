@@ -63,6 +63,76 @@ outcomes through the Launch draw; see
 The same work on the earlier `7316734e` cartridges is kept
 [below](#earlier-build-7316734e).
 
+## Egg pairs counted as two (after `b3d6d437`)
+
+Branch `claude/egg-army-ai-count` (on `b3d6d437`, with #933) makes two
+fixes:
+
+- The Custom Game planner counts a Zergling or Scourge Egg as the two units
+  it hatches, both in its census and when it places the order. Before, an Egg
+  counted as one, and the hatched pair as two.
+- Select Army no longer takes Eggs on the Terran cartridge. No qualified tape
+  is affected: the Terran cartridge's lobbies all have a Terran human.
+
+Only the Blood Bath lobbies with a Zerg opponent change. Every Outpost lobby,
+and Protoss P10 Blood Bath against Terran, wins on the same frame as on
+`d8c535a2`.
+
+With the plans unchanged, 18 of the 19 lobbies still won. The exception was
+Zerg Blood Bath against three Zerg, which lost at frame 25,452; its HOST
+author reproduces that loss exactly. In a HOST sweep of 72 plans around the
+old one, all at start order 156 (the order this cartridge resolves with no
+Launch-row wait), 10 won. `QUALIFIED` now uses the winner closest to the old
+plan, which differs only in `FIRST_ATTACK=5500` (was 6500).
+
+On the ARM cartridge that plan:
+
+- wins at update 52,428, frame 50,761;
+- continues in a fresh process from its pause save (update 6,336, frame
+  6,166) to the same result and victory SRAM;
+- reopens RESULT from the victory save with SRAM unchanged.
+
+The Zerg ROM's SHA-256 begins `2f8b38b8ebd12cfe`, and two separate builds of
+this branch gave that same ROM.
+
+Every lobby below was replayed on this branch's cartridges with
+`make check-sc64-custom-full-matches`: the whole tape, the fresh-process
+continuation of the pause save, and the victory reload. The Zerg against
+three Zerg row is from the requalified plan. Emulator evidence only.
+
+| Cartridge | Map | Opponents | Result | Victory frame | Pause save frame |
+| --- | --- | --- | --- | ---: | ---: |
+| Terran | Outpost | Zerg | won | 32,082 | 17,744 |
+| Terran | Outpost | Terran, Zerg | won | 27,308 | 14,085 |
+| Terran | Outpost | Zerg, Protoss, Terran | won | 29,794 | 13,746 |
+| Terran | Blood Bath | Zerg | won | 23,479 | 17,939 |
+| Terran | Blood Bath | Protoss, Zerg | won | 37,463 | 11,379 |
+| Terran | Blood Bath | Zerg, Protoss, Terran | won | 35,922 | 14,272 |
+| Zerg Z10 | Outpost | Protoss | won | 16,051 | 11,857 |
+| Zerg Z10 | Outpost | Protoss, Zerg | won | 23,645 | 21,749 |
+| Zerg Z10 | Outpost | Terran, Zerg, Protoss | won | 30,019 | 18,896 |
+| Zerg Z10 | Blood Bath | Protoss | won | 13,621 | 9,401 |
+| Zerg Z10 | Blood Bath | Terran, Zerg | won | 27,151 | 12,762 |
+| Zerg Z10 | Blood Bath | Zerg, Zerg, Zerg | won | 50,761 | 6,166 |
+| Protoss P10 | Outpost | Terran | won | 27,278 | 12,863 |
+| Protoss P10 | Outpost | Terran, Protoss | won | 33,629 | 14,239 |
+| Protoss P10 | Outpost | Terran, Zerg | won | 35,745 | 16,523 |
+| Protoss P10 | Outpost | Protoss, Terran, Zerg | won | 41,845 | 9,556 |
+| Protoss P10 | Blood Bath | Terran | won | 28,291 | 14,553 |
+| Protoss P10 | Blood Bath | Terran, Zerg | won | 23,371 | 15,544 |
+| Protoss P10 | Blood Bath | Terran, Zerg, Protoss | won | 26,903 | 8,716 |
+
+On the skirmish AI matrix (`tools/sc64_skirmish_ai_matrix.py`, profiles
+terran, zerg, protoss, showcase and protoss-p10), base and branch each pass
+544 of 611 cases. Base here is `d8c535a2`'s engine sources in the same tree.
+The 66 failures common to both are already on `codex/source-release`, and 90
+of the 611 case records change.
+
+- `match-terran-1-1-zz` now passes.
+- `match-terran-1-2-z` now fails with `match: float`. That is the known
+  late-bank limit of mirrored Blood Bath owners; base fails 13 other cases for
+  the same reason.
+
 ## Current base (`d8c535a2`)
 
 On `codex/source-release` at `d8c535a2` (Larva and Eggs, finite gas and
