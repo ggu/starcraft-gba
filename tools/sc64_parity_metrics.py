@@ -843,8 +843,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # A drop seen across a sampling gap may have come from a unit that left reach meanwhile.
         return near == [uid] and gaps_of.get(vid, {}).get(sf, 1) == 1
     unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
-    # A killing drop leaves no exact damage, but when it is not clearly the subject's it still
-    # splits the timing: no cooldown interval may span it.
+    # A killing drop leaves no exact damage, but it still splits the timing: no cooldown
+    # interval may span it.
     for vid in first['units']:
         if not enemy(vid):
             continue
@@ -852,9 +852,9 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         events = [sf for sf, _ in hits(track_, lethal=True)]
         if track_ and track_[-1][0] < end and track_[-1][1] > 0:
             events.append(track_[-1][0] + 1)   # a GBA row removed by a hit the trace never shows
-        for sf in events:
-            if not ours(sf, vid):
-                unclear.add(sf)
+        # Every kill splits the timing, the subject's own included: the killing hit is never in
+        # the hit list (see hits), so an interval across it would skip a shot.
+        unclear.update(events)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
