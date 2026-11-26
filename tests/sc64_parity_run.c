@@ -8,6 +8,15 @@
  *
  *   sc64_parity_run --scenario t1|skirmish [--steps N] [--trace PATH]
  *                   [--no-render] [--no-chain] [--no-route-checks] [--profile NAME]
+ *   sc64_parity_run --scenario move --unit X,Y [--unit X,Y ...] --target X,Y --at STEP ...
+ *   sc64_parity_run --scenario income ...
+ *
+ * move and income are the N64 parity scenarios (tools/sc64_parity.py passes
+ * their parameters from a golden file). move launches T1 and gives the
+ * human Marines standing exactly at the --unit points one group move order
+ * to --target at step --at. income launches Blood Bath, human Zerg against
+ * one Terran computer, and gives no command: the skirmish starts the human's
+ * Drones mining, as the cartridge does.
  *
  * It prints one JSON line: steps taken, host updates, the world hash and the
  * per-step world-hash chain, the route-purity checks made and the setup
@@ -320,6 +329,11 @@ static int pr_due(PrPending *p, unsigned long step, int owner)
 
 /* ---- Scenarios -------------------------------------------------------- */
 
+enum { PR_GROUP_CAP = 12 };
+static int pr_group_n, pr_group_x[PR_GROUP_CAP], pr_group_y[PR_GROUP_CAP], pr_group_slot[PR_GROUP_CAP];
+static int pr_target_x = -1, pr_target_y = -1;
+static unsigned long pr_at_step = 5, pr_command_step;
+
 static struct {
     int a, b2, spawned, enemy, worker0, worker1, worker2, producer;
     PrPending train, build;
@@ -505,6 +519,68 @@ static void pr_scenario_skirmish(unsigned long step)
     }
 }
 
+/* move: join each --unit point to the one human Marine standing exactly there
+ * (the N64 position halved), then one group order at --at. */
+static int pr_setup_move(void)
+{
+    for (int k = 0; k < pr_group_n; ++k) {
+        int found = -1;
+        if (pr_group_x[k] >= WORLD_W || pr_group_y[k] >= WORLD_H) {
+            fprintf(stderr, "move: point %d,%d is off the map\n", pr_group_x[k], pr_group_y[k]);
+            return 0;
+        }
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_MARINE &&
+                u[i].x == pr_group_x[k] && u[i].y == pr_group_y[k]) {
+                if (found >= 0) { fprintf(stderr, "move: two Marines at %d,%d\n", pr_group_x[k], pr_group_y[k]); return 0; }
+                found = i;
+            }
+        if (found < 0) {
+            int near = pr_nearest_unit(pr_group_x[k], pr_group_y[k], -1, U_MARINE);
+            fprintf(stderr, "move: no human Marine at %d,%d (nearest: slot %d at %d,%d)\n", pr_group_x[k], pr_group_y[k],
+                    near, near >= 0 ? u[near].x : -1, near >= 0 ? u[near].y : -1);
+            return 0;
+        }
+        pr_group_slot[k] = found;
+    }
+    return pr_group_n > 0 && pr_target_x >= 0;
+}
+
+static void pr_scenario_move(unsigned long step)
+{
+    if (step != pr_at_step) return;
+    pr_command_step = step;
+    sc64_pi_group_move(pr_group_slot, pr_group_n, pr_target_x, pr_target_y);
+}
+
+/* income: the human's Drones as the skirmish starts them. */
+static int pr_setup_income(void)
+{
+    pr_group_n = 0;
+    for (int i = 0; i < MAX_UNITS && pr_group_n < PR_GROUP_CAP; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_DRONE) pr_group_slot[pr_group_n++] = i;
+    if (pr_group_n != 4) { fprintf(stderr, "income: the human starts with %d Drones, not 4\n", pr_group_n); return 0; }
+    return 1;
+}
+
+static void pr_scenario_income(unsigned long step)
+{
+    (void)step; /* the human stays passive */
+}
+
+static int pr_parse_point(const char *text, int *x, int *y)
+{
+    char *end;
+    const char *second;
+    long a = strtol(text, &end, 10), c;
+    if (end == text || *end != ',') return 0;
+    second = end + 1;
+    c = strtol(second, &end, 10);
+    if (end == second || *end || a < 0 || c < 0 || a >= 65536 || c >= 65536) return 0;
+    *x = (int)a; *y = (int)c;
+    return 1;
+}
+
 static double pr_clock(clockid_t id)
 {
     struct timespec t;
@@ -520,7 +596,7 @@ int main(int argc, char **argv)
 {
     const char *scenario = 0, *trace_path = 0, *profile = "unnamed";
     unsigned long limit = 3000;
-    int skirmish;
+    int skirmish, kind;
     double t0, t1, c0, c1;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--scenario") && i + 1 < argc) scenario = argv[++i];
@@ -530,6 +606,10 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--no-render")) pr_render = 0;
         else if (!strcmp(argv[i], "--no-chain")) pr_chain_on = 0;
         else if (!strcmp(argv[i], "--no-route-checks")) pr_checks_on = 0;
+        else if (!strcmp(argv[i], "--unit") && i + 1 < argc && pr_group_n < PR_GROUP_CAP &&
+                 pr_parse_point(argv[i + 1], &pr_group_x[pr_group_n], &pr_group_y[pr_group_n])) { ++pr_group_n; ++i; }
+        else if (!strcmp(argv[i], "--target") && i + 1 < argc && pr_parse_point(argv[i + 1], &pr_target_x, &pr_target_y)) ++i;
+        else if (!strcmp(argv[i], "--at") && i + 1 < argc && (pr_at_step = strtoul(argv[++i], 0, 10)) >= 2) {}
         else { scenario = 0; break; }
     }
     for (const char *c = profile; *c; ++c)
@@ -537,12 +617,17 @@ int main(int argc, char **argv)
             scenario = 0; /* the name goes into JSON and the trace header unescaped */
             break;
         }
-    if (!scenario || (strcmp(scenario, "t1") && strcmp(scenario, "skirmish")) || !limit) {
+    /* kind: 0 t1, 1 skirmish, 2 move, 3 income */
+    kind = !scenario ? -1 : !strcmp(scenario, "t1") ? 0 : !strcmp(scenario, "skirmish") ? 1 :
+           !strcmp(scenario, "move") ? 2 : !strcmp(scenario, "income") ? 3 : -1;
+    if (kind < 0 || !limit || (kind == 2 && (!pr_group_n || pr_target_x < 0))) {
         fprintf(stderr, "usage: %s --scenario t1|skirmish [--steps N] [--trace PATH] [--no-render] [--no-chain]\n"
-                "       [--no-route-checks] [--profile NAME]\n", argv[0]);
+                "       [--no-route-checks] [--profile NAME]\n"
+                "       %s --scenario move --unit X,Y [--unit X,Y ...] --target X,Y [--at STEP] ...\n"
+                "       %s --scenario income [--at STEP] ...\n", argv[0], argv[0], argv[0]);
         return 64;
     }
-    skirmish = !strcmp(scenario, "skirmish");
+    skirmish = kind == 1 || kind == 3;
 #ifdef SC64_PARITY_TRACE
     sc64_pt_route_checks = pr_checks_on;
     if (trace_path) {
@@ -562,7 +647,8 @@ int main(int argc, char **argv)
     if (!pr_hash_selftest()) { fputs("parity world-hash mutation regression failed\n", stderr); return 67; }
     {
         uint64_t route = route_purity_hash();
-        if (!(skirmish ? pr_setup_skirmish() : pr_setup_t1())) return 66;
+        if (!(kind == 0 ? pr_setup_t1() : kind == 1 ? pr_setup_skirmish() : kind == 2 ? pr_setup_move() : pr_setup_income()))
+            return 66;
         ++pr_route_checks;
         if (route_purity_hash() != route) { fputs("parity runner: scenario setup changed route state\n", stderr); abort(); }
     }
@@ -581,8 +667,10 @@ int main(int argc, char **argv)
         if (dispatched != pr_steps + 1) {
             dispatched = pr_steps + 1;
             if (pr_checks_on) sc64_pi_route_expect_begin();
-            if (skirmish) pr_scenario_skirmish(dispatched);
-            else pr_scenario_t1(dispatched);
+            if (kind == 0) pr_scenario_t1(dispatched);
+            else if (kind == 1) pr_scenario_skirmish(dispatched);
+            else if (kind == 2) pr_scenario_move(dispatched);
+            else pr_scenario_income(dispatched);
             if (pr_checks_on) {
                 ++pr_route_checks;
                 sc64_pi_route_expect_end("during the scenario");
@@ -598,13 +686,21 @@ int main(int argc, char **argv)
             fprintf(stderr, "route region %zu size %zu hash %016llx\n", r, route_pure_regions[r].size,
                     (unsigned long long)pr_mix(1469598103934665603ull, route_pure_regions[r].addr,
                                                route_pure_regions[r].size));
-    if (skirmish && !sc64_pi_status.failures && !sc.gas_delivered)
+    if (kind == 1 && !sc64_pi_status.failures && !sc.gas_delivered)
         sc64_pi_fail("gas", "no gas delivery by step %lu (started=%d assigned=%d)", pr_steps, sc.gas_started, sc.gas_assigned);
     /* Every scripted command must have been issued, not left waiting. */
+    if (kind == 2 && !sc64_pi_status.failures && !pr_command_step)
+        sc64_pi_fail("scenario", "run ended at step %lu before the command step %lu", pr_steps, pr_at_step);
     if (!sc64_pi_status.failures && ((sc.train.armed && !sc.train.done) || (sc.build.armed && !sc.build.done)))
         sc64_pi_fail("scenario", "run ended at step %lu before the train or build command was issued", pr_steps);
     {
         uint64_t world = pr_world_hash();
+        char movers[PR_GROUP_CAP * 8 + 1] = "";
+        /* The command goes in before step pr_command_step, so the last state
+         * without it is that of the step before. */
+        unsigned long command_sf = pr_command_step ? (pr_command_step - 1) * 4ul / 5ul : 0;
+        for (int k = 0; kind >= 2 && k < pr_group_n; ++k)
+            snprintf(movers + strlen(movers), sizeof(movers) - strlen(movers), "%s%d", k ? "," : "", pr_group_slot[k]);
 #ifdef SC64_PARITY_TRACE
         if (pr_trace) {
             int bad = sc64_pt_close(pr_steps, pr_host_ticks, world, pr_chain) != 0;
@@ -617,7 +713,7 @@ int main(int argc, char **argv)
                "\"route_checks_on\":%d,\"route_checks\":%lu,\"verb_route_checks\":%u,\"dispatch_route_checks\":%u,"
                "\"spawn_route_retirements\":%u,"
                "\"gas_assigned\":%d,\"gas_pickup\":%d,\"gas_delivered\":%d,"
-               "\"verbs\":%u,\"setup_failures\":%u,"
+               "\"verbs\":%u,\"setup_failures\":%u,\"command_step\":%lu,\"command_sf\":%lu,\"human_owner\":%d,\"movers\":[%s],"
                "\"first_failure\":\"%s\",\"attack_mode\":\"%s\",\"wall_seconds\":%.6f,\"cpu_seconds\":%.6f,"
                "\"updates_per_cpu_second\":%.1f}\n",
                profile, scenario,
@@ -632,7 +728,8 @@ int main(int argc, char **argv)
                sc64_pi_status.route_retirements,
                sc.gas_assigned, sc.gas_picked_up, sc.gas_delivered,
                sc64_pi_status.issued,
-               sc64_pi_status.failures, sc64_pi_status.first_failure, sc64_pi_attack_mode(),
+               sc64_pi_status.failures, pr_command_step, command_sf, SIDE, movers,
+               sc64_pi_status.first_failure, sc64_pi_attack_mode(),
                t1 - t0, c1 - c0, c1 > c0 ? (double)pr_host_ticks / (c1 - c0) : 0.0);
     }
     return sc64_pi_status.failures ? 3 : 0;

@@ -41,6 +41,9 @@
  *   sc64_pi_stop(slot)                        any profile
  *   sc64_pi_harvest_minerals(slot, patch)     human-owned workers
  *   sc64_pi_harvest_gas(slot, refinery)       human-owned workers
+ *   sc64_pi_group_move(slots, n, x, y)        human-owned units; one product
+ *       group order: all n units selected at once, so issue_order() spreads
+ *       them into its formation, as a player's box selection does
  *   sc64_pi_train(owner, producer, type)      SC64_RACES only
  *   sc64_pi_build(owner, worker, type, x, y)  SC64_RACES only
  * Orders for computer-owned units are not supported: their command path is
@@ -257,6 +260,35 @@ static int sc64_pi_order(const char *verb, int slot, int order, int x, int y)
 static int sc64_pi_move(int slot, int x, int y)
 {
     return sc64_pi_order("move", slot, ORDER_MOVE, x, y);
+}
+
+/* Select exactly the given units (none twice), saving what the command may change. */
+static int sc64_pi_select_group(const char *verb, Sc64ParitySelection *saved, const int *slots, int n)
+{
+    if (n < 1 || n > MAX_UNITS) return sc64_pi_fail(verb, "group of %d units", n);
+    for (int k = 0; k < n; ++k) {
+        if (sc64_pi_check_commandable(verb, slots[k])) return -1;
+        for (int j = 0; j < k; ++j)
+            if (slots[j] == slots[k]) return sc64_pi_fail(verb, "slot %d listed twice", slots[k]);
+    }
+    sc64_pi_select_only(saved, slots[0]);
+    for (int k = 1; k < n; ++k) u[slots[k]].selected = 1;
+    return 0;
+}
+
+static int sc64_pi_group_move(const int *slots, int n, int x, int y)
+{
+    Sc64ParitySelection saved;
+    uint64_t route = route_purity_hash();
+    int issued;
+    if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H)
+        return sc64_pi_fail("group_move", "point %d,%d is off the map", x, y);
+    if (sc64_pi_select_group("group_move", &saved, slots, n)) return -1;
+    issued = issue_order(ORDER_MOVE, x, y);
+    sc64_pi_restore(&saved);
+    sc64_pi_route_check(route, "group_move");
+    if (issued != n) return sc64_pi_fail("group_move", "%d of %d units took the order", issued, n);
+    return sc64_pi_ok("group_move", "n=%d x=%d y=%d", n, x, y);
 }
 
 static int sc64_pi_attack_move(int slot, int x, int y)

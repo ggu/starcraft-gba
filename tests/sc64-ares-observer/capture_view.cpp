@@ -103,8 +103,22 @@ static void checks_links_and_liveness() {
     assert(links.bad == 2 && links.asymmetric == 1);          /* 899's prev no longer answered */
 }
 
+/* tap.bin file header: magic, then little-endian version and sizes. */
+static void tap_header_is_little_endian() {
+    std::uint8_t header[SC64_TAP_FILE_HEADER_BYTES];
+    sc64_capture_tap_file_header(header, 0xCC);
+    assert(std::memcmp(header, "SC64TAP\0", 8) == 0);
+    assert(header[8] == SC64_TAP_VERSION && header[9] == 0 && header[10] == 0 && header[11] == 0);
+    assert(header[12] == SC64_TAP_HEADER_WORDS * 4 && header[16] == 0xCC && header[17] == 0);
+    assert(header[20] == ((2 + SC64_UNIT_BYTES) & 0xFF) && header[21] == ((2 + SC64_UNIT_BYTES) >> 8));
+    std::uint8_t word[4];
+    sc64_capture_put_le32(word, 0x11223344u);
+    assert(word[0] == 0x44 && word[1] == 0x33 && word[2] == 0x22 && word[3] == 0x11);
+}
+
 int main() {
     pad_bits_are_distinct();
+    tap_header_is_little_endian();
     reader_overlays_cache_lines();
     locates_one_table();
     checks_links_and_liveness();

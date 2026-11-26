@@ -46,6 +46,10 @@ of every generated input header its dependency file (`<binary>.d`, from a
 separate `clang -M` pass over all its sources) names. A change to the compile
 command rebuilds the binary (`<binary>.cmd`).
 
+The runner's `move` and `income` scenarios are the N64 parity scenarios;
+`tools/sc64_parity.py` runs them with the parameters of their golden files
+([`PARITY-HARNESS.md`](PARITY-HARNESS.md)).
+
 One runner run:
 
 ```sh
@@ -82,6 +86,7 @@ taken for too long, but it does not press A to dismiss a box.
 | --- | --- | --- |
 | spawn | `spawn_unit` | all |
 | move, attack-move | `issue_order`, one selected unit | human units |
+| group move | `issue_order` with the whole group selected, so it spreads them into its formation | human units |
 | attack a target | `sc64_direct_attack_issue_target` | `SC64_DIRECT_ATTACK` builds (Zerg Z10) |
 | attack a target (fallback) | `issue_order(ORDER_ATTACK_MOVE)` at the target | builds without it (Terran) |
 | stop | `stop_selected`, one selected unit | all |
