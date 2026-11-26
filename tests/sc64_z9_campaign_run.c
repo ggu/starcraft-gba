@@ -111,7 +111,7 @@ static void census(const char *label,int leg)
     fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,"
         "\"side_units\":%d,\"hydras\":%d,\"drones\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,\"leg\":%d,\"bank\":[%d,%d],"
         "\"supply\":[%d,%d],\"cursor\":[%d,%d],\"countdown\":%u,\"towns\":%u,\"fault\":%u}\n",
-        label,(unsigned)frame,host_tick,screen,won,lost,count_units(SIDE,-1),count_units(SIDE,U_HYDRALISK),drone_count(),
+        label,(unsigned)frame,(unsigned)host_tick,screen,won,lost,count_units(SIDE,-1),count_units(SIDE,U_HYDRALISK),drone_count(),
         enemy,eb,leg,minerals,gas,race_owner_supply(SIDE),race_owner_supply_cap(SIDE),cx,cy,
         (unsigned)race_zl_sched.countdown,(unsigned)race_zl_ai.started,(unsigned)race_zl_sched.core.fault);
     fflush(trace);
@@ -121,6 +121,8 @@ int main(int argc,char **argv)
 {
     const char *path=argc>1?argv[1]:".local/traces/z9-controller.jsonl";
     unsigned limit_ticks=argc>2?(unsigned)strtoul(argv[2],0,10):Z9_RUN_LIMIT;
+    int guarded_air=argc==4&&!strcmp(argv[3],"--guarded-air");
+    if(argc>3&&!guarded_air){fprintf(stderr,"usage: %s [trace [ticks [--guarded-air]]]\n",argv[0]);return 2;}
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
     fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":%d,\"profile\":\"ZERG_Z9_CANONICAL_FLAGS\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",SC64_Z9_GLOBAL_ID);
     game_init();prior=0;
@@ -128,13 +130,15 @@ int main(int argc,char **argv)
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==SC64_Z9_GLOBAL_ID);
     census("launch",0);
     int saved=0,turn=0,leg=0,rush=0,next_checkpoint=2000,next_mine=0,next_train=0,next_build=100,next_gas=400,next_hatch=600,next_rally=1500,next_order=0,next_save_build=0,next_stream=0,next_runner=0,runner=-1,runner_leg=0,taken=0,escort=-1,next_defend=0,next_research=0,leg_since=0,leg_last=-1,last_box=-100000,next_muta=0,muta_go=0,next_lair=0,next_mgather=0,mfront=2,next_wait=0,next_mwait=0;
-    const int drone_goal=16,hatch_goal=7,gas_drones=3,hydra_cap=16;
+    const int drone_goal=16,hatch_goal=7,gas_drones=guarded_air?6:3,hydra_cap=16;
     /* The garrisons are Reaver-heavy and a Hydralisk cannot answer one from the ground, so
        Mutalisks (air-only targets for Reavers and Zealots) clear the road ahead of the Drone
        while a small Hydralisk guard holds the rally point. Upgrades come from the starting
        Evolution Chamber. */
     const int hold_after=36000,gather_percent=80,gather_wait=1500,upgrades=2,contact=320,fight_period=90,rebox_period=300,box_reach=420,
-        muta_cap=40,muta_go_count=14,lair_after=2500,muta_reach=520,hydra_go_count=12,return_lead=150;
+        muta_cap=40,muta_go_count=guarded_air?22:14,lair_after=2500,muta_reach=520,
+        hydra_go_count=12;
+    const unsigned return_lead=guarded_air?300u:150u;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         if(!taken&&race_zl_sched.countdown){taken=1;fprintf(trace,"{\"kind\":\"taken\",\"frame\":%u,\"hydras\":%d,\"leg\":%d}\n",(unsigned)frame,count_units(SIDE,U_HYDRALISK),leg);}
         if(taken==1&&crystal()>=0){taken=2;fprintf(trace,"{\"kind\":\"crystal\",\"frame\":%u,\"hydras\":%d}\n",(unsigned)frame,count_units(SIDE,U_HYDRALISK));}
@@ -461,6 +465,6 @@ int main(int argc,char **argv)
     census("final",leg);
     fclose(trace);
     printf("z9 controller: frame=%u calls=%u won=%d lost=%d screen=%d fault=%u drones=%d hydras=%d leg=%d countdown=%u crystal=%d\n",
-        (unsigned)frame,host_tick,won,lost,screen,(unsigned)race_zl_sched.core.fault,drone_count(),count_units(SIDE,U_HYDRALISK),leg,(unsigned)race_zl_sched.countdown,crystal()>=0);
+        (unsigned)frame,(unsigned)host_tick,won,lost,screen,(unsigned)race_zl_sched.core.fault,drone_count(),count_units(SIDE,U_HYDRALISK),leg,(unsigned)race_zl_sched.countdown,crystal()>=0);
     return won?0:1;
 }

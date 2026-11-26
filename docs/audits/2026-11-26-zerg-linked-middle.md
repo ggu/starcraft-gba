@@ -141,3 +141,43 @@ build/test-sc64-z8-normal-home build/z8-gather.jsonl 180000 --gather-west
 python3 tools/sc64_z8_linked_victory.py --trace build/z8-gather.jsonl \
   --rom "$Z10_ROM" --elf "$Z10_ELF" --runner "$RUNNER" --out "$OUT"
 ```
+
+## Z9 and Z10 from the earned Z8 result
+
+The archived Z9 route first diverged at call 8,425, with one fewer friendly
+unit and 24 fewer minerals on the standard cartridge. The archived Z10 route
+first diverged at call 8,785, with one fewer enemy unit. Both archived tapes
+later restarted their mission. Regenerating the controller recordings with
+the standard cartridge flags produced winning routes on this ROM. Z9 used
+`--guarded-air` to assign six gas workers, wait for 22 Mutalisks before the
+air attack and allow return orders with 300 countdown units remaining.
+
+A on the fresh Z8 RESULT started Z9. All 30 recorded checkpoints matched
+through victory at frame 67,745. A fresh HOME load restored the same RESULT,
+and its re-exported SRAM advanced directly to Z10. All 26 recorded Z10
+checkpoints matched through victory at frame 57,633. Fresh HOME loads held
+both results for eight neutral updates and re-exported identical SRAM.
+The last journal retained all ten Zerg completion bits (`0x3fc003`).
+These runs complete the standard Zerg campaign from blank SRAM on the
+cartridge identified above.
+
+| Artifact | SHA-256 |
+|---|---|
+| Z9 controller recording | `5270bdc222c6bc95e441a8315674434f53d298064c0e3203eab715844633c71d` |
+| Z9 victory and fresh SRAM re-export | `7d42bffeb2f5a5486202dba0861bb1cb12a2d34e4ee203a31785cc3ebb4d683d` |
+| Z10 controller recording | `39d348a2f2ac61ce1e55fc81740503e519a7ee99777fc0f79a0991ea7d33e82e` |
+| Z10 victory and fresh SRAM re-export | `1123eb7c9e8977228e33d24db85f14953a202da2a4c731bfdb4b6d940768b954` |
+
+Use the matching prepared inputs and a fresh output directory for each run.
+
+```sh
+make build/test-sc64-z9-normal-home build/test-sc64-z10-normal-home
+build/test-sc64-z9-normal-home build/z9-guarded-air.jsonl 200000 --guarded-air
+build/test-sc64-z10-normal-home build/z10-standard.jsonl 200000
+python3 tools/sc64_z10_fifo_normal_replay.py --chapter 9 \
+  --seed "$Z8_READBACK" --trace build/z9-guarded-air.jsonl \
+  --rom "$Z10_ROM" --elf "$Z10_ELF" --runner "$RUNNER" --out "$Z9_OUT"
+python3 tools/sc64_z10_fifo_normal_replay.py --chapter 10 \
+  --seed "$Z9_OUT/readback.sav" --trace build/z10-standard.jsonl \
+  --rom "$Z10_ROM" --elf "$Z10_ELF" --runner "$RUNNER" --out "$Z10_OUT"
+```

@@ -293,8 +293,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The previous Z8 recording diverges at call 9,696. The optional
   `--gather-west` controller cleared Z8 from HOME with Kerrigan at full
   health. The earned Z7 save also cleared Z8 at frame 70,229 with all
-  29 checkpoints matching. Continue the earned chain through Z9 and Z10.
-  [Z3–Z6 carried results and Z8 route](audits/2026-11-26-zerg-linked-middle.md).
+  29 checkpoints matching. The Z8 result carried into Z9 and Z10, which
+  matched 30 and 26 checkpoints and won at frames 67,745 and 57,633.
+  The fresh Z10 result retained all ten completion bits (`0x3fc003`).
+  [Z3–Z10 carried results](audits/2026-11-26-zerg-linked-middle.md).
   [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged

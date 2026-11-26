@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Replay a normal-input Z10 controller from a retained Z9 result.
+"""Replay a normal-input Z9 or Z10 controller from a retained victory.
 
 The tape's menu/briefing prefix is replaced by loading the prior result and
-pressing A. All observable checkpoint fields below are required to match; the
-controller-only route leg and lifetime peak counters are not ROM state.
+pressing A. Both standard and FIFO trial cartridges use this verifier.
 """
 import argparse
 import hashlib
@@ -28,17 +27,20 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('seed','trace','rom','elf','runner','out'):
         p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--chapter', type=int, choices=(9,10), default=10)
     a=p.parse_args()
+    mission = a.chapter + 11
+    launch_call = {9: 32, 10: 38}[a.chapter]
+    excluded = ['leg'] if a.chapter == 9 else ['leg','peak_units','peak_buildings','countdown']
     inputs=(a.seed,a.trace,a.rom,a.elf,a.runner)
     hashes={str(x):hashlib.sha256(x.read_bytes()).hexdigest() for x in inputs}
-    plan=load_trace(a.trace, mission=21)
+    plan=load_trace(a.trace, mission=mission)
     rows=[json.loads(x) for x in a.trace.read_text().splitlines() if x.strip()]
     checks=[x for x in rows if x.get('kind')=='checkpoint']
     require(checks and checks[0]['label']=='launch' and checks[0]['frame']==1 and
-            checks[0]['call_index']==38 and checks[-1]==plan['final'] and checks[-1]['won']==1,
+            checks[0]['call_index']==launch_call and checks[-1]==plan['final'] and checks[-1]['won']==1,
             'unexpected launch or final checkpoint')
     require(all(x['call_index']<=y['call_index'] for x,y in zip(checks,checks[1:])), 'unordered checkpoints')
-    keys=[(i-32,k) for i,k in plan['transitions'] if i>=38]
     u={k:i+1 for i,k in enumerate(UNIT_FIELDS)}; b={k:i+1 for i,k in enumerate(BUILDING_FIELDS)}
     _,core=dwarf_struct_layout(a.elf,'Sc64Z8SchedulerState'); _,late=dwarf_struct_layout(a.elf,'Sc64ZlSchedulerState')
     _,ai=dwarf_struct_layout(a.elf,'Sc64ZlAiState')
@@ -60,10 +62,15 @@ def main():
     try:
         for k in (0,0,512,0):g.step(k)
         prior=g.u32('race_completed')
-        required = (1 << 0) | (1 << 1) | sum(1 << i for i in range(14, 21))
-        require(prior & required == required and g.u32('won') and g.u32('race_selected_mission')==20,
-                'seed is not a Z1–Z9 victory chain')
-        g.tap(1); require(g.u32('frame')==1 and g.u32('race_selected_mission')==21,'launch failed')
+        required = (1 << 0) | (1 << 1) | sum(1 << i for i in range(14, mission))
+        require(prior & required == required and g.u32('screen')==3 and
+                g.u32('won') and not g.u32('lost') and g.u32('race_selected_mission')==mission-1,
+                f'seed is not a Z1–Z{a.chapter-1} victory chain')
+        g.tap(1)
+        require(g.u32('frame')==1 and g.u32('race_selected_mission')==mission and
+                g.u32('race_completed')==prior, 'launch failed')
+        shift = launch_call - g.rsp.completed
+        keys = [(i-shift,k) for i,k in plan['transitions'] if i>=launch_call]
         urules=g.rsp.read(g.sym['sc64_race_unit_rules'],g.sizes['sc64_race_unit_rules'])
         brules=g.rsp.read(g.sym['sc64_race_building_rules'],g.sizes['sc64_race_building_rules'])
         def rule(data, size, layout, typ, field):
@@ -71,30 +78,43 @@ def main():
             require(typ>=0 and width in (1,2,4) and off+width<=len(data), 'invalid supply rule')
             return int.from_bytes(data[off:off+width], 'little')
         for row in checks:
-            g.rsp.play_to(row['call_index']-32,keys);s=g.state();us=s['units'];bs=s['buildings']
-            own=[x for x in us if x[u['owner']]==0];halls=[x for x in bs if x[b['owner']]==0 and x[b['type']] in (6,24,33)];town=[x for x in halls if not x[b['under_construction']]]
+            g.rsp.play_to(row['call_index']-shift,keys);s=g.state();us=s['units'];bs=s['buildings']
+            own=[x for x in us if x[u['owner']]==0]
             observed=dict(frame=s['frame'],screen=s['screen'],won=g.u32('won'),lost=g.u32('lost'),
-                side_units=len(own),hydras=sum(x[u['type']]==5 for x in own),mutas=sum(x[u['type']]==20 for x in own),
-                drones=sum(x[u['type']]==7 for x in own),hatch=len(town),larva=sum(x[b['larva']] for x in halls),
-                queued=sum(x[b['queue_count']] for x in halls),sunk=sum(x[b['owner']]==0 and x[b['type']]==21 and not x[b['under_construction']] for x in bs),
+                side_units=len(own),hydras=sum(x[u['type']]==5 for x in own),drones=sum(x[u['type']]==7 for x in own),
                 enemy_units=sum(x[u['owner']]==1 for x in us),enemy_buildings=sum(x[b['owner']]==1 for x in bs),
                 bank=[s['minerals'],s['gas']],cursor=[g.u32('cx'),g.u32('cy')],
                 supply=[sum(rule(urules,unit_rule_size,unit_rule,x[u['type']],'supply') for x in own),
                         min(400,16*sum(x[u['type']]==8 for x in own)+sum(rule(brules,building_rule_size,building_rule,x[b['type']],'supply_provided') for x in bs if x[b['owner']]==0 and not x[b['under_construction']]))],
                 towns=scalar(g,'race_zl_ai',ai,'started'),fault=scalar(g,'race_zl_sched',core,'fault',late['core']))
+            if a.chapter == 9:
+                observed['countdown'] = scalar(g,'race_zl_sched',late,'countdown')
+            else:
+                halls = [x for x in bs if x[b['owner']]==0 and x[b['type']] in (6,24,33)]
+                observed.update(mutas=sum(x[u['type']]==20 for x in own),
+                                hatch=sum(not x[b['under_construction']] for x in halls),
+                                larva=sum(x[b['larva']] for x in halls),
+                                queued=sum(x[b['queue_count']] for x in halls),
+                                sunk=sum(x[b['owner']]==0 and x[b['type']]==21 and
+                                         not x[b['under_construction']] for x in bs))
             compare_checkpoint(row, observed)
             observations.append(dict(call_index=row['call_index'],**observed));print(f'matched {row["call_index"]} frame {s["frame"]}',flush=True)
         end=terminal(g)
-        require((end['completed'],end['mission'],end['won'],end['lost'],end['unsupported'])==(prior|(1<<21),21,1,0,0),'final victory mismatch')
+        require((end['completed'],end['mission'],end['won'],end['lost'],end['unsupported'])==
+                (prior|(1<<mission),mission,1,0,0), 'final victory mismatch')
         g.rsp.export_sram()
     finally:g.close()
     g=start('fresh',a.out/'victory.sav',a.out/'readback.sav')
     try:
-        g.step(512);require(terminal(g)==end,'fresh result differs');g.rsp.export_sram()
+        g.step(512)
+        require(terminal(g)==end,'fresh result differs')
+        g.step(0,8)
+        require(terminal(g)==end,'fresh result changed after eight neutral updates')
+        g.rsp.export_sram()
         require((a.out/'readback.sav').read_bytes()==(a.out/'victory.sav').read_bytes(),'SRAM changed on reload')
     finally:g.close()
     require(hashes=={str(x):hashlib.sha256(x.read_bytes()).hexdigest() for x in inputs},'input changed during replay')
     (a.out/'result.json').write_text(json.dumps(dict(inputs=hashes,terminal=end,checkpoints=observations,
-        excluded=['leg','peak_units','peak_buildings','countdown']),indent=2)+'\n')
+        excluded=excluded),indent=2)+'\n')
 
 if __name__=='__main__':main()

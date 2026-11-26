@@ -118,3 +118,6 @@ build/test-sc64-z10-normal-home-gas-fifo: tests/sc64_z10_campaign_run.c tests/sc
 # Standard Z8 controller on the Z10 cartridge, with all briefing and field inputs.
 build/test-sc64-z8-normal-home: tests/sc64_z8_campaign_run.c tests/sc64_zerg_late_controller.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(CUSTOM_FULL_MATCH_INPUTS_zerg) $(CUSTOM_FULL_MATCH_SOURCES_zerg) build/z10-normal-fifo-config build/canonical-target-index-config common/gba.c $(COMMON_HEADERS) Makefile mk/custom-full-match/Makefile | build
 	$(CLANG) $(filter-out -Icommon,$(CUSTOM_FULL_MATCH_HOST_FLAGS)) $(Z10_NORMAL_HOST_FLAGS) -DSC64_ZERG_LATE_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< $(CUSTOM_FULL_MATCH_SOURCES_zerg) -o $@
+
+build/test-sc64-z9-normal-home build/test-sc64-z10-normal-home: build/test-sc64-z%-normal-home: tests/sc64_z%_campaign_run.c tests/sc64_zerg_late_controller.h tests/sc64_controller_authored_pages.h $(STARCRAFT) $(wildcard starcraft/*.h) $(CUSTOM_FULL_MATCH_INPUTS_zerg) $(CUSTOM_FULL_MATCH_SOURCES_zerg) build/z10-normal-fifo-config build/canonical-target-index-config common/gba.c $(COMMON_HEADERS) Makefile mk/custom-full-match/Makefile | build
+	$(CLANG) $(filter-out -Icommon,$(CUSTOM_FULL_MATCH_HOST_FLAGS)) $(Z10_NORMAL_HOST_FLAGS) -DSC64_ZERG_LATE_NORMAL_HOME -DSC64_TEXT_BOX_HOST_MODAL $< $(CUSTOM_FULL_MATCH_SOURCES_zerg) -o $@
