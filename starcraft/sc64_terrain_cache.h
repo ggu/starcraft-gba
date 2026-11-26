@@ -586,6 +586,28 @@ sc64_terrain_prepare(int x, int y)
 }
 #endif
 
+#if defined(SC64_TERRAIN_DARK_VIEW) && defined(SC64_TERRAIN_SCROLL) && defined(SC64_SOFT_FOG) && defined(SC64_WORLD_DEPTH) && defined(GBA_SCENE_CLIP)
+#define SC64_TERRAIN_DARK_VIEW_ACTIVE 1
+/* Unknown cells are opaque black. World-depth resources and actors are
+ * painted afterwards, so a wholly unknown view needs only one band fill.
+ * Leave the last captured view intact for the next ordinary lookup. */
+static int __attribute__((noinline))
+sc64_terrain_fill_dark_view(int x, int y)
+{
+    if (x < 0 || y < 0 || x > WORLD_W - 240 ||
+        y > WORLD_H - SC64_TERRAIN_CACHE_HEIGHT ||
+        gfx_get_clip_y() != (u16)(SC64_TERRAIN_CACHE_Y | ((SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_HEIGHT) << 8))) return 0;
+    int col = x >> 4, first = y >> 4;
+    int width = ((x + 239) >> 4) - col + 1;
+    int last = (y + SC64_TERRAIN_CACHE_HEIGHT - 1) >> 4;
+    for (int row = first; row <= last; ++row)
+        if (sc64_terrain_fog_run(visible, row, col, width) ||
+            sc64_terrain_fog_run(explored, row, col, width)) return 0;
+    gfx_fill_rows(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT, C_BLACK);
+    return 1;
+}
+#endif
+
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
 #define SC64_TERRAIN_CACHE_KEY static_key
 static int
@@ -605,6 +627,12 @@ sc64_terrain_cached(int x, int y)
 #ifdef SC64_SOFT_FOG
     sc64_terrain_now_valid = 0;
     sc64_terrain_part_active = 0;
+#endif
+#ifdef SC64_TERRAIN_DARK_VIEW_ACTIVE
+    if (sc64_terrain_fill_dark_view(x, y)) {
+        sc64_terrain_hits++;
+        return 1;
+    }
 #endif
     if (!sc64_terrain_cache_valid ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
