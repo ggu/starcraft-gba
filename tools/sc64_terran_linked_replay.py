@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Replay Terran T6 or T7 from the preceding victory journal.
+"""Replay Terran T6 through T10 from the preceding victory journal.
 
 All gameplay uses physical buttons. Observations and dialogue handling reuse
 sc64_t9_normal_replay and the Terran controller observer; no world state is
@@ -10,6 +10,7 @@ import argparse
 from functools import lru_cache
 import hashlib
 import json
+import shutil
 from pathlib import Path
 import struct
 
@@ -17,13 +18,19 @@ from sc64_skirmish_sram_continuation import KEY_A, KEY_L, KEY_START, PhysicalGam
 import sc64_races_profile as races
 import sc64_skirmish_sram_continuation as physical
 import sc64_t9_normal_replay as normal
+import sc64_t9_arm_replay as t9
 import sc64_terran_controller_replay as terran
-from sc64_t9_normal_replay import T6_FIELDS, T7_FIELDS, T7_DIALOGUE, load_late_trace, observe_t7_carrier
-from sc64_terran_controller_replay import _compare_trace_row, _snapshot, _verify_terminal
+from sc64_t9_normal_replay import (T6_FIELDS, T7_FIELDS, T8_FIELDS, T10_FIELDS, T7_DIALOGUE, T8_DIALOGUE,
+                                  load_late_trace, observe_t7_carrier)
+from sc64_terran_controller_replay import _compare_trace_row, _find_raw_actor, _snapshot, _verify_terminal
+from sc64_t9_arm_replay import COMPARED as T9_FIELDS, load_trace as load_t9_trace
 
 ROUTES = {
     6: (23849, T6_FIELDS, {0, 680, 1792, 3765, 9056, 11559, 19659, 20578, 23846, 23849}),
     7: (4189, T7_FIELDS, {0, 1, 2, 347, 1000, 1264, 2000, 2200, 2334, 3000, 4000, 4189}),
+    8: (290459, T8_FIELDS, {0, 120, 332, 507, 1645, 5795, 290459, *range(1000, 290459, 1000)}),
+    9: (50204, T9_FIELDS, set()),
+    10: (3446, T10_FIELDS, {0, 120, 1000, 2000, 3000, 3446}),
 }
 
 
@@ -40,7 +47,8 @@ def compare(chapter, expected, observed, prior, carrier):
     if chapter == 6:
         _compare_trace_row(row, observed)
         return
-    diff = {key: [row.get(key), observed.get(key)] for key in T7_FIELDS
+    fields = {7: T7_FIELDS, 8: T8_FIELDS, 9: T9_FIELDS, 10: T10_FIELDS}[chapter]
+    diff = {key: [row.get(key), observed.get(key)] for key in fields
             if key not in row or key not in observed or row[key] != observed[key]}
     require(not diff, f'T{chapter} checkpoint {row.get("host_tick")} mismatch: {diff}')
     if chapter == 7:
@@ -54,14 +62,16 @@ def run(args):
     chapter = args.chapter
     mission = chapter + 3
     stop, fields, ticks = ROUTES[chapter]
-    plan = load_late_trace(args.trace, chapter, fields, stop, ticks)
+    plan = load_t9_trace(args.trace) if chapter == 9 else load_late_trace(args.trace, chapter, fields, stop, ticks)
+    require(plan['stop'] == stop, 'trace has wrong terminal tick')
     plan["mission"] = mission
     require(plan["final"]["kind"] == "won", 'trace does not end in victory')
     transitions = [(tick - 1, held) for tick, held in plan["transitions"]]
     if not transitions or transitions[0][0] != 0:
         transitions.insert(0, (0, 0))
     files = (args.seed, args.trace, args.rom, args.elf, args.runner, Path(__file__),
-             Path(races.__file__), Path(physical.__file__), Path(normal.__file__), Path(terran.__file__))
+             Path(races.__file__), Path(physical.__file__), Path(normal.__file__), Path(terran.__file__),
+             Path(t9.__file__))
     pins = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
     args.out.mkdir()
     victory, readback = args.out / 'victory.sav', args.out / 'readback.sav'
@@ -137,10 +147,12 @@ def run(args):
                 (1, 0, mission, prior), 'result advance did not enter expected chapter')
         offset = g.rsp.completed
         edges = [(tick + offset, mask) for tick, mask in transitions]
-        cuts = T7_DIALOGUE if chapter == 7 else {}
-        scan = range(1, stop + 1) if chapter == 6 else ()
-        dialogue_count = 13 if chapter == 6 else sum(x[1] for x in cuts.values())
+        cuts = (T7_DIALOGUE if chapter == 7 else T8_DIALOGUE if chapter == 8 else
+                {1: (1, 4), 50189: (49471, 9)} if chapter == 9 else {1: (1, 4)} if chapter == 10 else {})
+        scan = range(1, stop + 1) if chapter == 6 else range(289963, stop + 1) if chapter == 8 else ()
+        dialogue_count = 13 if chapter == 6 else 7 if chapter == 8 else sum(x[1] for x in cuts.values())
         for tick in sorted(set(plan['observations']) | set(cuts) | set(scan)):
+            require(shutil.disk_usage(args.out).free >= 64 << 20, 'replay needs at least 64 MiB free')
             if tick:
                 g.rsp.play_to(tick + offset, edges)
                 if tick in cuts:
@@ -158,6 +170,15 @@ def run(args):
             observed = observe()
             if chapter == 7:
                 carrier = observe_t7_carrier(g, observed, carrier)
+            elif chapter == 9:
+                observed['selected_building'] = n('selected_building')
+                observed['selection'] = len(persisted()['controls']['selected_units'])
+            elif chapter == 10:
+                hero = _find_raw_actor(observed['units'], 19)
+                cannon = _find_raw_actor(observed['buildings'], 127)
+                observed['hero_slot'] = hero['slot'] if hero else -1
+                observed['hero_raw'] = hero['raw_type'] if hero else -1
+                observed['ion_cannon_slot'] = cannon['slot'] if cannon else -1
             compare(chapter, plan['observations'][tick], observed, prior, carrier)
             checkpoints.append(dict(tick=tick, frame=observed['frame'], completed=observed['race_completed']))
             print(f'T{chapter}: matched {tick}, frame {observed["frame"]}', flush=True)
