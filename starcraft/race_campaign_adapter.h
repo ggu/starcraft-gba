@@ -259,35 +259,82 @@ static unsigned race_z4_hud_seconds(void)
 static int race_p4_world_paused(void)
 { return race_p4_active() && race_p4.source_paused; }
 
+static inline u32 race_p4_rescue_band(int y)
+{
+    return (unsigned)y < 2048u ? 1u << ((unsigned)y >> 6) : ~(u32)0;
+}
+
+static inline int race_p4_rescue_band_may_reach(u32 bands, int y)
+{
+    if ((unsigned)y >= 2048u) return 1;
+    unsigned upper = ((unsigned)y + 32u) >> 6;
+    return upper ? ((bands >> (upper - 1u)) & 3u) != 0 : (bands & 1u) != 0;
+}
+
+static inline int race_p4_rescue_witness(const Unit *q)
+{
+    return q->raw_type != 101 && q->raw_type != 150;
+}
+
+/* Witness order stays ascending even after a successful rescue. */
+static int race_p4_rescue_near(int x, int y, const u8 *side_slots, unsigned side_count)
+{
+    for (unsigned i = 0; i < side_count; ++i) {
+        const Unit *q = &u[side_slots[i]];
+        int dy = y - q->y;
+        if ((unsigned)dy + 32u > 64u) continue;
+        int dx = x - q->x;
+        if ((unsigned)dx + 32u > 64u) continue;
+        if (dx * dx + dy * dy <= 32 * 32) return 1;
+    }
+    return 0;
+}
+
 /* Bounded contact rescue keeps source-slot provenance while transferring
  * control. The 32-pixel GBA radius is an authored compatibility policy. */
 static void race_p4_rescue_tick(void)
 {
     if (race_p4.source_paused) return;
-    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE) {
-        for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
-            u[j].raw_type != 101 && u[j].raw_type != 150) {
-            int dx = u[i].x - u[j].x, dy = u[i].y - u[j].y;
-            if (dx * dx + dy * dy <= 32 * 32) {
-                #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-                if (!race_bc_before_unit_transfer(&u[i],SIDE,-1)) break;
-                #endif
-                u[i].owner = SIDE; u[i].selected = 0;
-                u[i].order = ORDER_IDLE; u[i].target = -1;
-                u[i].tx = u[i].x; u[i].ty = u[i].y;
-                break;
-            }
+    _Static_assert(MAX_UNITS <= 256, "P4 rescue slots fit in u8");
+    u8 side_slots[MAX_UNITS], rescue_slots[MAX_UNITS];
+    unsigned side_count = 0, rescue_count = 0;
+    u32 side_bands = 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        const Unit *q = &u[i];
+        if (!q->alive) continue;
+        if (q->owner == SIDE && race_p4_rescue_witness(q)) {
+            side_slots[side_count++] = (u8)i;
+            side_bands |= race_p4_rescue_band(q->y);
+        } else if (q->owner == RESCUABLE) {
+            rescue_slots[rescue_count++] = (u8)i;
         }
     }
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == RESCUABLE) {
-        for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
-            u[j].raw_type != 101 && u[j].raw_type != 150) {
-            int dx = b[i].x - u[j].x, dy = b[i].y - u[j].y;
-            if (dx * dx + dy * dy <= 32 * 32) {
-                if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
-                break;
-            }
+    if (!side_count) return;
+    for (unsigned slot = 0; slot < rescue_count; ++slot) {
+        u8 i = rescue_slots[slot];
+        Unit *q = &u[i];
+        if (!race_p4_rescue_band_may_reach(side_bands, q->y) ||
+            !race_p4_rescue_near(q->x, q->y, side_slots, side_count)) continue;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        if (!race_bc_before_unit_transfer(q, SIDE, -1)) continue;
+#endif
+        q->owner = SIDE; q->selected = 0;
+        q->order = ORDER_IDLE; q->target = -1;
+        q->tx = q->x; q->ty = q->y;
+        if (race_p4_rescue_witness(q)) {
+            unsigned j = side_count++;
+            for (; j && side_slots[j - 1] > i; --j)
+                side_slots[j] = side_slots[j - 1];
+            side_slots[j] = i;
+            side_bands |= race_p4_rescue_band(q->y);
         }
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        Building *q = &b[i];
+        if (!q->alive || q->owner != RESCUABLE ||
+            !race_p4_rescue_band_may_reach(side_bands, q->y) ||
+            !race_p4_rescue_near(q->x, q->y, side_slots, side_count)) continue;
+        if (SC64_BC_ALLOW_BUILDING_TRANSFER(i, SIDE)) q->owner = SIDE;
     }
 }
 #endif

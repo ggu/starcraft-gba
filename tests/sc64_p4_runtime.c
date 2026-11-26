@@ -197,6 +197,34 @@ static void test_contact_rescue_and_source_pause(void)
     assert(screen == SCREEN_PLAY);
 }
 
+static void test_rescue_slot_order(void)
+{
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    race_p4.source_paused = 0;
+
+    /* Slot 1 is visited before slot 5 can become a witness. Slot 10 and
+     * the building can use newly rescued witnesses on the same update. */
+    u[100] = (Unit){.alive=1, .owner=SIDE, .x=128, .y=128};
+    u[1] = (Unit){.alive=1, .owner=RESCUABLE, .x=64, .y=128};
+    u[5] = (Unit){.alive=1, .owner=RESCUABLE, .raw_owner=2, .x=96, .y=128};
+    u[10] = (Unit){.alive=1, .owner=RESCUABLE, .x=64, .y=128};
+    b[0] = (Building){.alive=1, .owner=RESCUABLE, .x=32, .y=128};
+
+    u[22] = (Unit){.alive=1, .owner=SIDE, .raw_type=101, .x=512, .y=512};
+    u[23] = (Unit){.alive=1, .owner=SIDE, .raw_type=150, .x=768, .y=768};
+    u[25] = (Unit){.alive=1, .owner=RESCUABLE, .x=513, .y=512};
+    u[26] = (Unit){.alive=1, .owner=RESCUABLE, .x=769, .y=768};
+
+    race_p4_rescue_tick();
+    assert(u[1].owner == RESCUABLE && u[5].owner == SIDE && u[10].owner == SIDE);
+    assert(u[5].raw_owner == 2 && b[0].owner == SIDE);
+    assert(u[25].owner == RESCUABLE && u[26].owner == RESCUABLE);
+    race_p4_rescue_tick();
+    assert(u[1].owner == SIDE);
+    assert(u[25].owner == RESCUABLE && u[26].owner == RESCUABLE);
+}
+
 static void test_creation_queue_reserve_and_saves(void)
 {
     launch_from_normal_menu();
@@ -301,6 +329,7 @@ static void test_synthetic_loss_and_escape_win(void)
 int main(void)
 {
     gba_init();
+    test_rescue_slot_order();
     test_contact_rescue_and_source_pause();
     test_creation_queue_reserve_and_saves();
     test_synthetic_loss_and_escape_win();
