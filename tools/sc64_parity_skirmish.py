@@ -582,6 +582,13 @@ def tick_frames(cap):
     before it. last: the run's last unpaused frame, trailing ticks included. The ticks after the
     last follow-up must run on without a gap (a missing change read leaves its pause state
     unknown), and a tick past the capture's last read has no frame: both raise ValueError."""
+    # A skirmish capture never leaves its mission: a read without a unit table after the first
+    # one would be a tick the clock cannot place (the decoder adds skipped frames only before
+    # in-mission records), so it is refused rather than dated.
+    start = next((i for i, r in enumerate(cap.ticks) if r['table']), None)
+    if start is not None and (any(not r['table'] for r in cap.ticks[start:]) or
+                              any(not table for _, _, table in getattr(cap, 'trailing_changes', []))):
+        raise ValueError(f'{cap.run}: a read without a unit table after the mission started')
     known = {r['tick']: r['sf'] for r in cap.ticks if r['table'] and r['sf'] >= 0}
     skipped = dict(getattr(cap, 'skipped_frames', []))
     for tick, step in getattr(cap, 'change_steps', {}).items():
@@ -590,12 +597,9 @@ def tick_frames(cap):
     if not known:
         return None, None
     ticks = sorted(known)
-    # Order is checked from the last follow-up of any kind (one without a unit table adds no
-    # frame, so the clock's base stays the last dated tick).
-    covered = max(ticks[-1], cap.ticks[-1]['tick']) if cap.ticks else ticks[-1]
+    covered = ticks[-1]
     # Trailing tick -> (paused, in mission) from its latest read (the decoder's rule for a tick's
-    # change read). Every read must keep the order, in mission or not; only unpaused in-mission
-    # ticks advance the clock.
+    # change read). Every read must keep the order; only unpaused ticks advance the clock.
     state = {}
     for tick, paused, table in getattr(cap, 'trailing_changes', []):
         if tick == covered:
