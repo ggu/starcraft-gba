@@ -26,14 +26,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   See the [paired terrain audit](audits/2026-11-26-wholly-unknown-terrain.md).
 - **Disjoint cycle budgets.** The two flagged Outpost samples reconcile using the guest loop timer. Measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
 
-- **Packaged race ROM save compatibility.** The `51c7f18f` package loaded
-  all 30 earned campaign victories (ten per race). All observed
-  result worlds, SRAM re-exports and chapter advances matched the standard
-  cartridges used to earn them. Seven missions also passed full packaged replays
-  (T9–T10, Z8–Z10, P9–P10). T1–T5 and Z3 now also pass packaged route
-  replay, with guest-cycle measurements. Profile the slower T4, T5 and Z3
-  cases alongside crowded skirmishes.
-  [Results and reproduction](audits/2026-11-26-packaged-campaign-results.md).
+- **Packaged campaign qualification.** All 30 missions were played to victory
+  on the three `51c7f18f` race ROMs in mGBA. Every freshly reloaded victory
+  matched the corresponding standard-cartridge SRAM byte for byte. Keep
+  these journals for regression checks as shared engine changes land.
+  The newer `c23009f8` package passed 30 result loads and all four binaries
+  have 27 checked Custom Game launches, save loads and continuations apiece.
+  Prioritize ground orders in P4 and P6 and the crowded three-AI windows.
+  [Mission coverage, pacing and reproduction](audits/2026-11-26-packaged-campaign-results.md).
 
 - **Custom Game defense targeting.** Skipping cells that contain only friendly
   units reduced mean advancing-update cost by 2.08% in the crowded Zerg
