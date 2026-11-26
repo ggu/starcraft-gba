@@ -67,6 +67,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   and Protoss Blood Bath Melee versus Terran and Zerg, including fresh
   HOME reload of each victory.
 
+- **Cold Bunker acquisition.** A [typed live-slot scan](audits/2026-11-26-bunker-target-scan.md)
+  saves 2.69% in a staffed three-CPU Blood Bath battle on Z10. The
+  mixed Outpost battle and four P10, Terran and Showcase windows are
+  effectively flat. All six fresh saves match. Keep targeting work
+  focused on the measured hot paths and preserve live slot order.
+
 - **Busy three-opponent performance.** The release's six recorded battle
   windows measured 11.29–16.73 loop updates/s. The original controls and
   camera are reproducible from the match traces. Prioritize ground orders

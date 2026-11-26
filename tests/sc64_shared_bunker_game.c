@@ -113,6 +113,23 @@ int main(void)
     assert(!race_bunker_request_board(marines[4],bunker));
     assert(!race_bunker_request_board(marines[0],bunker));
     for(int i=0;i<4;++i) assert(!race_can_attack(enemy,marines[i]));
+    /* A cold acquisition keeps the lower unified slot when eligible
+     * unit and building centers share the same distance. */
+    int second=spawn_unit(ENEMY,U_MARINE,x-40,y);
+    int tied_building=spawn_build(ENEMY,B_BUNKER,x,y+40,0);
+    assert(second>enemy && tied_building>=0);
+    u[enemy].x=x+40; u[enemy].y=y;
+    u[marines[0]].cd=0; u[marines[0]].build=-1;
+    assert(race_bunker_target_in_range(&u[marines[0]],enemy,0));
+    assert(race_bunker_target_in_range(&u[marines[0]],second,0));
+    assert(race_bunker_target_in_range(&u[marines[0]],MAX_UNITS+tied_building,0));
+    const int first_hp=u[enemy].hp, second_hp=u[second].hp, tied_hp=b[tied_building].hp;
+    race_bunker_fire_unit(marines[0],bunker);
+    assert(u[marines[0]].build==enemy && u[enemy].hp<first_hp);
+    assert(u[second].hp==second_hp && b[tied_building].hp==tied_hp);
+    u[second].alive=0;
+    destroy_building(tied_building,SIDE);
+
     /* Test the extended range using the actual order/update combat path. */
     u[enemy].x=x+160; u[enemy].y=y;
     Sc64StockAttack attack={0}; assert(sc64_stock_attack_select(0,0,&attack));
