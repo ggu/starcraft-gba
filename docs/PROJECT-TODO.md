@@ -19,6 +19,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Wholly unknown terrain.** The shared world-depth cache skips per-tile
+  drawing for completely unvisited viewports. The late Z10 Outpost camera
+  sweep cuts mean full-loop time by 7.15% and the measured linked P10 window
+  by 13.20%. Continue profiling visible combat, where this path rarely applies.
+  See the [paired terrain audit](audits/2026-11-26-wholly-unknown-terrain.md).
 - **Disjoint cycle budgets.** The two flagged Outpost samples reconcile using the guest loop timer. Measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
 
 - **Packaged race ROM save compatibility.** The `51c7f18f` package loaded

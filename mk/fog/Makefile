@@ -31,7 +31,12 @@ test-terrain-soft-fog: build/test-terrain-soft-fog build/test-terrain-soft-fog-s
 	./build/test-terrain-soft-fog-real-raster-rowmask
 	./build/test-terrain-soft-fog-vram
 	./build/test-terrain-soft-fog-vram-p7
-test: test-terrain-soft-fog
+build/test-terrain-dark-view: tests/sc64_terrain_dark_view.c starcraft/sc64_terrain_cache.h common/gba.h common/gba.c mk/fog/Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DSC64_TERRAIN_SCROLL -DSC64_SOFT_FOG -DSC64_WORLD_DEPTH -DSC64_TERRAIN_DARK_VIEW -Icommon $< common/gba.c -o $@
+.PHONY: test-terrain-dark-view
+test-terrain-dark-view: build/test-terrain-dark-view
+	./build/test-terrain-dark-view
+test: test-terrain-soft-fog test-terrain-dark-view
 
 # Asset-free ternary fog signature and clipped indexed-cell raster contract.
 build/test-sc64-fog: tests/sc64_fog.c starcraft/sc64_fog.h common/gba.c common/gba.h Makefile | build
