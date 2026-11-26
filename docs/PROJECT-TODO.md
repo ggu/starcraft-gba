@@ -70,12 +70,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Campaign playthroughs with the trial economy.** All 30 retained victories
   advanced or restarted their finales and reloaded new pause saves. A blank
-  Terran campaign cleared T1–T7: the actual T2 save carried through strict
-  T3 and T4 comparisons, a retained paid-input T5 route, then strict T6 and
-  reauthored T7 comparisons. All results reloaded; T5's uninterrupted HOST
-  tape diverged and was not treated as a match. Carry the new T7 result through
-  T8–T10 to connect it to the separately verified finale segment.
-  [T3–T7 trial evidence](audits/2026-11-26-fifo-terran-early-campaign.md).
+  Terran campaign cleared T1–T10 from blank SRAM with ordinary result
+  advances and fresh result reloads. The actual T2 save carried through
+  strict T3 and T4 comparisons, a retained paid-input T5 route, then strict
+  T6–T10 comparisons. T5's uninterrupted HOST tape diverged and was not
+  treated as a match. [Carried trial evidence](audits/2026-11-26-fifo-terran-early-campaign.md).
   P9→P10 and Z10 also cleared from retained predecessor victories. Track
   first sustained divergences from the release plans as the earlier missions
   are played. [Terran](audits/2026-11-26-fifo-terran-campaign.md),
