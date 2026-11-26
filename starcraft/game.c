@@ -2711,9 +2711,8 @@ static int race_nuke_silo_status(int slot);
 static const char *race_nuke_menu_label(int action);
 #endif
 static void race_add_owner_resources(int owner,int ore,int vespene);
-#ifdef SC64_SHARED_TRANSPORT
 static int race_owner_minerals(int owner), race_owner_gas(int owner);
-#endif
+static const int race_bot_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
 #ifdef SC64_EXPERIMENTAL_RESEARCH_CAMPAIGN_JOBS
@@ -2722,6 +2721,10 @@ static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
 #endif
 #include "field_menu_repeat.h"
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
+#ifdef SC64_RACES
+/* Presentation state. A journal always restores the ordinary result panel. */
+static u8 custom_defeat_overview;
+#endif
 static int cx, cy, camx, camy, toast_timer, toast_id, enemy_timer, wave;
 /* Transient controller gesture, deliberately outside the persistent save. */
 static int box_state, box_anchor_x, box_anchor_y, box_end_x, box_end_y;
@@ -5721,6 +5724,7 @@ init_state(void)
     reset_selection_gestures();
     mode=MODE_NORMAL;menu=menu_open=menu_cursor=help=0;
     screen=SCREEN_PLAY;selected_building=-1;result_timer=0;
+    custom_defeat_overview = 0;
     toast_timer=toast_id=enemy_timer=wave=0;
     weapons_level=armor_level=weapons_research=armor_research=0;
     mission_objective_stage=mission_unsupported_count=0;
@@ -10420,6 +10424,12 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	return;
     }
     if (screen == SCREEN_RESULT) {
+#ifdef SC64_RACES
+        if (race_mode && lost && !custom_defeat_overview && (pressed & KEY_A)) {
+            custom_defeat_overview = 1;
+            return;
+        }
+#endif
 	if (pressed & KEY_A) {
 #ifdef SC64_RACES
             if(won&&!race_mode){
@@ -10439,6 +10449,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	    screen = SCREEN_TITLE;
 	    won = lost = 0;
 #ifdef SC64_RACES
+            custom_defeat_overview = 0;
             race_frontend_reset();race_front.prev_buttons=held;
 #endif
 	}
@@ -12580,11 +12591,50 @@ draw_result(void)
     gfx_text(53, 68, won ? "ZERG BASE ELIMINATED" : "COMMAND CENTER DESTROYED", C_WHITE);
 #endif
     #ifdef SC64_RACES
-    gfx_text(39,86,won&&!race_mode&&sc64_catalog_available_next(sc64_catalog_mission_faction(race_selected_mission),race_selected_mission)>=0?"A NEXT MISSION B TITLE":"A RETRY B TITLE SCREEN",C_CYAN);
+    gfx_text(39,86,won&&!race_mode&&sc64_catalog_available_next(sc64_catalog_mission_faction(race_selected_mission),race_selected_mission)>=0?"A NEXT MISSION B TITLE":
+             race_mode&&lost?"A OVERVIEW B TITLE":"A RETRY B TITLE SCREEN",C_CYAN);
 #else
     gfx_text(47, 86, "A RETRY    B TITLE SCREEN", C_CYAN);
 #endif
 }
+
+#ifdef SC64_RACES
+static void
+draw_custom_defeat_overview(void)
+{
+    int units[5] = {0}, buildings[5] = {0};
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && (unsigned)u[i].owner < 5) ++units[u[i].owner];
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && (unsigned)b[i].owner < 5) ++buildings[b[i].owner];
+
+    gfx_rect(8, 15, 224, 130, C_PANEL);
+    gfx_frame(8, 15, 224, 130, C_RED);
+    gfx_text(16, 23, "DEFEAT OVERVIEW", C_RED);
+    gfx_text(16, 36, "COUNTS AND BANKS AT DEFEAT", C_WHITE);
+    gfx_text(16, 50, "PLAYER", C_DIM);
+    gfx_text(94, 50, "UNITS", C_DIM);
+    gfx_text(130, 50, "BLDGS", C_DIM);
+    gfx_text(169, 50, "MIN", C_DIM);
+    gfx_text(201, 50, "GAS", C_DIM);
+    gfx_rect(16, 60, 208, 1, C_EDGE);
+
+    for (int row = 0; row <= race_bots; ++row) {
+        int owner = row ? race_bot_owner_ids[row - 1] : SIDE;
+        int faction = row ? race_bot_races[row - 1] : race_human;
+        int y = 67 + row * 12;
+        gfx_text(16, y, row ? "CPU" : "YOU", row ? C_WHITE : C_GOLD);
+        if (row) gfx_num(37, y, row, C_WHITE);
+        gfx_text(48, y, sc64_race_names[faction], C_WHITE);
+        gfx_num(94, y, units[owner], C_WHITE);
+        gfx_num(130, y, buildings[owner], C_WHITE);
+        gfx_num(165, y, race_owner_minerals(owner), C_WHITE);
+        gfx_num(201, y, race_owner_gas(owner), C_WHITE);
+    }
+    gfx_text(16, 117, "LIFETIME SCORES UNAVAILABLE", C_DIM);
+    gfx_text(16, 131, "A RETRY   B TITLE SCREEN", C_CYAN);
+}
+#endif
 
 /* Result presentation: the final explosions play over the frozen
  * battlefield, then the panel grows open, as StarCraft 64 shows its
@@ -12592,6 +12642,12 @@ draw_result(void)
 static void
 draw_result_screen(void)
 {
+#ifdef SC64_RACES
+    if (custom_defeat_overview && race_mode && lost) {
+        draw_custom_defeat_overview();
+        return;
+    }
+#endif
 #ifndef SC64_DEATH_VFX_DISABLED
     u16 outro_end = result_outro_end_get(), outro = result_outro_get();
     if (!outro_end) return;
@@ -13314,8 +13370,12 @@ game_render(void)
 	    /* The pause panel crosses the bottom cached HUD band. */
 	    sc64_hud_bottom_band_invalidate();
 #endif
-	} else if (screen == SCREEN_RESULT)
+	} else if (screen == SCREEN_RESULT) {
 	    draw_result_screen();
+#if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION)
+            if (custom_defeat_overview) sc64_hud_bottom_band_invalidate();
+#endif
+        }
 #ifdef SC64_TEXT_BOXES
         if (sc64_text_box_count()) race_text_box_draw();
 #endif
