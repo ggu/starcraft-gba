@@ -121,8 +121,7 @@ sc64_move_start_frames(const Unit *q)
 static inline int
 sc64_move_at_rest(const Unit *q)
 {
-    return q->order == ORDER_IDLE ||
-           (q->order == ORDER_MOVE && dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5);
+    return q->order == ORDER_IDLE || (q->order == ORDER_MOVE && q->x == q->tx && q->y == q->ty);
 }
 
 /* Issue one pending command with its own selection; the player's current
@@ -206,12 +205,40 @@ sc64_move_order_due(const Unit *q)
     return ((unsigned)frame + (unsigned)(q - u)) % SC64_MOVE_ORDER_PHASE_UPDATES == 0u;
 }
 
-/* An arrived Move ends on its phase. Out of line: update_orders() is IWRAM
- * code with little room. */
+/* StarCraft 64 ends a Move on its point (parity unit labs: all 14 N64 legs
+ * of the seven move labs end exactly on the order point; the engine ended
+ * 5 px, 10 N64 px, short). Within SC64_MOVE_CLOSE px update_orders() calls
+ * sc64_move_close() instead of move_toward():
+ *  - on the point, the Move ends on its phase (see sc64_move_order_due);
+ *  - otherwise the unit steps; when an update with a nonzero stock step and
+ *    no pending wait brings it no closer (a unit, building or blocked tile on
+ *    or beside the point), its point becomes where it stands, so it ends
+ *    there on its phase instead of circling. One tile, 16 px, covers a point
+ *    that another unit stands on (personal space keeps the mover 6 px away)
+ *    and a point in a blocked tile (a mover stops at the tile's edge; from a
+ *    corner that is just over 12 px from the tile's centre).
+ * Out of line: update_orders() is IWRAM code with little room. */
+enum { SC64_MOVE_CLOSE = 16 };
+
 static void __attribute__((noinline))
-sc64_move_arrive(Unit *q)
+sc64_move_close(Unit *q)
 {
-    if (sc64_move_order_due(q)) q->order = ORDER_IDLE;
+    if (q->x == q->tx && q->y == q->ty) {
+        if (sc64_move_order_due(q)) q->order = ORDER_IDLE;
+        return;
+    }
+    int before = dist2(q->x, q->y, q->tx, q->ty), waiting = q->path_retry > 0;
+#ifdef SC64_RACES
+    int step = (int)sc64_unit_stock_step(q, q->tx, q->ty);
+#else
+    int step = 1;
+#endif
+    move_toward(q, q->tx, q->ty);
+    if (q->order == ORDER_MOVE && !waiting && step > 0 &&
+        dist2(q->x, q->y, q->tx, q->ty) >= before) {
+        q->tx = (s16)q->x;
+        q->ty = (s16)q->y;
+    }
 }
 
 /* The player's Move or attack-move. Returns the number of selected units

@@ -9581,10 +9581,11 @@ target_lists_unavailable:
 #endif
 
 	if (q->order == ORDER_MOVE) {
-	    if (dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5)
 #ifdef SC64_IMPORTED_MISSION
-		sc64_move_arrive(q);
+	    if (dist2(q->x, q->y, q->tx, q->ty) <= SC64_MOVE_CLOSE * SC64_MOVE_CLOSE)
+		sc64_move_close(q);
 #else
+	    if (dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5)
 		q->order = ORDER_IDLE;
 #endif
 	    else
