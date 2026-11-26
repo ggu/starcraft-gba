@@ -98,7 +98,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Hardware timing remains open. See the
   [Zerg10 lookup audit](audits/2026-11-26-z10-weapon-lookup.md).
 
-- **Route field work.** In an 80-update Zerg Blood Bath sample, the 44
+- **Route field work.** The 128×128 cache applies to Z5–Z9. Five Z10 holdouts
+  (including Z1 as a smaller-map control) match all 325 observations and five
+  fresh saves, with negligible timing changes. Use the busy Z7 run to judge
+  the benefit. [Campaign sizes and holdouts](audits/2026-11-26-campaign-route-map-sizes.md).
+  In an 80-update Zerg Blood Bath sample, the 44
   dense point floods all used distinct goals on the same walkability grid.
   Serving the observed direct and nearby-root requests took 122,980 full
   flood dequeues. Offline FIFO prefixes reached the observed origins in

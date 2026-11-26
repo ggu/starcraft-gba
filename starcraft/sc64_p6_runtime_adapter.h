@@ -618,44 +618,76 @@ static int race_p6_rebind_loaded_world(const Sc64RaceMap *map)
     return 1;
 }
 
+#ifdef SC64_P6_RESCUE_GROUPED
+/* 64-pixel bands conservatively cover a 32-pixel rescue radius.
+ * A synthetic or out-of-map center falls back to the ordinary search. */
+static inline u32 race_p6_rescue_side_band(int y)
+{
+    return (unsigned)y < 2048u ? (u32)1u << ((unsigned)y >> 6) : ~(u32)0;
+}
+
+static inline int race_p6_rescue_band_may_reach(u32 side_bands, int y)
+{
+    if ((unsigned)y >= 2048u) return 1;
+    unsigned upper = ((unsigned)y + 32u) >> 6;
+    if (!upper) return (side_bands & 1u) != 0;
+    return ((side_bands >> (upper - 1u)) & 3u) != 0;
+}
+
+static inline int race_p6_rescue_near_side(int x, int y, const Unit *q)
+{
+    int dx = x - q->x;
+    if ((unsigned)dx + 32u > 64u) return 0;
+    int dy = y - q->y;
+    if ((unsigned)dy + 32u > 64u) return 0;
+    return dx * dx + dy * dy <= 32 * 32;
+}
+#endif
+
 static void race_p6_rescue_tick(void)
 {
     int changed = 0;
     if (!race_p6_active() || screen != SCREEN_PLAY || !race_p6_runtime_state_valid()) return;
 #ifdef SC64_P6_RESCUE_GROUPED
-    /* Rescue candidates are already partitioned by live owner in the unit
-     * array. A compact frame-local list avoids rescanning every slot for each
-     * candidate; appending at the exact outer-loop point preserves the
-     * baseline's one-way chaining semantics. */
+    /* Collect both unit owners in one ascending pass. Append each rescue
+     * immediately so later unit slots and the building pass can use it. */
     _Static_assert(MAX_UNITS <= 256, "P6 rescue slots must fit in u8");
-    u8 side_slots[MAX_UNITS];
-    unsigned side_count = 0;
-    for (unsigned j = 0; j < MAX_UNITS; ++j)
-        if (u[j].alive && u[j].owner == SIDE) side_slots[side_count++] = (u8)j;
-    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE) {
+    u8 side_slots[MAX_UNITS], rescue_slots[MAX_UNITS];
+    unsigned side_count = 0, rescue_count = 0;
+    u32 side_bands = 0;
+    for (unsigned j = 0; j < MAX_UNITS; ++j) {
+        if (!u[j].alive) continue;
+        if (u[j].owner == SIDE) {
+            side_slots[side_count++] = (u8)j;
+            side_bands |= race_p6_rescue_side_band(u[j].y);
+        } else if (u[j].owner == RESCUABLE) rescue_slots[rescue_count++] = (u8)j;
+    }
+    if (!side_count) return;
+    for (unsigned slot = 0; slot < rescue_count; ++slot) {
+        int i = rescue_slots[slot];
+        Unit *q = &u[i];
+        const int x = q->x, y = q->y;
+        if (!race_p6_rescue_band_may_reach(side_bands, y)) continue;
         for (unsigned k = 0; k < side_count; ++k) {
-            int j = side_slots[k];
-            int dx = u[i].x-u[j].x, dy = u[i].y-u[j].y;
-            if (dx*dx+dy*dy <= 32*32) {
-                #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-                if (!race_bc_before_unit_transfer(&u[i],SIDE,-1)) break;
-                #endif
-                u[i].owner=SIDE; u[i].selected=0; u[i].target=-1;
-                u[i].order=ORDER_IDLE; u[i].tx=u[i].x; u[i].ty=u[i].y;
-                side_slots[side_count++] = (u8)i;
-                changed=1; break;
-            }
+            if (!race_p6_rescue_near_side(x, y, &u[side_slots[k]])) continue;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+            if (!race_bc_before_unit_transfer(q,SIDE,-1)) break;
+#endif
+            q->owner=SIDE; q->selected=0; q->target=-1;
+            q->order=ORDER_IDLE; q->tx=q->x; q->ty=q->y;
+            side_slots[side_count++] = (u8)i;
+            side_bands |= race_p6_rescue_side_band(q->y);
+            changed=1; break;
         }
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == RESCUABLE) {
+            const int x = b[i].x, y = b[i].y;
+            if (!race_p6_rescue_band_may_reach(side_bands, y)) continue;
             for (unsigned k = 0; k < side_count; ++k) {
-                int j = side_slots[k];
-                int dx=b[i].x-u[j].x, dy=b[i].y-u[j].y;
-                if (dx*dx+dy*dy <= 32*32) {
-                    if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) { b[i].owner=SIDE; changed=1; }
-                    break;
-                }
+                if (!race_p6_rescue_near_side(x, y, &u[side_slots[k]])) continue;
+                if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) { b[i].owner=SIDE; changed=1; }
+                break;
             }
         }
 #else

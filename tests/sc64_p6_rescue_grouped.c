@@ -151,6 +151,40 @@ static void test_chains_and_radius(void)
     assert(u[11].owner==SIDE && b[2].owner==SIDE); /* buildings scan after units */
 }
 
+static void test_signed_axis_edges(void)
+{
+    clear_world();
+    add_unit(0, SIDE, 100, 100);
+    add_unit(1, RESCUABLE, 67, 100);
+    add_unit(2, RESCUABLE, 68, 100);
+    add_building(0, RESCUABLE, 68, 67);
+    add_building(1, RESCUABLE, 68, 68);
+    run_pair();
+    assert(u[1].owner == RESCUABLE && u[2].owner == SIDE);
+    assert(b[0].owner == RESCUABLE && b[1].owner == SIDE);
+}
+
+static void test_rescue_across_bands(void)
+{
+    clear_world();
+    add_unit(0, SIDE, 100, 31);
+    add_unit(1, RESCUABLE, 100, 63);
+    add_unit(2, RESCUABLE, 100, 95);
+    add_unit(3, RESCUABLE, 100, 127);
+    add_building(0, RESCUABLE, 100, 159);
+    run_pair();
+    assert(u[1].owner == SIDE && u[2].owner == SIDE && u[3].owner == SIDE);
+    assert(b[0].owner == SIDE);
+
+    clear_world();
+    add_unit(0, SIDE, 100, -1);
+    add_unit(1, RESCUABLE, 100, 31);
+    add_unit(2, SIDE, 100, 2047);
+    add_unit(3, RESCUABLE, 100, 2015);
+    run_pair();
+    assert(u[1].owner == SIDE && u[3].owner == SIDE);
+}
+
 static void test_random_real_slots(void)
 {
     for (unsigned trial=0;trial<1200;++trial) {
@@ -238,6 +272,8 @@ int main(void)
 {
     launch();
     test_chains_and_radius();
+    test_signed_axis_edges();
+    test_rescue_across_bands();
     test_random_real_slots();
     test_full_capacity_and_guards();
     puts("P6 grouped rescue matches nested full-scan oracle");
