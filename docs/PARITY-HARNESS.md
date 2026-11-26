@@ -191,7 +191,7 @@ so both stay in the private fixture home; the compiler and its tests
 ```json
 {"format": "sc64-tape-scenario/1", "id": "example-move",
  "start": {"load": "lab.state", "step": 5000}, "camera": [0, 0], "map": [2048, 2048],
- "program": [{"op": "guard"}, {"op": "tap"}, {"op": "select", "at": [300, 200]},
+ "program": [{"op": "guard"}, {"op": "tap"}, {"op": "select", "at": [300, 200], "row": "0x802E2340"},
   {"op": "order", "kind": "move", "at": [500, 300], "mark": "command"}, {"op": "wait", "steps": 450},
   {"op": "order", "kind": "move", "at": [320, 210], "mark": "turn"}, {"op": "wait", "steps": 450}]}
 ```

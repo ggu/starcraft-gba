@@ -482,8 +482,9 @@ SCENARIOS.update(FIELD_SCENARIOS)
 # both engines. Subjects and the human player are found by cartridge unit id,
 # never by position, so no placement is written into tracked code.
 
-LAB_FIELDS = MOVE_FIELDS
-LAB_HP_FIELDS = MOVE_FIELDS + ['unit.hp']
+# The labs read the subject's order byte and gate on its Move and AttackMove values.
+LAB_FIELDS = MOVE_FIELDS + ['unit.order', 'order.6', 'order.14']
+LAB_HP_FIELDS = LAB_FIELDS + ['unit.hp']
 LAB_ACCEL_FRACTION = 0.9     # acceleration ends at the first chord this close to cruise
 LAB_ACCEL_CHORD = 4          # shortest chord, source frames
 LAB_ACCEL_GRID_STEPS = 2     # a chord spans at least this many GBA position steps at cruise:
@@ -738,32 +739,33 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     expect = (expect,) if isinstance(expect, int) else tuple(expect)
     # The order before the press, then the first different order within `window` N64 ticks of it:
     # a byte already set before the press is no evidence of the press.
-    # A follow-up record is read one step after its tick began: a tick began before the press
-    # when its record's step - 1 is at or before the mark, and its order is boundary state.
-    before = [r for r in cap.ticks if r['step'] - 1 <= step and row in r['rows']]
+    # The boundary is the last follow-up read taken at or before the press step, as for every
+    # lab time. A follow-up read one step after the press ran with the button held, so it is
+    # already after the press, even when its tick began at the press step.
+    before = [r for r in cap.ticks if r['step'] <= step and row in r['rows']]
     if not before:
         return None, []
     prior, tick0 = cap.unit(before[-1]['rows'][row], 'order'), before[-1]['tick']
     identity = (cap.unit(before[-1]['rows'][row], 'type'), cap.unit(before[-1]['rows'][row], 'owner'))
-    # The window starts at the last tick that began at or before the press. When that tick has
-    # no follow-up read (it began and ended inside one step), the order at the press is not
-    # observed: a change in that tick could pass for the press, so the check is inconclusive.
-    # The latest change read by frontend step, not by tick value (the counter can wrap or
+    # Every tick from the boundary to the first changed order must have been read: a tick that
+    # began and ended inside one step has no follow-up, and it could have held the press's first
+    # order. The latest change read by frontend step, not by tick value (the counter can wrap or
     # restart): every change record in capture order.
     reads = getattr(cap, 'change_reads', None)
     if reads is None:
-        reads = [(at, t) for t, at in getattr(cap, 'change_steps', {}).items()]
+        reads = sorted((at, t) for t, at in getattr(cap, 'change_steps', {}).items())
     def paired(record):
         # The change read this follow-up belongs to: the latest one of its tick before it.
         own = [(at, t) for at, t in reads if t == record['tick'] and at < record['step']]
         return max(own) if own else None
-    began = [(at, t) for at, t in reads if at <= step]
-    if began and max(began) != paired(before[-1]):
+    start = paired(before[-1])
+    if reads and start is None:
         return None, ['the order at the press was not read']
+    after = reads[reads.index(start) + 1:] if reads else []
     seen = []
     followed = set()
     for record in cap.ticks:
-        if record['step'] - 1 <= step:
+        if record['step'] <= step:
             continue
         if (record['tick'] - tick0) & 0xFFFFFFFF > window:
             break
@@ -776,10 +778,10 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
         order = cap.unit(record['rows'][row], 'order')
         seen.append(order)
         if order != prior:
-            # Every tick from the press to this read must have been read: an unread tick in
-            # between could have held another first order.
-            if any((at, t) not in followed for at, t in reads if step < at < record['step']):
-                return None, seen + ['a tick between the press and this read was not read']
+            unread = [at for at, t in after if at < record['step'] and (at, t) not in followed]
+            if unread:
+                return None, seen + ['the order at the press was not read' if min(unread) <= step
+                                     else 'a tick between the press and this read was not read']
             return (order if order in expect else None), seen
     return None, seen
 

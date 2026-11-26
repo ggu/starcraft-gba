@@ -90,7 +90,7 @@ reverse), so a GBA change that makes the event happen is judged afresh.
 | SCV | 4.30 / 4.85 PASS | **17 / 3** | **115 / 80** | 1 / 0 PASS | 5 / 1 |
 | Hydralisk | 3.64 / 3.61 PASS | 3 / 3 PASS | **83 / 79** | −1 / 0 PASS | 7 / 1 |
 | Siege Tank | 3.84 / 4.00 PASS | 3 / 3 PASS | **56 / 40** | 0 / 0 PASS | 7 / 1 |
-| Overlord | 0.825 / 0.839 PASS | 3 / 3 PASS | **239 / 232** | **−3 / 0** | 8 / 3 |
+| Overlord | 0.825 / 0.839 PASS | 4 / 4 PASS (5-frame chord) | **239 / 232** | **−3 / 0** | 8 / 3 |
 | Mutalisk | 6.22 / 6.54 PASS | **20 / 3** | **57 / 38** | −1 / 0 PASS | 7 / 1 |
 | Vulture | 5.76 / 5.85 PASS | **14 / 3** | **49 / 42** | 2 / 0 PASS | 5 / 1 |
 
