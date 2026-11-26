@@ -280,7 +280,7 @@ static void zerg_morph_chain(void)
         assert(minerals == old_minerals - drone_rule->minerals &&
                gas == old_gas - drone_rule->gas);
 
-#ifdef SC64_CUSTOM_LARVA_EGGS
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
         int egg = -1;
         int duration = sc64_z7_egg_duration(drone);
         assert(b[hatch].queue_count == 0 && duration > 1);
@@ -316,7 +316,7 @@ static void zerg_morph_chain(void)
             assert(count == drones_before + 1);
         }
         assert(b[hatch].under_construction && b[hatch].larva == 1);
-#ifdef SC64_CUSTOM_LARVA_EGGS
+#ifdef SC64_CUSTOM_EGGS_ACTIVE
         puts("morphing Lair produced a Drone through an independent Egg PASS");
 #else
         puts("morphing Lair produced a Drone through the legacy hall queue PASS");
