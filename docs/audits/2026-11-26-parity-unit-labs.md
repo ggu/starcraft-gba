@@ -112,9 +112,9 @@ pad-to-game input lag, so it is reported, not judged.
 | Marine range at first hit (centre distance) | 79.2 | absent | KNOWN |
 | Zergling damage on Marine | 5 (7 of 7 hits, one Zergling in reach) | absent | KNOWN |
 | Marine survival from first hit taken to 0 HP | 58 | absent | KNOWN |
-| Hydralisk shield damage on Zealot | 10 (HP untouched) | absent | KNOWN |
-| Hydralisk cooldown | 15 (the two hits credited to it; 8 more had an idle Hydralisk 273 px from the Zealot) | absent | KNOWN |
-| Damage the Hydralisk took | 8 (10 of 10 hits, Zealot blades) | absent | REPORT (the Zealot's Pylon is also in reach) |
+| Hydralisk shield damage on Zealot | 10 (HP untouched) | off-target | KNOWN |
+| Hydralisk cooldown | 15 (the two hits credited to it; 8 more had an idle Hydralisk 273 px from the Zealot) | off-target | KNOWN |
+| Damage the Hydralisk took | 8 (10 of 10 hits, Zealot blades) | off-target | REPORT (the Zealot's Pylon is also in reach) |
 | Hydralisk survival | 112 | absent | KNOWN |
 
 A hit that brings a unit to 0 is left out of the hit lists on both
@@ -136,7 +136,9 @@ is fired. The Z2 Hydralisk attack-moves to (1002,1100), south-west of a
 Zealot and away from that Zealot's Photon Cannon. On the N64 the Zealot
 comes out, the Hydralisk opens fire at 128 px, and the Zealot kills it 112
 frames after its first hit. On the GBA the Hydralisk reaches the point, 245
-px from the Zealot, and nothing happens.
+px from the Zealot, which never moves; the Hydralisk shoots a Protoss
+building 156 px away instead (10 shield damage about every 15 frames), so
+its Zealot checks read `off-target`: it fought, but only another enemy.
 
 N64 rows outlive their hit points: the Marine's row stays 16 frames after
 its HP reaches 0. A GBA row goes in the step of the killing hit, so the
@@ -192,7 +194,8 @@ a KNOWN line in `tools/parity/baseline.json`.
    stops 245–262 px away, and the fight follows (Marine: 6 per hit, cooldown
    16, first hit at 79 px, killed after 58; Hydralisk: 10 shield damage per
    hit, cooldown 15, killed after 112). On the GBA neither guard moves, even
-   with the Marine passing at 168 px, so neither lab has a GBA hit.
+   with the Marine passing at 168 px, so neither lab has a GBA hit on its
+   foe (the GBA Hydralisk shoots a nearby Protoss building instead).
 5. **No turn delay on reversal.** A Marine Move reversed back along its
    path starts 3 frames later than its first move on the N64 (turn cost 3)
    and 0 on the GBA. Every GBA subject shows 0; the N64 ranges from −3 to 3
@@ -307,7 +310,7 @@ hash chains, goldens written to a private `SC64_PARITY_HOME` until this lands):
 | --- | --- | --- |
 | `lab-marine-move` | Return press at (320,188) on open ground: both presses are now Move | turn cost N64 2 → 3, GBA 0: PASS → KNOWN (defect 5) |
 | `lab-marine-zergling` | Marine row 10 attack-moves to (873,1350): one Zergling in reach | damage taken gates again (5, KNOWN); damage, cooldown and range KNOWN (absent on the GBA, defect 4); survival KNOWN (absent) |
-| `lab-hydralisk-zealot` | Hydralisk row 37 attack-moves to (1002,1100): away from the Zealot's Photon Cannon, idle Hydralisks out of reach at the credited hits | cooldown gates again (15, KNOWN, absent on the GBA); shield damage and range stay KNOWN; survival 66 → absent, still KNOWN (defect 4) |
+| `lab-hydralisk-zealot` | Hydralisk row 37 attack-moves to (1002,1100): away from the Zealot's Photon Cannon, idle Hydralisks out of reach at the credited hits | cooldown gates again (15, KNOWN); shield damage and range stay KNOWN; survival 66 → absent, still KNOWN (defect 4). The GBA run fights a Protoss building, so cooldown, shield damage and range read the `off-target` marker, not absent |
 
 Review then hardened the attack measure further, with every lab golden regenerating
 byte-identical: a hit needs the sole human attacker in reach on both samples around the drop
@@ -315,8 +318,11 @@ byte-identical: a hit needs the sole human attacker in reach on both samples aro
 samples; a row that hatches, changes owner or is reused is a new unit (on the GBA every
 in-place change is a removal); kills of any enemy, destroyed GBA buildings and drops on other
 nearby enemies split cooldown intervals; an unresolved earlier hit withholds the first-hit
-range; a GBA fight that leaves a check without a value reads REGRESSION ("not measured"),
-never the absent marker; and an order check is refused when a tick around the press, or the
+range; a GBA fight with the foe that leaves a check without a value reads REGRESSION ("not
+measured"), never the absent marker, and so does a run that ended early or lost its subject;
+a GBA subject that fought only other enemies (drops or kills in its reach, GBA buildings
+included, burning excepted) reads the `off-target` marker, which only the same marker in the
+baseline accepts; and an order check is refused when a tick around the press, or the
 subject row itself, was not observed.
 
 Both new tapes give the selected row (`row`) and no longer need `legacy_selection`. Attempts
