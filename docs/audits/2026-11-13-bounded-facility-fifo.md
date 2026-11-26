@@ -148,9 +148,14 @@ respectively. Both pages and palettes match throughout; the Z9 displayed
 page differs at the sampled input 76 only. The original, frontier-disabled
 candidate completed the full Z7 route with all 45 state/world checkpoints
 and victory/reload SRAM matching the current control; it took
-145,473,761,161 versus 146,796,890,834 guest cycles. The corrected
-candidate full victory replay is still in progress; this measurement alone
-does not activate a product default.
+145,473,761,161 versus 146,796,890,834 guest cycles. The corrected candidate also completed the full Z7 route with all 45
+state/world checkpoints matching the control, winning at frame 267585
+without faults. Its victory SRAM and fresh reload match the control
+(`4e8266b1564444a72c820568931c730875b82f29ae5b75cd3ba8f8951dd72722`).
+The full route took 145,496,243,147 versus 146,796,890,834 guest cycles
+(−0.886%). A normal Z10 make build on release base `062fdcac` produces
+the same `1dab164d` ROM and passes its stack and ROM checks. Enable this
+wide-only path in Z10; retain the existing defaults for the other products.
 
 Additional corrected opt-in product checks: T4 frame 4968 plus 256 inputs
 matched cycles, state and save exactly; P4 frame 986 plus 256 inputs cost

@@ -3345,7 +3345,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   busy custom continuations change by +0.00087% to +0.00268%. One Z7
   sample has a different displayed page despite matching framebuffers.
   The [updated audit](audits/2026-11-13-bounded-facility-fifo.md#current-z10-wide-only-retest-november-26)
-  tracks the remaining victory and holdout checks before activation. The
+  records the full corrected win, matching 45 checkpoints and fresh SRAM.
+  Enable it for Z10 only; other product benefit remains unproven. The
   [typed save reader](audits/2026-11-13-typed-save-reader.md)
   cuts the P10 result update from 76.50M to 37.51M cycles with the same
   pause/result journals and fresh-load win. Keep it opt-in until broader
