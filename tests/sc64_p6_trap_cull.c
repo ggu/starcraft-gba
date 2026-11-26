@@ -47,22 +47,29 @@ static void enable_trap(unsigned slot)
 
 static void trap_geometry(void)
 {
-    Sc64Z5DetectBox trap={2000,2000,16,16,15,15};
-    unsigned s=rng_state;
-    for(unsigned i=0;i<100000u;++i) {
-        Sc64Z5DetectBox target;
-        unsigned exact;
-        target.x=(int)(next_random()%4096u);target.y=(int)(next_random()%4096u);
-        target.left=next_random()%129u;target.up=next_random()%129u;
-        target.right=next_random()%129u;target.down=next_random()%129u;
-        exact=sc64_p6_trap_reference_box_distance(&trap,&target);
-        if(!race_p6_combat_trap_center_may_reach(trap.x,trap.y,target.x,target.y))
-            assert(exact>SC64_P6_WALL_TRAP_RANGE_SOURCE_PX);
+    unsigned s = rng_state;
+    for (unsigned i = 0; i < 100000u; ++i) {
+        int trap_x = (int)(next_random() % 2048u);
+        int trap_y = (int)(next_random() % 2048u);
+        int x = (int)(next_random() % 2048u);
+        int y = (int)(next_random() % 2048u);
+        Sc64P6TrapWindow window = race_p6_combat_trap_window(trap_x, trap_y);
+        Sc64Z5DetectBox trap = {trap_x * 2, trap_y * 2, 16, 16, 15, 15};
+        Sc64Z5DetectBox target = {x * 2, y * 2, next_random() % 129u,
+            next_random() % 129u, next_random() % 129u, next_random() % 129u};
+        if (!race_p6_combat_trap_center_may_reach(&window, x, y))
+            assert(sc64_p6_trap_reference_box_distance(&trap, &target) >
+                   SC64_P6_WALL_TRAP_RANGE_SOURCE_PX);
     }
-    assert(race_p6_combat_trap_center_may_reach(-1,2000,4095,0));
-    assert(race_p6_combat_trap_center_may_reach(2000,2000,2305,2000));
-    assert(!race_p6_combat_trap_center_may_reach(2000,2000,2306,2000));
-    rng_state=s;
+
+    Sc64P6TrapWindow window = race_p6_combat_trap_window(1000, 1000);
+    assert(race_p6_combat_trap_center_may_reach(&window, 1152, 1000));
+    assert(!race_p6_combat_trap_center_may_reach(&window, 1153, 1000));
+    window = race_p6_combat_trap_window(0, 2047);
+    assert(race_p6_combat_trap_center_may_reach(&window, 0, 2047));
+    assert(!race_p6_combat_trap_center_may_reach(&window, -1, 2047));
+    assert(!race_p6_combat_trap_center_may_reach(&window, 0, 2048));
+    rng_state = s;
 }
 
 static unsigned actor_extents(int target, Sc64Z5DetectBox *box)
@@ -107,7 +114,8 @@ static void assert_actual_matches_exhaustive_reference(unsigned iteration)
     int expected_target;
     unsigned count;
     reset_world();
-    b[0].alive=1;b[0].owner=SIDE;b[0].raw_owner=7;
+    static const u8 owners[] = {SIDE, ENEMY, RESCUABLE, NEUTRAL, 4, 5, 255};
+    b[0].alive=1;b[0].owner=owners[iteration % sizeof(owners)];b[0].raw_owner=7;
     b[0].raw_type=SC64_P6_RAW_WALL_MISSILE_TRAP;
     b[0].type=sc64_race_building_from_raw(SC64_P6_RAW_WALL_MISSILE_TRAP);
     b[0].x=500;b[0].y=500;enable_trap(0);
@@ -118,7 +126,7 @@ static void assert_actual_matches_exhaustive_reference(unsigned iteration)
         static const int raw_types[]={0,37,65,79,84};
         int raw=raw_types[next_random()%5u];
         int px=(int)(next_random()%3600u),py=(int)(next_random()%3600u);
-        q->alive=(next_random()%11u)!=0;q->owner=(next_random()%8u)==0?SIDE:ENEMY;
+        q->alive=(next_random()%11u)!=0;q->owner=owners[next_random()%sizeof(owners)];
         q->raw_owner=q->owner==SIDE?7:3;q->raw_type=(s16)raw;
         q->type=sc64_race_unit_from_raw(raw);q->x=(s16)(px/2);q->y=(s16)(py/2);
         q->hp=q->maxhp=10000;q->target=-1;q->order=(next_random()%17u)==0?ORDER_TRANSPORTED:ORDER_IDLE;
@@ -128,7 +136,7 @@ static void assert_actual_matches_exhaustive_reference(unsigned iteration)
     unsigned buildings=1u+next_random()%12u;
     for(unsigned i=1;i<=buildings;++i) {
         Building *q=&b[i];int raw=(next_random()%3u)==0?110:112;
-        q->alive=(next_random()%9u)!=0;q->owner=(next_random()%8u)==0?SIDE:ENEMY;
+        q->alive=(next_random()%9u)!=0;q->owner=owners[next_random()%sizeof(owners)];
         q->raw_owner=q->owner==SIDE?7:3;q->raw_type=(s16)raw;
         q->type=sc64_race_building_from_raw(raw);
         q->x=(s16)(next_random()%1800u);q->y=(s16)(next_random()%1800u);
@@ -162,7 +170,6 @@ static void assert_actual_matches_exhaustive_reference(unsigned iteration)
     assert(memcmp(invincible_units,expected_iu,sizeof(invincible_units))==0);
     assert(memcmp(invincible_buildings,expected_ib,sizeof(invincible_buildings))==0);
     assert(memcmp(&race_p6,&expected_state,sizeof(race_p6))==0);
-    (void)iteration;
 }
 
 static void player_trap_respects_current_visibility(void)
@@ -180,8 +187,14 @@ static void player_trap_respects_current_visibility(void)
     assert(race_p6_combat_tick_traps()==0);
     assert(u[0].hp==100);
     SC64_GRID_SET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS,1);
+    u[1] = u[0]; /* Equal source boxes must retain the lower target slot. */
     assert(race_p6_combat_tick_traps()==1);
-    assert(u[0].hp<100);
+    assert(u[0].hp<100 && u[1].hp==100);
+    const int hp = u[0].hp;
+    assert(b[0].shield_remainder == SC64_P6_WALL_TRAP_COOLDOWN_GBA_TICKS);
+    assert(race_p6_combat_tick_traps()==0);
+    assert(u[0].hp==hp && u[1].hp==100);
+    assert(b[0].shield_remainder == SC64_P6_WALL_TRAP_COOLDOWN_GBA_TICKS - 1);
 }
 
 int main(void)
