@@ -1,0 +1,464 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Checks for the offline parity layer's content half (tools/sc64_parity_content.py)
+and the sound id map tools/sc64_audio_pack.py writes beside its bank.
+
+Every test but the last builds small synthetic iscript programs, CHK rows,
+census traces and audio tables, so no game data is needed. The last runs the
+real tool only when the private ROM inputs are present and skips otherwise.
+"""
+import json
+import struct
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+from tools import sc64_audio_pack as pack
+from tools import sc64_parity_content as pc
+from tools import sc64_parity_tables as pt
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def op(code, *operands):
+    """Encode one iscript instruction; operands are (width, value) pairs."""
+    out = bytes([code])
+    for width, value in operands:
+        out += value.to_bytes(width, 'little')
+    return out
+
+
+def playfram(f):
+    return op(0, (2, f))
+
+
+def wait(n):
+    return op(5, (1, n))
+
+
+def goto(target):
+    return op(7, (2, target))
+
+
+class IscriptWalkTest(unittest.TestCase):
+    def test_linear_loop_with_sound(self):
+        program = playfram(17) + wait(2) + op(24, (2, 5)) + playfram(34) + wait(1) + goto(0)
+        seq = pc.rom_sequence(program, 0)
+        self.assertEqual(seq['steps'], [(17, 2, 2), (34, 1, 1)])
+        self.assertEqual(seq['end'], 'loop')
+        self.assertEqual(seq['loop'], 0)
+        self.assertEqual(seq['sounds'], [(1, [5])])
+        self.assertEqual(seq['cycle'], [(17, 2, 2), (34, 1, 1)])
+
+    def test_wait_before_the_first_playfram_shows_the_loop_frame(self):
+        # move 4; wait 1; playfram 17; wait 1; playfram 34; goto start
+        program = op(41, (1, 4)) + wait(1) + playfram(17) + wait(1) + playfram(34) + goto(0)
+        seq = pc.rom_sequence(program, 0)
+        self.assertEqual(seq['steps'], [(None, 1, 1), (17, 1, 1)])
+        self.assertEqual(seq['cycle'], [(34, 1, 1), (17, 1, 1)])
+
+    def test_hold_end_and_waitrand(self):
+        program = playfram(1) + op(6, (1, 3), (1, 5)) + playfram(2) + op(48)
+        seq = pc.rom_sequence(program, 0)
+        self.assertEqual(seq['steps'], [(1, 3, 5)])
+        self.assertEqual((seq['end'], seq['last_frame']), ('hold', 2))
+        self.assertEqual(pc.per_tick(seq['steps'], 6, seq['last_frame']), [1, 1, 1, 2, 2, 2])
+        end = pc.rom_sequence(playfram(3) + wait(2) + op(22), 0)
+        self.assertEqual((end['steps'], end['end']), ([(3, 2, 2)], 'end'))
+
+    def test_collapse_and_relabel(self):
+        self.assertEqual(pc.collapse([(5, 2, 2), (5, 1, 1), (6, 1, 3)]), [(5, 3), (6, [1, 3])])
+        self.assertEqual(pc.relabel([51, 34, 51, 0]), [0, 1, 0, 2])
+        self.assertEqual(pc.relabel([7, 8, 7, 9]), pc.relabel([51, 34, 51, 0]))
+
+    def test_construction_waits_are_compared_with_openbw_timing(self):
+        class Fake:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(playfram(0) + wait(125) + goto(0), 0)
+        stage = {'raw_unit_id': 106, 'stage': 0, 'animation': 'Init', 'image_id': 325}
+        same = pc.compare_construction(Fake(), stage, {(106, 0): {'steps': [(0, 125)], 'loop_start': 0,
+                                                                   'frame_count': 3}})
+        longer = pc.compare_construction(Fake(), stage, {(106, 0): {'steps': [(0, 126)], 'loop_start': 0,
+                                                                     'frame_count': 3}})
+        missing = pc.compare_construction(Fake(), stage, {})
+        self.assertEqual(same['verdict'], 'match')
+        self.assertEqual(longer['verdict'], 'differs')
+        self.assertIn('[1]', longer['note'])
+        self.assertEqual(missing['verdict'], 'absent')
+
+    def test_waitless_loop_after_a_timed_intro_is_reported(self):
+        program = playfram(1) + wait(2) + op(41, (1, 4)) + goto(5)
+        seq = pc.rom_sequence(program, 0)
+        self.assertEqual((seq['steps'], seq['end'], seq['cycle']), ([(1, 2, 2)], 'waitless loop', []))
+
+    def test_construction_loop_against_a_held_last_frame(self):
+        class Fake:
+            def __init__(self, program):
+                self.program = program
+            def sequence(self, image, animation):
+                return pc.rom_sequence(self.program, 0)
+        stage = {'raw_unit_id': 131, 'stage': 0, 'animation': 'Init', 'image_id': 1}
+        looping = Fake(playfram(1) + wait(2) + playfram(2) + wait(2) + goto(0))
+        held = {(131, 0): {'steps': [(1, 2), (2, 2)], 'loop_start': pc.HOLD_LAST, 'frame_count': 3}}
+        looped = {(131, 0): {'steps': [(1, 2), (2, 2)], 'loop_start': 0, 'frame_count': 3}}
+        self.assertEqual(pc.compare_construction(looping, stage, held)['verdict'], 'differs')
+        self.assertEqual(pc.compare_construction(looping, stage, looped)['verdict'], 'match')
+        # Loop entry inside a run of one frame: A x2, A x3, B x1.
+        runs = Fake(playfram(1) + wait(2) + wait(3) + playfram(2) + wait(1) + goto(5))
+        # The loop re-enters at the second wait with frame 2 still shown (the
+        # frame the body leaves), so the steady cycle is 2 x3, 2 x1.
+        enters_second = {(131, 0): {'steps': [(1, 2), (2, 3), (2, 1)], 'loop_start': 1, 'frame_count': 3}}
+        enters_first = {(131, 0): {'steps': [(1, 2), (1, 3), (2, 1)], 'loop_start': 1, 'frame_count': 3}}
+        # No static program shows frame 1 there on the first pass and frame 2
+        # in the steady loop, so both bakes differ, each on one of the passes.
+        second = pc.compare_construction(runs, stage, enters_second)
+        first = pc.compare_construction(runs, stage, enters_first)
+        self.assertEqual((second['verdict'], first['verdict']), ('differs', 'differs'))
+        self.assertIn('first pass: frame order differs', second['note'])
+        self.assertIn('steady cycle: frame order differs', first['note'])
+        holding = Fake(playfram(1) + wait(2) + playfram(2) + wait(2) + op(48))
+        self.assertEqual(pc.compare_construction(holding, stage, held)['verdict'], 'match')
+        self.assertEqual(pc.compare_construction(holding, stage, looped)['verdict'], 'differs')
+        # iscript end removes the image; the engine holding it is a difference.
+        ending = Fake(playfram(1) + wait(2) + playfram(2) + wait(2) + op(22))
+        self.assertEqual(pc.compare_construction(ending, stage, held)['verdict'], 'differs')
+        # Unequal step counts cannot hide a loop entry inside a merged run.
+        merged = {(131, 0): {'steps': [(1, 5), (2, 1)], 'loop_start': 0, 'frame_count': 3}}
+        self.assertEqual(pc.compare_construction(runs, stage, merged)['verdict'], 'differs')
+
+    def test_attack_shorter_than_the_rom_path_differs(self):
+        attack = playfram(0) + wait(1) + playfram(17) + wait(1) + playfram(34) + wait(1) + playfram(51) + \
+            wait(1) + op(48)
+        idle = playfram(17) + wait(1) + playfram(0) + wait(1) + goto(0)
+
+        class Fake:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(idle if 'ToIdle' in animation else attack, 0)
+        def actor(ticks):
+            return {'root_image_id': 1, 'modes': [{'target_air': 0, 'animation': 'GndAttkInit', 'status': 'ok',
+                                                   'full_duration_source_ticks': ticks}]}
+        frames = [0, 17, 34, 51, 17, 0]
+        full = {(5, 'ground'): [(t, 100 + f) for t, f in enumerate(frames)]}
+        short = {(5, 'ground'): [(t, 100 + f) for t, f in enumerate(frames[:2])]}
+        self.assertEqual(pc.compare_attack(Fake(), 5, actor(6), full)[0]['verdict'], 'match')
+        self.assertEqual(pc.compare_attack(Fake(), 5, actor(2), short)[0]['verdict'], 'differs')
+        # A row keyed at the declared duration is never shown.
+        keyed = {(5, 'ground'): full[(5, 'ground')] + [(6, 999)]}
+        self.assertEqual(pc.compare_attack(Fake(), 5, actor(6), keyed)[0]['verdict'], 'match')
+
+    def test_composite_and_unsupported_attack_entries(self):
+        self.assertTrue(pc.refines([0, 1, 2, 3], [0, 1, 0, 1]))
+        self.assertFalse(pc.refines([0, 0, 1], [0, 1, 1]))
+        rows = pc.compare_attack(None, 5, {'raw_unit': 5, 'status': 'unsupported_actor_image'}, {})
+        self.assertEqual((rows[0]['verdict'], 'unsupported' in rows[0]['note']), ('absent', True))
+
+    def test_attack_with_no_known_rom_frame_is_not_compared(self):
+        class Fake:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(wait(1) + wait(1) + op(48), 0) if 'Init' in animation else None
+        actor = {'root_image_id': 1, 'modes': [{'target_air': 0, 'animation': 'GndAttkInit', 'status': 'ok',
+                                                'full_duration_source_ticks': 2}]}
+        row = pc.compare_attack(Fake(), 5, actor, {(5, 'ground'): [(0, 1), (1, 2)]})[0]
+        self.assertEqual(row['verdict'], 'not compared')
+
+    def test_engine_tables_are_read_from_header_text(self):
+        attack = ('static const Sc64UnitAttackPoseStep sc64_unit_attack_raw0_ground_full_steps[2] = {\n'
+                  '    {0u,{&sc64_unit_attack_frame_51,&sc64_unit_attack_frame_51}},\n'
+                  '    {1u,{&sc64_unit_attack_frame_34,&sc64_unit_attack_frame_34}},\n};\n')
+        self.assertEqual(pc.engine_attack_frames(attack), {(0, 'ground'): [(0, 51), (1, 34)]})
+        construction = ('static const SC64ConstructionAnimStep sc64_construction_raw_106_stage_0_layer_0_steps[] = {\n'
+                        '    { 0u, 126u },\n    { 1u, 4u },\n};\n'
+                        'static const SC64ConstructionAnimDesc sc64_construction_raw_106_stage_0_layer_0_animation = {\n'
+                        '    sc64_construction_raw_106_stage_0_layer_0_steps, 2u, 0u, 3u\n};\n')
+        self.assertEqual(pc.engine_construction(construction),
+                         {(106, 0): {'steps': [(0, 126), (1, 4)], 'loop_start': 0, 'frame_count': 3}})
+
+
+def chk(type_, owner, x, y, resources=0):
+    return {'type': type_, 'owner': owner, 'x': x, 'y': y, 'resources': resources, 'section': 'UNIT'}
+
+
+def gba(units=(), buildings=(), minerals=(), geysers=(), max_units=8, max_buildings=8):
+    def row(t, o, x, y):
+        return {'type': 0, 'raw_type': t, 'owner': o, 'raw_owner': o, 'x': x, 'y': y, 'hp': 1}
+    return {'units': [row(*u) for u in units], 'buildings': [row(*b) for b in buildings],
+            'minerals': [{'x': x, 'y': y, 'amount': a} for x, y, a in minerals],
+            'geysers': [{'x': x, 'y': y} for x, y in geysers],
+            'max_units': max_units, 'max_buildings': max_buildings, 'max_minerals': 8, 'banks': {}}
+
+
+class CensusTest(unittest.TestCase):
+    def test_exact_join_on_halved_position(self):
+        rom = [chk(0, 1, 173, 95), chk(106, 1, 1056, 1744), chk(176, 11, 480, 912, 1500),
+               chk(188, 11, 100, 200), chk(214, 1, 0, 0)]
+        result = pc.compare_census(rom, gba(units=[(0, 1, 86, 47)], buildings=[(106, 1, 528, 872)],
+                                            minerals=[(240, 456, 1500)], geysers=[(50, 100)]))
+        self.assertEqual(result['verdict'], 'exact')
+        self.assertEqual((result['matched'], result['minerals']['placed'], result['geysers']['placed']), (2, 1, 1))
+
+    def test_stacked_placement_displaced_is_a_collision(self):
+        rom = [chk(37, 4, 200, 200), chk(37, 4, 202, 200)]
+        result = pc.compare_census(rom, gba(units=[(37, 4, 100, 100), (37, 4, 110, 100)]))
+        self.assertEqual(result['verdict'], 'collision')
+        self.assertEqual(result['rows']['collision'][0]['offset'], [9, 0])
+
+    def test_unit_over_the_cap_is_cap_dropped(self):
+        rom = [chk(0, 1, 10, 10), chk(0, 1, 100, 100)]
+        result = pc.compare_census(rom, gba(units=[(0, 1, 5, 5)], max_units=1))
+        self.assertEqual(result['verdict'], 'cap-dropped')
+        self.assertEqual(result['counts']['cap-dropped'], 1)
+
+    def test_missing_extra_or_moved_differs(self):
+        rom = [chk(0, 1, 10, 10)]
+        self.assertEqual(pc.compare_census(rom, gba(units=[(0, 1, 5, 5), (7, 1, 9, 9)]))['verdict'], 'differs')
+        self.assertEqual(pc.compare_census(rom, gba())['counts']['missing'], 1)
+        moved = pc.compare_census(rom, gba(units=[(0, 1, 50, 5)]))
+        self.assertEqual((moved['verdict'], moved['counts']['moved']), ('differs', 1))
+        amount = pc.compare_census([chk(176, 11, 10, 10, 1500)], gba(minerals=[(5, 5, 1000)]))
+        self.assertEqual(amount['minerals']['amount_differs'], [{'half': [5, 5], 'rom': 1500, 'gba': 1000}])
+
+    def test_thg2_units_are_placements_and_sprites_are_not(self):
+        payload = struct.pack('<HHHBBH', 209, 320, 96, 6, 0, 0x0000) + \
+            struct.pack('<HHHBBH', 119, 64, 64, 6, 0, 0x1000) + \
+            struct.pack('<HHHBBH', 205, 32, 48, 1, 0, 0x8000)
+        rows = pc.doodad_units(payload)
+        self.assertEqual([(r['type'], r['owner'], r['x'], r['y'], r['disabled']) for r in rows],
+                         [(209, 6, 320, 96, False), (205, 1, 32, 48, True)])
+
+    def test_trace_parse_keeps_launch_placements_and_bank_history(self):
+        text = '\n'.join([
+            '#sc64-parity-trace 1',
+            'H schema=sc64-parity-trace/1 profile=terran scenario=census-m4 attack=x',
+            'H max_units=192 max_buildings=96 max_minerals=80 owners=5 cell_cap=1',
+            'S 0 0 5 0 1 0 0 0 1 -1 0',
+            '+U 0 4 1', 'U 0 4 37 1 4 812 23 35 35 0 -1 0 812 23 -1 0 0 -1 0 0 0 0 0',
+            'B 1 0 106 0 1 528 872 1500 1500 0 0 0 0 0 0 -1 -1 -1 -1 -1 3 0',
+            'P 0 0 0 20 36', 'M 0 240 456 355', 'G 0 50 60',
+            'S 1 0 6 1 1 0 0 0 1 -1 0',
+            'U 0 4 37 1 4 813 23 35 35 0 -1 0 812 23 -1 0 0 -1 0 0 0 0 0',
+            'P 0 40 0 20 36',
+            'Z steps=1 host_ticks=6 births=2 removals=0 damage=0 sounds=0 text_boxes=0 overflow=0 '
+            'write_errors=0 world=0 world_chain=0 body_fnv=0'])
+        census = pc.parse_census_trace(text)
+        self.assertEqual(census['units'][0]['x'], 812)
+        self.assertEqual(census['buildings'][0]['raw_type'], 106)
+        self.assertEqual(census['banks'][0]['minerals'], 0)
+        self.assertEqual([h['minerals'] for h in census['bank_history'][0]], [0, 40])
+        self.assertEqual((census['max_units'], census['geysers'], census['last_step']), (192, [{'x': 50, 'y': 60}], 1))
+        with self.assertRaises(ValueError):
+            pc.parse_census_trace(text.rsplit('\n', 1)[0])
+        with self.assertRaises(ValueError):
+            pc.parse_census_trace(text.replace('overflow=0', 'overflow=3'))
+        with self.assertRaises(ValueError):  # a short record marks the census absent, not a crash
+            pc.parse_census_trace(text.replace('M 0 240 456 355', 'M 0 240'))
+        with self.assertRaises(ValueError):
+            pc.parse_census_trace(text.replace('S 0 0 5 0 1 0 0 0 1 -1 0', 'S 0 0 5'))
+
+    def test_unreadable_or_unpinned_bank_manifest_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            header = root / 'bank.h'
+            header.write_text('x\n')
+            (root / 'cut.json').write_text('{"header_sha2')
+            (root / 'list.json').write_text('[]')
+            (root / 'bare.json').write_text('{"generated_header": "bank.h"}')
+            for name in ('cut.json', 'list.json', 'bare.json'):
+                manifest, status = pc.load_manifest(root / name, header)
+                self.assertIsNone(manifest, name)
+                self.assertTrue(status.startswith('unavailable'), status)
+
+    def test_first_pass_set_resources_rows(self):
+        def trigger(record, conditions, group, amount, executed=(0, 1)):
+            return {'record': record, 'conditions': conditions,
+                    'executed_for_player_values': list(executed) + [0] * 25,
+                    'actions': [{'name': 'SetResources', 'group1': group, 'group2': amount,
+                                 'unit_type': 0, 'modifier': 7}]}
+        elapsed = lambda cmp, n: {'name': 'ElapsedTime', 'comparison': cmp, 'amount': n,
+                                  'player_group': 0, 'unit_type': 0}
+        command = {'name': 'Command', 'comparison': 0, 'amount': 1, 'player_group': 2, 'unit_type': 229}
+        owners = bytes([6, 6, 5, 0, 0, 0, 0, 0])  # players 0-2 active, 3-7 inactive
+        triggers = [trigger(0, [elapsed(0, 0)], 13, 40), trigger(1, [elapsed(0, 180)], 1, 99),
+                    trigger(2, [command], 2, 5000), trigger(3, [dict(command, amount=5)], 2, 7000)]
+        rows = pc.start_banks(triggers, bytes(8), [chk(0, 2, 1, 1)], owners)
+        self.assertEqual([(r['trigger'], r['players'], r['amount']) for r in rows], [(0, [1], 40), (2, [2], 5000)])
+        # Each executor is evaluated alone: only player 1 commands a unit.
+        mine = dict(command, player_group=13)
+        both = trigger(4, [mine], 13, 300, executed=(1, 1))
+        rows4 = pc.start_banks([both], bytes(8), [chk(0, 1, 1, 1)], owners)
+        self.assertEqual([r['players'] for r in rows4], [[1]])
+        # A force grant reaches only the force's active slots.
+        forces = bytes([0, 0, 1, 0, 0, 1, 1, 1])
+        force = trigger(5, [elapsed(0, 0)], 18, 100)
+        self.assertEqual(sorted(r['players'][0] for r in pc.start_banks([force], forces, [], owners)), [0, 1])
+        census = {'step': 0, 'last_step': 120, 'bank_history': {
+            0: [{'step': 0, 'minerals': 0, 'gas': 0}, {'step': 30, 'minerals': 40, 'gas': 0}],
+            1: [{'step': 0, 'minerals': 0, 'gas': 0}]}, 'banks': {}}
+        self.assertEqual(pc.compare_banks(rows[:1], census, {1: 0})[0]['verdict'], 'match at step 30')
+        self.assertEqual(pc.compare_banks(rows[1:], census, {2: 0})[0]['verdict'],
+                         'differs (first changed to [40] at step 30)')
+        # Two source slots on the human's engine owner cannot be told apart either.
+        self.assertTrue(pc.compare_banks(rows[:1], census, {1: 0, 2: 0})[0]['verdict'].startswith('not compared'))
+        self.assertTrue(pc.compare_banks(rows[:1], census, {})[0]['verdict'].startswith('absent'))
+        # A rescuable slot executes nothing.
+        rescue = pc.start_banks([trigger(6, [elapsed(0, 0)], 13, 150, executed=(0, 1, 1))], bytes(8), [],
+                                bytes([6, 6, 3, 0, 0, 0, 0, 0]))
+        self.assertEqual([r['players'] for r in rescue], [[1]])
+        # A minerals+gas grant must arrive as one change of both balances.
+        split = [dict(rows[0], resource='minerals+gas', amount=40)]
+        apart = {'step': 0, 'last_step': 9, 'bank_history': {0: [
+            {'step': 0, 'minerals': 0, 'gas': 0}, {'step': 1, 'minerals': 40, 'gas': 0},
+            {'step': 2, 'minerals': 40, 'gas': 40}]}, 'banks': {}}
+        self.assertTrue(pc.compare_banks(split, apart, {1: 0})[0]['verdict'].startswith('differs'))
+        # Two source slots on one engine owner cannot be told apart.
+        shared = {'step': 0, 'last_step': 9, 'bank_history': {1: [{'step': 0, 'minerals': 5000, 'gas': 0}]},
+                  'banks': {}}
+        self.assertTrue(pc.compare_banks(rows[1:], shared, {2: 1, 3: 1})[0]['verdict'].startswith('not compared'))
+        # A computer's grant may live in a campaign wallet the trace lacks.
+        self.assertTrue(pc.compare_banks(rows[1:], census, {2: 1})[0]['verdict'].startswith('not compared'))
+        # Mining that later reaches the granted total does not match it.
+        mined = {'step': 0, 'last_step': 120, 'bank_history': {0: [
+            {'step': 0, 'minerals': 0, 'gas': 0}, {'step': 20, 'minerals': 8, 'gas': 0},
+            {'step': 90, 'minerals': 40, 'gas': 0}]}, 'banks': {}}
+        self.assertTrue(pc.compare_banks(rows[:1], mined, {1: 0})[0]['verdict'].startswith('differs'))
+
+    def test_distant_same_type_actor_is_not_a_collision(self):
+        rom = [chk(37, 4, 200, 200), chk(37, 4, 202, 200)]
+        result = pc.compare_census(rom, gba(units=[(37, 4, 100, 100), (37, 4, 900, 900)]))
+        self.assertEqual((result['verdict'], result['counts']['moved']), ('differs', 1))
+
+    def test_door_in_a_full_building_table_is_cap_dropped(self):
+        rom = [chk(209, 6, 20, 20), chk(209, 6, 400, 400)]
+        result = pc.compare_census(rom, gba(buildings=[(209, 6, 10, 10)], max_buildings=1))
+        self.assertEqual(result['verdict'], 'cap-dropped')
+        full_units = pc.compare_census(rom, gba(units=[(0, 1, 5, 5)], buildings=[(209, 6, 10, 10)],
+                                                max_units=1))
+        self.assertEqual(full_units['counts']['missing'], 1)
+
+    def test_blood_bath_needs_each_base_on_its_own_start(self):
+        starts = [dict(chk(214, i, 100 + 1000 * i, 100), type=214) for i in range(4)]
+        def lobby(*halls):
+            census = gba(buildings=[(-1, o, x, y) for o, x, y, _ in halls])
+            for b, (_, _, _, kind) in zip(census['buildings'], halls):
+                b['type'] = kind
+            return census
+        halls = {106: 0, 131: 6}  # raw town hall -> engine type in the profile
+        good = lobby((0, 50, 50, 6), (1, 550, 50, 0))
+        self.assertEqual(pc.skirmish_census(starts, good, halls)['verdict'], 'exact')
+        for bad in (lobby((0, 50, 50, 6), (1, 300, 300, 0)),     # off its start
+                    lobby((0, 50, 50, 6), (1, 550, 50, 2)),      # a Supply Depot, not a hall
+                    lobby((0, 50, 50, 6), (0, 550, 50, 0)),      # both halls one owner
+                    lobby((0, 50, 50, 6), (1, 52, 50, 0)),       # both on one start
+                    lobby((0, 50, 50, 6), (4, 550, 50, 0)),      # a neutral hall, not the computer's
+                    lobby((0, 50, 50, 0), (1, 550, 50, 6)),      # races swapped (Zerg human has a CC)
+                    gba()):
+            self.assertEqual(pc.skirmish_census(starts, bad, halls)['verdict'], 'differs')
+
+
+class SoundTest(unittest.TestCase):
+    HEADER = ('enum { SC64_AUDIO_READY, SC64_AUDIO_WHAT, SC64_AUDIO_YES, SC64_AUDIO_ATTACK, '
+              'SC64_AUDIO_DEATH, SC64_AUDIO_BUILT };\n'
+              'static const u16 sc64_audio_unit_first[6] __attribute__((unused)) = {\n0, 1, 1, 3, 3, 4\n};\n'
+              'static const u8 sc64_audio_unit_count[6] __attribute__((unused)) = {\n1, 0, 2, 0, 1, 0\n};\n'
+              'static const u16 sc64_audio_unit_sound[4] __attribute__((unused)) = {\n0, 1, 2, 0\n};\n')
+
+    def id_map(self, **override):
+        bank_index = {20: 0, 21: 1, 22: 2, 23: 0}
+        sets = [{'ready': [20], 'what': [], 'yes': [21, 22], 'attack': [], 'death': [23], 'built': []}]
+        return {**pack.sound_id_map(bank_index, 3, sets, 'x', 'y'), **override}
+
+    def test_pack_side_file_lists_every_id_per_bank_index(self):
+        ids = self.id_map()
+        self.assertEqual(ids['bank'], [[20, 23], [21], [22]])
+        self.assertEqual(ids['kinds'], list(pack.KINDS))
+        self.assertEqual(ids['units'][0]['yes'], [21, 22])
+
+    def test_engine_sounds_follow_the_header_indices(self):
+        sounds = pc.engine_unit_sounds(self.HEADER, self.id_map())
+        self.assertEqual(sounds[0], {'ready': [20], 'what': [], 'yes': [21, 22], 'attack': [],
+                                     'death': [23], 'built': []})
+        stale = self.id_map(units=[{'ready': [21], 'what': [], 'yes': [21, 22], 'attack': [],
+                                    'death': [23], 'built': []}])
+        with self.assertRaises(ValueError):
+            pc.engine_unit_sounds(self.HEADER, stale)
+
+    def test_sound_verdicts(self):
+        audible = {1, 2, 3}
+        self.assertEqual(pc.sound_verdict([1, 2], audible, [1, 2]), 'match')
+        self.assertEqual(pc.sound_verdict([1, 2, 3], audible, [1]), 'partial')
+        self.assertEqual(pc.sound_verdict([1], audible, []), 'absent')
+        self.assertEqual(pc.sound_verdict([1], audible, [1, 9]), 'extra')
+        self.assertEqual(pc.sound_verdict([], audible, []), 'none')
+        self.assertEqual(pc.sound_verdict([7], audible, []), 'silent in ROM')
+
+    def test_pack_side_file_replaces_links_instead_of_writing_through(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            tracked = root / 'tracked.txt'
+            tracked.write_text('keep\n')
+            (root / 'link.json').symlink_to(tracked)
+            with self.assertRaises(ValueError):
+                pack.publish({root / 'new.json': b'x\n', root / 'link.json': b'{}\n'})
+            self.assertFalse((root / 'new.json').exists())  # nothing is published when one is refused
+            (root / 'hard.json').hardlink_to(tracked)
+            (root / 'hard.json').chmod(0o600)
+            pack.publish({root / 'hard.json': b'{}\n'})
+            self.assertEqual((root / 'hard.json').stat().st_mode & 0o777, 0o600)
+            self.assertEqual(tracked.read_text(), 'keep\n')
+            self.assertEqual((root / 'hard.json').read_text(), '{}\n')
+
+    def test_pack_refuses_a_tracked_output_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+            (repo / '.gitignore').write_text('/private/\n/half/sc64_audio_sound_ids.json\n')
+            (repo / 'private').mkdir()
+            pack.refuse_tracked(repo / 'private' / 'bank')
+            with self.assertRaises(ValueError):  # every bank output must be ignored, not one
+                pack.refuse_tracked(repo / 'half')
+            with self.assertRaises(ValueError):
+                pack.refuse_tracked(repo / 'src' / 'bank')
+        with tempfile.TemporaryDirectory() as temp:
+            pack.refuse_tracked(Path(temp) / 'bank')  # outside any work tree
+
+
+class SkipTest(unittest.TestCase):
+    def test_missing_inputs_skip_cleanly(self):
+        with tempfile.TemporaryDirectory() as temp:
+            missing = str(Path(temp) / 'absent.z64')
+            self.assertEqual(pc.main(['--rom', missing, '--extractor', missing]), 0)
+            self.assertEqual(pc.main(['--rom', missing, '--extractor', missing, '--require-inputs']), 2)
+
+
+class RomContentTest(unittest.TestCase):
+    """Runs only where the private ROM and extractor are prepared."""
+
+    def test_report_covers_every_mission_and_drawn_unit(self):
+        try:
+            pt.find_input(ROOT, '.local/sc64/rom/StarCraft64-USA.z64', None)
+            pt.find_input(ROOT, 'references/sc64-maps/extract_sc64_maps.py', None)
+        except pt.InputsMissing as missing:
+            self.skipTest(f'private ROM inputs absent: {missing}')
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'content'
+            run = subprocess.run(['python3', 'tools/sc64_parity_content.py', '--out', str(out)],
+                                 cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            document = json.loads((out / 'l0-content.json').read_text())
+            text = (out / 'l0-content.txt').read_text()
+        self.assertEqual(document['provenance'], 'rom-table')
+        missions = document['census']['missions']
+        self.assertEqual([m['label'] for m in missions][:5], ['Z1', 'Z2', 'P1', 'P2', 'T1'])
+        self.assertEqual(len(missions), 31)
+        # Without census binaries every census is reported absent, never skipped.
+        self.assertTrue(all(m['verdict'] == 'absent' and m['rom_placements'] > 0 for m in missions))
+        for section in ('== opening censuses', '== iscript sequences', '== sounds', '== summary'):
+            self.assertIn(section, text)
+        units = {u['raw']: u for u in document['iscript']['units']}
+        if 0 in units:  # Marine: Walking is a nine-frame, one-tick-per-frame loop in the ROM
+            walk = next(r for r in units[0]['rows'] if r['animation'] == 'Walking')
+            self.assertEqual(walk.get('rom_waits'), [1] * 9)
+
+
+if __name__ == '__main__':
+    unittest.main()

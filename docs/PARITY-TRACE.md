@@ -56,6 +56,23 @@ One runner run:
 build/parity/terran-fast-trace --scenario t1 --steps 3000 --trace t1.trace
 ```
 
+An opening census (the offline layer's mission census, see
+`tools/sc64_parity_content.py`) launches one catalog mission, 0-29 as
+`starcraft/campaign_catalog.h` numbers them, or the Blood Bath lobby, and
+writes one record set of the launch state, then one `G index x y` line per
+geyser:
+
+```sh
+build/parity/terran-fast-trace --scenario census --mission 4 --trace build/parity/t1-census.trace
+build/parity/zerg-z10-fast-trace --scenario census --mission skirmish --trace build/parity/bb-census.trace
+```
+
+A census holds ROM-derived positions, so write it under an ignored folder such
+as `build/` or `.local/` (the runner does not check the path).
+A mission's census is taken on the START update, so its `S` line reads step 0;
+the lobby's follows its launch press and release. Protoss P10 has a
+`protoss-p10-fast-trace` census binary but no self-gate scenario.
+
 The runner hashes all route state (`route_purity_hash()`) around every update,
 scenario dispatch and trace step. That costs about 1 ms per update, more than
 the step itself; `--no-route-checks` drops those per-update checks for

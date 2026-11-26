@@ -45,6 +45,13 @@ Output format ("SC64 audio codec format 2", decoded by common/audio_codec.h):
     every stream's decoded PCM in blob order. --verify-bank rechecks a bank
     with the reference decoder; --encode-pcm and --decode-stream expose the
     codec for ROM-free cross checks.
+  * sc64_audio_sound_ids.json, beside the header, records the sfxdata ids
+    behind every bank index (several ids can share one clip) and, per raw unit
+    and kind, the ids the bank plays, pinned to the header's sha256. The
+    offline parity layer (tools/sc64_parity_content.py) reads it. It is
+    private derived data like the rest of the bank: generate() refuses an
+    output directory that git would track. The header, blob and manifest are
+    unchanged by it.
 
 Copyright (C) 2026 blizzard-gba contributors
 SPDX-License-Identifier: GPL-3.0-or-later
@@ -54,9 +61,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import struct
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Iterable
 
@@ -534,6 +544,72 @@ class Scripts:
 
 
 KINDS = ("ready", "what", "yes", "attack", "death", "built")
+SOUND_ID_FILE = "sc64_audio_sound_ids.json"
+BANK_FILES = ("sc64_audio_generated.bin", "sc64_audio_generated.h", "sc64_audio_manifest.json", SOUND_ID_FILE)
+
+
+def sound_id_map(bank_index: dict[int, int], clip_count: int, unit_sets: list[dict],
+                 header_sha256: str, rom_sha1: str, blob_sha256: str = "") -> dict:
+    """The sfxdata ids behind each bank index, and per raw unit and kind the
+    ids the bank plays, in the order of sc64_audio_unit_sound."""
+    bank: list[list[int]] = [[] for _ in range(clip_count)]
+    for sound in sorted(bank_index):
+        bank[bank_index[sound]].append(sound)
+    units = [{kind: [s for s in sets[kind] if s in bank_index] for kind in KINDS} for sets in unit_sets]
+    return {"schema": 1, "rom_sha1": rom_sha1, "header_sha256": header_sha256, "blob_sha256": blob_sha256,
+            "kinds": list(KINDS), "bank": bank, "units": units}
+
+
+def refuse_tracked(out_dir: Path, names=BANK_FILES) -> None:
+    """ROM-derived output must stay private: refuse paths inside a git work
+    tree unless git ignores every one of them."""
+    probe = out_dir.resolve()
+    while not probe.exists():
+        probe = probe.parent
+    top = subprocess.run(["git", "-C", str(probe), "rev-parse", "--show-toplevel"],
+                         capture_output=True, text=True)
+    if top.returncode != 0:
+        return
+    for name in names:
+        target = out_dir.resolve() / name
+        ignored = subprocess.run(["git", "-C", top.stdout.strip(), "check-ignore", "-q", str(target)])
+        if ignored.returncode != 0:
+            raise ValueError(f"{target} is not ignored by git; the audio bank and its sound id map are "
+                             "private ROM-derived data")
+
+
+def check_destination(path: Path) -> None:
+    """A bank output may only replace a regular file or nothing."""
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise ValueError(f"{path} is a link or not a regular file; refusing to replace it")
+
+
+def publish(outputs: dict) -> None:
+    """Publish {path: bytes} as one generation: every destination is checked,
+    every file is staged in a unique temporary file beside it, and only then
+    are they renamed into place, so a failure leaves the old bank whole and
+    a link at a destination is replaced, never written through. A file keeps
+    the mode of the one it replaces (a new one gets the umask's default)."""
+    for path in outputs:
+        check_destination(path)
+    umask = os.umask(0)
+    os.umask(umask)
+    staged = []
+    try:
+        for path, data in outputs.items():
+            fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+            staged.append((name, path))
+            with os.fdopen(fd, "wb") as f:
+                # The staging file itself must be ignored before it holds anything.
+                refuse_tracked(path.parent, (Path(name).name,))
+                f.write(data)
+            mode = path.stat().st_mode & 0o777 if path.is_file() else 0o666 & ~umask
+            os.chmod(name, mode)
+        for name, path in staged:
+            os.replace(name, path)
+    finally:
+        for name, _ in staged:
+            Path(name).unlink(missing_ok=True)
 
 
 def c_array(name: str, ctype: str, values: list[int], width: int = 16) -> str:
@@ -609,6 +685,9 @@ def encode_bank(clips: list[bytes], tracks: dict[int, bytes], verify: bool = Tru
 def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
              upstream: Path = UPSTREAM, verify: bool = True,
              predictors=DEFAULT_PREDICTORS, nuke_warning: bool = False) -> dict:
+    refuse_tracked(out_dir)
+    for name in BANK_FILES:  # every destination is checked before any is written
+        check_destination(out_dir / name)
     extractor = load_sprites(ROOT / "tools/sc64_sprites.py").load_extractor(upstream)
     rom = extractor.load_rom(str(rom_path))
     rom_sha = hashlib.sha1(rom).hexdigest()
@@ -693,7 +772,7 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
 
     out_dir.mkdir(parents=True, exist_ok=True)
     blob_path = out_dir / "sc64_audio_generated.bin"
-    blob_path.write_bytes(out)
+    outputs = {blob_path: out}
     header = [
         "/* Generated by tools/sc64_audio_pack.py from a user-supplied ROM. */",
         "/* Private derived data: do not commit or distribute. */",
@@ -736,7 +815,12 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         "",
     ]
     header_path = out_dir / "sc64_audio_generated.h"
-    header_path.write_text("\n".join(header), encoding="ascii")
+    header_text = "\n".join(header)
+    outputs[header_path] = header_text.encode("ascii")
+    ids = sound_id_map(bank_index, len(clips), unit_sets,
+                       hashlib.sha256(header_text.encode("ascii")).hexdigest(), rom_sha,
+                       hashlib.sha256(out).hexdigest())
+    outputs[out_dir / SOUND_ID_FILE] = (json.dumps(ids, indent=1) + "\n").encode()
     report = {
         "format": CODEC_FORMAT,
         "rom_sha1": rom_sha,
@@ -766,7 +850,8 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         report["nuclear_warning"] = {"sound_id": NUKE_WARNING_SOUND, "sample": sample,
                                      "samples": sample_length[sample],
                                      "source_entry_sha256": NUKE_WARNING_SHA256}
-    (out_dir / "sc64_audio_manifest.json").write_text(json.dumps(report, indent=2) + "\n")
+    outputs[out_dir / "sc64_audio_manifest.json"] = (json.dumps(report, indent=2) + "\n").encode()
+    publish(outputs)
     return report
 
 

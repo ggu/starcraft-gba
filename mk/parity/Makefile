@@ -5,7 +5,7 @@
 # output only under $(SC64_PARITY_HOME) (default: .local/parity in the main
 # checkout); they print a skip line and succeed when the inputs are absent.
 
-.PHONY: parity-tables parity
+.PHONY: parity-tables parity parity-content parity-l0
 parity-tables:
 	$(PYTHON) tools/sc64_parity_tables.py
 
@@ -15,6 +15,7 @@ parity-tables:
 # private inputs.
 parity:
 	$(PYTHON) tools/sc64_parity.py
+
 
 # GBA side of the N64 parity harness (WP2): host-only command injector and
 # trace emitter (tests/sc64_parity_inject.h, tests/sc64_parity_trace.h) and a
@@ -57,8 +58,13 @@ PARITY_INPUTS.zerg-z10 = $(ZERG_Z10_CANONICAL_INPUTS) $(if $(Z10_FACT_FLAGS),$(Z
 	build/z10-building-words-config $(Z10_BUILDING_WORDS_CONFIG) build/z10-facts-config $(Z10_FACT_CONFIG) \
 	build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG) build/terrain-dirty-capture-config \
 	$(if $(filter 1,$(SC64_STATIC_MINERAL_WORDS)),$(if $(filter build/starcraft-zerg-z10.elf,$(SC64_STATIC_MINERAL_WORDS_ELFS)),$(SC64_STATIC_MINERAL_WORDS_HEADER)))
+PARITY_INPUTS.protoss-p10 = $(PROTOSS_P10_INPUTS) $(P10_HATCHERY_CONFIG) $(P10_BUILDING_WORD_HEADER) \
+	build/canonical-target-index-config $(CANONICAL_TARGET_INDEX_CONFIG) build/terrain-dirty-capture-config \
+	$(SHARED_SIGHT_HEADERS) \
+	$(if $(filter 1,$(SC64_STATIC_MINERAL_WORDS)),$(if $(filter build/starcraft-protoss-p10.elf,$(SC64_STATIC_MINERAL_WORDS_ELFS)),$(SC64_STATIC_MINERAL_WORDS_HEADER)))
 PARITY_SOURCES.terran = $(filter-out starcraft/game.c,$(TERRAN_ARM_SOURCES))
 PARITY_SOURCES.zerg-z10 = $(filter-out starcraft/game.c,$(Z10_ARM_SOURCES))
+PARITY_SOURCES.protoss-p10 = $(filter-out starcraft/game.c,$(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES))
 
 # $(1) profile, $(2) build kind (asan|fast), $(3) emitter (trace|plain)
 #
@@ -103,14 +109,19 @@ $(PARITY_DIR)/$(1)-$(2)-$(3): $(PARITY_DIR)/$(1)-$(2)-$(3).cmd $$(PARITY_RUN_DEP
 PARITY_BINARIES += $(PARITY_DIR)/$(1)-$(2)-$(3)
 endef
 
-# $(1) profile, $(2) ROM ELF, $(3) scenario
+# $(1) profile, $(2) ROM ELF
 #
 # <profile>.romflags is rewritten only when the ROM's options change, so a ROM
 # flag change rebuilds the parity binaries.
-define PARITY_PROFILE
+define PARITY_ROMFLAGS
 $(PARITY_DIR)/$(1).romflags: parity-force | build
 	@mkdir -p $(PARITY_DIR)
 	@$$(PYTHON) tools/sc64_parity_selfgate.py rom-flags $(2) --make '$$(PARITY_SUBMAKE)' --out $$@
+endef
+
+# $(1) profile, $(2) ROM ELF, $(3) scenario
+define PARITY_PROFILE
+$(call PARITY_ROMFLAGS,$(1),$(2))
 $(call PARITY_BINARY,$(1),asan,trace)
 $(call PARITY_BINARY,$(1),asan,plain)
 $(call PARITY_BINARY,$(1),fast,trace)
@@ -120,6 +131,13 @@ endef
 
 $(eval $(call PARITY_PROFILE,terran,build/starcraft-terran.elf,t1))
 $(eval $(call PARITY_PROFILE,zerg-z10,build/starcraft-zerg-z10.elf,skirmish))
+# The self-gates and the bench cover the two profiles above. Protoss P10 has
+# only the census binary (the census needs one release profile per race).
+PARITY_GATE_BINARIES := $(PARITY_BINARIES)
+$(eval $(call PARITY_ROMFLAGS,protoss-p10,build/starcraft-protoss-p10.elf))
+$(eval $(call PARITY_BINARY,protoss-p10,fast,trace))
+PARITY_CENSUS_BINARIES := $(PARITY_DIR)/terran-fast-trace $(PARITY_DIR)/zerg-z10-fast-trace \
+	$(PARITY_DIR)/protoss-p10-fast-trace
 
 -include $(wildcard $(PARITY_DIR)/*.d)
 
@@ -127,5 +145,34 @@ $(eval $(call PARITY_PROFILE,zerg-z10,build/starcraft-zerg-z10.elf,skirmish))
 parity-force:
 test-sc64-parity: $(filter %-asan-trace %-asan-plain,$(PARITY_BINARIES))
 	$(PYTHON) tools/sc64_parity_selfgate.py gate --dir $(PARITY_DIR) --kind asan $(addprefix --profile ,$(PARITY_PROFILES))
-bench-sc64-parity: $(PARITY_BINARIES)
+bench-sc64-parity: $(PARITY_GATE_BINARIES)
 	$(PYTHON) tools/sc64_parity_selfgate.py bench --dir $(PARITY_DIR) $(addprefix --profile ,$(PARITY_PROFILES))
+
+# Opening censuses, iscript sequences and the sound id map
+# (tools/sc64_parity_content.py). The censuses launch every catalog mission in
+# the host build of its release profile; those binaries are prerequisites only
+# when this checkout has the private ROM and extractor (it also needs its own
+# prepared inputs to build them), and the tool reports a census as absent
+# when its binary is. parity-l0 prints the whole offline layer.
+# The census binaries are built by a sub-make, as tools/sc64_parity.py does,
+# with the prepared Z10 descriptor when the caller gave no other, so a plain
+# `make parity-content` works in a prepared checkout. Not $(MAKE): a recipe
+# naming it runs even under an outer make -n.
+# The ROM and extractor are found as the tool finds them: in this checkout or
+# in the main one (recursive variables, so git runs only for this target).
+PARITY_MAIN = $(patsubst %/.git,%,$(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null))
+PARITY_FIND = $(firstword $(wildcard $(1) $(PARITY_MAIN)/$(1)))
+PARITY_CENSUS_READY = $(and $(call PARITY_FIND,.local/sc64/rom/StarCraft64-USA.z64),$(call PARITY_FIND,references/sc64-maps/extract_sc64_maps.py))
+PARITY_Z8_PREPARED := .local/build/z9-inputs/z8-descriptor.json
+PARITY_CENSUS_Z8 := $(if $(and $(filter file default,$(origin Z8_DESCRIPTOR)),$(wildcard $(PARITY_Z8_PREPARED))),Z8_DESCRIPTOR=$(PARITY_Z8_PREPARED),Z8_DESCRIPTOR=$(Z8_DESCRIPTOR))
+# Each profile is built on its own; one that fails to build is passed as
+# --absent-profile, so its censuses read absent and the rest of the report is
+# still written (never from an older binary).
+PARITY_CENSUS_PROFILES := terran zerg-z10 protoss-p10
+parity-content:
+	@failed=; \
+	$(if $(PARITY_CENSUS_READY),for p in $(PARITY_CENSUS_PROFILES); do \
+	  $(PARITY_SUBMAKE) -s $(PARITY_CENSUS_Z8) $(PARITY_DIR)/$$p-fast-trace || failed="$$failed --absent-profile $$p"; \
+	done;) \
+	$(PYTHON) tools/sc64_parity_content.py $(if $(PARITY_CENSUS_READY),--binaries $(PARITY_DIR)) $$failed
+parity-l0: parity-tables parity-content

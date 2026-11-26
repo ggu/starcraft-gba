@@ -18,6 +18,22 @@
  * one Terran computer, and gives no command: the skirmish starts the human's
  * Drones mining, as the cartridge does.
  *
+ *   sc64_parity_run --scenario census --mission ID|skirmish --trace PATH [--steps N]
+ *                   [--profile NAME]
+ *
+ * census launches one catalog mission (ID 0-29, as campaign_catalog.h numbers
+ * them) or the Blood Bath skirmish lobby through the ordinary menus and writes
+ * a trace holding exactly one record set: the world the launch produced,
+ * before the first update a player could give input to (tools/
+ * sc64_parity_content.py compares it with the ROM CHK's placements). A
+ * mission's census is taken on the START update itself, so its S line reads
+ * step 0; the skirmish census follows the lobby's launch press and its
+ * release, and its S line gives the steps those took. With --steps N the
+ * census then runs up to N more steps with no input (a modal text box stops
+ * it early), recorded as ordinary deltas, so start-of-game triggers such as
+ * SetResources show in the last bank rows. "G index x y" lines, one per
+ * geyser, follow the launch record set.
+ *
  * It prints one JSON line: steps taken, host updates, the world hash and the
  * per-step world-hash chain, the route-purity checks made and the setup
  * failures (any failure exits 3). A step is an update in which the simulation
@@ -31,6 +47,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #ifdef SC64_PARITY_TRACE
 static void sc64_pt_hit(int target, int damage, int source_type, int source_owner);
@@ -355,6 +373,29 @@ static int pr_launch_t1(void)
     return screen == SCREEN_PLAY && race_selected_mission == 4;
 }
 
+/* The ordinary menu launch of one catalog mission, as
+ * tests/sc64_campaign_progression.h does it, ending on the START update. */
+static int pr_launch_mission(int mission)
+{
+#ifdef SC64_CAMPAIGN_RACE
+    int ordinal = sc64_catalog_playable_ordinal(sc64_catalog_mission_faction(mission), mission);
+    if (ordinal < 0) return 0;
+    game_init();
+    if (race_front.page != SC_FRONT_HOME) return 0;
+    pr_press(KEY_A);
+    if (race_front.page != SC_FRONT_MISSION) return 0;
+    for (int page = 0; page < ordinal / 2; ++page) pr_press(KEY_RIGHT);
+    if (ordinal & 1) pr_press(KEY_DOWN);
+    pr_press(KEY_A);
+    if (race_front.page != SC_FRONT_BRIEFING || race_front.mission != mission) return 0;
+    pr_update(KEY_START);
+    return screen == SCREEN_PLAY && race_selected_mission == mission;
+#else
+    (void)mission;
+    return 0; /* the census launches single-race campaign products only */
+#endif
+}
+
 static int pr_launch_skirmish(int human, int bot_race)
 {
     game_init();
@@ -592,24 +633,100 @@ static double pr_clock(clockid_t id)
 static double pr_now(void) { return pr_clock(CLOCK_MONOTONIC); }
 static double pr_cpu(void) { return pr_clock(CLOCK_PROCESS_CPUTIME_ID); }
 
+/* The opening census: launch, then one record set at the launch state. */
+static int pr_census(const char *mission_arg, const char *trace_path, const char *profile, unsigned long after)
+{
+    char name[32], tmp[4096];
+    int mission = -1, ok, fd = -1;
+    char *end = 0;
+    if (strcmp(mission_arg, "skirmish")) {
+        long v = strtol(mission_arg, &end, 10);
+        if (!*mission_arg || *end || v < 0 || v >= SC64_BASE_MISSION_COUNT) {
+            fprintf(stderr, "census: --mission takes 0-%d or skirmish\n", SC64_BASE_MISSION_COUNT - 1);
+            return 64;
+        }
+        mission = (int)v;
+    }
+#ifdef SC64_PARITY_TRACE
+    if (!trace_path) { fputs("census: --trace PATH is required\n", stderr); return 64; }
+    ok = mission < 0 ? pr_launch_skirmish(R_ZERG, R_TER) : pr_launch_mission(mission);
+    if (!ok) {
+        fprintf(stderr, "census %s: menu launch failed (screen=%d page=%d)\n", mission_arg, screen, race_front.page);
+        return 66;
+    }
+    if (mission < 0) snprintf(name, sizeof(name), "census-skirmish");
+    else snprintf(name, sizeof(name), "census-m%d", mission);
+    {
+        /* The census holds ROM-derived positions: never write it through a
+         * link (a symlink or a second hard link) into another file. Whether
+         * git tracks the path is the caller's to check (docs/PARITY-TRACE.md). */
+        struct stat st;
+        if (lstat(trace_path, &st) == 0 && (S_ISLNK(st.st_mode) || !S_ISREG(st.st_mode) || st.st_nlink > 1)) {
+            fprintf(stderr, "census: %s is a link or not a regular file; refusing to write it\n", trace_path);
+            return 66;
+        }
+    }
+    /* Written to a fresh file beside the destination and renamed over it
+     * once complete: rename replaces a link put there meanwhile instead of
+     * writing through it. */
+    if (snprintf(tmp, sizeof(tmp), "%s.XXXXXX", trace_path) >= (int)sizeof(tmp)) {
+        fputs("census: --trace path too long\n", stderr);
+        return 64;
+    }
+    fd = mkstemp(tmp);
+    pr_trace = fd < 0 ? 0 : fdopen(fd, "w");
+    if (!pr_trace) { perror(tmp); if (fd >= 0) { close(fd); unlink(tmp); } return 66; }
+    /* Opened after the launch, so the trace's first record set is the whole
+     * launch state rather than deltas from the menus. */
+    sc64_pt_open(pr_trace, profile, name, sc64_pi_attack_mode());
+    sc64_pt_step(pr_steps, pr_host_ticks);
+    /* Geysers have no record in the step schema; a census lists them once. */
+    for (int i = 0; i < geyser_count; ++i) sc64_pt_write("G %d %d %d\n", i, geysers[i].x, geysers[i].y);
+    {
+        unsigned long until = pr_steps + after, bound = pr_host_ticks + 4ul * after + 600ul;
+        while (pr_steps < until && screen == SCREEN_PLAY && pr_host_ticks < bound) pr_update(0);
+    }
+    if (sc64_pt_close(pr_steps, pr_host_ticks, pr_world_hash(), 0) != 0 || fclose(pr_trace) ||
+        rename(tmp, trace_path)) {
+        fprintf(stderr, "%s: trace write failed\n", trace_path);
+        unlink(tmp);
+        return 74;
+    }
+    printf("{\"profile\":\"%s\",\"scenario\":\"%s\",\"mission\":%d,\"steps\":%lu,\"host_ticks\":%lu,"
+           "\"frame\":%d,\"screen\":%d}\n", profile, name, mission, pr_steps, pr_host_ticks, (int)frame, screen);
+    return 0;
+#else
+    (void)mission; (void)ok; (void)name; (void)tmp; (void)fd; (void)trace_path; (void)profile; (void)after;
+    fputs("census needs a build with the trace emitter (SC64_PARITY_TRACE)\n", stderr);
+    return 64;
+#endif
+}
+
 int main(int argc, char **argv)
 {
-    const char *scenario = 0, *trace_path = 0, *profile = "unnamed";
+    const char *scenario = 0, *trace_path = 0, *profile = "unnamed", *mission_arg = 0;
     unsigned long limit = 3000;
-    int skirmish, kind;
+    int skirmish, kind, steps_given = 0, steps_ok = 1, move_args = 0;
     double t0, t1, c0, c1;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--scenario") && i + 1 < argc) scenario = argv[++i];
-        else if (!strcmp(argv[i], "--steps") && i + 1 < argc) limit = strtoul(argv[++i], 0, 10);
+        else if (!strcmp(argv[i], "--steps") && i + 1 < argc) {
+            char *end = 0;
+            const char *text = argv[++i];
+            limit = strtoul(text, &end, 10);
+            steps_given = 1;
+            steps_ok = *text >= '0' && *text <= '9' && !*end && limit <= 1000000ul;
+        }
         else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i];
         else if (!strcmp(argv[i], "--profile") && i + 1 < argc) profile = argv[++i];
+        else if (!strcmp(argv[i], "--mission") && i + 1 < argc) mission_arg = argv[++i];
         else if (!strcmp(argv[i], "--no-render")) pr_render = 0;
         else if (!strcmp(argv[i], "--no-chain")) pr_chain_on = 0;
         else if (!strcmp(argv[i], "--no-route-checks")) pr_checks_on = 0;
         else if (!strcmp(argv[i], "--unit") && i + 1 < argc && pr_group_n < PR_GROUP_CAP &&
-                 pr_parse_point(argv[i + 1], &pr_group_x[pr_group_n], &pr_group_y[pr_group_n])) { ++pr_group_n; ++i; }
-        else if (!strcmp(argv[i], "--target") && i + 1 < argc && pr_parse_point(argv[i + 1], &pr_target_x, &pr_target_y)) ++i;
-        else if (!strcmp(argv[i], "--at") && i + 1 < argc && (pr_at_step = strtoul(argv[++i], 0, 10)) >= 2) {}
+                 pr_parse_point(argv[i + 1], &pr_group_x[pr_group_n], &pr_group_y[pr_group_n])) { ++pr_group_n; ++i; move_args = 1; }
+        else if (!strcmp(argv[i], "--target") && i + 1 < argc && pr_parse_point(argv[i + 1], &pr_target_x, &pr_target_y)) { ++i; move_args = 1; }
+        else if (!strcmp(argv[i], "--at") && i + 1 < argc && (pr_at_step = strtoul(argv[++i], 0, 10)) >= 2) move_args = 1;
         else { scenario = 0; break; }
     }
     for (const char *c = profile; *c; ++c)
@@ -617,14 +734,18 @@ int main(int argc, char **argv)
             scenario = 0; /* the name goes into JSON and the trace header unescaped */
             break;
         }
+    if (scenario && !strcmp(scenario, "census") && mission_arg && steps_ok && !move_args)
+        return pr_census(mission_arg, trace_path, profile, steps_given ? limit : 0ul);
     /* kind: 0 t1, 1 skirmish, 2 move, 3 income */
     kind = !scenario ? -1 : !strcmp(scenario, "t1") ? 0 : !strcmp(scenario, "skirmish") ? 1 :
            !strcmp(scenario, "move") ? 2 : !strcmp(scenario, "income") ? 3 : -1;
-    if (kind < 0 || !limit || (kind == 2 && (!pr_group_n || pr_target_x < 0))) {
+    if (kind < 0 || !limit || mission_arg || (kind == 2 && (!pr_group_n || pr_target_x < 0))) {
         fprintf(stderr, "usage: %s --scenario t1|skirmish [--steps N] [--trace PATH] [--no-render] [--no-chain]\n"
                 "       [--no-route-checks] [--profile NAME]\n"
                 "       %s --scenario move --unit X,Y [--unit X,Y ...] --target X,Y [--at STEP] ...\n"
-                "       %s --scenario income [--at STEP] ...\n", argv[0], argv[0], argv[0]);
+                "       %s --scenario income [--at STEP] ...\n"
+                "       %s --scenario census --mission ID|skirmish --trace PATH [--steps N] [--profile NAME]\n",
+                argv[0], argv[0], argv[0], argv[0]);
         return 64;
     }
     skirmish = kind == 1 || kind == 3;
