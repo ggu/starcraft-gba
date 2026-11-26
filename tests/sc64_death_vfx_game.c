@@ -371,11 +371,18 @@ static void test_result_outro(void)
     assert(panel_pixels() > full * 3 / 4);           /* full result panel */
     assert(state_hash() == frozen && frame == outcome && screen == SCREEN_RESULT && won);
     fprintf(stderr, "result outro: %d updates before the panel\n", ticks);
-    /* Input is unchanged: A during the outro acts at once. */
+    /* A during the outro opens the first result action immediately. */
     setup_world(); find_base();
     game_update(0, 0); destroy_opposition(); game_update(0, 0);
     assert(screen == SCREEN_RESULT && !result_outro_end_get());
     game_update(KEY_A, KEY_A);
+#ifdef SC64_RACES
+    assert(screen == SCREEN_RESULT && won && custom_result_overview);
+    game_update(KEY_A, 0);
+    assert(screen == SCREEN_RESULT && custom_result_overview);
+    game_update(0, 0);
+    game_update(KEY_A, KEY_A);
+#endif
     assert(screen == SCREEN_PLAY && !won);
     /* A world loaded on its result screen shows the panel at once. */
     death_vfx_reset();
