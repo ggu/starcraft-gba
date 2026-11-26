@@ -19,6 +19,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Dense Z7 follow-up.** The release still spends 9.05% of sampled cycles in linear movement-field expansion and 5.94% in contact blocking. Four packing trials provided at most 0.72% over the whole battle and the fastest reduced stack headroom. Keep the existing placement. [Updated cycle measurements](audits/2026-11-26-post-facility-z7-profile.md)
+
 - **Crowded Z7 movement.** Copying aligned route fields four words per loop
   saves 1.39% across the 4,901-input battle on top of the wide-field cache.
   Only three updates in this window fit the 30 Hz guest-cycle budget. Prioritize
