@@ -2200,7 +2200,7 @@
   },
   {
    "key": "t1-fields:fog.explored_at_rest:human, T1",
-   "gba": 665
+   "gba": 666
   },
   {
    "key": "t1-fields:fog.first_clear:human, T1",
@@ -2212,39 +2212,35 @@
   },
   {
    "key": "t1-fields:fog.visible_at_rest:human, T1",
-   "gba": 648
+   "gba": 655
   },
   {
    "key": "t1-fields:move.arrival_first:Marine x5",
-   "gba": 61
+   "gba": 68
   },
   {
    "key": "t1-fields:move.arrival_last:Marine x5",
-   "gba": 100
+   "gba": 92
   },
   {
    "key": "t1-fields:move.group_spread:Marine x5",
-   "gba": 21.3242
+   "gba": 25.1396
   },
   {
    "key": "t1-fields:order.move_end_first:Marine x5",
    "gba": 63
   },
   {
-   "key": "t1-fields:order.move_end_last:Marine x5",
-   "gba": 102
-  },
-  {
    "key": "t1-move:move.arrival_first:Marine x5",
-   "gba": 65
+   "gba": 72
   },
   {
    "key": "t1-move:move.arrival_last:Marine x5",
-   "gba": 100
+   "gba": 92
   },
   {
    "key": "t1-move:move.group_spread:Marine x5",
-   "gba": 23.013
+   "gba": 24.0267
   }
  ]
 }
