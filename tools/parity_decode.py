@@ -363,6 +363,15 @@ class Capture:
                 elif change[value]['pause'] == 0 and change[value]['flags'] & FLAG_TABLE:
                     # Its own change read says it ran in mission and unpaused.
                     extra.setdefault(index, []).append(change[value]['step'])
+        # A capture can also start on a tick that ran inside one step, before any follow-up
+        # read: the same proof (the next tick's change read on the very next step) admits it.
+        if self.ticks:
+            lead = (self.ticks[0]['tick'] - 1) & 0xFFFFFFFF
+            head0 = change.get(self.ticks[0]['tick'])
+            if (lead in change and head0 is not None and head0['step'] == change[lead]['step'] + 1 and
+                    change[lead]['pause'] == 0 and change[lead]['flags'] & FLAG_TABLE):
+                extra.setdefault(0, []).insert(0, change[lead]['step'])
+                self.faults['skipped_ticks'] += 1
         # Unpaused clock: one source frame per tick whose change-step read
         # showed no pause; numbered from the first in-mission (table) tick.
         clock = -1

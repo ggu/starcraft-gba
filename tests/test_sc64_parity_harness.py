@@ -150,6 +150,12 @@ class Decoder(unittest.TestCase):
             first = parity_decode.Capture(m)
             self.assertEqual(first.skipped_frames, [(10, 0)])
             self.assertEqual([r['sf'] for r in first.ticks if r['table']][:2], [1, 2])
+            # A capture whose very first tick ran inside one step, with no follow-up read before it.
+            n = pathlib.Path(temp) / 'n'
+            write_capture(n, marine_frames(30), skip_follow={1})
+            lead = parity_decode.Capture(n)
+            self.assertEqual(lead.skipped_frames, [(2, 0)])
+            self.assertEqual(lead.ticks[0]['sf'], 1)
             # A jump of more than eight ticks is never explained, change-step reads or not.
             f, g = pathlib.Path(temp) / 'f', pathlib.Path(temp) / 'g'
             write_capture(f, marine_frames(30), skip_follow=set(range(10, 20)))
@@ -728,6 +734,8 @@ class CaptureReport(unittest.TestCase):
                 'every +500\n+1000 0 0 0\n') else None, {'500', '1000'})
             self.assertEqual(capture_report.expected_checkpoints(a) if (a / 'tape.txt').write_text(
                 'every 0000000000000500\n1000 0 0 0\n') else None, {'500', '1000'})
+            self.assertEqual(capture_report.expected_checkpoints(a) if (a / 'tape.txt').write_text(
+                'every 500\npulse 800F0C20 2 ne 0 +000700 2 3 60\n300 0 0 0\n') else None, {'500', '1000'})
             # `pulse` runs exactly its STEPS: checkpoints after it stay plannable.
             self.assertEqual(capture_report.expected_checkpoints(a) if (a / 'tape.txt').write_text(
                 'every 500\npulse 800F0C20 2 ne 0 700 2 3 60\n300 0 0 0\n') else None, {'500', '1000'})

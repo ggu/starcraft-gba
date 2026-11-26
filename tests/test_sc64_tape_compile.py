@@ -461,9 +461,20 @@ class LabMeasureTest(unittest.TestCase):
         m, err = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertEqual((m['hits'], m['ambiguous_hits']), (3, 0))
 
+    def test_gap_and_ambiguous_hits_never_set_timing(self):
+        frames = [sf for sf in range(0, 80) if sf != 34]   # frame 34 was never sampled
+        pos = {sf: (100, 100) for sf in frames}
+        marine = {sf: 40.0 for sf in frames}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in frames}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        # The hit first seen at 35 follows a gap: ambiguous, and no interval spans it.
+        self.assertEqual((m['hits'], m['ambiguous_hits'], m['gaps']), (2, 1, []))
+
     def test_n64_order_must_match_the_replay(self):
         class Cap:
-            ticks = [{'step': s, 'rows': {9: o}} for s, o in ((100, 3), (103, 3), (106, 14), (109, 14))]
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}}
+                     for s, t, o in ((100, 50, 3), (103, 51, 3), (106, 52, 14), (109, 53, 14))]
 
             @staticmethod
             def unit(row, name):
@@ -472,7 +483,17 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(metrics.n64_order_after(Cap, 9, 101, (metrics.ORDER_MOVE, metrics.ORDER_ATTACK_MOVE))[0], 14)
         ok, seen = metrics.n64_order_after(Cap, 9, 101, metrics.ORDER_MOVE)
         self.assertIsNone(ok)
-        self.assertEqual(seen, [3, 14, 14])
+        self.assertEqual(seen, [3, 14])
+
+        class Already:   # Move before the press and after it: no evidence the press did anything
+            ticks = [{'step': s, 'tick': t, 'rows': {9: 6}} for s, t in ((100, 50), (103, 51), (106, 52))]
+            unit = Cap.unit
+        self.assertIsNone(metrics.n64_order_after(Already, 9, 101, metrics.ORDER_MOVE)[0])
+
+        class Late:   # the change comes 20 ticks after the press: outside the window
+            ticks = [{'step': 100, 'tick': 50, 'rows': {9: 3}}, {'step': 140, 'tick': 70, 'rows': {9: 6}}]
+            unit = Cap.unit
+        self.assertIsNone(metrics.n64_order_after(Late, 9, 101, metrics.ORDER_MOVE)[0])
 
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},

@@ -285,9 +285,12 @@ def expected_checkpoints(run, allow_load=False, planned_end=None):
             continue
         elif words[0] == 'pulse':
             # `pulse ADDR BYTES OP VALUE STEPS ...` runs exactly STEPS steps.
-            if len(words) < 6 or not re.fullmatch(r'[0-9]{1,9}', words[5]):
+            # The frontend reads STEPS with `>>`: an optional sign and leading zeros, 1..10,000,000.
+            if len(words) < 6 or not re.fullmatch(r'\+?[0-9]+', words[5]) or len(words[5].lstrip('+0')) > 8:
                 return None
-            count = int(words[5])
+            count = int(words[5].lstrip('+0') or '0')
+            if not 1 <= count <= 10000000:
+                return None
             if every:
                 due = range((completed // every + 1) * every, completed + count + 1, every)
                 if len(steps) + len(due) > limit:

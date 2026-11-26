@@ -22,6 +22,7 @@ tolerance, layout_fields}; the band [lo, hi] is the N64 value widened by the
 tolerance written next to it, each derived from the S4 data
 (docs/PARITY-HARNESS.md).
 """
+import collections
 import functools
 import math
 import pathlib
@@ -74,8 +75,8 @@ def tape_commands(path):
             if words[0] == 'quit':
                 break
             lines.append(('command', words[0]))
-    names = [word for kind, word in lines if kind == 'mark']
-    duplicates = sorted({name for name in names if names.count(name) > 1})
+    counts = collections.Counter(word for kind, word in lines if kind == 'mark')
+    duplicates = sorted(name for name, n in counts.items() if n > 1)
     if duplicates:
         raise SystemExit(f'{tape}: mark names used more than once: {", ".join(duplicates)}')
     steps = lambda word: STEP_COUNT.fullmatch(word) is not None
@@ -680,14 +681,25 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     `window` ticks after frontend step `step`, and the orders seen: the GBA replays the order
     the cartridge actually gave. Returns (the first expected order seen or None, orders seen)."""
     expect = (expect,) if isinstance(expect, int) else tuple(expect)
+    # The order before the press, then the first different order within `window` N64 ticks of it:
+    # a byte already set before the press is no evidence of the press.
+    before = [r for r in cap.ticks if r['step'] <= step and row in r['rows']]
+    if not before:
+        return None, []
+    prior, tick0 = cap.unit(before[-1]['rows'][row], 'order'), before[-1]['tick']
     seen = []
     for record in cap.ticks:
-        if record['step'] <= step or row not in record['rows']:
+        if record['step'] <= step:
             continue
-        seen.append(cap.unit(record['rows'][row], 'order'))
-        if len(seen) >= window:
+        if (record['tick'] - tick0) & 0xFFFFFFFF > window:
             break
-    return next((o for o in seen if o in expect), None), seen
+        if row not in record['rows']:
+            continue
+        order = cap.unit(record['rows'][row], 'order')
+        seen.append(order)
+        if order != prior:
+            return (order if order in expect else None), seen
+    return None, seen
 
 
 def lab_report_frames(report):
@@ -735,6 +747,11 @@ def hits_left(series, uid, since, until):
     """[(sf, shield points left, frames since the previous sample)] after each shield drop (see hits)."""
     track = hp_track(series, uid, since, until, key='shield')
     return [(b[0], b[1], b[0] - a[0]) for a, b in zip(track, track[1:]) if a[1] - b[1] >= 0.5]
+
+
+def drop_gaps(points):
+    """{sf: frames since the previous sample} for each sample of a track (see hits)."""
+    return {b[0]: b[0] - a[0] for a, b in zip(points, points[1:])}
 
 
 def hits(points, lethal=False):
@@ -801,6 +818,11 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     # A drop counts for the subject only when the subject is the nearest human unit to the victim
     # at that frame; other drops (another human unit was closer) are listed as ambiguous.
     at_frame = {f['sf']: f for f in series['frames']}
+    gaps_of = {}
+    for vid in set(victims) | set(shielded):
+        gaps_of[vid] = drop_gaps(hp_track(series, vid, t0, end))
+        gaps_of[vid].update({sf: max(g, gaps_of[vid].get(sf, 1))
+                             for sf, g in drop_gaps(hp_track(series, vid, t0, end, key='shield')).items()})
 
     def ours(sf, vid):
         frame = at_frame.get(sf, {})
@@ -812,7 +834,9 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # LAB_REACH of the victim. Any other human unit in reach leaves the hit ambiguous.
         near = [k for k, u in units.items()
                 if u[1] == human and hp.get(k, 1) > 0 and math.hypot(u[2] - v[2], u[3] - v[3]) <= LAB_REACH]
-        return near == [uid]
+        # A drop seen across a sampling gap may have come from a unit that left reach meanwhile.
+        return near == [uid] and gaps_of.get(vid, {}).get(sf, 1) == 1
+    unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
@@ -844,7 +868,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         at = {f['sf']: f['units'] for f in series['frames']}
         su, vu = at[sf0].get(uid), at[sf0].get(v0)
         rng = math.hypot(su[2] - vu[2], su[3] - vu[3]) if su and vu else None
-    gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:])]
+    # Cooldown intervals never span an ambiguous hit: it may have been the subject's.
+    gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:]) if not any(a[0] < sf < b[0] for sf in unclear)]
     hp_hits = [d for _, _, d in landed if d]
     result = {
         'hits': len(landed), 'ambiguous_hits': ambiguous, 'damage_values': sorted(set(hp_hits)),
@@ -975,12 +1000,15 @@ def lab_attack_gba(spec):
                                ('survival', 'lab.survival')):
                 if m[key] is not None:
                     values[check] = m[key]
+            if not m.get('taken_single', False) and 'lab.counter_damage' in values:
+                # Hits taken from several enemies in reach cannot stand for one enemy's damage.
+                values['lab.counter_damage'] = ABSENT
             # Exact checks hold for every hit, not the median: submit the GBA hit furthest from
             # the N64 value, so one wrong hit among right ones still fails.
             n64 = {obs['check']: obs['value'] for obs in golden['observations']
                    if obs['gating'] and obs['lo'] == obs['hi']}
             for check, sizes in (('lab.damage', m['damage_values']), ('lab.shield_damage', m['shield_values']),
-                                 ('lab.counter_damage', m['counter_values'])):
+                                 ('lab.counter_damage', m['counter_values'] if m.get('taken_single') else [])):
                 if sizes and check in n64:
                     values[check] = max(sizes, key=lambda v: (abs(v - n64[check]), v))
         measured = dict(m or {}, error=err)
@@ -1029,7 +1057,9 @@ for _spec in LAB_SPECS:
     # world_points: the measurement replays the points the tape's orders were given at, so every
     # run of a bundle must agree on them (tools/parity_decode.py write_golden).
     SCENARIOS[_spec['id']] = {'title': _spec['title'], 'measure_n64': _make[0](_spec), 'measure_gba': _make[1](_spec),
-                              'profile': _spec['profile'], 'runner': _spec['runner'], 'world_points': True}
+                              'profile': _spec['profile'], 'runner': _spec['runner'], 'world_points': True,
+                              # 2: order-byte checks, single-attacker hits, observed-order replay.
+                              'decoder_revision': 2}
 
 
 # ---- passive train and build lab (Blood Bath computers) ---------------------

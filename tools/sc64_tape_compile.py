@@ -560,11 +560,12 @@ def compile_step(tape, step):
             if 'row' in step:   # the first row in the selection list
                 row, _ = field_of(f'{step["row"]}:4')
                 tape.until(SELECTION, 4, 'eq', row, 30)
-            count = integer(step.get('count', 1), 'count', 1, 12)
-            # Exactly `count` units: slot count-1 filled and slot count empty.
-            tape.until(SELECTION + 4 * (count - 1), 4, 'ne', 0, 30)
-            if count < 12:
-                tape.until(SELECTION + 4 * count, 4, 'eq', 0, 1)
+            if 'count' in step:
+                count = integer(step['count'], 'count', 1, 12)
+                # Exactly `count` units: slot count-1 filled and slot count empty.
+                tape.until(SELECTION + 4 * (count - 1), 4, 'ne', 0, 30)
+                if count < 12:
+                    tape.until(SELECTION + 4 * count, 4, 'eq', 0, 1)
         elif tape.legacy_selection:
             tape.until(SELECTION, 4, 'ne', 0, 30)
         else:
