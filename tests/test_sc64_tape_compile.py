@@ -271,7 +271,7 @@ class CompileTest(unittest.TestCase):
         self.assertIn('until 800C0C14 4 eq 0 1 0 0 0', out)    # and slot 5 is empty
         # Nothing selected before the drag, so a failed drag never leaves a stale group.
         empty = out.index('until 800C0C00 4 eq 0 1 0 0 0')
-        self.assertLess(empty, next(i for i, line in enumerate(out) if line.startswith('untilw') and ' 4096 ' not in line and i > empty))
+        self.assertEqual(out[empty + 1], f'{tc.PRESS_HOLD} {tc.BUTTONS["a"]} 0 0')   # right before A goes down
         legacy = lines(scenario([{'op': 'box', 'from': [150, 100], 'to': [225, 182]}], legacy_selection=True))
         self.assertNotIn('until 800C0C00 4 eq 0 1 0 0 0', legacy)
 
@@ -507,6 +507,65 @@ class LabMeasureTest(unittest.TestCase):
         for check in ('lab.damage', 'lab.cooldown', 'lab.counter_damage'):
             self.assertNotIn(check, result['values'])
 
+    def test_a_fight_without_a_usable_value_is_judged_afresh(self):
+        import sc64_parity
+        obs = [metrics.observation('lab.cooldown', 'Marine', 15, 14, 16, '+-1', True, [], provenance='n64-ram', n_runs=2),
+               metrics.observation('lab.survival', 'Marine', 50, 46, 54, '+-4', True, [], provenance='n64-ram', n_runs=2)]
+        golden = {'observations': obs}
+        baseline = {f'lab-x:{o["check"]}:{o["subject"]}': {'gba': metrics.ABSENT} for o in obs}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35) if t <= sf]) for sf in range(0, 80)}
+        drone = {sf: 40.0 - 6 * len([t for t in (28,) if t <= sf]) for sf in range(0, 80)}
+        report = {'subject': 1, 'lab': [[5, 4, 1, -1]]}
+        spec = {'foe_type': metrics.ZERGLING}
+        # Two clean hits split by a nearby Drone's drop: no interval, no ambiguous hit, a fight.
+        fought = walk(pos, hp={1: marine, 2: ling, 4: drone},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (4, metrics.DRONE, 4, 160, 100)])
+        result, _ = metrics.lab_attack_gba(spec)(fought, golden, report)
+        self.assertEqual(result['measured']['ambiguous_hits'], 0)
+        self.assertEqual(result['measured']['inconclusive'], ['lab.cooldown'])
+        verdicts = {r['check']: r['verdict'] for r in sc64_parity.judge('lab-x', golden, result['values'], {}, baseline)}
+        self.assertEqual(verdicts['lab.cooldown'], 'REGRESSION')   # never the no-fight KNOWN
+        self.assertEqual(verdicts['lab.survival'], 'KNOWN')        # it did not die: a real absence
+        # The control: no fight at all keeps the no-fight baseline.
+        calm = walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 80)}},
+                    others=[(2, metrics.ZERGLING, 4, 600, 100)])
+        result, _ = metrics.lab_attack_gba(spec)(calm, golden, report)
+        verdicts = {r['check']: r['verdict'] for r in sc64_parity.judge('lab-x', golden, result['values'], {}, baseline)}
+        self.assertEqual(set(verdicts.values()), {'KNOWN'})
+
+    def test_spawned_enemies_and_buildings_split_the_timing(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35) if t <= sf]) for sf in range(0, 80)}
+        egg = {sf: (5.0 if sf < 30 else 0.0) for sf in range(25, 80)}   # born at 25, killed at 30
+        series = walk(pos, hp={1: marine, 2: ling, 3: egg},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, metrics.DRONE, 4, 160, 100)])
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
+        # A GBA enemy building destroyed between the two hits.
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        for frame in series['frames']:
+            frame['buildings'] = {7: (4, 600, 100)} if frame['sf'] < 28 else {}
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
+
+    def test_an_unresolved_first_hit_withholds_the_range(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        series['frames'][20]['units'][5] = (metrics.MARINE, 1, 200, 100)   # a rival at the first hit only
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['hits'], m['range_first'], m['first_hit']), (2, None, None))
+
+    def test_damage_taken_across_a_type_change(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 - 5 * len([t for t in (20, 30) if t <= sf]) for sf in range(0, 80)}
+        ling = {sf: 35.0 for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 130, 100)])
+        series['frames'][19]['units'][2] = (metrics.DRONE, 4, 130, 100)   # the row was a Drone before the hit
+        self.assertFalse(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['taken_single'])
+
     def test_gap_and_ambiguous_hits_never_set_timing(self):
         frames = [sf for sf in range(0, 80) if sf != 34]   # frame 34 was never sampled
         pos = {sf: (100, 100) for sf in frames}
@@ -583,6 +642,16 @@ class LabMeasureTest(unittest.TestCase):
         ok, seen = metrics.n64_order_after(Unread, 9, 103, metrics.ORDER_MOVE)
         self.assertIsNone(ok)
         self.assertEqual(seen, ['the order at the press was not read'])
+
+        class Wrapped(Cap):   # the counter wraps between the read pre-press tick and the press
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 0xFFFFFFFF, 3), (103, 0, 3), (106, 1, 6))]
+            change_steps = {0xFFFFFFFF: 99, 0: 102, 1: 105}
+        self.assertEqual(metrics.n64_order_after(Wrapped, 9, 103, metrics.ORDER_MOVE)[0], 6)
+
+        class WrappedUnread(Cap):   # ... and the tick that began at the wrap was never read
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 0xFFFFFFFF, 3), (106, 1, 6))]
+            change_steps = {0xFFFFFFFF: 99, 0: 102, 1: 105}
+        self.assertIsNone(metrics.n64_order_after(WrappedUnread, 9, 103, metrics.ORDER_MOVE)[0])
 
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},

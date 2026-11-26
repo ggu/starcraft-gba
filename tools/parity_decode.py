@@ -272,7 +272,7 @@ class Capture:
         self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0,
                        'skipped_ticks': 0, 'unexplained_skips': 0, 'interior_missing': 0}
         skips = []   # (record index, skipped tick values) for ticks that began and ended inside one step
-        change = {}
+        change, change_all = {}, []
         chain = hashlib.sha256()
         last_tick = None
         self.regions, self.extra, extra_faults, joined = [], {}, 0, set()
@@ -293,6 +293,7 @@ class Capture:
                 # The change record a follow-up read belongs to is the latest one
                 # for its tick (a tick value can repeat if the counter restarts).
                 change[head['tick']] = head
+                change_all.append(head)   # every one, in capture order, for the leading-read check
                 continue
             if not head['flags'] & FLAG_ROWS:
                 continue
@@ -377,8 +378,10 @@ class Capture:
             first = change.get(self.ticks[0]['tick'])
             first_step = first['step'] if first is not None else self.ticks[0]['step']
             joined_lead = {id(head) for head in leading}
+            # Every change record in capture order: a tick value repeated by a counter restart
+            # before the first follow-up is counted, not hidden behind its later twin.
             self.faults['unexplained_skips'] += sum(
-                1 for head in change.values()
+                1 for head in change_all
                 if head['flags'] & FLAG_TABLE and head['step'] < first_step and id(head) not in joined_lead)
             for head in leading:
                 self.faults['skipped_ticks'] += 1

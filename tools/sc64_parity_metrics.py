@@ -692,8 +692,9 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     # The window starts at the last tick that began at or before the press. When that tick has
     # no follow-up read (it began and ended inside one step), the order at the press is not
     # observed: a change in that tick could pass for the press, so the check is inconclusive.
-    began = [t for t, at in getattr(cap, 'change_steps', {}).items() if at <= step]
-    if began and max(began) != tick0:
+    # The latest change read by frontend step, not by tick value (the counter can wrap).
+    began = [(at, t) for t, at in getattr(cap, 'change_steps', {}).items() if at <= step]
+    if began and max(began)[1] != tick0:
         return None, ['the order at the press was not read']
     seen = []
     for record in cap.ticks:
@@ -799,12 +800,20 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     if own[-1][0] < last_sf or own[-1][1] <= 0:
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
     end = death if death is not None else last_sf
+    window = [f for f in series['frames'] if t0 <= f['sf'] <= end]
+    # Every row seen during the fight, with the first frame it was seen on: a unit born after
+    # the command (a spawned enemy) is a victim, a barrier and a rival like any other.
+    seen = {}
+    for frame in window:
+        for vid in frame['units']:
+            seen.setdefault(vid, frame)
+
     def enemy(vid):
-        unit = first['units'][vid]
+        unit = seen[vid]['units'][vid]
         return (unit[1] != human and unit[1] < 8 and
-                (foe_type is None or cartridge_type(first, vid, unit_raw) == foe_type))
+                (foe_type is None or cartridge_type(seen[vid], vid, unit_raw) == foe_type))
     victims = {}
-    for vid in first['units']:
+    for vid in seen:
         if not enemy(vid):
             continue
         got = hits(hp_track(series, vid, t0, end))
@@ -812,7 +821,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
             victims[vid] = got
     # Shields take hits before hit points; a victim's shield drops are hits of their own.
     shielded = {}
-    for vid in first['units']:
+    for vid in seen:
         if not enemy(vid):
             continue
         got = hits(hp_track(series, vid, t0, end, key='shield'), lethal=True)
@@ -860,20 +869,21 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     # unit outside the configured foe between two hits), and so do their other drops while
     # they are within reach of the subject.
     def any_enemy(vid):
-        unit = first['units'][vid]
+        unit = seen[vid]['units'][vid]
         return unit[1] != human and unit[1] < 8
 
     def near_subject(sf, vid):
         units = at_frame.get(sf, {}).get('units', {})
         me, v = units.get(uid), units.get(vid)
         return me is not None and v is not None and math.hypot(v[2] - me[2], v[3] - me[3]) <= LAB_REACH
-    for vid in first['units']:
+    for vid in seen:
         if not any_enemy(vid) or enemy(vid):
             continue
         for key in ('hp', 'shield'):
             track_ = hp_track(series, vid, t0, end, key=key)
             unclear.update(sf for sf, _ in hits(track_, lethal=True) if near_subject(sf, vid) or near_subject(sf - 1, vid))
-    for vid in first['units']:
+    foe_kills = set()
+    for vid in seen:
         if not any_enemy(vid):
             continue
         track_ = hp_track(series, vid, t0, end)
@@ -883,8 +893,17 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # Every kill splits the timing, the subject's own included: the killing hit is never in
         # the hit list (see hits), so an interval across it, or touching it, would skip a shot.
         barriers.update(events)
+        if enemy(vid):
+            foe_kills.update(events)
+    # GBA buildings carry no hit points in the series: an enemy building that disappears
+    # during the fight was destroyed, and splits the timing too.
+    for before_, after_ in zip(window, window[1:]):
+        for k, b in before_.get('buildings', {}).items():
+            if b[0] != human and b[0] < 8 and k not in after_.get('buildings', {}):
+                barriers.add(after_['sf'])
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
+    victims_all, shielded_all = victims, shielded
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
     shielded = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in shielded.items()}
     shield_hits = sorted((sf, vid, round(d)) for vid, got in shielded.items() for sf, d in got)
@@ -896,12 +915,13 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
 
     def single_foe(sf):
         # The same single living enemy in reach on the sample before the drop and on the one
-        # that shows it, and a unit of the configured foe type: a lone building, or another
-        # enemy type, never stands for the foe's damage.
+        # that shows it, and a unit of the configured foe type on both: a lone building, another
+        # enemy type, or a row that changed type in between never stands for the foe's damage.
         one = sole_foe(sf)
         if one is None or one != sole_foe(sf - 1) or isinstance(one, tuple):
             return False
-        return foe_type is None or cartridge_type(at_frame.get(sf, first), one, unit_raw) == foe_type
+        return foe_type is None or all(cartridge_type(at_frame[s], one, unit_raw) == foe_type
+                                       for s in (sf - 1, sf) if s in at_frame)
 
     def sole_foe(sf):
         frame = at_frame.get(sf, {})
@@ -922,7 +942,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     first_taken = next((sf for sf, _ in hits(own, lethal=True)), None)
     # What the subject took is measured even when it never lands a hit.
     rng = sf0 = None
-    if landed:
+    # The first hit's range and time stand only when no earlier foe drop or kill could have
+    # been the subject's first shot.
+    foe_unclear = {sf for vid, got in list(victims_all.items()) + list(shielded_all.items())
+                   for sf, _ in got if not ours(sf, vid)}
+    earlier = min(foe_unclear | foe_kills, default=None)
+    if landed and (earlier is None or earlier > landed[0][0]):
         sf0, v0, _ = landed[0]
         at = {f['sf']: f['units'] for f in series['frames']}
         su, vu = at[sf0].get(uid), at[sf0].get(v0)
@@ -944,10 +969,13 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # its first hit taken is the death itself, as on the N64.
         'survival': (death - (first_taken if first_taken is not None else death)) if death is not None else None,
         'death': (death - t0) if death is not None else None,
+        # Evidence that a fight happened: any drop or kill of the foe, or any hit on the subject
+        # (its death included). With it, a check left without a value is inconclusive, never absent.
+        'combat': bool(victims_all or shielded_all or foe_kills or hits(own, lethal=True) or death is not None),
         # A dying N64 row outlives its hit points (16 frames for a Marine); a GBA row goes in
         # the step of the killing hit, so that hit leaves no hit-point record there. A victim
         # counts as killed when its points reach 0 or its row is gone before the end.
-        'victims': {str(v): {'type': first['units'][v][0], 'hits': len(g),
+        'victims': {str(v): {'type': seen[v]['units'][v][0], 'hits': len(g),
                              'killed': (lambda tr: not tr or tr[-1][1] <= 0 or tr[-1][0] < end)(
                                  hp_track(series, v, t0, end))}
                     for v, g in victims.items()},
@@ -1076,12 +1104,11 @@ def lab_attack_gba(spec):
         # those checks get no value (a gating REGRESSION, "not measured"), never ABSENT, which
         # a baseline recording no fight would otherwise accept.
         inconclusive = set()
-        if m is not None:
-            if m['ambiguous_hits']:
-                inconclusive |= {'lab.damage', 'lab.shield_damage', 'lab.cooldown', 'lab.range_first',
-                                 'lab.first_hit'} - set(values)
-            if m['taken'] and not m.get('taken_single', False):
-                inconclusive.add('lab.counter_damage')
+        if m is not None and m['combat']:
+            # Survival is the one check whose absence is an outcome: the subject did not die.
+            inconclusive = {obs['check'] for obs in golden['observations']} - set(values)
+            if m['death'] is None:
+                inconclusive.discard('lab.survival')
         inconclusive &= {obs['check'] for obs in golden['observations']}
         measured['inconclusive'] = sorted(inconclusive)
         missing = absent_values(golden, values)
