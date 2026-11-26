@@ -26,7 +26,10 @@ markers and re-exports its own SRAM byte for byte after HOME loads.
 The three differing pairs all use the Z10 cartridge. The chosen
 human and occupied CPU races agree. Their start orders differ as
 shown below. Blood Bath derives its start draw from elapsed guest
-milliseconds at confirmation.
+milliseconds at confirmation. Each differing save was also loaded
+on the other revision. All six directions restored the writing
+revision’s start markers and matched 60 further updates, with
+byte-identical SRAM re-export.
 
 | Human | CPU rows | #913 start order | #942 start order |
 | --- | --- | ---: | ---: |
@@ -75,3 +78,22 @@ isolates the defense change.
 The private timing receipt has SHA-256
 `c7966452ce1f1f75ce16465c2572ec6749f560275dbe602babd210bb54c3a859`.
 Hardware tests and the 30 fps goal remain open.
+
+
+## Full matches on the new package
+
+The public full-match matrix authored two new win tapes against
+the current release. Physical ARM replay confirmed the
+Terran Outpost win against one Zerg CPU at world frame 32,082.
+All 251 whole-match checkpoints and 116 fresh-pause continuation
+checkpoints passed. Both runs wrote the same victory SRAM, and
+fresh HOME loaded its victory screen and state. The uninterrupted
+match averaged 21.21 emulated calls/s and the tail after the pause
+averaged 19.79.
+
+The Protoss Blood Bath Melee win against Terran and Zerg reached
+world frame 23,371 with physical inputs and wrote its pause and
+victory journals. The first fresh-pause continuation hit the
+headless backend’s 60-second command timeout. A separate
+continuation from that retained pause save checks only the
+unfinished phase.
