@@ -38,7 +38,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   these journals for regression checks as shared engine changes land.
   The newer `c23009f8` package passed 30 result loads and all four binaries
   have 27 checked Custom Game launches, save loads and continuations apiece.
-  Prioritize ground orders in P4 and crowded three-AI windows. In P6,
+  In P4, [grouped contact rescue](audits/2026-11-26-p4-rescue-roster.md)
+  saves 2.66% of linked victory replay cycles with the same ownership
+  transfers and fresh victory SRAM. The two busy windows build zero
+  ground route fields. Prioritize target acquisition and target index
+  rebuilds in P4 and check crowded three-AI windows. In P6,
   the merged burrow optimization raised the full mission replay from 15.55 to
   16.92 updates/s. Trigger validation took it to 17.32, and trap filtering
   to 17.89 with the same victory save. Keep profiling remaining simulation
