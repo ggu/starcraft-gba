@@ -20,7 +20,7 @@ GBA defect, not an accepted gap.
 | `./dev parity` | Exit 0 against the baseline |
 
 The largest defects: every GBA economy still gathers faster than the N64's
-(the passive human 1.2–1.5x, computers 1.3–1.7x at 2,000 frames, up to 2.7x
+(at 1,000–2,000 frames the passive human 1.2–1.5x, computers 1.3–1.7x, up to 2.7x
 against the rushing Zerg; before #986 it was about 2x); each computer race
 follows a different build order; the N64 Zerg computer has a 9-pool rush
 that the GBA never plays; and in 12 of the 16 N64 matches that ended in the
@@ -297,12 +297,13 @@ to the shared ones, and none is stale.
 | `build.first.<Type>` | 153 | 9 | 80 | 29 | 35 | 13 | 157 |
 | `supply.used@T` | 77 | 22 | 21 | 19 | 15 | 11 | 66 |
 | `supply.cap@T` | 64 | 15 | 7 | 37 | 5 | 0 | 49 |
-| `workers@T` | 78 | 16 | 12 | 33 | 17 | 4 | 66 |
+| `workers@T` | 78 | 16 | 11 | 34 | 17 | 4 | 66 |
 | `attack.first_wave` | 13 | 0 | 3 | 3 | 7 | 0 | 13 |
 | `result.human_defeated` | 13 | 0 | 0 | 11 | 2 | 0 | 13 |
-| All | 564 | 68 | 283 | 132 | 81 | 28 | 524 |
+| All | 564 | 68 | 282 | 133 | 81 | 28 | 524 |
 
-"Narrowed" and "widened" compare the distance from the N64 band; the two
+"Narrowed" and "widened" compare the distance from the N64 band (a value
+that moved to the same distance on the other side counts as unchanged); the two
 attack lines that changed outcome count by which side of the band they
 moved to (`sk-tvt-w0`'s Terran now attacks at 10,084, closer than never;
 `sk-zvt-w0`'s no longer attacks within the N64 run). Every mineral total
@@ -320,18 +321,23 @@ unchanged): every one is a GBA behaviour the N64 captures contradict. The
 109 widened or new lines, by defect:
 
 - **Protoss tech (defects 3 and 6), 24 lines:** with slower income the GBA
-  Protoss reaches its Cybernetics Core and Assimilator earlier and adds a
-  Stargate in all five 1v1s, a Fleet Beacon in two and Scouts in two; the N64
-  Protoss builds none of these within the run. It also has more Probes and
-  supply after 6,000 frames (15 lines).
+  Protoss places its Assimilator earlier (5 lines) and builds a Cybernetics
+  Core (4) and Dragoons (3) sooner, and adds a Stargate in all five 1v1s
+  (5), a Fleet Beacon in two (2) and Scouts in two (2). In `sk-ffa-w37`,
+  where the N64 Protoss falls at 4,775 before building any of them, the GBA
+  Protoss now builds an Assimilator, a Cybernetics Core and a Shield Battery
+  (3). The N64 Protoss builds none of the Core,
+  Dragoon, Stargate, Fleet Beacon or Scout within the run. It also has more
+  supply used at 4,000 frames once (1 line) and more Probes and supply at
+  6,000–8,000 (14).
 - **Terran opening (defect 2), 17 lines:** the Depot-first order makes the
   Barracks and first Marine wait longer for 150 minerals (12), and the
   Bunker and Factory move a few frames further out (5). The GBA Terran also
   has more SCVs and supply after 6,000 frames (13 lines).
 - **Zerg Drones and Overlords (defects 4 and 5), 31 lines:** one Drone more
-  and more supply used at 1,000–2,000 frames (16), fewer Drones and
-  Overlords at 6,000 and later (8), the Creep Colony later (4) and the Pool
-  3–40 frames further out (3).
+  and more supply used at 1,000–4,000 frames (17), fewer Drones and
+  Overlords at 6,000 (7), the Creep Colony later (4) and the Pool 3–40
+  frames further out (3).
 - **Timings (defects 8 and 9), 9 lines:** Protoss and Terran waves 10–80
   frames later than before (and `sk-zvt-w0`'s Terran no longer attacks
   within the run), the late-pool Zerg's 60–90 frames earlier, and two human
@@ -342,12 +348,15 @@ unchanged): every one is a GBA behaviour the N64 captures contradict. The
 Each line is a GBA defect against the N64 ROM, with its numbers above. All
 are baseline lines (`tools/parity/baseline.json`, GBA values).
 
-1. **Mining rate 1.2–1.7x (all races, all players).** Minerals gathered at
-   every checkpoint and the per-worker-count rates run 1.2–1.5x the N64's
-   for the passive human and 1.3–1.7x for the computers (up to 2.7x against
-   the rushing Zerg, which mines with fewer Drones). The S4 first delivery
-   comes at 105 against 154 frames. Before the N64 mining time (#986) the
-   ratio was 1.8–2.6x.
+1. **Mining rate faster (all races, all players).** The passive human
+   gathers 1.2–1.5x the N64's at every checkpoint, and 1.2–1.4x per frame
+   with 4 workers. The computers gather 1.3–1.7x at 1,000 and 2,000 frames,
+   up to 2.7x against the rushing Zerg, which mines with fewer Drones. At
+   6,000–8,000 frames the late-pool Zerg's gap narrows to 1.1–1.2x, while the Terran and
+   Protoss computers, with more workers, stay at 1.5–1.8x. The S4 first
+   delivery comes at 105 against 154 frames. Before the N64 mining time
+   (#986) the ratio at 2,000 frames was 1.8–2.6x, and up to 4.1x against
+   the rushing Zerg.
 2. **Terran build order.** The GBA builds the Supply Depot first (844–950)
    and the Barracks second (1,676–1,705); the N64 builds the Barracks first
    (1,292–1,504) and the Depot at 1,796–2,114. With slower income the GBA
