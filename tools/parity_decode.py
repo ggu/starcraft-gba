@@ -371,6 +371,9 @@ class Capture:
             while nxt is not None and lead in change and nxt['step'] == change[lead]['step'] + 1:
                 leading.insert(0, change[lead])   # walk back through contiguous change-only ticks
                 nxt, lead = change[lead], (lead - 1) & 0xFFFFFFFF
+            # An earlier in-mission change read not contiguous with them cannot be placed.
+            if lead in change and change[lead]['flags'] & FLAG_TABLE:
+                self.faults['unexplained_skips'] += 1
             for head in leading:
                 self.faults['skipped_ticks'] += 1
                 if head['pause'] == 0 and head['flags'] & FLAG_TABLE:
@@ -379,6 +382,8 @@ class Capture:
                 extra[0] = sorted(extra.get(0, []))
         # Unpaused clock: one source frame per tick whose change-step read
         # showed no pause; numbered from the first in-mission (table) tick.
+        # Tick -> frontend step of its change read, for order windows anchored on the press.
+        self.change_steps = {t: h['step'] for t, h in change.items()}
         clock = -1
         self.skipped_frames = []   # (frontend step of the change read, source frame) of skipped ticks
         for index, record in enumerate(self.ticks):

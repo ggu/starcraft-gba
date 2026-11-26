@@ -689,6 +689,10 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     if not before:
         return None, []
     prior, tick0 = cap.unit(before[-1]['rows'][row], 'order'), before[-1]['tick']
+    # The window starts at the last tick that began at or before the press, read or not.
+    began = [t for t, at in getattr(cap, 'change_steps', {}).items() if at <= step]
+    if began:
+        tick0 = max(tick0, max(began))
     seen = []
     for record in cap.ticks:
         if record['step'] - 1 <= step:
@@ -841,8 +845,14 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
     # A killing drop leaves no exact damage, but when it is not clearly the subject's it still
     # splits the timing: no cooldown interval may span it.
-    for vid in victims:
-        for sf, _ in hits(hp_track(series, vid, t0, end), lethal=True):
+    for vid in first['units']:
+        if not enemy(vid):
+            continue
+        track_ = hp_track(series, vid, t0, end)
+        events = [sf for sf, _ in hits(track_, lethal=True)]
+        if track_ and track_[-1][0] < end and track_[-1][1] > 0:
+            events.append(track_[-1][0] + 1)   # a GBA row removed by a hit the trace never shows
+        for sf in events:
             if not ours(sf, vid):
                 unclear.add(sf)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
@@ -857,18 +867,23 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     taken = [(sf, round(d)) for sf, d in hits(own)]
 
     def single_foe(sf):
-        # Exactly one living enemy row (buildings included where the series holds them) in reach.
+        # The same single living enemy (a row, or a GBA building) in reach on the sample before
+        # the drop and on the one that shows it.
+        one = sole_foe(sf)
+        return one is not None and one == sole_foe(sf - 1)
+
+    def sole_foe(sf):
         frame = at_frame.get(sf, {})
         units, hp = frame.get('units', {}), frame.get('hp', {})
         me = units.get(uid)
         if me is None:
-            return False
+            return None
         near = [k for k, u in units.items() if u[1] != human and u[1] < 8 and hp.get(k, 1) > 0
                 and math.hypot(u[2] - me[2], u[3] - me[3]) <= LAB_REACH]
         # GBA buildings live outside the unit rows (the N64 table holds them as rows already).
         near += [('B', k) for k, b in frame.get('buildings', {}).items()
                  if b[0] != human and b[0] < 8 and math.hypot(b[1] - me[2], b[2] - me[3]) <= LAB_REACH]
-        return len(near) == 1
+        return near[0] if len(near) == 1 else None
     own_gaps = drop_gaps(own)
     # Each hit taken must come between consecutive samples with one enemy in reach.
     taken_single = all(single_foe(sf) and own_gaps.get(sf, 1) == 1 for sf, _ in taken)
