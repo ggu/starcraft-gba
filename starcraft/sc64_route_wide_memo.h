@@ -31,6 +31,7 @@ static void sc64_wide_copy_field(u8 *dst, const u8 *src)
     }
     CopyWord *out = (CopyWord *)(void *)dst;
     const CopyWord *in = (const CopyWord *)(const void *)src;
+#pragma GCC unroll 4
     for (unsigned i = 0; i < SC64_MEMO_BYTES / sizeof(*in); ++i)
         out[i] = in[i];
 }
