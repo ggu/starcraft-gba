@@ -25,8 +25,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   all 30 earned campaign victories (ten per race). All observed
   result worlds, SRAM re-exports and chapter advances matched the standard
   cartridges used to earn them. Seven missions also passed full packaged replays
-  (T9–T10, Z8–Z10, P9–P10). Extend ordinary-input package coverage to
-  the earlier chapters, prioritizing timing-sensitive routes.
+  (T9–T10, Z8–Z10, P9–P10). T1–T5 and Z3 now also pass packaged route
+  replay, with guest-cycle measurements. Profile the slower T4, T5 and Z3
+  cases alongside crowded skirmishes.
   [Results and reproduction](audits/2026-11-26-packaged-campaign-results.md).
 
 - **Custom Game defense targeting.** Skipping cells that contain only friendly

@@ -53,5 +53,26 @@ corresponding victory earned on the standard cartridge byte for byte.
 
 The P10 run consumed the P9 save exported by the packaged ROM. T10, Z9 and Z10
 consumed standard-cartridge predecessor journals that matched the separately
-replayed packaged victories byte for byte. The remaining 23 missions have
-full-play evidence on the standard cartridges and result-load evidence on the package.
+replayed packaged victories byte for byte. See below for additional packaged mission runs.
+
+## Early mission pacing on the packaged cartridges
+
+The packaged Terran ROM started T1 from erased SRAM and used each exported
+victory to start T2 through T4. T5 loaded the identical T4 journal from
+the standard cartridge and completed its 39-stage paid-production route.
+The packaged Zerg ROM also completed Z3 from an earned Z2 victory.
+All six fresh victory exports matched the standard cartridge byte for byte.
+
+| Chapter | Main-loop updates | Standard updates/s | Packaged updates/s |
+|---|---:|---:|---:|
+| T1 | 10,195 | 29.46 | 29.46 |
+| T2 | 29,414 | 29.48 | 29.48 |
+| T3 | 54,022 | 29.18 | 29.18 |
+| T4 | 8,975 | 24.60 | 24.60 |
+| T5 | 146,309 | 24.59 | 24.59 |
+| Z3 | 69,243 | 23.51 | 23.51 |
+
+The emulator measured guest-clock cycles across each recorded route, including
+menu, save and load inputs. T1–T3 approach 30 main-loop updates/s; T4, T5
+and Z3 are slower. The figures do not measure display refreshes or GBA SP
+hardware and do not predict a crowded three-AI match.
