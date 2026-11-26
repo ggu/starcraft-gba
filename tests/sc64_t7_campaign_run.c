@@ -235,6 +235,8 @@ static int order_unit(int slot,int x,int y)
           slot,cx,cy,x,y);return 0;
     }
     tap(KEY_A);
+    /* A player order lands after the N64 command delay (sc64_command_delay.h). */
+    for(int k=0;k<SC64_COMMAND_DELAY_UPDATES&&u[slot].alive&&u[slot].order!=ORDER_MOVE;k++)step(0);
     if(!u[slot].alive||u[slot].order!=ORDER_MOVE){
         fprintf(stderr,"T7 move command not registered slot=%d alive=%d order=%d at=%d,%d intended=%d,%d cursor=%d,%d\n",
           slot,u[slot].alive,u[slot].order,u[slot].x,u[slot].y,x,y,cx,cy);
@@ -1007,10 +1009,13 @@ static int controller_air_deliver_emitter(int emitter)
         if(dist2(u[ship].x,u[ship].y,wx,wy)<12*12)continue;
         if(!order_unit(ship,wx,wy))return 0;
         int arrived=0;
+        /* Issue the next leg before the ship stops: a player order lands after the
+           N64 command delay, so give it a lookahead of the delay's travel. */
+        const int lookahead=12+SC64_COMMAND_DELAY_UPDATES*2;
         for(int t=0;t<4000&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++){
             step(0);
             if(!u[ship].alive||!u[carrier].alive)return 0;
-            if(dist2(u[ship].x,u[ship].y,wx,wy)<12*12){arrived=1;break;}
+            if(dist2(u[ship].x,u[ship].y,wx,wy)<lookahead*lookahead){arrived=1;break;}
         }
         if(!arrived){
             fprintf(stderr,"T7 Dropship waypoint timeout ship=%d at=%d,%d target=%d,%d order=%d tx=%d ty=%d leg=%d\n",

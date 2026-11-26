@@ -750,9 +750,13 @@ static int fleet_order(int attack, int x, int y)
     if (!selected) { failed_action = 1; return 0; }
     order_selection(attack, x, y);
     int ordered = 0;
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (is_wraith(i) && u[i].selected &&
-            u[i].order == (attack ? ORDER_ATTACK_MOVE : ORDER_MOVE)) ++ordered;
+    /* A player order lands after the N64 command delay (sc64_command_delay.h). */
+    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES && !ordered; ++k) {
+        if (k) step(0);
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (is_wraith(i) && u[i].selected &&
+                u[i].order == (attack ? ORDER_ATTACK_MOVE : ORDER_MOVE)) ++ordered;
+    }
     if (verbose)
         fprintf(stderr, "T9 fleet %s to=%d,%d ordered=%d/%d tick=%u\n",
                 attack ? "attack" : "move", x, y, ordered, selected, (unsigned)host_tick);
