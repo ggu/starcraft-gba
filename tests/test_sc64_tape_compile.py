@@ -357,8 +357,9 @@ class LabRunnerArgsTest(unittest.TestCase):
         self.assertEqual(series['frames'][1]['units'][3][2:], (202, 100))
         self.assertIn(('+U', 1, 3, 7, 1), series['events'])
         self.assertIn(('B', 1, 2, 0, 1, 0, 1, 1, 0), series['events'])
-        # owner, x, y, hp, shields, max hp, engine type, cartridge type, under construction
-        self.assertEqual(series['frames'][0]['buildings'][2], (1, 600, 600, 1500, 0, 1500, 0, -1, 0))
+        # owner, x, y, hp, shields, max hp, engine type, cartridge type, under construction, live owner
+        self.assertEqual(series['frames'][0]['buildings'][2], (1, 600, 600, 1500, 0, 1500, 0, -1, 0, 1))
+        self.assertEqual(series['frames'][0]['live'], {3: 1})
 
     def test_gba_series_reads_weapon_hits_and_capacities(self):
         trace = '\n'.join([
@@ -996,6 +997,59 @@ class LabMeasureTest(unittest.TestCase):
             series['events'] = [('-B', 35, 7, 0, 0)]
             series['removals'] = [('B', 35, 7, owner, 900, 900, 5, 500, 5, -1, 0, 34, 0)]
             self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], gaps)
+
+    def test_live_owners_and_damage_records(self):
+        import sc64_parity
+        obs = [metrics.observation(c, 'Marine', v, v - 1, v + 1, '+-1', True, [], provenance='n64-ram', n_runs=2)
+               for c, v in (('lab.cooldown', 15), ('lab.damage', 6))]
+        golden = {'observations': obs}
+        report = {'subject': 1, 'lab': [[5, 4, 1, -1]]}
+        spec = {'foe_type': metrics.ZERGLING}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        calm_ling = {sf: 35.0 for sf in range(0, 80)}
+        wounded = {sf: 40.0 - 6 * (sf >= 28) for sf in range(0, 80)}
+
+        def measured(series):
+            return metrics.lab_attack_gba(spec)(series, golden, report)[0]['measured']
+        # A rescued unit keeps its cartridge owner (4) but fights for the human (live owner 0):
+        # in reach of the wounded Drone it is a second attacker, so the drop is unattributed.
+        series = as_gba(walk(pos, hp={1: marine, 2: calm_ling, 4: wounded, 5: marine},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100),
+                                     (5, metrics.MARINE, 4, 220, 100)]))
+        for frame in series['frames']:
+            frame['live'] = {1: 0, 2: 3, 4: 3, 5: 0}
+        m = measured(series)
+        self.assertEqual((m['off_target'], m['inconclusive']), ([], ['lab.cooldown', 'lab.damage']))
+        # Weapon-hit records count whatever the sampled hit points show: on an enemy building in
+        # reach (its hit points offset by repair), on the foe, or on the subject.
+        def quiet(hits_, building=False):
+            series = as_gba(walk(pos, hp={1: marine, 2: calm_ling}, others=[(2, metrics.ZERGLING, 4, 900, 100)]))
+            for frame in series['frames']:
+                frame['buildings'] = {7: (4, 200, 100, 500, 0, 1500, 3, 154, 0, 3)} if building else {}
+            series['hits'], series['max_units'] = hits_, 100
+            return measured(series)
+        self.assertEqual(quiet([], building=True)['combat'], False)
+        m = quiet([(35, 107, 6, 0, 0)], building=True)
+        self.assertEqual((m['combat'], m['foe_combat'], m['off_target']), (True, False, ['lab.cooldown', 'lab.damage']))
+        m = quiet([(35, 2, 6, 0, 0)])
+        self.assertEqual((m['foe_combat'], m['inconclusive']), (True, ['lab.cooldown', 'lab.damage']))
+        m = quiet([(35, 1, 5, 3, 3)])
+        self.assertEqual((m['foe_combat'], m['inconclusive']), (True, ['lab.cooldown', 'lab.damage']))
+
+    def test_neutral_removals_and_interval_endpoints(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35) if t <= sf]) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        series['events'] = [('-B', 35, 7, 0, 0)]   # a neutral mineral field's removal: no barrier
+        series['removals'] = [('B', 35, 7, 11, 900, 900, 0, 500, 5, -1, 0, 34, 0)]
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [15])
+        # A drop on a Drone in reach in the second hit's own frame may hide a shot: no interval.
+        drone = {sf: 40.0 - 6 * (sf >= 35) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling, 4: drone},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (4, metrics.DRONE, 4, 160, 100)])
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
 
     def test_a_lost_or_shielded_subject(self):
         import sc64_parity
