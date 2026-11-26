@@ -492,6 +492,9 @@ static int command_force_to(int x, int y, int attack_move)
     move_cursor(x, y);
     if (!selected_count()) return command_group_to(x, y, attack_move);
     tap(KEY_A);
+    /* The command is taken once the target cursor closes; a tap the tick
+     * budget or the match end swallowed leaves it open. */
+    if (mode != MODE_NORMAL || screen != SCREEN_PLAY) return 0;
     fprintf(stderr, "T5 force order issued=%d attack=%d at %d,%d\n", force, attack_move, x, y);
     return 1;
 }
