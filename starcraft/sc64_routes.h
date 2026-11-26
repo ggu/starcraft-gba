@@ -3390,7 +3390,13 @@ sc64_route_fill_wide_depot(u8 *field, int center_x, int center_y,
 /* The origin check follows each whole pop, including its remaining
  * neighbors. At entry an origin on any seed stops before the first pop.
  * The sentinel for an unbounded flood is in the padded border. */
+/* The wide-only experiment keeps this large kernel in ROM: its hot copy
+ * would exceed the Z10 IWRAM linker limit. */
+#ifdef SC64_ROUTE_FACILITY_FIFO_WIDE_ONLY
+static int __attribute__((noinline))
+#else
 static int GBA_HOT __attribute__((noinline))
+#endif
 sc64_route_expand_facility_fifo(u8 *dense, int tail, int stride, int cap,
                                 int origin, int *complete)
 {
@@ -3828,7 +3834,11 @@ sc64_route_facility_slot_for_origin(int depot_id, int center_x, int center_y, in
     const int perimeter = 0;
 #endif
     if ((MAP_COLS == SC64_DENSE_SIDE || MAP_COLS == SC64_LINEAR_COLS ||
-         MAP_COLS == SC64_LINEAR_WIDE_COLS) && MAP_ROWS <= SC64_LINEAR_MAX_ROWS) {
+         MAP_COLS == SC64_LINEAR_WIDE_COLS) && MAP_ROWS <= SC64_LINEAR_MAX_ROWS
+#ifdef SC64_ROUTE_FACILITY_FIFO_WIDE_ONLY
+        && MAP_COLS == SC64_LINEAR_WIDE_COLS && MAP_ROWS == SC64_LINEAR_MAX_ROWS
+#endif
+       ) {
         tail = sc64_route_fill_facility_fifo(sc64_route_field[slot], center_x, center_y,
                                             x0, x1, y0, y1, perimeter, origin, &complete);
         if (tail >= 0) goto facility_finished;
