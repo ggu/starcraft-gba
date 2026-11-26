@@ -35,7 +35,10 @@ chain as one run alone), but check a parallel run against a solo one before
 relying on it, and keep to two of your own captures at a time.
 
 The frontend counts every byte it writes into the run directory. `capture.py`
-passes `--output-budget-gib` (default 8) and `--reserve-gib` (default 5) to it
+refuses a frontend binary that does not read the budget (one built before it),
+and marks a finished run `ok: false` (`budget_not_acknowledged`) unless its
+`status.log` reports the budget it was given. It passes `--output-budget-gib`
+(default 8) and `--reserve-gib` (default 5) to the frontend
 as `SC64_CAPTURE_BUDGET_BYTES` and `SC64_CAPTURE_RESERVE_BYTES`; before a
 write would pass the budget or leave less than the reserve free (free space is
 measured again every 16 MiB written) the run stops with exit code 10, so the
@@ -103,7 +106,7 @@ A tape is one command per line:
 | `mode jit\|interp` | Switch CPU mode through an in-process state round trip |
 | `rawcheck` | Check the direct RDRAM copy against the core's own debugger read for all 8 MiB |
 | `pulse ADDR BYTES OP VALUE STEPS MASK HOLD GAP` | Run exactly `STEPS` steps, pressing `MASK` (`HOLD` steps on, `GAP` off) only while the field, read after the previous step, meets `OP` against `VALUE`; otherwise press nothing. Never misses. Dismisses prompts that come at unknown times: `pulse 800F0C20 2 ne 0 N 2 3 60` presses Start only while a text box holds the pause halfword, so it cannot open the pause menu. Replies `PULSE step pressed value cpu_ms` |
-| `poke ADDR HEX` | Write 1 to 256 guest bytes (an even number of hex digits) into RDRAM and into any data-cache line holding them, then read them back through the guest view (exit 8 if they differ). Logged in `events.csv`, counted in `status.log` (`pokes=`); refused before a `load`. For data only: it does not invalidate recompiled blocks or the instruction cache, so never poke guest code. A state saved after a poke stays staged: a capture that loads it records `n64_staged` and `n64_staged_inputs` |
+| `poke ADDR HEX` | Write 1 to 256 guest bytes (an even number of hex digits) into RDRAM and into any data-cache line holding them, then read them back through the guest view (exit 8 if they differ). Logged in `events.csv`, counted in `status.log` (`pokes=`); refused before a `load`. For data only: it does not invalidate recompiled blocks or the instruction cache, so never poke guest code. A state saved after a poke stays staged: a capture that loads it records `n64_staged` and `n64_staged_inputs`, and so does one started from a `--flash-input` save that a staged capture flushed |
 | `region ADDR BYTES`, `region every K`, `region on` | Declare up to 16 guest blocks (1 MiB in all); `region on` opens `extra.bin` and fixes them. While `tap tick` runs, each block is written on every follow-up read (every `K`th tick change with `region every K`). Format in `capture_view.h`; `tools/parity_decode.py` joins the blocks to the tick's record and its hash chain |
 | `peek ADDR N`, `dump NAME`, `shot NAME`, `quit` | Diagnostics |
 | `# ...` | Comment; parity tapes mark the command step with `# mark command` |

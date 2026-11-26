@@ -185,18 +185,26 @@ def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
     within DISPLACE_RADIUS 'displaced' (a stacked placement spread out at creation). A missing placement and an extra row of the same
     type on the same spot are one unit whose owner a start trigger changed."""
     expected = [r for r in chk_rows if r['type'] != START_LOCATION]
-    pool = defaultdict(list)
-    for i, r in enumerate(n64_rows):
-        pool[(r['type'], r['owner'], r['x'], r['y'])].append(i)
-    used, matched, missing, amount_differs = set(), [], [], []
-    for r in expected:
-        key = (r['type'], r['owner'], r['x'], r['y'])
-        if pool[key]:
-            i = pool[key].pop(0)
-            used.add(i)
-            matched.append((r, n64_rows[i]))
-        else:
-            missing.append(r)
+    index_of = {id(n): i for i, n in enumerate(n64_rows)}
+    # A placement may stand where the CHK put it, have moved up to MOVED_RADIUS by the first tick,
+    # or, when another placement within STACK_RADIUS gives the cartridge a reason to spread them,
+    # be displaced up to DISPLACE_RADIUS. One assignment covers all three (most pairs, then exact
+    # positions, then the least distance); each pair is labelled by its distance afterwards.
+    reach = {id(r): DISPLACE_RADIUS if any(o is not r and abs(o['x'] - r['x']) <= STACK_RADIUS and
+                                           abs(o['y'] - r['y']) <= STACK_RADIUS for o in expected) else MOVED_RADIUS
+             for r in expected}
+    cheb = lambda r, n: max(abs(n['x'] - r['x']), abs(n['y'] - r['y']))
+    fits = lambda r, n: n['type'] == r['type'] and n['owner'] == r['owner'] and cheb(r, n) <= reach[id(r)]
+    used, matched, amount_differs = set(), [], []
+    out, taken = {'moved': [], 'displaced': []}, set()
+    for r, n in max_pairs(expected, n64_rows, fits):
+        used.add(index_of[id(n)])
+        taken.add(id(r))
+        matched.append((r, n))
+        if cheb(r, n):
+            label = 'moved' if cheb(r, n) <= MOVED_RADIUS else 'displaced'
+            out[label].append({'type': r['type'], 'owner': r['owner'], 'chk': [r['x'], r['y']], 'n64': [n['x'], n['y']]})
+    missing = [r for r in expected if id(r) not in taken]
     # Unit doodads (THG2 rows: doors, traps) join on type and spot; the cartridge gives
     # enabled ones to player 11 and keeps the CHK owner of disabled ones (reported).
     for r in list(missing):
@@ -210,26 +218,6 @@ def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
             missing.remove(r)
     doodad_owner = [{'chk_owner': r['owner'], 'n64_owner': n['owner'], 'disabled': bool(r.get('disabled'))}
                     for r, n in matched if r.get('section') == 'THG2']
-    # Units already moving on the first tick: same type and owner within MOVED_RADIUS px.
-    out = {}
-    stacked = lambda r: any(o is not r and abs(o['x'] - r['x']) <= STACK_RADIUS and abs(o['y'] - r['y']) <= STACK_RADIUS
-                            for o in expected)
-    index_of = {id(n): i for i, n in enumerate(n64_rows)}
-    out['moved'], out['displaced'] = [], []
-    # One matching for both classes: a placement may move up to MOVED_RADIUS, or, when a stacked
-    # neighbour gives a reason, be displaced up to DISPLACE_RADIUS; each pair is labelled after.
-    free_rows = [n for i, n in enumerate(n64_rows) if i not in used]
-    reach = lambda r: DISPLACE_RADIUS if stacked(r) else MOVED_RADIUS
-    fits = lambda r, n: (n['type'], n['owner']) == (r['type'], r['owner']) and \
-        max(abs(n['x'] - r['x']), abs(n['y'] - r['y'])) <= reach(r)
-    taken = set()
-    for r, n in max_pairs(missing, free_rows, fits):   # most pairs, then the least distance
-        used.add(index_of[id(n)])
-        taken.add(id(r))
-        matched.append((r, n))
-        label = 'moved' if max(abs(n['x'] - r['x']), abs(n['y'] - r['y'])) <= MOVED_RADIUS else 'displaced'
-        out[label].append({'type': r['type'], 'owner': r['owner'], 'chk': [r['x'], r['y']], 'n64': [n['x'], n['y']]})
-    missing = [r for r in missing if id(r) not in taken]
     moved, displaced = out['moved'], out['displaced']
     missing = [{k: r[k] for k in ('type', 'owner', 'x', 'y', 'section', 'resources')} for r in missing]
     spots = {(r['x'], r['y'], subunits.get(r['type'])) for r, _ in matched if subunits.get(r['type'])}
@@ -528,15 +516,21 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
     align = lambda a: (a + 3) & ~3
     out, previous = [], {}
     hints = {k: int(v, 16) - RAM_BASE for k, v in (base_hint or {}).items() if isinstance(v, str) and v.startswith('0x')}
-    following = {columns[k][0]: columns[k + 1] for k in range(len(columns) - 1)
-                 if columns[k][0].split('.')[0] == columns[k + 1][0].split('.')[0]}
+    position = {c[0]: k for k, c in enumerate(columns)}
+
+    def corroboration(name, at, depth=3):
+        """How many of the next `depth` columns of the same table match in sequence from `at`."""
+        k, table, count = position[name] + 1, name.split('.')[0], 0
+        while k < len(columns) and count < depth and columns[k][0].split('.')[0] == table and 0 <= at < len(ram):
+            nxt = columns[k]
+            blobs = [big_endian(nxt[1], nxt[3])] + ([per_u16(nxt[3])] if nxt[0] in PACKED_U16 else [])
+            if not any(ram[at:at + len(blob)] == blob for blob in blobs):
+                break
+            count, at, k = count + 1, align(at + len(nxt[3])), k + 1
+        return count
 
     def next_matches(name, at):
-        nxt = following.get(name)
-        if nxt is None or at < 0:
-            return False
-        blobs = [big_endian(nxt[1], nxt[3])] + ([per_u16(nxt[3])] if nxt[0] in PACKED_U16 else [])
-        return any(ram[at:at + len(blob)] == blob for blob in blobs)
+        return corroboration(name, at, 1) == 1
 
     for name, fmt, rows, raw in columns:
         table = name.split('.')[0]
@@ -566,13 +560,17 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                         spots.append(at)
                     at = ram.find(blob, at + 1)
                 if spots:
-                    best = next((a for a in spots if next_matches(name, align(a + size))), spots[0])
-                    found = (enc, best, ram.count(blob))
+                    # The spot whose following columns match furthest wins; a tie between
+                    # corroborated spots is reported as ambiguous.
+                    scores = {a: corroboration(name, align(a + size)) for a in spots}
+                    best = max(spots, key=lambda a: (scores[a], -a))
+                    ambiguous = scores[best] > 0 and sum(1 for a in spots if scores[a] == scores[best]) > 1
+                    found = (enc, best, ram.count(blob)) + (('ambiguous',) if ambiguous else ())
                     break
         if found:
-            encoding, at, count = found
+            encoding, at, count = found[:3]
             out.append({'column': name, 'address': f'{RAM_BASE + at:08x}', 'status': 'equal', 'encoding': encoding,
-                        'occurrences': count})
+                        'occurrences': count, **({'ambiguous': True} if 'ambiguous' in found[3:] else {})})
             previous[table] = align(at + size)
             continue
         entry = {'column': name, 'status': 'not found', 'address': None}
@@ -853,17 +851,25 @@ def tick_clock(ticks):
     return out
 
 
-def bullet_rows(block, table_address):
-    """Live bullets of the 100 x 112-byte pool: {slot: (weapon, source row, target row, x, y, time)}."""
+def bullet_rows(block, table_address, layout=None, gating=False):
+    """Live bullets of the 100 x 112-byte pool: {slot: (weapon, source row, target row, x, y, time)},
+    read through the layout's pool.bullet field definitions."""
+    import parity_decode as pdx
+    layout = layout or pdx.Layout()
+    size = layout.pool('bullet', gating)['record_bytes']
+    f = {name: layout.pool_field('bullet', name, gating)
+         for name in ('sprite', 'weapon', 'source', 'target', 'x', 'y', 'time_remaining')}
+    get = lambda b, name: struct.unpack_from(f[name][1], b, f[name][0])[0]
+
     def row_of(pointer):
         offset = pointer - table_address
         return offset // UNIT_POOL[1] if 0 <= offset < UNIT_POOL[0] and offset % UNIT_POOL[1] == 0 else None
     out = {}
-    for k in range(BULLET_POOL[0] // BULLET_POOL[1]):
-        b = block[k * BULLET_POOL[1]:(k + 1) * BULLET_POOL[1]]
-        if struct.unpack_from('>I', b, 0x0C)[0]:
-            out[k] = (b[0x60], row_of(struct.unpack_from('>I', b, 0x64)[0]), row_of(struct.unpack_from('>I', b, 0x5C)[0]),
-                      struct.unpack_from('>H', b, 0x28)[0], struct.unpack_from('>H', b, 0x2A)[0], b[0x61])
+    for k in range(len(block) // size):
+        b = block[k * size:(k + 1) * size]
+        if get(b, 'sprite'):
+            out[k] = (get(b, 'weapon'), row_of(get(b, 'source')), row_of(get(b, 'target')),
+                      get(b, 'x'), get(b, 'y'), get(b, 'time_remaining'))
     return out
 
 
@@ -920,7 +926,7 @@ def t3_measure_n64(cap, marks):
             continue
         if table_address is None:
             table_address = 0x80000000 | r['table_offset']
-        now = bullet_rows(bullets, table_address)
+        now = bullet_rows(bullets, table_address, cap.layout, gating=False)
         for slot, b in now.items():
             if slot not in live or live[slot]['b'][:3] != b[:3]:
                 live[slot] = {'b': b, 'spawn': t, 'hit': None}

@@ -33,6 +33,7 @@ ARES_COMMIT = '0aafd85789215e84e1e43415c07d4c88461b7899'
 # name its own lock in SC64_CAPTURE_LOCK to run its captures alongside others': emulation is
 # deterministic under host load (S1-S3), but compare such a run with a solo one before relying on it.
 LOCK = os.environ.get('SC64_CAPTURE_LOCK') or '/tmp/sc64-native-build-20261031.lock'
+BUDGET_ENV = b'SC64_CAPTURE_BUDGET_BYTES'
 FLASH_BYTES = 128 * 1024
 RESOURCES = ('ares/ares/resource/resource.cpp', 'ares/ares/resource/resource.hpp',
              'mia/resource/resource.cpp', 'mia/resource/resource.hpp')
@@ -123,6 +124,16 @@ def state_recorded(state, digest, legacy_producer=False):
     return state_source(state, digest, legacy_producer) is not None
 
 
+def budget_supported(binary):
+    """True when the frontend build reads the output budget (capture.cpp names its variable)."""
+    return BUDGET_ENV in pathlib.Path(binary).read_bytes()
+
+
+def budget_acknowledged(status_text, budget):
+    """True when a finished frontend's status.log reports the budget the wrapper asked for."""
+    return f'output_budget={budget}' in status_text.split()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('binary', 'source', 'rom', 'tape', 'output'):
@@ -171,6 +182,11 @@ def main():
     if len(set(folded)) != len(folded) or 'game.z64' in folded:
         raise SystemExit('state input names must be distinct, ignoring case, and not game.z64')
     provenance()
+    # The frontend must enforce the output budget this wrapper asks for: a build from before the
+    # budget would ignore SC64_CAPTURE_BUDGET_BYTES and could overrun with ok=true.
+    if not budget_supported(args.binary):
+        raise SystemExit('the frontend binary predates the output budget (no SC64_CAPTURE_BUDGET_BYTES); '
+                         'build capture.cpp from this tree')
     frontend = pathlib.Path(__file__).resolve().parent
     sources = {name: sha(frontend / name) for name in ('capture.cpp', 'capture_view.h', 'inject.cmake', 'capture.py')}
     with open(LOCK, 'a') as lock:
@@ -218,6 +234,17 @@ def main():
             flash.parent.mkdir()
             shutil.copyfile(args.flash_input, flash)
             flash_sha = sha(flash)
+            # A save a staged capture flushed carries its guest edits: find the run that wrote it
+            # (the manifest beside its saves folder) and inherit the tag.
+            for folder in list(pathlib.Path(args.flash_input).resolve().parents)[:3]:
+                try:
+                    writer = json.loads((folder / 'manifest.json').read_text())
+                except (OSError, ValueError):
+                    continue
+                if isinstance(writer, dict) and writer.get('flash_file_after_sha256') == flash_sha and \
+                        (writer.get('pokes') or writer.get('n64_staged')):
+                    staged_inputs.append('flash')
+                break
         manifest = {
             'binary_sha256': sha(args.binary), 'frontend_sha256': sources, 'ares_commit': ARES_COMMIT,
             'generated_resource_sha256': {r: sha(args.source / r) for r in RESOURCES},
@@ -280,8 +307,13 @@ def main():
         if args.unrecorded_state:
             # A refusal test only: such a run is never evidence, so it is never ok.
             manifest['unrecorded_state'] = True
+        # A finished frontend acknowledges the budget it enforced in status.log.
+        status = out / 'status.log'
+        acknowledged = status.is_file() and budget_acknowledged(status.read_text(), manifest['output_budget_bytes'])
+        if manifest['returncode'] == 0 and not acknowledged:
+            manifest['budget_not_acknowledged'] = True
         manifest['ok'] = (manifest['returncode'] == 0 and manifest['inputs_unchanged'] and not manifest.get('timeout')
-                          and not args.unrecorded_state
+                          and not args.unrecorded_state and acknowledged
                           and not manifest.get('states_changed_after_save'))
         (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         print(json.dumps({'ok': manifest['ok'], 'returncode': manifest['returncode'], 'seconds': manifest['seconds']}))

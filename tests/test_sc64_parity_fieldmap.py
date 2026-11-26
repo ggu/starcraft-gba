@@ -244,6 +244,16 @@ class TableAnchor(unittest.TestCase):
         self.assertEqual([(f['status'], f['address']) for f in found],
                          [('differs', f'{fm.RAM_BASE + 16:08x}'), ('equal', f'{fm.RAM_BASE + 20:08x}')])
 
+    def test_ambiguous_bases_are_reported(self):
+        a, b = struct.pack('<2H', 1, 2), bytes([4, 5, 6, 7])
+        columns = [('t.a', 'H', 2, a), ('t.b', 'B', 4, b)]
+        copy = struct.pack('>2H', 1, 2) + b
+        found = fm.anchor_columns(copy + copy, columns)
+        self.assertTrue(found[0].get('ambiguous'))
+        found = fm.anchor_columns(copy + struct.pack('>2H', 1, 2) + b'\0' * 4, columns)
+        self.assertFalse(found[0].get('ambiguous'))
+        self.assertEqual(found[0]['address'], f'{fm.RAM_BASE:08x}')
+
     def test_columns_found_aligned_and_differences_listed(self):
         a = struct.pack('<3H', 1, 2, 3)           # u16 column, 6 bytes
         b = bytes([4, 5, 6])                      # u8 column right after, 4-byte aligned in RAM
@@ -346,6 +356,35 @@ class ExtraJoin(unittest.TestCase):
             (missing / 'extra.bin').unlink()
             self.assertTrue(any('recorded in the manifest but missing' in p
                                 for p in parity_decode.Capture(missing).verified))
+
+    def test_table_offset_joins_the_chain_and_size_is_capped(self):
+        import os
+        import struct as st
+        with tempfile.TemporaryDirectory() as d:
+            run = self.capture(d, 'a', [(3, 1, b'ab'), (5, 2, b'cd')])
+            before = parity_decode.Capture(run).chain
+            tap = bytearray((run / 'tap.bin').read_bytes())
+            # The first follow-up record (after one change record of 48 + 0xCC bytes): its table offset.
+            st.pack_into('<I', tap, 24 + 48 + 0xCC + 9 * 4, 0x300010)
+            (run / 'tap.bin').write_bytes(bytes(tap))
+            self.assertNotEqual(parity_decode.Capture(run).chain, before)
+            os.environ['SC64_PARITY_MAX_CAPTURE_BYTES'] = '100'
+            try:
+                with self.assertRaises(ValueError):
+                    parity_decode.Capture(run)
+            finally:
+                del os.environ['SC64_PARITY_MAX_CAPTURE_BYTES']
+
+    def test_capture_wrapper_needs_the_budget(self):
+        sys.path.insert(0, str(ROOT / 'experiments' / 'ares-headless'))
+        import capture
+        with tempfile.TemporaryDirectory() as d:
+            old, new = pathlib.Path(d) / 'old', pathlib.Path(d) / 'new'
+            old.write_bytes(b'\0frontend\0')
+            new.write_bytes(b'\0SC64_CAPTURE_BUDGET_BYTES\0')
+            self.assertEqual((capture.budget_supported(old), capture.budget_supported(new)), (False, True))
+        self.assertTrue(capture.budget_acknowledged('pokes=0 output_written=5 output_budget=8589934592\n', 8589934592))
+        self.assertFalse(capture.budget_acknowledged('pokes=0 output_written=5\n', 8589934592))
 
     def test_fog_needs_one_region_of_its_size(self):
         with tempfile.TemporaryDirectory() as d:

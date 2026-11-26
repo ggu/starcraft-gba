@@ -46,9 +46,11 @@ Binaries (SHA-256): `9363c669a872da374e71f9775693d3c605cc0980096f807e07db97572e8
 `bdb29af2dd6abbc622051a299c25639157589b499d381cad25605fa3b5144e89`
 (adds the output budget over every file the frontend writes, checked before
 each command and at finalization; the golden pairs `f-t1-7/8` and
-`tl-T3g/h`). The tracked `capture.cpp`,
-`capture_view.h`, `capture.py` and `inject.cmake` are byte for byte the
-sources of the last build. Both golden pairs give the same per-tick hash
+`tl-T3g/h`). The tracked `capture.cpp`, `capture_view.h` and `inject.cmake`
+are byte for byte the sources of the last build; the tracked `capture.py`
+gained wrapper-only checks after those captures (it refuses frontends without
+the budget, requires the budget acknowledgement, and carries the staged tag
+through flash saves). Both golden pairs give the same per-tick hash
 chain under `db9de872` and `bdb29af2`, so the budget changes nothing in the
 emulation. With a zero budget a run stops with exit 10 at its first record;
 a CSV-only `tap step` tape stops at step 64, and tapes of only `hash` or

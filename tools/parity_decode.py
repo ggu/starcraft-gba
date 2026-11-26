@@ -35,6 +35,7 @@ import sc64_parity_metrics as metrics  # noqa: E402
 LAYOUT = ROOT / 'tools' / 'parity' / 'sc64-usa-v1.json'
 MAGIC = b'SC64TAP\0'
 EXTRA_MAGIC = b'SC64XTR\0'
+MAX_CAPTURE_BYTES = 3 << 30   # tap.bin + extra.bin of one capture; golden writing holds two
 HEADER_FIELDS = ('step', 'tick', 'phase', 'live', 'seconds', 'pause', 'selector', 'running', 'countdown',
                  'table', 'flags', 'rows')
 FLAG_ROWS, FLAG_TABLE, FLAG_DUAL_DIFFER, FLAG_BAD_LINKS = 1, 2, 4, 8
@@ -140,6 +141,22 @@ class Layout:
             raise LayoutError(f'{self.name}: no pool {name!r}')
         return self._check(f'pool.{name}', field, gating)
 
+    def pool_field(self, pool, name, gating):
+        """(offset, struct format) of one field of a pool record, parsed from the layout's
+        "0xNN type ..." definition; a definition the decoders cannot honour raises LayoutError."""
+        fields = self.pool(pool, gating).get('fields', {})
+        text = fields.get(name)
+        words = text.split() if isinstance(text, str) else []
+        fmt = {'u8': '>B', 'u16': '>H', 'u32': '>I'}.get(words[1] if len(words) > 1 else None)
+        try:
+            offset = int(words[0], 16) if words else None
+        except ValueError:
+            offset = None
+        if offset is None or fmt is None or offset + struct.calcsize(fmt) > self.pool(pool, gating)['record_bytes']:
+            raise LayoutError(f'{self.name}: pool.{pool} field {name!r} is {text!r}; the decoders need "0xNN u8|u16|u32" '
+                              'inside the record')
+        return offset, fmt
+
     def order_name(self, value, gating):
         """Name of an order value; gating use needs that value proven."""
         field = self.doc.get('orders', {}).get('values', {}).get(str(value))
@@ -235,6 +252,12 @@ class Capture:
         chain = hashlib.sha256()
         last_tick = None
         self.regions, self.extra, extra_faults, joined = [], {}, 0, set()
+        # Decoding holds a whole capture in memory: refuse clearly instead of exhausting it.
+        limit = int(os.environ.get('SC64_PARITY_MAX_CAPTURE_BYTES') or MAX_CAPTURE_BYTES)
+        size = sum((self.run / name).stat().st_size for name in ('tap.bin', 'extra.bin') if (self.run / name).is_file())
+        if size > limit:
+            raise ValueError(f'{self.run}: tap.bin and extra.bin hold {size} bytes, more than the decoder holds in '
+                             f'memory ({limit}; SC64_PARITY_MAX_CAPTURE_BYTES); record a shorter window or every Kth tick')
         if (self.run / 'extra.bin').is_file():
             self.regions, records = read_extra(self.run / 'extra.bin')
             for step, tick, ordinal, blocks in records:
@@ -270,6 +293,10 @@ class Capture:
             # unpaused clock), table presence, globals and rows.
             digest = hashlib.sha256()
             digest.update(struct.pack('<IIBB', tick, head['step'], paused, record['table']))
+            if self.regions:
+                # Extra-region decoders resolve unit pointers through the table offset: bind it.
+                # Captures without extra.bin keep the chain they always had.
+                digest.update(struct.pack('<I', head['table']))
             digest.update(glob)
             for index in sorted(rows):
                 digest.update(struct.pack('>H', index))
@@ -397,13 +424,18 @@ class Capture:
             raise LayoutError(f'{self.run.name}: not exactly one recorded region of {size} bytes for the fog tiles')
         for (start, n), block in zip(self.regions, record.get('extra', ())):
             if n == size:
+                step = field['record_bytes']
+                (ex, ex_fmt), (vi, vi_fmt) = (self.layout.pool_field('fog_tiles', 'explored_mask', gating),
+                                              self.layout.pool_field('fog_tiles', 'visible_mask', gating))
+                if ex_fmt != '>B' or vi_fmt != '>B':
+                    raise LayoutError(f'{self.layout.name}: the fog decoder reads one-byte player masks')
                 # The tiles a fog block holds: no player sees a tile it has not explored.
-                if any(~block[4 * i + 3] & block[4 * i + 2] & 0xFF for i in range(width * height)):
+                if any(~block[step * i + vi] & block[step * i + ex] & 0xFF for i in range(width * height)):
                     raise LayoutError(f'{self.run.name}: the {size}-byte region at {start:08x} breaks the '
                                       'visible-within-explored rule; it is not the fog block')
                 bit = 1 << player
-                visible = {i for i in range(width * height) if not block[4 * i + 3] & bit}
-                explored = {i for i in range(width * height) if not block[4 * i + 2] & bit}
+                visible = {i for i in range(width * height) if not block[step * i + vi] & bit}
+                explored = {i for i in range(width * height) if not block[step * i + ex] & bit}
                 return visible, explored
         return None
 
@@ -412,26 +444,27 @@ class Capture:
         image fields, through its sprite (both pools read from the extra regions). Links are
         followed from the primary image (sprite +0x18) while they stay in recorded memory."""
         sprite_pool, image_pool = self.layout.pool('sprite', gating), self.layout.pool('image', gating)
-        self.unit(record['rows'][index], 'sprite', gating)
-        sprite = struct.unpack_from('>I', record['rows'][index], 0x0C)[0]
+        get = lambda blob, pool, name: struct.unpack_from((f := self.layout.pool_field(pool, name, gating))[1], blob, f[0])[0]
+        sprite = self.unit(record['rows'][index], 'sprite', gating)
         blob = self.extra_bytes(record, sprite, sprite_pool['record_bytes'])
         if blob is None:
             return None
-        at, out = struct.unpack_from('>I', blob, 0x18)[0], []
+        at, out = get(blob, 'sprite', 'image_primary'), []
         while at and len(out) < 16:
             image = self.extra_bytes(record, at, image_pool['record_bytes'])
             if image is None:
                 # The primary must be recorded; a linked image outside the recorded regions
                 # (a selection circle from another pool, say) ends the list.
                 return out or None
-            out.append({'address': at, 'image_id': struct.unpack_from('>H', image, 0x08)[0],
-                        'draw_function': image[0x0B], 'frame_set': struct.unpack_from('>H', image, 0x0C)[0] // 4,
-                        'frame_index': struct.unpack_from('>H', image, 0x0E)[0] >> 6,
-                        'direction': struct.unpack_from('>H', image, 0x0E)[0] & 63,
-                        'iscript_header': struct.unpack_from('>H', image, 0x14)[0],
-                        'iscript_offset': struct.unpack_from('>H', image, 0x16)[0],
-                        'animation': image[0x1A], 'wait': image[0x1B]})
-            at = struct.unpack_from('>I', image, 0x04)[0]
+            frame = get(image, 'image', 'frame_and_direction')
+            out.append({'address': at, 'image_id': get(image, 'image', 'image_id'),
+                        'draw_function': get(image, 'image', 'draw_function'),
+                        'frame_set': get(image, 'image', 'frame_set_x4') // 4,
+                        'frame_index': frame >> 6, 'direction': frame & 63,
+                        'iscript_header': get(image, 'image', 'iscript_header'),
+                        'iscript_offset': get(image, 'image', 'iscript_offset'),
+                        'animation': get(image, 'image', 'animation'), 'wait': get(image, 'image', 'wait')})
+            at = get(image, 'image', 'next')
         return out
 
     def orders(self, index, gating=True):

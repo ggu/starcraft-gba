@@ -222,11 +222,17 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}
         if value is None:
             row['verdict'] = 'REGRESSION' if gating else 'REPORT'
-            row['why'] = 'not measured on the GBA'
+            row['why'] = 'not measured on the GBA' if obs['value'] is not None else 'recorded on neither engine'
             rows.append(row)
             continue
         if isinstance(value, float):
             row['gba'] = round(value, 4)
+        if obs['value'] is None or obs['lo'] is None or obs['hi'] is None:
+            # An event only the GBA recorded (a report-only observation the N64 never saw) has no band.
+            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
+            row['why'] = 'recorded on the GBA only; the N64 capture has no such event'
+            rows.append(row)
+            continue
         if obs['value']:
             row['ratio'] = round(value / obs['value'], 3)
         gap = outside(value, obs['lo'], obs['hi'])

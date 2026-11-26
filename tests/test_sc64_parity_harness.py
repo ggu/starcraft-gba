@@ -341,6 +341,22 @@ class Comparator(unittest.TestCase):
         self.assertEqual(self.verdict(25.0, {'demo:x.a:s': {'gba': 20.0}}), 'REGRESSION')
         self.assertEqual(self.verdict(10.0, {'demo:x.a:s': {'gba': 20.0}}), 'IMPROVED')
 
+    def test_one_sided_report_rows(self):
+        golden = {'observations': [
+            {'check': 'x.n64only', 'subject': 's', 'value': 5, 'lo': 5, 'hi': 5, 'gating': False, 'n_runs': 2,
+             'provenance': 'n64-ram', 'tolerance': 'report'},
+            {'check': 'x.gbaonly', 'subject': 's', 'value': None, 'lo': None, 'hi': None, 'gating': False, 'n_runs': 2,
+             'provenance': 'n64-ram', 'tolerance': 'report'},
+            {'check': 'x.neither', 'subject': 's', 'value': None, 'lo': None, 'hi': None, 'gating': False, 'n_runs': 2,
+             'provenance': 'n64-ram', 'tolerance': 'report'}]}
+        rows = {r['check']: r for r in sc64_parity.judge('demo', golden, {'x.n64only': None, 'x.gbaonly': 7}, {}, {})}
+        self.assertEqual({r['verdict'] for r in rows.values()}, {'REPORT'})
+        self.assertIn('GBA only', rows['x.gbaonly']['why'])
+        self.assertIn('not measured on the GBA', rows['x.n64only']['why'])
+        self.assertIn('neither', rows['x.neither']['why'])
+        lines, counts = sc64_parity.scorecard([{'id': 'demo', 'status': 'RUN', 'rows': list(rows.values())}], pathlib.Path('.'), [])
+        self.assertEqual(counts, {'REPORT': 3})
+
     def test_exit_codes(self):
         skip = [{'id': 'scenarios', 'status': 'SKIP'}]
         self.assertEqual(sc64_parity.exit_code(skip, {}, private_inputs=False), 0)
