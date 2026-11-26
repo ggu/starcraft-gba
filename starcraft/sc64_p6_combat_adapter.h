@@ -677,28 +677,32 @@ race_p6_combat_infested_attack(Unit *q, int target)
 }
 
 #if defined(SC64_P6_TRAP_CULL)
-/* Every target box accepted by race_p6_combat_box_for_target has source
- * extents no larger than 128px (sc64_z5_detect_box_valid). The wall trap's
- * largest half-extent is 16px and its inclusive box-distance range is 160px.
- * Thus a center separation above 160+128+16+1 on either axis cannot reach
- * the trap. Coordinates outside the bounded map domain deliberately fall
- * through to the exact path. This is only a conservative rejection test;
- * inclusive distance, target ordering, and every eligibility check remain
- * on the original path.
- */
-static int
-race_p6_combat_trap_center_may_reach(int trap_x, int trap_y,
-                                     int target_x, int target_y)
+typedef struct {
+    int left, top;
+    unsigned width, height;
+} Sc64P6TrapWindow;
+
+/* Accepted boxes have extents of at most 128 source pixels. Wall-trap
+ * extents are at most 16. Clip the conservative center window to the
+ * source box domain, where engine centers correspond to even pixels. */
+static inline Sc64P6TrapWindow
+race_p6_combat_trap_window(int x, int y)
 {
-    unsigned dx, dy;
-    const unsigned max_center_gap =
-        SC64_P6_WALL_TRAP_RANGE_SOURCE_PX + 128u + 16u + 1u;
-    if (trap_x < 0 || trap_x >= 4096 || trap_y < 0 || trap_y >= 4096 ||
-        target_x < 0 || target_x >= 4096 || target_y < 0 || target_y >= 4096)
-        return 1;
-    dx=(unsigned)(trap_x > target_x ? trap_x-target_x : target_x-trap_x);
-    dy=(unsigned)(trap_y > target_y ? trap_y-target_y : target_y-trap_y);
-    return dx <= max_center_gap && dy <= max_center_gap;
+    const int gap = (SC64_P6_WALL_TRAP_RANGE_SOURCE_PX + 128 + 16 + 1) / 2;
+    const int maximum = 4096 / 2 - 1;
+    Sc64P6TrapWindow box;
+    box.left = x < gap ? 0 : x - gap;
+    box.top = y < gap ? 0 : y - gap;
+    box.width = (unsigned)((x > maximum - gap ? maximum : x + gap) - box.left);
+    box.height = (unsigned)((y > maximum - gap ? maximum : y + gap) - box.top);
+    return box;
+}
+
+static inline int
+race_p6_combat_trap_center_may_reach(const Sc64P6TrapWindow *box, int x, int y)
+{
+    return (unsigned)x - (unsigned)box->left <= box->width &&
+           (unsigned)y - (unsigned)box->top <= box->height;
 }
 #endif
 
@@ -718,42 +722,42 @@ race_p6_combat_tick_traps(void)
             SC64_P6_RAW_WALL_MISSILE_TRAP || !race_p6_doodad_slot_bound(i) ||
             !race_p6_doodad_enabled_slot(i)) continue;
         if (trap->shield_remainder && --trap->shield_remainder) continue;
-        int cx=trap->x*2, cy=trap->y*2;
         Sc64Z5DetectBox trap_box;
         if (!race_p6_combat_building_box(trap,&trap_box)) continue;
+#if defined(SC64_P6_TRAP_CULL)
+        const Sc64P6TrapWindow window = race_p6_combat_trap_window(trap->x, trap->y);
+#endif
+        unsigned hostile_owners = 0;
+        for (int owner = SIDE; owner <= 4; ++owner)
+            if (race_p6_owners_hostile(trap->owner, owner)) hostile_owners |= 1u << owner;
         for (int j=0;j<MAX_UNITS+MAX_BUILDINGS;++j) {
-            int owner,flying=0,raw;
             unsigned dist;
             Sc64Z5DetectBox target_box;
             if (j==MAX_UNITS+i) continue;
             if (j<MAX_UNITS) {
-                Unit *q=&u[j];
-                if (!q->alive || SC64_TRANSPORT_LOADED(q) ||
-                    race_p6_combat_unit_burrowed(j)) continue;
-                owner=q->owner; raw=race_p6_combat_raw_unit(q);
-                flying=sc64_race_unit_flying(q->type);
+                const Unit *q = &u[j];
+                if (!q->alive || (unsigned)q->owner > 4u ||
+                    !(hostile_owners & (1u << q->owner))) continue;
 #if defined(SC64_P6_TRAP_CULL)
-                if (!race_p6_combat_trap_center_may_reach(
-                        trap_box.x,trap_box.y,q->x*2,q->y*2)) continue;
+                if (!race_p6_combat_trap_center_may_reach(&window, q->x, q->y)) continue;
 #endif
+                if (SC64_TRANSPORT_LOADED(q) || race_p6_combat_unit_burrowed(j) ||
+                    sc64_race_unit_flying(q->type)) continue;
             } else {
-                Building *q=&b[j-MAX_UNITS];
-                if (!q->alive) continue;
-                owner=q->owner; raw=race_p6_combat_raw_building(q);
+                const Building *q = &b[j - MAX_UNITS];
+                if (!q->alive || (unsigned)q->owner > 4u ||
+                    !(hostile_owners & (1u << q->owner))) continue;
 #if defined(SC64_P6_TRAP_CULL)
-                if (!race_p6_combat_trap_center_may_reach(
-                        trap_box.x,trap_box.y,q->x*2,q->y*2)) continue;
+                if (!race_p6_combat_trap_center_may_reach(&window, q->x, q->y)) continue;
 #endif
             }
-            if (race_p6_owners_hostile(trap->owner,owner)==0 || flying ||
-                race_p6_combat_target_is_invincible(j) ||
+            if (race_p6_combat_target_is_invincible(j) ||
                 !sc64_auto_target_visible(j,trap->owner) ||
                 !race_p6_combat_target_detected(j,trap->owner) ||
                 !race_p6_combat_box_for_target(j,&target_box)) continue;
             dist=sc64_z5_box_distance(&trap_box,&target_box);
-            if (dist>SC64_P6_WALL_TRAP_RANGE_SOURCE_PX) continue;
-            (void)raw; (void)cx; (void)cy;
-            if (dist<best_dist || (dist==best_dist && best>=0 && j<best)) {
+            /* Ascending slots retain the first target on an equal distance. */
+            if (dist < best_dist) {
                 best=j; best_dist=dist;
             }
         }
