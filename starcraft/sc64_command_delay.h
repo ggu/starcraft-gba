@@ -99,20 +99,58 @@ sc64_command_delay_input_end(void)
             sc64_command_delay_forget(i);
 }
 
+/* StarCraft 64 starts a unit moving some source frames after its order
+ * changes (parity unit labs: N64 start latency minus the GBA's with the
+ * command delay above, source frames): Marine, Hydralisk, Mutalisk and Siege
+ * Tank 3, Overlord 2, SCV and Vulture 1. A unit at rest that a delayed Move
+ * or attack-move reaches waits that long through the engine's own movement
+ * wait (path_retry), so no new state is saved. Units without a lab take the
+ * Marine's 3 frames (provisional). Ground units only: flyers move without
+ * path_retry, which the skirmish AI's group orders and the P7 interceptors
+ * also set on flyers for their own purposes, so the Mutalisk (N64 3) and
+ * Overlord (N64 2) waits remain a listed gap. */
+static int
+sc64_move_start_frames(const Unit *q)
+{
+    switch (q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type)) {
+    case 2: case 7: return 1;   /* Vulture, SCV */
+    default: return 3;          /* Marine, Siege Tank, Hydralisk, Mutalisk; others provisional */
+    }
+}
+
+static inline int
+sc64_move_at_rest(const Unit *q)
+{
+    return q->order == ORDER_IDLE ||
+           (q->order == ORDER_MOVE && dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5);
+}
+
 /* Issue one pending command with its own selection; the player's current
  * selection, selected building and toast line are restored afterwards. */
 static void __attribute__((noinline))
 sc64_command_delay_apply(Sc64DelayedCommand *c)
 {
-    u8 now[SC64_COMMAND_DELAY_BYTES];
+    u8 now[SC64_COMMAND_DELAY_BYTES], rest[SC64_COMMAND_DELAY_BYTES];
     int building = selected_building, line = toast_id, line_timer = toast_timer;
     memset(now, 0, sizeof now);
+    memset(rest, 0, sizeof rest);
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (u[i].selected) now[i >> 3] |= (u8)(1u << (i & 7));
         u[i].selected = (c->selected[i >> 3] >> (i & 7)) & 1;
+        if (u[i].selected && sc64_move_at_rest(&u[i])) rest[i >> 3] |= (u8)(1u << (i & 7));
     }
     c->active = 0;
     (void)issue_order(c->order, c->tx, c->ty);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (((rest[i >> 3] >> (i & 7)) & 1) && u[i].alive && !sc64_race_unit_flying(u[i].type) &&
+            (u[i].order == ORDER_MOVE || u[i].order == ORDER_ATTACK_MOVE)) {
+            /* The wait counts updates, and a ground unit spends one more on
+             * replanning after it, so the frame count itself lands the first
+             * step on the N64's frame (labs: Marine 7, SCV 5, Vulture 5,
+             * Hydralisk 7, Siege Tank 7). */
+            u[i].path_retry = sc64_move_start_frames(&u[i]);
+            u[i].path_timer = 0;
+        }
     for (int i = 0; i < MAX_UNITS; ++i) {
         u[i].selected = (now[i >> 3] >> (i & 7)) & 1;
         if (sc64_command_delay_watching) sc64_command_delay_seen[i] = sc64_command_delay_hash(&u[i]);
