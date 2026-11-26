@@ -250,8 +250,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Z3 paid route won at frame 68,639, with the Chrysalis at 170 HP. A fresh
   boot re-exported identical SRAM and A advanced to Z4 with all three bits.
   Z4 carried that result through victory and a fresh SRAM reload at frame
-  64,147. Continue from Z4 through Z5–Z10.
-  [Z3 route and victory](audits/2026-11-26-zerg-linked-middle.md). [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
+  64,147. Z5 then matched all 14 recorded stage worlds and won at frame
+  18,974. The old Z6 route ended without victory. Paid reinforcements and
+  a replacement assault cleared Z6 at frame 212,428 and its fresh result
+  reloaded with all six bits. Continue from the Z6 readback through Z7–Z10.
+  [Z3–Z6 carried results](audits/2026-11-26-zerg-linked-middle.md).
+  [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
   Zerg ROM. The opening tape reaches a frame-984 pause, then 17 normal
