@@ -6,7 +6,6 @@ import argparse
 import json
 from pathlib import Path
 import resource
-import shutil
 import struct
 
 from sc64_skirmish_sram_continuation import PhysicalGame
@@ -184,14 +183,17 @@ def main():
         return 0
     out = args.out
     require(out is not None, "--out is required when running")
-    require(
-        shutil.disk_usage(out.parent).free >= int(5.25 * 1024**3),
-        "launch requires at least 5.25 GiB free",
-    )
     out.mkdir()
+    def open_game(name, **sram):
+        folder = out / name
+        folder.mkdir()
+        (folder / "headless.log").symlink_to("/dev/null")
+        return PhysicalGame(runner, rom, elf, folder, **sram)
+
     resource.setrlimit(resource.RLIMIT_FSIZE, (256 * 1024, 256 * 1024))
     size, fields = dwarf_struct_layout(elf, "Sc64RaceCampaignState")
-    g = PhysicalGame(runner, rom, elf, out / "guest")
+    victory = out / "victory.sav"
+    g = open_game("guest", save_output=victory)
     r = g.rsp
 
     def n(k):
@@ -276,9 +278,6 @@ def main():
         # Splice immediately after the old START press; its neutral release still advances frame 1.
         held = 0
         for i in range(splice, stop):
-            if i % 500 == 0 and shutil.disk_usage(out).free < int(4.15 * 1024**3):
-                emit("disk-floor")
-                raise SystemExit(75)
             held = keys.get(i, held)
             step(held)
             for _ in range(48):
@@ -315,7 +314,13 @@ def main():
                 )
             else:
                 raise ValueError("modal bound")
-            if n("screen") == 3 and i + 1 != total:
+            # An inserted victory-dialogue acknowledgement can expose RESULT
+            # before the HOST controller's final neutral release. Still play
+            # that release and compare the full final observation at total.
+            terminal_release = (i + 2 == total and keys.get(i + 1) == 0
+                                and pages and pages[-1]["tape_call"] == i + 1
+                                and n("frame") == final["frame"] and n("won") and not n("lost"))
+            if n("screen") == 3 and i + 1 != total and not terminal_release:
                 emit(
                     "diverged",
                     dict(unexpected_result={k: n(k) for k in ("frame", "won", "lost")}),
@@ -369,6 +374,24 @@ def main():
                 and got["faults"] == 0,
                 "expected: got['screen']==3 and got['won']==1 and got['lost']==0 and got['faults']==0",
             )
+            world = g.state()
+            r.export_sram()
+            readback = out / "readback.sav"
+            fresh = open_game("fresh", save_input=victory, save_output=readback)
+            try:
+                require(fresh.u32("screen") == fresh.front_field("page") == 0, "expected fresh HOME")
+                fresh.step(512)
+                require(fresh.state() == world, "fresh result world differs")
+                for field, expected in (("won", 1), ("lost", 0), ("race_selected_mission", mission),
+                                        ("race_completed", n("race_completed"))):
+                    require(fresh.u32(field) == expected, f"fresh result {field} differs")
+                loaded = fresh.rsp.read(fresh.sym["race_campaign"], size)
+                for k in ("elapsed_frames", "objective_flags", "phase"):
+                    require(get(loaded, k) == get(c, k), f"fresh result {k} differs")
+                fresh.rsp.export_sram()
+                require(readback.read_bytes() == victory.read_bytes(), "victory SRAM changed on load")
+            finally:
+                fresh.close()
         emit("won" if stop == total else "prefix")
     except Exception as exc:
         emit("error", str(exc))

@@ -83,12 +83,25 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Zerg](audits/2026-11-26-z10-fifo-normal.md).
 
 - **Terran campaign after the Custom Game Larva merge.** The standard
-  cartridge cleared T1–T5 from blank SRAM with ordinary result advances,
+  cartridge cleared T1–T7 from blank SRAM with ordinary result advances,
   fresh mid-mission loads and identical victory re-exports. The T5 paid
   air route is replayable from the T4 result using the committed button
-  recording. Continue from this T5 victory through T10. The T4
+  recording. T6 and T7 carried that exact victory forward. Continue from T7 through T10. The T4
   main loop averaged 24.60 Hz on this route.
-  [Replay commands, hashes and timing](audits/2026-11-26-terran-linked-opening.md).
+  [Opening route and timing](audits/2026-11-26-terran-linked-opening.md) and [linked T6/T7 victories](audits/2026-11-26-terran-t6-t7-linked.md).
+
+- **Standard Protoss cartridge after the Custom Game Larva merge.** P1 cleared
+  from HOME on cartridge SHA-256
+  `967e2b35152df87ac05f98d4ee0ccd81f3c1634066503306257eb7450296d4ff`.
+  The older recording diverged at call 6,000. A new controller recording
+  matched every 1,000-call checkpoint and the final state at call 28,253
+  (frame 27,764, zero enemy buildings, zero faults). The last dialogue
+  acknowledgement exposed victory immediately before the recorded neutral
+  release. A fresh boot loaded the same world and re-exported identical SRAM
+  (`a5183059b513536784634e374ce4ab56cba0ecca3abdbe38037ea46415ae7475`).
+  Continue P2 from that save. Use
+  [the pinned-input verifier](../tools/sc64_early_protoss_home_replay.py)
+  to reproduce the HOME-to-result and fresh-load checks.
 
 - **Campaign save continuity on the finite-gas cartridges.** The packaged
   Protoss10 cleared P9 and P10 from a retained P8 victory, with fresh result
