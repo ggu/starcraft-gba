@@ -493,6 +493,9 @@ class Capture:
         last_step = self.ticks[-1]['step'] if self.ticks else -1
         self.trailing_changes = [(h['tick'], h['pause'] != 0, bool(h['flags'] & FLAG_TABLE))
                                  for h in change_all if h['step'] > last_step]
+        # Every change read's unit-table flag in capture order, for scenarios that never leave
+        # their mission (a skipped tick without a table adds no frame).
+        self.change_tables = [bool(h['flags'] & FLAG_TABLE) for h in change_all]
 
     def _verify_artifacts(self, tap):
         """tap.bin and tape.txt must be the files the capture wrote (manifest digests)."""

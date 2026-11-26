@@ -586,7 +586,9 @@ def tick_frames(cap):
     # one would be a tick the clock cannot place (the decoder adds skipped frames only before
     # in-mission records), so it is refused rather than dated.
     start = next((i for i, r in enumerate(cap.ticks) if r['table']), None)
-    if start is not None and (any(not r['table'] for r in cap.ticks[start:]) or
+    tables = getattr(cap, 'change_tables', [])
+    entered = tables.index(True) if True in tables else len(tables)
+    if start is not None and (any(not r['table'] for r in cap.ticks[start:]) or not all(tables[entered:]) or
                               any(not table for _, _, table in getattr(cap, 'trailing_changes', []))):
         raise ValueError(f'{cap.run}: a read without a unit table after the mission started')
     known = {r['tick']: r['sf'] for r in cap.ticks if r['table'] and r['sf'] >= 0}
@@ -610,6 +612,10 @@ def tick_frames(cap):
             raise ValueError(f'{cap.run}: change reads after the last follow-up go from tick {covered} to {tick}')
         state[tick] = (paused, table)
         covered = tick
+    if len(state) > 1:
+        # Only the tick the capture's end cut off may lack its follow-up; more would be ticks
+        # whose rows (builds, waves) the measurement never saw.
+        raise ValueError(f'{cap.run}: {len(state)} ticks after the last follow-up read')
     trailing = sorted(t for t, (paused, table) in state.items() if table and not paused)
 
     def frame_of(tick):

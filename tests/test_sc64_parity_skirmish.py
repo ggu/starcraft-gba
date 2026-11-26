@@ -376,49 +376,43 @@ class ResultFrames(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             run = pathlib.Path(d)
             # Ticks 1-10 are frames 0-9; ticks 11-14 are paused (the result screen). The computer
-            # (owner 2) falls during paused tick 13; after the last read (tick 14) come paused
-            # ticks 15-16 and unpaused 17-18, and the human (owner 0) falls during tick 18.
-            (run / 'watch.csv').write_text('step,tick,address,bytes,value' + chr(10) + '10,0,800b936c,4,0' + chr(10) +
-                                           '30,13,800b936c,4,200' + chr(10) + '40,18,800b936c,4,2000200' + chr(10))
+            # (owner 2) falls during paused tick 13; the human (owner 0) during tick 15, the one
+            # tick after the last read (unpaused).
+            log = ['step,tick,address,bytes,value', '10,0,800b936c,4,0', '30,13,800b936c,4,200',
+                   '32,15,800b936c,4,2000200']
+            (run / 'watch.csv').write_text(chr(10).join(log) + chr(10))
             ticks = [{'tick': k + 1, 'step': 2 * k + 3, 'sf': min(k, 9), 'table': True, 'paused': k >= 10}
                      for k in range(14)]
-            trailing = [(15, True, True), (16, True, True), (17, False, True), (18, False, True)]
             cap = type('Cap', (), {'run': run, 'ticks': ticks, 'skipped_frames': [], 'change_steps': {},
-                                   'trailing_changes': trailing, 'layout': sc64_parity.parity_decode.Layout()})()
-            # A raw tick count would date them 12 and 17.
-            self.assertEqual(sk.result_frames(cap), {2: (9, 2), 0: (11, 2)})
-            self.assertEqual(sk.tick_frames(cap)[1], 11)
-            # A missing change read after the last follow-up leaves a pause state unknown.
-            cap.trailing_changes = [(15, True, True), (17, False, True), (18, False, True)]
+                                   'change_tables': [True] * 15, 'trailing_changes': [(15, False, True)],
+                                   'layout': sc64_parity.parity_decode.Layout()})()
+            # A raw tick count would date them 12 and 14.
+            self.assertEqual(sk.result_frames(cap), {2: (9, 2), 0: (10, 2)})
+            self.assertEqual(sk.tick_frames(cap)[1], 10)
+            # A paused trailing tick adds nothing; a tick read again keeps its latest state.
+            cap.trailing_changes = [(15, True, True)]
+            self.assertEqual(sk.tick_frames(cap)[1], 9)
+            cap.trailing_changes = [(15, True, True), (15, False, True)]
+            self.assertEqual(sk.tick_frames(cap)[1], 10)
+            # Refused: a gap or a step back after the last follow-up, more than the one cut-off
+            # tick, a read without a unit table after the mission started, a result past the last read.
+            for bad in ([(16, False, True)], [(15, False, True), (14, False, True)],
+                        [(15, False, True), (16, False, True)], [(15, False, False)]):
+                cap.trailing_changes = bad
+                with self.assertRaises(ValueError):
+                    sk.tick_frames(cap)
+            cap.trailing_changes = [(15, False, True)]
+            cap.change_tables = [True] * 5 + [False] + [True] * 9
             with self.assertRaises(ValueError):
                 sk.tick_frames(cap)
-            # A result logged after the capture's last read has no frame.
-            cap.trailing_changes = trailing[:3]
-            with self.assertRaises(ValueError):
-                sk.result_frames(cap)
-            # A tick read again keeps its latest pause state; a tick that steps back is refused.
-            cap.trailing_changes = [(15, True, True), (15, False, True), (16, True, True), (17, False, True),
-                                    (18, False, True)]
-            self.assertEqual(sk.tick_frames(cap)[1], 12)
-            cap.trailing_changes = [(15, True, True), (16, False, True), (15, False, True), (17, False, True),
-                                    (18, False, True)]
-            with self.assertRaises(ValueError):
-                sk.tick_frames(cap)
-            # A read without a unit table after the mission started cannot be placed: refused.
-            cap.trailing_changes = [(15, False, False), (16, True, True), (17, False, True), (18, False, True)]
-            with self.assertRaises(ValueError):
-                sk.tick_frames(cap)
-            cap.trailing_changes = trailing
+            cap.change_tables = [True] * 15
             cap.ticks = ticks + [{'tick': 15, 'step': 31, 'sf': 9, 'table': False, 'paused': False}]
             with self.assertRaises(ValueError):
                 sk.tick_frames(cap)
             cap.ticks = ticks
-            for bad in ([(16, False, True), (17, False, True), (18, False, True)],
-                        [(15, False, True), (16, False, True), (15, False, True), (17, False, True),
-                         (18, False, True)]):
-                cap.trailing_changes = bad
-                with self.assertRaises(ValueError):
-                    sk.tick_frames(cap)
+            (run / 'watch.csv').write_text(chr(10).join(log[:3] + ['40,18,800b936c,4,2000200']) + chr(10))
+            with self.assertRaises(ValueError):
+                sk.result_frames(cap)
 
     def test_goldens_of_an_older_revision_are_stale(self):
         self.assertEqual(metrics.SCENARIOS['sk-zvt-w0']['decoder_revision'], sk.DECODER_REVISION)
