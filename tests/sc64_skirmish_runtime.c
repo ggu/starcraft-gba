@@ -509,12 +509,12 @@ static void custom_result_controls(void)
         if (b[i].owner == SIDE) b[i].alive = 0;
     frame = 120;
     race_skirmish_outcome();
-    assert(screen == SCREEN_RESULT && lost && !custom_defeat_overview);
+    assert(screen == SCREEN_RESULT && lost && !custom_result_overview);
     game_update(KEY_A, KEY_A);
-    assert(screen == SCREEN_RESULT && lost && custom_defeat_overview);
+    assert(screen == SCREEN_RESULT && lost && custom_result_overview);
     assert(frame == 120 && minerals == 5000 && gas == 5000);
     game_update(KEY_A, 0);
-    assert(screen == SCREEN_RESULT && custom_defeat_overview);
+    assert(screen == SCREEN_RESULT && custom_result_overview);
     game_render();
 #if defined(SC64_HUD_PAGE_BANDS)
     assert(sc64_hud_page_version[gfx_backbuffer_index()][1] == ~0u);
@@ -524,13 +524,18 @@ static void custom_result_controls(void)
 
     game_update(0, 0);
     game_update(KEY_A, KEY_A);
-    assert(screen == SCREEN_PLAY && frame == 0 && race_mode && !lost && !custom_defeat_overview);
+    assert(screen == SCREEN_PLAY && frame == 0 && race_mode && !lost && !custom_result_overview);
 
-    /* A custom win uses its existing first-A retry path. */
+    frame = 240;
     race_skirmish_outcome();
-    assert(screen == SCREEN_RESULT && won && !lost);
+    assert(screen == SCREEN_RESULT && won && !lost && !custom_result_overview);
     game_update(KEY_A, KEY_A);
-    assert(screen == SCREEN_PLAY && frame == 0 && race_mode && !won && !custom_defeat_overview);
+    assert(screen == SCREEN_RESULT && won && frame == 240 && custom_result_overview);
+    game_update(KEY_A, 0);
+    assert(screen == SCREEN_RESULT && won && frame == 240 && custom_result_overview);
+    game_update(0, 0);
+    game_update(KEY_A, KEY_A);
+    assert(screen == SCREEN_PLAY && frame == 0 && race_mode && !won && !custom_result_overview);
 }
 
 int main(void)

@@ -1152,6 +1152,7 @@ field_controls_draw_result(void)
     gfx_text(44, 72, "TIME", C_DIM); ui_clock(44, 82, (unsigned)frame, C_WHITE);
     gfx_text(98, 72, "UNITS", C_DIM); gfx_num(98, 82, units, C_WHITE);
     gfx_text(146, 72, "BUILDINGS", C_DIM); gfx_num(146, 82, buildings, C_WHITE);
-    const char *action = next ? "NEXT MISSION" : race_mode && lost ? "OVERVIEW" : "RETRY";
-    ui_key(ui_key(next || (race_mode && lost) ? 42 : 58, 101, "A", action, C_WHITE), 101, "B", "TITLE SCREEN", C_DIM);
+    int overview = race_mode && (won || lost);
+    const char *action = next ? "NEXT MISSION" : overview ? "OVERVIEW" : "RETRY";
+    ui_key(ui_key(next || overview ? 42 : 58, 101, "A", action, C_WHITE), 101, "B", "TITLE SCREEN", C_DIM);
 }
