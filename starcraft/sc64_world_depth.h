@@ -161,9 +161,30 @@ sc64_depth_push(u32 *heap, unsigned *size, unsigned layer, int y,
     sc64_depth_push_key(heap, size, sc64_depth_key(layer, y, kind, slot));
 }
 
+#ifdef SC64_DEPTH_ARM_POP_TRIAL
+static u32 GBA_HOT __attribute__((noinline))
+#else
 static u32
+#endif
 sc64_depth_pop(u32 *heap, unsigned *size)
 {
+#ifdef SC64_DEPTH_ARM_POP_TRIAL
+    unsigned count = *size - 1;
+    *size = count;
+    u32 first = heap[0], key = heap[count];
+    unsigned at = 0;
+    while (at * 2 + 1 < count) {
+        unsigned child = at * 2 + 1;
+        u32 child_key = heap[child];
+        if (child + 1 < count && heap[child + 1] < child_key)
+            child_key = heap[++child];
+        if (key <= child_key) break;
+        heap[at] = child_key;
+        at = child;
+    }
+    heap[at] = key;
+    return first;
+#else
     u32 first = heap[0], key = heap[--*size];
     unsigned at = 0;
     while (at * 2 + 1 < *size) {
@@ -175,6 +196,7 @@ sc64_depth_pop(u32 *heap, unsigned *size)
     }
     heap[at] = key;
     return first;
+#endif
 }
 
 #ifdef SC64_PROJECTILE_DEPTH
