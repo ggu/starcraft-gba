@@ -24,6 +24,41 @@ static void check_memo_goal(int goal)
     check_grid_unchanged();
 }
 
+/* Admission must produce the same packets for every destination alignment.
+ * The maze makes goal 2 a multi-run difference from goal 1. */
+static void check_admission_alignment(void)
+{
+    static _Alignas(4) u8 output[SC64_MEMO_BYTES + 8];
+    static u8 expected_field[SC64_MEMO_BYTES];
+    static u8 expected_memo[sizeof(sc64_wide_memo)];
+    int expected_reached = 0;
+    for (unsigned phase = 0; phase < 4; ++phase) {
+        memset(&sc64_wide_memo, 0, sizeof(sc64_wide_memo));
+        memset(output, 0x93, sizeof(output));
+        u8 *field = output + phase;
+        assert(sc64_route_fill_wide_cached(field, 1) > SC64_MEMO_SMALL_FILL);
+        int reached = sc64_route_fill_wide_cached(field, 2);
+        assert(sc64_wide_memo.used == 1 && sc64_wide_memo.diff[0].count > 1);
+        if (!phase) {
+            expected_reached = reached;
+            memcpy(expected_field, field, sizeof(expected_field));
+            memcpy(expected_memo, &sc64_wide_memo, sizeof(expected_memo));
+        } else {
+            assert(reached == expected_reached);
+            assert(!memcmp(field, expected_field, sizeof(expected_field)));
+            assert(!memcmp(&sc64_wide_memo, expected_memo, sizeof(expected_memo)));
+        }
+        for (unsigned i = 0; i < phase; ++i) assert(output[i] == 0x93);
+        for (unsigned i = phase + SC64_MEMO_BYTES; i < sizeof(output); ++i)
+            assert(output[i] == 0x93);
+        memset(field, 0, SC64_MEMO_BYTES);
+        assert(sc64_route_fill_wide_cached(field, 2) == expected_reached);
+        assert(!memcmp(field, expected_field, sizeof(expected_field)));
+        check_grid_unchanged();
+    }
+    sc64_wide_memo_reset();
+}
+
 int main(void)
 {
     race_cols = race_rows = 128;
@@ -32,6 +67,7 @@ int main(void)
         for (int x = 0; x < 128; x++)
             desired[y*128+x] = !(y & 1) || x == (y & 2 ? 0 : 127);
     build_path_grid();
+    check_admission_alignment();
     check_memo_goal(1);
     check_memo_goal(2);
     assert(sc64_wide_memo.diff[0].count > 1);

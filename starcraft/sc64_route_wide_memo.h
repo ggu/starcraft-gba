@@ -63,6 +63,14 @@ sc64_route_fill_wide_cached(u8 *field, int goal)
     u8 *packet = (u8 *)(void *)bfs_queue;
     unsigned size = 0, end = 0, last_header = 0;
     for (unsigned i = 0; i < SC64_MEMO_BYTES; ++i) {
+        if (((i | (uintptr_t)field) & 3u) == 0) {
+            typedef u32 MemoWord __attribute__((__may_alias__));
+            while (i < SC64_MEMO_BYTES &&
+                   *(const MemoWord *)(const void *)(field + i) ==
+                   *(const MemoWord *)(const void *)(sc64_wide_memo.field + i))
+                i += 4;
+            if (i == SC64_MEMO_BYTES) break;
+        }
         if (field[i] == sc64_wide_memo.field[i]) continue;
         if (!size || i - end > 2 || packet[last_header] + i - end + 1 > 255) {
             if (size + 4 > SC64_MEMO_PACKET_BYTES) goto reject;
