@@ -85,10 +85,11 @@ static int sc64_p6_count_snapshot_row_supported(
 /* Start a one-tick cache. Rows that are copied, malformed, unsupported, or
  * outside the bounded P6 query rectangle bank remain on the original
  * full-scan path. */
-static int sc64_p6_count_snapshot_begin(Sc64P6CountSnapshot *snapshot,
-                                         const Sc64P6WorldContext *ctx,
-                                         const Sc64P6State *state,
-                                         int prune_started)
+static int sc64_p6_count_snapshot_begin_policy(Sc64P6CountSnapshot *snapshot,
+                                                const Sc64P6WorldContext *ctx,
+                                                const Sc64P6State *state,
+                                                int prune_started,
+                                                int metadata_validated)
 {
     if (!snapshot) return 0;
     memset(snapshot, 0, sizeof(*snapshot));
@@ -99,7 +100,7 @@ static int sc64_p6_count_snapshot_begin(Sc64P6CountSnapshot *snapshot,
         if (condition->opcode != SC64_P6_CONDITION_COMMAND &&
             condition->opcode != SC64_P6_CONDITION_BRING) continue;
         if (prune_started && sc64_p6_trigger_started(state, condition->trigger) &&
-            sc64_p6_trigger_one_shot(condition->trigger)) continue;
+            (metadata_validated || sc64_p6_trigger_one_shot(condition->trigger))) continue;
         if (sc64_p6_count_snapshot_row_supported(ctx, snapshot, condition)) {
             snapshot->cached_rows |= bit;
             snapshot->selector_rows[condition->player] |= bit;
@@ -195,6 +196,14 @@ static int sc64_p6_count_snapshot_begin(Sc64P6CountSnapshot *snapshot,
     }
     snapshot->active = 1;
     return 1;
+}
+
+static inline int sc64_p6_count_snapshot_begin(Sc64P6CountSnapshot *snapshot,
+                                               const Sc64P6WorldContext *ctx,
+                                               const Sc64P6State *state,
+                                               int prune_started)
+{
+    return sc64_p6_count_snapshot_begin_policy(snapshot, ctx, state, prune_started, 0);
 }
 
 /* A miss means the caller must use sc64_p6_world_count unchanged. */
