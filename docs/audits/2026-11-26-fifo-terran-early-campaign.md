@@ -43,7 +43,7 @@ trace hashes were `b212efeeaa935c800b1ac66004da915d37b17bbba31d84e8cac647cb2c626
 and `f10192aab83c53c616888b0430e354d9dc49f163d7e3a94796ff7ca362df7b7a`,
 respectively. The private stage scripts and generated traces are not supplied
 as repository replay targets. This is emulator evidence for the trial ROM,
-not a physical-hardware measurement or a completed T1–T10 run.
+not a physical-hardware measurement. The carried continuation is below.
 
 ## Carried T6 and T7
 
@@ -65,4 +65,27 @@ identical SRAM (SHA-256
 The private T7 replay reduced its generic free-disk reserve from 256 to
 48 MiB after two reserve stops; its log was redirected to `/dev/null` and
 its save outputs are small. No gameplay or comparison rule was changed.
-The continuation from this newly produced T7 save through T8–T10 is ongoing.
+The newly produced T7 result then entered T8. Its candidate HOST trace was
+byte-identical to the finite-gas reference; the cartridge matched all 467
+checkpoint ticks and won at frame 285,946 with mask `0xff0`. Its fresh HOME
+result reload re-exported identical SRAM (SHA-256
+`8991e276738298ea4527421b88142a93c622146d01aae99b7e21f0a4fd924fa3`).
+The private T8 replay likewise used the 48 MiB free-space reserve and sent
+progress to a pipe after an earlier attempt stopped when the disk filled.
+No gameplay or comparison rule was changed.
+
+The new T8 victory then entered T9. The trial HOST trace's 53 checkpoint
+ticks all matched, and T9 won at frame 48,586 with mask `0x1ff0`. Its fresh
+HOME result reload re-exported identical SRAM (SHA-256
+`e79e3b0b4937a9af8937868fb436d6ae1de15df25195e6f9f48d1791e46dfaf3`).
+That actual save entered T10. A regenerated trial HOST trace matched the
+previous qualified trace byte for byte; all six cartridge checkpoints matched
+and T10 won at frame 3,361 with all ten Terran bits (`0x3ff0`). Its fresh
+HOME result reload re-exported identical SRAM (SHA-256
+`74dfc2d264dc18bb6fed40eaa2b34350911b73d77e24e515fbc98e20225be1ba`).
+
+Together with the already verified blank-start T1–T2 and the carried T3–T7
+above, this completes the T1–T10 ordinary-input trial campaign on mGBA.
+The T5 qualification remains the staged paid route described above, not a
+strict uninterrupted HOST-tape match. This does not activate the trial or
+establish physical hardware behavior.
