@@ -105,7 +105,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The same save then carried P4 to victory at frame 84,220, with both
   heroes in extraction and a byte-identical fresh result readback. P5 then
   cleared at frame 5,057 and retained all five completion bits after a fresh
-  load. Continue from the P5 result into P6.
+  load. P6 followed at frame 51,746, retaining the first six completion
+  bits after a fresh load. Continue from P6 into Homeland.
   [Linked Protoss replay and evidence](audits/2026-11-26-protoss-opening-continuation.md).
   Use
   [the pinned-input verifier](../tools/sc64_early_protoss_home_replay.py)

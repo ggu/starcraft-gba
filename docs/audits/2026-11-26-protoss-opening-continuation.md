@@ -136,3 +136,28 @@ dialogue log, the P4 readback path and hash, and a new output directory.
 | P5 controller trace | `b0806cae59b0e595e5f9de874d8f6c5a556587fd1a12ae532f6d228e01e2f10d` |
 | P5 victory SRAM and fresh re-export | `97762bd635561d2af4812afeb51f031d0b5b91b23824b2c9db7f72554141d992` |
 | Qualification receipt | `db512f6997e85f21adb7ac07f0b555a8e77f2a779155f5761bf74fbd829ee51c` |
+
+## Protoss mission 6 from the P5 result
+
+The same ROM loaded the P5 readback and advanced from RESULT into
+mission slot 25 at frame zero. Victory arrived at frame 51,746 after
+52,709 linked calls. All 59 checkpoints and 17 field dialogue pages
+matched. Zeratul and Tassadar survived. No faults or unsupported
+actions occurred, the campaign reached phase 3, and the completion
+mask `0x3c0000c` retained all six mission flags.
+
+Fresh HOME L matched the world, named controls, P6 runtime and
+completion mask and re-exported identical SRAM. Sequence 6 in slot 1
+contains the P6 result and passes its checksum. Slot 0 retained the
+preceding sequence 5 P5 bank byte for byte.
+
+Build `build/px-p6-normal-home` and run
+`./build/px-p6-normal-home --trace p6-home.json 2> p6-pages.log`.
+The verifier command above uses `--mission 25`, this trace and
+dialogue log, the P5 readback path and hash, and a new output directory.
+
+| Artifact | SHA-256 |
+|---|---|
+| P6 controller trace | `812de47cfab5e7a1fb01c42e0bf664db7a874ab09a7651c689d5431a0aed54be` |
+| P6 victory SRAM and fresh re-export | `076f0a2f0336ef86d900b0c99eae2a1416bb04e9f7c5a26f07d9f02b5f7d1c9d` |
+| Qualification receipt | `0c9401ac3f37c4498876aef2701995d3c530468c4c9e2cabd06db0ebf939823d` |
