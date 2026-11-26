@@ -3,7 +3,7 @@
 A passive Terran human lost a Blood Bath Free for All on both
 cartridges against Zerg, Terran and Protoss computers. The two N64
 runs are the retained `s8-k0` and `s8-k0b` captures from the
-[scenario spikes](2026-11-26-parity-scenario-spikes.md#same-lobby-same-start-step).
+[scenario spikes](2026-11-26-parity-scenario-spikes.md#s8-seeds).
 This comparison uses their watch rows and sampled live unit rows. The
 paired captures have identical ticks, sparse raw rows and result
 watches. The standard Terran GBA ROM ran with physical buttons and
@@ -41,10 +41,14 @@ counts human buildings for defeat. The field result panel displayed
 “Your forces were eliminated” alongside Units 4 and Buildings 0.
 
 Both results follow the loss of the human's final structure. The
-N64 workers were already gone in this run, so a native last-building
-loss with surviving workers remains open. The two computer matches
-also followed different battle trajectories despite their matched
-start anchors.
+[earlier ordinary native survivor capture](2026-11-21-blood-bath-live-results.md#ordinary-human-survivor-transfer)
+established that a surviving SCV changes to neutral on the defeat
+update. All four GBA SCVs retain their human owner on the standard
+cartridge here. The opt-in GBA transfer already has its own coverage
+in that earlier audit. This run adds a comparison with the same start
+anchors and shows the standard cartridge's current result panel,
+surviving-actor counts and result controls. The two computer matches
+followed different battle trajectories.
 
 ## Result controls and readback
 

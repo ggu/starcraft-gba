@@ -1642,8 +1642,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   pairs two retained N64 captures with a passive physical GBA match from
   the same four start anchors. Both lose their final structure. The GBA
   shows four living SCVs on its result panel and retries with A or goes
-  HOME with B after a byte-identical defeat reload. Verify the native
-  result controls and last-building defeat with living workers.
+  HOME with B after a byte-identical defeat reload. The earlier native
+  survivor capture records neutral ownership at defeat. Verify the
+  native score and controls after a Blood Bath defeat.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
   Free for All loads or Melee rejections. Random seats and four
