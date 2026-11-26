@@ -309,6 +309,16 @@ hash chains, goldens written to a private `SC64_PARITY_HOME` until this lands):
 | `lab-marine-zergling` | Marine row 10 attack-moves to (873,1350): one Zergling in reach | damage taken gates again (5, KNOWN); damage, cooldown and range KNOWN (absent on the GBA, defect 4); survival KNOWN (absent) |
 | `lab-hydralisk-zealot` | Hydralisk row 37 attack-moves to (1002,1100): away from the Zealot's Photon Cannon, idle Hydralisks out of reach at the credited hits | cooldown gates again (15, KNOWN, absent on the GBA); shield damage and range stay KNOWN; survival 66 → absent, still KNOWN (defect 4) |
 
+Review then hardened the attack measure further, with every lab golden regenerating
+byte-identical: a hit needs the sole human attacker in reach on both samples around the drop
+(GBA buildings of the human included); damage taken needs one enemy of the foe's id on both
+samples; a row that hatches, changes owner or is reused is a new unit (on the GBA every
+in-place change is a removal); kills of any enemy, destroyed GBA buildings and drops on other
+nearby enemies split cooldown intervals; an unresolved earlier hit withholds the first-hit
+range; a GBA fight that leaves a check without a value reads REGRESSION ("not measured"),
+never the absent marker; and an order check is refused when a tick around the press, or the
+subject row itself, was not observed.
+
 Both new tapes give the selected row (`row`) and no longer need `legacy_selection`. Attempts
 that did not give a single attacker: the lone T1 Zergling at (67,1143) (the Marine's route
 round the ridge meets the pair first) and Hydralisk points (1000,1200) and (1000,1250)
