@@ -166,7 +166,7 @@ coverage are in
 
 | Kind | Measures (both engines, `tools/sc64_parity_metrics.py`) | Band |
 | --- | --- | --- |
-| Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a 4-frame chord at 90% of cruise), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
+| Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a chord at 90% of cruise; the chord is 4 frames, or long enough to span two GBA position steps at the N64 cruise speed, as for the Overlord's 5. A lengthened chord's cutoff is at most the N64 cruise distance rounded down to whole GBA steps, so the Overlord's is 4 px, about 95% of its 5-frame cruise distance. The N64 side records chord and floor in the golden (`accel_chord`, `accel_floor`) for the GBA side to use. A mover slower than about 1 px a frame resolves acceleration to about one GBA step, 3-4 frames), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
 | Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death | exact; ±1 frame; ±8 px; exact; ±4 frames |
 | Train and build (passive) | Blood Bath computers: N64 rows born with the status bit clear until it sets; GBA queue progress 1 to the unit's birth, and a building's birth to its completion | ±2 frames |
 
