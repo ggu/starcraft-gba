@@ -115,7 +115,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   load. P6 followed at frame 51,746, retaining the first six completion
   bits after a fresh load. Homeland then won from the P6 result at frame
   41,224, with all three heroes alive and seven completion bits after a
-  byte-identical fresh readback. Continue from Homeland into P8.
+  byte-identical fresh readback. P8 continued at frame zero and won at
+  frame 93,065. The Stasis Cell was destroyed, both heroes survived, and
+  all eight completion bits restored from a fresh boot. P9 and P10
+  then won from the preceding result at frames 101,649 and 53,225.
+  The final fresh readback retains all ten completion bits (0x3fc0000c)
+  and re-exports identical SRAM.
+  [Standard Protoss finale continuation](audits/2026-11-26-protoss-standard-finale.md).
   [Homeland replay and evidence](audits/2026-11-26-protoss-p7-linked/README.md).
   [Linked Protoss replay and evidence](audits/2026-11-26-protoss-opening-continuation.md).
   Use
