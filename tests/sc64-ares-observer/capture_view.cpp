@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Asset-free checks for the capture spike's pure helpers: pad bits, the
- * line-wise cache-aware reader, and the unit-table locate/link/live rules.
+ * line-wise cache-aware reader, the unit-table locate/link/live rules, the
+ * closed-loop tape conditions and run-directory file names.
  * Synthetic buffers only; no ROM, emulator or guest data. */
 #include "../../experiments/ares-headless/capture_view.h"
 #include <cassert>
@@ -17,6 +18,46 @@ static_assert(sc64_capture_pad_bit("Right") == 16 && sc64_capture_pad_bit("C-Rig
 static_assert(sc64_capture_pad_bit("Z") == 1024 && sc64_capture_pad_bit("Left") == 8192);
 static_assert(sc64_capture_pad_bit("Axis") == 0 && sc64_capture_pad_bit("") == 0 && sc64_capture_pad_bit("Startx") == 0);
 static_assert(sc64_capture_mask_allowed(16383) && !sc64_capture_mask_allowed(16384) && !sc64_capture_mask_allowed(-1));
+
+static_assert(sc64_capture_until_op("eq") == Sc64UntilOp::eq && sc64_capture_until_op("changed") == Sc64UntilOp::changed);
+static_assert(sc64_capture_until_op("clear") == Sc64UntilOp::clear && sc64_capture_until_op("eqx") == Sc64UntilOp::invalid);
+static_assert(sc64_capture_until_op("") == Sc64UntilOp::invalid);
+static_assert(sc64_capture_until_met(Sc64UntilOp::eq, 5, 5, 0) && !sc64_capture_until_met(Sc64UntilOp::eq, 4, 5, 0));
+static_assert(sc64_capture_until_met(Sc64UntilOp::ne, 4, 5, 0) && !sc64_capture_until_met(Sc64UntilOp::ne, 5, 5, 0));
+static_assert(sc64_capture_until_met(Sc64UntilOp::ge, 6, 5, 0) && !sc64_capture_until_met(Sc64UntilOp::ge, 4, 5, 0));
+static_assert(sc64_capture_until_met(Sc64UntilOp::lt, 4, 5, 0) && !sc64_capture_until_met(Sc64UntilOp::lt, 5, 5, 0));
+static_assert(sc64_capture_until_met(Sc64UntilOp::changed, 7, 0, 6) && !sc64_capture_until_met(Sc64UntilOp::changed, 6, 0, 6));
+static_assert(sc64_capture_until_met(Sc64UntilOp::set, 0x13, 0x03, 0) && !sc64_capture_until_met(Sc64UntilOp::set, 0x11, 0x03, 0));
+static_assert(sc64_capture_until_met(Sc64UntilOp::clear, 0x10, 0x03, 0) && !sc64_capture_until_met(Sc64UntilOp::clear, 0x12, 0x03, 0));
+static_assert(!sc64_capture_until_met(Sc64UntilOp::invalid, 0, 0, 0));
+static void parses_addresses() {
+    std::uint32_t v = 0;
+    assert(sc64_capture_hex32("800AFDCC", &v) && v == 0x800AFDCCu);
+    assert(sc64_capture_hex32("0xff", &v) && v == 0xFFu && sc64_capture_hex32("FFFFFFFF", &v) && v == 0xFFFFFFFFu);
+    assert(!sc64_capture_hex32("100000000", &v) && !sc64_capture_hex32("", &v) && !sc64_capture_hex32("0x", &v));
+    assert(!sc64_capture_hex32("12g4", &v) && !sc64_capture_hex32("-1", &v) && !sc64_capture_hex32(nullptr, &v));
+    assert(sc64_capture_guest_offset(0x800AFDCCu, &v) && v == 0x0AFDCCu);
+    assert(sc64_capture_guest_offset(0xA0000010u, &v) && v == 0x10u && sc64_capture_guest_offset(0x7FFFFCu, &v) && v == 0x7FFFFCu);
+    assert(!sc64_capture_guest_offset(0x01000000u, &v) && !sc64_capture_guest_offset(0x00800000u, &v));
+    assert(!sc64_capture_guest_offset(0x80800000u, &v) && !sc64_capture_guest_offset(0xC0000000u, &v));
+    assert(!sc64_capture_guest_offset(0x40000000u, &v));
+}
+
+static_assert(sc64_capture_decimal_ok("25") && sc64_capture_decimal_ok("1") && sc64_capture_decimal_ok("999999999"));
+static_assert(!sc64_capture_decimal_ok("") && !sc64_capture_decimal_ok("rec") && !sc64_capture_decimal_ok("-1"));
+static_assert(!sc64_capture_decimal_ok("+5") && !sc64_capture_decimal_ok("2x") && !sc64_capture_decimal_ok("1000000000"));
+static_assert(!sc64_capture_decimal_ok(nullptr));
+static_assert(sc64_capture_file_name_ok("lobby-1.state") && sc64_capture_file_name_ok("a_B.9"));
+static_assert(!sc64_capture_file_name_ok("") && !sc64_capture_file_name_ok(".hidden") && !sc64_capture_file_name_ok(".."));
+static_assert(!sc64_capture_file_name_ok("a/b") && !sc64_capture_file_name_ok("a b") && !sc64_capture_file_name_ok(nullptr));
+static_assert(sc64_capture_file_name_ok("0123456789012345678901234567890123456789012345678901234567890123"));
+static_assert(!sc64_capture_file_name_ok("01234567890123456789012345678901234567890123456789012345678901234"));
+
+static void reads_field_widths() {
+    const std::uint8_t p[4] = {0x12, 0x34, 0x56, 0x78};
+    assert(sc64_capture_be(p, 1) == 0x12 && sc64_capture_be(p, 2) == 0x1234 && sc64_capture_be(p, 4) == 0x12345678u);
+    assert(sc64_capture_be(p, 3) == 0 && sc64_capture_be(p, 0) == 0);
+}
 
 static void pad_bits_are_distinct() {
     const char *names[] = {"A", "Start", "Down", "C-Left", "Right", "R", "C-Right", "C-Up",
@@ -122,6 +163,8 @@ int main() {
     reader_overlays_cache_lines();
     locates_one_table();
     checks_links_and_liveness();
+    reads_field_widths();
+    parses_addresses();
     std::uint8_t sample[3] = {1, 2, 3};
     assert(sc64_capture_fnv64(sample, 3) != sc64_capture_fnv64(sample, 2));
     return 0;

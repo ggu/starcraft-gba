@@ -25,6 +25,7 @@ tolerance written next to it, each derived from the S4 data
 import functools
 import math
 import pathlib
+import re
 import statistics
 
 MARINE, SCV, DRONE, ZERGLING = 0, 7, 41, 37
@@ -35,19 +36,71 @@ CHORD = 8  # source frames per chord in the cruise-speed measure
 
 # ---- tape ------------------------------------------------------------------
 
-def tape_commands(path):
-    """Step numbers of '# mark NAME' comments in a capture tape (the frontend skips comments)."""
-    marks, step = {}, 0
-    for line in pathlib.Path(path).read_text().splitlines():
-        words = line.split()
+def frontend_lines(text):
+    """Tape lines as the frontend reads them (pass raw bytes decoded without newline
+    translation, never read_text(), which turns a bare CR into a line break): split at LF only, comments and empty lines
+    skipped (a line starting with '#'), tokens split at C whitespace, nothing after quit."""
+    for line in text.split('\n'):
+        if not line or line[0] == '#':
+            continue
+        words = [w for w in re.split('[ \t\n\v\f\r]+', line) if w]
         if not words:
             continue
-        if words[0] == '#':
-            if len(words) >= 3 and words[1] == 'mark':
-                marks[words[2]] = step
-            continue
-        if words[0].lstrip('-').isdigit():
-            step += int(words[0])
+        if words[0] == 'quit':
+            return
+        yield words
+
+
+# The frontend reads a pad line's count with `>>` into a long long, so a sign is allowed.
+STEP_COUNT = re.compile(r'[+-]?[0-9]+')
+
+
+def tape_commands(path):
+    """Step numbers of '# mark NAME' comments in a capture tape (the frontend skips comments).
+
+    A mark falls where the next step-advancing command (a pad line or `until`) began. When
+    the run's commands.csv is beside the tape, those begin steps are the executed ones, which
+    covers `load NAME STEP` renumbering and `until` waits of any length. Without it the pad
+    steps are summed, which is only valid for tapes with neither command."""
+    tape = pathlib.Path(path)
+    # Read as the frontend does: lines split at LF, tokens at C whitespace, a line starting with
+    # '#' is a comment (marks are '# mark NAME'), nothing after `quit` runs.
+    lines = []
+    for line in tape.read_bytes().decode('utf-8', 'surrogateescape').split('\n'):
+        words = [w for w in re.split('[ \t\n\v\f\r]+', line) if w]
+        if line[:1] == '#':
+            lines.append(('mark', words[2]) if len(words) >= 3 and words[:2] == ['#', 'mark'] else ('comment', None))
+        elif words:
+            if words[0] == 'quit':
+                break
+            lines.append(('command', words[0]))
+    steps = lambda word: STEP_COUNT.fullmatch(word) is not None
+    executed = tape.parent / 'commands.csv'
+    if executed.is_file():
+        rows = executed.read_text().splitlines()[1:]
+        begins = [(int(r.split(',')[0]), int(r.split(',')[1])) for r in rows if r]
+        marks, index = {}, 0
+        for kind, word in lines:
+            if kind == 'mark':
+                if index < len(begins):
+                    marks[word] = begins[index][0]
+                elif begins:
+                    marks[word] = begins[-1][0] + begins[-1][1]
+                else:
+                    raise SystemExit(f'{tape}: mark {word} has no executed command')
+            elif kind == 'command' and (steps(word) or word == 'until'):
+                index += 1
+        if index != len(begins):
+            raise SystemExit(f'{tape}: {index} step commands but {len(begins)} rows in commands.csv')
+        return marks
+    marks, step = {}, 0
+    for kind, word in lines:
+        if kind == 'command' and word in ('load', 'until'):
+            raise SystemExit(f'{tape}: marks after load or until need the run\'s commands.csv')
+        if kind == 'mark':
+            marks[word] = step
+        elif kind == 'command' and steps(word):
+            step += int(word)
     return marks
 
 

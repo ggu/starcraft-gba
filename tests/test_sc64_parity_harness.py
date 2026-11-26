@@ -2,7 +2,9 @@
 """Asset-free checks of the S4 parity slice: tap.bin decoding, the layout's
 proven-field gate, golden bundles, GBA trace parsing and every comparator
 verdict, on synthetic data only (no ROM, capture or GBA build needed)."""
+import contextlib
 import hashlib
+import io
 import json
 import shutil
 import pathlib
@@ -15,6 +17,8 @@ import uuid
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import parity_decode  # noqa: E402
+sys.path.insert(0, str(ROOT / 'experiments' / 'ares-headless'))
+import capture_report  # noqa: E402
 import sc64_parity  # noqa: E402
 import sc64_parity_metrics as metrics  # noqa: E402
 
@@ -126,6 +130,30 @@ class Decoder(unittest.TestCase):
             for name in ('paused', 'shifted'):
                 problems = parity_decode.same_bundle(A, parity_decode.Capture(temp / name))
                 self.assertTrue(any('hash chains diverge' in p for p in problems), (name, problems))
+
+
+    def test_loaded_state_inputs_must_match(self):
+        """Captures that load a state (S5) are one bundle only with the same state bytes."""
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            caps = {}
+            for name, payload in (('a', b'state-one'), ('b', b'state-one'), ('c', b'state-two'), ('d', b'state-one')):
+                write_capture(temp / name, marine_frames(40))
+                (temp / name / 'input').mkdir()
+                (temp / name / 'input' / 'lobby.state').write_bytes(payload)
+                manifest = json.loads((temp / name / 'manifest.json').read_text())
+                manifest['state_input_sha256'] = {'lobby.state': hashlib.sha256(b'state-one' if name == 'd' else payload).hexdigest()}
+                (temp / name / 'manifest.json').write_text(json.dumps(manifest))
+                caps[name] = parity_decode.Capture(temp / name)
+            self.assertEqual(parity_decode.same_bundle(caps['a'], caps['b']), [])
+            self.assertTrue(any('state_input_sha256' in p for p in parity_decode.same_bundle(caps['a'], caps['c'])))
+            (temp / 'd' / 'input' / 'lobby.state').write_bytes(b'state-edited')
+            caps['d'] = parity_decode.Capture(temp / 'd')
+            self.assertTrue(any('state input lobby.state' in p for p in parity_decode.same_bundle(caps['a'], caps['d'])))
+            # A manifest from before S5 has no state inputs and still pairs with an empty one.
+            write_capture(temp / 'e', marine_frames(40))
+            write_capture(temp / 'f', marine_frames(40))
+            self.assertEqual(parity_decode.same_bundle(parity_decode.Capture(temp / 'e'), parity_decode.Capture(temp / 'f')), [])
 
 
 class Golden(unittest.TestCase):
@@ -268,6 +296,294 @@ class Comparator(unittest.TestCase):
             tape = pathlib.Path(temp) / 'tape.txt'
             tape.write_text('tap tick rec\n700 0 0 0\nshot a\n10 2 0 0\n# mark command\n4 1 0 0\n')
             self.assertEqual(metrics.tape_commands(tape), {'command': 710})
+
+
+class TapeMarks(unittest.TestCase):
+    def test_marks_follow_executed_commands(self):
+        """A mark after `load` (renumbered steps) and an `until` of unknown length lands where
+        the next command actually began."""
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            (run / 'tape.txt').write_text('load a.state 5000\nwatch 800F0C20 2\n10 0 0 0\n'
+                                          'until 800F0C20 2 eq 1 3000 0 0 0\n# mark box\n3 2 0 0\n20 0 0 0\n# mark end\n')
+            (run / 'commands.csv').write_text('begin,steps,mask,x,y\n5000,10,0,0,0\n5010,917,0,0,0\n5927,3,2,0,0\n5930,20,0,0,0\n')
+            self.assertEqual(metrics.tape_commands(run / 'tape.txt'), {'box': 5927, 'end': 5950})
+            (run / 'commands.csv').write_text('begin,steps,mask,x,y\n5000,10,0,0,0\n5010,917,0,0,0\n5927,3,2,0,0\n')
+            with self.assertRaises(SystemExit):   # one executed row missing
+                metrics.tape_commands(run / 'tape.txt')
+            (run / 'commands.csv').unlink()
+            with self.assertRaises(SystemExit):
+                metrics.tape_commands(run / 'tape.txt')
+            # The frontend accepts a signed count, so the summing fallback must too.
+            (run / 'tape.txt').write_text('+10 0 0 0\n# mark a\n5 1 0 0\n')
+            self.assertEqual(metrics.tape_commands(run / 'tape.txt'), {'a': 10})
+
+    def test_commands_log_must_match_the_manifest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            write_capture(temp / 'a', marine_frames(40))
+            (temp / 'a' / 'commands.csv').write_text('begin,steps,mask,x,y\n0,100,0,0,0\n')
+            problems = parity_decode.Capture(temp / 'a').verified
+            self.assertTrue(any('commands.csv' in p for p in problems), problems)
+            # A log the manifest declares may not be deleted to fall back to inferred marks.
+            manifest = json.loads((temp / 'a' / 'manifest.json').read_text())
+            manifest['outputs_sha256']['commands.csv'] = hashlib.sha256((temp / 'a' / 'commands.csv').read_bytes()).hexdigest()
+            (temp / 'a' / 'manifest.json').write_text(json.dumps(manifest))
+            (temp / 'a' / 'commands.csv').unlink()
+            problems = parity_decode.Capture(temp / 'a').verified
+            self.assertTrue(any('recorded in the manifest but missing' in p for p in problems), problems)
+
+    def test_tape_lines_follow_the_frontend(self):
+        """LF-only lines, '#' comments (a CR inside one is not a quit), nothing after quit."""
+        text = '# note\rquit\nload a.state\n10 0 0 0\nquit\nload b.state\n'
+        self.assertEqual(list(metrics.frontend_lines(text)), [['load', 'a.state'], ['10', '0', '0', '0']])
+        # File entry points read bytes, so a bare CR in a comment never becomes a line break.
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            (run / 'tape.txt').write_bytes(b'10 0 0 0\n# note\rquit\n# mark a\n5 1 0 0\n')
+            self.assertEqual(metrics.tape_commands(run / 'tape.txt'), {'a': 10})
+
+    def test_marks_stop_at_quit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            (run / 'tape.txt').write_text('10 0 0 0\n# mark a\n5 1 0 0\nquit\n7 0 0 0\n# mark late\n')
+            (run / 'commands.csv').write_text('begin,steps,mask,x,y\n0,10,0,0,0\n10,5,1,0,0\n')
+            self.assertEqual(metrics.tape_commands(run / 'tape.txt'), {'a': 10})
+
+    def test_a_load_needs_a_recorded_digest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            write_capture(temp / 'a', marine_frames(40))
+            tape = (temp / 'a' / 'tape.txt')
+            tape.write_bytes(b'load lobby.state 3900\n' + tape.read_bytes())
+            manifest = json.loads((temp / 'a' / 'manifest.json').read_text())
+            manifest['tape_sha256'] = hashlib.sha256(tape.read_bytes()).hexdigest()
+            (temp / 'a' / 'manifest.json').write_text(json.dumps(manifest))
+            problems = parity_decode.Capture(temp / 'a').verified
+            self.assertTrue(any('records no digest' in p for p in problems), problems)
+
+
+class CaptureReport(unittest.TestCase):
+    """The spike report helpers never count missing evidence as agreement."""
+
+    @staticmethod
+    def run_dir(root, name, checkpoints, ticks=(), run_id=None, raw=b''):
+        run = root / name
+        run.mkdir()
+        (run / 'checkpoints.csv').write_text('step,tick,sha256,cached_lines,dual_hits,dual_differ\n' +
+                                             ''.join(f'{s},0,{h},0,0,0\n' for s, h, _ in checkpoints))
+        (run / 'regions.csv').write_text(''.join(f'{s},' + ','.join(blocks) + '\n' for s, _, blocks in checkpoints if blocks))
+        header = 'step,tick,phase,same,seconds,pause,selector,running,countdown,table,live,bad_links,asymmetric_links,' \
+                 'dual_hits,dual_differ,raw_differs,rows_sha256,globals_sha256\n'
+        (run / 'ticks.csv').write_text(header + ''.join(f'{t},{t},1,1,0,0,4,1,0,0,0,0,0,0,0,0,r{t},g{t}\n' for t in ticks))
+        (run / 'ticks.raw').write_bytes(raw)
+        CaptureReport.seal(run, run_id or str(uuid.uuid4()))
+        return run
+
+    @staticmethod
+    def seal(run, run_id):
+        """Record ticks.csv in the manifest, as capture.py does."""
+        digest = hashlib.sha256((run / 'ticks.csv').read_bytes()).hexdigest()
+        (run / 'manifest.json').write_text(json.dumps({'run_id': run_id, 'ok': True, 'outputs_sha256': {'ticks.csv': digest}}))
+
+    def report(self, fn, *args):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            fn(*args)
+        return out.getvalue()
+
+    def test_compare_needs_every_region(self):
+        full = ['0' * 16] * capture_report.REGION_BLOCKS
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            a = self.run_dir(temp, 'a', [('1000', 'x', full), ('2000', 'y', full)])
+            b = self.run_dir(temp, 'b', [('1000', 'z', full[:5]), ('2000', 'w', [])])
+            text = self.report(capture_report.compare, a, b, set())
+            self.assertIn('state_regions_equal=0', text)
+            self.assertIn('checkpoints_without_all_regions=2', text)
+
+    def test_s8_pair_refuses_copies_and_partial_coverage(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            a = self.run_dir(temp, 'a', [], ticks=range(1, 6), run_id='same')
+            b = self.run_dir(temp, 'b', [], ticks=range(1, 6), run_id='same')
+            self.assertIn('no verdict', self.report(capture_report.s8_pair, a, b))
+            c = self.run_dir(temp, 'c', [], ticks=range(1, 4))
+            self.assertIn('coverage differs', self.report(capture_report.s8_pair, a, c))
+            e = self.run_dir(temp, 'e', [], ticks=range(1, 6))
+            with open(e / 'ticks.csv', 'a') as handle:
+                handle.write('6,6,0,0,0,0,4,1,0,0,0,0,0,0,0,0,r6,g6\n')   # a change-step read only in e
+            self.seal(e, 'e')
+            self.assertIn('change-step records: 0/1 shared=0 only_in_one_run=1', self.report(capture_report.s8_pair, a, e))
+            # A repeated tick: each follow-up belongs to the change before it.
+            r1, r2 = self.run_dir(temp, 'r1', []), self.run_dir(temp, 'r2', [])
+            header = (r1 / 'ticks.csv').read_text()
+            row = lambda tick, phase, h: f'{tick},{tick},{phase},0,0,0,4,1,0,0,0,0,0,0,0,0,{h},g\n'
+            (r1 / 'ticks.csv').write_text(header + row(5, 0, 'a') + row(5, 1, 'x') + row(5, 0, 'b'))
+            (r2 / 'ticks.csv').write_text(header + row(5, 0, 'a') + row(5, 0, 'b') + row(5, 1, 'x'))
+            self.seal(r1, 'r1'); self.seal(r2, 'r2')
+            text = self.report(capture_report.s8_pair, r1, r2)
+            self.assertIn('follow-up records: 1/1 shared=0 only_in_one_run=2', text)
+            self.assertIn('coverage differs', text)
+            # The same occurrences in a different order are not the same coverage.
+            o1, o2 = self.run_dir(temp, 'o1', []), self.run_dir(temp, 'o2', [])
+            (o1 / 'ticks.csv').write_text(header + row(5, 0, 'a') + row(6, 0, 'a') + row(5, 0, 'a'))
+            (o2 / 'ticks.csv').write_text(header + row(5, 0, 'a') + row(5, 0, 'a') + row(6, 0, 'a'))
+            self.seal(o1, 'o1'); self.seal(o2, 'o2')
+            self.assertIn('coverage differs', self.report(capture_report.s8_pair, o1, o2))
+            # Same change-step logs and no follow-up reads: not called a coverage difference.
+            (o2 / 'ticks.csv').write_bytes((o1 / 'ticks.csv').read_bytes()); self.seal(o2, 'o2')
+            text = self.report(capture_report.s8_pair, o1, o2)
+            self.assertIn('a phase has no comparable unit rows', text)
+            self.assertNotIn('coverage differs', text)
+            # A unit table readable in one run only is a coverage difference, not a row mismatch.
+            t1, t2 = self.run_dir(temp, 't1', []), self.run_dir(temp, 't2', [])
+            line = lambda table: f'7,7,1,1,0,0,4,1,0,{table},3,0,0,0,0,0,r7,g7\n'
+            (t1 / 'ticks.csv').write_text(header + line(3154736)); (t2 / 'ticks.csv').write_text(header + line(0))
+            self.seal(t1, 't1'); self.seal(t2, 't2')
+            text = self.report(capture_report.s8_pair, t1, t2)
+            self.assertIn('table_in_one_run_only=1', text)
+            self.assertIn('coverage differs', text)
+            # A log copied over another run's, with that run's own manifest kept: no verdict.
+            (o2 / 'ticks.csv').write_bytes((r1 / 'ticks.csv').read_bytes())
+            self.assertIn('does not match its manifest', self.report(capture_report.s8_pair, o1, o2))
+            (o2 / 'ticks.csv').unlink()
+            self.assertIn('tick log is missing', self.report(capture_report.s8_pair, o1, o2))
+            d = self.run_dir(temp, 'd', [], ticks=range(1, 6))
+            (d / 'manifest.json').write_text(json.dumps({'outputs_sha256': json.loads((d / 'manifest.json').read_text())['outputs_sha256']}))
+            self.assertIn('no verdict', self.report(capture_report.s8_pair, c, d))
+
+    def test_watch_counts_only_value_changes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = pathlib.Path(temp)
+            (run / 'watch.csv').write_text('step,tick,address,bytes,value\n1,0,800d13e4,4,4\n9,0,800d13e4,4,4\n12,0,800d13e4,4,6\n')
+            self.assertIn('changes=1 distinct=2', self.report(capture_report.watch_summary, run))
+
+    def test_sweep_skips_an_empty_first_sample(self):
+        def record(step, tick, rows):
+            body = b''.join(struct.pack('>H', i) + r for i, r in enumerate(rows))
+            return struct.pack('<4I', step, tick, 1, len(rows)) + body
+        start = [row(10, 10, 0, 7), row(20, 20, 1, 41)]
+        raw = record(1, 1, []) + record(2, 2, start) + record(3, 3, start + [row(30, 30, 0, 111)])
+        with tempfile.TemporaryDirectory() as temp:
+            run = self.run_dir(pathlib.Path(temp), 'a', [], raw=raw)
+            (run / 'tape.txt').write_text('tap tick raw\n10 0 0 0\n')
+            # Tick log: rows live from step 2; a stale seed at step 0 and the launch seed at step 2.
+            header = (run / 'ticks.csv').read_text().split('\n')[0]
+            readable = ''.join(f'{n},{n},1,1,0,0,4,1,0,1,2,0,0,0,0,0,r,g\n' for n in range(2, 62))
+            (run / 'ticks.csv').write_text(header + '\n1,1,1,1,0,0,4,1,0,0,0,0,0,0,0,0,r,g\n' + readable)
+            (run / 'watch.csv').write_text('step,tick,address,bytes,value\n0,0,800eff20,4,111\n2,0,800eff20,4,222\n5,0,800eff20,4,333\n')
+            text = self.report(capture_report.sweep, [run], 10, '800eff20')
+            self.assertIn('seed=546', text)   # 0x222, not the stale 0x111 or the later 0x333
+            self.assertIn('unit samples ending at tick 3', text)
+            self.assertIn('through tick 3', text)
+            # A pause in raw logging inside the window is missing samples, not a wide stride.
+            gapped = record(4, 4, start) + record(5, 5, start) + record(60, 60, start) + record(61, 61, start)
+            (run / 'ticks.raw').write_bytes(raw + gapped)
+            self.assertIn('a missing unit sample at tick 6', self.report(capture_report.sweep, [run], 50, '800eff20'))
+            # A gap that starts after the cutoff leaves a covered run eligible.
+            self.assertNotIn('missing unit sample', self.report(capture_report.sweep, [run], 5, '800eff20'))
+            # No --ticks: the gap check still runs through the run's own last sample.
+            self.assertIn('a missing unit sample at tick 6', self.report(capture_report.sweep, [run], 1 << 30, '800eff20'))
+            # A truncated record after a covered window: the run is reported, with its cutoff.
+            (run / 'ticks.raw').write_bytes(raw + record(4, 4, start)[:-5])
+            self.assertIn('a truncated record', self.report(capture_report.sweep, [run], 10, '800eff20'))
+            (run / 'ticks.raw').write_bytes(raw + record(4, 4, start)[:9])   # a partial header
+            self.assertIn('a truncated record', self.report(capture_report.sweep, [run], 10, '800eff20'))
+            # Two launches under one tap: the tick counter restarts, so the run is refused.
+            (run / 'ticks.raw').write_bytes(raw + record(4, 2, start) + record(5, 3, start))
+            self.assertIn('a tick counter reset', self.report(capture_report.sweep, [run], 3, '800eff20'))
+            # A sample whose read found no unit table is not coverage.
+            (run / 'ticks.raw').write_bytes(raw + record(4, 4, start))
+            csv_text = (run / 'ticks.csv').read_text()
+            (run / 'ticks.csv').write_text(csv_text.replace('\n3,3,1,1,0,0,4,1,0,1,', '\n3,3,1,1,0,0,4,1,0,0,'))
+            self.assertIn('no readable unit table at tick 3', self.report(capture_report.sweep, [run], 3, '800eff20'))
+            (run / 'ticks.csv').write_text(csv_text)
+            # The tick log must reach an explicit cutoff, and a reset in the log refuses the run.
+            (run / 'ticks.raw').write_bytes(raw + record(4, 4, start))
+            self.assertIn('unit samples ending', self.report(capture_report.sweep, [run], 70, '800eff20'))
+            reset_log = csv_text.split('\n')[0] + '\n' + ''.join(
+                f'{st},{t},1,1,0,0,4,1,0,1,2,0,0,0,0,0,r,g\n' for st, t in ((1, 1), (2, 2), (3, 3), (4, 0), (5, 1), (6, 2)))
+            (run / 'ticks.csv').write_text(reset_log)
+            self.assertIn('a tick counter reset to 0', self.report(capture_report.sweep, [run], 4, '800eff20'))
+            # A reset after the cutoff still means two matches in one capture: refused too.
+            self.assertIn('a tick counter reset to 0', self.report(capture_report.sweep, [run], 2, '800eff20'))
+            # Empty records before the first live one, at the same tick or past the cutoff, are
+            # outside the match and change nothing.
+            (run / 'ticks.csv').write_text(csv_text)
+            (run / 'ticks.raw').write_bytes(record(0, 90, []) + raw + record(4, 4, start))
+            text = self.report(capture_report.sweep, [run], 3, '800eff20')
+            self.assertNotIn('left out of the totals', text)
+            self.assertIn('owner 0: 111@3', text)
+            # A first live sample after the cutoff: that run is skipped, the next is still reported.
+            late = self.run_dir(pathlib.Path(temp), 'late', [], raw=record(24, 24, start))
+            (late / 'tape.txt').write_text('tap tick raw\n10 0 0 0\n')
+            text = self.report(capture_report.sweep, [late, run], 3, '800eff20')
+            self.assertIn('sweep late: no sample with live rows by tick 3', text)
+            self.assertIn('sweep a: seed=', text)
+            # --opening skips an empty pre-match record past the cutoff too.
+            (run / 'ticks.raw').write_bytes(record(0, 90, []) + raw)
+            self.assertIn('owner 0: 7@2 111@3', self.report(capture_report.opening, run, 3))
+            # A second launch in the same capture is never merged into the opening.
+            (run / 'ticks.raw').write_bytes(raw + record(9, 1, [row(5, 5, 2, 64)]))
+            opened = self.report(capture_report.opening, run, 50)
+            self.assertIn('restarts', opened)
+            self.assertNotIn('owner 2', opened)
+            # A reset between raw samples, visible only in the tick log, also stops the opening.
+            (run / 'ticks.raw').write_bytes(raw + record(9, 24, [row(5, 5, 2, 64)]))
+            hidden = csv_text.split('\n')[0] + '\n' + ''.join(
+                f'{st},{t},1,1,0,0,4,1,0,1,2,0,0,0,0,0,r,g\n' for st, t in ((1, 1), (2, 2), (3, 3), (5, 40), (6, 0), (9, 24)))
+            (run / 'ticks.csv').write_text(hidden)
+            opened = self.report(capture_report.opening, run, 50)
+            self.assertIn('restarts', opened)
+            self.assertNotIn('owner 2', opened)
+            # A truncated record at the reset step does not discard the first match.
+            (run / 'ticks.raw').write_bytes(raw + record(6, 0, start)[:-5])
+            (run / 'ticks.csv').write_text(hidden)
+            self.assertIn('owner 0: 7@2 111@3', self.report(capture_report.opening, run, 50))
+            (run / 'ticks.csv').write_text(csv_text)
+            # A tap turned off and on again could hide a relaunch: no report.
+            (run / 'ticks.raw').write_bytes(raw)
+            (run / 'tape.txt').write_text('tap tick raw\n10 0 0 0\ntap off\n10 0 0 0\ntap tick raw\n10 0 0 0\n')
+            self.assertIn('no report', self.report(capture_report.opening, run, 50))
+            # An initial or trailing `tap off` leaves no gap between active taps.
+            (run / 'tape.txt').write_text('tap off\ntap tick raw\n10 0 0 0\ntap off\ntap off\n')
+            self.assertNotIn('no report', self.report(capture_report.opening, run, 50))
+            (run / 'tape.txt').write_text('tap tick raw\n10 0 0 0\n')
+            # A header cut off after the step field, at the reset step, keeps the first match.
+            (run / 'ticks.raw').write_bytes(raw + struct.pack('<I', 6))
+            (run / 'ticks.csv').write_text(hidden)
+            self.assertIn('owner 0: 7@2 111@3', self.report(capture_report.opening, run, 50))
+            (run / 'ticks.csv').write_text(csv_text)
+            (run / 'ticks.raw').write_bytes(raw)
+            # A corrupt row count is refused before the body is read.
+            (run / 'ticks.raw').write_bytes(struct.pack('<4I', 1, 1, 1, 100000))
+            with self.assertRaises(ValueError):
+                list(capture_report.raw_records(run / 'ticks.raw'))
+            (run / 'ticks.raw').write_bytes(raw)
+            # Reads before the match (an earlier tap reaching tick 300) cannot satisfy the cutoff.
+            early = csv_text.split('\n')[0] + '\n0,300,1,1,0,0,4,1,0,1,2,0,0,0,0,0,r,g\n' + ''.join(
+                f'{st},{st},1,1,0,0,4,1,0,1,2,0,0,0,0,0,r,g\n' for st in range(2, 6))
+            (run / 'ticks.csv').write_text(early)
+            self.assertIn('more than one match in the capture', self.report(capture_report.sweep, [run], 65, '800eff20'))
+            (run / 'ticks.csv').write_text(csv_text)
+            # Tap settings changed during the run: coverage cannot be judged.
+            (run / 'ticks.raw').write_bytes(raw)
+            (run / 'tape.txt').write_text('tap tick raw\n10 0 0 0\ntap tick raw 25\n10 0 0 0\n')
+            self.assertIn('tap settings that change', self.report(capture_report.sweep, [run], 3, '800eff20'))
+            (run / 'ticks.raw').write_bytes(raw)
+            # A missing raw file is reported and skipped, not fatal.
+            (run / 'ticks.raw').unlink()
+            self.assertIn('no ticks.raw', self.report(capture_report.sweep, [run], 10, '800eff20'))
+            (run / 'ticks.raw').write_bytes(raw)
+            # A half-width sample or a tape that turns watches off gives an unknown seed.
+            (run / 'watch.csv').write_text('step,tick,address,bytes,value\n2,0,800eff20,2,1\n')
+            self.assertIn('seed=None', self.report(capture_report.sweep, [run], 10, '800eff20'))
+            (run / 'watch.csv').write_text('step,tick,address,bytes,value\n2,0,800eff20,4,222\n')
+            (run / 'tape.txt').write_text('watch 800EFF20 4\nwatch off\n10 0 0 0\n')
+            self.assertIn('seed=None', self.report(capture_report.sweep, [run], 10, '800eff20'))
+            self.assertIn('owner 0: 111@3', text)
+            self.assertNotIn('7@2', text)
 
 
 if __name__ == '__main__':

@@ -198,6 +198,23 @@ class Capture:
             problems.append('tape.txt does not match the manifest')
         if not self.manifest.get('run_id'):
             problems.append('the manifest has no run id (capture.py before S4)')
+        # commands.csv places tape marks (S5); it must be the log the capture wrote.
+        commands = self.run / 'commands.csv'
+        recorded = self.manifest.get('outputs_sha256', {}).get('commands.csv')
+        if recorded and not commands.is_file():
+            problems.append('commands.csv is recorded in the manifest but missing')
+        elif commands.is_file() and (not recorded or recorded != hashlib.sha256(commands.read_bytes()).hexdigest()):
+            problems.append('commands.csv does not match the manifest')
+        # State files the tape loaded (S5); manifests from before S5 have none. Every `load`
+        # in the tape needs a recorded digest, so two runs cannot both omit the map.
+        states = self.manifest.get('state_input_sha256') or {}
+        for words in metrics.frontend_lines((self.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape')):
+            if len(words) >= 2 and words[0] == 'load' and words[1] not in states:
+                problems.append(f'the tape loads {words[1]} but the manifest records no digest for it')
+        for name, digest in states.items():
+            staged = self.run / 'input' / name
+            if not staged.is_file() or hashlib.sha256(staged.read_bytes()).hexdigest() != digest:
+                problems.append(f'state input {name} does not match the manifest')
         return problems
 
     def bank(self, record, array, owner, gating=True):
@@ -253,6 +270,8 @@ def same_bundle(a, b):
     for key in ('binary_sha256', 'tape_sha256', 'rom_sha256', 'mode', 'flash_input_sha256'):
         if a.manifest.get(key) != b.manifest.get(key):
             problems.append(f'{key} differs')
+    if (a.manifest.get('state_input_sha256') or {}) != (b.manifest.get('state_input_sha256') or {}):
+        problems.append('state_input_sha256 differs')
     if a.manifest.get('run_id') and a.manifest.get('run_id') == b.manifest.get('run_id'):
         problems.append('both runs carry the same run id: a copied capture is not a second capture')
     for cap in (a, b):
@@ -288,7 +307,10 @@ def write_golden(scenario_id, runs, home, layout, note=None):
     if problems:
         raise SystemExit('not golden: ' + '; '.join(problems))
     spec = metrics.SCENARIOS[scenario_id]
-    tape_steps = metrics.tape_commands(caps[0].run / 'tape.txt')
+    marks = [metrics.tape_commands(c.run / 'tape.txt') for c in caps]
+    if any(m != marks[0] for m in marks[1:]):
+        raise SystemExit(f'not golden: tape marks resolve to different steps {marks}')
+    tape_steps = marks[0]
     result = spec['measure_n64'](caps[0], tape_steps)
     for obs in result['observations']:
         obs['n_runs'] = len(caps)

@@ -115,7 +115,10 @@ must own its source frame (`gba_boundary_ok`).
 ## Adding a scenario
 
 1. Write a tape that reaches the situation with ordinary input, turns on
-   `tap tick rec`, and marks the command step with `# mark command`.
+   `tap tick rec`, and marks the command step with `# mark command`. A
+   tape may start from a state file (`load`) and wait on guest fields
+   (`until`); marks then resolve through the run's `commands.csv`, so they
+   land on the steps actually executed.
 2. Capture it twice with `capture.py` (fresh processes, same binary).
 3. Add measurement code to `SCENARIOS` in `tools/sc64_parity_metrics.py`: an
    N64 side that resolves the human player, measures, and returns
