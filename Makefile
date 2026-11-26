@@ -5872,7 +5872,7 @@ test-sc64-bc-normal-input: $(UNIT_FACING_INPUTS)
 	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable $(TERRAN_ROM_FLAGS) tests/sc64_bc_normal_input_fresh_load.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/fresh-load"; \
 	"$$run/controller" "$$run/controller.json"; \
 	$(PYTHON) tools/sc64_bc_normal_input_tape.py --input "$$run/controller.json" --output "$$run/transitions.txt"; \
-	"$$run/replay" "$$run/transitions.txt" 17937 "$$run/pause.sav"; \
+	"$$run/replay" "$$run/transitions.txt" 23064 "$$run/pause.sav"; \
 	"$$run/fresh-load" "$$run/pause.sav"
 
 # These fixtures still name narrower historical input sets instead of the

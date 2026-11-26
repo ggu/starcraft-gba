@@ -3587,7 +3587,7 @@ validates the resulting trace, saves during an in-flight Yamato shot, and
 loads that save through HOME/L in a fresh host process. It does not generate
 or modify imported inputs. The target creates a new ignored directory under
 `.local/build/bc-normal-input/` for its binaries, trace, transitions and SRAM.
-The fixed tick 17937 and frame 17658 are a source-bound witness for this
+The fixed tick 23064 and frame 22787 are a source-bound witness for this
 controller and runtime, not a general scenario or hardware guarantee; a
 runtime change that alters the controller timeline requires a fresh witness
 and review. This host test is not a physical-GBA or frame-rate qualification.

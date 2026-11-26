@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-END_TICK = 17937
-END_FRAME = 17658
+END_TICK = 23064
+END_FRAME = 22787
+START_TICK = 24
 
 def unique_object(pairs):
     out = {}
@@ -49,7 +50,7 @@ def convert(document):
             input_tick, previous_held = tick, held
             rows.append((tick, held, pressed))
         elif kind == 'start':
-            if event != {'kind':'start','host_tick':20,'frame':1,'map':1,'human_race':0,'bots':[{'owner':1,'race':1}]} or starts or results:
+            if event != {'kind':'start','host_tick':START_TICK,'frame':1,'map':1,'human_race':0,'bots':[{'owner':1,'race':1}]} or starts or results:
                 raise ValueError('invalid scenario start')
             for name in ('map', 'human_race'):
                 integer(event[name], name, 0, 2)
