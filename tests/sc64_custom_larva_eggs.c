@@ -341,7 +341,11 @@ static void lifecycle(void)
                 CHECK(!is_egg(&u[i]));
                 ++picked;
             }
-        CHECK(u[zergling].selected && picked >= units_of(SIDE, U_ZERGLING));
+        /* Every born Zergling and Scourge is in the army, and no Egg. */
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && (u[i].type == U_ZERGLING || u[i].type == U_SCOURGE))
+                CHECK(u[i].selected);
+        CHECK(picked >= units_of(SIDE, U_ZERGLING) + units_of(SIDE, U_SCOURGE));
         CHECK(!u[eggs[0]].selected && !u[eggs[1]].selected);
     }
     printf("army selection: the army without its %d Eggs\n", eggs_of(SIDE));

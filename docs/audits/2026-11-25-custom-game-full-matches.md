@@ -80,8 +80,8 @@ and Protoss P10 Blood Bath against Terran, wins on the same frame as on
 
 With the plans unchanged, 18 of the 19 lobbies still won. The exception was
 Zerg Blood Bath against three Zerg. Its HOST author lost at frame 25,452,
-so the matrix stopped before an ARM replay; the sweep below reproduced that
-HOST loss exactly. In a HOST sweep of 72 plans around the
+so the matrix skipped that lobby's ARM replay, replayed the other 18 and
+reported the failure; the sweep below reproduced that HOST loss exactly. In a HOST sweep of 72 plans around the
 old one, all at start order 156 (the order this cartridge resolves with no
 Launch-row wait), 10 won. `QUALIFIED` now uses the winner closest to the old
 plan, which differs only in `FIRST_ATTACK=5500` (was 6500).
