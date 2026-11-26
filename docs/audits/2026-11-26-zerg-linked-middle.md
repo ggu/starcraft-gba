@@ -90,6 +90,19 @@ observations and all five stage SRAM hashes through victory.
 The stage recordings and emulator receipts remain local. This is
 ordinary-button mGBA evidence on the standard ROM identified above.
 
+## Independent Z7 control on the standard Z10 cartridge
+
+Starting from HOME, the retained 270,585-call recording won at frame
+267,585 with zero mission faults and zero enemy buildings. Comparing the
+206 observations against the older unlimited-reserve controller recording,
+the gas balance differed at 67 checkpoints. Every other recorded field
+matched. The finite-reserve cartridge finished with 6,646 gas. Its fresh
+victory re-export was byte-identical, SHA-256
+`3f3f96fe3634cb85e0347fdb17c68efe5a136f5d3123f87d716f8cdeb93ba159`.
+The recording SHA-256 was
+`022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`.
+Use these same-cartridge observations for the linked Z6-to-Z7 comparison.
+
 ## Z8 controller on the standard Z10 cartridge
 
 The previous winning recording first diverges at call 9,696. It expects
