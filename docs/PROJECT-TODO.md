@@ -22,10 +22,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Disjoint cycle budgets.** The two flagged Outpost samples reconcile using the guest loop timer. Measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
 
 - **Packaged race ROM save compatibility.** The `51c7f18f` package loaded
-  26 earned campaign victories (T1–T10, Z1–Z6 and P1–P10). All observed
+  all 30 earned campaign victories (ten per race). All observed
   result worlds, SRAM re-exports and chapter advances matched the standard
-  cartridges used to earn them. Extend the comparison as the remaining Zerg
-  journals become available.
+  cartridges used to earn them. Keep the thirty journals as release regression
+  fixtures and verify full mission replays after shared-engine changes.
   [Results and reproduction](audits/2026-11-26-packaged-campaign-results.md).
 
 - **Custom Game defense targeting.** Skipping cells that contain only friendly
