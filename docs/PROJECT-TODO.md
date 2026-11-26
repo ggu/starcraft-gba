@@ -19,7 +19,7 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
-- **Campaign handoffs.** All ten Protoss victories on the #977 ROM link from blank SRAM through the finale. Each victory survived a fresh emulator reload. The #978 ROMs separately passed 30 chapter-result handoffs and 180 custom lobby launch/save/continue cases. Qualify full campaign play when shared rules or assets change. [Protoss chapter frames and binary provenance](audits/2026-11-26-protoss-linked-release.md)
+- **Campaign handoffs.** All ten Zerg and all ten Protoss victories on the #977 ROM link from blank SRAM through the finale. Each victory survived a fresh emulator reload. The #978 ROMs separately passed 30 chapter-result handoffs and 180 custom lobby launch/save/continue cases. Qualify full campaign play when shared rules or assets change. [Protoss replay](audits/2026-11-26-protoss-linked-release.md) · [Zerg replay and staged recovery](audits/2026-11-26-zerg-linked-release.md)
 
 - **Dense Z7 follow-up.** Release #978 averages 10.56 advancing world updates/s in the dense Z7 window. Orders take 879,273 cycles on average, exceeding the entire 30 Hz budget. Prioritize repeated one-to-seven route builds per update and measure contact blocking on zero-build updates. Four packing trials provided at most 0.72% over the whole battle and the fastest reduced stack headroom. Keep the existing placement. [Updated cycle measurements](audits/2026-11-26-post-facility-z7-profile.md)
 
