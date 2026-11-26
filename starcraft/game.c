@@ -2785,6 +2785,11 @@ static void update_exploration(void);
 static int owner_command_center(int owner);
 #ifdef SC64_IMPORTED_MISSION
 static void sc64_start_human_workers_mining(void);
+static void sc64_command_delay_flush(void), sc64_command_delay_reset(void),
+    sc64_command_delay_forget(int);
+#define SC64_CMD_FORGET(i) sc64_command_delay_forget(i)
+#else
+#define SC64_CMD_FORGET(i) ((void)0)
 #endif
 static int currently_visible(int x, int y);
 #ifdef SC64_SHARED_BUNKER
@@ -3142,6 +3147,7 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+    SC64_CMD_FORGET(i);
 #if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     sc64_mineral_fifo_remove(&mineral_fifo, (unsigned)i);
 #endif
@@ -5690,6 +5696,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_reset();
+#endif
 #if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     memset(&mineral_fifo, 0, sizeof(mineral_fifo));
     mineral_fifo_enabled = 1;
@@ -6324,6 +6333,9 @@ remember_unit_tap(int picked)
     unit_tap_x = cx; unit_tap_y = cy;
 }
 
+#ifdef SC64_IMPORTED_MISSION
+#include "sc64_command_delay.h"
+#endif
 static int
 issue_order(int order, int tx, int ty)
 {
@@ -6406,6 +6418,12 @@ issue_order(int order, int tx, int ty)
 	toast(5);
     return n;
 }
+
+#ifdef SC64_IMPORTED_MISSION
+#define SC64_PLAYER_ORDER(o, x, y) sc64_command_delay_order((o), (x), (y))
+#else
+#define SC64_PLAYER_ORDER(o, x, y) issue_order((o), (x), (y))
+#endif
 
 static int
 find_selected_worker(void)
@@ -7747,7 +7765,7 @@ interact(void)
             mode = MODE_NORMAL; return;
         }
 #endif
-	int issued=issue_order(ORDER_MOVE, cx, cy);
+	int issued=SC64_PLAYER_ORDER(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
 	if (issued) field_ui_ping(cx, cy, C_GREEN);
@@ -7771,7 +7789,7 @@ interact(void)
             return;
         }
 #endif
-	int issued=issue_order(ORDER_ATTACK_MOVE, cx, cy);
+	int issued=SC64_PLAYER_ORDER(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
 	if (issued) field_ui_ping(cx, cy, C_RED);
@@ -9547,9 +9565,12 @@ target_lists_unavailable:
 #endif
 
 	if (q->order == ORDER_MOVE) {
-	    if (dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5)
+	    if (dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5) {
+#ifdef SC64_IMPORTED_MISSION
+		if (!sc64_move_order_due(q)) continue;
+#endif
 		q->order = ORDER_IDLE;
-	    else
+	    } else
 		move_toward(q, q->tx, q->ty);
 	    continue;
 	}
@@ -10541,6 +10562,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC_FIELD_FEEDBACK
     if (ping_life) --ping_life;
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_input_begin();
+#endif
 #if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     /* A spell hotkey keeps real-time targeting practical on the GBA pad. */
     if ((held&KEY_B) && (pressed&KEY_R) && !box_state &&
@@ -10674,6 +10698,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     }
     if (pressed & KEY_A)
 	interact();
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_input_end();
+#endif
 
     frame++;
 #ifdef SC64_RANGE_WORK
@@ -10707,6 +10734,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     race_bc_yamato_sync_references();
 #endif
 #ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_tick();
     SC64_UPDATE_ORDERS();
 #else
     update_orders();

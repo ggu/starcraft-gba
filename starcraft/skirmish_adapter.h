@@ -476,6 +476,9 @@ skirmish_init(void)
 #endif
     }
     frame = 0;
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_reset();
+#endif
     death_vfx_reset();
     enemy_timer = 0;
     wave = 0;

@@ -70,6 +70,13 @@ static void issue_attack_move(void)
     assert(race_z7.runtime.fault == 0);
     tap(KEY_A);       /* issue ATTACK_MOVE at the cursor */
     assert(race_z7.runtime.fault == 0);
+#ifdef SC64_IMPORTED_MISSION
+    /* The player's order lands after the N64 command delay. */
+    assert(u[0].order != ORDER_ATTACK_MOVE);
+    for (int k = 0; k < SC64_COMMAND_DELAY_UPDATES && u[0].order != ORDER_ATTACK_MOVE; ++k)
+        game_update(0, 0);
+    assert(race_z7.runtime.fault == 0);
+#endif
 }
 
 static void check_group_slot_policy(void)

@@ -2090,6 +2090,7 @@ static void race_skirmish_init(void)
     race_skirmish_geometry();
     race_skirmish_reset_elimination();
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
+    sc64_command_delay_reset();
     death_vfx_reset();
     memset(geysers, 0, sizeof(geysers));
     /* Native Melee opens with 50 minerals; give every active player the
