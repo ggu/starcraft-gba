@@ -471,6 +471,16 @@ class LabMeasureTest(unittest.TestCase):
         # The hit first seen at 35 follows a gap: ambiguous, and no interval spans it.
         self.assertEqual((m['hits'], m['ambiguous_hits'], m['gaps']), (2, 1, []))
 
+    def test_kills_split_cooldown_intervals(self):
+        pos = {sf: (100, 100) for sf in range(0, 90)}
+        marine = {sf: 40.0 for sf in range(0, 90)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 50, 65) if t <= sf]) for sf in range(0, 90)}
+        other = {sf: (5.0 if sf < 35 else 0.0) for sf in range(0, 90)}   # a second Zergling killed at 35
+        series = walk(pos, hp={1: marine, 2: ling, 3: other},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, metrics.ZERGLING, 4, 160, 100)])
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual(m['gaps'], [15])   # 20 -> 50 spans the kill at 35; 50 -> 65 stands
+
     def test_enemy_buildings_count_for_damage_taken(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: 40.0 - 5 * len([t for t in (20, 30) if t <= sf]) for sf in range(0, 80)}

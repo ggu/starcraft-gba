@@ -843,18 +843,19 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # A drop seen across a sampling gap may have come from a unit that left reach meanwhile.
         return near == [uid] and gaps_of.get(vid, {}).get(sf, 1) == 1
     unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
+    barriers = set()
     # A killing drop leaves no exact damage, but it still splits the timing: no cooldown
     # interval may span it.
     for vid in first['units']:
         if not enemy(vid):
             continue
         track_ = hp_track(series, vid, t0, end)
-        events = [sf for sf, _ in hits(track_, lethal=True)]
+        events = [b[0] for a, b in zip(track_, track_[1:]) if a[1] > 0 >= b[1]]   # killing drops only
         if track_ and track_[-1][0] < end and track_[-1][1] > 0:
             events.append(track_[-1][0] + 1)   # a GBA row removed by a hit the trace never shows
         # Every kill splits the timing, the subject's own included: the killing hit is never in
-        # the hit list (see hits), so an interval across it would skip a shot.
-        unclear.update(events)
+        # the hit list (see hits), so an interval across it, or touching it, would skip a shot.
+        barriers.update(events)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
@@ -897,7 +898,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         su, vu = at[sf0].get(uid), at[sf0].get(v0)
         rng = math.hypot(su[2] - vu[2], su[3] - vu[3]) if su and vu else None
     # Cooldown intervals never span an ambiguous hit: it may have been the subject's.
-    gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:]) if not any(a[0] < sf < b[0] for sf in unclear)]
+    gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:])
+            if not any(a[0] < sf < b[0] for sf in unclear) and not any(a[0] <= sf <= b[0] for sf in barriers)]
     hp_hits = [d for _, _, d in landed if d]
     result = {
         'hits': len(landed), 'ambiguous_hits': ambiguous, 'damage_values': sorted(set(hp_hits)),
