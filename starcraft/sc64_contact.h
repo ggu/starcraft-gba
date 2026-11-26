@@ -661,7 +661,12 @@ sc64_contact_blocked_mask_memo(const Unit *q, int speed)
 #endif
 
 static unsigned
-#if defined(SC64_CONTACT_STEER_ROM)
+#if defined(SC64_CONTACT_STEER_ARM_IWRAM) && defined(SC64_CONTACT_STEER_ROM) && \
+    !defined(GBA_HOST) && defined(__GNUC__) && !defined(__clang__) && defined(__arm__)
+/* The guarded hot link puts this function in IWRAM, where ARM mode reduces
+ * register spills in the contact scan. Keep the ordinary profile otherwise. */
+__attribute__((noinline, target("arm"), optimize("Os")))
+#elif defined(SC64_CONTACT_STEER_ROM)
 __attribute__((noinline))
 #else
 GBA_HOT

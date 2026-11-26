@@ -52,6 +52,9 @@ $(eval $(call iwram_hot_rules,terran,build/starcraft-terran.elf,build/StarCraft-
 endif
 ifneq ($(Z10_CARRIER_RELEASE),0)
 $(eval $(call iwram_hot_rules,zerg-z10,build/starcraft-zerg-z10.elf,build/StarCraft-Zerg-Z10-Transport1-GBA.gba))
+# This kernel fits and wins in the guarded Z10 IWRAM layout. The older ROM
+# link and stock comparison still use the original Thumb steering kernel.
+build/starcraft-zerg-z10.elf: CFLAGS += -DSC64_CONTACT_STEER_ARM_IWRAM
 endif
 $(eval $(call iwram_hot_rules,protoss-p10,build/starcraft-protoss-p10.elf,build/StarCraft-Protoss-P10-Transport1-GBA.gba))
 endif
