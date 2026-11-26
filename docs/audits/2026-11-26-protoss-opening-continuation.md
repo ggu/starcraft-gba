@@ -28,3 +28,27 @@ python3 tools/sc64_p2_linked_replay.py --rom "$ROM" --elf "$ELF" \
   --runner "$RUNNER" --seed "$P1_SAVE" --trace build/p2-home.json \
   --out build/p2-linked-result
 ```
+
+## Protoss mission 3 from the same P2 result
+
+On the same standard Protoss10 ROM, a fresh mGBA process loaded the P2
+victory above. A on the result entered P3 (mission slot 22) at frame zero.
+The November 25 recording reached its last checkpoint with P3 still in play.
+The input recording generated against the current engine reached victory at
+call 49,311, frame 48,801. All 48 periodic observations and the victory
+observation matched the controller's screen, frame and win/loss flags.
+
+The P3 controller timestamps inputs after applying them. For the linked replay
+the trace's tick 42 resumes inputs after the result-screen advance. An input
+transition at host tick T was scheduled at runner index T − 37 and the
+post-update observation was read after T − 36 completed runner calls.
+
+At victory the primary objective bit was set, campaign phase was 3 and the
+completion mask was 0x40000c (mission slots 2, 3 and 22). The resulting world
+had 51 units and 22 buildings. A separate emulator loaded the result, matched
+the world fingerprint and campaign snapshot, and wrote identical SRAM.
+
+| Artifact | SHA-256 |
+|---|---|
+| Current P3 controller trace | `3cf1e5dd626db3eacd980520de6e92d31aac16ff7d878046aa4b27e1da84e449` |
+| P3 victory SRAM and fresh re-export | `09ed33e7311476ca976ecdb3d1443f3bc4da84930dc9b0445df5f59cbd5247d6` |
