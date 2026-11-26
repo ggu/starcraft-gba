@@ -1189,7 +1189,10 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     def slot_of(k):
         return k if isinstance(k, int) else int(str(k).split('.')[0])
     struck_by_record, foe_hit_by_record = False, set()
-    removed_at = {(r[2], r[1]) for r in series.get('removals', []) if r[0] == 'U'}
+    # Killing hits: a removal at 0 hit points or below in the hit's own step (a removal with hit
+    # points left, a Drone consumed by construction, takes over nothing).
+    removed_at = {(r[2], r[1]) for r in series.get('removals', []) if r[0] == 'U' and r[6] <= 0}
+    record_count = {}
     for step_, target, *_ in series.get('hits', []) if max_units is not None else ():
         sf = (step_ or 0) * 4 // 5
         # After the pre-command sample: a hit in its frame may come before the command.
@@ -1198,12 +1201,23 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         if target < max_units and (target, step_) in removed_at and target != uid:
             continue   # a killing hit: its removal record, with the victim's last position, counts it
         if target < max_units:
-            for s_ in (sf - 1, sf):   # the row as last sampled before the hit, or after it
+            # The row as last sampled before the hit, unless the slot was reborn since (a birth
+            # after that sample's step and by the hit's): then only a sample after the hit names
+            # the occupant, and a hit on an occupant no sample shows stays unresolved.
+            before_step = at_frame.get(sf - 1, {}).get('step')
+            reborn = any(slot_b == target and (before_step is None or step_b > before_step) and step_b <= step_
+                         for slot_b, step_b in born_in)
+            k = None
+            for s_ in ((sf,) if reborn else (sf - 1, sf)):
                 k = next((k for k in at_frame.get(s_, {}).get('units', {}) if slot_of(k) == target), None)
                 if k is not None and k in seen:
                     break
-            else:
+                k = None
+            if k is None:
+                if reborn:
+                    nearby_ambiguous.add(sf)   # a hit nobody can place: unmeasured, never absent
                 continue
+            record_count[(sf, k)] = record_count.get((sf, k), 0) + 1
             if k == uid:
                 struck_by_record = True
             elif enemy(k):
@@ -1225,7 +1239,10 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # it splits the timing and withholds the first hit's range. Matched ones time themselves.
     drops_seen = {(sf, vid) for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got}
     foe_unmatched = {sf for sf, k in foe_hit_by_record if (sf, k) not in drops_seen}
-    unclear |= nearby | nearby_ambiguous | foe_unmatched
+    # Several hit records on one unit in one frame show as one drop: no per-hit value, and no
+    # interval touching that frame.
+    multiple = {key for key, n in record_count.items() if n > 1}
+    unclear |= nearby | nearby_ambiguous | foe_unmatched | {sf for sf, _ in multiple}
     foe_kills = set()
     for vid in seen:
         if not any_enemy(vid):
@@ -1268,11 +1285,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
     shielded = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in shielded.items()}
     shield_hits = sorted((sf, vid, round(d)) for vid, got in shielded.items() for sf, d in got)
-    shield_exact = [d for vid, got in shielded.items() for sf, d in got if (vid, sf) not in clipped]
+    shield_exact = [d for vid, got in shielded.items() for sf, d in got
+                    if (vid, sf) not in clipped and (sf, vid) not in multiple]
     hp_frames = {(sf, vid) for vid, got in victims.items() for sf, _ in got}
     landed = sorted([(sf, vid, round(d)) for vid, got in victims.items() for sf, d in got] +
                     [(sf, vid, 0) for sf, vid, _ in shield_hits if (sf, vid) not in hp_frames])
-    taken = [(sf, round(d)) for sf, d in hits(own)]
+    taken = [(sf, round(d)) for sf, d in hits(own) if (sf, uid) not in multiple]
 
     def single_foe(sf):
         # The same single living enemy in reach on the sample before the drop and on the one
@@ -1320,7 +1338,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # Two hits in one frame are no interval: the samples cannot time them apart.
     gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:]) if b[0] > a[0]
             and not any(a[0] <= sf <= b[0] for sf in unclear | barriers)]
-    hp_hits = [d for _, _, d in landed if d]
+    hp_hits = [d for sf, vid, d in landed if d and (sf, vid) not in multiple]
     # The subject was hit: hit points, or shields (a Protoss subject's first hits).
     struck = bool(hits(own, lethal=True) or hits(hp_track(series, uid, t0, end, key='shield'), lethal=True)
                   or struck_by_record)

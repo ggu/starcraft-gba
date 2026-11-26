@@ -1073,6 +1073,36 @@ class LabMeasureTest(unittest.TestCase):
         m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
         self.assertEqual((m['combat'], m['foe_combat'], m['nearby_ambiguous']), (True, False, False))
 
+    def test_hit_records_that_samples_cannot_resolve(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        calm_ling = {sf: 35.0 for sf in range(0, 80)}
+        # A shot on a Drone in reach, which construction then consumes in the same step (removed
+        # with hit points left): the shot is still a fight.
+        drone = {sf: 40.0 for sf in range(0, 28)}
+        series = as_gba(walk(pos, hp={1: marine, 2: calm_ling, 4: drone},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)]),
+                        [('U', 35, 4, 4, 160, 100, 34, None, 40, metrics.DRONE, 0, None, None)])
+        series['hits'], series['max_units'] = [(35, 4, 6, 0, 0)], 100
+        self.assertTrue(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['combat'])
+        # A friendly slot reused by a unit born at step 35 and hit at 35, before any sample of it:
+        # the hit is unresolved, never discarded as a hit on the friendly unit.
+        series = as_gba(walk(pos, hp={1: marine, 2: calm_ling, 6: {sf: 40.0 for sf in range(0, 28)}},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100), (6, metrics.MARINE, 1, 600, 100)]))
+        series['events'] = [('+U', 35, 6, 0, 4)]
+        series['hits'], series['max_units'] = [(35, 6, 6, 0, 0)], 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['combat'], m['nearby_ambiguous']), (True, True))
+        # Two hit records on the foe in one frame whose sum looks like one hit: no damage value
+        # from that drop, and no interval touching it.
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 36, 52) if t <= sf]) for sf in range(0, 80)}
+        series = as_gba(walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)]))
+        # Source frame 36 holds engine steps 45 and 46 (5 steps to 4 frames).
+        series['hits'] = [(26, 2, 6, 0, 0), (45, 2, 3, 0, 0), (46, 2, 3, 0, 0), (66, 2, 6, 0, 0)]
+        series['max_units'] = 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['damage_values'], m['gaps']), ([6], []))
+
     def test_neutral_removals_and_interval_endpoints(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: 40.0 for sf in range(0, 80)}
