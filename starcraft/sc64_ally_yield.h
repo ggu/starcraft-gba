@@ -132,23 +132,24 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
 }
 
 /* The longest step the mover's stock motion takes over the next
- * SC64_MOVE_GIVE_UP_PHASES updates in its current waypoint's motion mode,
- * at most SC64_MOVE_GIVE_UP_PROBE_STEPS: the give-up probes only lengths
- * the mover can use. */
+ * SC64_MOVE_GIVE_UP_PHASES updates in either motion mode, at most
+ * SC64_MOVE_GIVE_UP_PROBE_STEPS: the give-up probes only lengths the mover
+ * can use. */
 static int
 sc64_move_longest_step(const Unit *q)
 {
     int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type), longest = 1;
-    /* The motion mode (straight or diagonal) of the current waypoint. */
-    int diagonal = q->path_x != q->x && q->path_y != q->y;
-    for (unsigned f = 0; f < SC64_MOVE_GIVE_UP_PHASES; ++f) {
+    /* Both motion modes: a fresh route may pick a straight or a diagonal
+     * waypoint, and ending a Move early is the worse error. */
+    for (unsigned f = 0; f < SC64_MOVE_GIVE_UP_PHASES; ++f)
+        for (int diagonal = 0; diagonal < 2; ++diagonal) {
 #ifdef SC64_CONTACT_CACHE
-        int s = (int)sc64_contact_stock_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
+            int s = (int)sc64_contact_stock_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
 #else
-        int s = (int)sc64_stock_motion_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
+            int s = (int)sc64_stock_motion_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
 #endif
-        if (s > longest) longest = s;
-    }
+            if (s > longest) longest = s;
+        }
     return longest < SC64_MOVE_GIVE_UP_PROBE_STEPS ? longest : SC64_MOVE_GIVE_UP_PROBE_STEPS;
 }
 
