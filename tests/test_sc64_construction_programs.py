@@ -16,8 +16,8 @@ def play(frame: int) -> bytes:
     return bytes((0, frame & 0xFF, frame >> 8))
 
 
-def wait(ticks_minus_one: int) -> bytes:
-    return bytes((5, ticks_minus_one))
+def wait(ticks: int) -> bytes:
+    return bytes((5, ticks))
 
 
 def goto(target: int) -> bytes:
@@ -30,10 +30,10 @@ class CompilePrimaryFrameStreamTests(unittest.TestCase):
         return compile_primary_frame_stream(code, 0, frame_count, initial_frame)
 
     def test_intro_then_loop_has_source_wait_durations(self) -> None:
-        # frame 0 wait 1; loop: frame 1 wait 0; frame 2 wait 0; goto loop.
+        # frame 0 wait 2; loop: frame 1 wait 1; frame 2 wait 1; goto loop.
         loop_start = 8
-        code = (play(0) + wait(1) + goto(loop_start) + play(1) + wait(0) +
-                play(2) + wait(0) + goto(loop_start))
+        code = (play(0) + wait(2) + goto(loop_start) + play(1) + wait(1) +
+                play(2) + wait(1) + goto(loop_start))
         result = self.compile(code, frame_count=3)
         self.assertEqual(result, {
             "steps": [
@@ -46,6 +46,13 @@ class CompilePrimaryFrameStreamTests(unittest.TestCase):
             "omitted_layers": [],
             "signals": [],
         })
+
+    def test_wait_n_holds_n_source_updates(self) -> None:
+        # OpenBW: state.wait = N - 1, then one decrement per update.
+        result = self.compile(play(2) + wait(5) + bytes((22,)))
+        self.assertEqual(result["steps"], [
+            {"frame": 2, "duration_source_updates": 5}
+        ])
 
     def test_wait_zero_is_one_source_update(self) -> None:
         result = self.compile(play(2) + wait(0) + bytes((22,)))
@@ -61,7 +68,7 @@ class CompilePrimaryFrameStreamTests(unittest.TestCase):
         ])
 
     def test_end_holds_a_new_frame_after_previous_wait(self) -> None:
-        result = self.compile(wait(3) + play(2) + bytes((22,)))
+        result = self.compile(wait(4) + play(2) + bytes((22,)))
         self.assertEqual(result["steps"], [
             {"frame": 0, "duration_source_updates": 4},
             {"frame": 2, "duration_source_updates": 1},
@@ -139,7 +146,7 @@ class CompilePrimaryFrameStreamTests(unittest.TestCase):
         # Root waits one update, then places image 20 at (+1,-2), waits, ends.
         # Child image's Init starts at byte 10 and draws frame 1 for two ticks.
         code = bytes((5, 0, 8, 20, 0, 1, 254, 5, 0, 22,
-                      0, 1, 0, 5, 1, 7, 10, 0))
+                      0, 1, 0, 5, 2, 7, 10, 0))
         layers = compile_source_layers(
             code, {10: 0}, 10, decode_instruction, [0],
             {(20, "Init"): 10}, {10: 2, 20: 2})
@@ -154,7 +161,7 @@ class CompilePrimaryFrameStreamTests(unittest.TestCase):
     def test_follow_main_and_gas_overlays_are_explicit_layer_metadata(self) -> None:
         # followmaingraphic (29), creategasoverlays (56) with signed selector,
         # then end. Gas requests remain dynamic and are not folded into GRPs.
-        code = bytes((5, 0, 29, 5, 1, 56, 0xFE, 22))
+        code = bytes((5, 0, 29, 5, 2, 56, 0xFE, 22))
         layers = compile_source_layers(
             code, {10: 0}, 10, decode_instruction, [0], {}, {10: 1})
         self.assertTrue(layers[0]["follows_main_graphic"])
