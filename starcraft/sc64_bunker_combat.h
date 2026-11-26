@@ -52,15 +52,32 @@ static void __attribute__((noinline)) race_bunker_fire_unit(int unit,int slot)
     }
     if (!bound) return;
     int best=-1,best_distance=0;
-    for (int target=0;target<MAX_UNITS+MAX_BUILDINGS;++target) {
-        int alive=target<MAX_UNITS?u[target].alive:b[target-MAX_UNITS].alive;
-        if (!alive) continue;
-        int x=target_x(target),y=target_y(target);
-        int dx=x-q->x,dy=y-q->y;
-        if (FAST_ABS(dx)>bound || FAST_ABS(dy)>bound) continue;
-        int distance=dx*dx+dy*dy;
-        if ((best>=0 && distance>=best_distance) || !race_bunker_target_in_range(q,target,raw)) continue;
-        best=target;best_distance=distance;
+    {
+        const int x = q->x, y = q->y;
+        for (int target = 0; target < MAX_UNITS; ++target) {
+            const Unit *candidate = &u[target];
+            if (!candidate->alive) continue;
+            const int dx = candidate->x - x, dy = candidate->y - y;
+            if ((unsigned)dx + (unsigned)bound > 2u * (unsigned)bound ||
+                (unsigned)dy + (unsigned)bound > 2u * (unsigned)bound) continue;
+            const int distance = dx * dx + dy * dy;
+            if ((best >= 0 && distance >= best_distance) ||
+                !race_bunker_target_in_range(q, target, raw)) continue;
+            best = target;
+            best_distance = distance;
+        }
+        for (int i = 0; i < MAX_BUILDINGS; ++i) {
+            const Building *candidate = &b[i];
+            if (!candidate->alive) continue;
+            const int dx = candidate->x - x, dy = candidate->y - y;
+            if ((unsigned)dx + (unsigned)bound > 2u * (unsigned)bound ||
+                (unsigned)dy + (unsigned)bound > 2u * (unsigned)bound) continue;
+            const int distance = dx * dx + dy * dy, target = MAX_UNITS + i;
+            if ((best >= 0 && distance >= best_distance) ||
+                !race_bunker_target_in_range(q, target, raw)) continue;
+            best = target;
+            best_distance = distance;
+        }
     }
     if (best<0) return;
     /* P7's compact codec accepts only -2..239; larger building target IDs
