@@ -1159,3 +1159,8 @@ def train_measure_gba(series, golden, report):
 
 SCENARIOS['bb-train'] = {'title': 'Blood Bath: computer train and build times (passive)', 'measure_n64': train_measure_n64,
                          'measure_gba': train_measure_gba, 'profile': 'zerg-z10', 'runner': 'income'}
+
+# Blood Bath lobbies with a passive human (tools/sc64_parity_skirmish.py): their own
+# frame streams, runner arguments and per-player observations.
+import sc64_parity_skirmish  # noqa: E402
+SCENARIOS.update(sc64_parity_skirmish.scenarios())
