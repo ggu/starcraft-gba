@@ -2783,6 +2783,9 @@ volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_c
 static int nearest_refinery(int x, int y);
 static void update_exploration(void);
 static int owner_command_center(int owner);
+#ifdef SC64_IMPORTED_MISSION
+static void sc64_start_human_workers_mining(void);
+#endif
 static int currently_visible(int x, int y);
 #ifdef SC64_SHARED_BUNKER
 static void race_bunker_clear_slot(int slot);
@@ -5820,6 +5823,9 @@ init_state(void)
 #endif
     if (mission_unsupported_count) toast(14);
     update_exploration();
+#ifndef SC64_SKIRMISH
+    sc64_start_human_workers_mining();
+#endif
     return;
 #endif
     minerals = 500;

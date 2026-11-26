@@ -595,7 +595,7 @@ static void test_gas_overlay_source_requests(void)
     const SC64ConstructionSourceLayer *root=&refinery->layers[0];
     assert(root->gas_overlay_request_count==7 && root->gas_overlay_requests);
     static const signed char selectors[]={0,2,1,2,0,1,2};
-    static const uint32_t times[]={34,62,90,118,146,174,202};
+    static const uint32_t times[]={32,59,86,113,140,167,194}; /* iscript wait N = N updates */
     for (unsigned i=0;i<7;++i) {
         const SC64ConstructionGasOverlayRequest *request=&root->gas_overlay_requests[i];
         assert(request->selector==selectors[i]);

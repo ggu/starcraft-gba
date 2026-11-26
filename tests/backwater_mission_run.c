@@ -181,7 +181,14 @@ static int select_worker(void)
 
 static int begin_mining(void)
 {
-    return order_idle_workers_to_visible_minerals() > 0;
+    /* Campaign start sends the human's workers to their fields (the N64
+     * does); command any that are still idle, then require a miner. */
+    int miners = 0;
+    (void)order_idle_workers_to_visible_minerals();
+    for (int i = 0; i < MAX_UNITS; ++i)
+        miners += u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
+                  u[i].order == ORDER_MINE;
+    return miners > 0;
 }
 
 static int wait_for_minerals(int target,int limit)

@@ -9,6 +9,20 @@ import sys
 import tempfile
 
 
+def apply_overrides(expected: list, overrides: dict, table: int, raw: int, name: str) -> list:
+    """BWAPI row -> table row: swap in each recorded N64 cell after checking
+    the reference still holds the BWAPI value the override names."""
+    out = list(expected)
+    for (t, r, field), (bwapi, n64) in overrides.items():
+        if t != table or r != raw:
+            continue
+        if out[field] != bwapi:
+            raise AssertionError(f'{name} field {field}: BWAPI reference {out[field]} '
+                                 f'!= recorded override base {bwapi}')
+        out[field] = n64
+    return out
+
+
 def check(root: Path, facts_path: Path, upgrade_families: bool = False) -> None:
     facts = json.loads(facts_path.read_text(encoding='utf-8'))
     units = {u['id']: u for u in facts['units'] if u['id'] < 228}
@@ -28,9 +42,16 @@ def check(root: Path, facts_path: Path, upgrade_families: bool = False) -> None:
                            cwd=root, check=True)
             subprocess.run([str(fixture)], cwd=root, check=True)
     unit_rows, weapon_rows, armor_rows, family_rows = {}, {}, {}, {}
+    # N64 departures (sc64_n64_stock_overrides.h): (table, row, dump column)
+    # -> (BWAPI value, N64 value). The table holds the N64 value; the BWAPI
+    # reference must still hold the recorded BWAPI value.
+    overrides = {}
     for line in lines:
         row = line.split(',')
-        if row[0] == 'U':
+        if row[0] == 'O':
+            table, raw, field, bwapi, n64 = map(int, row[1:])
+            overrides[(table, raw, field)] = (bwapi, n64)
+        elif row[0] == 'U':
             unit_rows[int(row[1])] = list(map(int, row[2:]))
         elif row[0] == 'W':
             weapon_rows[int(row[1])] = list(map(int, row[2:]))
@@ -52,6 +73,7 @@ def check(root: Path, facts_path: Path, upgrade_families: bool = False) -> None:
                     u['mineral_cost'], u['gas_cost'], u['build_time'],
                     u['supply_required'], u['supply_provided'], u['hp'],
                     u['shields'], round(float(u['top_speed']) * 1024)]
+        expected = apply_overrides(expected, overrides, 0, raw_id, u['name'])
         if unit_rows[raw_id] != expected:
             raise AssertionError(f'raw unit {raw_id} {u["name"]}: '
                                  f'{unit_rows[raw_id]} != {expected}')
@@ -60,6 +82,7 @@ def check(root: Path, facts_path: Path, upgrade_families: bool = False) -> None:
         expected = [w['damage_amount'], w['damage_bonus'], w['damage_factor'],
                     w['damage_cooldown'], w['min_range'], w['max_range'],
                     w['damage_type']['id']]
+        expected = apply_overrides(expected, overrides, 1, weapon_id, w['name'])
         if weapon_rows[weapon_id] != expected:
             raise AssertionError(f'weapon {weapon_id} {w["name"]}: '
                                  f'{weapon_rows[weapon_id]} != {expected}')

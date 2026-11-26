@@ -79,7 +79,7 @@ static inline const Sc64P7ActorFact *sc64_p7_actor_fact(int type)
           0,0,0,0,0, 0,0,0,0,0,
           SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
           SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN},
-         130,130,0,0,0,0,0,0,12,1,1,
+         130,130,0,0,0,0,0,0,16,1,1, /* N64: 8 supply, doubled */
          SC64_P7_SRC_FLYER|SC64_P7_SRC_HUGE|SC64_P7_SRC_AUTO_ATTACK|
          SC64_P7_SRC_ATTACK|SC64_P7_SRC_MECHANICAL|
          SC64_P7_SRC_PRODUCES_UNITS,

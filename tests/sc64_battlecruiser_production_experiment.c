@@ -12,7 +12,9 @@ int main(void)
     int tower = fixture_building_raw(SIDE, 115, 748, 508);
     int lab = fixture_building_raw(SIDE, 118, 900, 500);
     int sf = fixture_building_raw(SIDE, 116, 852, 492);
+    int depot = fixture_building_raw(SIDE, 109, 300, 300); /* 16 supply needed */
     int type = unit_raw(12);
+    assert(depot >= 0);
     assert(starport >= 0 && second >= 0 && tower >= 0 && lab >= 0 && sf >= 0 && type >= 0);
     assert(!race_queue_unit(SIDE, starport, type)); /* tower belongs to second */
     b[tower].x = 548; b[tower].y = 508;
@@ -25,7 +27,10 @@ int main(void)
     assert(race_queue_unit(SIDE, starport, type));
     assert(minerals == before_m - 400 && gas == before_g - 300);
     assert(b[starport].queue_count == 1 && b[starport].queue[b[starport].queue_head] == type);
-    for (int tick = 0; tick < 2510 && b[starport].queue_count; ++tick)
+    /* 2,400 source frames: still training at the former 2,000-frame end. */
+    for (int tick = 0; tick < 2600; ++tick) race_tick_buildings();
+    assert(b[starport].queue_count == 1);
+    for (int tick = 2600; tick < 3010 && b[starport].queue_count; ++tick)
         race_tick_buildings();
     assert(b[starport].queue_count == 0);
     int cruiser = find_worker_raw(SIDE, 12);

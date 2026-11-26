@@ -3,7 +3,39 @@
 """Generate compact C facts tables from sc64_unit_spec_reference.py output."""
 import argparse
 import json
+import re
 from pathlib import Path
+
+OVERRIDES = Path(__file__).resolve().parents[1] / 'starcraft/sc64_n64_stock_overrides.h'
+UNIT_FIELDS = ('flags', 'ground_weapon', 'air_weapon', 'ground_hits', 'air_hits', 'size',
+               'armor', 'minerals', 'gas', 'build_frames', 'supply_required',
+               'supply_provided', 'hp', 'shields', 'top_speed_q10')
+WEAPON_FIELDS = ('damage', 'upgrade_bonus', 'cooldown', 'min_range', 'max_range',
+                 'damage_factor', 'damage_class')
+
+
+def n64_overrides(path: Path = OVERRIDES) -> dict:
+    """(table, row, field index) -> (BWAPI value, N64 value) from the tracked list."""
+    out = {}
+    pattern = (r'\{ SC64_STOCK_OVERRIDE_(UNIT|WEAPON), (\d+), SC64_STOCK_([UW])_([A-Z0-9_]+), '
+               r'(\d+), (\d+) \}')
+    for table, row, prefix, name, bwapi, n64 in re.findall(pattern, path.read_text(encoding='utf-8')):
+        fields = UNIT_FIELDS if table == 'UNIT' else WEAPON_FIELDS
+        if (prefix == 'U') != (table == 'UNIT') or name.lower() not in fields:
+            raise ValueError(f'bad override row {table} {row} {name}')
+        out[(table, int(row), fields.index(name.lower()))] = (int(bwapi), int(n64))
+    return out
+
+
+def apply_overrides(table: str, row: int, fields: tuple, overrides: dict) -> tuple:
+    """Swap in the N64 cells after checking each BWAPI base value."""
+    values = list(fields)
+    for (t, r, index), (bwapi, n64) in overrides.items():
+        if t == table and r == row:
+            if values[index] != bwapi:
+                raise ValueError(f'{table} {row} field {index}: BWAPI {values[index]} != override base {bwapi}')
+            values[index] = n64
+    return tuple(values)
 
 
 def emit_upgrade_families(facts_path: Path, output: Path) -> None:
@@ -42,12 +74,15 @@ def emit(facts_path: Path, output: Path) -> None:
     facts = json.loads(facts_path.read_text(encoding='utf-8'))
     units = facts['units']
     weapons = facts['weapons']
+    overrides = n64_overrides()
     lines = [
         '/* SPDX-License-Identifier: GPL-3.0-or-later */',
         '#ifndef SC64_STOCK_PROFILES_H', '#define SC64_STOCK_PROFILES_H', '',
         '/* Numeric default-table facts extracted independently from pinned BWAPI',
-        ' * d727fed68558c506163048ea889131d8cbb33915. Values do not establish',
-        ' * native N64 equivalence. Do not copy BWAPI implementation code here.',
+        ' * d727fed68558c506163048ea889131d8cbb33915, except the cells listed in',
+        ' * sc64_n64_stock_overrides.h, which hold the StarCraft 64 rule-table value',
+        ' * (the ROM-derived profiles follow the N64). Do not copy BWAPI',
+        ' * implementation code here.',
         ' * Unit records are indexed by public raw UnitType ID; raw IDs below None',
         ' * (228) are addressable. Q10 speed is source pixels per source frame.',
         ' */',
@@ -74,12 +109,14 @@ def emit(facts_path: Path, output: Path) -> None:
                   u['ground_weapon_hits'], u['air_weapon_hits'], u['size']['id'],
                   u['armor'], u['mineral_cost'], u['gas_cost'], u['build_time'],
                   u['supply_required'], u['supply_provided'], u['hp'], u['shields'], speed)
+        fields = apply_overrides('UNIT', u['id'], fields, overrides)
         lines.append('    [%d] = { %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d }, /* %s */' %
                      (u['id'], *fields, u['name']))
     lines.extend(['};', 'static const Sc64StockWeaponProfile sc64_stock_weapon_profiles[SC64_STOCK_WEAPON_ROWS] = {'])
     for w in weapons:
         fields = (w['damage_amount'], w['damage_bonus'], w['damage_cooldown'],
                   w['min_range'], w['max_range'], w['damage_factor'], w['damage_type']['id'])
+        fields = apply_overrides('WEAPON', w['id'], fields, overrides)
         lines.append('    [%d] = { %d, %d, %d, %d, %d, %d, %d }, /* %s */' %
                      (w['id'], *fields, w['name']))
     lines.extend([

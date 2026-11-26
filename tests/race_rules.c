@@ -136,7 +136,7 @@ int main(void)
     assert(sc64_race_raw_building(B_GREATER_SPIRE) == 137);
     assert(sc64_race_building_rule(B_GREATER_SPIRE)->hp == 1000);
     assert(sc64_race_building_armor(B_GREATER_SPIRE) == 1);
-    assert(sc64_race_building_armor(B_SUNKEN_COLONY) == 2);
+    assert(sc64_race_building_armor(B_SUNKEN_COLONY) == 0); /* N64 units.dat */
     assert(sc64_race_building_armor(B_PYLON) == 0);
     assert(sc64_race_unit_from_raw(30) == U_SIEGE_TANK);
     assert(sc64_race_pay_unit(&bank, U_ZERGLING));

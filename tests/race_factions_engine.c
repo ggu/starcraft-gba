@@ -216,7 +216,7 @@ int main(void)
         pool = find_building(SIDE, B_SPAWNING_POOL);
         assert(pool >= 0 && b[pool].under_construction);
         assert(!u[drone].alive && race_owner_supply(SIDE) == before - 2);
-        assert(race_owner_minerals(SIDE) == before_minerals - 200);
+        assert(race_owner_minerals(SIDE) == before_minerals - 150); /* N64 Pool */
         for (int f = 0; f < 1600; ++f) race_tick_buildings();
         assert(building_complete(pool));
     }

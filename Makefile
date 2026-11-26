@@ -4602,7 +4602,7 @@ test-unified: test-game-audio-unified
 # Stock profile facts are generated from the pinned public BWAPI default tables.
 # The normal local test stays asset-free; pass SC64_STOCK_FACTS to run the full
 # independent table-by-table comparison when the reference JSON is available.
-build/test-sc64-stock-profiles: tests/sc64_stock_profiles_dump.c starcraft/sc64_stock_profiles.h | build
+build/test-sc64-stock-profiles: tests/sc64_stock_profiles_dump.c starcraft/sc64_stock_profiles.h starcraft/sc64_n64_stock_overrides.h | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-stock-combat: tests/sc64_stock_combat.c starcraft/sc64_stock_combat.h starcraft/sc64_stock_profiles.h | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@

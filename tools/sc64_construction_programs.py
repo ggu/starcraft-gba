@@ -90,17 +90,19 @@ def compile_primary_frame_stream(
             if frame >= frame_count:
                 raise ValueError(f"playfram index {frame} outside frame bank")
             current_frame = frame
-        elif opcode == 5:  # wait u8; N means N+1 source updates
+        elif opcode == 5:  # wait u8: the frame holds N source updates
+            # As OpenBW runs it (state.wait = N - 1, then one decrement per
+            # update), which the StarCraft 64 parity content check follows.
+            # A zero wait, which no shipped script uses, still holds one.
             need(1)
             wait = data[pc]
             pc += 1
-            duration = wait + 1
-            append_wait(duration)
+            append_wait(max(wait, 1))
         elif opcode == 6:  # randwait: bounded visual timing uses its midpoint
             need(2)
             low, high = data[pc], data[pc + 1]
             pc += 2
-            append_wait((low + high) // 2 + 1)
+            append_wait(max((low + high) // 2, 1))
         elif opcode == 7:  # goto u16 absolute payload offset
             need(2)
             target = int.from_bytes(data[pc:pc + 2], "little")
@@ -195,7 +197,7 @@ def compile_source_layers(data: bytes, starts: dict[int, int], root_image: int,
             if opcode == 0:
                 frame = args[0]
             elif opcode in (5, 6):
-                duration = args[0] + 1 if opcode == 5 else (args[0] + args[1]) // 2 + 1
+                duration = max(args[0] if opcode == 5 else (args[0] + args[1]) // 2, 1)
                 if len(steps) >= MAX_STEPS:
                     raise ValueError(f"timeline exceeds {MAX_STEPS} steps")
                 steps.append({"frame": frame, "duration_source_updates": duration})

@@ -91,7 +91,7 @@ static inline int sc64_battlecruiser_tech_complete(unsigned *bits,
 typedef struct { unsigned kind, remaining; } Sc64BattlecruiserResearch;
 
 static inline unsigned sc64_battlecruiser_research_cost(unsigned kind)
-{ return kind == SC64_BC_TECH_YAMATO ? 100u : kind == SC64_BC_TECH_REACTOR ? 150u : 0u; }
+{ return kind == SC64_BC_TECH_YAMATO ? 200u : kind == SC64_BC_TECH_REACTOR ? 150u : 0u; }
 static inline unsigned sc64_battlecruiser_research_duration(unsigned kind)
 { return kind == SC64_BC_TECH_YAMATO ? 1800u : kind == SC64_BC_TECH_REACTOR ? 2500u : 0u; }
 static inline int sc64_battlecruiser_research_valid(const Sc64BattlecruiserResearch *r)

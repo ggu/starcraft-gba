@@ -400,7 +400,8 @@ class RomTablesTest(unittest.TestCase):
                 self.assertEqual((reported['rom'], reported['engine']),
                                  (value, engine[raw][engine_column]))
         stock = (ROOT / 'starcraft/sc64_stock_profiles.h').read_text()
-        storm_engine = int(re.search(r'\[84\] = \{ (\d+),', stock).group(1))
+        weapons = stock[stock.index('sc64_stock_weapon_profiles['):]
+        storm_engine = int(re.search(r'\[84\] = \{ (\d+),', weapons).group(1))
         storm = [d for d in document['diffs'] if d['table'] == 'weapons.stock' and d['row'] == 84
                  and d['column'] == 'damage']
         self.assertEqual(bool(storm), storm_engine != 16)

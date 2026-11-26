@@ -155,7 +155,8 @@ int main(int argc, char **argv)
     int tower=addon_raw(starport,115); (void)tower;
     int lab=addon_raw(facility,118);
     fprintf(stderr,"infrastructure reached tick=%u bank=%d/%d\n",host_ticks,minerals,gas);
-    assert(wait_bank(100,100) && select_building_fast(lab));
+    assert(wait_bank((int)sc64_battlecruiser_research_cost(SC64_BC_TECH_YAMATO),
+                     (int)sc64_battlecruiser_research_cost(SC64_BC_TECH_YAMATO)) && select_building_fast(lab));
     int research_row=race_bc_menu_base();
     assert(choose_menu_command(research_row));
     fprintf(stderr,"research requested tick=%u level=%d progress=%d bank=%d/%d\n",host_ticks,b[lab].level,b[lab].queue_progress,minerals,gas);
