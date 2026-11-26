@@ -57,6 +57,60 @@ static void defend_near(int x,int y)
         (void)attack_selected(ex,ey);
     }
 }
+/* Keep the Barracks training Marines with spare minerals and supply. */
+static void reinforce(int barracks)
+{
+    static unsigned next;
+    if(host_ticks<next) return;
+    next=host_ticks+64;
+    const int need=sc64_race_unit_rule(sc64_race_unit_from_raw(0))->supply;
+#define REINFORCE_READY() (b[barracks].alive && b[barracks].queue_count<2 && minerals>=50 && \
+                           race_owner_supply_cap(SIDE)-race_owner_reserved_supply(SIDE)>=need)
+    if(!REINFORCE_READY()) return;
+    /* A click on the selected Barracks trains; select it only when needed,
+       then train once if the queue, bank and supply still allow it. */
+    if(menu_open || mode!=MODE_NORMAL) tap(KEY_B);
+    if(selected_building!=barracks && !select_building_fast(barracks)) return;
+    if(menu_open || mode!=MODE_NORMAL || selected_building!=barracks || !REINFORCE_READY()) return;
+#undef REINFORCE_READY
+    int before=b[barracks].queue_count; tap(KEY_A);
+    if(b[barracks].queue_count>before) fprintf(stderr,"reinforce tick=%u queue=%d bank=%d/%d\n",host_ticks,b[barracks].queue_count,minerals,gas);
+}
+/* The nearest enemy the Battlecruiser may fire Yamato at, or -1. */
+static int yamato_target(int cruiser)
+{
+    int target=-1, best=0x7fffffff;
+    for(int i=0;i<MAX_UNITS+MAX_BUILDINGS;++i) {
+        int owner=i<MAX_UNITS?u[i].owner:b[i-MAX_UNITS].owner;
+        if(owner==SIDE || owner==NEUTRAL || !race_bc_yamato_target_valid(i,&u[cruiser],1)) continue;
+        int d=dist2(u[cruiser].x,u[cruiser].y,target_x(i),target_y(i));
+        if(d<best){best=d;target=i;}
+    }
+    return target;
+}
+/* Death or loss of sight: the only reasons the witness aims again. */
+static int target_gone(int target)
+{
+    return !target_alive(target) || !currently_visible(target_x(target),target_y(target));
+}
+/* Move the cursor onto a target that may be moving, until the Yamato
+   cursor resolves to it; 0 when it dies or leaves sight first. */
+static int aim_cursor(int target)
+{
+    for(unsigned guard=0;guard<6000u && host_ticks<match_limit && screen==SCREEN_PLAY && !won && !lost;++guard) {
+        if(race_bc_yamato_target_at(cx,cy)==target) return 1;
+        if(target_gone(target)) return 0;
+        int dx=target_x(target)-cx, dy=target_y(target)-cy;
+        if(abs(dx)<=1 && abs(dy)<=1) { if(race_bc_yamato_target_at(cx,cy)!=target) return 0; return 1; }
+        u16 held=(abs(dx)>=4 && (abs(dy)>=4 || abs(dy)<=1)) || (abs(dy)>=4 && abs(dx)<=1) ? KEY_R : 0;
+        if(dx>1) held|=KEY_RIGHT;
+        if(dx<-1) held|=KEY_LEFT;
+        if(dy>1) held|=KEY_DOWN;
+        if(dy<-1) held|=KEY_UP;
+        input(held);
+    }
+    return 0;
+}
 static int build_raw(int raw)
 {
     int type=sc64_race_building_from_raw(raw), worker=-1, x=-1, y=-1;
@@ -128,7 +182,8 @@ int main(int argc, char **argv)
     gba_init();
     assert(launch_match());
     fprintf(stderr, "start tick=%u minerals=%d gas=%d bots=%d workers=%d\n", host_ticks, minerals, gas, race_bots, count_units(SIDE,U_SCV));
-    assert(minerals == 200 && gas == 0 && race_bots == 1 && count_units(SIDE,U_SCV) > 0);
+    /* Custom matches open with the native Melee bank of 50 minerals (#306). */
+    assert(minerals == 50 && gas == 0 && race_bots == 1 && count_units(SIDE,U_SCV) > 0);
     while (minerals < 150 && host_ticks < match_limit && !won && !lost) input(0);
     fprintf(stderr, "ready tick=%u minerals=%d gas=%d won=%d lost=%d\n", host_ticks, minerals, gas, won, lost);
     assert(!won && !lost && minerals >= 150);
@@ -141,6 +196,14 @@ int main(int argc, char **argv)
     assert(select_building_fast(barracks));
     for(int i=0;i<4;++i) { assert(wait_bank(50,0)); int before=b[barracks].queue_count; tap(KEY_A); assert(b[barracks].queue_count>before); }
     fprintf(stderr,"queued four defenders tick=%u bank=%d/%d\n",host_ticks,minerals,gas);
+    /* Four more SCVs: at the native mining pace one CC's opening workers
+       cannot fund the Battlecruiser path before the Zerg computer attacks. */
+    int command=find_raw_build(106);
+    assert(command>=0 && select_building_fast(command));
+    /* Queued plus live SCVs: an SCV may finish during the purchase tap. */
+    for(int i=0;i<4;++i) { assert(wait_bank(50,0)); while(b[command].queue_count>=4 && !won && !lost) input(0);
+        int before=b[command].queue_count+count_units(SIDE,U_SCV); tap(KEY_A); assert(b[command].queue_count+count_units(SIDE,U_SCV)>before); }
+    fprintf(stderr,"queued four SCVs tick=%u bank=%d/%d\n",host_ticks,minerals,gas);
     int refinery=build_raw(110);
     gas_worker(refinery);
     gas_worker(refinery);
@@ -161,12 +224,22 @@ int main(int argc, char **argv)
     assert(choose_menu_command(research_row));
     fprintf(stderr,"research requested tick=%u level=%d progress=%d bank=%d/%d\n",host_ticks,b[lab].level,b[lab].queue_progress,minerals,gas);
     assert(b[lab].level);
+    /* The Battlecruiser takes 8 supply (16 doubled, StarCraft 64): build a
+       Supply Depot first, then confirm the free supply covers it. */
+    int depot=build_raw(109); (void)depot;
+    fprintf(stderr,"supply for BC used=%d reserved=%d cap=%d need=%d\n",race_owner_supply(SIDE),race_owner_reserved_supply(SIDE),
+            race_owner_supply_cap(SIDE),sc64_race_unit_rule(sc64_race_unit_from_raw(12))->supply);
+    assert(race_owner_supply_cap(SIDE)-race_owner_reserved_supply(SIDE) >= sc64_race_unit_rule(sc64_race_unit_from_raw(12))->supply);
     assert(wait_bank(400,300) && select_building_fast(starport));
     for(int i=0;i<20 && sc64_race_raw_unit(train_type)!=12;++i) tap(KEY_R);
     fprintf(stderr,"train selection raw=%d tick=%u towerAlive=%d labAlive=%d bank=%d/%d\n",sc64_race_raw_unit(train_type),host_ticks,b[tower].alive,b[lab].alive,minerals,gas);
     assert(sc64_race_raw_unit(train_type)==12);
     int queued=b[starport].queue_count; tap(KEY_A); assert(b[starport].queue_count>queued);
     fprintf(stderr,"BC queued tick=%u bank=%d/%d\n",host_ticks,minerals,gas);
+    /* The Zerg computer's attack outlasts eight Marines while the
+       Battlecruiser builds and charges: spend the floating minerals on one
+       more Depot and a steady stream of Marines. */
+    (void)build_raw(109);
     int cruiser=-1;
     while(host_ticks<match_limit && !won && !lost) {
         for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==SIDE && sc64_race_raw_unit(u[i].type)==12) {cruiser=i;break;}
@@ -174,45 +247,94 @@ int main(int argc, char **argv)
         if(cruiser>=0 && key>=0 && sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,(unsigned)key,SC64_BC_TECH_YAMATO)) break;
         if(host_ticks%500==0) fprintf(stderr,"queue watch tick=%u progress=%d count=%d starport_alive=%d lab_alive=%d BC=%d research=%u\n",host_ticks,b[starport].queue_progress,b[starport].queue_count,b[starport].alive,b[lab].alive,cruiser,(unsigned)sc64_battlecruiser_tech_bits);
         if(host_ticks%64==0) defend_near(b[starport].x,b[starport].y);
+        reinforce(barracks);
         input(0);
     }
     fprintf(stderr,"BC=%d research bits=%u tick=%u won=%d lost=%d bank=%d/%d\n",cruiser,(unsigned)sc64_battlecruiser_tech_bits,host_ticks,won,lost,minerals,gas);
     assert(cruiser>=0 && !won && !lost);
     int tech_key=sc64_battlecruiser_owner_key(race_mode,race_selected_mission,u[cruiser].owner,u[cruiser].raw_owner);
     assert(tech_key>=0 && sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,(unsigned)tech_key,SC64_BC_TECH_YAMATO));
+    /* The Zerg computer attacks the base, Hydralisks included, while the
+       Battlecruiser charges to 150 energy: park it in the far corner away
+       from both bases, and keep the Marines at the Starport. */
+    assert(select_unit(cruiser) && choose_menu_command(MENU_MOVE) && mode==MODE_MOVE);
+    move_cursor(WORLD_W-48,48); tap(KEY_A);
+    fprintf(stderr,"BC parks tick=%u dest=%d,%d\n",host_ticks,WORLD_W-48,48);
     while(u[cruiser].alive && u[cruiser].carry<150*256 && host_ticks<match_limit && !won && !lost) {
-        if(host_ticks%2000==0) fprintf(stderr,"energy watch tick=%u energy=%d hp=%d base_alive=%d\n",host_ticks,u[cruiser].carry,u[cruiser].hp,b[0].alive);
-        if(host_ticks%128==0) defend_near(u[cruiser].x,u[cruiser].y);
+        if(host_ticks%2000==0) fprintf(stderr,"energy watch tick=%u energy=%d hp=%d xy=%d,%d base_alive=%d\n",host_ticks,u[cruiser].carry,u[cruiser].hp,u[cruiser].x,u[cruiser].y,b[0].alive);
+        if(host_ticks%128==0) defend_near(b[starport].x,b[starport].y);
+        reinforce(barracks);
         input(0);
     }
     fprintf(stderr,"energy done tick=%u energy=%d alive=%d won=%d lost=%d\n",host_ticks,u[cruiser].carry,u[cruiser].alive,won,lost);
     assert(u[cruiser].alive && u[cruiser].carry>=150*256 && !won && !lost);
     assert(select_unit(cruiser));
-    int target=-1;
-    for(int i=0;i<MAX_UNITS+MAX_BUILDINGS;++i) {
-        int owner=i<MAX_UNITS?u[i].owner:b[i-MAX_UNITS].owner;
-        if(owner!=SIDE && owner!=NEUTRAL && race_bc_yamato_target_valid(i,&u[cruiser],1)) {target=i;break;}
-    }
+    int target=yamato_target(cruiser);
     if(target<0) {
         assert(choose_menu_command(MENU_MOVE) && mode==MODE_MOVE);
         move_cursor(race_base_x[1],race_base_y[1]); tap(KEY_A);
         fprintf(stderr,"BC move toward enemy tick=%u dest=%d,%d\n",host_ticks,race_base_x[1],race_base_y[1]);
         while(target<0 && u[cruiser].alive && !won && !lost && host_ticks<match_limit) {
-            for(int i=0;i<MAX_UNITS+MAX_BUILDINGS;++i) {
-                int owner=i<MAX_UNITS?u[i].owner:b[i-MAX_UNITS].owner;
-                if(owner!=SIDE && owner!=NEUTRAL && race_bc_yamato_target_valid(i,&u[cruiser],1)) {target=i;break;}
-            }
+            target=yamato_target(cruiser);
             if(target<0) input(0);
         }
     }
-    fprintf(stderr,"target=%d tick=%u BC_alive=%d won=%d lost=%d\n",target,host_ticks,u[cruiser].alive,won,lost);
+    fprintf(stderr,"target=%d tick=%u BC_alive=%d won=%d lost=%d target_xy=%d,%d bc_xy=%d,%d\n",target,host_ticks,u[cruiser].alive,won,lost,
+            target>=0?target_x(target):-1,target>=0?target_y(target):-1,u[cruiser].x,u[cruiser].y);
     assert(target>=0 && u[cruiser].alive && !won && !lost);
-    assert(choose_menu_command(race_bc_yamato_menu_base()) && mode==MODE_YAMATO);
-    move_cursor(target_x(target),target_y(target)); tap(KEY_A);
+    /* Aim at the nearest valid target. Aim again only when the target dies
+       or leaves sight before the click, or while an accepted cast is still
+       approaching (the engine then clears it), scouting toward the enemy
+       base when no target is in sight. A rejected click, any other
+       cancellation, a cast that clears after charging and a stalled
+       approach fail the witness. Charge and flight must be seen on the same
+       cast by this cruiser. */
     int charged=0,launched=0;
-    for(int n=0;n<5000 && !won && !lost;++n) {
-        for(int j=0;j<SC64_BC_SHOT_LIMIT;++j) {if(sc64_bc_shots[j].state==SC64_BC_SHOT_CHARGING)charged=1;if(sc64_bc_shots[j].state==SC64_BC_SHOT_FLIGHT)launched=1;}
-        if(launched) break; input(0);
+    for(int attempt=0;attempt<16 && !launched && target>=0 && u[cruiser].alive && !won && !lost;++attempt) {
+        assert(select_unit(cruiser) && choose_menu_command(race_bc_yamato_menu_base()) && mode==MODE_YAMATO);
+        /* The target may move while the cursor travels: follow it, and
+           click only while the UI would aim Yamato at it. */
+        if(!aim_cursor(target)) {
+            fprintf(stderr,"yamato target left before the click attempt=%d target=%d alive=%d tick=%u\n",attempt,target,target_alive(target),host_ticks);
+            assert(target_gone(target));
+            tap(KEY_B);
+        } else {
+            tap(KEY_A);
+            fprintf(stderr,"yamato aim attempt=%d target=%d xy=%d,%d tick=%u\n",attempt,target,target_x(target),target_y(target),host_ticks);
+            charged=0;
+            int seen=0,n=0;
+            for(;n<5000 && !won && !lost;++n) {
+                int pending=0;
+                for(int j=0;j<SC64_BC_SHOT_LIMIT;++j) {
+                    if(!sc64_bc_shots[j].state || sc64_bc_shots[j].caster!=(unsigned)cruiser) continue;
+                    pending=1; assert(sc64_bc_shots[j].target==(unsigned)target);
+                    if(sc64_bc_shots[j].state==SC64_BC_SHOT_CHARGING) charged=1;
+                    if(sc64_bc_shots[j].state==SC64_BC_SHOT_FLIGHT) launched=1;
+                }
+                if(launched) break;
+                if(!pending) {
+                    fprintf(stderr,"yamato cleared attempt=%d seen=%d charged=%d target_alive=%d target_gone=%d tick=%u\n",
+                            attempt,seen,charged,target_alive(target),target_gone(target),host_ticks);
+                    /* Only an accepted cast, seen approaching, may clear. */
+                    assert(seen && !charged && target_gone(target));
+                    break;
+                }
+                seen=1;
+                input(0);
+            }
+            assert(launched || won || lost || n<5000);
+        }
+        if(!launched && !won && !lost) {
+            int scouting=0;
+            while((target=yamato_target(cruiser))<0 && u[cruiser].alive && !won && !lost && host_ticks<match_limit) {
+                if(!scouting && u[cruiser].order==ORDER_IDLE) {
+                    assert(select_unit(cruiser) && choose_menu_command(MENU_MOVE) && mode==MODE_MOVE);
+                    move_cursor(race_base_x[1],race_base_y[1]); tap(KEY_A); scouting=1;
+                    fprintf(stderr,"BC scouts toward enemy tick=%u\n",host_ticks);
+                }
+                input(0);
+            }
+        }
     }
     fprintf(stderr,"yamato charged=%d launched=%d tick=%u won=%d lost=%d\n",charged,launched,host_ticks,won,lost);
     assert(charged && launched);
@@ -228,11 +350,18 @@ int main(int argc, char **argv)
     fprintf(stderr,"flight target=%d hp=%d alive=%d energy=%d tick=%u\n",target,pre_hp,pre_alive,energy_at_flight,host_ticks);
     assert(pre_alive && energy_at_flight<150*256);
     static unsigned char saved[sizeof(race_impact_record)]; u32 saved_len=0;
-    assert(!save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&saved_len));
+    /* The tag race_impact_save_read() loads: shared-transport builds save
+       under the transport version. */
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
+    const u32 save_tag=SC64_TRANSPORT_SAVE_VERSION;
+#else
+    const u32 save_tag=SAVE_VERSION;
+#endif
+    assert(!save_read_latest(saved,(u32)sizeof(saved),save_tag,&saved_len));
     int save_frame=frame; tap(KEY_START); assert(screen==SCREEN_PAUSE && frame==save_frame);
     input(KEY_B); input(0);
     assert((pause_notice & 0xc0)==UI_NOTICE_SAVED && (pause_notice & 0x3f)>0);
-    assert(save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&saved_len) && saved_len>0);
+    assert(save_read_latest(saved,(u32)sizeof(saved),save_tag,&saved_len) && saved_len>0);
     int saved_flight=0;for(int j=0;j<SC64_BC_SHOT_LIMIT;++j) if(sc64_bc_shots[j].state==SC64_BC_SHOT_FLIGHT) saved_flight=1;
     assert(saved_flight && frame==save_frame);
     fprintf(stderr,"flight save tick=%u frame=%d bytes=%u\n",host_ticks,frame,(unsigned)saved_len);
