@@ -36,7 +36,7 @@
  * resting ally on its own point; 16 px covers a 6 px radius plus the 3 px
  * longest probe step around the mover, with margin. */
 enum { SC64_ALLY_YIELD_STEP = 2, SC64_MOVE_GIVE_UP_RADIUS = 12, SC64_MOVE_GIVE_UP_PROBE_STEPS = 3,
-       SC64_MOVE_GIVE_UP_REACH = 16 };
+       SC64_MOVE_GIVE_UP_REACH = 16, SC64_MOVE_GIVE_UP_PHASES = 32 };
 
 static int
 sc64_ally_yield_radius(const Unit *q, const Unit *a)
@@ -130,16 +130,35 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
     return 0;
 }
 
+/* The longest step the mover's stock motion takes over the next
+ * SC64_MOVE_GIVE_UP_PHASES updates, at most SC64_MOVE_GIVE_UP_PROBE_STEPS:
+ * the give-up probes only lengths the mover can use. */
+static int
+sc64_move_longest_step(const Unit *q)
+{
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type), longest = 1;
+    for (unsigned f = 0; f < SC64_MOVE_GIVE_UP_PHASES; ++f)
+        for (int diagonal = 0; diagonal < 2; ++diagonal) {
+#ifdef SC64_CONTACT_CACHE
+            int s = (int)sc64_contact_stock_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
+#else
+            int s = (int)sc64_stock_motion_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
+#endif
+            if (s > longest) longest = s;
+        }
+    return longest < SC64_MOVE_GIVE_UP_PROBE_STEPS ? longest : SC64_MOVE_GIVE_UP_PROBE_STEPS;
+}
+
 /* The mover's intended step (nx, ny) is taken. Returns 1 when the mover
  * may take it after all (an idle ally stepped aside), else 0 and the engine
  * steers as before. A Move or attack-move mover only, with a nonzero step:
  *  1. Yield: the idle ally nearest the step that blocks it moves aside.
  *  2. Give up: with no ally moved, a Move within SC64_MOVE_GIVE_UP_RADIUS
- *     of its own point whose mover has no free step of 1-3 px in any of the
- *     8 directions or toward its waypoint (the probes the engine's steering
- *     makes, at every stock step length), and with no unit within
- *     SC64_MOVE_GIVE_UP_REACH px still travelling to a point beyond that
- *     radius, ends where it stands; the steering then finds no step either
+ *     of its own point whose mover has no free step in any of the 8
+ *     directions or toward its waypoint (the probes the engine's steering
+ *     makes) at any length its stock motion takes, up to 3 px, and with no
+ *     unit on its layer within SC64_MOVE_GIVE_UP_REACH px still travelling
+ *     to a point beyond that radius, ends where it stands; the steering then finds no step either
  *     and waits. An attack-move is left alone: move_toward() also serves
  *     its chase of an enemy, away from its point. */
 static int __attribute__((noinline))
@@ -168,8 +187,8 @@ sc64_move_blocked(Unit *q, int nx, int ny)
     /* The stock step alternates between lengths from update to update: an
      * order ends only when no length up to SC64_MOVE_GIVE_UP_PROBE_STEPS is
      * free in any direction. */
-    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
-    for (int speed = 1; speed <= SC64_MOVE_GIVE_UP_PROBE_STEPS; ++speed) {
+    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS, longest = sc64_move_longest_step(q);
+    for (int speed = 1; speed <= longest; ++speed) {
         /* The waypoint step clamps each axis on its own, so it is probed too. */
         int wx = sc64_stock_motion_axis(q->x, q->path_x, (unsigned)speed);
         int wy = sc64_stock_motion_axis(q->y, q->path_y, (unsigned)speed);
@@ -185,7 +204,8 @@ sc64_move_blocked(Unit *q, int nx, int ny)
      * Movers that are themselves near their points may all end. */
     for (int i = 0; i < MAX_UNITS; ++i) {
         const Unit *a = &u[i];
-        if (a == q || !a->alive || (a->order != ORDER_MOVE && a->order != ORDER_ATTACK_MOVE)) continue;
+        if (a == q || !a->alive || (a->order != ORDER_MOVE && a->order != ORDER_ATTACK_MOVE) ||
+            sc64_race_unit_flying(a->type) != sc64_race_unit_flying(q->type)) continue;
         if (dist2(a->x, a->y, q->x, q->y) < SC64_MOVE_GIVE_UP_REACH * SC64_MOVE_GIVE_UP_REACH &&
             dist2(a->x, a->y, a->tx, a->ty) > SC64_MOVE_GIVE_UP_RADIUS * SC64_MOVE_GIVE_UP_RADIUS) return 0;
     }
