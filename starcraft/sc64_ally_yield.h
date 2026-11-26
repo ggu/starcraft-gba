@@ -25,14 +25,18 @@
  *     continue. A zero step (the stock motion's speed this update) neither
  *     pushes nor ends an order.
  *
- * Bounded: one scan of the unit table per blocked mover per update, no new
- * state. Positions and orders are the only effects, so saves need nothing.
- * Both constants are provisional: the N64 captures (T1, five Marines) end
- * every move in formation with no crowd, so they hold no blocked-mover
- * evidence. 2 px is one ordinary ground step; 12 px is two of the 6 px
- * personal-space radii, enough for a mover pressed against a resting ally
- * on its own point. */
-enum { SC64_ALLY_YIELD_STEP = 2, SC64_MOVE_GIVE_UP_RADIUS = 12, SC64_MOVE_GIVE_UP_PROBE_STEPS = 3 };
+ * Bounded: at most two scans of the unit table per blocked mover per update,
+ * no new state. Positions and orders are the only effects, so saves need
+ * nothing; with no per-unit timer to save, the give-up is decided on the
+ * update the mover is found boxed in, by stationary units or near-point
+ * movers. The constants are provisional: the N64 captures (T1, five
+ * Marines) end every move in formation with no crowd, so they hold no
+ * blocked-mover evidence. 2 px is one ordinary ground step; 12 px is two of
+ * the 6 px personal-space radii, enough for a mover pressed against a
+ * resting ally on its own point; 16 px covers a 6 px radius plus the 3 px
+ * longest probe step around the mover, with margin. */
+enum { SC64_ALLY_YIELD_STEP = 2, SC64_MOVE_GIVE_UP_RADIUS = 12, SC64_MOVE_GIVE_UP_PROBE_STEPS = 3,
+       SC64_MOVE_GIVE_UP_REACH = 16 };
 
 static int
 sc64_ally_yield_radius(const Unit *q, const Unit *a)
@@ -132,8 +136,10 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
  *  1. Yield: the idle ally nearest the step that blocks it moves aside.
  *  2. Give up: with no ally moved, a Move within SC64_MOVE_GIVE_UP_RADIUS
  *     of its own point whose mover has no free step of 1-3 px in any of the
- *     8 directions (the probes the engine's steering makes, at every stock
- *     step length) ends where it stands; the steering then finds no step either
+ *     8 directions or toward its waypoint (the probes the engine's steering
+ *     makes, at every stock step length), and with no unit within
+ *     SC64_MOVE_GIVE_UP_REACH px still travelling to a point beyond that
+ *     radius, ends where it stands; the steering then finds no step either
  *     and waits. An attack-move is left alone: move_toward() also serves
  *     its chase of an enemy, away from its point. */
 static int __attribute__((noinline))
@@ -163,11 +169,26 @@ sc64_move_blocked(Unit *q, int nx, int ny)
      * order ends only when no length up to SC64_MOVE_GIVE_UP_PROBE_STEPS is
      * free in any direction. */
     int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
-    for (int speed = 1; speed <= SC64_MOVE_GIVE_UP_PROBE_STEPS; ++speed)
+    for (int speed = 1; speed <= SC64_MOVE_GIVE_UP_PROBE_STEPS; ++speed) {
+        /* The waypoint step clamps each axis on its own, so it is probed too. */
+        int wx = sc64_stock_motion_axis(q->x, q->path_x, (unsigned)speed);
+        int wy = sc64_stock_motion_axis(q->y, q->path_y, (unsigned)speed);
+        if ((wx != q->x || wy != q->y) && is_traversable(wx / 16, wy / 16, from_cell) &&
+            unit_step_clear(q, wx, wy)) return 0;
         for (int k = 0; k < 8; ++k) {
             int sx = q->x + dx[k] * speed, sy = q->y + dy[k] * speed;
             if (is_traversable(sx / 16, sy / 16, from_cell) && unit_step_clear(q, sx, sy)) return 0;
         }
+    }
+    /* A crowd still on its way out may clear the mover next update: keep the
+     * order while a unit within reach travels to a point beyond the radius.
+     * Movers that are themselves near their points may all end. */
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        const Unit *a = &u[i];
+        if (a == q || !a->alive || (a->order != ORDER_MOVE && a->order != ORDER_ATTACK_MOVE)) continue;
+        if (dist2(a->x, a->y, q->x, q->y) < SC64_MOVE_GIVE_UP_REACH * SC64_MOVE_GIVE_UP_REACH &&
+            dist2(a->x, a->y, a->tx, a->ty) > SC64_MOVE_GIVE_UP_RADIUS * SC64_MOVE_GIVE_UP_RADIUS) return 0;
+    }
     q->order = ORDER_IDLE;
     return 0;
 }
