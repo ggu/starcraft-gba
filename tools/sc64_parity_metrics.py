@@ -499,6 +499,7 @@ LAB_SETTLE = 20              # source frames a leg must stay still before its en
 LAB_STILL = 8.0              # N64 px a non-subject human unit of the subject's type may drift
 LAB_ORDER_WINDOW = 12        # ticks after a press within which the subject's order must change
 ORDER_MOVE, ORDER_ATTACK_MOVE = 6, 14   # proven unit.order values (layout 'orders')
+SC64_BURN_Q8 = 20   # Terran building burn per source frame, 1/256 hp (starcraft/sc64_building_damage.h)
 LAB_REACH = 288.0            # N64 px: 9 tiles, past every weapon but siege mode, for single-attacker checks
 LAB_ARRIVE_TOLERANCE = 32.0  # N64 px a leg may settle from its order point: one tile, for the GBA's
                              # 2-px grain and a destination another unit already holds
@@ -935,7 +936,9 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     buildings included (the N64 table holds them, the GBA unit series does not), never count."""
     removed = [ev for ev in series.get('events', []) if ev[0] == '-B']
     series = unit_lifetimes(series, t0, uid)
-    first = next(f for f in series['frames'] if f['sf'] >= t0)
+    first = next((f for f in series['frames'] if f['sf'] >= t0), None)
+    if first is None or uid not in first['units']:
+        return None, 'the subject is not in the trace after the command'
     human = first['units'][uid][1]
     own = hp_track(series, uid, t0)
     if not own:
@@ -1036,16 +1039,43 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
             track_ = hp_track(series, vid, t0, end, key=key)
             nearby.update(sf for sf, _ in hits(track_, lethal=True) if near_subject(sf, vid) or near_subject(sf - 1, vid))
 
-    def building_near(frame, b):
-        me = frame.get('units', {}).get(uid)
-        return me is not None and math.hypot(b[1] - me[2], b[2] - me[3]) <= LAB_REACH
+    def point_near(sf, x, y):
+        # The subject in reach of a point on the sample at sf or the one before it.
+        for s_ in (sf, sf - 1):
+            me = at_frame.get(s_, {}).get('units', {}).get(uid)
+            if me is not None and math.hypot(x - me[2], y - me[3]) <= LAB_REACH:
+                return True
+        return False
+
+    def burning(hp, max_hp):
+        # A Terran building at or below a third of its hit points burns 20/256 hp a source frame
+        # (starcraft/sc64_building_damage.h): its hit-point loss there is no evidence of an attack.
+        return max_hp is not None and max_hp > 0 and hp * 100 < max_hp * 34
+
+    def burn_loss(frames):
+        return (SC64_BURN_Q8 * max(1, frames) + 255) // 256
+    # GBA enemy buildings in reach that lose shields, or more hit points than burning explains.
     for before_, after_ in zip(window, window[1:]):
         for k, b in before_.get('buildings', {}).items():
             a = after_.get('buildings', {}).get(k)
             if b[0] == human or b[0] >= 8 or a is None or len(b) < 5 or len(a) < 5 or a[0] != b[0]:
                 continue
-            if (b[3] - a[3] >= 0.5 or b[4] - a[4] >= 0.5) and (building_near(before_, b) or building_near(after_, b)):
+            drop, max_hp = b[3] - a[3], (b[5] if len(b) > 5 else None)
+            hit = b[4] - a[4] >= 0.5 or (drop >= 0.5 and not (burning(b[3], max_hp) and
+                                                               drop <= burn_loss(after_['sf'] - before_['sf'])))
+            if hit and point_near(after_['sf'], b[1], b[2]):
                 nearby.add(after_['sf'])
+    # GBA removals (a unit or building born and removed inside one source frame shows only here):
+    # an enemy killed in reach of the subject, unless a burning building could have burned out.
+    for kind, step, slot, owner, x, y, hp, max_hp, last_hp in series.get('removals', []):
+        sf = (step or 0) * 4 // 5
+        if not t0 <= sf <= end or owner == human or owner >= 8 or hp > 0:
+            continue
+        barriers.add(sf)
+        if kind == 'B' and last_hp is not None and burning(last_hp, max_hp):
+            continue   # a burning building may have burned out
+        if point_near(sf, x, y):
+            nearby.add(sf)
     unclear |= nearby
     foe_kills = set()
     for vid in seen:
@@ -1061,27 +1091,15 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         barriers.update(events)
         if enemy(vid):
             foe_kills.update(events)
-        else:
-            nearby.update(sf for sf in events if near_subject(sf - 1, vid) or near_subject(sf, vid))
     # GBA buildings carry no hit points in the series: an enemy building that disappears
     # during the fight was destroyed, and splits the timing too.
     for before_, after_ in zip(window, window[1:]):
         for k, b in before_.get('buildings', {}).items():
             if b[0] != human and b[0] < 8 and k not in after_.get('buildings', {}):
                 barriers.add(after_['sf'])
-                if building_near(before_, b):
-                    nearby.add(after_['sf'])
     # A building destroyed and replaced in its slot inside one source frame shows only in the
     # trace's removal events (GBA steps, 5 to 4 source frames).
-    for _, step, slot, *_ in removed:
-        sf = (step or 0) * 4 // 5
-        if not t0 <= sf <= end:
-            continue
-        barriers.add(sf)
-        # Where it stood: its last sample before the removal.
-        last = next((f for f in reversed(window) if f['sf'] < sf and slot in f.get('buildings', {})), None)
-        if last is not None and last['buildings'][slot][0] != human and building_near(last, last['buildings'][slot]):
-            nearby.add(sf)
+    barriers.update((step or 0) * 4 // 5 for _, step, *_ in removed if t0 <= (step or 0) * 4 // 5 <= end)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims_all, shielded_all = victims, shielded
@@ -1157,6 +1175,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # included). With it, a check left without a value is inconclusive, never absent.
         'combat': bool(victims_all or shielded_all or foe_kills or nearby or hits(own, lethal=True)
                        or death is not None),
+        # The same without the drops near the subject: a fight with the foe, or one the subject took.
+        'foe_combat': bool(victims_all or shielded_all or foe_kills or hits(own, lethal=True) or death is not None),
         'subject_changed': subject_changed,
         # A dying N64 row outlives its hit points (16 frames for a Marine); a GBA row goes in
         # the step of the killing hit, so that hit leaves no hit-point record there. A victim
@@ -1253,6 +1273,12 @@ def lab_attack_n64(spec):
 # far outside every band, and tools/sc64_parity.py never lets a measured value inherit a KNOWN
 # verdict from it (nor an absence inherit one from a measured baseline).
 ABSENT = -999999
+# GBA value of an attack-lab check when the subject fought only enemies other than the foe (drops
+# or kills in its reach, GBA enemy buildings included) and the foe and the subject were never hit.
+# Like ABSENT it is a marker, never a measurement: it inherits KNOWN only from the same marker in
+# the baseline, so a run that fought where the baseline recorded no fight (or the reverse) fails.
+OFF_TARGET = -999998
+MARKERS = (ABSENT, OFF_TARGET)
 
 
 def absent_values(golden, values):
@@ -1293,13 +1319,22 @@ def lab_attack_gba(spec):
         # Combat that happened but could not be attributed is not combat that never happened:
         # those checks get no value (a gating REGRESSION, "not measured"), never ABSENT, which
         # a baseline recording no fight would otherwise accept.
-        # A subject that changed owner or type ended the observation early: what it did not
-        # reach is unmeasured too, survival included.
-        inconclusive = set()
-        if m is not None and (m['combat'] or m['subject_changed']):
+        # An observation that ended early is no evidence of absence either: a subject that
+        # changed owner or type, a run that stopped before its requested steps (the mission left
+        # play), or a measure that found no subject. What it did not reach is unmeasured,
+        # survival included.
+        requested, ran = golden.get('gba', {}).get('steps'), report.get('steps')
+        truncated = requested is not None and ran is not None and int(ran) < int(requested)
+        measured['truncated'] = truncated
+        inconclusive, off_target = set(), False
+        if m is not None and m['combat'] and not m['foe_combat'] and not m['subject_changed'] and not truncated:
+            # The subject fought only other enemies: what it never did to the foe is the
+            # OFF_TARGET marker, which only a baseline holding the same marker accepts.
+            off_target = True
+        elif m is None or m['combat'] or m['subject_changed'] or truncated:
             # Survival is the one check whose absence is an outcome: the subject did not die.
             inconclusive = {obs['check'] for obs in golden['observations']} - set(values)
-            if m['death'] is None and not m['subject_changed']:
+            if m is not None and m['death'] is None and not m['subject_changed'] and not truncated:
                 inconclusive.discard('lab.survival')
         inconclusive &= {obs['check'] for obs in golden['observations']}
         measured['inconclusive'] = sorted(inconclusive)
@@ -1307,6 +1342,12 @@ def lab_attack_gba(spec):
         for check in inconclusive:
             values.pop(check, None)
         measured['absent'] = [c for c in missing if c not in inconclusive]
+        measured['off_target'] = []
+        if off_target:
+            # Survival stays absent: the subject did not die.
+            measured['off_target'] = [c for c in measured['absent'] if c != 'lab.survival']
+            values.update({c: OFF_TARGET for c in measured['off_target']})
+            measured['absent'] = [c for c in measured['absent'] if c == 'lab.survival']
         return {'values': values, 'measured': measured}, None
     return measure
 
