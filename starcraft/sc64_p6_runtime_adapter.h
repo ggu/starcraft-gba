@@ -709,8 +709,10 @@ static int race_p6_campaign_tick(void)
     count_context.world = &race_p6_world;
     count_context.snapshot = &count_snapshot;
 #ifdef SC64_P6_PRUNE_STARTED
-    (void)sc64_p6_count_snapshot_begin(&count_snapshot, &race_p6_world,
-                                      &race_p6.runtime.model, 1);
+    /* The binding check above proves preflight accepted the immutable
+     * program, including the absence of repeat and PreserveTrigger. */
+    (void)sc64_p6_count_snapshot_begin_policy(&count_snapshot, &race_p6_world,
+                                             &race_p6.runtime.model, 1, 1);
 #else
     (void)sc64_p6_count_snapshot_begin(&count_snapshot, &race_p6_world,
                                       &race_p6.runtime.model, 0);
@@ -725,7 +727,7 @@ static int race_p6_campaign_tick(void)
        preflight and successful world binding. The still-valid check above is
        required on every frame before using this entry. */
     if (!race_p6_doodad_bindings_valid) return 0;
-    result = sc64_p6_adapter_tick_prevalidated(&race_p6.runtime, &ops, 0);
+    result = sc64_p6_adapter_tick_checked_state(&race_p6.runtime, &ops);
 #else
     result = sc64_p6_adapter_tick(&race_p6.runtime, &ops, 0);
 #endif
@@ -734,7 +736,9 @@ static int race_p6_campaign_tick(void)
        invalidate before any world mutation within the tick. */
     sc64_p6_count_snapshot_end(&count_snapshot);
 #endif
-    if (result < 0 || !sc64_p6_persistent_state_valid(&race_p6)) return 0;
+    /* The adapter checked its runtime after effects. Snapshot cleanup
+     * only touched the local cache, so check the other persisted fields. */
+    if (result < 0 || !sc64_p6_persistent_fields_valid(&race_p6)) return 0;
     for (unsigned i=0;i<SC64_P6_DOODAD_SOURCE_COUNT;++i) {
         if (sc64_p6_doodads[i].sprite_only) continue;
         race_p6_doodad_bindings[i].enabled=(u8)race_p6_doodad_row_enabled(i);

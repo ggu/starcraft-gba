@@ -368,16 +368,20 @@ static inline int sc64_p6_runtime_metadata_valid(void)
 
 static inline int sc64_p6_runtime_state_valid(const Sc64P6RuntimeState *s)
 {
-    if (!s || !sc64_p6_state_valid(&s->model) || s->fault ||
+    if (!s || !sc64_p6_state_header_valid(&s->model) || s->fault ||
         (s->switch_bits & ~((u32)SC64_P6_SWITCH_MASK))) return 0;
-    for (unsigned i=0;i<SC64_P6_TRIGGER_COUNT;++i) {
-        u8 cursor=s->model.action_cursor[i];
-        u16 ticks=s->action_ticks[i];
-        if ((cursor!=0)!=(ticks!=0)) return 0;
-        if (ticks) {
-            u16 limit=sc64_p6_action_duration(i,cursor-1u);
-            if (!limit || ticks>limit) return 0;
+    /* Model cursors and runtime durations describe the same actions, so
+     * validate them together. An idle cursor still requires a zero timer. */
+    for (unsigned i = 0; i < SC64_P6_TRIGGER_COUNT; ++i) {
+        u8 cursor = s->model.action_cursor[i];
+        u16 ticks = s->action_ticks[i];
+        if (!cursor) {
+            if (ticks) return 0;
+            continue;
         }
+        if (!ticks || !sc64_p6_active_cursor_valid(&s->model, i, cursor)) return 0;
+        u16 limit = sc64_p6_action_duration(i, cursor - 1u);
+        if (!limit || ticks > limit) return 0;
     }
     return 1;
 }
@@ -440,15 +444,16 @@ static inline int sc64_p6_dispatch_action(Sc64P6RuntimeState *s,
     return SC64_P6_FAULT_NONE;
 }
 
-static inline int sc64_p6_adapter_tick_policy(Sc64P6RuntimeState *s,
-                                               const Sc64P6WorldOps *ops,
-                                               int user_paused,
-                                               int prune_started,
-                                               int validate_immutable_metadata)
+static inline int sc64_p6_adapter_tick_with_validation(Sc64P6RuntimeState *s,
+                                                        const Sc64P6WorldOps *ops,
+                                                        int user_paused,
+                                                        int prune_started,
+                                                        int validate_immutable_metadata,
+                                                        int validate_initial_state)
 {
     Sc64P6Input in={{0},0,0};
     Sc64P6Output out;
-    if (!s || !sc64_p6_runtime_state_valid(s)) {
+    if (!s || (validate_initial_state && !sc64_p6_runtime_state_valid(s))) {
         if (s) s->fault=SC64_P6_FAULT_STATE;
         return -SC64_P6_FAULT_STATE;
     }
@@ -461,8 +466,10 @@ static inline int sc64_p6_adapter_tick_policy(Sc64P6RuntimeState *s,
     }
     for (unsigned t=0;t<SC64_P6_TRIGGER_COUNT;++t) {
         const Sc64P6SourceTrigger *tr=&sc64_p6_source_triggers[t];
-        if (prune_started && sc64_p6_trigger_started(&s->model,t) &&
-            sc64_p6_trigger_one_shot(t)) continue;
+        /* Both entry paths require authenticated metadata. Its validation
+         * rejects repeat flags and PreserveTrigger, so started records
+         * cannot need another condition poll. */
+        if (prune_started && sc64_p6_trigger_started(&s->model,t)) continue;
         for (unsigned i=0;i<tr->condition_count;++i) {
             const Sc64P6SourceCondition *row;
             int value;
@@ -496,6 +503,16 @@ static inline int sc64_p6_adapter_tick_policy(Sc64P6RuntimeState *s,
     return 1;
 }
 
+static inline int sc64_p6_adapter_tick_policy(Sc64P6RuntimeState *s,
+                                               const Sc64P6WorldOps *ops,
+                                               int user_paused,
+                                               int prune_started,
+                                               int validate_immutable_metadata)
+{
+    return sc64_p6_adapter_tick_with_validation(s, ops, user_paused, prune_started,
+                                                validate_immutable_metadata, 1);
+}
+
 static inline int sc64_p6_adapter_tick(Sc64P6RuntimeState *s,
                                        const Sc64P6WorldOps *ops,
                                        int user_paused)
@@ -520,6 +537,19 @@ static inline int sc64_p6_adapter_tick_prevalidated(Sc64P6RuntimeState *s,
     return sc64_p6_adapter_tick_policy(s,ops,user_paused,1,0);
 #else
     return sc64_p6_adapter_tick_policy(s,ops,user_paused,0,0);
+#endif
+}
+
+/* The campaign wrapper has already validated the whole persistent state and
+ * performs no runtime mutation before this call. The adapter still checks
+ * dispatch preconditions and validates the resulting runtime after effects. */
+static inline int sc64_p6_adapter_tick_checked_state(Sc64P6RuntimeState *s,
+                                                     const Sc64P6WorldOps *ops)
+{
+#ifdef SC64_P6_PRUNE_STARTED
+    return sc64_p6_adapter_tick_with_validation(s, ops, 0, 1, 0, 0);
+#else
+    return sc64_p6_adapter_tick_with_validation(s, ops, 0, 0, 0, 0);
 #endif
 }
 #endif

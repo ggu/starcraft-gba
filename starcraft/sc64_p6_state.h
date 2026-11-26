@@ -36,10 +36,9 @@ _Static_assert(sizeof(Sc64P6PersistentState) <=
 #endif
                "P6 persistent state bound");
 
-static inline int sc64_p6_persistent_state_valid(const Sc64P6PersistentState *s)
+static inline int sc64_p6_persistent_fields_valid(const Sc64P6PersistentState *s)
 {
-    if (!s || !sc64_p6_runtime_state_valid(&s->runtime) ||
-        s->pause_acknowledged > 1 || s->reserved[0] || s->reserved[1]) return 0;
+    if (!s || s->pause_acknowledged > 1 || s->reserved[0] || s->reserved[1]) return 0;
     for (unsigned i = 0; i < SC64_P6_SOURCE_SLOT_COUNT; ++i)
         if (s->deaths_by_source[i] > SC64_P6_MAX_SOURCE_DEATHS) return 0;
 #ifdef SC64_P6_STORM_ENABLED
@@ -55,6 +54,12 @@ static inline int sc64_p6_persistent_state_valid(const Sc64P6PersistentState *s)
         if (sc64_p6_doodads[i].sprite_only &&
             (s->doodad_enabled[i >> 3] & (u8)(1u << (i & 7u)))) return 0;
     return 1;
+}
+
+static inline int sc64_p6_persistent_state_valid(const Sc64P6PersistentState *s)
+{
+    return s && sc64_p6_runtime_state_valid(&s->runtime) &&
+           sc64_p6_persistent_fields_valid(s);
 }
 
 static inline unsigned sc64_p6_remaining_creations(const Sc64P6RuntimeState *s)

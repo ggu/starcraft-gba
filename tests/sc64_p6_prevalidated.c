@@ -121,11 +121,44 @@ static void test_terminal_and_errors(void)
     assert_equal(&fast,&full,&a,&b);
 }
 
+static int condition_for_first_trigger(void *ctx, const Sc64P6RuntimeState *state,
+                                       const Sc64P6SourceCondition *row)
+{
+    (void)ctx;
+    (void)state;
+    return row->trigger == 0;
+}
+
+static int corrupt_timer_after_action(void *ctx, const Sc64P6SourceAction *action)
+{
+    Sc64P6RuntimeState *state = ctx;
+    assert(action->trigger == 0);
+    state->action_ticks[1] = 1;
+    return 1;
+}
+
+static void checked_entry_still_validates_effects(void)
+{
+    Sc64P6RuntimeState checked, generic;
+    sc64_p6_runtime_init(&checked);
+    generic = checked;
+    assert(sc64_p6_runtime_state_valid(&checked));
+    Sc64P6WorldOps checked_ops = {
+        &checked, condition_for_first_trigger, corrupt_timer_after_action, NULL
+    };
+    Sc64P6WorldOps generic_ops = checked_ops;
+    generic_ops.context = &generic;
+    assert(sc64_p6_adapter_tick_checked_state(&checked, &checked_ops) == -SC64_P6_FAULT_STATE);
+    assert(sc64_p6_adapter_tick(&generic, &generic_ops, 0) == -SC64_P6_FAULT_STATE);
+    assert(memcmp(&checked, &generic, sizeof(checked)) == 0);
+}
+
 int main(void)
 {
     assert(sc64_p6_runtime_metadata_valid());
     test_differential_timeline();
     test_terminal_and_errors();
+    checked_entry_still_validates_effects();
     puts("P6 prevalidated tick matches full-validation reference");
     return 0;
 }

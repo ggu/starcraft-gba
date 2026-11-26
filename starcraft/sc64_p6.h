@@ -88,30 +88,41 @@ static inline void sc64_p6_init(Sc64P6State *s)
     }
 }
 
-static inline int sc64_p6_state_valid(const Sc64P6State *s)
+/* Every validation entry checks the same terminal records. Their outcome
+ * can be checked directly, independently of the other action cursors. */
+static inline int sc64_p6_state_header_valid(const Sc64P6State *s)
 {
-    unsigned terminal_count = 0, terminal = 0xffu;
+    const u32 defeat = sc64_p6_trigger_bit(SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER);
+    const u32 hero = sc64_p6_trigger_bit(SC64_P6_TRIGGER_DEFEAT_HERO_ABSENT);
+    const u32 victory = sc64_p6_trigger_bit(SC64_P6_TRIGGER_VICTORY);
+    u32 completed;
+
     if (!s || s->outcome > SC64_P6_LOST ||
         (s->started & ~(((u32)1u << SC64_P6_TRIGGER_COUNT) - 1u))) return 0;
+    completed = s->started & (defeat | hero | victory);
+    if (!completed) return s->outcome == SC64_P6_RUNNING;
+    if (s->action_cursor[SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER]) completed &= ~defeat;
+    if (s->action_cursor[SC64_P6_TRIGGER_DEFEAT_HERO_ABSENT]) completed &= ~hero;
+    if (s->action_cursor[SC64_P6_TRIGGER_VICTORY]) completed &= ~victory;
+    if (s->outcome == SC64_P6_RUNNING) return !completed;
+    if (s->outcome == SC64_P6_WON) return completed == victory;
+    return completed == defeat || completed == hero;
+}
+
+static inline int sc64_p6_active_cursor_valid(const Sc64P6State *s,
+                                               unsigned trigger, u8 cursor)
+{
+    return (s->started & sc64_p6_trigger_bit(trigger)) &&
+           cursor <= sc64_p6_action_count((u8)trigger);
+}
+
+static inline int sc64_p6_state_valid(const Sc64P6State *s)
+{
+    if (!sc64_p6_state_header_valid(s)) return 0;
     for (unsigned i = 0; i < SC64_P6_TRIGGER_COUNT; ++i) {
         u8 cursor = s->action_cursor[i];
-        if (cursor > sc64_p6_action_count((u8)i) ||
-            (cursor && !sc64_p6_trigger_started(s, i))) return 0;
-        if ((i == SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER ||
-             i == SC64_P6_TRIGGER_DEFEAT_HERO_ABSENT ||
-             i == SC64_P6_TRIGGER_VICTORY) &&
-            sc64_p6_trigger_started(s, i) && !cursor) {
-            ++terminal_count;
-            terminal = i;
-        }
+        if (cursor && !sc64_p6_active_cursor_valid(s, i, cursor)) return 0;
     }
-    if (s->outcome == SC64_P6_RUNNING && terminal_count) return 0;
-    if (s->outcome == SC64_P6_WON &&
-        (terminal_count != 1 || terminal != SC64_P6_TRIGGER_VICTORY)) return 0;
-    if (s->outcome == SC64_P6_LOST &&
-        (terminal_count != 1 ||
-         (terminal != SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER &&
-          terminal != SC64_P6_TRIGGER_DEFEAT_HERO_ABSENT))) return 0;
     return 1;
 }
 
@@ -131,9 +142,9 @@ static inline int sc64_p6_input_state_valid(const Sc64P6State *s,
                                              const Sc64P6Input *in)
 {
     if (!sc64_p6_state_valid(s) || !sc64_p6_input_valid(in)) return 0;
-    for (unsigned i = 0; i < SC64_P6_TRIGGER_COUNT; ++i)
-        if ((in->action_complete & sc64_p6_trigger_bit(i)) &&
-            !s->action_cursor[i]) return 0;
+    u32 completed = in->action_complete;
+    for (unsigned i = 0; completed; ++i, completed >>= 1)
+        if ((completed & 1u) && !s->action_cursor[i]) return 0;
     return 1;
 }
 
@@ -150,15 +161,13 @@ static inline int sc64_p6_conditions_met(const Sc64P6Input *in, u8 trigger)
 static inline Sc64P6Output sc64_p6_step(Sc64P6State *s, const Sc64P6Input *in)
 {
     Sc64P6Output out = {0,0,{{0,0}}};
-    u8 was_active[SC64_P6_TRIGGER_COUNT];
     if (!sc64_p6_input_state_valid(s, in) || in->paused ||
         s->outcome != SC64_P6_RUNNING) return out;
-    for (unsigned i = 0; i < SC64_P6_TRIGGER_COUNT; ++i)
-        was_active[i] = s->action_cursor[i] != 0;
-    for (u8 i = 0; i < SC64_P6_TRIGGER_COUNT; ++i) {
-        u8 cursor = s->action_cursor[i];
+    u32 completed = in->action_complete;
+    for (u8 i = 0; completed; ++i, completed >>= 1) {
         if (s->outcome != SC64_P6_RUNNING) break;
-        if (!cursor || !(in->action_complete & sc64_p6_trigger_bit(i))) continue;
+        if (!(completed & 1u)) continue;
+        u8 cursor = s->action_cursor[i];
         if (cursor < sc64_p6_action_count(i)) {
             s->action_cursor[i] = (u8)(cursor + 1u);
             sc64_p6_emit(&out, i, cursor);
@@ -176,8 +185,9 @@ static inline Sc64P6Output sc64_p6_step(Sc64P6State *s, const Sc64P6Input *in)
     }
     if (s->outcome == SC64_P6_RUNNING) {
         for (u8 i = 0; i < SC64_P6_TRIGGER_COUNT; ++i) {
-            if (!sc64_p6_conditions_met(in, i) || was_active[i] ||
-                s->action_cursor[i] || sc64_p6_trigger_started(s, i)) continue;
+            /* A validated active cursor implies started, and completing
+             * an action does not clear its one-shot record's started bit. */
+            if (sc64_p6_trigger_started(s, i) || !sc64_p6_conditions_met(in, i)) continue;
             s->started |= sc64_p6_trigger_bit(i);
             s->action_cursor[i] = 1;
             sc64_p6_emit(&out, i, 0);

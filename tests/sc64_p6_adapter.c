@@ -172,9 +172,63 @@ static void callbacks_and_exact_source_rows(void)
     }
 }
 
+static void runtime_validation_boundaries(void)
+{
+    assert(!sc64_p6_runtime_state_valid(NULL));
+    for (unsigned trigger = 0; trigger < SC64_P6_TRIGGER_COUNT; ++trigger) {
+        Sc64P6RuntimeState state;
+        const u32 started = sc64_p6_trigger_bit(trigger);
+        const u8 count = sc64_p6_action_count((u8)trigger);
+        sc64_p6_runtime_init(&state);
+        for (u8 cursor = 1; cursor <= count; ++cursor) {
+            const u16 duration = sc64_p6_action_duration(trigger, cursor - 1u);
+            state.model.started = started;
+            state.model.action_cursor[trigger] = cursor;
+            state.action_ticks[trigger] = duration;
+            assert(sc64_p6_runtime_state_valid(&state));
+
+            state.model.started = 0;
+            assert(!sc64_p6_runtime_state_valid(&state));
+            state.model.started = started;
+            state.action_ticks[trigger] = 0;
+            assert(!sc64_p6_runtime_state_valid(&state));
+            state.action_ticks[trigger] = duration + 1u;
+            assert(!sc64_p6_runtime_state_valid(&state));
+        }
+        state.action_ticks[trigger] = 1;
+        state.model.action_cursor[trigger] = count + 1u;
+        assert(!sc64_p6_runtime_state_valid(&state));
+        state.model.action_cursor[trigger] = 0;
+        assert(!sc64_p6_runtime_state_valid(&state));
+    }
+
+    Sc64P6RuntimeState state;
+    sc64_p6_runtime_init(&state);
+    const u32 defeat = sc64_p6_trigger_bit(SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER);
+    const u32 hero = sc64_p6_trigger_bit(SC64_P6_TRIGGER_DEFEAT_HERO_ABSENT);
+    const u32 victory = sc64_p6_trigger_bit(SC64_P6_TRIGGER_VICTORY);
+    state.model.started = defeat;
+    assert(!sc64_p6_runtime_state_valid(&state));
+    state.model.outcome = SC64_P6_LOST;
+    assert(sc64_p6_runtime_state_valid(&state));
+    state.model.started = hero;
+    assert(sc64_p6_runtime_state_valid(&state));
+    state.model.started |= defeat;
+    assert(!sc64_p6_runtime_state_valid(&state));
+    state.model.started = victory;
+    state.model.outcome = SC64_P6_WON;
+    assert(sc64_p6_runtime_state_valid(&state));
+    state.model.started |= defeat;
+    assert(!sc64_p6_runtime_state_valid(&state));
+    state.model.action_cursor[SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER] = 1;
+    state.action_ticks[SC64_P6_TRIGGER_DEFEAT_CURRENT_PLAYER] = 1;
+    assert(sc64_p6_runtime_state_valid(&state));
+}
+
 int main(void)
 {
     metadata_and_source_geometry();
+    runtime_validation_boundaries();
     selector_comparison_and_switch_semantics();
     callbacks_and_exact_source_rows();
     return 0;
