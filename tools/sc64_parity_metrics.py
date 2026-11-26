@@ -952,8 +952,15 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # A GBA row vanishes on its killing hit, so a missing row is a death, unless the trace's
     # removal record shows the subject left with hit points (loaded, or removed by the mission):
     # then it is lost, and survival is left unmeasured.
-    gone = next((r for r in series.get('removals', []) if r[0] == 'U' and r[2] == uid and
-                 (r[1] or 0) * 4 // 5 >= own[-1][0]), None) if own[-1][1] > 0 else None
+    step_at = {f['sf']: f.get('step') for f in series['frames']}
+
+    def removal_after(slot, last_sf):
+        # The removal of the unit last sampled at last_sf: after the engine step of that sample
+        # (two steps can share a source frame, so an earlier occupant's removal can share it too).
+        floor = step_at.get(last_sf)
+        return next((r for r in series.get('removals', []) if r[0] == 'U' and r[2] == slot and
+                     (r[1] or 0) * 4 // 5 >= last_sf and (floor is None or (r[1] or 0) > floor)), None)
+    gone = removal_after(uid, own[-1][0]) if own[-1][1] > 0 else None
     subject_lost = not subject_changed and own[-1][0] < last_sf and gone is not None and gone[6] > 0
     if not subject_changed and not subject_lost and (own[-1][0] < last_sf or own[-1][1] <= 0):
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
@@ -1104,7 +1111,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                 continue
         # A burning Terran building whose last hit points its burn could have taken since its
         # last row may have burned out: burn stops at exactly 0, so overkill is a shot. Any other
-        # building death is a kill.
+        # building death is a kill. (A weapon that leaves such a building at exactly 0 looks the
+        # same here: the trace records no cause of death.)
         if kind == 'B' and hp == 0 and last_hp is not None and last_step is not None and \
                 burning(last_hp, max_hp, raw, etype_, under_construction) and \
                 last_hp <= burn_loss(((step or 0) - last_step) * 4 // 5):
@@ -1123,8 +1131,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             # A GBA row removed by a hit the trace never shows, unless its removal record shows
             # hit points left (a mission script, a transport): that is no kill.
             slot = vid if isinstance(vid, int) else int(str(vid).split('.')[0])
-            left = next((r for r in series.get('removals', []) if r[0] == 'U' and r[2] == slot and
-                         (r[1] or 0) * 4 // 5 >= track_[-1][0]), None)
+            left = removal_after(slot, track_[-1][0])
             if left is None or left[6] <= 0:
                 events.append(track_[-1][0] + 1)
         # Every kill splits the timing, the subject's own included: the killing hit is never in

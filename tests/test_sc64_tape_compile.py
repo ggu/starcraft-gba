@@ -314,6 +314,15 @@ def walk(points_by_sf, uid=1, typ=metrics.MARINE, owner=1, hp=None, others=()):
     return {'source': 'n64', 'frames': frames}
 
 
+def as_gba(series, removals=()):
+    """A walk() series as a GBA trace gives it: each source frame's last engine step (5 steps to
+    4 frames) and the trace's removal records."""
+    series['source'], series['removals'] = 'gba', list(removals)
+    for frame in series['frames']:
+        frame['step'] = (5 * frame['sf'] + 4) // 4
+    return series
+
+
 class LabRunnerArgsTest(unittest.TestCase):
     def test_lab_arguments_reach_only_lab_runners(self):
         import sc64_parity
@@ -724,10 +733,8 @@ class LabMeasureTest(unittest.TestCase):
         calm = {'lab.cooldown': 'KNOWN', 'lab.damage': 'KNOWN', 'lab.survival': 'KNOWN'}
 
         def with_drone(drone, x=160, removals=()):
-            series = walk(pos, hp={1: marine, 2: calm_ling, 4: drone},
-                          others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, x, 100)])
-            series['source'], series['removals'] = 'gba', list(removals)
-            return series
+            return as_gba(walk(pos, hp={1: marine, 2: calm_ling, 4: drone},
+                               others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, x, 100)]), removals)
         # The Zergling is far and untouched and the Marine takes nothing, but in its reach a Drone
         # is wounded, killed (on the N64 its row keeps 0 hit points), or removed with 0 on the GBA.
         self.assertEqual(verdicts(with_drone({sf: 40.0 - 6 * (sf >= 28) for sf in range(0, 80)})), fought)
@@ -779,8 +786,7 @@ class LabMeasureTest(unittest.TestCase):
             for frame in series['frames']:
                 b = rows(frame['sf'])
                 frame['buildings'] = {7: b} if b else {}
-            series['source'], series['removals'] = 'gba', list(removals)
-            return series
+            return as_gba(series, removals)
         # A GBA building in reach that loses hit points or shields, or is destroyed (also when it
         # was born and destroyed inside one source frame),
         self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500 - 6 * (sf >= 28), 0, 1500))), fought)
@@ -811,11 +817,17 @@ class LabMeasureTest(unittest.TestCase):
         # two buildings: no drop.
         self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500, 0, 1500, 3, 111, 0) if sf < 28
                                                 else (4, 200, 100, 200, 0, 1000, 4, 112, 0))), calm)
+        # A slot's earlier occupant killed in a step that shares the foe's birth frame is not the
+        # foe's removal: the foe, born in the next step, leaves with hit points.
+        series = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(16, 17)}},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100)]),
+                        [('U', 20, 2, 4, 900, 100, -3, None, 40, metrics.DRONE, 0, None, None),
+                         ('U', 22, 2, 4, 900, 100, 35, None, 35, metrics.ZERGLING, 0, None, None)])
+        self.assertEqual(verdicts(series), calm)
         # A foe removed with hit points left (a mission script) was not killed.
-        series = walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 28)}},
-                      others=[(2, metrics.ZERGLING, 4, 900, 100)])
-        series['source'] = 'gba'
-        series['removals'] = [('U', 35, 2, 4, 900, 100, 35, None, 35, metrics.ZERGLING, 0, None, None)]
+        series = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 28)}},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100)]),
+                        [('U', 35, 2, 4, 900, 100, 35, None, 35, metrics.ZERGLING, 0, None, None)])
         self.assertEqual(verdicts(series), calm)
         # Burn explains a death only from what it could take since the building's last row: a
         # shot that kills a building at 5 hp, or a burning one at 300, is a kill.
@@ -875,10 +887,9 @@ class LabMeasureTest(unittest.TestCase):
         # The subject's row vanishes at 30. Its removal record with hit points left is a lost
         # subject, not a death: survival is unmeasured. At 0 it is a death.
         for hp_left, lost in ((40, True), (0, False)):
-            series = walk(pos, hp={1: {sf: 40.0 for sf in range(0, 30)}, 2: {sf: 35.0 for sf in range(0, 80)}},
-                          others=[(2, metrics.ZERGLING, 4, 900, 100)])
-            series['source'] = 'gba'
-            series['removals'] = [('U', 38, 1, 1, 100, 100, hp_left, None, 40, metrics.MARINE, 0, None)]
+            series = as_gba(walk(pos, hp={1: {sf: 40.0 for sf in range(0, 30)}, 2: {sf: 35.0 for sf in range(0, 80)}},
+                                 others=[(2, metrics.ZERGLING, 4, 900, 100)]),
+                            [('U', 38, 1, 1, 100, 100, hp_left, None, 40, metrics.MARINE, 0, None)])
             result, rows = run(series)
             self.assertEqual(result['measured']['subject_lost'], lost)
             if lost:
