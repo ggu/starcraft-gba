@@ -78,6 +78,7 @@ FIELDS = {
 }
 OPS = ('eq', 'ne', 'ge', 'lt', 'changed', 'set', 'clear')
 WORLD_OPS = ('eq', 'ne', 'ge', 'lt')
+NAME_CHARS = frozenset('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-')
 OPTIONAL_COMMANDS = {'poke', 'pulse'}   # field-map frontend only (see Tape.require)
 
 # Pad bits (CAPTURE.md).
@@ -223,8 +224,9 @@ def field_of(name):
 
 
 def name_ok(name, suffix=''):
+    # The frontend's rule: one plain component of [A-Za-z0-9._-], ASCII only, not starting with '.'.
     return (isinstance(name, str) and 0 < len(name) <= 64 and name[0] != '.' and name.endswith(suffix) and
-            len(name) > len(suffix) and all(c.isalnum() or c in '._-' for c in name))
+            len(name) > len(suffix) and all(c in NAME_CHARS for c in name))
 
 
 class Tape:

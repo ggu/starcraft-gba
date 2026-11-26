@@ -484,6 +484,8 @@ LAB_ACCEL_CHORD = 4
 LAB_RANGE_TOLERANCE = 8.0    # N64 px: one GBA pixel each way per axis, plus a movement step's overshoot
 LAB_SETTLE = 20              # source frames a leg must stay still before its end
 LAB_STILL = 8.0              # N64 px a non-subject human unit of the subject's type may drift
+LAB_ARRIVE_TOLERANCE = 32.0  # N64 px a leg may settle from its order point: one tile, for the GBA's
+                             # 2-px grain and a destination another unit already holds
 
 
 def lab_command_frames(series, marks, names):
@@ -533,7 +535,11 @@ def lab_subject(series, t0, subject_type, human, kind='moved'):
     return movers[0], None
 
 
-def lab_move_measure(series, uid, frames):
+def lab_move_measure(series, uid, frames, targets):
+    """targets: the point each leg's order was given at (N64 px). A leg counts only when it
+    settles within LAB_ARRIVE_TOLERANCE of it, so a stop anywhere else never reads as arrival."""
+    if len(targets) != len(frames):
+        return None, 'one target per leg is needed'
     legs = []
     for k, t0 in enumerate(frames):
         t1 = frames[k + 1] if k + 1 < len(frames) else None
@@ -547,6 +553,11 @@ def lab_move_measure(series, uid, frames):
             return None, f'leg {k}: the subject was still moving {end - leg["arrive"]} frames before the leg ended'
         if leg['accel'] is None:
             return None, f'leg {k}: the subject never reached {LAB_ACCEL_FRACTION:.0%} of its cruise speed'
+        miss = math.hypot(leg['end'][0] - targets[k][0], leg['end'][1] - targets[k][1])
+        if miss > LAB_ARRIVE_TOLERANCE:
+            return None, (f'leg {k}: the subject settled at {tuple(leg["end"])}, {miss:.0f} px from its order point '
+                          f'{tuple(targets[k])} (allowed {LAB_ARRIVE_TOLERANCE})')
+        leg['target_miss'] = round(miss, 2)
         legs.append(leg)
     result = {'legs': [{k: (list(v) if isinstance(v, tuple) else v) for k, v in leg.items()} for leg in legs],
               'cruise': legs[0]['cruise'], 'accel': legs[0]['accel'], 'duration': legs[0]['duration'],
@@ -617,16 +628,15 @@ def lab_move_n64(spec):
         uid, err = lab_subject(series, frames[0], spec['subject_type'], human)
         if err:
             raise SystemExit(f'{spec["id"]}: {err}')
-        m, err = lab_move_measure(series, uid, frames)
+        # The GBA replays the order the tape gave: the world point under the cursor at the press.
+        clicked = [cap.world_point(marks[name]) for name in names]
+        m, err = lab_move_measure(series, uid, frames, clicked)
         if err:
             raise SystemExit(f'{spec["id"]}: {err}')
         start = first[uid][2:4]
         steps = lab_gba_steps(frames)
-        cmds, clicked = [], []
-        for name, step in zip(names, steps):
-            # The GBA replays the order the tape gave: the world point under the cursor at the press.
-            px, py = cap.world_point(marks[name])
-            clicked.append((px, py))
+        cmds = []
+        for (px, py), step in zip(clicked, steps):
             if spec.get('relative'):
                 cmds.append([step, 16, round((px - start[0]) / 2), round((py - start[1]) / 2)])
             else:
@@ -657,7 +667,11 @@ def lab_move_gba(spec):
         frames = lab_report_frames(report)
         if uid is None or len(frames) != len(golden['gba']['cmds']):
             return None, 'the runner reported no subject or a different number of orders'
-        m, err = lab_move_measure(series, uid, frames)
+        # Order points in N64 px: an offset from the subject's start when the golden gives one.
+        start = report.get('subject_start') or [0, 0]
+        targets = [(2 * (x + (start[0] if kind & 16 else 0)), 2 * (y + (start[1] if kind & 16 else 0)))
+                   for _, kind, x, y in golden['gba']['cmds']]
+        m, err = lab_move_measure(series, uid, frames, targets)
         if err:
             return None, err
         values = {'lab.cruise_speed': m['cruise'], 'lab.accel_frames': m['accel'], 'lab.leg_duration': m['duration'],
@@ -699,8 +713,23 @@ def hits(points, lethal=False):
             if a[1] - b[1] >= 0.5 and (lethal or b[1] > 0)]
 
 
-def lab_attack_measure(series, uid, t0):
-    """The subject's hits on enemy units and theirs on it, from the command to its death or the end."""
+def cartridge_type(frame, vid, unit_raw=None):
+    """A unit's cartridge id: the row's own on the N64 and on GBA traces that carry it; else the
+    engine type through the runner's unit_raw map (zerg-z10 rows carry no raw ids)."""
+    unit = frame['units'].get(vid)
+    if unit is None:
+        return None
+    if unit[0] >= 0 or unit_raw is None:
+        return unit[0]
+    engine = frame.get('etype', {}).get(vid)
+    return unit_raw[engine] if engine is not None and 0 <= engine < len(unit_raw) else None
+
+
+def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
+    """The subject's hits on enemy units and theirs on it, from the command to its death or the end.
+
+    With foe_type, only enemy units of that cartridge id are victims: hits on any other row,
+    buildings included (the N64 table holds them, the GBA unit series does not), never count."""
     first = next(f for f in series['frames'] if f['sf'] >= t0)
     human = first['units'][uid][1]
     own = hp_track(series, uid, t0)
@@ -711,9 +740,13 @@ def lab_attack_measure(series, uid, t0):
     if own[-1][0] < last_sf or own[-1][1] <= 0:
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
     end = death if death is not None else last_sf
+    def enemy(vid):
+        unit = first['units'][vid]
+        return (unit[1] != human and unit[1] < 8 and
+                (foe_type is None or cartridge_type(first, vid, unit_raw) == foe_type))
     victims = {}
-    for vid, unit in first['units'].items():
-        if unit[1] == human or unit[1] >= 8:
+    for vid in first['units']:
+        if not enemy(vid):
             continue
         got = hits(hp_track(series, vid, t0, end))
         if got:
@@ -721,7 +754,7 @@ def lab_attack_measure(series, uid, t0):
     # Shields take hits before hit points; a victim's shield drops are hits of their own.
     shielded = {}
     for vid in first['units']:
-        if first['units'][vid][1] == human or first['units'][vid][1] >= 8:
+        if not enemy(vid):
             continue
         got = hits(hp_track(series, vid, t0, end, key='shield'), lethal=True)
         if got:
@@ -838,11 +871,12 @@ def lab_attack_n64(spec):
         uid, err = lab_subject(series, t0, spec['subject_type'], human)
         if err:
             raise SystemExit(f'{spec["id"]}: {err}')
-        m, err = lab_attack_measure(series, uid, t0)
+        m, err = lab_attack_measure(series, uid, t0, spec['foe_type'])
         if err or not m['hits']:
             raise SystemExit(f'{spec["id"]}: {err or "the subject hit nothing"}')
-        if len(m['damage_values']) > 1:
-            raise SystemExit(f'{spec["id"]}: the subject\'s hits differ ({m["damage_values"]}); one weapon expected')
+        if len(m['damage_values']) > 1 or len(m['shield_values']) > 1:
+            raise SystemExit(f'{spec["id"]}: the subject\'s hits differ ({m["damage_values"]}, shields '
+                             f'{m["shield_values"]}); one weapon expected')
         px, py = cap.world_point(marks['command'])
         start = first[uid]
         step = lab_gba_steps([t0])[0]
@@ -880,7 +914,7 @@ def lab_attack_gba(spec):
         frames = lab_report_frames(report)
         if uid is None or len(frames) != 1:
             return None, 'the runner reported no subject or more than one order'
-        m, err = lab_attack_measure(series, uid, frames[0])
+        m, err = lab_attack_measure(series, uid, frames[0], spec['foe_type'], report.get('unit_raw'))
         values = {}
         if m is not None:
             for key, check in (('range_first', 'lab.range_first'), ('first_hit', 'lab.first_hit'),
@@ -889,6 +923,13 @@ def lab_attack_gba(spec):
                                ('survival', 'lab.survival')):
                 if m[key] is not None:
                     values[check] = m[key]
+            # Exact checks hold for every hit, not the median: submit the GBA hit furthest from
+            # the N64 value, so one wrong hit among right ones still fails.
+            n64 = {obs['check']: obs['value'] for obs in golden['observations']}
+            for check, sizes in (('lab.damage', m['damage_values']), ('lab.shield_damage', m['shield_values']),
+                                 ('lab.counter_damage', m['counter_values'])):
+                if sizes and check in n64:
+                    values[check] = max(sizes, key=lambda v: (abs(v - n64[check]), v))
         measured = dict(m or {}, error=err)
         measured['absent'] = absent_values(golden, values)
         return {'values': values, 'measured': measured}, None
@@ -905,7 +946,8 @@ LAB_SPECS = [
     {'id': 'lab-scv-move', 'kind': 'move', 'name': 'SCV', 'subject_type': SCV, 'human_type': MARINE,
      'marks': ['command', 'turn'], 'profile': 'terran', 'runner': 'lab-t1',
      'title': 'T1 lab: one SCV moved out and back (worker)'},
-    {'id': 'lab-marine-zergling', 'kind': 'attack', 'name': 'Marine', 'foe': 'Zergling', 'subject_type': MARINE,
+    {'id': 'lab-marine-zergling', 'kind': 'attack', 'name': 'Marine', 'foe': 'Zergling', 'foe_type': ZERGLING,
+     'subject_type': MARINE,
      'human_type': MARINE, 'profile': 'terran', 'runner': 'lab-t1',
      'title': 'T1 lab: one Marine attacks a Zergling pair (weapon, damage, range, death)'},
     {'id': 'lab-overlord-move', 'kind': 'move', 'name': 'Overlord', 'subject_type': 42, 'human_type': DRONE,
@@ -924,14 +966,17 @@ LAB_SPECS = [
     {'id': 'lab-tank-move', 'kind': 'move', 'name': 'Siege Tank', 'subject_type': 5, 'human_type': 5,
      'marks': ['command', 'turn'], 'profile': 'terran', 'runner': 'lab-mission', 'mission': 13,
      'title': 'T10 lab: one Siege Tank moved out and back (ground, large)'},
-    {'id': 'lab-hydralisk-zealot', 'kind': 'attack', 'name': 'Hydralisk', 'foe': 'Zealot', 'subject_type': 38,
+    {'id': 'lab-hydralisk-zealot', 'kind': 'attack', 'name': 'Hydralisk', 'foe': 'Zealot', 'foe_type': 65,
+     'subject_type': 38,
      'human_type': DRONE, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 1, 'shields': True,
      'title': 'Z2 lab: one Hydralisk attacks a Zealot (explosive on small, shields then hit points)'},
 ]
 for _spec in LAB_SPECS:
     _make = (lab_move_n64, lab_move_gba) if _spec['kind'] == 'move' else (lab_attack_n64, lab_attack_gba)
+    # world_points: the measurement replays the points the tape's orders were given at, so every
+    # run of a bundle must agree on them (tools/parity_decode.py write_golden).
     SCENARIOS[_spec['id']] = {'title': _spec['title'], 'measure_n64': _make[0](_spec), 'measure_gba': _make[1](_spec),
-                              'profile': _spec['profile'], 'runner': _spec['runner']}
+                              'profile': _spec['profile'], 'runner': _spec['runner'], 'world_points': True}
 
 
 # ---- passive train and build lab (Blood Bath computers) ---------------------
@@ -991,47 +1036,63 @@ def train_n64(cap, human):
     return out
 
 
-def train_gba(series, human, unit_raw, building_raw):
-    """The same table from a GBA trace's births and building rows."""
+def train_gba(series, human, unit_raw, building_raw, ambiguous=None):
+    """The same table from a GBA trace's births and building rows.
+
+    Events are taken a step at a time. A producer completes its queue head in a step when its row
+    then shows fewer queued units, a restarted progress or another head; a unit born in that step
+    is credited to the one producer of its owner that completed its type there. A birth with no
+    such producer, or with several, is counted in `ambiguous` (a list, when given) and left out."""
     out = {}
     queue = {}      # producer slot -> (start step, head engine type)
+    state = {}      # producer slot -> (owner, count, progress, head) as last seen
     building = {}   # slot -> (birth step, engine type, owner)
-    owner_of = {}
+    by_step = {}
     for event in series.get('events', []):
-        tag, step = event[0], event[1]
-        if step is None:
-            continue
-        if tag == '+B':
-            _, _, slot, typ, owner = event
-            if step > 1:   # pre-placed buildings are born complete by the launch
-                building[slot] = (step, typ, owner)
-        elif tag == '-B':
-            _, _, slot, _, _ = event   # destroyed: its pending job and construction end here
-            queue.pop(slot, None)
-            building.pop(slot, None)
-            owner_of.pop(slot, None)
-        elif tag == 'B':
-            _, _, slot, typ, owner, uc, count, progress, head = event
-            owner_of[slot] = owner
-            if slot in building and not uc:
-                step0, btyp, bowner = building.pop(slot)
-                if bowner != human:
-                    raw = building_raw[btyp] if 0 <= btyp < len(building_raw) else -1
-                    out.setdefault(raw, []).append((step0 * 4 // 5, (step - step0) * 4 / 5, None))
-            if count and progress == 1 and owner != human:
-                queue[slot] = (step, head)
-            elif not count or (slot in queue and queue[slot][1] != head):
-                queue.pop(slot, None)   # cancelled, or the head changed without a birth
-        elif tag == '+U':
-            _, _, slot, typ, owner = event
-            if owner == human:
+        if event[1] is not None:
+            by_step.setdefault(event[1], []).append(event)
+    for step in sorted(by_step):
+        births, completed = [], {}
+        for event in by_step[step]:
+            tag = event[0]
+            if tag == '+B':
+                _, _, slot, typ, owner = event
+                if step > 1:   # pre-placed buildings are born complete by the launch
+                    building[slot] = (step, typ, owner)
+            elif tag == '-B':
+                _, _, slot, _, _ = event   # destroyed: its pending job and construction end here
+                queue.pop(slot, None)
+                building.pop(slot, None)
+                state.pop(slot, None)
+            elif tag == 'B':
+                _, _, slot, typ, owner, uc, count, progress, head = event
+                if slot in building and not uc:
+                    step0, btyp, bowner = building.pop(slot)
+                    if bowner != human:
+                        raw = building_raw[btyp] if 0 <= btyp < len(building_raw) else -1
+                        out.setdefault(raw, []).append((step0 * 4 // 5, (step - step0) * 4 / 5, None))
+                before = state.get(slot)
+                if before and slot in queue and before[1] and (
+                        count < before[1] or progress < before[2] or head != before[3]):
+                    completed.setdefault((owner, before[3]), []).append((slot, queue.pop(slot)[0]))
+                state[slot] = (owner, count, progress, head)
+                if count and progress == 1 and owner != human:
+                    queue[slot] = (step, head)
+                elif not count:
+                    queue.pop(slot, None)   # an empty queue holds no job (a cancel, or the last one done)
+            elif tag == '+U':
+                births.append(event)
+        for _, _, slot, typ, owner in births:
+            if owner == human or step <= 1:   # step 1 holds the units placed at launch
                 continue
-            match = [p for p, (s0, head) in queue.items() if head == typ and owner_of.get(p) == owner]
-            if match:
-                producer = min(match, key=lambda p: queue[p][0])
-                step0, _ = queue.pop(producer)
-                raw = unit_raw[typ] if 0 <= typ < len(unit_raw) else -1
-                out.setdefault(raw, []).append((step0 * 4 // 5, (step - step0 + 1) * 4 / 5, None))
+            candidates = completed.get((owner, typ), [])
+            if len(candidates) != 1:
+                if ambiguous is not None:
+                    ambiguous.append((step, slot, typ, len(candidates)))
+                continue
+            _, step0 = candidates.pop()
+            raw = unit_raw[typ] if 0 <= typ < len(unit_raw) else -1
+            out.setdefault(raw, []).append((step0 * 4 // 5, (step - step0 + 1) * 4 / 5, None))
     return out
 
 
@@ -1080,7 +1141,8 @@ def train_measure_gba(series, golden, report):
     unit_raw, building_raw = report.get('unit_raw'), report.get('building_raw')
     if not unit_raw or not building_raw:
         return None, 'the runner reported no engine-to-cartridge id maps'
-    table = train_gba(series, report['human_owner'], unit_raw, building_raw)
+    ambiguous = []
+    table = train_gba(series, report['human_owner'], unit_raw, building_raw, ambiguous)
     values, absent = {}, []
     for obs in golden['observations']:
         raw = next((k for k, v in TRAIN_NAMES.items() if v == obs['subject']), None)
@@ -1089,7 +1151,8 @@ def train_measure_gba(series, golden, report):
         elif obs['gating']:
             values[(obs['check'], obs['subject'])] = ABSENT
             absent.append(obs['subject'])
-    return {'values': values, 'measured': {'table': {str(k): v for k, v in table.items()}, 'absent': absent}}, None
+    return {'values': values, 'measured': {'table': {str(k): v for k, v in table.items()}, 'absent': absent,
+                                           'ambiguous_births': ambiguous}}, None
 
 
 SCENARIOS['bb-train'] = {'title': 'Blood Bath: computer train and build times (passive)', 'measure_n64': train_measure_n64,

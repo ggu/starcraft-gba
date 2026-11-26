@@ -335,7 +335,7 @@ class LabMeasureTest(unittest.TestCase):
                     x = max(100, x - min(4, k + 1))
             pos[sf] = (round(x), 50)
         series = walk(pos)
-        m, err = metrics.lab_move_measure(series, 1, [9, 99])
+        m, err = metrics.lab_move_measure(series, 1, [9, 99], [(260, 50), (100, 50)])
         self.assertIsNone(err)
         self.assertAlmostEqual(m['cruise'], 4.0, places=1)
         self.assertEqual(m['latency'], 2)
@@ -347,9 +347,18 @@ class LabMeasureTest(unittest.TestCase):
 
     def test_move_refuses_an_unsettled_leg(self):
         pos = {sf: (100 + 4 * sf, 50) for sf in range(0, 60)}
-        m, err = metrics.lab_move_measure(walk(pos), 1, [0])
+        m, err = metrics.lab_move_measure(walk(pos), 1, [0], [(400, 50)])
         self.assertIsNone(m)
         self.assertIn('still moving', err)
+
+    def test_move_refuses_a_leg_that_stops_away_from_its_order(self):
+        # A mirrored route: the unit moves 160 px the other way and stops there; it is no arrival.
+        pos = {sf: (max(100 - 4 * max(0, sf - 10), -60) + 200, 50) for sf in range(0, 120)}
+        m, err = metrics.lab_move_measure(walk(pos), 1, [9], [(460, 50)])
+        self.assertIsNone(m)
+        self.assertIn('from its order point', err)
+        m, err = metrics.lab_move_measure(walk(pos), 1, [9], [(150, 60)])   # within one tile: fine
+        self.assertIsNone(err)
 
     def test_gba_steps_keep_offsets(self):
         steps = metrics.lab_gba_steps([40, 140, 151])
@@ -384,6 +393,52 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(m['counter_values'], [5])
         self.assertEqual(m['survival'], dead - 30)
         self.assertEqual(m['first_hit'], 15)
+
+    def test_attack_counts_only_the_named_foe(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+        bunker = {sf: 350.0 - 6 * len([t for t in (25, 40) if t <= sf]) for sf in range(0, 80)}   # a building row
+        drone = {sf: 40.0 - 6 * len([t for t in (30,) if t <= sf]) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling, 3: bunker, 4: drone},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, 125, 4, 140, 100),
+                              (4, metrics.DRONE, 4, 160, 100)])
+        m, err = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertIsNone(err)
+        self.assertEqual(m['hits'], 3)
+        self.assertEqual(m['gaps'], [15, 15])
+        self.assertEqual(list(m['victims']), ['2'])
+        # Without the foe filter the building and the Drone would pass as hits on the foe.
+        m, _ = metrics.lab_attack_measure(series, 1, 5)
+        self.assertEqual(m['hits'], 6)
+
+    def test_exact_damage_needs_every_hit(self):
+        golden = {'observations': [{'check': 'lab.damage', 'value': 6}, {'check': 'lab.range_first', 'value': 50}]}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        drops = {20: 4, 35: 6, 50: 8}   # median 6, but two hits are wrong
+        ling = {sf: 35.0 - sum(d for t, d in drops.items() if t <= sf) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        spec = {'foe_type': metrics.ZERGLING}
+        result, err = metrics.lab_attack_gba(spec)(series, golden, {'subject': 1, 'lab': [[5, 4, 1, -1]]})
+        self.assertIsNone(err)
+        self.assertEqual(result['measured']['damage'], 6)
+        self.assertIn(result['values']['lab.damage'], (4, 8))   # the worst hit, never the median
+
+    def test_training_births_go_to_the_producer_that_completed(self):
+        # Two Command Centers (slots 1, 2) of owner 3 train SCVs (engine 0); the newer one finishes first.
+        ev = [('B', 10, 1, 0, 3, 0, 1, 1, 0), ('B', 20, 2, 0, 3, 0, 1, 1, 0),
+              ('B', 300, 2, 0, 3, 0, 0, 0, -1), ('+U', 300, 7, 0, 3),
+              ('B', 400, 1, 0, 3, 0, 0, 0, -1), ('+U', 400, 8, 0, 3)]
+        table = metrics.train_gba({'events': ev}, 0, [7], [106])
+        self.assertEqual(sorted(d for _, d, _ in table[7]), [(300 - 20 + 1) * 4 / 5, (400 - 10 + 1) * 4 / 5])
+        # Two producers completing the same type in one step: the birth is ambiguous, not guessed.
+        ev = [('B', 10, 1, 0, 3, 0, 1, 1, 0), ('B', 20, 2, 0, 3, 0, 1, 1, 0),
+              ('B', 300, 1, 0, 3, 0, 0, 0, -1), ('B', 300, 2, 0, 3, 0, 0, 0, -1), ('+U', 300, 7, 0, 3)]
+        ambiguous = []
+        table = metrics.train_gba({'events': ev}, 0, [7], [106], ambiguous)
+        self.assertEqual(table, {})
+        self.assertEqual(len(ambiguous), 1)
 
     def test_clipped_shield_drop_and_one_shot_death(self):
         pos = {sf: (100, 100) for sf in range(0, 60)}

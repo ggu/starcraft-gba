@@ -77,7 +77,7 @@ def gba_series(trace_path):
     changes (series['walks'][slot] = [(sf, walk, anim)]) and the human fog sets
     (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
     [(sf, cell, visible, explored)]}, cells col + row * cols)."""
-    units, hp, shield, banks, frames = {}, {}, {}, {}, []
+    units, hp, shield, etype, banks, frames = {}, {}, {}, {}, {}, []
     orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
     keyframe = {}
     # Births and building rows with engine type ids, for the passive train and build lab
@@ -90,6 +90,7 @@ def gba_series(trace_path):
             return
         sf = step * 4 // 5
         frame = {'sf': sf, 'step': step, 'units': dict(units), 'hp': dict(hp), 'shield': dict(shield),
+                 'etype': dict(etype),
                  'banks': {o: (v, None) for o, v in banks.items()}}
         if frames and frames[-1]['sf'] == sf:
             frames[-1] = frame
@@ -124,10 +125,12 @@ def gba_series(trace_path):
                         strides.append(((step or 0) * 4 // 5,) + walk)
                 hp[slot] = float(int(words[8]))
                 shield[slot] = float(max(0, int(words[10])))
+                etype[slot] = int(words[2])   # engine type: the runner's unit_raw map gives its cartridge id
             elif tag == '-U':
                 units.pop(int(words[1]), None)
                 hp.pop(int(words[1]), None)
                 shield.pop(int(words[1]), None)
+                etype.pop(int(words[1]), None)
             elif tag in ('+U', '+B', '-B'):
                 events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
             elif tag == 'B':

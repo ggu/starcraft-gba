@@ -737,11 +737,16 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         return value & 0x1FFFFFFF in (0x000A2EE8, 0x000A2EEC, 0x000AFDCC, 0x000AFDCE) and value >> 29 in (0, 4, 5)
     tapes = [list(metrics.frontend_lines((c.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape')))
              for c in caps]
-    watched = [any(watches_view(w) for w in words) for words in tapes]
+    # Only scenarios whose measurement replays the clicked points need them verified; other tapes
+    # may watch the view (or clear their watches) for diagnosis.
+    uses_points = spec.get('world_points', False)
+    watched = [uses_points and any(watches_view(w) for w in words) for words in tapes]
     if any(watched) and any(w[:2] == ['watch', 'off'] for words in tapes for w in words):
         raise SystemExit('not golden: a tape that watches the cursor clears its watches (`watch off`), '
                          'so its logged points cannot be tied to the marks')
     for name, step in tape_steps.items():
+        if not uses_points:
+            break
         if not any(watched):
             break   # a tape that never watched the cursor (the S4 tapes): nothing to compare
         points = []
