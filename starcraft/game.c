@@ -2723,7 +2723,7 @@ static int race_campaign_owner(const Sc64RaceMap *map, int raw_owner);
 static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
 #ifdef SC64_RACES
 /* Presentation state. A journal always restores the ordinary result panel. */
-static u8 custom_defeat_overview;
+static u8 custom_result_overview;
 #endif
 static int cx, cy, camx, camy, toast_timer, toast_id, enemy_timer, wave;
 /* Transient controller gesture, deliberately outside the persistent save. */
@@ -5724,7 +5724,7 @@ init_state(void)
     reset_selection_gestures();
     mode=MODE_NORMAL;menu=menu_open=menu_cursor=help=0;
     screen=SCREEN_PLAY;selected_building=-1;result_timer=0;
-    custom_defeat_overview = 0;
+    custom_result_overview = 0;
     toast_timer=toast_id=enemy_timer=wave=0;
     weapons_level=armor_level=weapons_research=armor_research=0;
     mission_objective_stage=mission_unsupported_count=0;
@@ -10425,8 +10425,8 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     }
     if (screen == SCREEN_RESULT) {
 #ifdef SC64_RACES
-        if (race_mode && lost && !custom_defeat_overview && (pressed & KEY_A)) {
-            custom_defeat_overview = 1;
+        if (race_mode && (won || lost) && !custom_result_overview && (pressed & KEY_A)) {
+            custom_result_overview = 1;
             return;
         }
 #endif
@@ -10449,7 +10449,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	    screen = SCREEN_TITLE;
 	    won = lost = 0;
 #ifdef SC64_RACES
-            custom_defeat_overview = 0;
+            custom_result_overview = 0;
             race_frontend_reset();race_front.prev_buttons=held;
 #endif
 	}
@@ -12592,7 +12592,7 @@ draw_result(void)
 #endif
     #ifdef SC64_RACES
     gfx_text(39,86,won&&!race_mode&&sc64_catalog_available_next(sc64_catalog_mission_faction(race_selected_mission),race_selected_mission)>=0?"A NEXT MISSION B TITLE":
-             race_mode&&lost?"A OVERVIEW B TITLE":"A RETRY B TITLE SCREEN",C_CYAN);
+             race_mode&&(won||lost)?"A OVERVIEW B TITLE":"A RETRY B TITLE SCREEN",C_CYAN);
 #else
     gfx_text(47, 86, "A RETRY    B TITLE SCREEN", C_CYAN);
 #endif
@@ -12600,7 +12600,7 @@ draw_result(void)
 
 #ifdef SC64_RACES
 static void
-draw_custom_defeat_overview(void)
+draw_custom_result_overview(void)
 {
     int units[5] = {0}, buildings[5] = {0};
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -12609,9 +12609,10 @@ draw_custom_defeat_overview(void)
         if (b[i].alive && (unsigned)b[i].owner < 5) ++buildings[b[i].owner];
 
     gfx_rect(8, 15, 224, 130, C_PANEL);
-    gfx_frame(8, 15, 224, 130, C_RED);
-    gfx_text(16, 23, "DEFEAT OVERVIEW", C_RED);
-    gfx_text(16, 36, "COUNTS AND BANKS AT DEFEAT", C_WHITE);
+    u8 accent = won ? C_GOLD : C_RED;
+    gfx_frame(8, 15, 224, 130, accent);
+    gfx_text(16, 23, won ? "VICTORY OVERVIEW" : "DEFEAT OVERVIEW", accent);
+    gfx_text(16, 36, won ? "COUNTS AND BANKS AT VICTORY" : "COUNTS AND BANKS AT DEFEAT", C_WHITE);
     gfx_text(16, 50, "PLAYER", C_DIM);
     gfx_text(94, 50, "UNITS", C_DIM);
     gfx_text(130, 50, "BLDGS", C_DIM);
@@ -12643,8 +12644,8 @@ static void
 draw_result_screen(void)
 {
 #ifdef SC64_RACES
-    if (custom_defeat_overview && race_mode && lost) {
-        draw_custom_defeat_overview();
+    if (custom_result_overview && race_mode && (won || lost)) {
+        draw_custom_result_overview();
         return;
     }
 #endif
@@ -13373,7 +13374,7 @@ game_render(void)
 	} else if (screen == SCREEN_RESULT) {
 	    draw_result_screen();
 #if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION)
-            if (custom_defeat_overview) sc64_hud_bottom_band_invalidate();
+            if (custom_result_overview) sc64_hud_bottom_band_invalidate();
 #endif
         }
 #ifdef SC64_TEXT_BOXES
