@@ -24,9 +24,16 @@ typedef struct {
 } RaceDefenseCells;
 
 #ifdef SC64_DEFENSE_CUSTOM_CELLS
+typedef struct {
+    RaceDefenseCellLinks links;
+    /* Shots can kill indexed units, so these bits conservatively describe
+     * owners at pass start. The per-unit live check handles later deaths. */
+    u8 owners[DEFENSE_CELL_SIDE * DEFENSE_CELL_SIDE];
+} RaceCustomDefenseCells;
+
 static int __attribute__((noinline))
 race_defense_target_from_custom_cells(const Building *q, int ground, int air,
-                                     int range, const RaceDefenseCellLinks *cells,
+                                     int range, const RaceCustomDefenseCells *cells,
                                      u8 hostile_mask)
 {
     int x = q->x, y = q->y;
@@ -44,7 +51,8 @@ race_defense_target_from_custom_cells(const Building *q, int ground, int air,
     for (int row = top; row <= bottom; ++row) {
         for (int col = left; col <= right; ++col) {
             int cell = row * DEFENSE_CELL_SIDE + col;
-            for (int j = cells->head[cell]; j != 0xff; j = cells->next[j]) {
+            if (!(cells->owners[cell] & hostile_mask)) continue;
+            for (int j = cells->links.head[cell]; j != 0xff; j = cells->links.next[j]) {
                 const Unit *target = &u[j];
                 unsigned owner = target->owner;
                 if (!target->alive || owner >= DEFENSE_OWNER_LIMIT ||

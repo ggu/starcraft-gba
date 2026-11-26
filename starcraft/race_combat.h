@@ -249,17 +249,19 @@ static int race_defense_cooldown_ready(Building *q)
 #ifdef SC64_DEFENSE_CUSTOM_CELLS
 _Static_assert(MAX_UNITS < 255, "Custom Game defense lists require byte unit slots");
 static int __attribute__((noinline))
-race_defense_custom_build_cells(RaceDefenseCellLinks *cells)
+race_defense_custom_build_cells(RaceCustomDefenseCells *cells)
 {
-    memset(cells->head, 0xff, sizeof(cells->head));
+    memset(cells->links.head, 0xff, sizeof(cells->links.head));
+    memset(cells->owners, 0, sizeof(cells->owners));
     for (int j = 0; j < MAX_UNITS; ++j) {
         const Unit *q = &u[j];
         if (!q->alive) continue;
         unsigned x = (unsigned)q->x, y = (unsigned)q->y;
         if ((unsigned)q->owner >= DEFENSE_OWNER_LIMIT || (x | y) >= DEFENSE_CELL_LIMIT) return 0;
         int cell = (y >> DEFENSE_CELL_SHIFT) * DEFENSE_CELL_SIDE + (x >> DEFENSE_CELL_SHIFT);
-        cells->next[j] = cells->head[cell];
-        cells->head[cell] = (u8)j;
+        cells->links.next[j] = cells->links.head[cell];
+        cells->links.head[cell] = (u8)j;
+        cells->owners[cell] |= (u8)(1u << q->owner);
     }
     return 1;
 }
@@ -269,7 +271,7 @@ race_defense_custom_build_cells(RaceDefenseCellLinks *cells)
 /* Inline one defense pass into both wrappers. The scalar wrapper carries
  * no spatial scratch, and existing weapon rules stay shared. */
 static inline __attribute__((always_inline)) void
-race_tick_defenses_scan(RaceDefenseCellLinks *cells)
+race_tick_defenses_scan(RaceCustomDefenseCells *cells)
 {
 #else
 #if defined(SC64_P3_DEFENSE_TARGETS) || defined(SC64_TERRAN_LATE_RUNTIME) || \
@@ -351,7 +353,7 @@ static __attribute__((noinline)) void race_tick_defenses_fullscan(void)
 
 static __attribute__((noinline)) void race_tick_defenses_custom(void)
 {
-    RaceDefenseCellLinks cells;
+    RaceCustomDefenseCells cells;
     race_tick_defenses_scan(&cells);
 }
 #endif
