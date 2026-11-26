@@ -15,7 +15,7 @@ GBA defect, not an accepted gap.
 | Free-for-all | Human Terran against computer Zerg, Terran and Protoss, two seeds |
 | Goldens | 17, each from two fresh-process captures with identical hash chains and identical `watch.csv` |
 | Start corners | The GBA, given the N64 seed, put every player of all 17 lobbies in the N64 corner (38 of 38 `start.corner` checks pass) |
-| Gated checks | 524 differ (baseline lines, GBA values only), 804 pass; 178 report-only. Before the N64 mining time and rule tables (#986, #989) 564 differed; see *Re-run on the N64 mining time and rule tables* |
+| Gated checks | 522 differ (baseline lines, GBA values only), 806 pass; 178 report-only. Before the N64 mining time and rule tables (#986, #989) 564 differed, before ally yielding (#992) 524; see *Re-run on the N64 mining time and rule tables* |
 | Wrong-variant test | The same lobbies launched on the GBA with a seed 333 ms off fail 3–17 gated checks each, `start.corner` among them; the right seed fails none |
 | `./dev parity` | Exit 0 against the baseline |
 
@@ -183,18 +183,18 @@ milliseconds since power-on at launch.
 | --- | ---: | ---: | ---: | ---: |
 | `sk-tvt-w0` | 97,835 | 10,076 | never | 298 |
 | `sk-tvz-w0` | 96,834 | 4,000 | never | 129 |
-| `sk-tvz-w37` | 97,451 | 15,253 | 14,640 | 430 |
-| `sk-tvz-w101` | 98,518 | 17,857 | 14,678 | 171 |
+| `sk-tvz-w37` | 97,451 | 15,253 | 14,670 | 430 |
+| `sk-tvz-w101` | 98,518 | 17,857 | 14,629 | 171 |
 | `sk-tvp-w0` | 98,835 | 9,084 | never | 291 |
 | `sk-tvp-w37` | 99,453 | 9,177 | never | 224 |
 | `sk-tvp-w101` | 100,521 | 9,022 | never | 250 |
 | `sk-zvt-w0` | 100,837 | 10,262 | never | 1 |
 | `sk-zvt-w37` | 101,455 | 10,572 | never | 0 |
 | `sk-zvt-w101` | 102,523 | 9,921 | never | 1 |
-| `sk-zvz-w0` | 99,837 | 17,609 | 14,453 | 0 |
+| `sk-zvz-w0` | 99,837 | 17,609 | 14,468 | 0 |
 | `sk-zvp-w0` | 101,839 | 9,084 | never | 1 |
 | `sk-pvt-w0` | 98,835 | 10,138 | never | 283 |
-| `sk-pvz-w0` | 97,835 | 16,679 | 14,542 | 362 |
+| `sk-pvz-w0` | 97,835 | 16,679 | 14,776 | 362 |
 | `sk-pvp-w0` | 99,837 | 8,929 | never | 252 |
 | `sk-ffa-w0` | 91,828 | 3,566 | never | 93 |
 | `sk-ffa-w37` | 92,446 | never (Protoss computer defeated at 4,775) | never | 158 |
@@ -226,8 +226,8 @@ range over the captured seeds against the GBA range:
 | | Assimilator | 5,949–6,313 | 4,195–4,490 |
 | | Cybernetics Core | never | 4,194–4,896 (all but `sk-ffa-w0`) |
 | | Dragoon | never | 6,397–7,012 (every 1v1) |
-| | Stargate | never | 5,698–5,943 (every 1v1) |
-| | Fleet Beacon, Scout | never | Fleet Beacon in two, Scouts in two (8,610–8,648) |
+| | Stargate | never | 5,698–5,943 (four of the five 1v1s) |
+| | Fleet Beacon, Scout | never | Fleet Beacon in two, Scouts in one (8,648) |
 | Zerg, late pool (4 matches) | Spawning Pool | 3,178–3,243 | 1,388–1,428 |
 | | Extractor | 3,509–3,597 | 2,452–2,538 |
 | | Creep Colony | 3,840–3,902 | 4,089–4,131 |
@@ -281,9 +281,9 @@ ahead on the GBA for Terran and Protoss (an earlier Depot or Pylon).
 
 | Computer | N64 | GBA |
 | --- | ---: | ---: |
-| Terran (1v1) | 9,492–10,051 | 10,084–10,309, or never within the N64 match |
-| Protoss | 8,464–8,741 | 8,847–9,043 |
-| Zerg, late pool | 14,906–17,537 | 14,040–14,320 |
+| Terran (1v1) | 9,492–10,051 | 10,079–10,328, or never within the N64 match |
+| Protoss | 8,464–8,741 | 8,848–9,012 |
+| Zerg, late pool | 14,906–17,537 | 14,122–14,470 |
 
 ## Re-run on the N64 mining time and rule tables
 
@@ -348,6 +348,27 @@ unchanged): every one is a GBA behaviour the N64 captures contradict. The
   within the run), the late-pool Zerg's 60–90 frames earlier, and two human
   defeats 35–60 frames earlier.
 
+### After ally yielding (#992)
+
+#992 (ally yielding and the blocked-Move give-up) changes how armies move,
+so the 17 scenarios ran again on main with it. Against the 524-line
+baseline: 2 lines now pass, 9 narrowed, 5 widened, none is new, and the
+rest are unchanged; 522 differ.
+
+- **Now pass:** in `sk-tvp-w101` the Protoss computer no longer reaches a
+  Stargate or Scouts within the N64 run.
+- **Narrowed:** seven first waves and two human defeats moved toward the
+  N64 (up to 280 frames for the late-pool Zerg in `sk-pvz-w0`).
+- **Widened:** `sk-tvp-w101` Protoss supply used at 8,000 frames 122 to
+  128 (N64 94–98: it trains more units instead of the Stargate tech,
+  defects 3 and 7), and `sk-zvt-w37` Terran first wave 10,309 to 10,328
+  (N64 up to 10,053, defect 8). Both read REGRESSION under the seed-band
+  slack and were accepted as GBA defects. Three lines moved further out
+  within the seed's own tolerance (one wave by 1 frame, two mineral totals
+  by 8 and 16).
+
+The goldens did not change: #992 touches game code only.
+
 ## Defects
 
 Each line is a GBA defect against the N64 ROM, with its numbers above. All
@@ -372,9 +393,9 @@ are baseline lines (`tools/parity/baseline.json`, GBA values).
 3. **Protoss build order.** The GBA places its first Pylon about 2x earlier
    (656–714 against 1,247–1,518), its Gateway 190–490, its first Zealot
    550–860 and its Assimilator 1,750–2,120 frames early, and
-   builds a Cybernetics Core, Dragoons and a Stargate that the N64 computer
-   never builds before the human falls (two matches also reach a Fleet
-   Beacon and two train Scouts).
+   builds a Cybernetics Core, Dragoons and (in four of the five 1v1s) a
+   Stargate that the N64 computer never builds before the human falls (two
+   matches also reach a Fleet Beacon and one trains Scouts).
 4. **Zerg openings.** The GBA has no 9-pool rush: its Pool always comes at
    1,388–1,449 (N64: 738–857 when rushing, 3,178–3,243 otherwise). In the
    late-pool games the GBA reaches most tech steps early (Pool 1,750–1,860,
@@ -386,19 +407,19 @@ are baseline lines (`tools/parity/baseline.json`, GBA values).
    4,000 frames and has 10–11 at 6,000 (N64 12 and 15), with fewer
    Overlords at 6,000 (supply provided 38 against 52).
 6. **GBA-only types.** Within the N64 run the GBA builds types the N64
-   computer never makes: Cybernetics Core, Dragoons and Stargates (all five
-   1v1s against Protoss; the Core also in `sk-ffa-w37`), Fleet Beacons and
-   Scouts (two matches each), Spire (four Zerg games), Machine Shop, Vulture
+   computer never makes: Cybernetics Core and Dragoons (all five 1v1s
+   against Protoss; the Core also in `sk-ffa-w37`), Stargates (four of
+   them), Fleet Beacons (two) and Scouts (one), Spire (four Zerg games), Machine Shop, Vulture
    and Starport (Terran), and early Creep Colonies and Extractors against
    the rush openings.
 7. **Supply.** Used and provided supply at the checkpoints follow the build
    orders; the passive human's `supply.cap` passes at all 78 checkpoints.
-8. **Attack timing.** The GBA Terran attacks 260–550 frames later or not
-   within the N64 match, the Protoss 290–450 frames later, the late-pool
-   Zerg 600–3,200 frames earlier.
+8. **Attack timing.** The GBA Terran attacks 280–540 frames later or not
+   within the N64 match, the Protoss 270–410 frames later, the late-pool
+   Zerg 600–3,300 frames earlier.
 9. **Outcome.** In 12 of the 16 N64 matches that ended in the human's
    defeat, the GBA human survived to the end of the N64 run; in the other 4
-   (late-pool Zerg) the GBA defeat came 600–3,200 frames early.
+   (late-pool Zerg) the GBA defeat came 580–3,200 frames early.
 
 ## Coverage
 
