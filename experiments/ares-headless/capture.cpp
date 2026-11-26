@@ -220,7 +220,10 @@ int main(int argc, char** argv) {
   auto threadCpuUs = [] { timespec t{}; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t); return (long long)t.tv_sec * 1000000 + t.tv_nsec / 1000; };
   auto elapsedMs = [&] { return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - began).count(); };
 
+  bool observed = false;   // a checkpoint or dump was taken; `load` must come before any
+  bool loaded = false;     // one `load` per process
   auto checkpoint = [&]() -> std::string {
+    observed = true;
     Sc64CaptureReadStats stats;
     if(!guest_view(0, full.size(), full.data(), &stats)) return {};
     auto digest = sha256(full.data(), full.size());
@@ -529,6 +532,7 @@ int main(int argc, char** argv) {
       std::cout << "PEEK " << completed << ' ' << addressText << ' ' << hex_bytes(bytes.data(), bytes.size()) << ' ' << stats.dual_hits << std::endl; continue;
     }
     if(word == "dump") {
+      observed = true;
       std::string name; in >> name;
       if(name.empty() || name.find('/') != std::string::npos || name.find('\0') != std::string::npos ||
          std::filesystem::exists(out / name)) return 7;
@@ -627,7 +631,9 @@ int main(int argc, char** argv) {
         step = std::atoll(stepText.c_str());
         if(step > 0xFFFFFFFFll) return 7;
       }
-      if(completed != 0 || tapMode || every || !watches.empty() || verifyEvery || !sc64_capture_file_name_ok(name.c_str()) ||
+      // Also refused after a checkpoint or dump: a hash taken before the load would describe a
+      // machine the rest of the run never continues.
+      if(completed != 0 || observed || loaded || tapMode || every || !watches.empty() || verifyEvery || !sc64_capture_file_name_ok(name.c_str()) ||
          std::strlen(name.c_str()) != name.size()) return 7;
       // A load-mode serializer zero-fills reads past its end, so a truncated or padded file must
       // be refused here: its size must equal this core's synchronized state size. At most one
@@ -657,7 +663,7 @@ int main(int argc, char** argv) {
          cpu.recompiler.enabled != jitNow || rsp.recompiler.enabled != jitNow) {
         std::cerr << "state load failure: " << name << "\n"; return 8;
       }
-      completed = step;
+      completed = step; loaded = true;
       auto digest = sha256(bytes.data(), bytes.size());
       events << completed << ",load," << name << ' ' << bytes.size() << ' ' << digest << '\n';
       if(!outputsOk()) return 5;

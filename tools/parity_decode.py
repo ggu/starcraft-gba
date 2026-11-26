@@ -198,6 +198,12 @@ class Capture:
             problems.append('tape.txt does not match the manifest')
         if not self.manifest.get('run_id'):
             problems.append('the manifest has no run id (capture.py before S4)')
+        # Recording must stay on once started: a later tap line without `rec` stops tap.bin early.
+        taps = [w for w in metrics.frontend_lines((self.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape'))
+                if w[0] == 'tap']
+        first_rec = next((i for i, w in enumerate(taps) if 'rec' in w[1:]), None)
+        if first_rec is not None and any('rec' not in w[1:] for w in taps[first_rec + 1:]):
+            problems.append('the tape stops or changes recording after it starts (tap.bin covers part of the run)')
         # commands.csv places tape marks (S5); it must be the log the capture wrote.
         commands = self.run / 'commands.csv'
         recorded = self.manifest.get('outputs_sha256', {}).get('commands.csv')
@@ -211,6 +217,18 @@ class Capture:
         for words in metrics.frontend_lines((self.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape')):
             if len(words) >= 2 and words[0] == 'load' and words[1] not in states:
                 problems.append(f'the tape loads {words[1]} but the manifest records no digest for it')
+        if self.manifest.get('unrecorded_state'):
+            problems.append('the capture staged a state no capture recorded (--unrecorded-state)')
+        # Golden evidence needs the producer of every loaded state: its run id and binary.
+        sources = self.manifest.get('state_input_source') or {}
+        for words in metrics.frontend_lines((self.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape')):
+            if len(words) >= 2 and words[0] == 'load':
+                source = sources.get(words[1]) if isinstance(sources, dict) else None
+                binary = source.get('binary_sha256') if isinstance(source, dict) else None
+                run_id = source.get('run_id') if isinstance(source, dict) else None
+                if not (isinstance(run_id, str) and run_id and isinstance(binary, str) and len(binary) == 64
+                        and all(c in '0123456789abcdef' for c in binary)):
+                    problems.append(f'state input {words[1]} has no recorded producer (run id and binary)')
         for name, digest in states.items():
             staged = self.run / 'input' / name
             if not staged.is_file() or hashlib.sha256(staged.read_bytes()).hexdigest() != digest:
@@ -260,6 +278,10 @@ class Capture:
             'selectors': sorted({r['selector'] for r in mission}),
             'first_tick': mission[0]['tick'] if mission else None, 'faults': self.faults,
             'chain': self.chain, 'seed': self.seed(),
+            # Provenance and digest problems found when the capture was opened: totals above are
+            # unproven while this list is not empty.
+            'verified': not self.verified and self.manifest.get('ok') is True,
+            'capture_ok': self.manifest.get('ok') is True, 'verification_problems': list(self.verified),
         }
 
 

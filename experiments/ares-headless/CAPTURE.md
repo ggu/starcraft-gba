@@ -92,16 +92,48 @@ starts the same way. Addresses are KSEG0 or physical hex; the frontend
 reads physical offsets.
 
 `capture_report.py` summarises run directories without copying guest bytes:
-`--s1 RUN_A RUN_B` compares checkpoints, `--s2 RUN` checks the clocks and a
-Marine build timer, `--s3 RUN` counts follow-step changes, link and alias
-faults and the branch results, `--compare RUN_A RUN_B [--exclude-block HEX]`
-compares checkpoints at shared steps without requiring the same tape (a
-loaded state against an uninterrupted run), `--watch RUN` summarises
-`watch.csv`, `--s8 RUN_A RUN_B [--legacy]` compares per-tick unit records
-and globals of two matches (it needs both run ids unless `--legacy` is
-given, and reports ticks without a follow-up read), `--opening RUN` lists each owner's unit types in order of
-first appearance, and `--sweep RUN... [--ticks N]` gives each run's launch
-seed, owners by race and each computer race's opening order.
+
+| Option | Report |
+| --- | --- |
+| `--s1 RUN_A RUN_B` | Same-tape determinism over checkpoints |
+| `--s2 RUN` | Clocks and a Marine build timer |
+| `--s3 RUN` | Follow-step changes, link and alias faults, branch results |
+| `--compare RUN_A RUN_B [--exclude-block HEX]` | Checkpoints at shared steps without requiring the same tape (a loaded state against the run that wrote it); says when one run ends early |
+| `--watch RUN` | `watch.csv` changes per field |
+| `--s8 RUN_A RUN_B` | Per-tick unit records and globals of two matches, per phase |
+| `--opening RUN` | Each owner's unit types in order of first appearance |
+| `--sweep RUN... [--ticks N]` | Each run's launch seed, owners by race and each computer race's opening order |
+
+The run-pair reports (`--s1`, `--compare`, `--s8`) give no verdict for the
+same directory or run id twice, a missing run id (unless `--legacy`, for
+captures made before run ids), a log that does not match its manifest
+digest, a loaded state with no recorded digest, or a run made with
+`--unrecorded-state`. A run that did not finish cleanly makes the result
+partial. `--s1` gives a PASS only for power-on tapes (no `load` or `mode`)
+that end with `hash`, with matching verified end steps and a shared
+checkpoint there, and never under `--legacy`. `--s1` and `--compare` also check each log
+against the checkpoints its own tape schedules (`every`, `hash`, from a
+`load` step), so a checkpoint missing from both runs is not passed over;
+`--compare` says when a tape does not end with `hash`, when a run stopped
+before its tape's last step, and when checkpoints or end steps leave
+steps uncompared. `--s8` says when a run was not tapped to its end, when
+the verified end steps differ, and when the tick log does not match the
+frontend's `tap_reads` and `tick_changes` counters in `status.log`. The
+single-run reports say when a truncated or unverified `ticks.raw` cuts
+them short. `--sweep` leaves out of its totals any run whose coverage,
+launch or loaded state it cannot establish (`--legacy` admits older
+loaded captures with a warning), keeps totals per raw stride and flags
+strided starting rosters.
+
+`capture.py` records in each manifest where every staged state came from
+(`state_input_source`: the run id and binary of the capture that wrote
+it, which must have finished cleanly, not used `--unrecorded-state`, and
+recorded the producers of any states it loaded itself). A state from a
+capture made before run ids needs `--legacy-producer`; the manifest then
+records `legacy_producer` and the reports treat the run as legacy
+evidence. `--unrecorded-state`
+exists for refusal tests only; it sets `unrecorded_state` and makes `ok`
+false.
 
 The pure helpers in `capture_view.h` have an asset-free test,
 `make test-ares-capture-view`, which is part of `make test`.

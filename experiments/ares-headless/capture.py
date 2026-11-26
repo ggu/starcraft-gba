@@ -70,13 +70,54 @@ def check_loads(tape_text, names):
             raise SystemExit('the tape loads a state not given exactly with --state-input')
 
 
-def state_recorded(state, digest):
-    manifest = state.parent / 'manifest.json'
+def hex64(value):
+    return isinstance(value, str) and len(value) == 64 and all(c in '0123456789abcdef' for c in value)
+
+
+def state_source(state, digest, legacy_producer=False):
+    """The manifest of the capture that wrote `state`, if it records this digest under this
+    name and that capture finished cleanly; otherwise None."""
     try:
-        recorded = json.loads(manifest.read_text()).get('states_sha256') or {}
+        producer = json.loads((state.parent / 'manifest.json').read_text())
     except (OSError, ValueError):
+        return None
+    if not isinstance(producer, dict) or producer.get('ok') is not True or producer.get('unrecorded_state'):
+        return None
+    # The producer's own identity: its binary always, its run id unless it predates run ids
+    # and the caller asked for that explicitly.
+    run_id = producer.get('run_id')
+    if not hex64(producer.get('binary_sha256')):
+        return None
+    if not (isinstance(run_id, str) and run_id or (legacy_producer and run_id is None)):
+        return None   # the legacy switch covers a missing run id only, never a malformed one
+    states = producer.get('states_sha256')
+    if not isinstance(states, dict) or states.get(state.name) != digest:
+        return None
+    # A producer that itself loaded states must have recorded where they came from; otherwise
+    # its output rests on an unproven input. Its own tape (checked against its manifest) says
+    # which states it actually loaded.
+    tape = state.parent / 'tape.txt'
+    if not tape.is_file() or producer.get('tape_sha256') != sha(tape):
+        return None
+    loaded = [w[1] for w in frontend_lines(tape.read_bytes().decode('utf-8', 'surrogateescape'))
+              if w[0] == 'load' and len(w) >= 2]
+    inputs, sources = producer.get('state_input_sha256'), producer.get('state_input_source')
+    if loaded and not (isinstance(inputs, dict) and isinstance(sources, dict) and all(
+            hex64(inputs.get(name)) and producer_ok(sources.get(name)) for name in loaded)):
+        return None
+    return producer
+
+
+def producer_ok(source):
+    """A recorded state producer: a nonempty run id string and a 64-hex binary digest."""
+    if not isinstance(source, dict):
         return False
-    return recorded.get(state.name) == digest
+    run_id, binary = source.get('run_id'), source.get('binary_sha256')
+    return isinstance(run_id, str) and bool(run_id) and hex64(binary)
+
+
+def state_recorded(state, digest, legacy_producer=False):
+    return state_source(state, digest, legacy_producer) is not None
 
 
 def main():
@@ -86,8 +127,11 @@ def main():
     parser.add_argument('--flash-input', type=pathlib.Path)
     parser.add_argument('--state-input', type=pathlib.Path, action='append', default=[],
                         help='state file for the tape\'s "load" command (repeatable)')
+    parser.add_argument('--legacy-producer', action='store_true',
+                        help='stage states from a capture made before run ids (its source then records no run id)')
     parser.add_argument('--unrecorded-state', action='store_true',
-                        help='stage state files that no capture manifest records (for refusal tests only)')
+                        help='stage state files that no capture manifest records (for refusal tests only; '
+                             'the manifest then records unrecorded_state and ok is false)')
     parser.add_argument('--mode', choices=('jit', 'interp'), default='jit')
     parser.add_argument('--timeout', type=int, default=6 * 3600)
     parser.add_argument('--reserve-gib', type=int, default=5)
@@ -113,8 +157,9 @@ def main():
             raise SystemExit(f'state input larger than {STATE_LIMIT} bytes: {state}')
     check_loads(args.tape.read_bytes().decode('utf-8', 'surrogateescape'), names)
     for state in args.state_input:   # checked again on the staged copy, under the lock
-        if not args.unrecorded_state and not state_recorded(state, sha(state)):
-            raise SystemExit(f'state input is not recorded by the manifest of the run that wrote it: {state}')
+        if not args.unrecorded_state and not state_recorded(state, sha(state), args.legacy_producer):
+            raise SystemExit(f'state input is not recorded by a clean producer manifest: {state} '
+                             '(a state from a capture made before run ids needs --legacy-producer)')
     # Compare case-folded: the run directory may sit on a case-insensitive volume.
     folded = [name.casefold() for name in names]
     if len(set(folded)) != len(folded) or 'game.z64' in folded:
@@ -137,7 +182,7 @@ def main():
         tape_copy = out / 'tape.txt'
         shutil.copyfile(args.tape, tape_copy)
         check_loads(tape_copy.read_bytes().decode('utf-8', 'surrogateescape'), names)   # the tape bytes the child will read
-        states = {}
+        states, state_sources, legacy_sources = {}, {}, {}
         for state in args.state_input:
             staged = out / 'input' / state.name
             shutil.copyfile(state, staged)
@@ -145,9 +190,18 @@ def main():
                 raise SystemExit(f'state input grew past {STATE_LIMIT} bytes while staging: {state}')
             states[state.name] = sha(staged)
             # The core trusts a state's payload, so only states a capture wrote are staged: the
-            # manifest beside the source file must record this digest under this name.
-            if not args.unrecorded_state and not state_recorded(state, states[state.name]):
-                raise SystemExit(f'state input is not recorded by the manifest of the run that wrote it: {state}')
+            # manifest beside the source file must record this digest under this name. The same
+            # read supplies the provenance recorded below.
+            producer = state_source(state, states[state.name], args.legacy_producer)
+            if not args.unrecorded_state and producer is None:
+                raise SystemExit(f'state input is not recorded by a clean producer manifest: {state} '
+                             '(a state from a capture made before run ids needs --legacy-producer)')
+            if producer is not None and not producer.get('run_id'):
+                # A producer from before run ids: its provenance is kept apart, so the per-state
+                # source stays absent and the reports treat the run as legacy evidence.
+                legacy_sources[state.name] = {'binary_sha256': producer.get('binary_sha256')}
+            else:
+                state_sources[state.name] = {k: (producer or {}).get(k) for k in ('run_id', 'binary_sha256')}
         if sha(rom) != ROM_SHA:
             raise SystemExit('staged ROM changed while staging inputs')
         flash_sha = None
@@ -161,6 +215,8 @@ def main():
             'generated_resource_sha256': {r: sha(args.source / r) for r in RESOURCES},
             'rom_sha256': ROM_SHA, 'moltenvk_sha256': MOLTENVK_SHA, 'tape_sha256': sha(tape_copy),
             'flash_input_sha256': flash_sha, 'state_input_sha256': states, 'mode': args.mode,
+            # Where each staged state came from: the capture that wrote it (run id, binary).
+            'state_input_source': state_sources,
             # A fresh id per process, so a copied run directory never counts as a second capture.
             'run_id': str(uuid.uuid4()),
         }
@@ -198,7 +254,15 @@ def main():
         flash_out = out / 'saves' / 'Nintendo 64' / 'game.flash'
         # The frontend flushes the cartridge save only on a "flush" command; otherwise this is the staged input copy.
         manifest['flash_file_after_sha256'] = sha(flash_out) if flash_out.is_file() else None
+        if legacy_sources:
+            # States from captures made before run ids (--legacy-producer): the producer binary is
+            # recorded here; the reports treat the run as legacy evidence.
+            manifest['legacy_producer'] = legacy_sources
+        if args.unrecorded_state:
+            # A refusal test only: such a run is never evidence, so it is never ok.
+            manifest['unrecorded_state'] = True
         manifest['ok'] = (manifest['returncode'] == 0 and manifest['inputs_unchanged'] and not manifest.get('timeout')
+                          and not args.unrecorded_state
                           and not manifest.get('states_changed_after_save'))
         (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         print(json.dumps({'ok': manifest['ok'], 'returncode': manifest['returncode'], 'seconds': manifest['seconds']}))

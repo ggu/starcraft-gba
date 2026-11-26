@@ -53,14 +53,17 @@ reports success even when it cannot write), and parses `until` pulses,
 `load` steps, `tap` options and guest addresses strictly (a physical
 RDRAM offset or its KSEG0/KSEG1 alias, never masked into range), and
 checks a state's header against the core's own before loading it. It
-builds `94ff9532783582b0940251d470a209fc5834cf19be9aa92b14c519b6ca5d1e7d`,
+builds `41430947b823625e1fdfe74a8d0b9511578454cb501f43cecac29c06bd8f8902`,
 which loaded the S5 state in a fresh process, matched the writer's
 step-21,000 hash, wrote a state at step 21,002 identical to the one from
-two earlier review builds (`ae80e99b…`), and refused a truncated state,
-an oversized state, an exact-size state with a corrupted header, an
-out-of-range watch address, a malformed pulse and a non-numeric load step
-before running any step; loaded after `mode interp`, it kept the
-interpreter and matched the earlier interpreter run from the same state.
+the earlier review builds (`ae80e99b…`), and refused a `load` after a
+checkpoint and a second `load` before running any step. Smoke runs on the review builds
+before it, whose refusal code is unchanged in the final build, refused a
+truncated state, an oversized state, an exact-size state with a
+corrupted header, an out-of-range watch address, a malformed pulse and a
+non-numeric load step before running any step; loaded after `mode
+interp`, a review build kept the interpreter and matched the earlier
+interpreter run from the same state.
 `capture.py` refuses a `load` name that does not
 match a staged state exactly, and stages only state files whose digest
 the manifest of the run that wrote them records, because the core trusts a
