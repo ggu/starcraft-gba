@@ -78,11 +78,13 @@ def gba_series(trace_path):
     (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
     [(sf, cell, visible, explored)]}, cells col + row * cols)."""
     units, hp, shield, etype, banks, frames = {}, {}, {}, {}, {}, []
-    buildings = {}   # slot -> (owner, x, y in N64 px, hp, shields, max hp), for the labs' enemy checks
+    buildings = {}   # slot -> (owner, x, y in N64 px, hp, shields, max hp, engine type, cartridge type
+    #                  or -1, under construction), for the labs' enemy checks
     # Every removal with the actor's last owner, position and hit points, read before its row is
     # dropped: a unit or building born and removed inside one source frame never shows in frames.
     removals = []    # (kind 'U' or 'B', step, slot, owner, x, y, hp at removal, max hp or None, last row's hp,
-    #                  cartridge type (-1 when the row has none), engine type, step of the last row or None)
+    #                  cartridge type (-1 when the row has none), engine type, step of the last row or None,
+    #                  under construction at the last row or None)
     building_step = {}   # slot -> step of its last building row
     orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
     keyframe = {}
@@ -136,7 +138,7 @@ def gba_series(trace_path):
                 gone = units.get(int(words[1]))
                 if gone is not None:
                     removals.append(('U', step, int(words[1]), gone[1], gone[2], gone[3], int(words[4]), None,
-                                     hp.get(int(words[1])), gone[0], int(words[2]), None))
+                                     hp.get(int(words[1])), gone[0], int(words[2]), None, None))
                 units.pop(int(words[1]), None)
                 hp.pop(int(words[1]), None)
                 shield.pop(int(words[1]), None)
@@ -148,13 +150,14 @@ def gba_series(trace_path):
                     if gone is not None:
                         removals.append(('B', step, int(words[1]), gone[0], gone[1], gone[2],
                                          int(words[4]) if len(words) > 4 else gone[3], gone[5], gone[3],
-                                         -1, int(words[2]), building_step.get(int(words[1]))))
+                                         gone[7], int(words[2]), building_step.get(int(words[1])), gone[8]))
             elif tag == 'B':
                 raw_owner = int(words[5])
                 building_step[int(words[1])] = step
                 buildings[int(words[1])] = (raw_owner if raw_owner >= 0 else int(words[4]),
                                             2 * int(words[6]), 2 * int(words[7]),
-                                            int(words[8]), max(0, int(words[10])), int(words[9]))
+                                            int(words[8]), max(0, int(words[10])), int(words[9]),
+                                            int(words[2]), int(words[3]), int(words[11]))
                 # slot, engine type, owner, under construction, queue count, queue progress, queue head
                 events.append(('B', step, int(words[1]), int(words[2]), int(words[4]), int(words[11]),
                                int(words[14]), int(words[15]), int(words[16])))

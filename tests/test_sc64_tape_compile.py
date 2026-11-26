@@ -348,7 +348,8 @@ class LabRunnerArgsTest(unittest.TestCase):
         self.assertEqual(series['frames'][1]['units'][3][2:], (202, 100))
         self.assertIn(('+U', 1, 3, 7, 1), series['events'])
         self.assertIn(('B', 1, 2, 0, 1, 0, 1, 1, 0), series['events'])
-        self.assertEqual(series['frames'][0]['buildings'][2], (1, 600, 600, 1500, 0, 1500))   # owner, x, y, hp, shields, max
+        # owner, x, y, hp, shields, max hp, engine type, cartridge type, under construction
+        self.assertEqual(series['frames'][0]['buildings'][2], (1, 600, 600, 1500, 0, 1500, 0, -1, 0))
 
     def test_gba_series_keeps_each_removal_with_its_last_row(self):
         # A unit and a building removed one step after their rows: kind, step, slot, owner, x, y,
@@ -365,8 +366,8 @@ class LabRunnerArgsTest(unittest.TestCase):
             path = pathlib.Path(temp) / 't.trace'
             path.write_text(trace)
             series = sc64_parity.gba_series(path)
-        self.assertEqual(series['removals'], [('U', 2, 3, 1, 200, 100, -3, None, 80.0, -1, 7, None),
-                                              ('B', 2, 2, 1, 600, 600, 0, 1500, 1500, -1, 0, 1)])
+        self.assertEqual(series['removals'], [('U', 2, 3, 1, 200, 100, -3, None, 80.0, -1, 7, None, None),
+                                              ('B', 2, 2, 1, 600, 600, 0, 1500, 1500, -1, 0, 1, 0)])
 
 
 class LabMeasureTest(unittest.TestCase):
@@ -787,15 +788,35 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500, 0, 500) if sf < 28 else None,
                                                 [('B', 35, 7, 4, 200, 100, 0, 500, 500)])), fought)
         self.assertEqual(verdicts(with_building(lambda sf: None, [('B', 35, 7, 4, 200, 100, 0, 500, 500)])), fought)
-        # and a burning building (a third of its hit points or less) hit harder than it burns.
-        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 400 - 6 * (sf >= 28), 0, 1500))), fought)
+        # and a burning Barracks (a third of its hit points or less) hit harder than it burns.
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 400 - 6 * (sf >= 28), 0, 1500, 3, 111, 0))), fought)
         # The controls: the same damage out of reach or to a friendly building, a burning
         # building's 1 hp a sample, and a burning building that burns out.
         self.assertEqual(verdicts(with_building(lambda sf: (4, 700, 100, 500 - 6 * (sf >= 28), 0, 1500))), calm)
         self.assertEqual(verdicts(with_building(lambda sf: (1, 200, 100, 500 - 6 * (sf >= 28), 0, 1500))), calm)
-        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 400 - (sf >= 28), 0, 1500))), calm)
-        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 1, 0, 1500) if sf < 28 else None,
-                                                [('B', 35, 7, 4, 200, 100, 0, 1500, 1, -1, 0, 34)])), calm)
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 400 - (sf >= 28), 0, 1500, 3, 111, 0))), calm)
+        burnout = ('B', 35, 7, 4, 200, 100, 0, 1500, 1, 111, 3, 34, 0)
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 1, 0, 1500, 3, 111, 0) if sf < 28 else None,
+                                                [burnout])), calm)
+        # Burn stops at exactly 0, so overkill is a shot; and only a completed Terran building
+        # burns (a Hatchery, an unfinished Barracks, one of unknown kind: kills).
+        for record in (burnout[:6] + (-5,) + burnout[7:], burnout[:9] + (131,) + burnout[10:],
+                       burnout[:12] + (1,), burnout[:9] + (-1,) + burnout[10:]):
+            self.assertEqual(verdicts(with_building(lambda sf: None, [record])), fought)
+        # The runner's engine-type map names a row's kind when the row carries no cartridge id.
+        series = with_building(lambda sf: None, [burnout[:9] + (-1,) + burnout[10:]])
+        result, _ = metrics.lab_attack_gba(spec)(series, golden, dict(report, building_raw=[0, 0, 0, 111]))
+        self.assertEqual(result['measured']['combat'], False)
+        # A slot whose type changes between samples (a replacement inside one engine step) holds
+        # two buildings: no drop.
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500, 0, 1500, 3, 111, 0) if sf < 28
+                                                else (4, 200, 100, 200, 0, 1000, 4, 112, 0))), calm)
+        # A foe removed with hit points left (a mission script) was not killed.
+        series = walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 28)}},
+                      others=[(2, metrics.ZERGLING, 4, 900, 100)])
+        series['source'] = 'gba'
+        series['removals'] = [('U', 35, 2, 4, 900, 100, 35, None, 35, metrics.ZERGLING, 0, None, None)]
+        self.assertEqual(verdicts(series), calm)
         # Burn explains a death only from what it could take since the building's last row: a
         # shot that kills a building at 5 hp, or a burning one at 300, is a kill.
         for last_hp, max_hp in ((5, 500), (300, 1500)):

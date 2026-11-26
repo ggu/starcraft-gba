@@ -499,6 +499,7 @@ LAB_SETTLE = 20              # source frames a leg must stay still before its en
 LAB_STILL = 8.0              # N64 px a non-subject human unit of the subject's type may drift
 LAB_ORDER_WINDOW = 12        # ticks after a press within which the subject's order must change
 ORDER_MOVE, ORDER_ATTACK_MOVE = 6, 14   # proven unit.order values (layout 'orders')
+TERRAN_BUILDINGS = (106, 127)   # cartridge ids: Command Center to Ion Cannon (units.dat order)
 SC64_BURN_Q8 = 20   # Terran building burn per source frame, 1/256 hp (starcraft/sc64_building_damage.h)
 LAB_REACH = 288.0            # N64 px: 9 tiles, past every weapon but siege mode, for single-attacker checks
 LAB_ARRIVE_TOLERANCE = 32.0  # N64 px a leg may settle from its order point: one tile, for the GBA's
@@ -929,7 +930,7 @@ def unit_lifetimes(series, t0, keep):
     return dict(series, frames=frames, lifetime_end=ended)
 
 
-def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
+def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_raw=None):
     """The subject's hits on enemy units and theirs on it, from the command to its death or the end.
 
     With foe_type, only enemy units of that cartridge id are victims: hits on any other row,
@@ -1053,10 +1054,15 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
                 return True
         return False
 
-    def burning(hp, max_hp):
-        # A Terran building at or below a third of its hit points burns 20/256 hp a source frame
-        # (starcraft/sc64_building_damage.h): its hit-point loss there is no evidence of an attack.
-        return max_hp is not None and max_hp > 0 and hp * 100 < max_hp * 34
+    def burning(hp, max_hp, raw, etype_, under_construction):
+        # A completed Terran building at or below a third of its hit points burns 20/256 hp a
+        # source frame (starcraft/sc64_building_damage.h): its own loss is no evidence of an
+        # attack. Its cartridge id comes from the row or the runner's engine-type map; a building
+        # of unknown kind is never taken to burn.
+        cart = raw if raw is not None and raw >= 0 else (
+            building_raw[etype_] if building_raw and etype_ is not None and 0 <= etype_ < len(building_raw) else None)
+        return (cart is not None and TERRAN_BUILDINGS[0] <= cart <= TERRAN_BUILDINGS[1] and not under_construction
+                and max_hp is not None and max_hp > 0 and hp * 100 < max_hp * 34)
 
     def burn_loss(frames):
         return (SC64_BURN_Q8 * max(1, frames) + 255) // 256
@@ -1069,10 +1075,13 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
             a = after_.get('buildings', {}).get(k)
             if b[0] == human or b[0] >= 8 or a is None or len(b) < 5 or len(a) < 5 or a[0] != b[0]:
                 continue
-            if any(slot == k and before_['sf'] < sf <= after_['sf'] for slot, sf in turnover):
+            # Another building in the slot: removed or born between the samples, or a type change
+            # (a replacement inside one engine step).
+            if any(slot == k and before_['sf'] < sf <= after_['sf'] for slot, sf in turnover) or b[6:8] != a[6:8]:
                 continue
-            drop, max_hp = b[3] - a[3], (b[5] if len(b) > 5 else None)
-            hit = b[4] - a[4] >= 0.5 or (drop >= 0.5 and not (burning(b[3], max_hp) and
+            drop = b[3] - a[3]
+            row = (list(b) + [None] * 9)[:9]
+            hit = b[4] - a[4] >= 0.5 or (drop >= 0.5 and not (burning(b[3], row[5], row[7], row[6], row[8]) and
                                                                drop <= burn_loss(after_['sf'] - before_['sf'])))
             if hit and point_near(after_['sf'], b[1], b[2]):
                 nearby.add(after_['sf'])
@@ -1081,7 +1090,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     removed_foes = set()
     for record in series.get('removals', []):
         kind, step, slot, owner, x, y, hp, max_hp, last_hp, *rest = record
-        raw, etype_, last_step = (list(rest) + [None] * 3)[:3]
+        raw, etype_, last_step, under_construction = (list(rest) + [None] * 4)[:4]
         sf = (step or 0) * 4 // 5
         if not t0 <= sf <= end or owner == human or owner >= 8 or hp > 0:
             continue
@@ -1094,8 +1103,10 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
                 removed_foes.add(sf)   # a foe killed, even one born and killed inside one source frame
                 continue
         # A burning Terran building whose last hit points its burn could have taken since its
-        # last row may have burned out; any other building death is a kill.
-        if kind == 'B' and last_hp is not None and last_step is not None and burning(last_hp, max_hp) and \
+        # last row may have burned out: burn stops at exactly 0, so overkill is a shot. Any other
+        # building death is a kill.
+        if kind == 'B' and hp == 0 and last_hp is not None and last_step is not None and \
+                burning(last_hp, max_hp, raw, etype_, under_construction) and \
                 last_hp <= burn_loss(((step or 0) - last_step) * 4 // 5):
             continue
         if point_near(sf, x, y):
@@ -1109,7 +1120,13 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         events = [b[0] for a, b in zip(track_, track_[1:]) if a[1] > 0 >= b[1]]   # killing drops only
         if track_ and track_[-1][0] < end and track_[-1][1] > 0 and \
                 series['lifetime_end'].get(vid) != 'changed':   # a hatch or a morph is no kill
-            events.append(track_[-1][0] + 1)   # a GBA row removed by a hit the trace never shows
+            # A GBA row removed by a hit the trace never shows, unless its removal record shows
+            # hit points left (a mission script, a transport): that is no kill.
+            slot = vid if isinstance(vid, int) else int(str(vid).split('.')[0])
+            left = next((r for r in series.get('removals', []) if r[0] == 'U' and r[2] == slot and
+                         (r[1] or 0) * 4 // 5 >= track_[-1][0]), None)
+            if left is None or left[6] <= 0:
+                events.append(track_[-1][0] + 1)
         # Every kill splits the timing, the subject's own included: the killing hit is never in
         # the hit list (see hits), so an interval across it, or touching it, would skip a shot.
         barriers.update(events)
@@ -1321,7 +1338,8 @@ def lab_attack_gba(spec):
         frames = lab_report_frames(report)
         if uid is None or len(frames) != 1:
             return None, 'the runner reported no subject or more than one order'
-        m, err = lab_attack_measure(series, uid, frames[0], spec['foe_type'], report.get('unit_raw'))
+        m, err = lab_attack_measure(series, uid, frames[0], spec['foe_type'], report.get('unit_raw'),
+                                    report.get('building_raw'))
         values = {}
         if m is not None:
             for key, check in (('range_first', 'lab.range_first'), ('first_hit', 'lab.first_hit'),
