@@ -183,6 +183,14 @@ static int race_ai_count(const RaceAiCensus *c, int key)
     return c->have[key] + c->pend[key];
 }
 
+/* Count n more units of a key on order, saturating like the other counts. */
+static void race_ai_add_pend(RaceAiCensus *c, int key, int n)
+{
+    if (key < 0) return;
+    n += c->pend[key];
+    c->pend[key] = (unsigned char)(n > 255 ? 255 : n);
+}
+
 static int race_ai_owner_base(int owner)
 {
     int base = race_skirmish_owner_base(owner);
@@ -369,7 +377,9 @@ static void __attribute__((noinline)) race_ai_census(int owner, RaceAiCensus *c)
              * second of a pair takes its slot at birth. */
             int product = q->target;
             int qk = race_ai_key(sc64_race_raw_unit(product));
-            if (qk >= 0 && c->pend[qk] < 255) ++c->pend[qk];
+            /* Both units of a pair are on order, as they are counted once
+             * born: a Scourge Egg is two Scourge against the Scourge limit. */
+            race_ai_add_pend(c, qk, sc64_race_product_count(product));
             if (c->race == R_ZERG) c->supply_used += unit_slot_supply(q);
             if (product == U_OVERLORD && c->race == R_ZERG) ++c->pending_supply;
             if (sc64_race_is_worker(product)) ++c->egg_workers;
@@ -1331,6 +1341,20 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
 
 /* ------------------------------------------------------------ production */
 
+/* Actor slots one Larva order of this product takes against the owner's
+ * share: a Zergling or Scourge Egg is two units. Larva can place many such
+ * orders in one pass, so each is counted whole. The serial queue keeps its
+ * one-per-order count. */
+static int race_ai_order_slots(int raw)
+{
+#ifdef SC64_EGG_RUNTIME
+    int type = sc64_race_unit_from_raw(raw);
+    if (SC64_EGG_CONTEXT() && type >= 0) return sc64_race_product_count(type);
+#endif
+    (void)raw;
+    return 1;
+}
+
 static int race_ai_try_queue(RaceAiCensus *c, int producer, int raw, int honor_reserve)
 {
     int type = sc64_race_unit_from_raw(raw), key;
@@ -1344,7 +1368,9 @@ static int race_ai_try_queue(RaceAiCensus *c, int producer, int raw, int honor_r
     if (!race_queue_unit(c->owner, producer, type)) return 0;
     c->free_supply -= r->supply * sc64_race_product_count(type);
     key = race_ai_key(raw);
-    if (key >= 0) ++c->pend[key];
+    /* An Egg is counted as the units it will hatch, as the census counts it
+     * on the next pass. The serial queue keeps its one-per-order count. */
+    race_ai_add_pend(c, key, race_ai_order_slots(raw));
     if (sc64_race_is_worker(type)) ++c->workers;
     return 1;
 }
@@ -1501,20 +1527,6 @@ static int race_ai_gas_fallback(RaceAiCensus *c, int producer, int raw)
         else if (b[producer].type == B_FACTORY) alt = 2;        /* Vulture */
     } else if (c->race == R_ZERG) alt = 37;                     /* Zergling */
     return alt >= 0 && alt != raw && race_ai_try_queue(c, producer, alt, 1);
-}
-
-/* Actor slots one Larva order of this product takes against the owner's
- * share: a Zergling or Scourge Egg is two units. Larva can place many such
- * orders in one pass, so each is counted whole. The serial queue keeps its
- * one-per-order count. */
-static int race_ai_order_slots(int raw)
-{
-#ifdef SC64_EGG_RUNTIME
-    int type = sc64_race_unit_from_raw(raw);
-    if (SC64_EGG_CONTEXT() && type >= 0) return sc64_race_product_count(type);
-#endif
-    (void)raw;
-    return 1;
 }
 
 /* How many orders a Zerg town hall can take in this pass. With Larva and
