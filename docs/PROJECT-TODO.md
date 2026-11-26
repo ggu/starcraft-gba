@@ -609,26 +609,18 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles. Investigate exact reuse on an unchanged grid, preserving
   the existing cache eviction and path decisions. Measure the entire
   update including lookup and invalidation costs.
-  A [bounded cache of complete movement fields](audits/2026-11-25-wide-point-reuse.md)
-  reduced Z7 guest cycles by 8.27% on the current `81e76943` Z10
-  trial, reaching 9.61 emulated updates/s with 72 matching sampled
-  state and display cuts. Per-update counters put the saving in movement
-  orders (1,212,133 to 1,052,743 mean cycles); drawing was unchanged.
-  A Z9 ordinary-input flank continuation also matched 86 state and
-  display cuts and byte-identical pause and fresh-reload SRAM on this
-  Z10 pair; it showed no meaningful timing change.
-  The earlier after-#885 trial reduced cycles by
-  7.80%, reaching
-  8.98 emulated updates/s. A paired ordinary-input Z7 continuation also
-  reached victory and reloaded its identical terminal SRAM in fresh
-  processes on the initial cache implementation. Sharing 1,536 bytes
-  of packet storage trimmed the cache from 9,272 to 7,756 bytes, with
-  1,867,971 cycles/update on the same 4,901-update replay. The revised
-  cache also matched all 45 remaining Z7 checkpoints, won and restored
-  the same terminal SRAM. Whole-campaign timing and EWRAM headroom remain the
-  promotion priorities; the two current Custom Game maps are 64×64 and do
-  not exercise this cache.
-  Physical GBA timing remains open.
+  The [bounded cache of complete movement fields](audits/2026-11-25-wide-point-reuse.md#z10-release-qualification)
+  now targets the Z10 cartridge's 128×128 maps. The 4,901-input Z7 battle
+  uses 9.40% fewer guest cycles, with p95 falling from 3,852,238 to
+  3,548,716. All 72 sampled worlds and video states match. The late Z7
+  route saves 2.27%, matches all 45 checkpoints and exports identical
+  victory and fresh-reload SRAM. Z1, Z5, Z6,
+  Z8 and Z9 pause and reload checks match in 325 samples, with a maximum
+  0.042% mean cost increase across those holdouts. The Z10 link leaves
+  10,056 B below the EWRAM guard and 432 B beyond the IWRAM stack guard
+  margin. The [campaign map inventory](audits/2026-11-26-campaign-route-map-sizes.md)
+  describes the 128×128 coverage. Measure physical GBA timing and profile
+  the remaining peak orders on Z7.
   [Linking the hottest ROM functions into the unused IWRAM stack
   reserve](audits/2026-11-25-iwram-hot-placement.md) saves 6.87–8.46%
   in five late three-CPU pairs and 2.95% in Protoss Blood Bath, with
