@@ -33,3 +33,25 @@ python3 tools/sc64_compare_campaign_victory.py --race protoss --chapter 7 \
   --rom "$NEW_ROM" --elf "$NEW_ELF" --runner "$RUNNER" \
   --victory "$P7_SAVE" --out "$OUT"
 ```
+
+## Late missions played on the packaged ROMs
+
+Starting from earned predecessor saves, the following missions ran through victory
+in mGBA using ordinary controller input on the packaged ROMs at `51c7f18f`.
+Each victory was loaded in a fresh process. The exported SRAM matched the
+corresponding victory earned on the standard cartridge byte for byte.
+
+| Mission | Winning frame | Matched checkpoints |
+|---|---:|---:|
+| T9 | 49,486 | 54 |
+| T10 | 3,361 | 6 |
+| Z8 | 70,229 | 29 |
+| Z9 | 67,745 | 30 |
+| Z10 | 57,633 | 26 |
+| P9 | 101,649 | 43 |
+| P10 | 53,225 | 22 |
+
+The P10 run consumed the P9 save exported by the packaged ROM. T10, Z9 and Z10
+consumed standard-cartridge predecessor journals that matched the separately
+replayed packaged victories byte for byte. The remaining 23 missions have
+full-play evidence on the standard cartridges and result-load evidence on the package.
