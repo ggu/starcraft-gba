@@ -388,7 +388,7 @@
   },
   {
    "key": "sk-pvp-w0:attack.first_wave:cpu Protoss",
-   "gba": 8847
+   "gba": 8848
   },
   {
    "key": "sk-pvp-w0:build.first.Assimilator:cpu Protoss",
@@ -648,7 +648,7 @@
   },
   {
    "key": "sk-pvz-w0:attack.first_wave:cpu Zerg",
-   "gba": 14195
+   "gba": 14470
   },
   {
    "key": "sk-pvz-w0:build.first.Creep Colony:cpu Zerg",
@@ -736,7 +736,7 @@
   },
   {
    "key": "sk-pvz-w0:result.human_defeated:human",
-   "gba": 14542
+   "gba": 14776
   },
   {
    "key": "sk-pvz-w0:supply.cap@2000:cpu Zerg",
@@ -784,7 +784,7 @@
   },
   {
    "key": "sk-tvp-w0:attack.first_wave:cpu Protoss",
-   "gba": 8925
+   "gba": 8924
   },
   {
    "key": "sk-tvp-w0:build.first.Assimilator:cpu Protoss",
@@ -880,7 +880,7 @@
   },
   {
    "key": "sk-tvp-w101:attack.first_wave:cpu Protoss",
-   "gba": 8940
+   "gba": 8907
   },
   {
    "key": "sk-tvp-w101:build.first.Assimilator:cpu Protoss",
@@ -903,16 +903,8 @@
    "gba": 714
   },
   {
-   "key": "sk-tvp-w101:build.first.Scout:cpu Protoss",
-   "gba": 8610
-  },
-  {
    "key": "sk-tvp-w101:build.first.Shield Battery:cpu Protoss",
    "gba": 4169
-  },
-  {
-   "key": "sk-tvp-w101:build.first.Stargate:cpu Protoss",
-   "gba": 5722
   },
   {
    "key": "sk-tvp-w101:build.first.Zealot:cpu Protoss",
@@ -952,7 +944,7 @@
   },
   {
    "key": "sk-tvp-w101:econ.gathered@8000:cpu Protoss",
-   "gba": 5304
+   "gba": 5320
   },
   {
    "key": "sk-tvp-w101:econ.gathered@8000:human",
@@ -980,7 +972,7 @@
   },
   {
    "key": "sk-tvp-w101:supply.used@8000:cpu Protoss",
-   "gba": 122
+   "gba": 128
   },
   {
    "key": "sk-tvp-w101:workers@4000:cpu Protoss",
@@ -996,7 +988,7 @@
   },
   {
    "key": "sk-tvp-w37:attack.first_wave:cpu Protoss",
-   "gba": 9028
+   "gba": 9012
   },
   {
    "key": "sk-tvp-w37:build.first.Assimilator:cpu Protoss",
@@ -1108,7 +1100,7 @@
   },
   {
    "key": "sk-tvt-w0:attack.first_wave:cpu Terran",
-   "gba": 10084
+   "gba": 10079
   },
   {
    "key": "sk-tvt-w0:build.first.Academy:cpu Terran",
@@ -1532,7 +1524,7 @@
   },
   {
    "key": "sk-zvp-w0:attack.first_wave:cpu Protoss",
-   "gba": 9043
+   "gba": 9008
   },
   {
    "key": "sk-zvp-w0:build.first.Assimilator:cpu Protoss",
@@ -1924,7 +1916,7 @@
   },
   {
    "key": "sk-zvt-w37:attack.first_wave:cpu Terran",
-   "gba": 10309
+   "gba": 10328
   },
   {
    "key": "sk-zvt-w37:build.first.Academy:cpu Terran",
@@ -2000,7 +1992,7 @@
   },
   {
    "key": "sk-zvt-w37:econ.gathered@8000:cpu Terran",
-   "gba": 5096
+   "gba": 5104
   },
   {
    "key": "sk-zvt-w37:econ.gathered@8000:human",
@@ -2064,7 +2056,7 @@
   },
   {
    "key": "sk-zvz-w0:attack.first_wave:cpu Zerg",
-   "gba": 14040
+   "gba": 14122
   },
   {
    "key": "sk-zvz-w0:build.first.Creep Colony:cpu Zerg",
@@ -2148,7 +2140,7 @@
   },
   {
    "key": "sk-zvz-w0:result.human_defeated:human",
-   "gba": 14453
+   "gba": 14468
   },
   {
    "key": "sk-zvz-w0:supply.cap@2000:cpu Zerg",
