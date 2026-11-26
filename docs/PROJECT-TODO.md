@@ -19,11 +19,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Dense Z7 follow-up.** Release #978 averages 10.56 advancing world updates/s in the dense Z7 window. Orders take 879,273 cycles on average, exceeding the entire 30 Hz budget. Prioritize repeated one-to-seven route builds per update and measure contact blocking on zero-build updates. Four packing trials provided at most 0.72% over the whole battle and the fastest reduced stack headroom. Keep the existing placement. [Updated cycle measurements](audits/2026-11-26-post-facility-z7-profile.md)
+
 - **Crowded Z7 movement.** Copying aligned route fields four words per loop
   saves 1.39% across the 4,901-input battle on top of the wide-field cache.
-  Only three updates in this window fit the 30 Hz guest-cycle budget. Prioritize
-  facility routing (#896) and full-grid expansion. These ranked first in
-  both systematic guest profiles of the battle. See the [movement-field measurements](audits/2026-11-25-wide-point-reuse.md#copying-cached-fields).
+  The Zerg cartridge now uses the wide facility FIFO from #977. On the
+  subsequent #978 build the battle still averages 10.64 updates/s, with only
+  three of 4,901 input intervals inside the 30 Hz guest-cycle budget. See the [movement-field measurements](audits/2026-11-25-wide-point-reuse.md#copying-cached-fields).
 
 - **Wholly unknown terrain.** The shared world-depth cache skips per-tile
   drawing for completely unvisited viewports. The late Z10 Outpost camera
