@@ -523,6 +523,25 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   cycles. Investigate exact reuse on an unchanged grid, preserving
   the existing cache eviction and path decisions. Measure the entire
   update including lookup and invalidation costs.
+  A [bounded cache of complete movement fields](audits/2026-11-25-wide-point-reuse.md)
+  reduced Z7 guest cycles by 8.27% on the current `81e76943` Z10
+  trial, reaching 9.61 emulated updates/s with 72 matching sampled
+  state and display cuts. Per-update counters put the saving in movement
+  orders (1,212,133 to 1,052,743 mean cycles); drawing was unchanged.
+  A Z9 ordinary-input flank continuation also matched 86 state and
+  display cuts and byte-identical pause and fresh-reload SRAM on this
+  Z10 pair; it showed no meaningful timing change.
+  The earlier after-#885 trial reduced cycles by
+  7.80%, reaching
+  8.98 emulated updates/s. A paired ordinary-input Z7 continuation also
+  reached victory and reloaded its identical terminal SRAM in fresh
+  processes on the initial cache implementation. Sharing 1,536 bytes
+  of packet storage trimmed the cache from 9,272 to 7,756 bytes, with
+  1,867,971 cycles/update on the same 4,901-update replay. The revised
+  cache also matched all 45 remaining Z7 checkpoints, won and restored
+  the same terminal SRAM. Whole-campaign timing and EWRAM headroom remain the
+  promotion priorities; the two current Custom Game maps are 64×64 and do
+  not exercise this cache.
   Physical GBA timing remains open.
   [Linking the hottest ROM functions into the unused IWRAM stack
   reserve](audits/2026-11-25-iwram-hot-placement.md) saves 6.87–8.46%
