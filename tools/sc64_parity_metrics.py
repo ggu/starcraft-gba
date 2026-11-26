@@ -689,10 +689,12 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     if not before:
         return None, []
     prior, tick0 = cap.unit(before[-1]['rows'][row], 'order'), before[-1]['tick']
-    # The window starts at the last tick that began at or before the press, read or not.
+    # The window starts at the last tick that began at or before the press. When that tick has
+    # no follow-up read (it began and ended inside one step), the order at the press is not
+    # observed: a change in that tick could pass for the press, so the check is inconclusive.
     began = [t for t, at in getattr(cap, 'change_steps', {}).items() if at <= step]
-    if began:
-        tick0 = max(tick0, max(began))
+    if began and max(began) != tick0:
+        return None, ['the order at the press was not read']
     seen = []
     for record in cap.ticks:
         if record['step'] - 1 <= step:
@@ -830,24 +832,49 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         gaps_of[vid].update({sf: max(g, gaps_of[vid].get(sf, 1))
                              for sf, g in drop_gaps(hp_track(series, vid, t0, end, key='shield')).items()})
 
-    def ours(sf, vid):
+    def sole_attacker(sf, vid):
         frame = at_frame.get(sf, {})
         units, hp = frame.get('units', {}), frame.get('hp', {})
         v = units.get(vid)
         if v is None or uid not in units:
             return False
         # A verified single attacker: the subject is alive and the only living human row within
-        # LAB_REACH of the victim. Any other human unit in reach leaves the hit ambiguous.
+        # LAB_REACH of the victim. Any other human unit in reach, a GBA building of the human
+        # included (the N64 table holds buildings as rows already), leaves the hit ambiguous.
         near = [k for k, u in units.items()
                 if u[1] == human and hp.get(k, 1) > 0 and math.hypot(u[2] - v[2], u[3] - v[3]) <= LAB_REACH]
+        near += [('B', k) for k, b in frame.get('buildings', {}).items()
+                 if b[0] == human and math.hypot(b[1] - v[2], b[2] - v[3]) <= LAB_REACH]
+        return near == [uid]
+
+    def ours(sf, vid):
+        # On the sample that shows the drop and on the one before it: a second attacker that
+        # fired and then died or left inside the interval is still in reach on one of them.
         # A drop seen across a sampling gap may have come from a unit that left reach meanwhile.
-        return near == [uid] and gaps_of.get(vid, {}).get(sf, 1) == 1
+        return (sole_attacker(sf, vid) and sole_attacker(sf - 1, vid)
+                and gaps_of.get(vid, {}).get(sf, 1) == 1)
     unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
     barriers = set()
     # A killing drop leaves no exact damage, but it still splits the timing: no cooldown
-    # interval may span it.
+    # interval may span it. Kills of enemies of any type split it (the subject may have shot a
+    # unit outside the configured foe between two hits), and so do their other drops while
+    # they are within reach of the subject.
+    def any_enemy(vid):
+        unit = first['units'][vid]
+        return unit[1] != human and unit[1] < 8
+
+    def near_subject(sf, vid):
+        units = at_frame.get(sf, {}).get('units', {})
+        me, v = units.get(uid), units.get(vid)
+        return me is not None and v is not None and math.hypot(v[2] - me[2], v[3] - me[3]) <= LAB_REACH
     for vid in first['units']:
-        if not enemy(vid):
+        if not any_enemy(vid) or enemy(vid):
+            continue
+        for key in ('hp', 'shield'):
+            track_ = hp_track(series, vid, t0, end, key=key)
+            unclear.update(sf for sf, _ in hits(track_, lethal=True) if near_subject(sf, vid) or near_subject(sf - 1, vid))
+    for vid in first['units']:
+        if not any_enemy(vid):
             continue
         track_ = hp_track(series, vid, t0, end)
         events = [b[0] for a, b in zip(track_, track_[1:]) if a[1] > 0 >= b[1]]   # killing drops only
@@ -868,10 +895,13 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     taken = [(sf, round(d)) for sf, d in hits(own)]
 
     def single_foe(sf):
-        # The same single living enemy (a row, or a GBA building) in reach on the sample before
-        # the drop and on the one that shows it.
+        # The same single living enemy in reach on the sample before the drop and on the one
+        # that shows it, and a unit of the configured foe type: a lone building, or another
+        # enemy type, never stands for the foe's damage.
         one = sole_foe(sf)
-        return one is not None and one == sole_foe(sf - 1)
+        if one is None or one != sole_foe(sf - 1) or isinstance(one, tuple):
+            return False
+        return foe_type is None or cartridge_type(at_frame.get(sf, first), one, unit_raw) == foe_type
 
     def sole_foe(sf):
         frame = at_frame.get(sf, {})
@@ -1031,8 +1061,7 @@ def lab_attack_gba(spec):
                 if m[key] is not None:
                     values[check] = m[key]
             if not m.get('taken_single', False):
-                # Hits taken from several enemies in reach cannot stand for one enemy's damage:
-                # absent_values() lists the check, so the verdict and the record agree.
+                # Hits taken from several enemies in reach cannot stand for one enemy's damage.
                 values.pop('lab.counter_damage', None)
             # Exact checks hold for every hit, not the median: submit the GBA hit furthest from
             # the N64 value, so one wrong hit among right ones still fails.
@@ -1043,7 +1072,22 @@ def lab_attack_gba(spec):
                 if sizes and check in n64:
                     values[check] = max(sizes, key=lambda v: (abs(v - n64[check]), v))
         measured = dict(m or {}, error=err)
-        measured['absent'] = absent_values(golden, values)
+        # Combat that happened but could not be attributed is not combat that never happened:
+        # those checks get no value (a gating REGRESSION, "not measured"), never ABSENT, which
+        # a baseline recording no fight would otherwise accept.
+        inconclusive = set()
+        if m is not None:
+            if m['ambiguous_hits']:
+                inconclusive |= {'lab.damage', 'lab.shield_damage', 'lab.cooldown', 'lab.range_first',
+                                 'lab.first_hit'} - set(values)
+            if m['taken'] and not m.get('taken_single', False):
+                inconclusive.add('lab.counter_damage')
+        inconclusive &= {obs['check'] for obs in golden['observations']}
+        measured['inconclusive'] = sorted(inconclusive)
+        missing = absent_values(golden, values)
+        for check in inconclusive:
+            values.pop(check, None)
+        measured['absent'] = [c for c in missing if c not in inconclusive]
         return {'values': values, 'measured': measured}, None
     return measure
 

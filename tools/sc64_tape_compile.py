@@ -546,6 +546,10 @@ def compile_step(tape, step):
         # first corner's side of the far one, so each drag leg runs the intended way.
         if a == b or any(0 < abs(e - s0) <= 2 * REACH for s0, e in zip(a, b)):
             raise ScenarioError(f'a box needs two corners, each moving side longer than {2 * REACH} px')
+        if not tape.legacy_selection:
+            # Nothing selected before the drag: a failed drag then leaves an empty selection,
+            # never a stale group of the expected size that the checks below would accept.
+            tape.until(SELECTION, 4, 'eq', 0, 1)
         tape.pad(PRESS_HOLD, BUTTONS['a'])
         # The cursor stands on the first corner, so each axis of the drag has a known
         # direction: one slow leg per axis, never past the far corner's side.

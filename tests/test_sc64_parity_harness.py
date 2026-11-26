@@ -165,6 +165,11 @@ class Decoder(unittest.TestCase):
             two = parity_decode.Capture(q)
             self.assertEqual([sf for _, sf in two.skipped_frames], [0, 1])
             self.assertEqual(two.ticks[0]['sf'], 2)
+            # An in-mission change read two ticks back, with nothing read for the tick between:
+            # it cannot be joined to the first follow-up, so the clock start is unexplained.
+            r = pathlib.Path(temp) / 'r'
+            write_capture(r, marine_frames(30), skip_follow={1, 2}, skip_change={2})
+            self.assertEqual(parity_decode.Capture(r).faults['unexplained_skips'], 1)
             # A jump of more than eight ticks is never explained, change-step reads or not.
             f, g = pathlib.Path(temp) / 'f', pathlib.Path(temp) / 'g'
             write_capture(f, marine_frames(30), skip_follow=set(range(10, 20)))

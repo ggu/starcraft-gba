@@ -269,6 +269,11 @@ class CompileTest(unittest.TestCase):
         out = lines(scenario([{'op': 'box', 'from': [150, 100], 'to': [225, 182], 'count': 5}]))
         self.assertIn('until 800C0C10 4 ne 0 30 0 0 0', out)   # slot 4 holds the fifth unit
         self.assertIn('until 800C0C14 4 eq 0 1 0 0 0', out)    # and slot 5 is empty
+        # Nothing selected before the drag, so a failed drag never leaves a stale group.
+        empty = out.index('until 800C0C00 4 eq 0 1 0 0 0')
+        self.assertLess(empty, next(i for i, line in enumerate(out) if line.startswith('untilw') and ' 4096 ' not in line and i > empty))
+        legacy = lines(scenario([{'op': 'box', 'from': [150, 100], 'to': [225, 182]}], legacy_selection=True))
+        self.assertNotIn('until 800C0C00 4 eq 0 1 0 0 0', legacy)
 
     def test_mark_names_are_unique(self):
         with self.assertRaisesRegex(tc.ScenarioError, 'used twice'):
@@ -439,8 +444,14 @@ class LabMeasureTest(unittest.TestCase):
         m, err = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertIsNone(err)
         self.assertEqual(m['hits'], 3)
-        self.assertEqual(m['gaps'], [15, 15])
+        # The building and the Drone took hits between the Zergling's, within reach of the
+        # subject: it may have fired at them, so no cooldown interval spans them.
+        self.assertEqual(m['gaps'], [])
         self.assertEqual(list(m['victims']), ['2'])
+        far = walk(pos, hp={1: marine, 2: ling, 3: bunker, 4: drone},
+                   others=[(2, metrics.ZERGLING, 4, 150, 100), (3, 125, 4, 900, 100),
+                           (4, metrics.DRONE, 4, 900, 140)])
+        self.assertEqual(metrics.lab_attack_measure(far, 1, 5, metrics.ZERGLING)[0]['gaps'], [15, 15])
         # Without the foe filter the building and the Drone would pass as hits on the foe.
         m, _ = metrics.lab_attack_measure(series, 1, 5)
         self.assertEqual(m['hits'], 6)
@@ -461,6 +472,41 @@ class LabMeasureTest(unittest.TestCase):
         m, err = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertEqual((m['hits'], m['ambiguous_hits']), (3, 0))
 
+    def test_a_second_attacker_on_the_sample_before_the_hit(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        # A second Marine stands in reach on frame 34 only: it may have fired the hit seen at 35.
+        series['frames'][34]['units'][5] = (metrics.MARINE, 1, 200, 100)
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['hits'], m['ambiguous_hits'], m['gaps']), (2, 1, []))
+        # A GBA building of the human in reach of the victim is a possible attacker too.
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 150, 100)])
+        for frame in series['frames']:
+            frame['buildings'] = {7: (1, 220, 100)}
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['hits'], m['ambiguous_hits']), (0, 3))
+
+    def test_inconclusive_gba_combat_is_not_absent(self):
+        golden = {'observations': [{'check': c, 'value': 6, 'lo': 6, 'hi': 6, 'gating': True}
+                                   for c in ('lab.damage', 'lab.cooldown', 'lab.counter_damage')]}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 - 5 * len([t for t in (25, 40) if t <= sf]) for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+        ling2 = {sf: 35.0 for sf in range(0, 80)}
+        # A second Marine in reach of the Zergling, and a second Zergling in reach of the subject.
+        series = walk(pos, hp={1: marine, 2: ling, 3: ling2, 5: {sf: 40.0 for sf in range(0, 80)}},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, metrics.ZERGLING, 4, 160, 120),
+                              (5, metrics.MARINE, 1, 250, 100)])
+        result, err = metrics.lab_attack_gba({'foe_type': metrics.ZERGLING})(series, golden, {'subject': 1, 'lab': [[5, 4, 1, -1]]})
+        self.assertIsNone(err)
+        # The fight happened: no ABSENT a no-fight baseline would accept, no value at all instead.
+        self.assertEqual(result['measured']['inconclusive'], ['lab.cooldown', 'lab.counter_damage', 'lab.damage'])
+        self.assertEqual(result['measured']['absent'], [])
+        for check in ('lab.damage', 'lab.cooldown', 'lab.counter_damage'):
+            self.assertNotIn(check, result['values'])
+
     def test_gap_and_ambiguous_hits_never_set_timing(self):
         frames = [sf for sf in range(0, 80) if sf != 34]   # frame 34 was never sampled
         pos = {sf: (100, 100) for sf in frames}
@@ -480,6 +526,10 @@ class LabMeasureTest(unittest.TestCase):
                       others=[(2, metrics.ZERGLING, 4, 150, 100), (3, metrics.ZERGLING, 4, 160, 100)])
         m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertEqual(m['gaps'], [15])   # 20 -> 50 spans the kill at 35; 50 -> 65 stands
+        # A kill of another enemy type splits the timing the same way.
+        series = walk(pos, hp={1: marine, 2: ling, 3: other},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, metrics.DRONE, 4, 160, 100)])
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [15])
 
     def test_enemy_buildings_count_for_damage_taken(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
@@ -492,6 +542,16 @@ class LabMeasureTest(unittest.TestCase):
             frame['buildings'] = {7: (4, 200, 100)}
         m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertFalse(m['taken_single'])
+        # The only enemy in reach is a building, or a unit of another type: neither stands
+        # for the Zergling's damage.
+        for others in ([(2, metrics.ZERGLING, 4, 900, 100), (3, 125, 4, 130, 100)],
+                       [(2, metrics.ZERGLING, 4, 900, 100), (3, metrics.DRONE, 4, 130, 100)]):
+            series = walk(pos, hp={1: marine, 2: ling, 3: {sf: 300.0 for sf in range(0, 80)}}, others=others)
+            self.assertFalse(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['taken_single'])
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 900, 100)])
+        for frame in series['frames']:   # a lone GBA building
+            frame['buildings'] = {7: (4, 200, 100)}
+        self.assertFalse(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['taken_single'])
 
     def test_n64_order_must_match_the_replay(self):
         class Cap:
@@ -516,6 +576,13 @@ class LabMeasureTest(unittest.TestCase):
             ticks = [{'step': 100, 'tick': 50, 'rows': {9: 3}}, {'step': 140, 'tick': 70, 'rows': {9: 6}}]
             unit = Cap.unit
         self.assertIsNone(metrics.n64_order_after(Late, 9, 101, metrics.ORDER_MOVE)[0])
+
+        class Unread(Cap):   # tick 51 began before the press and was never read: its order is unknown
+            ticks = [{'step': s, 'tick': t, 'rows': {9: o}} for s, t, o in ((100, 50, 3), (106, 52, 6))]
+            change_steps = {50: 99, 51: 102, 52: 105}
+        ok, seen = metrics.n64_order_after(Unread, 9, 103, metrics.ORDER_MOVE)
+        self.assertIsNone(ok)
+        self.assertEqual(seen, ['the order at the press was not read'])
 
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},

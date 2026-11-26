@@ -371,9 +371,15 @@ class Capture:
             while nxt is not None and lead in change and nxt['step'] == change[lead]['step'] + 1:
                 leading.insert(0, change[lead])   # walk back through contiguous change-only ticks
                 nxt, lead = change[lead], (lead - 1) & 0xFFFFFFFF
-            # An earlier in-mission change read not contiguous with them cannot be placed.
-            if lead in change and change[lead]['flags'] & FLAG_TABLE:
-                self.faults['unexplained_skips'] += 1
+            # An earlier in-mission change read not contiguous with them cannot be placed: any
+            # in-mission change read before the first follow-up's tick that the walk did not
+            # join, however many ticks back (a missing read between them breaks the chain).
+            first = change.get(self.ticks[0]['tick'])
+            first_step = first['step'] if first is not None else self.ticks[0]['step']
+            joined_lead = {id(head) for head in leading}
+            self.faults['unexplained_skips'] += sum(
+                1 for head in change.values()
+                if head['flags'] & FLAG_TABLE and head['step'] < first_step and id(head) not in joined_lead)
             for head in leading:
                 self.faults['skipped_ticks'] += 1
                 if head['pause'] == 0 and head['flags'] & FLAG_TABLE:

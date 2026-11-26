@@ -156,6 +156,8 @@ the map mode halfword `0x800A5AB4` reads 3, and dismisses text boxes with
 Each N64 press must show in the subject's order byte (`+0x4D`) within 12
 ticks as Move (6) or AttackMove (14); the GBA replays that order at the
 point the press was given, and each leg must settle within 32 N64 px of it.
+A press whose last preceding tick has no follow-up read (it ran inside one
+frontend step) is refused: the order at the press was not observed.
 Each lab gives one human subject timed orders: on the N64 from a compiled
 tape that loads a lab state (saved once, after the mission's opening
 transmissions), on the GBA through the injector at the same source-frame
@@ -170,7 +172,7 @@ coverage are in
 | Kind | Measures (both engines, `tools/sc64_parity_metrics.py`) | Band |
 | --- | --- | --- |
 | Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a 4-frame chord at 90% of cruise), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
-| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death. A hit counts only on the configured foe's unit id and only with a verified single attacker (the subject is the only living human row within 288 N64 px of the victim); damage taken gates only when exactly one enemy row was within 288 px of the subject at every hit | exact (every hit); ±1 frame; ±8 px; exact; ±4 frames |
+| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death. A hit counts only on the configured foe's unit id and only with a verified single attacker: the subject is the only living human row (or GBA building of the human) within 288 N64 px of the victim, on the sample that shows the drop and on the one before it. No cooldown interval spans a kill of any enemy or a drop on another enemy within reach of the subject. Damage taken gates only when the same single enemy, a unit of the foe's id, was the only enemy within 288 px of the subject on both samples around every hit. When the GBA fought but no hit could be attributed, the affected checks get no value (REGRESSION, "not measured"), never the "absent" marker | exact (every hit); ±1 frame; ±8 px; exact; ±4 frames |
 | Train and build (passive) | Blood Bath computers: N64 rows born with the status bit clear until it sets; GBA queue progress 1 to the unit's birth, and a building's birth to its completion | ±2 frames |
 
 Hit points are the 8.8 field at `+0x08`, divided by 256. A capture whose
@@ -194,7 +196,7 @@ so both stay in the private fixture home; the compiler and its tests
 | Op | Tape |
 | --- | --- |
 | `start` | `{"load": NAME.state, "step": N}`, `{"boot": "t1"}`, `{"boot": {"lobby": "blood-bath", "human": R, "computer": R}}` or `{"boot": {"episode": R, "mission": N}}` (the progress-byte guest edit; staged) |
-| `select`, `cursor` | Cursor onto a world point (panning with Z first when needed), A, and a check that the selection list is not empty |
+| `select`, `cursor` | Cursor onto a world point (panning with Z first when needed); `select` then presses A and checks the selection list (below) |
 | `box` | A held while the cursor drags to the second corner |
 | `order` | `move` (C-Right), `attack` (B), `hold` (C-Left), `stop` (C-Down) at the point under the cursor; `"mark": NAME` puts `# mark NAME` right before the issuing press |
 | `boxes N` | Wait for each text box and pulse Start until the pause halfword clears |
@@ -204,7 +206,8 @@ so both stay in the private fixture home; the compiler and its tests
 `select` needs `"row"`, the KSEG0 address of the subject's unit row (table
 address + 312 × index), and then requires the selection list to hold
 exactly that row; `box` needs `"count"` (exactly that many units selected)
-or `"row"` (the first one). Scenarios written before this rule set
+or `"row"` (the first one), and nothing selected before the drag, so a
+failed drag never leaves a stale group that passes. Scenarios written before this rule set
 `"legacy_selection": true`, which keeps their recorded tapes unchanged and
 only checks that something is selected. Mark names must be unique, in the
 compiler and in hand-written tapes. `poke`
