@@ -101,7 +101,7 @@ class SimulatedTape:
 class CompileTest(unittest.TestCase):
     def test_every_line_is_a_frontend_command(self):
         doc = scenario([{'op': 'boxes', 'count': 2}, {'op': 'guard'}, {'op': 'tap'},
-                        {'op': 'select', 'at': [310, 140]},
+                        {'op': 'select', 'at': [310, 140], 'row': '80300210'},
                         {'op': 'order', 'kind': 'move', 'at': [520, 330], 'mark': 'command'},
                         {'op': 'wait', 'steps': 2500}, {'op': 'order', 'kind': 'attack', 'at': [600, 1200]},
                         {'op': 'order', 'kind': 'stop', 'mark': 'halt'}, {'op': 'save', 'name': 'x.state'}])
@@ -118,7 +118,7 @@ class CompileTest(unittest.TestCase):
         self.assertIn('500 0 0 0', out)
 
     def test_marks_land_right_before_the_issuing_press(self):
-        out = lines(scenario([{'op': 'select', 'at': [310, 140]},
+        out = lines(scenario([{'op': 'select', 'at': [310, 140], 'row': '80300210'},
                               {'op': 'order', 'kind': 'move', 'at': [520, 330], 'mark': 'command'},
                               {'op': 'order', 'kind': 'hold', 'mark': 'hold'}]))
         i = out.index('# mark command')
@@ -253,10 +253,32 @@ class CompileTest(unittest.TestCase):
         self.assertEqual(sim.camera[1], 96)
         # Near the top-left corner the pan runs into the edge, pinning the camera exactly.
         text = tc.compile_scenario(scenario([{'op': 'cursor', 'at': [900, 900]},
-                                             {'op': 'box', 'from': [150, 100], 'to': [225, 182]}]))
+                                             {'op': 'box', 'from': [150, 100], 'to': [225, 182], 'count': 5}]))
         sim = SimulatedTape()
         self.assertTrue(sim.run(text))
         self.assertEqual(sim.camera, [-32, -32])
+
+    def test_selection_must_be_named(self):
+        with self.assertRaisesRegex(tc.ScenarioError, 'select needs "row"'):
+            lines(scenario([{'op': 'select', 'at': [310, 140]}]))
+        with self.assertRaisesRegex(tc.ScenarioError, 'box needs "count"'):
+            lines(scenario([{'op': 'box', 'from': [150, 100], 'to': [225, 182]}]))
+        # Scenarios written before the rule keep their tapes: something selected is enough.
+        legacy = lines(scenario([{'op': 'select', 'at': [310, 140]}], legacy_selection=True))
+        self.assertIn('until 800C0C00 4 ne 0 30 0 0 0', legacy)
+        out = lines(scenario([{'op': 'box', 'from': [150, 100], 'to': [225, 182], 'count': 5}]))
+        self.assertIn('until 800C0C10 4 ne 0 30 0 0 0', out)   # slot 4 holds the fifth unit
+        self.assertIn('until 800C0C14 4 eq 0 1 0 0 0', out)    # and slot 5 is empty
+
+    def test_mark_names_are_unique(self):
+        with self.assertRaisesRegex(tc.ScenarioError, 'used twice'):
+            lines(scenario([{'op': 'order', 'kind': 'stop', 'mark': 'command'},
+                            {'op': 'order', 'kind': 'hold', 'mark': 'command'}]))
+        with tempfile.TemporaryDirectory() as temp:
+            tape = pathlib.Path(temp) / 'tape.txt'
+            tape.write_text('# mark command\n5 0 0 0\n# mark command\n5 0 0 0\n')
+            with self.assertRaises(SystemExit):
+                metrics.tape_commands(tape)
 
     def test_cli_never_overwrites(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -423,6 +445,35 @@ class LabMeasureTest(unittest.TestCase):
         m, _ = metrics.lab_attack_measure(series, 1, 5)
         self.assertEqual(m['hits'], 6)
 
+    def test_hits_need_a_single_attacker_in_reach(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35, 50) if t <= sf]) for sf in range(0, 80)}
+        friend = {sf: 40.0 for sf in range(0, 80)}
+        # A second human Marine 100 px from the Zergling: every hit is ambiguous, none is credited.
+        series = walk(pos, hp={1: marine, 2: ling, 5: friend},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (5, metrics.MARINE, 1, 250, 100)])
+        m, err = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['hits'], m['ambiguous_hits']), (0, 3))
+        # Outside reach it is no rival.
+        series = walk(pos, hp={1: marine, 2: ling, 5: friend},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (5, metrics.MARINE, 1, 150 + 400, 100)])
+        m, err = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertEqual((m['hits'], m['ambiguous_hits']), (3, 0))
+
+    def test_n64_order_must_match_the_replay(self):
+        class Cap:
+            ticks = [{'step': s, 'rows': {9: o}} for s, o in ((100, 3), (103, 3), (106, 14), (109, 14))]
+
+            @staticmethod
+            def unit(row, name):
+                return row
+        self.assertEqual(metrics.n64_order_after(Cap, 9, 101, metrics.ORDER_ATTACK_MOVE)[0], 14)
+        self.assertEqual(metrics.n64_order_after(Cap, 9, 101, (metrics.ORDER_MOVE, metrics.ORDER_ATTACK_MOVE))[0], 14)
+        ok, seen = metrics.n64_order_after(Cap, 9, 101, metrics.ORDER_MOVE)
+        self.assertIsNone(ok)
+        self.assertEqual(seen, [3, 14, 14])
+
     def test_exact_damage_needs_every_hit(self):
         golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},
                                    {'check': 'lab.range_first', 'value': 50, 'lo': 42, 'hi': 58, 'gating': True}]}
@@ -436,6 +487,14 @@ class LabMeasureTest(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual(result['measured']['damage'], 6)
         self.assertIn(result['values']['lab.damage'], (4, 8))   # the worst hit, never the median
+
+    def test_cancelled_tail_keeps_the_head_start(self):
+        # Two SCVs queued at step 10; the second is cancelled at step 100 (count 2 -> 1, same head,
+        # progress still rising); the first completes at 384.
+        ev = [('B', 10, 1, 0, 3, 0, 2, 1, 0), ('B', 100, 1, 0, 3, 0, 1, 91, 0),
+              ('B', 384, 1, 0, 3, 0, 0, 0, -1), ('+U', 384, 7, 0, 3)]
+        table = metrics.train_gba({'events': ev}, 0, [7], [106])
+        self.assertEqual([d for _, d, _ in table[7]], [(384 - 10 + 1) * 4 / 5])
 
     def test_training_births_go_to_the_producer_that_completed(self):
         # Two Command Centers (slots 1, 2) of owner 3 train SCVs (engine 0); the newer one finishes first.

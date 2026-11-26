@@ -153,6 +153,9 @@ the map mode halfword `0x800A5AB4` reads 3, and dismisses text boxes with
 
 ## Unit-class labs
 
+Each N64 press must show in the subject's order byte (`+0x4D`) within 12
+ticks as Move (6) or AttackMove (14); the GBA replays that order at the
+point the press was given, and each leg must settle within 32 N64 px of it.
 Each lab gives one human subject timed orders: on the N64 from a compiled
 tape that loads a lab state (saved once, after the mission's opening
 transmissions), on the GBA through the injector at the same source-frame
@@ -167,7 +170,7 @@ coverage are in
 | Kind | Measures (both engines, `tools/sc64_parity_metrics.py`) | Band |
 | --- | --- | --- |
 | Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a 4-frame chord at 90% of cruise), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
-| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death | exact; ±1 frame; ±8 px; exact; ±4 frames |
+| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death. A hit counts only on the configured foe's unit id and only with a verified single attacker (the subject is the only living human row within 288 N64 px of the victim); damage taken gates only when exactly one enemy row was within 288 px of the subject at every hit | exact (every hit); ±1 frame; ±8 px; exact; ±4 frames |
 | Train and build (passive) | Blood Bath computers: N64 rows born with the status bit clear until it sets; GBA queue progress 1 to the unit's birth, and a building's birth to its completion | ±2 frames |
 
 Hit points are the 8.8 field at `+0x08`, divided by 256. A capture whose
@@ -198,8 +201,13 @@ so both stay in the private fixture home; the compiler and its tests
 | `wait`, `"dismiss": true` | Idle steps; with `dismiss`, Start is pulsed only while a box is open (`pulse`) |
 | `guard`, `tap`, `save`, `shot`, `peek`, `until`, `hold`, `press`, `poke` | One frontend line each, validated |
 
-`select` takes an optional `"row"`, the KSEG0 address of the subject's unit
-row, and then requires the selection list to hold exactly that row. `poke`
+`select` needs `"row"`, the KSEG0 address of the subject's unit row (table
+address + 312 × index), and then requires the selection list to hold
+exactly that row; `box` needs `"count"` (exactly that many units selected)
+or `"row"` (the first one). Scenarios written before this rule set
+`"legacy_selection": true`, which keeps their recorded tapes unchanged and
+only checks that something is selected. Mark names must be unique, in the
+compiler and in hand-written tapes. `poke`
 (and the episode boot that uses it) and `wait` with `dismiss` (`pulse`)
 compile only when the scenario lists them in `"frontend_commands"`, an
 explicit opt-in: `poke` writes guest memory, and captures made with

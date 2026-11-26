@@ -360,14 +360,15 @@ class Capture:
                 nxt = change.get((value + 1) & 0xFFFFFFFF)
                 if value not in change or nxt is None or nxt['step'] != change[value]['step'] + 1:
                     self.faults['unexplained_skips'] += 1
-                elif change[value]['pause'] == 0:
+                elif change[value]['pause'] == 0 and change[value]['flags'] & FLAG_TABLE:
+                    # Its own change read says it ran in mission and unpaused.
                     extra.setdefault(index, []).append(change[value]['step'])
         # Unpaused clock: one source frame per tick whose change-step read
         # showed no pause; numbered from the first in-mission (table) tick.
         clock = -1
         self.skipped_frames = []   # (frontend step of the change read, source frame) of skipped ticks
         for index, record in enumerate(self.ticks):
-            if record['table'] and clock >= 0:
+            if record['table']:
                 for step in extra.get(index, []):
                     clock += 1
                     self.skipped_frames.append((step, clock))

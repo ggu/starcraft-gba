@@ -239,6 +239,10 @@ class Tape:
         self.exact = [camera is not None] * 2
         self.world = world
         self.pending_mark = None
+        self.mark_names = set()
+        # Scenarios written before exact selection checks: select/box check only that something
+        # is selected, so their recorded tapes compile unchanged.
+        self.legacy_selection = False
         self.staged = False
         self.extra_commands = set()   # frontend commands the scenario declared (frontend_commands)
 
@@ -276,6 +280,9 @@ class Tape:
             raise ScenarioError(f'bad mark name {name!r}')
         if self.pending_mark is not None:
             raise ScenarioError(f'mark {name} follows mark {self.pending_mark} with no command between')
+        if name in self.mark_names:
+            raise ScenarioError(f'mark {name} is used twice')
+        self.mark_names.add(name)
         self.pending_mark = name
 
     def press(self, button, mark=None):
@@ -430,6 +437,9 @@ def compile_scenario(doc):
     if not isinstance(extra, list) or not all(isinstance(c, str) and c in OPTIONAL_COMMANDS for c in extra):
         raise ScenarioError(f'frontend_commands may list only {sorted(OPTIONAL_COMMANDS)}')
     tape.extra_commands = set(extra)
+    if not isinstance(doc.get('legacy_selection', False), bool):
+        raise ScenarioError('legacy_selection must be true or false')
+    tape.legacy_selection = doc.get('legacy_selection', False)
     ident = doc.get('id', 'unnamed')
     if not name_ok(ident):
         raise ScenarioError('id must be one plain token ([A-Za-z0-9._-], at most 64 characters)')
@@ -518,8 +528,11 @@ def compile_step(tape, step):
             row, _ = field_of(f'{step["row"]}:4')
             tape.until(SELECTION, 4, 'eq', row, 30)
             tape.until(SELECTION + 4, 4, 'eq', 0, 1)   # and nothing else: no stale group
-        else:
+        elif tape.legacy_selection:
             tape.until(SELECTION, 4, 'ne', 0, 30)
+        else:
+            raise ScenarioError('select needs "row" (the KSEG0 address of the unit row to select), so a '
+                                'miss that leaves an earlier selection can never pass')
     elif op == 'box':
         a, b = point(step.get('from'), 'from'), point(step.get('to'), 'to')
         tape.cursor_to(*a)
@@ -543,7 +556,19 @@ def compile_step(tape, step):
             elif end < start:
                 tape.untilw('xy'[axis], 'lt', end + 1, STEP_MAX, BUTTONS['a'], *stick(-SLOW))
         tape.pad(PRESS_GAP)
-        tape.until(SELECTION, 4, 'ne', 0, 30)
+        if 'row' in step or 'count' in step:
+            if 'row' in step:   # the first row in the selection list
+                row, _ = field_of(f'{step["row"]}:4')
+                tape.until(SELECTION, 4, 'eq', row, 30)
+            count = integer(step.get('count', 1), 'count', 1, 12)
+            # Exactly `count` units: slot count-1 filled and slot count empty.
+            tape.until(SELECTION + 4 * (count - 1), 4, 'ne', 0, 30)
+            if count < 12:
+                tape.until(SELECTION + 4 * count, 4, 'eq', 0, 1)
+        elif tape.legacy_selection:
+            tape.until(SELECTION, 4, 'ne', 0, 30)
+        else:
+            raise ScenarioError('box needs "count" (how many units it selects) or "row" (the first one)')
     elif op == 'deselect':
         tape.press('b')
     elif op == 'order':

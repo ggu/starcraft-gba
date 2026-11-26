@@ -276,3 +276,18 @@ re-decoded there against the merged layout; `./dev parity` then exits 0
 with 24 PASS, 34 KNOWN, 24 REPORT and 17 SKIP (skirmish goldens this branch
 has no measurement code for), and no STALE-GOLDEN, REGRESSION or IMPROVED
 line.
+
+## Follow-up (after #984)
+
+Rules tightened after review, with their effect on these goldens:
+
+- A hit counts for the subject only with a verified single attacker (no other living human row
+  within 288 N64 px of the victim). In the Hydralisk–Zealot lab two of the three N64 hits had
+  other Hydralisks in reach, so one hit is credited and the cooldown check is gone (shield
+  damage 10, range and survival remain).
+- Damage taken gates only when exactly one enemy row was within 288 px of the subject at every
+  hit. Both Zerglings were in reach of the T1 Marine, so its damage taken (5) is now report-only.
+- Each press is checked against the subject's order byte. The Marine lab's return press gave an
+  attack-move (C-Right with the cursor over the other Marines), and the GBA now replays that leg
+  as an attack-move; its values are unchanged.
+
