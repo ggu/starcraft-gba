@@ -21,6 +21,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Disjoint cycle budgets.** The two flagged Outpost samples reconcile using the guest loop timer. Measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
 
+- **Custom Game defense targeting.** Skipping cells that contain only friendly
+  units reduced mean advancing-update cost by 2.08% in the crowded Zerg
+  Blood Bath replay (18.00 to 18.35 updates/s). Sparse Terran timing was
+  effectively flat. Validate the merged build on hardware and keep prioritizing
+  ground orders and actor drawing against the remaining frame budget.
+  [Paired timing and Terran placement measurements](audits/2026-11-26-z10-triple-zerg-pacing.md).
+
 - **Busy three-opponent performance.** The release's six recorded battle
   windows measured 11.29–16.73 loop updates/s. The original controls and
   camera are reproducible from the match traces. Prioritize ground orders
