@@ -202,6 +202,11 @@ static void output_budget() {
     assert(!sc64_capture_budget_ok(0, 100, 8 * G, 5 * G + 99, 0, 5 * G));            /* would dip into the reserve */
     assert(!sc64_capture_budget_ok(0, 100, 8 * G, 6 * G, G, 5 * G));                /* counted since the last measure */
     assert(!sc64_capture_budget_ok(0, 100, 8 * G, 50, 0, 0));                        /* not even the bytes free */
+    std::uint64_t v = 0;
+    assert(sc64_capture_u64("5368709120", &v) && v == 5 * G);                         /* ten digits */
+    assert(sc64_capture_u64("18446744073709551615", &v) && v == ~std::uint64_t(0));
+    assert(!sc64_capture_u64("18446744073709551616", &v) && !sc64_capture_u64("", &v));
+    assert(!sc64_capture_u64("-1", &v) && !sc64_capture_u64("12a", &v) && !sc64_capture_u64("0x10", &v));
 }
 
 int main() {

@@ -84,14 +84,14 @@ def mission_chk(label: str, maps, extractor) -> dict:
 
 def max_pairs(left: list, right: list, fits) -> list:
     """A best one-to-one pairing of left and right items that fit, as [(left, right)] in left
-    order: the most pairs, then the most exact positions, then the most equal resource
-    amounts (minerals and geysers only), then the least total distance. Searched exhaustively (at
+    order: the most pairs, then the most exact positions, then the least total distance,
+    then the most equal resource amounts (minerals and geysers only). Searched exhaustively (at
     most EXHAUSTIVE_GROUP placements per connected group of candidates); larger groups fall back
     to augmenting paths."""
     near = lambda a, b: abs(a['x'] - b['x']) + abs(a['y'] - b['y'])
     resource = lambda a: a['type'] in MINERALS + (GEYSER,)
-    score = lambda a, b: (1, near(a, b) == 0,
-                          resource(a) and a.get('resources', 0) == b.get('resource_amount', 0), -near(a, b))
+    score = lambda a, b: (1, near(a, b) == 0, -near(a, b),
+                          resource(a) and a.get('resources', 0) == b.get('resource_amount', 0))
     chosen = {}
     # Connected groups of candidates (left i and right j joined when they fit): each is searched
     # on its own, so isolated placements never enlarge a search.
@@ -206,20 +206,21 @@ def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
     stacked = lambda r: any(o is not r and abs(o['x'] - r['x']) <= STACK_RADIUS and abs(o['y'] - r['y']) <= STACK_RADIUS
                             for o in expected)
     index_of = {id(n): i for i, n in enumerate(n64_rows)}
-    for label, radius in (('moved', MOVED_RADIUS), ('displaced', DISPLACE_RADIUS)):
-        out[label] = []
-        # An isolated placement has nothing to be spread from, so only stacked ones may be displaced.
-        eligible = [r for r in missing if label == 'moved' or stacked(r)]
-        free_rows = [n for i, n in enumerate(n64_rows) if i not in used]
-        fits = lambda r, n: (n['type'], n['owner']) == (r['type'], r['owner']) and \
-            max(abs(n['x'] - r['x']), abs(n['y'] - r['y'])) <= radius
-        taken = set()
-        for r, n in max_pairs(eligible, free_rows, fits):   # most pairs, then the least distance
-            used.add(index_of[id(n)])
-            taken.add(id(r))
-            matched.append((r, n))
-            out[label].append({'type': r['type'], 'owner': r['owner'], 'chk': [r['x'], r['y']], 'n64': [n['x'], n['y']]})
-        missing = [r for r in missing if id(r) not in taken]
+    out['moved'], out['displaced'] = [], []
+    # One matching for both classes: a placement may move up to MOVED_RADIUS, or, when a stacked
+    # neighbour gives a reason, be displaced up to DISPLACE_RADIUS; each pair is labelled after.
+    free_rows = [n for i, n in enumerate(n64_rows) if i not in used]
+    reach = lambda r: DISPLACE_RADIUS if stacked(r) else MOVED_RADIUS
+    fits = lambda r, n: (n['type'], n['owner']) == (r['type'], r['owner']) and \
+        max(abs(n['x'] - r['x']), abs(n['y'] - r['y'])) <= reach(r)
+    taken = set()
+    for r, n in max_pairs(missing, free_rows, fits):   # most pairs, then the least distance
+        used.add(index_of[id(n)])
+        taken.add(id(r))
+        matched.append((r, n))
+        label = 'moved' if max(abs(n['x'] - r['x']), abs(n['y'] - r['y'])) <= MOVED_RADIUS else 'displaced'
+        out[label].append({'type': r['type'], 'owner': r['owner'], 'chk': [r['x'], r['y']], 'n64': [n['x'], n['y']]})
+    missing = [r for r in missing if id(r) not in taken]
     moved, displaced = out['moved'], out['displaced']
     missing = [{k: r[k] for k in ('type', 'owner', 'x', 'y', 'section', 'resources')} for r in missing]
     spots = {(r['x'], r['y'], subunits.get(r['type'])) for r, _ in matched if subunits.get(r['type'])}
@@ -533,6 +534,9 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
         # per u16; every other column only as big-endian values.
         candidates = (('be', big_endian(fmt, raw)),) + ((('u16', per_u16(raw)),) if fmt in ('I', 'Q') else ())
         found = None
+        hint = hints.get(name) if expected is None else None
+        if hint is not None and next_matches(name, align(hint + size)):
+            expected = hint   # the next column confirms the layout's base: judge this column there
         if expected is not None:
             # The spot after the previous column decides first: a short or uniform column
             # (all zeros, say) also occurs by chance elsewhere.

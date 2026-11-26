@@ -189,7 +189,7 @@ def stale(obs, golden, layout):
     want = obs.get('layout_fields_sha256')
     if want is None:
         return golden.get('layout_sha256') != layout.sha256
-    return want != layout.fields_digest(obs.get('layout_fields', []))
+    return want != layout.fields_digest(obs.get('layout_reads', obs.get('layout_fields', [])))
 
 
 def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False):
@@ -197,29 +197,28 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
     for obs in golden['observations']:
         gating = obs['gating']
         unproven = []
-        if stale(obs, golden, layout):
+        unproven = []
+        if gating and layout is not None:
+            unproven = [k for k in obs.get('layout_fields', []) if layout.status(k) != 'proven']
+            if layout.doc['unit_table'].get('status') != 'proven':
+                unproven.append('unit_table')
+        if stale(obs, golden, layout) or unproven:
             key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
             row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                    'n64': obs['value'], 'gba': values.get(obs['check']), 'provenance': provenance(obs, golden),
                    'gating': False, 'n_runs': obs['n_runs'], 'tolerance': obs['tolerance']}
             # A stale golden fails unless recording work asks for it (--allow-stale); either way it never gates.
+            # So does a gating check whose fields the layout no longer proves.
             row['verdict'] = 'REPORT' if allow_stale else 'STALE-GOLDEN'
-            row['why'] = STALE_WHY + (' (--allow-stale)' if allow_stale else '')
+            row['why'] = (STALE_WHY if not unproven else STALE_WHY + '; the layout no longer proves '
+                          + ', '.join(unproven)) + (' (--allow-stale)' if allow_stale else '')
             rows.append(row)
             continue
-        if gating and layout is not None:
-            unproven = [k for k in obs.get('layout_fields', []) if layout.status(k) != 'proven']
-            if layout.doc['unit_table'].get('status') != 'proven':
-                unproven.append('unit_table')
         key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
         value = values.get(obs['check'])
         row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden), 'gating': obs['gating'],
                'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}
-        if unproven:
-            # The layout no longer proves a field this check read: it cannot gate.
-            gating = row['gating'] = False
-            row['why'] = 'reads fields the current layout does not prove: ' + ', '.join(unproven)
         if value is None:
             row['verdict'] = 'REGRESSION' if gating else 'REPORT'
             row['why'] = 'not measured on the GBA'
@@ -481,7 +480,13 @@ def main(argv=None):
                         'why': f'no golden files in {home / "golden"} (private N64 captures; see docs/PARITY-HARNESS.md)'})
     if args.explain:
         print(json.dumps(results, indent=1, default=str))
-        return 0 if results and all(r['status'] == 'RUN' for r in results) else 1
+        counts = {}
+        for r in results:
+            for row in r.get('rows', []):
+                counts[row['verdict']] = counts.get(row['verdict'], 0) + 1
+        if not results or any(r['status'] != 'RUN' for r in results):
+            return 1
+        return 1 if any(counts.get(v) for v in FAILING) else 0
     lines, counts = scorecard(results, home, goldens)
     print('\n'.join(lines))
     if args.json:

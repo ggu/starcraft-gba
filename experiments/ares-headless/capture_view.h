@@ -290,6 +290,19 @@ inline bool sc64_capture_region_ok(std::uint32_t offset, std::uint32_t bytes, st
  * pass the budget, or leave less than the reserve free on the output volume (`available` is
  * the free space last measured, `since` the bytes written after that measurement). */
 constexpr std::uint64_t SC64_OUTPUT_CHECK_BYTES = 16ull << 20;   /* re-measure free space this often */
+/* A byte count from the environment: 1 to 20 decimal digits, no sign, no overflow. */
+constexpr bool sc64_capture_u64(const char *text, std::uint64_t *out) {
+    if (!text || !*text || !out) return false;
+    std::uint64_t value = 0;
+    for (unsigned n = 0; text[n]; ++n) {
+        if (text[n] < '0' || text[n] > '9' || n >= 20) return false;
+        std::uint64_t digit = std::uint64_t(text[n] - '0');
+        if (value > (~std::uint64_t(0) - digit) / 10) return false;
+        value = value * 10 + digit;
+    }
+    *out = value;
+    return true;
+}
 constexpr bool sc64_capture_budget_ok(std::uint64_t written, std::uint64_t bytes, std::uint64_t budget,
                                       std::uint64_t available, std::uint64_t since, std::uint64_t reserve) {
     if (bytes > budget || written > budget - bytes) return false;

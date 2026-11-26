@@ -185,6 +185,18 @@ class CensusClasses(unittest.TestCase):
         r = fm.census_compare(chk, live, {})
         self.assertEqual([e['x'] for e in r['extra']], [107])
 
+    def test_moved_and_displaced_are_one_matching(self):
+        unit = lambda x: {'type': 0, 'owner': 1, 'x': x, 'y': 10, 'resources': 0, 'section': 'UNIT'}
+        row = lambda x: {'type': 0, 'owner': 1, 'x': x, 'y': 10, 'resource_amount': 0}
+        r = fm.census_compare([unit(100), unit(112)], [row(107), row(168)], {})
+        self.assertEqual((r['verdict'], len(r['moved']), len(r['displaced'])), ('exact', 1, 1))
+
+    def test_distance_ranks_before_amounts(self):
+        unit = lambda x, a: {'type': 176, 'owner': 11, 'x': x, 'y': 10, 'resources': a, 'section': 'UNIT'}
+        row = lambda x, a: {'type': 176, 'owner': 11, 'x': x, 'y': 10, 'resource_amount': a}
+        r = fm.census_compare([unit(100, 900), unit(108, 1200)], [row(101, 1200), row(107, 900)], {})
+        self.assertEqual(sorted((d['chk'], d['n64']) for d in r['amount_differs']), [(900, 1200), (1200, 900)])
+
     def test_reowned_resource_amounts(self):
         chk = [{'type': 176, 'owner': 11, 'x': 5, 'y': 5, 'resources': 900, 'section': 'UNIT'}]
         same = fm.census_compare(chk, [{'type': 176, 'owner': 3, 'x': 5, 'y': 5, 'resource_amount': 900}], {})
@@ -194,6 +206,17 @@ class CensusClasses(unittest.TestCase):
 
 
 class TableAnchor(unittest.TestCase):
+    def test_hinted_base_confirmed_by_the_next_column(self):
+        a = struct.pack('<2H', 1, 2)
+        b = bytes([4, 5, 6, 7])
+        columns = [('t.a', 'H', 2, a), ('t.b', 'B', 4, b)]
+        decoy = struct.pack('>2H', 1, 2) + b'\0' * 4          # an unchanged copy of the first column elsewhere
+        base = struct.pack('>2H', 1, 9) + bytes([4, 5, 6, 7])  # the real table: first column changed
+        ram = decoy + b'\xEE' * 8 + base
+        found = fm.anchor_columns(ram, columns, {'t.a': f'0x{fm.RAM_BASE + 16:08X}'})
+        self.assertEqual([(f['status'], f['address']) for f in found],
+                         [('differs', f'{fm.RAM_BASE + 16:08x}'), ('equal', f'{fm.RAM_BASE + 20:08x}')])
+
     def test_columns_found_aligned_and_differences_listed(self):
         a = struct.pack('<3H', 1, 2, 3)           # u16 column, 6 bytes
         b = bytes([4, 5, 6])                      # u8 column right after, 4-byte aligned in RAM
@@ -214,6 +237,15 @@ class Scenario(unittest.TestCase):
             tape.write_text('10 0 0 0\npulse 800F0C20 2 ne 0 50 2 3 60\n# mark command\n4 64 0 0\nquit\n')
             (pathlib.Path(d) / 'commands.csv').write_text('begin,steps,mask,x,y\n0,10,0,0,0\n10,50,2,0,0\n60,4,64,0,0\n')
             self.assertEqual(metrics.tape_commands(tape), {'command': 60})
+
+    def test_a_lethal_first_hit_keeps_its_victim(self):
+        with tempfile.TemporaryDirectory() as d:
+            trace = pathlib.Path(d) / 't.trace'
+            u = lambda slot, owner: f'U {slot} 0 0 0 {owner} 10 10 40 40 0 -1 0 0 0 -1 0 0 0 0 0 0 0 0'
+            trace.write_text('#sc64-parity-trace 1\nH max_units=240 x=1\nS 1\n' + u(3, 1) + '\n' + u(4, 4) + '\n'
+                             'S 6\n-U 3 0 1 0\nD 3 40 0 4\nS 7\nD 3 40 0 4\nZ overflow=0 write_errors=0\n')
+            t = fm.gba_timeline(trace, {1})
+            self.assertEqual(t['first_hit'], {'sf': 4, 'type': 0, 'owner': 1})
 
     def test_gba_series_keeps_orders_walks_and_fog(self):
         with tempfile.TemporaryDirectory() as d:

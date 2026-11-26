@@ -518,9 +518,35 @@ def same_bundle(a, b, allow_skips=False):
     return problems
 
 
+# What the capture frontend records at fixed addresses (experiments/ares-headless/capture.cpp:
+# kTick, kPause, kSeconds, kSelector, kBanks, kRng; the unit table rows). tap.bin holds those
+# bytes, so a golden can only be (re)written while the layout reads the same places.
+TAP_CONTRACT = {('clock', 'tick_counter'): '0x800B1E84', ('clock', 'pause_halfword'): '0x800F0C20',
+                ('clock', 'seconds'): '0x800B9368', ('clock', 'selector'): '0x800D13E4'}
+TAP_BANKS, TAP_RNG, TAP_ROWS = '0x800B1D44', '0x800EFF20', (900, 312)
+
+
+def check_tap_contract(layout):
+    """Raise LayoutError when the layout reads a recorded field somewhere the frontend did not."""
+    doc = layout.doc
+    wrong = [f'{a}.{b}' for (a, b), address in TAP_CONTRACT.items()
+             if int(doc[a][b]['address'], 16) != int(address, 16)]
+    if int(doc['globals']['banks']['address'], 16) != int(TAP_BANKS, 16):
+        wrong.append('banks')
+    if int(doc['globals']['rng']['address'], 16) != int(TAP_RNG, 16):
+        wrong.append('rng')
+    if (doc['unit_table']['rows'], doc['unit_table']['row_bytes']) != TAP_ROWS:
+        wrong.append('unit_table')
+    if wrong:
+        raise LayoutError(f'{layout.name}: {", ".join(wrong)} moved from where the capture frontend records them; '
+                          'tap.bin holds the old addresses, so capture again with a frontend that reads the new ones')
+
+
 def write_golden(scenario_id, runs, home, layout, note=None):
     if scenario_id not in metrics.SCENARIOS:
         raise SystemExit(f'unknown scenario {scenario_id}; known: {", ".join(metrics.SCENARIOS)}')
+    check_tap_contract(layout)
+    layout.used = set()   # the fields this measurement reads, recorded with each observation
     caps = [Capture(run, layout) for run in runs]
     if len(caps) < 2:
         raise SystemExit('a golden bundle needs two fresh-process captures')
@@ -547,7 +573,9 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         obs['layout_fields'] = sorted(set(obs.get('layout_fields', [])))
         if obs['gating']:
             layout.require_all(obs['layout_fields'])
-        obs['layout_fields_sha256'] = layout.fields_digest(obs['layout_fields'])
+        # Every field the measurement read (qualification checks included) joins the digest.
+        obs['layout_reads'] = sorted(set(obs['layout_fields']) | layout.used)
+        obs['layout_fields_sha256'] = layout.fields_digest(obs['layout_reads'])
         if staged:
             obs['tags'] = sorted(set(obs.get('tags', [])) | {'n64-staged'})
     golden = {

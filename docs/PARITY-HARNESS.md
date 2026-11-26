@@ -52,15 +52,19 @@ lists the layout fields it read. Promoting a field needs an evidence line in
 the layout file: a controlled change, or a cross-check like the Blood Bath
 bank test below.
 
-Each observation also stores `layout_fields_sha256`: a digest of the
-definitions of the fields it lists (offsets, types, addresses, names; not
-their status or evidence) plus the decoder's fixed parts (unit table locator,
-bank block, record rule). A layout edit that leaves those unchanged (a new
-field, a promotion, a new evidence line) keeps the golden gating. When they
-change, the observation is `STALE-GOLDEN` and `./dev parity` fails until the
-golden is regenerated from the same runs with `tools/parity_decode.py
-golden`; `--allow-stale` reports it instead, for recording work only.
-Goldens written before per-field digests compare the whole layout file.
+Each observation also stores `layout_reads` (its listed fields plus every
+field the measurement read) and `layout_fields_sha256`: a digest of their
+definitions (offsets, types, addresses, names; not their status or evidence)
+plus the decoder's fixed parts (unit table locator, bank block, record rule).
+A layout edit that leaves those unchanged (a new field, a promotion, a new
+evidence line) keeps the golden gating. When they change, or the layout no
+longer proves a field a gating check reads, the observation is
+`STALE-GOLDEN` and `./dev parity` fails until the golden is regenerated from
+the same runs with `tools/parity_decode.py golden`; `--allow-stale` reports
+it instead, for recording work only. Regeneration refuses a layout that moves
+a field the frontend records at a fixed address (`TAP_CONTRACT`): that needs
+new captures. Goldens written before per-field digests compare the whole
+layout file.
 
 ## Golden format
 

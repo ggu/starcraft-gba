@@ -334,7 +334,7 @@ def move_measure_gba(series, golden, report):
 # ---- Blood Bath worker income ---------------------------------------------
 
 INCOME_FIELDS = ['banks.minerals_gathered', 'banks.minerals', 'unit.type', 'unit.owner', 'unit.sprite',
-                 'clock.tick_counter', 'clock.pause_halfword']
+                 'unit.x', 'unit.y', 'clock.tick_counter', 'clock.pause_halfword']
 INCOME_HORIZON = 2000   # source frames from the first in-mission frame
 INCOME_WORKERS = 4
 INCOME_CLEAR_RADIUS = 320  # N64 px: no foreign unit this close to the human's workers during the window

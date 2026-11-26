@@ -213,7 +213,12 @@ class Golden(unittest.TestCase):
             # A golden judged under a layout that no longer proves a field cannot gate.
             _, golden = parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home',
                                                    parity_decode.Layout())
+            # It fails rather than quietly reporting, unless recording work allows stale goldens.
             rows = sc64_parity.judge('t1-move', golden, {'move.cruise_speed': 99.0}, {}, {}, parity_decode.Layout(weak))
+            self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
+            self.assertIn('no longer proves clock.pause_halfword', rows[0]['why'])
+            rows = sc64_parity.judge('t1-move', golden, {'move.cruise_speed': 99.0}, {}, {}, parity_decode.Layout(weak),
+                                     allow_stale=True)
             self.assertEqual(rows[0]['verdict'], 'REPORT')
 
     def test_layout_edits_keep_or_stale_a_golden_per_field(self):
@@ -256,6 +261,24 @@ class Golden(unittest.TestCase):
             self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
             rows = sc64_parity.judge('t1-move', legacy, regression, {}, {}, parity_decode.Layout())
             self.assertEqual(rows[0]['verdict'], 'REGRESSION')
+
+    def test_reads_join_the_digest_and_recorded_addresses_are_fixed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            for name in 'ab':
+                write_capture(temp / name, marine_frames())
+            _, golden = parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home',
+                                                   parity_decode.Layout())
+            reads = golden['observations'][0]['layout_reads']
+            self.assertTrue({'unit.x', 'unit.y', 'unit.type'} <= set(reads))
+            doc = json.loads(parity_decode.LAYOUT.read_text())
+            doc['clock']['pause_halfword']['address'] = '0x800F0C24'
+            moved = temp / 'moved.json'
+            moved.write_text(json.dumps(doc))
+            with self.assertRaises(parity_decode.LayoutError):   # tap.bin recorded the old address
+                parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home2', parity_decode.Layout(moved))
+            rows = sc64_parity.judge('t1-move', golden, {'move.cruise_speed': 4.0}, {}, {}, parity_decode.Layout(moved))
+            self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
 
     def test_staged_tag_reaches_each_row(self):
         golden = {'tags': ['n64-staged'], 'observations': [

@@ -205,29 +205,6 @@ int main(int argc, char** argv) {
   std::vector<Region> regionList; std::uint32_t regionBytes = 0; unsigned long long regionStride = 1, extraRecords = 0;
   std::vector<std::uint8_t> regionBuffer;
   unsigned long long pokes = 0, pokeBytes = 0, pokeCached = 0;
-  // Output budget (capture_view.h): bytes written to the run directory, the limit and the free
-  // space to leave, from SC64_CAPTURE_BUDGET_BYTES and SC64_CAPTURE_RESERVE_BYTES (capture.py
-  // sets both). A refused write stops the run with exit 10; the capture is then incomplete.
-  auto envBytes = [](const char* name, std::uint64_t fallback) {
-    const char* text = std::getenv(name);
-    return text && sc64_capture_decimal_ok(text) ? std::strtoull(text, nullptr, 10) : fallback;
-  };
-  const std::uint64_t outputBudget = envBytes("SC64_CAPTURE_BUDGET_BYTES", 8ull << 30);
-  const std::uint64_t outputReserve = envBytes("SC64_CAPTURE_RESERVE_BYTES", 5ull << 30);
-  std::uint64_t outputWritten = 0, outputSince = 0, outputAvailable = 0; bool outputMeasured = false, outputStop = false;
-  auto charge = [&](std::uint64_t bytes) -> bool {
-    if(!outputMeasured || outputSince + bytes >= SC64_OUTPUT_CHECK_BYTES) {
-      std::error_code error;
-      auto space = std::filesystem::space(out, error);
-      if(error) { outputStop = true; return false; }
-      outputAvailable = space.available; outputSince = 0; outputMeasured = true;
-    }
-    if(!sc64_capture_budget_ok(outputWritten, bytes, outputBudget, outputAvailable, outputSince, outputReserve)) {
-      outputStop = true; return false;
-    }
-    outputWritten += bytes; outputSince += bytes;
-    return true;
-  };
   // Required logs are checked whether or not they opened; the raw file only once requested.
   auto outputsOk = [&] {
     for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events}) { stream->flush(); if(!*stream) return false; }
@@ -245,6 +222,39 @@ int main(int argc, char** argv) {
 
   long long completed = 0;
   std::vector<std::uint8_t> pollLog;
+  // Output budget (capture_view.h): everything the frontend writes into the run directory counts:
+  // every open log and data stream (by position), the polls log it writes at the end, and the
+  // dumps, states and frames it writes whole. Limits come from SC64_CAPTURE_BUDGET_BYTES and
+  // SC64_CAPTURE_RESERVE_BYTES (capture.py sets both). A refused write stops the run with exit 10.
+  std::uint64_t outputBudget = 8ull << 30, outputReserve = 5ull << 30;
+  for(auto [name, target] : {std::pair{"SC64_CAPTURE_BUDGET_BYTES", &outputBudget}, std::pair{"SC64_CAPTURE_RESERVE_BYTES", &outputReserve}}) {
+    const char* text = std::getenv(name);
+    if(text && !sc64_capture_u64(text, target)) { std::cerr << "invalid " << name << "\n"; return 7; }
+  }
+  std::uint64_t fileBytes = 0, outputMeasuredAt = 0, outputAvailable = 0; bool outputMeasured = false, outputStop = false;
+  std::ofstream* watchStream = nullptr;   // set when watch.csv opens
+  auto outputTotal = [&]() -> std::uint64_t {
+    std::uint64_t total = fileBytes + pollLog.size();
+    for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events, &rawRows, &recFile, &extraFile, watchStream}) {
+      if(!stream || !stream->is_open()) continue;
+      auto at = stream->tellp();
+      if(at > 0) total += (std::uint64_t)at;
+    }
+    return total;
+  };
+  auto charge = [&](std::uint64_t bytes) -> bool {
+    const std::uint64_t written = outputTotal();
+    if(!outputMeasured || written + bytes - outputMeasuredAt >= SC64_OUTPUT_CHECK_BYTES) {
+      std::error_code error;
+      auto space = std::filesystem::space(out, error);
+      if(error) { outputStop = true; return false; }
+      outputAvailable = space.available; outputMeasuredAt = written; outputMeasured = true;
+    }
+    if(!sc64_capture_budget_ok(written, bytes, outputBudget, outputAvailable, written - outputMeasuredAt, outputReserve)) {
+      outputStop = true; return false;
+    }
+    return true;
+  };
   std::vector<std::uint8_t> full(SC64_CAPTURE_RAM), table(SC64_UNIT_TABLE_BYTES), rows, previousRows, rawTable(SC64_UNIT_TABLE_BYTES);
   long long every = 0;
   // Tap state: 0 off, 1 on tick change plus one follow-up step, 2 every step.
@@ -502,6 +512,8 @@ int main(int argc, char** argv) {
       if(rendererFailed()) { std::cerr << "renderer failure: " << p.failure << "\n"; return 6; }
       std::cerr << "verify failure\n"; return 8;
     }
+    // Logs grow every step (ticks.csv under `tap step`, watch.csv, polls): check them too.
+    if(!outputStop && completed % 64 == 0) charge(0);
     if(outputStop) { std::cerr << "output budget or free-space reserve reached; the capture is incomplete\n"; return 10; }
     if(!watchStep()) return 8;
     if(every && completed % every == 0 && checkpoint().empty()) return 8;
@@ -599,6 +611,7 @@ int main(int argc, char** argv) {
       if(!guest_view(0, full.size(), full.data(), nullptr)) return 8;
       if(!charge(full.size())) { std::cerr << "output budget or free-space reserve reached\n"; return 10; }
       std::ofstream file(out / name, std::ios::binary); file.write(reinterpret_cast<const char*>(full.data()), (std::streamsize)full.size());
+      fileBytes += full.size();
       file.close(); if(!file) return 5;
       std::cout << "DUMP " << completed << ' ' << name << ' ' << sha256(full.data(), full.size()) << std::endl; continue;
     }
@@ -612,6 +625,7 @@ int main(int argc, char** argv) {
       if(!watchLog.is_open()) {
         if(std::filesystem::exists(out / "watch.csv")) return 7;   // never overwrite, e.g. a dump of that name
         watchLog.open(out / "watch.csv"); watchLog << "step,tick,address,bytes,value\n";
+        watchStream = &watchLog;
       }
       if(!watchLog) { std::cerr << "output open failure: watch.csv\n"; return 5; }
       Watch w; w.address = address; w.bytes = bytes; watches.push_back(w);
@@ -707,6 +721,7 @@ int main(int argc, char** argv) {
       auto state = root->serialize(true);
       if(!state) return 8;
       if(!charge(state.size())) { std::cerr << "output budget or free-space reserve reached\n"; return 10; }
+      fileBytes += state.size();
       std::ofstream file(out / name, std::ios::binary);
       file.write(reinterpret_cast<const char*>(state.data()), (std::streamsize)state.size());
       file.close(); if(!file) { std::cerr << "state write failure\n"; return 5; }
@@ -853,6 +868,7 @@ int main(int argc, char** argv) {
       std::unique_lock lock(p.mutex);
       p.cv.wait_for(lock, std::chrono::seconds(5), [&] { return p.failed || p.haveFrame; });
       if(p.haveFrame && !charge(p.pixels.size() * 4)) { std::cerr << "output budget or free-space reserve reached\n"; return 10; }
+      if(p.haveFrame) fileBytes += p.pixels.size() * 4;
       if(p.haveFrame) {
         std::ofstream frame(out / (pendingShot + ".argb"), std::ios::binary);
         frame.write(reinterpret_cast<const char*>(p.pixels.data()), (std::streamsize)(p.pixels.size() * 4));
@@ -882,7 +898,7 @@ int main(int argc, char** argv) {
          << " verify_count=" << verifyCount << " verify_failures=" << verifyFailures << " verify_view_differ=" << verifyViewDiffer << '\n';
   status << "pokes=" << pokes << " poke_bytes=" << pokeBytes << " poke_cached=" << pokeCached
          << " extra_records=" << extraRecords << " extra_regions=" << regionList.size()
-         << " output_written=" << outputWritten << " output_budget=" << outputBudget << " output_stopped=" << outputStop << '\n';
+         << " output_written=" << outputTotal() << " output_budget=" << outputBudget << '\n';
   status.close(); pollFile.close();
   if(!outputsOk() || !status || !pollFile) { std::cerr << "output write failure\n"; return 5; }
   for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events}) { stream->close(); if(!*stream) return 5; }
