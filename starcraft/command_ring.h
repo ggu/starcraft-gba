@@ -94,11 +94,11 @@ ring_execute(RingSlot e)
 {
     switch (e.kind) {
     case RING_MOVE:
-        issue_order(ORDER_MOVE, cx, cy);
+        SC64_PLAYER_ORDER(ORDER_MOVE, cx, cy);
         toast(0);
         break;
     case RING_ATTACK:
-        issue_order(ORDER_ATTACK_MOVE, cx, cy);
+        SC64_PLAYER_ORDER(ORDER_ATTACK_MOVE, cx, cy);
         toast(0);
         break;
     case RING_STOP:

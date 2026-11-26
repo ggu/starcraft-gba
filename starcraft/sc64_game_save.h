@@ -14,6 +14,10 @@ save_game(void)
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) return 0;
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    /* The save goes ahead: no save holds a delayed player command. */
+    sc64_command_delay_flush();
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_Q8_FLASH_ARM_PROBE
     if(!gba_flash_game_transaction_begin())return 0;
@@ -115,7 +119,7 @@ load_game(void)
 #ifdef SC64_TEXT_BOXES
     if (loaded) sc64_text_box_reset();
 #endif
-    if (loaded) { sc64_walk_reset_all(); game_audio_prime(); }
+    if (loaded) { sc64_walk_reset_all(); game_audio_prime(); sc64_command_delay_reset(); }
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
@@ -292,6 +296,9 @@ raw_game_save_apply(int apply)
     update_exploration();
     toast(0);
     game_audio_prime();
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_reset(); /* pending commands belonged to the old world */
+#endif
     return 1;
 #endif
 }

@@ -784,6 +784,7 @@ race_campaign_init(void)
     supply_used = 0;
     supply_cap = 0;
     frame = 0;
+    sc64_command_delay_reset();
     mode = MODE_NORMAL;
     menu = 0; menu_open = 0; menu_cursor = 0; help = 0;
     won = lost = 0;
