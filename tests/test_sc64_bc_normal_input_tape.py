@@ -14,8 +14,8 @@ def witness():
     return {'profile':'unified-race-skirmish','events':[
         {'kind':'input','host_tick':1,'frame':0,'held':128,'pressed':128},
         {'kind':'input','host_tick':2,'frame':0,'held':0,'pressed':0},
-        {'kind':'start','host_tick':20,'frame':1,'map':1,'human_race':0,'bots':[{'owner':1,'race':1}]},
-        {'kind':'result','result':'impact','host_tick':17937,'frame':17658,'won':0,'lost':0,'saved_flight':1}]}
+        {'kind':'start','host_tick':24,'frame':1,'map':1,'human_race':0,'bots':[{'owner':1,'race':1}]},
+        {'kind':'result','result':'impact','host_tick':23064,'frame':22787,'won':0,'lost':0,'saved_flight':1}]}
 
 class TapeTest(unittest.TestCase):
     def test_valid_witness(self):
@@ -24,10 +24,10 @@ class TapeTest(unittest.TestCase):
         cases=[]
         for event,key,value in [(0,'held',1024),(0,'pressed',0),(1,'host_tick',1),(1,'frame',-1),
                                 (2,'map',0),(2,'human_race',False),(3,'won',True),
-                                (3,'result','flight'),(3,'host_tick',17936),(3,'saved_flight',0)]:
+                                (3,'result','flight'),(3,'host_tick',23063),(3,'saved_flight',0)]:
             x=witness();x['events'][event][key]=value;cases.append(x)
         x=witness();x['events'].pop();cases.append(x)
-        x=witness();x['events'].insert(3,{'kind':'mystery','host_tick':21,'frame':2});cases.append(x)
+        x=witness();x['events'].insert(3,{'kind':'mystery','host_tick':25,'frame':2});cases.append(x)
         x=witness();x['events'].insert(2,copy.deepcopy(x['events'][1]));cases.append(x)
         for item in cases:
             with self.subTest(item=item),self.assertRaises(ValueError):tape.convert(item)
