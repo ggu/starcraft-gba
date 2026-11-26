@@ -616,6 +616,20 @@ class LabMeasureTest(unittest.TestCase):
         m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
         self.assertEqual(sorted(m['victims']), ['2', '4.1'])
 
+    def test_a_gba_type_change_is_a_removal(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 35) if t <= sf]) for sf in range(0, 80)}
+        other = {sf: 100.0 for sf in range(0, 80)}   # a Zealot whose slot a Probe takes at 28
+        series = walk(pos, hp={1: marine, 2: ling, 3: other},
+                      others=[(2, metrics.ZERGLING, 4, 150, 100), (3, 65, 4, 900, 100)])
+        for frame in series['frames']:
+            if frame['sf'] >= 28:
+                frame['units'][3] = (64, 4, 900, 100)
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [15])   # N64: a morph
+        series['source'] = 'gba'   # the GBA can kill and reuse a slot in one step: a removal
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
+
     def test_a_replaced_subject_is_not_the_subject(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: (40.0 if sf < 30 else 60.0) for sf in range(0, 80)}   # row 1 becomes an SCV at 30

@@ -810,13 +810,18 @@ def unit_lifetimes(series, t0, keep):
     Keys are strings ("ROW", then "ROW.N"), except the subject's first lifetime, which keeps
     `keep`. series['lifetime_end'] says why a lifetime ended early: 'changed' when the row went
     on in place as another unit (a hatch or an owner change: not a death), 'reborn' when a GBA
-    birth record reused the slot (the old unit was removed: a death)."""
+    birth record reused the slot (the old unit was removed: a death).
+
+    On the GBA a unit can die and its slot be reused inside one engine step, which the trace
+    shows only as a type change, so there every in-place change of another row is 'reborn'.
+    The N64 cannot: a dying row keeps 0 hit points for frames before its slot is freed."""
     births = {}
     for ev in series.get('events', []):
         if ev[0] == '+U':   # GBA: a unit born in this slot at this step
             births.setdefault((ev[1] or 0) * 4 // 5, set()).add(ev[2])
     frames, life, last, ended = [], {}, {}, {}
     previous = set()
+    gba = series.get('source') == 'gba'
     name = lambda vid, n: (keep if n == 0 else f'{vid}.{n}') if vid == keep else (str(vid) if n == 0 else f'{vid}.{n}')
     for frame in series['frames']:
         if frame['sf'] < t0:
@@ -826,7 +831,8 @@ def unit_lifetimes(series, t0, keep):
         for vid, unit in frame['units'].items():
             ident = (unit[0], unit[1], etype.get(vid))
             if vid in last:
-                reborn = vid in previous and vid in births.get(frame['sf'], ())
+                reborn = vid in previous and (vid in births.get(frame['sf'], ()) or
+                                              (gba and vid != keep and last[vid] != ident))
                 changed = vid in previous and last[vid] != ident and not reborn
                 if changed or reborn or vid not in previous:
                     if changed or reborn:
