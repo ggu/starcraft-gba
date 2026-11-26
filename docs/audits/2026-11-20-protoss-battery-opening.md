@@ -98,6 +98,37 @@ images from the typed-decoder release. The combined campaign receipt
 SHA-256 is
 `f4b29d56fbf895d1e51a2bb09206a50b252a70d46352b9f697f9aac513ceb340`.
 
+## HOST trial for the third Gateway
+
+Both unmodified Gateway openings first show a third Gateway after the
+Battery completes, at native frames 5,762 and 5,764. Each has 17
+completed Probes and four completed Zealots. The first Assimilator
+appears at 6,407 and 6,197, while the Gateway is still warping in.
+
+The HOST-only `SC64_PROTOSS_THIRD_GATEWAY_PROBE` reuses paid placement
+in the intact one-Nexus Battery opening. It waits for the Battery to
+finish, then resumes the normal gas plan when the third Gateway
+foundation exists. The existing opening deadline and armed-air and
+economy fallbacks remain available. The separate Cannon branch is
+outside this trial.
+
+| Observation | Solo HOST | Mixed HOST |
+| --- | ---: | ---: |
+| Completed Battery | 5,729 | 5,714 |
+| Paid, powered third Gateway | 6,743 | 6,238 |
+| Assimilator foundation during Gateway warp | 6,779 | 6,302 |
+| Cybernetics Core foundation | 6,896 | 6,430 |
+
+Both cases have 15 Probes at placement. The third Gateway and gas
+still begin before the converted native windows. Both saves at frame
+5,251 reload with the same state and reproduce the uninterrupted run
+through 8,251. The first-wave, other-map, mixed Bunker and Sunken checks
+also pass. Normal builds leave the probe disabled. Ordinary ARM and
+hardware checks remain open.
+
+The eight-case sanitizer receipt at source `1f3106dd` has SHA-256
+`dcaf1a3c8f846c18a83dc0f0be4c14b148083deb63c94eb03d1e06b76cb725cb`.
+
 ## Regression cases
 
 With the prepared inputs, build `build/test-sc64-skirmish-ai-progress-terran`

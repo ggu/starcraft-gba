@@ -137,6 +137,37 @@ The new census SHA-256 is
 `841841ee5e3ec0fe02118ca7e1f3b1b25c9efe6aeead03b185f4663d1c23c049`.
 Pair more clean starts across seats before selecting the GBA opening.
 
+#### Unmodified solo Protoss repeat
+
+The authenticated USA ROM resumed a saved solo Protoss Blood Bath
+lobby in ares. Start launched the match and the controller stayed
+neutral for all 91 samples through frame 8,026. No guest edits or
+fast-forward were used in this run. The human Terran is owner 1 and
+Protoss is owner 2. The last sample still registers the human
+Command Center.
+
+| Event for Protoss owner 2 | Native game frames |
+| --- | ---: |
+| Second Nexus placed | (2,278, 2,365] |
+| First Pylon placed | (2,452, 2,531] |
+| Forge placed | (4,072, 4,159] |
+| First Cannon placed | (4,940, 5,032] |
+| First complete Cannons | (5,753, 5,846] |
+| First Gateway placed | (7,538, 7,637] |
+
+The first Cannon sample has two Cannon foundations, a complete
+Forge, two complete Nexuses and Pylons, and 14 complete Probes
+with one in production. The first Gateway sample has six complete
+Cannons and two in progress. Gas and a Battery are absent through
+frame 8,026. The earlier clean solo Protoss run opened with Gateways
+and a Battery. An adjustment to that opening needs evidence of the
+actual Battery in play before it changes the tech sequence.
+
+The lobby state SHA-256 is
+`28e5069157b9de97afc15fe0566c8acfe5bb2f76898928e731cf7785c1c23ebc`.
+The census SHA-256 is
+`e0b8132ad129d654916d0b11cdc2987703fdd33a234dd884b5d7edc3aff07c3f`.
+
 ### First offensive
 
 A wave starts at the first sample with six or more army units more than 640
