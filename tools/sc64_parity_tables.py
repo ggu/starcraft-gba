@@ -27,7 +27,8 @@ compared in source frames: engine ticks scaled by (x*5+3)/4 are inverted.
 
 Output goes to $SC64_PARITY_HOME (default: .local/parity in the main
 checkout), never to a tracked path. Every entry is tagged provenance rom-table.
-Per-mission CHK censuses and iscript sequences are not covered yet.
+Per-mission CHK opening censuses, iscript sequences and sound ids are not
+covered here; tools/sc64_parity_content.py reports them (make parity-l0 runs both).
 """
 from __future__ import annotations
 
@@ -937,7 +938,8 @@ def report_lines(result: dict) -> list[str]:
     lines.append(f"== speed not comparable from flingy.dat (iscript mover or engine-immobile, not counted): {len(result['iscript_speed'])}")
     for d in result['iscript_speed']:
         lines.append(f"units.stock  {d['row']:>3} {d['name']:<38} top_speed_q10 flingy={d['rom']} engine={d['engine']} ({d['note']})")
-    lines.append('== not covered: per-mission CHK opening censuses and iscript sequences (not implemented)')
+    lines.append('== not covered here: per-mission CHK opening censuses, iscript sequences and sound ids '
+                 '(tools/sc64_parity_content.py, make parity-content)')
     lines.append('== summary: ' + ', '.join(f'{k} {v}' for k, v in result['counts'].items()))
     return lines
 
@@ -999,6 +1001,7 @@ def run(args) -> int:
                           'shields gated by shield-enable', 'speed = flingy top speed * 4 (Q10)',
                           'times in source frames; engine ticks inverted from (x*5+3)/4'],
         'not_covered': ['per-mission CHK opening censuses', 'iscript animation and sound sequences'],
+        'covered_by': 'tools/sc64_parity_content.py',
         **result,
     }
     for name in engine['profiles']:
