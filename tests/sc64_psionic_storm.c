@@ -12,7 +12,7 @@ int main(void)
     u32 t;
 
     assert(SC64_STORM_TECH_ID == 19 && SC64_STORM_WEAPON_ID == 84);
-    assert(SC64_STORM_ENERGY_COST == 75 && SC64_STORM_DAMAGE_PER_PULSE == 14);
+    assert(SC64_STORM_ENERGY_COST == 75 && SC64_STORM_DAMAGE_PER_PULSE == 16);
     assert(SC64_STORM_RADIUS_SOURCE_PX == 48 && SC64_STORM_RADIUS_GBA_PX == 24);
     assert(SC64_STORM_CAST_RANGE_SOURCE_PX == 288 && SC64_STORM_CAST_RANGE_GBA_PX == 144);
     assert(sc64_psionic_storm_target_class(1, 0) ==
@@ -52,14 +52,15 @@ int main(void)
     hp = 100 * 256; shields = 20 * 256; storm_hit_tick = 0;
     assert(sc64_psionic_storm_apply_hit(sc64_psionic_storm_target_class(0, 0),
                                         0, &storm_hit_tick, &hp, &shields));
-    assert(shields == 6 * 256 && hp == 100 * 256);
+    assert(shields == (20 - SC64_STORM_DAMAGE_PER_PULSE) * 256 && hp == 100 * 256);
     assert(!sc64_psionic_storm_apply_hit(sc64_psionic_storm_target_class(0, 0),
                                          0, &storm_hit_tick, &hp, &shields));
-    assert(shields == 6 * 256 && hp == 100 * 256);
+    assert(shields == (20 - SC64_STORM_DAMAGE_PER_PULSE) * 256 && hp == 100 * 256);
     storm_hit_tick = 0;
     assert(sc64_psionic_storm_apply_hit(sc64_psionic_storm_target_class(1, 0),
                                         0, &storm_hit_tick, &hp, &shields));
-    assert(shields == 0 && hp == 92 * 256);
+    /* The remaining shields absorb part of the second pulse. */
+    assert(shields == 0 && hp == (120 - 2 * SC64_STORM_DAMAGE_PER_PULSE) * 256);
     storm_hit_tick = 0;
     assert(!sc64_psionic_storm_apply_hit(sc64_psionic_storm_target_class(1, 1),
                                          0, &storm_hit_tick, &hp, &shields));

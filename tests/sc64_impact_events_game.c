@@ -576,8 +576,9 @@ int main(int argc, char **argv)
         int z = add_unit(SIDE, U_ZEALOT, 100, 100);
         assert(u[z].hp == 80 && u[z].maxhp == 80 && u[z].shield == 80);
         assert(sc64_actor_max_shields(U_ZEALOT, 0) == 80);
-        assert(sc64_stock_unit_profile(65)->hp == 100);
-        assert(sc64_stock_unit_profile(65)->shields == 60);
+        /* The stock row now holds the N64 values too. */
+        assert(sc64_stock_unit_profile(65)->hp == 80);
+        assert(sc64_stock_unit_profile(65)->shields == 80);
 #if !defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
         /* Raw legacy rows must fail preflight before any world mutation. */
         RaceLoadPlan plan = {0};

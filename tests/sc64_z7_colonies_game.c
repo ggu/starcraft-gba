@@ -269,7 +269,8 @@ static void test_paid_in_place_morph_and_roundtrip(int damage_mode)
     assert(sc64_race_building_armor(b[colony].type) ==
            sc64_race_building_armor(B_SUNKEN_COLONY));
     hit_target(MAX_UNITS + colony, 10, U_MARINE, ENEMY);
-    assert(b[colony].hp == sunken_hp - 8 && b[colony].shield == 0);
+    assert(b[colony].hp == sunken_hp - (10 - sc64_race_building_armor(B_SUNKEN_COLONY)) &&
+           b[colony].shield == 0);
     assert(minerals == before - 50);
 }
 

@@ -492,14 +492,14 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_OVERLORD]  = { R_ZERG, SC_RACE_F_LARVA | SC_RACE_F_PROVIDES_SUPPLY, B_HATCHERY, 0, 100, 0, 600, 200, 0, 0 },
     [U_PROBE]     = { R_PROTOSS, SC_RACE_F_WORKER, B_NEXUS, 2, 50, 0, 300, 20, 20, 0 },
     [U_ZEALOT]    = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 100, 0, 600, 80, 80, SC_PR_GATEWAY },
-    [U_DRAGOON]   = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 125, 50, 750, 100, 80, SC_PR_CYBERNETICS_CORE },
-    [U_SCOUT]     = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 6, 275, 125, 1200, 150, 100, 0 },
+    [U_DRAGOON]   = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 125, 50, 600, 100, 80, SC_PR_CYBERNETICS_CORE },
+    [U_SCOUT]     = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 6, 300, 150, 1200, 150, 100, 0 },
     [U_TASSADAR]  = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 100, 300, 1500, 80, 300, 0 },
     [U_FENIX]     = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 200, 0, 1200, 240, 240, 0 },
     /* Mission powerup only: the source's 1/1/1 sentinel costs are not a
        production offer, so keep the authored zero-cost, nonproducer policy. */
     [U_CHRYSALIS] = { R_ZERG, 0, B_HATCHERY, 0, 0, 0, 0, 800, 0, 0 },
-    [U_QUEEN]     = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 100, 100, 750, 120, 0, SC_PR_SPAWNING_POOL },
+    [U_QUEEN]     = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 100, 150, 750, 120, 0, SC_PR_SPAWNING_POOL },
     [U_GOLIATH]   = { R_TER, 0, B_FACTORY, 4, 100, 50, 600, 125, 0, 0 },
     [U_TANK]      = { R_TER, 0, B_FACTORY, 4, 150, 100, 750, 150, 0, 0 },
     [U_WRAITH]    = { R_TER, 0, B_STARPORT, 4, 150, 100, 900, 120, 0, 0 },
@@ -556,9 +556,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     , [U_SCIENCE_VESSEL] = { R_TER, 0, 255, 4, 100, 225, 1200, 200, 0, 0 }
-    , [U_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
+    , [U_BATTLECRUISER] = { R_TER, 0, 255, 16, 400, 300, 2400, 500, 0, 0 }
     , [U_NORAD_II] = { R_TER, 0, 255, 0, 800, 600, 4800, 700, 0, 0 }
-    , [U_ULTRALISK] = { R_ZERG, 0, 255, 8, 200, 200, 900, 400, 0, 0 }
+    , [U_ULTRALISK] = { R_ZERG, 0, 255, 12, 200, 200, 900, 400, 0, 0 }
     , [U_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 4, 200, 0, 900, 80, 60, 0 }
     , [U_PSI_EMITTER] = { R_TER, 0, 255, 0, 1, 1, 1, 800, 0, 0 }
 #endif
@@ -588,7 +588,7 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #ifdef SC64_P5_ACTORS
     , [U_P5_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 4, 200, 0, 900, 80, 60, 0 }
-    , [U_P5_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
+    , [U_P5_BATTLECRUISER] = { R_TER, 0, 255, 16, 400, 300, 2400, 500, 0, 0 }
 #endif
 #ifdef SC64_P8_DATA_ENABLED
     , [U_P8_HYPERION] = { R_TER, 0, 255, 0, 0, 0, 0, 850, 0, 0 }
@@ -615,11 +615,11 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
        costs/vitals while the impossible producer sentinel blocks training. */
     , [U_P7_ARCHON] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 0, 0, 300, 10, 350, 0 }
     , [U_P7_ARBITER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 100, 350, 2400, 200, 150, 0 }
-    , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 12, 350, 250, 2100, 300, 150, 0 }
+    , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 16, 350, 250, 2100, 300, 150, 0 }
     , [U_P7_OBSERVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 2, 25, 75, 600, 40, 20, 0 }
 #endif
 #ifdef SC64_TERRAN_CARRIER_PROBE
-    , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 12, 350, 250, 2100, 300, 150, 0 }
+    , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 16, 350, 250, 2100, 300, 150, 0 }
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     /* Egg stats are raw36; product cost, supply and duration live on its
@@ -639,7 +639,7 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #ifndef SC64_TERRAN_LATE_ACTORS
     , [U_SK_SCIENCE_VESSEL] = { R_TER, 0, B_STARPORT, 4, 100, 225, 1200, 200, 0, 0 }
 #ifndef SC64_P5_ACTORS
-    , [U_SK_BATTLECRUISER] = { R_TER, 0, B_STARPORT, 12, 400, 300, 2000, 500, 0, 0 }
+    , [U_SK_BATTLECRUISER] = { R_TER, 0, B_STARPORT, 16, 400, 300, 2400, 500, 0, 0 }
 #endif
 #endif
 #ifndef SC64_Z6_ACTORS
@@ -651,14 +651,14 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #ifndef SC64_P6_ACTORS
     , [U_SK_INFESTED_TERRAN] = { R_ZERG, 0, B_INFESTED_COMMAND, 2, 100, 50, 600, 60, 0, 0 }
 #endif
-    , [U_SK_VALKYRIE] = { R_TER, 0, B_STARPORT, 6, 250, 125, 750, 200, 0, 0 }
+    , [U_SK_VALKYRIE] = { R_TER, 0, B_STARPORT, 6, 250, 125, 900, 200, 0, 0 }
 #ifndef SC64_ZP_CAMPAIGN_ACTORS
     , [U_SK_HIGH_TEMPLAR] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 50, 150, 750, 40, 40, 0 }
 #endif
     , [U_SK_DARK_TEMPLAR] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 4, 125, 100, 750, 80, 40, 0 }
 #ifndef SC64_P7_ACTORS
     , [U_SK_OBSERVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 2, 25, 75, 600, 40, 20, 0 }
-    , [U_SK_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 12, 350, 250, 2100, 300, 150, 0 }
+    , [U_SK_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 16, 350, 250, 2100, 300, 150, 0 }
     , [U_SK_ARBITER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 8, 100, 350, 2400, 200, 150, 0 }
     , [U_SK_ARCHON] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 0, 0, 300, 10, 350, 0 }
 #endif
@@ -669,7 +669,7 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
-    , [U_SHARED_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
+    , [U_SHARED_BATTLECRUISER] = { R_TER, 0, 255, 16, 400, 300, 2400, 500, 0, 0 }
 #endif
 #if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
     , [U_SHARED_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 4, 200, 0, 900, 80, 60, 0 }
@@ -698,13 +698,13 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_BARRACKS] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_SCV, 0, 150, 0, 1200, 1000, SC_PR_DEPOT },
     [B_DEPOT] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PROVIDES_SUPPLY, U_SCV, 16, 100, 0, 600, 500, 0 },
     [B_REFINERY] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 100, 0, 600, 750, 0 },
-    [B_ACADEMY] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 150, 0, 1200, 600, 0 },
+    [B_ACADEMY] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 200, 0, 1200, 600, 0 },
     [B_ENG_BAY] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 125, 0, 900, 850, 0 },
     [B_BUNKER] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 100, 0, 450, 350, 0 },
     /* Scenario building with no stock whatBuilds producer; retain no-cost UI. */
     [B_INFESTED_COMMAND] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 1500, 0 },
     [B_HATCHERY] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 2, 300, 0, 1800, 1250, 0 },
-    [B_SPAWNING_POOL] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 200, 0, 1200, 750, SC_PR_HATCHERY },
+    [B_SPAWNING_POOL] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 150, 0, 1200, 750, SC_PR_HATCHERY },
     [B_HYDRALISK_DEN] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 100, 50, 600, 850, SC_PR_SPAWNING_POOL },
     [B_EVOLUTION_CHAMBER] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 75, 0, 600, 750, SC_PR_HATCHERY },
     [B_EXTRACTOR] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 50, 0, 600, 750, SC_PR_HATCHERY },
@@ -734,7 +734,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
         0
 #endif
     },
-    [B_MISSILE_TURRET] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 75, 0, 450, 200, 0 },
+    [B_MISSILE_TURRET] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 100, 0, 450, 200, 0 },
     [B_SPORE_COLONY] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 50, 0, 300, 400, SC_PR_HATCHERY },
     /* Legacy u16 fallback; sc64_race_building_max_hp returns stock 100000. */
     [B_ZERG_BEACON] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 250, 0, 0, 10000, 0 },
@@ -788,7 +788,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_ROBOTICS_SUPPORT_BAY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS, 255, 0, 150, 100, 450, 450, 0 }
     , [B_SHIELD_BATTERY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS, 255, 0, 100, 0, 450, 200, 0 }
     , [B_SPECIAL_ION_CANNON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 200, 0, 900, 2000, 0 }
-    , [B_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 200, 1200, 850, 0 }
     , [B_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #elif defined(SC64_P8_DATA_ENABLED)
     , [B_STASIS_CELL_PRISON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 0, 1, 2000, 0 }
@@ -874,7 +874,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SK_ARBITER_TRIBUNAL] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 200, 150, 900, 500, 0 }
 #endif
 #ifndef SC64_TERRAN_LATE_ACTORS
-    , [B_SK_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_SK_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 200, 1200, 850, 0 }
     , [B_SK_NUCLEAR_SILO] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 100, 1200, 600, 0 }
     , [B_SK_COVERT_OPS] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 750, 0 }
     , [B_SK_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
@@ -882,7 +882,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
 #endif
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
-    , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 200, 1200, 850, 0 }
     , [B_SHARED_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #endif
 #ifdef SC64_NUKE_FALLBACK_ADDONS
@@ -890,7 +890,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SHARED_COVERT_OPS] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 750, 0 }
 #endif
 #ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
-    , [B_NUKE_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_NUKE_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 200, 1200, 850, 0 }
 #endif
 };
 
@@ -1923,8 +1923,9 @@ static inline int sc64_race_building_armor(int type)
 #endif
     switch (type) {
     case B_CREEP_COLONY: case B_SPORE_COLONY: case B_PYLON:
-    case B_PHOTON_CANNON: case B_MISSILE_TURRET: case B_ZERG_BEACON: return 0;
-    case B_SUNKEN_COLONY: return 2;
+    /* StarCraft 64's units.dat gives the Sunken Colony no armour. */
+    case B_PHOTON_CANNON: case B_MISSILE_TURRET: case B_ZERG_BEACON:
+    case B_SUNKEN_COLONY: return 0;
     case B_COMMAND: case B_BARRACKS: case B_DEPOT: case B_REFINERY:
     case B_ACADEMY: case B_ENG_BAY: case B_BUNKER: case B_HATCHERY:
     case B_INFESTED_COMMAND: case B_SPAWNING_POOL: case B_HYDRALISK_DEN:
@@ -1946,6 +1947,18 @@ static inline int sc64_race_building_armor(int type)
 #endif
 #ifdef SC64_NUKE_FALLBACK_SCIENCE_FACILITY
     case B_NUKE_SCIENCE_FACILITY: return 1;
+#endif
+#if defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_SK_SCIENCE_FACILITY: case B_SK_PHYSICS_LAB: case B_SK_DEFILER_MOUND: return 1;
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_SHARED_SCIENCE_FACILITY: case B_SHARED_PHYSICS_LAB: return 1;
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_P9_DEFILER_MOUND: return 1;
+#endif
+#if defined(SC64_P8_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_STASIS_CELL_PRISON: return 1;
 #endif
     default: return 0;
     }

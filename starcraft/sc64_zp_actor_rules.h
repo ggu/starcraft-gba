@@ -112,7 +112,7 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 #endif
 #ifdef SC64_P5_ACTORS
     static const Sc64ZpActorFact battlecruiser = {
-        12,500,0,3,400,300,2000,352, 37,29,37,29,1,2,
+        12,500,0,3,400,300,2400,352, 37,29,37,29,1,2,
         25,3,30,192,1, 25,3,30,192,1,
         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|
@@ -122,7 +122,7 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
     static const Sc64ZpActorFact shared_battlecruiser = {
-        12,500,0,3,400,300,2000,352, 37,29,37,29,1,2,
+        12,500,0,3,400,300,2400,352, 37,29,37,29,1,2,
         25,3,30,192,1, 25,3,30,192,1,
         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|
