@@ -78,6 +78,14 @@ def gba_series(trace_path):
     (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
     [(sf, cell, visible, explored)]}, cells col + row * cols)."""
     units, hp, shield, etype, banks, frames = {}, {}, {}, {}, {}, []
+    buildings = {}   # slot -> (owner, x, y in N64 px, hp, shields, max hp, engine type, cartridge type
+    #                  or -1, under construction), for the labs' enemy checks
+    # Every removal with the actor's last owner, position and hit points, read before its row is
+    # dropped: a unit or building born and removed inside one source frame never shows in frames.
+    removals = []    # (kind 'U' or 'B', step, slot, owner, x, y, hp at removal, max hp or None, last row's hp,
+    #                  cartridge type (-1 when the row has none), engine type, step of the last row or None,
+    #                  under construction at the last row or None)
+    building_step = {}   # slot -> step of its last building row
     orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
     keyframe = {}
     # Births and building rows with engine type ids, for the passive train and build lab
@@ -90,7 +98,7 @@ def gba_series(trace_path):
             return
         sf = step * 4 // 5
         frame = {'sf': sf, 'step': step, 'units': dict(units), 'hp': dict(hp), 'shield': dict(shield),
-                 'etype': dict(etype),
+                 'etype': dict(etype), 'buildings': dict(buildings),
                  'banks': {o: (v, None) for o, v in banks.items()}}
         if frames and frames[-1]['sf'] == sf:
             frames[-1] = frame
@@ -127,13 +135,29 @@ def gba_series(trace_path):
                 shield[slot] = float(max(0, int(words[10])))
                 etype[slot] = int(words[2])   # engine type: the runner's unit_raw map gives its cartridge id
             elif tag == '-U':
+                gone = units.get(int(words[1]))
+                if gone is not None:
+                    removals.append(('U', step, int(words[1]), gone[1], gone[2], gone[3], int(words[4]), None,
+                                     hp.get(int(words[1])), gone[0], int(words[2]), None, None))
                 units.pop(int(words[1]), None)
                 hp.pop(int(words[1]), None)
                 shield.pop(int(words[1]), None)
                 etype.pop(int(words[1]), None)
             elif tag in ('+U', '+B', '-B'):
                 events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
+                if tag == '-B':
+                    gone = buildings.pop(int(words[1]), None)
+                    if gone is not None:
+                        removals.append(('B', step, int(words[1]), gone[0], gone[1], gone[2],
+                                         int(words[4]) if len(words) > 4 else gone[3], gone[5], gone[3],
+                                         gone[7], int(words[2]), building_step.get(int(words[1])), gone[8]))
             elif tag == 'B':
+                raw_owner = int(words[5])
+                building_step[int(words[1])] = step
+                buildings[int(words[1])] = (raw_owner if raw_owner >= 0 else int(words[4]),
+                                            2 * int(words[6]), 2 * int(words[7]),
+                                            int(words[8]), max(0, int(words[10])), int(words[9]),
+                                            int(words[2]), int(words[3]), int(words[11]))
                 # slot, engine type, owner, under construction, queue count, queue progress, queue head
                 events.append(('B', step, int(words[1]), int(words[2]), int(words[4]), int(words[11]),
                                int(words[14]), int(words[15]), int(words[16])))
@@ -157,7 +181,7 @@ def gba_series(trace_path):
     if not complete:
         raise ValueError(f'{trace_path}: incomplete trace (no clean Z line)')
     return {'source': 'gba', 'scale': 2, 'frames': frames, 'orders': orders, 'walks': walks, 'fog': fog,
-            'events': events}
+            'events': events, 'removals': removals}
 
 
 def gba_command(scenario_id, golden, trace):
@@ -234,6 +258,12 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                  'provenance': '-', 'gating': False, 'n_runs': 0, 'tolerance': '-',
                  'verdict': 'REPORT' if allow_stale else 'STALE-GOLDEN', 'stale': True,
                  'why': 'the golden has no observations; ' + STALE_WHY}]
+    if metrics.SCENARIOS.get(scenario_id, {}).get('require_gating') and \
+            not any(obs['gating'] for obs in golden['observations']):
+        # A lab whose golden holds report-only rows would pass without checking parity.
+        return [{'key': f'{scenario_id}:golden:-', 'check': 'golden', 'subject': '-', 'n64': None, 'gba': None,
+                 'provenance': '-', 'gating': True, 'n_runs': 0, 'tolerance': '-', 'verdict': 'REGRESSION',
+                 'why': 'the golden has no gating check; re-record the lab'}]
     for obs in golden['observations']:
         gating = obs['gating']
         # A scenario with several subjects per check keys its values by (check, subject).
@@ -276,7 +306,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['why'] = 'recorded on the GBA only; the N64 capture has no such event'
             rows.append(row)
             continue
-        if obs['value'] and value != metrics.ABSENT:
+        if obs['value'] and value not in metrics.MARKERS:
             row['ratio'] = round(value / obs['value'], 3)
         gap = outside(value, obs['lo'], obs['hi'])
         known = baseline.get(key)
@@ -287,11 +317,17 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         elif known is None:
             row['verdict'] = 'REGRESSION'
             row['why'] = 'outside the band and not in the baseline'
-        elif (value == metrics.ABSENT) != (known['gba'] == metrics.ABSENT):
-            # An event the GBA now produces, or no longer produces, is never the known gap.
+        elif (value in metrics.MARKERS or known['gba'] in metrics.MARKERS) and value != known['gba']:
+            # An event the GBA now produces, or no longer produces, is never the known gap, and
+            # neither is a fight with other enemies where the baseline recorded none (or the reverse).
             row['verdict'] = 'REGRESSION'
-            row['why'] = ('the event is absent on the GBA; the baseline holds a measurement' if value == metrics.ABSENT
-                          else 'the baseline records the event as absent on the GBA; it is now measured outside the band')
+            row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' +
+                          ('a fight with other enemies' if known['gba'] == metrics.OFF_TARGET else 'a measurement'),
+                          metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' +
+                          ('no fight' if known['gba'] == metrics.ABSENT else 'a measurement')}.get(
+                value, 'the baseline records the event as ' +
+                ('absent' if known['gba'] == metrics.ABSENT else 'a fight with other enemies') +
+                ' on the GBA; it is now measured outside the band')
         else:
             was = outside(known['gba'], obs['lo'], obs['hi'])
             slack = max((obs['hi'] - obs['lo']) / 2, 1e-9)
@@ -456,6 +492,8 @@ def fmt(v):
         return '-'
     if v == metrics.ABSENT:
         return 'absent'
+    if v == metrics.OFF_TARGET:
+        return 'off-target'
     if isinstance(v, float):
         return f'{v:.4g}'
     return str(v)

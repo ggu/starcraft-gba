@@ -153,6 +153,14 @@ the map mode halfword `0x800A5AB4` reads 3, and dismisses text boxes with
 
 ## Unit-class labs
 
+Each N64 press must show in the subject's order byte (`+0x4D`) within 12
+ticks as Move (6) or AttackMove (14); the GBA replays that order at the
+point the press was given, and each leg must settle within 32 N64 px of it.
+A press whose last preceding tick has no follow-up read (it ran inside one
+frontend step), with an unread tick between it and the first changed order,
+or whose subject row vanishes or changes type or owner before then, is
+refused: the first order the press gave was not observed. An attack golden
+with no gating check is refused when written and fails when scored.
 Each lab gives one human subject timed orders: on the N64 from a compiled
 tape that loads a lab state (saved once, after the mission's opening
 transmissions), on the GBA through the injector at the same source-frame
@@ -167,7 +175,7 @@ coverage are in
 | Kind | Measures (both engines, `tools/sc64_parity_metrics.py`) | Band |
 | --- | --- | --- |
 | Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a chord at 90% of cruise; the chord is 4 frames, or long enough to span two GBA position steps at the N64 cruise speed, as for the Overlord's 5. A lengthened chord's cutoff is at most the N64 cruise distance rounded down to whole GBA steps, so the Overlord's is 4 px, about 95% of its 5-frame cruise distance. The N64 side records chord and floor in the golden (`accel_chord`, `accel_floor`) for the GBA side to use. A mover slower than about 1 px a frame resolves acceleration to about one GBA step, 3-4 frames), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
-| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death | exact; ±1 frame; ±8 px; exact; ±4 frames |
+| Attack | damage per hit, cooldown (frames between the subject's hits), centre distance at the first hit, the target's damage on the subject, frames from the first hit taken to death. A hit counts only on the configured foe's unit id and only with a verified single attacker: the subject is the only living human row (or GBA building of the human) within 288 N64 px of the victim, on the sample that shows the drop and on the one before it. A row that hatches, changes owner or is reused by a new unit (the subject's row included; on the GBA also a birth record in the slot) counts as a new unit from that frame. A lifetime that ends in place (a hatch, an owner change) is no kill, and a subject that changes in place leaves survival unmeasured; on the GBA, where a unit can die and its slot be reused inside one engine step, a birth in an occupied slot or any in-place change of another row counts as a removal, which is a kill. No cooldown interval spans a kill of any enemy (units born during the fight included), a destroyed GBA building (seen in the frames or in the trace's removal events), or a drop on another enemy or GBA enemy building (shields, or more hit points than a burning Terran building loses) within reach of the subject; the first hit's range and time stand only when no earlier foe drop or kill was unresolved. Damage taken gates only when the same single enemy, a unit of the foe's id on both samples, was the only enemy within 288 px of the subject around every hit. When the GBA fought (any foe drop or kill; a drop or kill of another enemy unit or GBA enemy building within reach of the subject, a kill being a row that reaches 0 hit points or a trace removal at 0, with the actor's last position, so a unit born and killed inside one source frame counts; or any hit on the subject), or the observation ended early (the subject changed in place or was removed with hit points left, the run stopped before its requested steps, or the subject was not found), but a check has no value, that check gets none (REGRESSION, "not measured"), never the "absent" marker; only survival reads absent then, when the subject did not die and the observation ran its course. When the only fighting was with other enemies in reach of the subject (the foe and the subject untouched), the missing checks read the "off-target" marker instead, which, like "absent", inherits KNOWN only from the same marker in the baseline. A GBA removal record counts for the unit last sampled in that slot before it (no birth in between, the same owner and type); burn excuses only a completed Terran building's death at exactly 0 that its burn could explain since its last row. The trace records no cause of death and no same-type slot reuse within one update, so a weapon kill to exactly 0 of such a burning building, or a unit replaced in that way, is not told apart | exact (every hit); ±1 frame; ±8 px; exact; ±4 frames |
 | Train and build (passive) | Blood Bath computers: N64 rows born with the status bit clear until it sets; GBA queue progress 1 to the unit's birth, and a building's birth to its completion | ±2 frames |
 
 Hit points are the 8.8 field at `+0x08`, divided by 256. A capture whose
@@ -183,7 +191,7 @@ so both stay in the private fixture home; the compiler and its tests
 ```json
 {"format": "sc64-tape-scenario/1", "id": "example-move",
  "start": {"load": "lab.state", "step": 5000}, "camera": [0, 0], "map": [2048, 2048],
- "program": [{"op": "guard"}, {"op": "tap"}, {"op": "select", "at": [300, 200]},
+ "program": [{"op": "guard"}, {"op": "tap"}, {"op": "select", "at": [300, 200], "row": "0x802E2340"},
   {"op": "order", "kind": "move", "at": [500, 300], "mark": "command"}, {"op": "wait", "steps": 450},
   {"op": "order", "kind": "move", "at": [320, 210], "mark": "turn"}, {"op": "wait", "steps": 450}]}
 ```
@@ -191,15 +199,24 @@ so both stay in the private fixture home; the compiler and its tests
 | Op | Tape |
 | --- | --- |
 | `start` | `{"load": NAME.state, "step": N}`, `{"boot": "t1"}`, `{"boot": {"lobby": "blood-bath", "human": R, "computer": R}}` or `{"boot": {"episode": R, "mission": N}}` (the progress-byte guest edit; staged) |
-| `select`, `cursor` | Cursor onto a world point (panning with Z first when needed), A, and a check that the selection list is not empty |
+| `select`, `cursor` | Cursor onto a world point (panning with Z first when needed); `select` then presses A and checks the selection list (below) |
 | `box` | A held while the cursor drags to the second corner |
 | `order` | `move` (C-Right), `attack` (B), `hold` (C-Left), `stop` (C-Down) at the point under the cursor; `"mark": NAME` puts `# mark NAME` right before the issuing press |
 | `boxes N` | Wait for each text box and pulse Start until the pause halfword clears |
 | `wait`, `"dismiss": true` | Idle steps; with `dismiss`, Start is pulsed only while a box is open (`pulse`) |
 | `guard`, `tap`, `save`, `shot`, `peek`, `until`, `hold`, `press`, `poke` | One frontend line each, validated |
 
-`select` takes an optional `"row"`, the KSEG0 address of the subject's unit
-row, and then requires the selection list to hold exactly that row. `poke`
+`select` needs `"row"`, the KSEG0 address of the subject's unit row (table
+address + 312 × index), and then requires the selection list to hold
+exactly that row; `box` needs `"count"` (exactly that many units selected)
+or `"row"` (the first one), and nothing selected before the drag, so a
+failed drag never leaves a stale group that passes. Scenarios written before this rule set
+`"legacy_selection": true`, which keeps their recorded tapes unchanged and
+only checks that something is selected. A `sc64-tape-scenario/1` file
+with a `select` lacking `row`, or a `box` lacking `row` and `count`,
+therefore compiles only with `legacy_selection`; every scenario recorded
+before the rule already sets it. Mark names must be unique, in the
+compiler and in hand-written tapes. `poke`
 (and the episode boot that uses it) and `wait` with `dismiss` (`pulse`)
 compile only when the scenario lists them in `"frontend_commands"`, an
 explicit opt-in: `poke` writes guest memory, and captures made with

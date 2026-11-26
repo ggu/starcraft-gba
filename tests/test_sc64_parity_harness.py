@@ -41,15 +41,18 @@ def row(x, y, owner=HUMAN, typ=metrics.MARINE):
 
 
 def write_capture(run, frames, pause_ticks=(), command_step=100, tamper_tick=None, step_shift_tick=None,
-                  skip_follow=(), skip_change=(), loose_skip=False):
+                  skip_follow=(), skip_change=(), loose_skip=False, menu_ticks=()):
     """A capture directory: tap.bin with one tick per two frontend steps, a
     manifest and a tape whose '# mark command' falls at command_step."""
     run.mkdir(parents=True)
     out = bytearray(b'SC64TAP\0' + struct.pack('<4I', 1, 48, 0xCC, 314))
     for tick, units in enumerate(frames, start=1):
         step = 2 * tick + (1 if step_shift_tick is not None and tick >= step_shift_tick else 0)
-        if tick - 1 in skip_follow and not loose_skip:
-            step -= 1   # a genuine skip: this tick changed on the step after the skipped one
+        streak = 0
+        while tick - 1 - streak in skip_follow:
+            streak += 1
+        if streak and not loose_skip:
+            step -= streak   # a genuine skip: each tick after a skipped one changes on the very next step
         glob = bytearray(0xCC)
         gathered = 8 * (tick // 20)
         struct.pack_into('>I', glob, 4 * HUMAN, 50 + gathered)
@@ -58,7 +61,8 @@ def write_capture(run, frames, pause_ticks=(), command_step=100, tamper_tick=Non
             glob[0xC0] ^= 1
         pause = 1 if tick in pause_ticks else 0
         rows = b''.join(struct.pack('>H', i) + row(*u) for i, u in sorted(units.items()))
-        for phase, flags, data in ((0, 2, b''), (1, 3, rows)):
+        table = 0 if tick in menu_ticks else 2   # menu ticks have no unit table
+        for phase, flags, data in ((0, table, b''), (1, table | 1, rows)):
             if (phase and tick in skip_follow) or (not phase and tick in skip_change):
                 continue   # a tick that began and ended inside one frontend step
             out += struct.pack('<12I', step + phase, tick, phase, len(units), 0, pause, 4, 1, 0, 0x300000, flags,
@@ -143,6 +147,29 @@ class Decoder(unittest.TestCase):
             self.assertEqual(cap.series()['skipped'], [(20, 9)])
             self.assertEqual(metrics.n64_command_frame(cap.series(), 20), 9)
             self.assertEqual(metrics.n64_command_frame(cap.series(), 19), 8)
+            # A skipped first in-mission tick still starts the clock: ticks 1-4 are menus, 5 is skipped.
+            m = pathlib.Path(temp) / 'm'
+            write_capture(m, marine_frames(30), menu_ticks={1, 2, 3, 4}, skip_follow={5})
+            first = parity_decode.Capture(m)
+            self.assertEqual(first.skipped_frames, [(10, 0)])
+            self.assertEqual([r['sf'] for r in first.ticks if r['table']][:2], [1, 2])
+            # A capture whose very first tick ran inside one step, with no follow-up read before it.
+            n = pathlib.Path(temp) / 'n'
+            write_capture(n, marine_frames(30), skip_follow={1})
+            lead = parity_decode.Capture(n)
+            self.assertEqual(lead.skipped_frames, [(2, 0)])
+            self.assertEqual(lead.ticks[0]['sf'], 1)
+            # Two leading change-only ticks, each on the step before the next tick's change read.
+            q = pathlib.Path(temp) / 'q'
+            write_capture(q, marine_frames(30), skip_follow={1, 2})
+            two = parity_decode.Capture(q)
+            self.assertEqual([sf for _, sf in two.skipped_frames], [0, 1])
+            self.assertEqual(two.ticks[0]['sf'], 2)
+            # An in-mission change read two ticks back, with nothing read for the tick between:
+            # it cannot be joined to the first follow-up, so the clock start is unexplained.
+            r = pathlib.Path(temp) / 'r'
+            write_capture(r, marine_frames(30), skip_follow={1, 2}, skip_change={2})
+            self.assertEqual(parity_decode.Capture(r).faults['unexplained_skips'], 1)
             # A jump of more than eight ticks is never explained, change-step reads or not.
             f, g = pathlib.Path(temp) / 'f', pathlib.Path(temp) / 'g'
             write_capture(f, marine_frames(30), skip_follow=set(range(10, 20)))
@@ -721,6 +748,11 @@ class CaptureReport(unittest.TestCase):
                 'every +500\n+1000 0 0 0\n') else None, {'500', '1000'})
             self.assertEqual(capture_report.expected_checkpoints(a) if (a / 'tape.txt').write_text(
                 'every 0000000000000500\n1000 0 0 0\n') else None, {'500', '1000'})
+            self.assertEqual(capture_report.expected_checkpoints(a) if (a / 'tape.txt').write_text(
+                'every 500\npulse 800F0C20 2 ne 0 +000700 2 3 60\n300 0 0 0\n') else None, {'500', '1000'})
+            # `pulse` runs exactly its STEPS: checkpoints after it stay plannable.
+            self.assertEqual(capture_report.expected_checkpoints(a) if (a / 'tape.txt').write_text(
+                'every 500\npulse 800F0C20 2 ne 0 700 2 3 60\n300 0 0 0\n') else None, {'500', '1000'})
             # A checkpoint the tape never schedules is reported too.
             for run in (a, b):
                 (run / 'tape.txt').write_text('1000 0 0 0\n'); (run / 'status.log').unlink(); self.seal(run, run.name)
