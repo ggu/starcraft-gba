@@ -41,12 +41,15 @@ write would pass the budget or leave less than the reserve free (free space is
 measured again every 16 MiB written) the run stops with exit code 10, so the
 manifest's `ok` is false and the capture is incomplete (like other failure
 exits, no `status.log` is written). A run that finishes records
-`output_written` and `output_budget` in `status.log`. The check runs before
-every command, every 64 steps, before each tap record, dump, state, frame and
-cartridge flush, and at finalization, so the budget holds to within one
-command's log lines, the final status and polls files and a flushed
-cartridge save (well under 1 MiB); the frontend's own stdout and stderr,
-which `capture.py` redirects into the run directory, are not counted.
+`output_written` and `output_budget` in `status.log`. Counted: every log and
+data file the frontend writes (`*.csv`, `tap.bin`, `extra.bin`,
+`ticks.raw`, dumps, states, frames) and the polls it writes at the end. The
+check runs before every command, every 64 steps, before each tap record,
+dump, state, frame and cartridge flush, and at finalization (which reserves
+64 KiB for `status.log`), so the budget holds to within one command's log
+lines and a flushed cartridge save (128 KiB). Outside the budget: the staged
+inputs and `manifest.json` (written by `capture.py`) and the frontend's
+stdout and stderr, which `capture.py` redirects into the run directory.
 
 ## Build
 

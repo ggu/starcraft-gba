@@ -537,15 +537,17 @@ TAP_FORMAT_SHA256 = '131ffcd2fc7d0c7c766b75613b64c5403ef58639be236ba6d7db00fb31f
 def tap_format(layout):
     doc = layout.doc
 
-    def norm(value):   # hex spellings compare by value
+    def norm(value, key=None):   # addresses compare by value, however they are spelled
         if isinstance(value, dict):
-            return {k: norm(v) for k, v in value.items()}
-        if isinstance(value, str) and value[:2].lower() == '0x':
+            return {k: norm(v, k) for k, v in value.items()}
+        if isinstance(value, str) and key == 'address':
             try:
-                return f'0x{int(value, 16):08X}'
+                return f'0x{int(value.strip(), 16):08X}'
             except ValueError:
                 return value
         return value
+    if 'record_rule' not in doc['clock']:
+        raise LayoutError(f'{layout.name}: the layout has no clock.record_rule; the tap format needs one')
     return norm(semantic({'clock': {k: doc['clock'][k] for k in ('tick_counter', 'pause_halfword', 'seconds', 'selector',
                                                                  'record_rule')},
                           'unit_table': doc['unit_table'],
