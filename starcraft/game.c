@@ -6335,12 +6335,16 @@ remember_unit_tap(int picked)
 
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_command_delay.h"
+#include "sc64_group_formation.h"
 #endif
 static int
 issue_order(int order, int tx, int ty)
 {
     int i, n = 0;
     int group_order = selected_count() > 1;
+#ifdef SC64_IMPORTED_MISSION
+    Sc64GroupFormation formation = sc64_group_formation_begin(order, group_order, tx, ty);
+#endif
 #ifdef SC64_REACHABLE_FORMATION
     int route_hint_slots[4] = {-1, -1, -1, -1};
     int route_hint_roots[4] = {-1, -1, -1, -1};
@@ -6381,8 +6385,13 @@ issue_order(int order, int tx, int ty)
 #endif
 	#ifdef SC64_REACHABLE_FORMATION
 	    if (group_order) {
+#ifdef SC64_IMPORTED_MISSION
+	        int slot_x, slot_y;
+	        sc64_group_formation_slot(&formation, &u[i], n, tx, ty, 0, &slot_x, &slot_y);
+#else
 	        int slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 	        int slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
+#endif
 	        if (!sc64_race_unit_flying(u[i].type)) {
 	            int use_cursor = formation_route_pair(u[i].x, u[i].y,
                 slot_x, slot_y, tx, ty, route_hint_slots, route_hint_roots,
@@ -6400,8 +6409,15 @@ issue_order(int order, int tx, int ty)
 	    }
 	#else
 	    if (group_order) {
+#ifdef SC64_IMPORTED_MISSION
+		int slot_x, slot_y; /* tx/ty are s16 in compact-storage builds */
+		sc64_group_formation_slot(&formation, &u[i], n, tx, ty, 1, &slot_x, &slot_y);
+		u[i].tx = slot_x;
+		u[i].ty = slot_y;
+#else
 		u[i].tx = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 		u[i].ty = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
+#endif
 	    } else {
 		u[i].tx = tx;
 		u[i].ty = ty;
