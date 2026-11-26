@@ -44,7 +44,7 @@ import struct
 import subprocess
 import sys
 import tempfile
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -586,20 +586,26 @@ def compare_census(chk: list[dict], gba: dict) -> dict:
     for s in spare:
         classes['extra'].append({'type': s[0], 'owner': s[1], 'gba': list(s[2:])})
     # Resources: minerals join on halved position, then compare amounts.
-    rom_min = [((r['x'] // 2, r['y'] // 2), r['resources']) for r in chk if r['type'] in MINERALS]
-    gba_min = Counter((m['x'], m['y']) for m in gba['minerals'])
-    amounts = {(m['x'], m['y']): m['amount'] for m in gba['minerals']}
-    minerals = {'rom': len(rom_min), 'gba': len(gba['minerals']), 'placed': 0, 'amount_differs': [],
-                'missing': []}
-    for pos, amount in rom_min:
-        if gba_min[pos] > 0:
-            gba_min[pos] -= 1
-            minerals['placed'] += 1
-            if amounts[pos] != amount:
-                minerals['amount_differs'].append({'half': list(pos), 'rom': amount, 'gba': amounts[pos]})
-        else:
-            minerals['missing'].append({'half': list(pos), 'rom': amount})
-    minerals['extra'] = [list(p) for p, n in gba_min.items() for _ in range(n)]
+    rom_min = defaultdict(Counter)
+    for row in chk:
+        if row['type'] in MINERALS:
+            rom_min[row['x'] // 2, row['y'] // 2][row['resources']] += 1
+    gba_min = defaultdict(Counter)
+    for patch in gba['minerals']:
+        gba_min[patch['x'], patch['y']][patch['amount']] += 1
+    minerals = {'rom': sum(sum(amounts.values()) for amounts in rom_min.values()),
+                'gba': len(gba['minerals']), 'placed': 0, 'amount_differs': [], 'missing': [], 'extra': []}
+    for pos in sorted(rom_min.keys() | gba_min.keys()):
+        source, actual = rom_min[pos], gba_min[pos]
+        # Match equal amounts first so coincident patches can appear in any order.
+        rom_left = sorted((source - actual).elements())
+        gba_left = sorted((actual - source).elements())
+        pairs = min(len(rom_left), len(gba_left))
+        minerals['placed'] += sum((source & actual).values()) + pairs
+        minerals['amount_differs'].extend({'half': list(pos), 'rom': rom_amount, 'gba': gba_amount}
+                                         for rom_amount, gba_amount in zip(rom_left, gba_left))
+        minerals['missing'].extend({'half': list(pos), 'rom': amount} for amount in rom_left[pairs:])
+        minerals['extra'].extend(list(pos) for _ in gba_left[pairs:])
     minerals['cap'] = gba['max_minerals']
     rom_gey = Counter((r['x'] // 2, r['y'] // 2) for r in chk if r['type'] == GEYSER)
     gba_gey = Counter((g['x'], g['y']) for g in gba['geysers'])

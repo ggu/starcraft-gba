@@ -240,6 +240,17 @@ class CensusTest(unittest.TestCase):
                                                max_units=8, max_buildings=1))
         self.assertEqual(capped['counts']['cap-dropped'], 1)  # against the building table, not units
 
+    def test_coincident_minerals_compare_each_amount(self):
+        rom = [chk(176, 11, 10, 10, 1500), chk(176, 11, 11, 10, 1500)]
+        guest = gba(minerals=[(5, 5, 500), (5, 5, 1500)])
+        result = pc.compare_census(rom, guest)
+        self.assertEqual(result['verdict'], 'differs')
+        self.assertEqual(result['minerals']['placed'], 2)
+        self.assertEqual(result['minerals']['amount_differs'], [{'half': [5, 5], 'rom': 1500, 'gba': 500}])
+
+        rom[1]['resources'] = 500
+        self.assertEqual(pc.compare_census(rom, guest)['verdict'], 'exact')
+
     def test_thg2_units_are_placements_and_sprites_are_not(self):
         payload = struct.pack('<HHHBBH', 209, 320, 96, 6, 0, 0x0000) + \
             struct.pack('<HHHBBH', 119, 64, 64, 6, 0, 0x1000) + \
