@@ -6,6 +6,7 @@
 #include "../starcraft/game.c"
 #include "sc64_zerg_late_controller.h"
 #include <assert.h>
+#include <string.h>
 
 #ifndef SC64_Z8_RUNTIME
 #error "Compile this controller with the zerg-z8 profile flags"
@@ -132,7 +133,7 @@ static void census(const char *label)
         "\"side_units\":%d,\"army\":%d,\"drones\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,"
         "\"nexus\":[%d,%d],\"kerrigan\":%d,\"bank\":[%d,%d],\"supply\":[%d,%d],\"cursor\":[%d,%d],"
         "\"guards\":[%d,%d,%d],\"fault\":%u}\n",
-        label,(unsigned)frame,host_tick,screen,won,lost,count_units(SIDE,-1),army_count(),drone_count(),
+        label,(unsigned)frame,(unsigned)host_tick,screen,won,lost,count_units(SIDE,-1),army_count(),drone_count(),
         count_units(ENEMY,-1),enemy_b,n1>=0?b[n1].hp+b[n1].shield:-1,n2>=0?b[n2].hp+b[n2].shield:-1,k>=0?u[k].hp:-1,
         minerals,gas,race_owner_supply(SIDE),race_owner_supply_cap(SIDE),cx,cy,
         army_near(guards[0].guard_x,guards[0].guard_y,280),army_near(guards[1].guard_x,guards[1].guard_y,280),
@@ -198,6 +199,11 @@ int main(int argc,char **argv)
 {
     const char *path=argc>1?argv[1]:".local/traces/z8-controller.jsonl";
     unsigned limit_ticks=argc>2?(unsigned)strtoul(argv[2],0,10):Z8_RUN_LIMIT;
+    int gather_west=argc==4&&!strcmp(argv[3],"--gather-west");
+    if(argc>3&&!gather_west){fprintf(stderr,"usage: %s [trace [ticks [--gather-west]]]\n",argv[0]);return 2;}
+    /* Let the southern column assemble before crossing the western garrison. */
+    int west_launch=gather_west?66000:34800;
+    int waypoint_radius=gather_west?210:170;
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
     fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":%d,\"profile\":\"ZERG_Z8_CANONICAL_FLAGS\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",SC64_Z8_GLOBAL_ID);
     game_init();prior=0;
@@ -404,7 +410,7 @@ int main(int argc,char **argv)
                 int home=army_near(from_x,from_y,west?460:700);
                 /* The south has a raid at about frame 34,200, then no raid reaches
                    it or the east again until the Nexus is gone or far later. */
-                if(home>=(west?(frame<52000?40:28):(frame<28000?50:26))&&frame>=(west?34800:21900)&&fields!=1){
+                if(home>=(west?(frame<52000?40:28):(frame<28000?50:26))&&frame>=(west?west_launch:21900)&&fields!=1){
                     rush=1;army_leg=0;army_x=from_x;army_y=from_y;army_r=west?460:700;
                     rush_west=west;
                     fprintf(trace,"{\"kind\":\"assault\",\"frame\":%u,\"army\":%d,\"target\":%d}\n",(unsigned)frame,home,target);
@@ -441,7 +447,7 @@ int main(int argc,char **argv)
                 /* After the Nydus crossing, keep the coherent southern
                    column on the westward road instead of selecting a
                    larger group still gathering in the east. */
-                if(front_n&&3*front_n>=n){n=front_n;sx=front_x;sy=front_y;}
+                if(front_n&&(gather_west?4*front_n>=3*n:3*front_n>=n)){n=front_n;sx=front_x;sy=front_y;}
                 if(!west&&n&&sy/n<560&&n<20)rush=0;
                 if(n<8)rush=0;
                 else if(rush){
@@ -453,7 +459,7 @@ int main(int argc,char **argv)
                     while(army_leg<leg_count-1){
                         int there=0;
                         for(int i=0;i<MAX_UNITS;i++)there+=u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK&&
-                            dist2(u[i].x,u[i].y,legs[army_leg][0],legs[army_leg][1])<170*170;
+                            dist2(u[i].x,u[i].y,legs[army_leg][0],legs[army_leg][1])<waypoint_radius*waypoint_radius;
                         if(there*100<n*60)break;
                         ++army_leg;
                     }
@@ -724,7 +730,7 @@ int main(int argc,char **argv)
     census("final");
     fclose(trace);
     printf("z8 controller: frame=%u calls=%u won=%d lost=%d screen=%d fault=%u drones=%d army=%d kerrigan=%d nexus1=%d nexus2=%d\n",
-        (unsigned)frame,host_tick,won,lost,screen,(unsigned)race_z8_sched.fault,drone_count(),army_count(),kerrigan()>=0,
+        (unsigned)frame,(unsigned)host_tick,won,lost,screen,(unsigned)race_z8_sched.fault,drone_count(),army_count(),kerrigan()>=0,
         nexus(1)>=0?b[nexus(1)].hp+b[nexus(1)].shield:0,nexus(2)>=0?b[nexus(2)].hp+b[nexus(2)].shield:0);
     return won?0:1;
 }

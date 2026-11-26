@@ -89,3 +89,55 @@ observations and all five stage SRAM hashes through victory.
 
 The stage recordings and emulator receipts remain local. This is
 ordinary-button mGBA evidence on the standard ROM identified above.
+
+## Independent Z7 control on the standard Z10 cartridge
+
+Starting from HOME, the retained 270,585-call recording won at frame
+267,585 with zero mission faults and zero enemy buildings. Comparing the
+206 observations against the older unlimited-reserve controller recording,
+the gas balance differed at 67 checkpoints. Every other recorded field
+matched. The finite-reserve cartridge finished with 6,646 gas. Its fresh
+victory re-export was byte-identical, SHA-256
+`3f3f96fe3634cb85e0347fdb17c68efe5a136f5d3123f87d716f8cdeb93ba159`.
+The recording SHA-256 was
+`022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1`.
+A separate run loaded the actual Z6 readback, advanced to Z7, and matched
+all 206 same-cartridge observations, including every gas balance. The final
+result preserved the seven completion bits (0x7c003). A fresh boot matched
+the world and exported identical SRAM, SHA-256
+`05c8bf28416eef8c52cfcd9d59901e31b1ffe6f74598a023a321201c26939639`.
+
+## Z8 controller on the standard Z10 cartridge
+
+The previous winning recording first diverges at call 9,696. It expects
+55 enemy units where the standard ROM has 54. The default controller,
+regenerated with the standard cartridge flags and dialogue handling,
+destroys the eastern Nexus but loses Kerrigan at frame 91,637.
+
+The optional `--gather-west` controller delays the western assault until
+frame 66,000, requires the forward group to have at least three quarters
+of the largest group's strength before following it, and advances a waypoint when
+60% of the group is within 210 pixels. All three adjustments drive
+ordinary controller inputs. From HOME the cartridge wins at frame 70,229
+(call 71,502). Both Nexuses are gone and Kerrigan has 400 HP. Fresh SRAM
+re-export SHA-256 is
+`6a505816f87fb71ffa218f73a72e262477c014b6de7a19d622099ec4766ecf0f`.
+The newer packaged Z10 ROM at `51c7f18f` independently cleared the
+same HOME route and re-exported the identical journal. The recording SHA-256 is
+`f0479c6c302d377f792f23a7dfc5d61d8b22f12779f4e97e99dcd14440509685`.
+
+From the earned Z7 victory, the same recording matched all 29 checkpoints
+and won at frame 70,229 with both Nexuses destroyed and Kerrigan at 400 HP.
+The fresh-loaded victory re-exported byte for byte with SHA-256
+`39ef09adaccc4a8e3aabc01cfddbc4ed261ad714fa96225234a57ffe500b8739`.
+
+Use matching private generated inputs and a new output directory. Omit
+`--previous-victory` for the HOME replay. Supply the actual Z1–Z7
+completion journal to check the linked campaign instead.
+
+```sh
+make build/test-sc64-z8-normal-home
+build/test-sc64-z8-normal-home build/z8-gather.jsonl 180000 --gather-west
+python3 tools/sc64_z8_linked_victory.py --trace build/z8-gather.jsonl \
+  --rom "$Z10_ROM" --elf "$Z10_ELF" --runner "$RUNNER" --out "$OUT"
+```

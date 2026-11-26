@@ -288,8 +288,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   64,147. Z5 then matched all 14 recorded stage worlds and won at frame
   18,974. The old Z6 route ended without victory. Paid reinforcements and
   a replacement assault cleared Z6 at frame 212,428 and its fresh result
-  reloaded with all six bits. Continue from the Z6 readback through Z7–Z10.
-  [Z3–Z6 carried results](audits/2026-11-26-zerg-linked-middle.md).
+  reloaded with all six bits. Z7 continued from that save, matched all 206
+  same-cartridge observations and won at frame 267,585.
+  The previous Z8 recording diverges at call 9,696. The optional
+  `--gather-west` controller cleared Z8 from HOME with Kerrigan at full
+  health. The earned Z7 save also cleared Z8 at frame 70,229 with all
+  29 checkpoints matching. Continue the earned chain through Z9 and Z10.
+  [Z3–Z6 carried results and Z8 route](audits/2026-11-26-zerg-linked-middle.md).
   [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
