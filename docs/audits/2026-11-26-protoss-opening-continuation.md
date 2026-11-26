@@ -65,7 +65,8 @@ reached frame 64,000. The ARM replay uses the same standard ROM and
 ordinary keypad buttons throughout.
 
 The P4 result arrived at frame 84,220, on call 85,200 of the controller's
-HOME tape. The linked replay matched all 96 named checkpoints and 13
+HOME tape and physical call 85,170. The linked replay matched all 96
+named checkpoints and 13
 field dialogue arm and release pairs. Both heroes survived in the
 extraction region, Raynor at (1552,1984) and Tassadar at (1520,1995).
 Campaign phase was 3, faults and unsupported actions were zero, and
@@ -111,7 +112,7 @@ python3 tools/sc64_p56_normal_home_replay.py --mission 23 --quiet-guest \
 | Headless physical observer | `050e5e7dcab772798780a11d1c6c3b4b84135e4b681aa11e08f666738ebaa9bf` |
 | P4 controller trace | `ac7be694ca11fcb2398a62c50be88d511981843de89188d031596d50b1046c25` |
 | P4 victory SRAM and fresh re-export | `414162bb7ed8218ddf4abe6e4f1bb520ee4c21c0240d053614cf31e319a2d969` |
-| Qualification receipt | `259a90bd01b6afff62c1494caa089663b6cabebd7f5f7a9d6de0c5e11096131d` |
+| Independent qualification with the repository verifier | `230a62f5e64d1353f871ef9cf9a2e429047a1f33a4a3ea84c3c5f199b1b3b07a` |
 
 ## Protoss mission 5 from the P4 result
 
