@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Unmodified nearest-target query from bb55a170 (renamed for differential testing).
+ * Scalar nearest-target query from bb55a170. The shared Egg capability
+ * uses the same fallback policy across profiles that provide the actor.
  */
 static int GBA_HOT __attribute__((noinline))
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
@@ -8,7 +9,7 @@ __attribute__((optimize("Os")))
 sc64_target_nearest_reference(int x, int y, int owner, int max_distance, int attacker
                     SC64_P7_SOURCE_OWNER_PARAM)
 {
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     int egg_best = -1, egg_distance = max_distance * max_distance;
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
@@ -57,8 +58,8 @@ sc64_target_nearest_reference(int x, int y, int owner, int max_distance, int att
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                    if (entity < MAX_UNITS && u[entity].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                    if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance &&
                             sc64_auto_target_candidate_allowed(
                                 attacker, entity, owner,
@@ -79,7 +80,7 @@ sc64_target_nearest_reference(int x, int y, int owner, int max_distance, int att
                 }
             }
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;
@@ -119,8 +120,8 @@ sc64_target_nearest_reference(int x, int y, int owner, int max_distance, int att
                             attacker, entity, owner,
                             SC64_P7_SOURCE_OWNER_VALUE)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                    if (entity < MAX_UNITS && u[entity].type == U_Z7_EGG) {
+#ifdef SC64_EGG_RUNTIME
+                    if (entity < MAX_UNITS && u[entity].type == SC64_EGG_ACTOR) {
                         if (d < egg_distance) {
                             egg_distance = d;
                             egg_best = entity;
@@ -136,7 +137,7 @@ sc64_target_nearest_reference(int x, int y, int owner, int max_distance, int att
                 }
             }
     }
-#ifdef SC64_Z7_EGG_PRODUCTION
+#ifdef SC64_EGG_RUNTIME
     return best >= 0 ? best : egg_best;
 #else
     return best;

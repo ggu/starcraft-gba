@@ -28,3 +28,9 @@ An independent run using emulator-side stack sampling every eighth update reprod
 | Arbiter cloak and detector cache source tick | 29,918 | 31,336 |
 
 For target-search changes, preserve candidate ordering at ties, egg fallback, attack eligibility, and changes to occupancy during movement. Use Blood Bath as a second measurement: the same search accounts for less than half as many self cycles there. Movement clearance and contact tests deserve a separate paired measurement. The simulation and presentation still exceed the budget for sustained 30 fps.
+
+## Target search trials
+
+On the same P10 inputs and `4c63a258` control, clipping a query to the fixed target grid bounds saved 0.17% of whole-loop cycles on Outpost and 0.12% on Blood Bath. Adding a 256-pixel sector occupancy table to reject absent owners saved 0.47% and 0.04%, respectively, relative to that same control. Both experiments matched the unit, building, mineral and fog hashes, both bitmap pages, palette, display selection and camera across 65 cuts per map. The freshly reloaded worlds and SRAM matched on both maps. Keep these experiments local and prioritize movement and contact checks alongside target acquisition.
+
+The prepared scalar comparison revealed an independent test issue. At frame 174, three host profiles picked slot 13 in the historical reference. Slot 13 contained an Egg. The release correctly preferred an eligible building. The reference selected the fallback rule only for the older Z7-specific Egg capability. The updated reference applies that same rule to the shared Egg actor while retaining its independent target traversal.
