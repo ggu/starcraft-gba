@@ -71,7 +71,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Outpost and Blood Bath windows spent 59% and 62% of guest loop time in
   orders. Nearest-target search costs far more on Outpost, while movement
   and contact checks matter on both maps. Compare changes on both and
-  retain opponents, camera, SRAM and displayed-page checks.
+  retain opponents, camera, SRAM and displayed-page checks. The grid and
+  sector target-search trials each saved less than 0.5% of total cycles.
+  Use the corrected Egg fallback reference for future comparisons.
   [Two-map comparison and reproduction](audits/2026-11-26-p10-mixed-skirmish.md).
 
 - **Packed Pylon, Gateway and Forge rendering.** The opt-in renderer saved
