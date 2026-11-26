@@ -792,11 +792,27 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the expanded Terran Blood Bath window, before cache overhead.
   The opt-in [16-path continuation table](https://github.com/ggu/starcraft-gba/pull/805)
   saves 72.11% of route-wrapper cycles in the bounded ARM replay
-  of those calls. Check full dispatch and frame timing before
-  selecting a production cache size.
-  The 99 new endpoints that continue an earlier path account for
-  7.07% of loop cycles. Verify reuse with the existing route-slot
-  precedence, aging, and grid invalidation before activation.
+  of those calls. The [paired host dispatch check](audits/2026-10-29-monotone-route-step/README.md#retaining-successful-path-prefixes)
+  matches 642,890 route-state samples. Check integrated race-ROM
+  frame timing and linked memory before enabling the cache.
+  The [full observed point-dispatch trace](audits/2026-10-29-monotone-route-step/README.md#route-dispatcher-chronology-in-late-terran-blood-bath)
+  captures 381 calls and a stable field pool. The conditional ARM
+  replay matches outputs and cache counters with the observed clock
+  and age inputs and uses 61.16% fewer cycles. Thirty-seven of 96
+  update groups cost more. The [paired authored game-loop test](audits/2026-10-29-monotone-route-step/README.md#paired-authored-game-loop-test)
+  matches 280 updates through two live grid edits. Its mean
+  simulation cost falls 2.84%. The two-VBlank misses stay
+  at 18. Check the intended release profiles' frame peaks and
+  save boundaries before enabling the cache. The preferred-L
+  shortcut after slot and age checks reduces misses from 18
+  to 13 with matching route counters on the authored aging
+  workload. The [combined dispatcher test](audits/2026-10-29-monotone-route-step/README.md#clear-prefix-and-retained-path-comparison)
+  verifies real retained-path hits, exact and nearby point fields,
+  depot hits, recency rollover and grid invalidation. Both flags
+  also match the authored ARM frame trace. The clear prefix alone
+  achieves the same 13 budget misses and adds no working RAM in
+  that scene. Qualify it first on the busy race cartridges, then
+  measure whether a 360-byte table warrants the added state there.
   The [direct grid corridor walk](audits/2026-11-22-steady-order-cost.md#walk-direct-corridors-by-grid-cell)
   uses the existing walk grid and visits the same cells in order.
   All 95 direct-path calls in the retained Outpost battle have

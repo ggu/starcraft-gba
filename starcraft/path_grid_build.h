@@ -422,6 +422,9 @@ path_grid_verify_fail(const PathFootprint *kept)
 static void __attribute__((noinline))
 build_path_grid(void)
 {
+#if defined(SC64_ROUTE_MONOTONE_WITNESS) && defined(SC64_IMPORTED_MISSION)
+    sc64_route_witness_reset();
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
     sc64_routes_grid_begin();
 #endif

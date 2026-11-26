@@ -11,8 +11,10 @@ request aging still run through the existing code.
 
 The shortcut skips the bitmap clear only when the first path
 reaches the origin. Diagnostics keep the standard search to
-preserve the reported work counts. A configuration that records
-witness paths also uses the standard search.
+preserve the reported work counts. This original qualification used
+the clear prefix on its own. The later
+[combined comparison](2026-10-29-monotone-route-step/README.md#clear-prefix-and-retained-path-comparison)
+also checks the retained-path table with the shortcut enabled.
 
 ## Evidence
 

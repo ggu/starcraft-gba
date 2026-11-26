@@ -1968,6 +1968,9 @@ static u16 bfs_queue[MAP_CELLS];
 static u16 bfs_queue[MAP_CELLS];
 #endif
 static void sc64_routes_reset(void);
+#ifdef SC64_ROUTE_MONOTONE_WITNESS
+static inline void sc64_route_witness_reset(void);
+#endif
 #ifdef SC64_ROUTE_KEEP_FIELDS
 static void sc64_routes_topology_changed(void);
 static void sc64_routes_grid_begin(void);
