@@ -32,7 +32,11 @@ ROM's own flags; see [PARITY-TRACE.md](PARITY-TRACE.md)). `parity-content`
 builds them in a sub-make with the prepared Z10 descriptor
 (`.local/build/z9-inputs/z8-descriptor.json`) unless `Z8_DESCRIPTOR` is given.
 A profile whose binary fails to build has its censuses reported absent; the
-rest of the report is still written.
+rest of the report is still written. Before a census binary runs, it is
+checked against the build record make wrote beside it (`<binary>.inputs`: the
+executable's SHA-256 and every input's SHA-256 at build time) and must sit in
+this checkout's `build/` tree; the verified copy is what runs, and its digest
+is recorded per mission. A binary that fails the check is never run.
 Do not run it in parallel with `parity` (`./dev parity`), which builds the
 same Terran and Zerg binaries.
 
@@ -79,14 +83,38 @@ unconditional goto, ignorerest and end, with the sound opcodes on the way.
 
 ROM animations with no baked table for a unit are listed as not modelled.
 
+A row reads `match` only when everything it names was compared. When part of
+it could not be, the row reads `not compared` with the reason: a Walking path
+with no steady loop, a death path that never ends or a remnant layer (its
+duration is the engine's cap), a construction program whose end the linear
+walk cannot follow, or an attack with any tick whose frame the previous
+animation left (the ROM does not define it). A manual `--binaries` is checked
+against the recorded inputs only; `make parity-content` always rebuilds first,
+with make's own dependency tracking. A death burst is
+timed from its first framed wait, and a waitrand is a range the engine's value
+must fall in. The banks are read from this checkout's `.local/sc64` only
+(never the main checkout's: this checkout's builds do not read those). A bank
+that is missing, stale or malformed gives every unit whose ROM image carries
+its animation an `absent` row, so no unit drops out of the report.
+
 ## Sound ids
 
 `tools/sc64_audio_pack.py` writes `sc64_audio_sound_ids.json` beside its bank:
 the sfxdata ids behind every bank index and, per raw unit and kind, the ids
 the bank plays, pinned to the header's SHA-256. The header, blob and manifest
 are unchanged by it. An older bank has no id map; regenerate it with the same
-options to get one (the bank itself comes out byte-identical). The report
-compares, per drawn unit and kind (ready, yes, what, annoyed, attack, death),
+options to get one (the bank itself comes out byte-identical). The pack
+stages each file inside the bank folder and renames them into place in order
+(blob, header, manifest, then the id map) under a lock in that folder, so two
+packers never interleave. The id map pins the header's and the blob's SHA-256
+and is renamed last, so it is the generation's commit record: after an
+interrupted publish, or for a reader looking mid-publish, its digests do not
+match and the report refuses the bank as stale (the manifest also pins the
+blob). A ROM build reads the header and the blob separately and does not
+check the id map, so do not run the pack while building, and after an
+interrupted pack run it again (or check with `--verify-bank`) before building. The report
+compares, per unit the ROM voices or the animation report names, and per kind
+(ready, yes, what, annoyed, attack, death),
 the ROM's ids from units.dat and the iscript opcodes (the unit's attack
 animations, its weapons' bullet images, Death and the images it spawns) with
 the bank's, after checking the id map against the header's own indices. Ids

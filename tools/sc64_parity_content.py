@@ -37,7 +37,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -49,11 +51,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.sc64_parity_tables import (  # noqa: E402
-    PROVENANCE, InputsMissing, check_private, find_input, fixture_home, main_checkout, stock_names,
-    write_private,
+    PROVENANCE, InputsMissing, check_private, find_input, fixture_home, stock_names, write_private,
 )
 from tools.sc64_construction_sprites import (  # noqa: E402
-    ANIMATIONS, decode_instruction, image_animation_starts, script_index,
+    ANIMATIONS, decode_instruction, image_animation_starts, script_index, source_stage_inputs, table_images,
 )
 
 SCHEMA = 1
@@ -119,7 +120,7 @@ def rom_sequence(payload: bytes, start: int, limit: int = 256, frame=None, stead
     visited: dict[int, int] = {}
     end = 'limit'
     loop_pc = None
-    first_goto = None
+    first_goto = goto_frame = None
     for _ in range(limit):
         if pc in visited:
             end, loop_pc = 'loop', pc
@@ -144,7 +145,7 @@ def rom_sequence(payload: bytes, start: int, limit: int = 256, frame=None, stead
             spawns.append(('image', args[0]))
         if opcode == OP_GOTO and jump is not None:
             if first_goto is None:
-                first_goto = len(steps)
+                first_goto, goto_frame = len(steps), frame
             pc = jump
             continue
         if opcode in (OP_END, OP_RETURN):
@@ -155,7 +156,7 @@ def rom_sequence(payload: bytes, start: int, limit: int = 256, frame=None, stead
             break
         pc = next_pc
     result = {'steps': steps, 'end': end, 'sounds': sounds, 'spawns': spawns, 'last_frame': frame,
-              'first_goto': first_goto,
+              'first_goto': first_goto, 'goto_frame': goto_frame,
               'loop': visited[loop_pc] if loop_pc is not None else None}
     if steady:
         return result
@@ -249,6 +250,7 @@ class Scripts:
         self.weapon_flingy = struct.unpack_from(f'<{WEAPON_COUNT}I', weapons, WEAPON_COUNT * 2)
         self.payload = tables['iscript.bin']
         self.index = script_index(self.payload)
+        self.tables = table_images(units, flingy, sprites, images)
 
     def unit_image(self, raw: int) -> int:
         return self.sprite_image[self.flingy_sprite[self.unit_flingy[raw]]]
@@ -341,6 +343,7 @@ def doodad_units(payload: bytes) -> list[dict]:
     return rows
 
 
+DISABLED = 0x02  # trigger condition and action flag: the game skips it
 # Condition comparisons (CHK): 0 at least, 1 at most, 10 exactly.
 AT_LEAST, AT_MOST, EXACTLY = 0, 1, 10
 ANY_UNIT, MEN, BUILDINGS = 229, 230, 231
@@ -380,7 +383,8 @@ def placed_count(placements: list[dict], players: list, unit_type: int) -> int:
         if unit_type == BUILDINGS:
             return raw in BUILDING_RAW
         return raw == unit_type
-    return sum(1 for r in placements if r['owner'] in players and counted(r['type']))
+    return sum(1 for r in placements if r['owner'] in players and r['type'] != START_LOCATION
+               and counted(r['type']))
 
 
 def start_condition(c: dict, current: int, forces: bytes, active: set, placements: list[dict]) -> str | None:
@@ -427,11 +431,12 @@ def start_banks(triggers: list[dict], forces: bytes, placements: list[dict], own
         if not t['conditions']:
             continue
         for current in executors(t['executed_for_player_values'], forces, playing_players(owners)):
-            reasons = [start_condition(c, current, forces, active, placements) for c in t['conditions']]
+            reasons = [start_condition(c, current, forces, active, placements)
+                   for c in t['conditions'] if not c.get('flags', 0) & DISABLED]
             if None in reasons:
                 continue
             for index, a in enumerate(t['actions']):
-                if a['name'] != 'SetResources':
+                if a['name'] != 'SetResources' or a.get('flags', 0) & DISABLED:
                     continue
                 kind = {0: 'minerals', 1: 'gas', 2: 'minerals+gas'}.get(a['unit_type'], f"resource {a['unit_type']}")
                 mode = {7: 'set', 8: 'add', 9: 'subtract'}.get(a['modifier'], f"modifier {a['modifier']}")
@@ -521,26 +526,59 @@ def compare_census(chk: list[dict], gba: dict) -> dict:
     classes = {'collision': [], 'moved': [], 'cap-dropped': [], 'missing': [], 'extra': []}
     full_units = len(gba['units']) >= gba['max_units'] > 0
     full_buildings = len(gba['buildings']) >= gba['max_buildings'] > 0
-    def nearest(key):
-        dist = [max(abs(s[2] - key[2]), abs(s[3] - key[3])) for s in spare if s[:2] == key[:2]]
-        return min(dist) if dist else 1 << 30
-    # Nearest pairs first, so CHK row order cannot decide which stacked
-    # placement takes the one nearby candidate.
-    for key in sorted(unmatched, key=nearest):
-        candidates = [s for s in spare if s[:2] == key[:2]]
-        stacked = sum(near(key[2:], other[2:], STACK_RADIUS) for other in rom) > 1
-        if candidates:
-            best = min(candidates, key=lambda s: max(abs(s[2] - key[2]), abs(s[3] - key[3])))
-            spare.remove(best)
-            row = {'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]), 'gba': list(best[2:]),
-                   'offset': [best[2] - key[2], best[3] - key[3]]}
-            # Only a nearby displacement explains a stacked placement.
-            classes['collision' if stacked and near(key[2:], best[2:], DISPLACE_RADIUS) else 'moved'].append(row)
+    def dist(key, cand):
+        return max(abs(cand[2] - key[2]), abs(cand[3] - key[3]))
+
+    stacked = {key: sum(near(key[2:], other[2:], STACK_RADIUS) for other in rom) > 1 for key in set(unmatched)}
+    left_rom = sorted(unmatched)
+    # Phase 1: as many stacked placements as possible pair with nearby
+    # same-type actors (maximum bipartite matching, Kuhn's algorithm). Nodes
+    # and edges are visited in sorted order, so CHK row order decides nothing.
+    left_keys = sorted(k for k in left_rom if stacked[k])
+    edges = {i: sorted(((dist(k, c), c) for c in set(spare) if c[:2] == k[:2] and
+                        near(k[2:], c[2:], DISPLACE_RADIUS)))
+             for i, k in enumerate(left_keys)}
+    pool = sorted(spare)
+    owner_of: dict = {}
+
+    def augment(i, seen):
+        for _, cand in edges[i]:
+            slots = [j for j, c in enumerate(pool) if c == cand and j not in seen]
+            for j in slots:
+                seen.add(j)
+                if j not in owner_of or augment(owner_of[j], seen):
+                    owner_of[j] = i
+                    return True
+        return False
+    for i in range(len(left_keys)):
+        augment(i, set())
+    for j, i in sorted(owner_of.items(), key=lambda kv: kv[1]):
+        key, cand = left_keys[i], pool[j]
+        left_rom.remove(key)
+        spare.remove(cand)
+        classes['collision'].append({'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]),
+                                     'gba': list(cand[2:]), 'offset': [cand[2] - key[2], cand[3] - key[3]]})
+    # Phase 2: the rest pair nearest first; a pair is a move. Indexed, so
+    # identical placements and actors each pair once.
+    rom_left, cand_left = sorted(left_rom), sorted(spare)
+    pairs = sorted((dist(k, c), i, j) for i, k in enumerate(rom_left) for j, c in enumerate(cand_left)
+                   if c[:2] == k[:2])
+    used_rom, used_cand = set(), set()
+    for _, i, j in pairs:
+        if i in used_rom or j in used_cand:
             continue
+        used_rom.add(i)
+        used_cand.add(j)
+        key, cand = rom_left[i], cand_left[j]
+        left_rom.remove(key)
+        spare.remove(cand)
+        classes['moved'].append({'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]),
+                                 'gba': list(cand[2:]), 'offset': [cand[2] - key[2], cand[3] - key[3]]})
+    for key in left_rom:
         building = key[0] in building_types or (key[0] not in unit_types and key[0] in BUILDING_RAW)
         full = full_buildings if building else full_units
         classes['cap-dropped' if full else 'missing'].append(
-            {'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]), 'stacked': stacked})
+            {'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]), 'stacked': stacked[key]})
     for s in spare:
         classes['extra'].append({'type': s[0], 'owner': s[1], 'gba': list(s[2:])})
     # Resources: minerals join on halved position, then compare amounts.
@@ -619,6 +657,9 @@ def compare_banks(rows: list[dict], gba: dict, owners: dict) -> list[dict]:
             # later total reached by mining does not count.
             parts = {'minerals': ('minerals',), 'gas': ('gas',), 'minerals+gas': ('minerals', 'gas')}.get(
                 row['resource'], ())
+            if not parts:
+                out.append(dict(entry, verdict=f"not compared (unknown resource type: {row['resource']})"))
+                continue
             values = [(h['step'], tuple(h[part] for part in parts)) for h in history]
             want = tuple(row['amount'] for _ in parts)
             first_change = next(((st, v) for st, v in values if v != values[0][1]), None)
@@ -683,7 +724,54 @@ def skirmish_census(chk: list[dict], gba: dict, hall_types: dict) -> dict:
             'gba_buildings': len(gba['buildings']), 'gba_units': len(gba['units']),
             'gba_identity': 'skirmish rows carry no raw type or owner (raw_type -1)',
             'minerals': base['minerals'], 'geysers': base['geysers'], 'gba_banks': gba['banks'],
-            'verdict': 'exact' if halls_ok and resources_ok else 'differs'}
+            'verdict': ('differs' if not resources_ok  # a confirmed resource mismatch stands
+                        else 'not compared' if not all(raw in hall_types for raw in SKIRMISH_HALLS.values())
+                        else 'exact' if halls_ok else 'differs')}
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for block in iter(lambda: f.read(1 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def binary_record(binary: Path, root: Path, work: Path) -> dict:
+    """Check a census binary against the build record make wrote beside it
+    (<binary>.inputs: the executable's SHA-256 and every generated and source
+    input's SHA-256 at build time), as data only: no recorded command is run.
+    A verified binary is copied into the work directory and that copy is what
+    runs, so a rebuild during the report cannot change what was verified.
+    A binary that fails is never run and its censuses read absent."""
+    try:
+        sidecar = Path(str(binary) + '.inputs')
+        if not binary.is_file() or not sidecar.is_file():  # never open a FIFO or a device
+            raise FileNotFoundError(2, 'not a regular file', str(sidecar if binary.is_file() else binary))
+        record = json.loads(sidecar.read_text())
+        recorded = record['binary_sha256']
+        inputs = {**record['inputs']['generated'], **record['inputs']['sources']}
+        if not isinstance(recorded, str) or not isinstance(inputs, dict) or not inputs:
+            raise ValueError('malformed build record')
+        fd, name = tempfile.mkstemp(prefix=f'{binary.name}.', suffix='.verified', dir=work)
+        os.close(fd)
+        snapshot = Path(name)  # unique per attempt, so one profile's check cannot replace another's copy
+        shutil.copy2(binary, snapshot)
+        if file_sha256(snapshot) != recorded:
+            return {'error': f'{binary}: its .inputs record belongs to another build; rebuild with make'}
+        changed = []
+        for name, digest in sorted(inputs.items()):
+            path = Path(name) if os.path.isabs(name) else root / name
+            if not path.is_file() or file_sha256(path) != digest:
+                changed.append(name)
+        if changed:
+            return {'error': f"{binary}: inputs changed since it was built ({', '.join(changed[:5])}); "
+                             'rebuild with make'}
+    except FileNotFoundError as error:
+        return {'error': f'{binary}: no build record ({error.filename}); rebuild with make'}
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return {'error': f'{binary}: unreadable build record ({type(error).__name__}: {error})'}
+    return {'binary_sha256': recorded, 'snapshot': snapshot, 'inputs_checked': len(inputs)}
 
 
 # Steps the census runs on after the launch, with no input, so first-pass
@@ -703,17 +791,19 @@ def run_census(binary: Path, mission: str, profile: str, work: Path) -> dict:
     return parse_census_trace(trace.read_text())
 
 
-def census_section(maps: dict, binaries: Path | None, extractor, absent_profiles=()) -> dict:
+def census_section(maps: dict, binaries: Path | None, extractor, absent_profiles=(), root: Path = ROOT) -> dict:
     with tempfile.TemporaryDirectory(prefix='sc64-parity-census-') as temp:
-        missions = census_missions(maps, binaries, extractor, Path(temp), set(absent_profiles))
+        missions = census_missions(maps, binaries, extractor, Path(temp), set(absent_profiles), root)
     verdicts = Counter(m['verdict'] for m in missions)
     return {'missions': missions, 'verdicts': dict(verdicts), 'bank_steps': BANK_STEPS}
 
 
-def census_missions(maps: dict, binaries: Path | None, extractor, work: Path, absent_profiles=frozenset()) -> list:
+def census_missions(maps: dict, binaries: Path | None, extractor, work: Path, absent_profiles=frozenset(),
+                    root: Path = ROOT) -> list:
     from tools import sc64_import as importer
     missions = []
     hall_types: dict = {}
+    verified: dict = {}
     for mission, label, path in MISSIONS + ((None,) + SKIRMISH,):
         entry = {'mission': mission, 'label': label, 'chk': path,
                  'profile': SKIRMISH_PROFILE if mission is None else PROFILE_BY_RACE[label[0]]}
@@ -730,6 +820,19 @@ def census_missions(maps: dict, binaries: Path | None, extractor, work: Path, ab
                      rom_unit_doodads=sum(r['section'] == 'THG2' for r in rows),
                      rom_start_locations=sum(r['type'] == START_LOCATION for r in rows))
         binary = binaries / f"{entry['profile']}-fast-trace" if binaries else None
+        if binary:
+            try:
+                binary = binary.resolve()  # checked and read through the same path
+            except (OSError, RuntimeError) as error:
+                entry.update(verdict='absent', note=f'census binary path does not resolve: {error}',
+                             rom_start_banks=bank_rows)
+                missions.append(entry)
+                continue
+        if binary and not binary.is_relative_to(root.resolve() / 'build'):
+            entry.update(verdict='absent', note=f'census binary {binary} is not in this checkout\'s build tree',
+                         rom_start_banks=bank_rows)
+            missions.append(entry)
+            continue
         if entry['profile'] in absent_profiles:
             entry.update(verdict='absent', note=f"the {entry['profile']} census binary failed to build",
                          rom_start_banks=bank_rows)
@@ -740,8 +843,18 @@ def census_missions(maps: dict, binaries: Path | None, extractor, work: Path, ab
                          rom_start_banks=bank_rows)
             missions.append(entry)
             continue
+        record = verified.get(entry['profile'])
+        if record is None:
+            record = verified[entry['profile']] = binary_record(binary, root, work)
+        if 'error' in record:
+            entry.update(verdict='absent', note=f"census binary not trusted: {record['error']}",
+                         rom_start_banks=bank_rows)
+            missions.append(entry)
+            continue
+        entry['gba_binary_sha256'] = record['binary_sha256']
         try:
-            gba = run_census(binary, 'skirmish' if mission is None else str(mission), entry['profile'], work)
+            gba = run_census(record['snapshot'], 'skirmish' if mission is None else str(mission),
+                             entry['profile'], work)
         except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired) as error:
             entry.update(verdict='absent', note=f'GBA census failed: {error}', rom_start_banks=bank_rows)
             missions.append(entry)
@@ -766,7 +879,11 @@ def census_missions(maps: dict, binaries: Path | None, extractor, work: Path, ab
 
 # ---- 2. iscript sequences ------------------------------------------------
 
-def load_manifest(path: Path, header: Path) -> tuple[dict | None, str]:
+BANK_SECTIONS = {'walk': ('entries',), 'attack': ('actors',), 'death': ('actors', 'images'),
+                 'construction': ('stages',)}
+
+
+def load_manifest(path: Path, header: Path, sections=()) -> tuple[dict | None, str]:
     """A baked table's manifest, trusted only when it pins the header beside
     it; returns (manifest or None, status)."""
     if not path.is_file() or not header.is_file():
@@ -787,6 +904,9 @@ def load_manifest(path: Path, header: Path) -> tuple[dict | None, str]:
         return None, f'unavailable: {path} pins no header digest'
     if pinned != digest:
         return None, f'stale: {path} pins header {pinned[:12]}, header is {digest[:12]}'
+    bad = [key for key in sections if not isinstance(manifest.get(key), list) or not manifest.get(key)]
+    if bad:
+        return None, f"unavailable: {path} has no {', '.join(bad)} entries"
     return manifest, 'ok'
 
 
@@ -822,7 +942,7 @@ def sounds_of(seq) -> list:
 
 
 def compare_walk(scripts: Scripts, entry: dict) -> dict:
-    image = entry.get('image_id', scripts.unit_image(entry['unit_id']))
+    image = entry['image_id'] if 'image_id' in entry else scripts.unit_image(entry['unit_id'])
     seq = scripts.sequence(image, 'Walking')
     if 'steps' not in entry:  # the walk importer left this unit out
         row = {'animation': 'Walking', 'image': image, 'verdict': 'absent',
@@ -838,7 +958,10 @@ def compare_walk(scripts: Scripts, entry: dict) -> dict:
            'engine_waits': eng_waits}
     if not seq:
         return dict(row, verdict='absent', note='ROM image has no Walking animation')
-    steps = collapse(seq.get('cycle') or seq['steps'])
+    if seq['end'] != 'loop' or not seq.get('cycle'):
+        return dict(row, verdict='not compared', rom_end=seq['end'], sounds=sounds_of(seq),
+                    note=f"ROM Walking path has no steady loop ({seq['end']}); the cycle is not compared")
+    steps = collapse(seq['cycle'])
     directional = scripts.directional(image)
     rom_frames = [(f // 17 if directional and f is not None else f) for f, _ in steps]
     rom_waits = [w for _, w in steps]
@@ -893,7 +1016,8 @@ def compare_attack(scripts: Scripts, raw: int, actor: dict, frames: dict) -> lis
         path_ticks = sum(low for _, low, _ in seq['steps'])
         idle_name = 'AirAttkToIdle' if mode['target_air'] else 'GndAttkToIdle'
         idle = scripts.sequence(image, idle_name)
-        # ToIdle up to its first goto (which leads into the idle loop).
+        # ToIdle up to its first goto (which leads into the idle loop); the
+        # frame shown at that goto stays after it.
         tail = idle['steps'][:idle['first_goto'] if idle['first_goto'] is not None else len(idle['steps'])] \
             if idle and seq['end'] == 'hold' else []
         # A recovery tick before its first playfram still shows the attack's
@@ -904,8 +1028,22 @@ def compare_attack(scripts: Scripts, raw: int, actor: dict, frames: dict) -> lis
                 break
             tail[i] = (carried, lo, hi)
         finite = path_ticks + sum(low for _, low, _ in tail) if seq['end'] in ('hold', 'end') else None
-        hold = (tail[-1][0] if tail else seq['last_frame']) if seq['end'] == 'hold' else None
-        rom = per_tick(list(seq['steps']) + tail, ticks, hold)
+        if seq['end'] != 'hold':
+            hold = None
+        elif idle and idle['first_goto'] is not None:
+            # The frame ToIdle shows when it jumps to the idle loop; a ToIdle
+            # that set no frame by then still shows the attack's last one.
+            hold = idle['goto_frame'] if idle['goto_frame'] is not None else seq['last_frame']
+        elif idle:
+            # ToIdle never jumps: the frame it ends on, or the attack's.
+            hold = idle['last_frame'] if idle['last_frame'] is not None else seq['last_frame']
+        else:
+            hold = seq['last_frame']  # no ToIdle: ignorerest keeps the attack frame
+        path = list(seq['steps']) + tail
+        if seq['end'] == 'loop' and seq.get('cycle'):  # a looping path repeats its steady cycle
+            while sum(low for _, low, _ in path) < ticks and sum(low for _, low, _ in seq['cycle']):
+                path += list(seq['cycle'])
+        rom = per_tick(path, ticks, hold)
         if seq['end'] == 'hold' and len(rom) < ticks:  # ignorerest holds a frame we may not know
             rom += [hold] * (ticks - len(rom))
         row.update(rom_ticks=path_ticks, rom_end=seq['end'], rom_frames=[f for f, _ in collapse(seq['steps'])],
@@ -928,6 +1066,11 @@ def compare_attack(scripts: Scripts, raw: int, actor: dict, frames: dict) -> lis
             if not keep:
                 row['verdict'] = 'not compared'
                 notes.append('no ROM frame is known on any engine tick (the path never plays a frame)')
+            elif rp == ep and len(keep) < ticks:
+                # Agreement on the known ticks only: a tick that shows the frame
+                # the previous animation left cannot be checked.
+                row['verdict'] = 'not compared'
+                notes.append('the known ticks agree up to relabelling (heading 0, root image)')
             elif rp == ep:
                 row['verdict'] = 'match'
                 notes.append('frame order and waits agree up to relabelling (heading 0, root image)')
@@ -969,11 +1112,15 @@ def compare_death(scripts: Scripts, raw: int, actor: dict, images: dict) -> list
             continue
         steps = collapse(seq['steps'])
         rom_frames = [f for f, _ in steps if f is not None]
-        rom_ticks = sum(low for _, low, _ in seq['steps'])
+        # The burst starts at the first wait that shows a frame; a waitrand
+        # gives a range of durations.
+        framed = seq['steps'][next((i for i, st in enumerate(seq['steps']) if st[0] is not None),
+                                   len(seq['steps'])):]
+        rom_lo, rom_hi = sum(lo for _, lo, _ in framed), sum(hi for _, _, hi in framed)
         eng_frames = images.get(image, {}).get('source_frames')
         eng_ticks = layer['end'] - layer['start']
-        row.update(rom_frames=rom_frames, rom_ticks=rom_ticks, rom_end=seq['end'], sounds=sounds_of(seq),
-                   engine_frames=eng_frames, engine_ticks=eng_ticks)
+        row.update(rom_frames=rom_frames, rom_ticks=rom_lo if rom_lo == rom_hi else [rom_lo, rom_hi],
+                   rom_end=seq['end'], sounds=sounds_of(seq), engine_frames=eng_frames, engine_ticks=eng_ticks)
         notes = []
         if eng_frames is None:
             notes.append('engine image has no frame list')
@@ -981,16 +1128,20 @@ def compare_death(scripts: Scripts, raw: int, actor: dict, images: dict) -> list
             notes.append('frame set differs')
         elif eng_frames != rom_frames:
             notes.append('same frames; the engine record lists them in index order, so play order is unchecked')
+        frames_bad = any(n.startswith(('frame', 'engine image')) for n in notes)
         if layer.get('remnant'):
             notes.append('remnant layer: duration is the engine cap, not compared')
-            row['verdict'] = 'differs' if any(n.startswith(('frame', 'engine image')) for n in notes) else 'match'
+            row['verdict'] = 'differs' if frames_bad else 'not compared'
+        elif seq['end'] != 'end':
+            notes.append(f'ROM path does not end ({seq["end"]}); duration not compared')
+            row['verdict'] = 'differs' if frames_bad else 'not compared'
         else:
-            if seq['end'] == 'end' and eng_ticks != rom_ticks:
-                notes.append(f'duration differs (ROM {rom_ticks}, engine {eng_ticks} source ticks)')
-            elif seq['end'] != 'end':
-                notes.append(f'ROM path does not end ({seq["end"]}); duration not compared')
-            row['verdict'] = 'differs' if any(n.startswith(('frame', 'duration', 'engine image'))
-                                              for n in notes) else 'match'
+            if not rom_lo <= eng_ticks <= rom_hi:
+                rng = rom_lo if rom_lo == rom_hi else f'{rom_lo}-{rom_hi}'
+                notes.append(f'duration differs (ROM {rng}, engine {eng_ticks} source ticks)')
+            elif rom_lo != rom_hi:
+                notes.append(f'ROM waitrand: engine duration {eng_ticks} lies in the ROM range {rom_lo}-{rom_hi}')
+            row['verdict'] = 'differs' if frames_bad or any(n.startswith('duration') for n in notes) else 'match'
         if notes:
             row['note'] = '; '.join(notes)
         rows.append(row)
@@ -1022,6 +1173,7 @@ def compare_construction(scripts: Scripts, stage: dict, baked: dict) -> dict:
     cycle = list(seq.get('cycle') or []) if rom_loop is not None else []
     notes = []
     eng_steps = [(f, d, d) for f, d in eng_raw]
+    unknown_frame = any(f is None for f, _, _ in seq['steps'])
     if len(rom_raw) == len(eng_raw):
         first = (rom_raw, eng_raw)
         steady = ([(f, lo if lo == hi else [lo, hi]) for f, lo, hi in cycle], eng_raw[eng_loop:]) \
@@ -1064,7 +1216,11 @@ def compare_construction(scripts: Scripts, stage: dict, baked: dict) -> dict:
     elif seq['end'] not in ('loop', 'end', 'hold'):
         notes.append(f'ROM path ends by {seq["end"]}; termination not compared')
     blocking = [n for n in notes if not n.startswith(('ROM path ends by', 'step counts differ'))]
-    row['verdict'] = 'differs' if blocking else 'match'
+    unknown_end = any(n.startswith('ROM path ends by') for n in notes)
+    if unknown_frame and not blocking:
+        notes.append('a ROM step shows the frame the previous stage left; it is not compared')
+        unknown_end = True
+    row['verdict'] = 'differs' if blocking else 'not compared' if unknown_end else 'match'
     if notes:
         row['note'] = '; '.join(notes)
     return row
@@ -1072,10 +1228,10 @@ def compare_construction(scripts: Scripts, stage: dict, baked: dict) -> dict:
 
 def iscript_section(scripts: Scripts, root: Path, banks: dict, names: dict) -> dict:
     status = {}
-    walk, status['walk'] = load_manifest(*banks['walk'])
-    attack, status['attack'] = load_manifest(*banks['attack'])
-    death, status['death'] = load_manifest(*banks['death'])
-    construction, status['construction'] = load_manifest(*banks['construction'])
+    walk, status['walk'] = load_manifest(*banks['walk'], BANK_SECTIONS['walk'])
+    attack, status['attack'] = load_manifest(*banks['attack'], BANK_SECTIONS['attack'])
+    death, status['death'] = load_manifest(*banks['death'], BANK_SECTIONS['death'])
+    construction, status['construction'] = load_manifest(*banks['construction'], BANK_SECTIONS['construction'])
     units: dict[int, dict] = {}
 
     def unit(raw):
@@ -1127,6 +1283,27 @@ def iscript_section(scripts: Scripts, root: Path, banks: dict, names: dict) -> d
     for name, build in (('walk', walk_rows), ('attack', attack_rows), ('death', death_rows),
                         ('construction', construction_rows)):
         bank_rows(name, build)
+    missing = {name: state for name, state in status.items() if state != 'ok'}
+    stages_by_raw: dict = {}
+    if 'construction' in missing:  # the stages the construction importer would bake
+        for st in source_stage_inputs(scripts.tables, scripts.payload):
+            stages_by_raw.setdefault(st['raw_unit_id'], []).append(st)
+    for raw in range(UNIT_COUNT) if missing else ():
+        image = scripts.unit_image(raw)
+        present = scripts.animations(image)
+        wanted = []
+        if 'walk' in missing and 'Walking' in present:
+            wanted.append(('Walking', image, 'walk'))
+        if 'attack' in missing:
+            wanted += [(name, image, 'attack') for name in ('GndAttkInit', 'AirAttkInit') if name in present]
+        if 'death' in missing and 'Death' in present:
+            wanted.append(('Death', image, 'death'))
+        if 'construction' in missing:
+            wanted += [(f"construction {st['animation']} (stage {st['stage']})", st['image_id'], 'construction')
+                       for st in stages_by_raw.get(raw, [])]
+        for animation, img, name in wanted:
+            unit(raw)['rows'].append({'animation': animation, 'image': img, 'verdict': 'absent',
+                                      'note': f'{name} bank {missing[name]}'})
     if status['construction'] != 'ok':
         construction = None
     # Construction stages run on the construction image, which may not be the
@@ -1176,6 +1353,18 @@ def iscript_section(scripts: Scripts, root: Path, banks: dict, names: dict) -> d
 
 SOUND_KINDS = ('ready', 'yes', 'what', 'annoyed', 'attack', 'death')
 ENGINE_KINDS = ('ready', 'what', 'yes', 'attack', 'death', 'built')  # game_audio.h emits these
+
+
+def manifest_blob(audio_dir: Path):
+    """The blob SHA-256 the bank's manifest pins, or None."""
+    path = audio_dir / 'sc64_audio_manifest.json'
+    if not path.is_file():  # never open a FIFO or a device
+        return None
+    try:
+        manifest = json.loads(path.read_text())
+        return manifest['output']['blob_sha256']
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def header_array(text: str, name: str) -> list[int]:
@@ -1263,6 +1452,8 @@ def sound_section(scripts: Scripts, units: list, audio_dir: Path, lengths: list,
             status = f'absent: the bank blob or its digest in {side.name} is missing; regenerate the bank'
         elif id_map.get('blob_sha256') != blob_digest:
             status = f'stale: {side.name} and the blob come from different generations'
+        elif manifest_blob(audio_dir) != blob_digest:
+            status = 'stale: the manifest pins another blob than the one beside it'
         else:
             try:  # parse the same bytes the digest covers
                 engine = engine_unit_sounds(header_bytes.decode('ascii'), id_map)
@@ -1417,9 +1608,8 @@ def run(args) -> int:
     local = Path(args.local) if args.local else None
 
     def bank(relative):
-        for base in [local] if local else [root / '.local/sc64', main_checkout(root) / '.local/sc64']:
-            if (base / relative).exists():
-                return base / relative
+        # No fallback to the main checkout: this checkout's builds read only
+        # its own .local, so another checkout's bank would describe another build.
         return (local or root / '.local/sc64') / relative
     banks = {'walk': (bank('walk/generated/manifest.json'), bank('walk/generated/sc64_unit_walk_generated.h')),
              'attack': (bank('attack-poses/generated/manifest.json'),
@@ -1428,11 +1618,12 @@ def run(args) -> int:
              'construction': (bank('construction/generated/manifest.json'),
                               bank('construction/generated/sc64_construction_sprites_generated.h'))}
     binaries = Path(args.binaries) if args.binaries else None
-    result = {'census': census_section(maps, binaries, extractor, args.absent_profile)}
+    result = {'census': census_section(maps, binaries, extractor, args.absent_profile, root)}
     result['iscript'] = iscript_section(scripts, root, banks, names)
-    drawn = sorted({u['raw'] for u in result['iscript']['units']})
-    if not drawn:  # no animation bank: report every unit the ROM voices
-        drawn = [raw for raw in range(UNIT_COUNT) if any(scripts.rom_sounds(raw).values())]
+    # Independent of which banks loaded: every unit the ROM voices, and every
+    # unit the animation report names.
+    drawn = sorted({u['raw'] for u in result['iscript']['units']} |
+                   {raw for raw in range(UNIT_COUNT) if any(scripts.rom_sounds(raw).values())})
     audio = Path(args.audio) if args.audio else bank('audio/generated')
     result['sounds'] = sound_section(scripts, drawn, audio, lengths, names)
     result['summary'] = summarize(result)

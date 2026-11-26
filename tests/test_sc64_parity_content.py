@@ -8,6 +8,7 @@ census traces and audio tables, so no game data is needed. The last runs the
 real tool only when the private ROM inputs are present and skips otherwise.
 """
 import json
+import os
 import struct
 import subprocess
 import tempfile
@@ -153,6 +154,17 @@ class IscriptWalkTest(unittest.TestCase):
         rows = pc.compare_attack(None, 5, {'raw_unit': 5, 'status': 'unsupported_actor_image'}, {})
         self.assertEqual((rows[0]['verdict'], 'unsupported' in rows[0]['note']), ('absent', True))
 
+    def test_attack_with_an_unknown_leading_tick_is_not_a_match(self):
+        attack = wait(1) + playfram(17) + wait(1) + op(48)
+
+        class Fake:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(attack, 0) if 'Init' in animation else None
+        actor = {'root_image_id': 1, 'modes': [{'target_air': 0, 'animation': 'GndAttkInit', 'status': 'ok',
+                                                'full_duration_source_ticks': 2}]}
+        row = pc.compare_attack(Fake(), 5, actor, {(5, 'ground'): [(0, 1), (1, 2)]})[0]
+        self.assertEqual(row['verdict'], 'not compared')
+
     def test_attack_with_no_known_rom_frame_is_not_compared(self):
         class Fake:
             def sequence(self, image, animation):
@@ -263,8 +275,16 @@ class CensusTest(unittest.TestCase):
             (root / 'cut.json').write_text('{"header_sha2')
             (root / 'list.json').write_text('[]')
             (root / 'bare.json').write_text('{"generated_header": "bank.h"}')
+            import hashlib
+            digest = hashlib.sha256(header.read_bytes()).hexdigest()
+            (root / 'digest-only.json').write_text(json.dumps({'header_sha256': digest}))
+            (root / 'empty.json').write_text(json.dumps({'header_sha256': digest, 'entries': []}))
             for name in ('cut.json', 'list.json', 'bare.json'):
                 manifest, status = pc.load_manifest(root / name, header)
+                self.assertIsNone(manifest, name)
+                self.assertTrue(status.startswith('unavailable'), status)
+            for name in ('digest-only.json', 'empty.json'):  # pinned, but its data section is missing
+                manifest, status = pc.load_manifest(root / name, header, pc.BANK_SECTIONS['walk'])
                 self.assertIsNone(manifest, name)
                 self.assertTrue(status.startswith('unavailable'), status)
 
@@ -355,6 +375,134 @@ class CensusTest(unittest.TestCase):
             self.assertEqual(pc.skirmish_census(starts, bad, halls)['verdict'], 'differs')
 
 
+class SkippedComparisonTest(unittest.TestCase):
+    """A row whose comparison was partly skipped never reads as a match."""
+
+    class Fake:
+        def __init__(self, programs, directional=False):
+            self.programs, self.turns = programs, directional
+        def sequence(self, image, animation):
+            program = self.programs.get(animation)
+            return pc.rom_sequence(program, 0) if program is not None else None
+        def directional(self, image):
+            return self.turns
+
+    def test_attack_recovery_uses_the_frame_shown_at_the_goto(self):
+        attack = playfram(34) + wait(1) + playfram(51) + wait(1) + op(48)
+        idle = playfram(0) + goto(0)  # ToIdle plays the idle pose and leaves at once
+        fake = self.Fake({'GndAttkInit': attack, 'GndAttkToIdle': idle})
+        actor = {'root_image_id': 1, 'modes': [{'target_air': 0, 'animation': 'GndAttkInit', 'status': 'ok',
+                                                'full_duration_source_ticks': 4}]}
+        right = {(5, 'ground'): [(0, 7), (1, 8), (2, 9), (3, 9)]}   # idle pose after the path
+        holds = {(5, 'ground'): [(0, 7), (1, 8), (2, 8), (3, 8)]}   # wrongly keeps the attack frame
+        self.assertEqual(pc.compare_attack(fake, 5, actor, right)[0]['verdict'], 'match')
+        self.assertEqual(pc.compare_attack(fake, 5, actor, holds)[0]['verdict'], 'differs')
+
+    def test_a_looping_attack_path_repeats_its_cycle(self):
+        attack = playfram(0) + wait(1) + playfram(17) + wait(1) + goto(0)
+        fake = self.Fake({'GndAttkInit': attack})
+        actor = {'root_image_id': 1, 'modes': [{'target_air': 0, 'animation': 'GndAttkInit', 'status': 'ok',
+                                                'full_duration_source_ticks': 4}]}
+        two_cycles = {(5, 'ground'): [(0, 1), (1, 2), (2, 1), (3, 2)]}
+        self.assertEqual(pc.compare_attack(fake, 5, actor, two_cycles)[0]['verdict'], 'match')
+
+    def test_walk_without_a_steady_loop_is_not_compared(self):
+        entry = {'unit_id': 0, 'image_id': 1, 'cycle_ticks': 2, 'steps': [{'tick': 0, 'pose': 1}, {'tick': 1, 'pose': 2}]}
+        ending = self.Fake({'Walking': playfram(17) + wait(1) + playfram(34) + wait(1) + op(22)}, True)
+        self.assertEqual(pc.compare_walk(ending, entry)['verdict'], 'not compared')
+        looping = self.Fake({'Walking': playfram(17) + wait(1) + playfram(34) + wait(1) + goto(0)}, True)
+        self.assertEqual(pc.compare_walk(looping, entry)['verdict'], 'match')
+
+    def test_death_duration_counts_from_the_first_frame_and_honours_waitrand(self):
+        actor = {'image_id': 1, 'layers': [{'image_id': 1, 'start': 0, 'end': 5, 'remnant': False}]}
+        images = {1: {'source_frames': [0, 1]}}
+        rand = self.Fake({'Death': playfram(0) + op(6, (1, 2), (1, 4)) + playfram(1) + wait(2) + op(22)})
+        self.assertEqual(pc.compare_death(rand, 0, actor, images)[0]['verdict'], 'match')  # 5 in 4-6
+        lead = self.Fake({'Death': wait(1) + playfram(0) + wait(2) + playfram(1) + wait(3) + op(22)})
+        self.assertEqual(pc.compare_death(lead, 0, actor, images)[0]['verdict'], 'match')  # 2+3 = 5
+        loops = self.Fake({'Death': playfram(0) + wait(2) + playfram(1) + wait(3) + goto(0)})
+        self.assertEqual(pc.compare_death(loops, 0, actor, images)[0]['verdict'], 'not compared')
+        remnant = {'image_id': 1, 'layers': [{'image_id': 1, 'start': 0, 'end': 720, 'remnant': True}]}
+        self.assertEqual(pc.compare_death(loops, 0, remnant, images)[0]['verdict'], 'not compared')
+
+    def test_construction_with_an_unknown_end_is_not_compared(self):
+        class Fake:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(playfram(1) + wait(2) + playfram(2) + op(41, (1, 4)) + goto(6), 0)
+        stage = {'raw_unit_id': 106, 'stage': 0, 'animation': 'Init', 'image_id': 1}
+        baked = {(106, 0): {'steps': [(1, 2)], 'loop_start': 0, 'frame_count': 3}}
+        self.assertEqual(pc.compare_construction(Fake(), stage, baked)['verdict'], 'not compared')
+
+        class Leading:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(wait(3) + playfram(1) + wait(2) + op(48), 0)
+        held = {(106, 0): {'steps': [(0, 3), (1, 2)], 'loop_start': pc.HOLD_LAST, 'frame_count': 3}}
+        self.assertEqual(pc.compare_construction(Leading(), stage, held)['verdict'], 'not compared')
+
+    def test_unknown_resource_type_disabled_rows_and_start_locations(self):
+        always = [{'name': 'Always', 'comparison': 0, 'amount': 0, 'player_group': 0, 'unit_type': 0, 'flags': 0}]
+        def trigger(actions, conditions=always):
+            return {'record': 0, 'conditions': conditions, 'executed_for_player_values': [0, 1] + [0] * 25,
+                    'actions': actions}
+        def grant(kind, amount, flags=0):
+            return {'name': 'SetResources', 'group1': 13, 'group2': amount, 'unit_type': kind, 'modifier': 7,
+                    'flags': flags}
+        owners = bytes([6, 6, 5, 0, 0, 0, 0, 0])
+        rows = pc.start_banks([trigger([grant(3, 9), grant(0, 40, flags=pc.DISABLED)])], bytes(8), [], owners)
+        self.assertEqual([r['resource'] for r in rows], ['resource 3'])  # the disabled action is skipped
+        census = {'step': 0, 'last_step': 9, 'bank_history': {0: [{'step': 0, 'minerals': 0, 'gas': 0}]},
+                  'banks': {}}
+        self.assertTrue(pc.compare_banks(rows, census, {1: 0})[0]['verdict'].startswith('not compared'))
+        # A disabled condition does not have to hold.
+        never = dict(always[0], name='Never', flags=pc.DISABLED)
+        self.assertEqual(len(pc.start_banks([trigger([grant(0, 40)], always + [never])], bytes(8), [], owners)), 1)
+        # A start location is not a unit a Command condition counts.
+        men = {'name': 'Command', 'comparison': 0, 'amount': 1, 'player_group': 13, 'unit_type': pc.MEN, 'flags': 0}
+        starts = [{'type': pc.START_LOCATION, 'owner': 1, 'x': 0, 'y': 0}]
+        self.assertEqual(pc.start_banks([trigger([grant(0, 40)], [men])], bytes(8), starts, owners), [])
+
+    def test_blood_bath_without_town_hall_calibration_is_not_compared(self):
+        starts = [dict(chk(214, i, 100 + 1000 * i, 100), type=214) for i in range(4)]
+        census = gba(buildings=[(-1, 0, 50, 50), (-1, 1, 550, 50)])
+        self.assertEqual(pc.skirmish_census(starts, census, {})['verdict'], 'not compared')
+        # A missing mineral patch is a difference whatever the calibration.
+        mineral = [chk(176, 11, 300, 300, 1500)]
+        self.assertEqual(pc.skirmish_census(starts + mineral, census, {})['verdict'], 'differs')
+
+    def test_collision_pairing_does_not_depend_on_chk_row_order(self):
+        rows = [chk(37, 4, 200, 200), chk(37, 4, 204, 200)]
+        census = gba(units=[(37, 4, 101, 100), (37, 4, 36, 100)])
+        forward = pc.compare_census(rows, census)
+        backward = pc.compare_census(list(reversed(rows)), census)
+        self.assertEqual((forward['verdict'], forward['counts']), (backward['verdict'], backward['counts']))
+        # 100 can pair with 101 or 36, 102 only with 101: both are collisions.
+        both = pc.compare_census([chk(37, 4, 200, 200), chk(37, 4, 204, 200)],
+                                 gba(units=[(37, 4, 101, 100), (37, 4, 60, 100)]))
+        self.assertEqual((both['counts']['collision'], both['counts']['moved']), (2, 0))
+        # Identical placements and actors far apart: two moves, nothing missing or extra.
+        far = pc.compare_census([chk(0, 1, 10, 10), chk(0, 1, 10, 10)], gba(units=[(0, 1, 500, 5), (0, 1, 500, 5)]))
+        self.assertEqual((far['counts']['moved'], far['counts']['missing'], far['counts']['extra']), (2, 0, 0))
+
+    def test_an_untrusted_census_binary_is_not_run(self):
+        with tempfile.TemporaryDirectory() as temp:
+            binary = Path(temp) / 'terran-fast-trace'
+            binary.write_text('#!/bin/sh\nexit 0\n')
+            self.assertIn('error', pc.binary_record(binary, Path(temp), Path(temp)))  # no build record
+            source = Path(temp) / 'game.c'
+            source.write_text('int x;\n')
+            record = {'binary_sha256': pc.file_sha256(binary),
+                      'inputs': {'generated': {}, 'sources': {'game.c': pc.file_sha256(source)}},
+                      'compile_command': 'touch should-not-run'}
+            Path(str(binary) + '.inputs').write_text(json.dumps(record))
+            work = Path(temp) / 'work'
+            work.mkdir()
+            good = pc.binary_record(binary, Path(temp), work)
+            self.assertEqual(good['binary_sha256'], record['binary_sha256'])
+            self.assertFalse((Path(temp) / 'should-not-run').exists())  # the command is data
+            source.write_text('int y;\n')
+            self.assertIn('inputs changed', pc.binary_record(binary, Path(temp), work)['error'])
+
+
 class SoundTest(unittest.TestCase):
     HEADER = ('enum { SC64_AUDIO_READY, SC64_AUDIO_WHAT, SC64_AUDIO_YES, SC64_AUDIO_ATTACK, '
               'SC64_AUDIO_DEATH, SC64_AUDIO_BUILT };\n'
@@ -393,19 +541,88 @@ class SoundTest(unittest.TestCase):
 
     def test_pack_side_file_replaces_links_instead_of_writing_through(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            tracked = root / 'tracked.txt'
+            tracked = Path(temp) / 'tracked.txt'
             tracked.write_text('keep\n')
-            (root / 'link.json').symlink_to(tracked)
+            linked = Path(temp) / 'linked'
+            linked.mkdir()
+            (linked / 'link.json').symlink_to(tracked)
             with self.assertRaises(ValueError):
-                pack.publish({root / 'new.json': b'x\n', root / 'link.json': b'{}\n'})
-            self.assertFalse((root / 'new.json').exists())  # nothing is published when one is refused
-            (root / 'hard.json').hardlink_to(tracked)
-            (root / 'hard.json').chmod(0o600)
-            pack.publish({root / 'hard.json': b'{}\n'})
-            self.assertEqual((root / 'hard.json').stat().st_mode & 0o777, 0o600)
+                pack.publish({linked / 'new.json': b'x\n', linked / 'link.json': b'{}\n'})
+            self.assertFalse((linked / 'new.json').exists())  # nothing is published when one is refused
+            bank = Path(temp) / 'bank'
+            bank.mkdir()
+            (bank / 'hard.json').hardlink_to(tracked)
+            (bank / 'hard.json').chmod(0o600)
+            pack.publish({bank / 'hard.json': b'{}\n'})
+            self.assertEqual((bank / 'hard.json').stat().st_mode & 0o777, 0o600)
             self.assertEqual(tracked.read_text(), 'keep\n')
-            self.assertEqual((root / 'hard.json').read_text(), '{}\n')
+            self.assertEqual((bank / 'hard.json').read_text(), '{}\n')
+
+    def test_pack_publishes_one_whole_generation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bank = Path(temp) / 'generated'
+            bank.mkdir()
+            (bank / 'keep.txt').write_text('other\n')
+            (bank / 'a.bin').write_bytes(b'old')
+            (bank / 'a.bin').chmod(0o600)
+            pack.publish({bank / 'a.bin': b'new', bank / 'a.h': b'#define X 1\n'})
+            self.assertEqual(((bank / 'a.bin').read_bytes(), (bank / 'a.h').read_bytes(),
+                              (bank / 'keep.txt').read_text()), (b'new', b'#define X 1\n', 'other\n'))
+            self.assertEqual((bank / 'a.bin').stat().st_mode & 0o777, 0o600)
+            self.assertEqual(sorted(x.name for x in bank.iterdir()),
+                             sorted(['a.bin', 'a.h', 'keep.txt', pack.LOCK_FILE]))  # no staging left
+            with self.assertRaises(ValueError):
+                pack.publish({bank / 'a.bin': b'x', Path(temp) / 'b.bin': b'y'})
+
+    def test_an_interrupted_publish_leaves_the_old_commit_record(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as temp:
+            bank = Path(temp) / 'generated'
+            bank.mkdir()
+            for name, data in (('a.bin', b'old'), ('ids.json', b'old ids')):
+                (bank / name).write_bytes(data)
+            real = os.replace
+            def interrupt(src, dst, **dir_fds):
+                result = real(src, dst, **dir_fds)
+                if Path(dst).name == 'a.bin':
+                    raise KeyboardInterrupt  # after the blob, before the id map
+                return result
+            with mock.patch('os.replace', interrupt), self.assertRaises(KeyboardInterrupt):
+                pack.publish({bank / 'a.bin': b'new', bank / 'ids.json': b'new ids'})
+            # The commit record still describes the old generation, so a reader
+            # comparing its digests with the new blob refuses the bank.
+            self.assertEqual(((bank / 'a.bin').read_bytes(), (bank / 'ids.json').read_bytes()), (b'new', b'old ids'))
+            self.assertEqual([x.name for x in bank.iterdir() if x.name.startswith('.') and 'lock' not in x.name], [])
+
+    def test_pack_publishes_into_the_current_folder(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bank = Path(temp) / 'generated'
+            bank.mkdir()
+            here = os.getcwd()
+            try:
+                os.chdir(bank)
+                pack.publish({Path('.') / 'a.bin': b'new'})
+            finally:
+                os.chdir(here)
+            self.assertEqual((bank / 'a.bin').read_bytes(), b'new')
+
+    def test_pack_refuses_a_bank_folder_that_is_a_link(self):
+        with tempfile.TemporaryDirectory() as temp:
+            real = Path(temp) / 'real'
+            real.mkdir()
+            (Path(temp) / 'generated').symlink_to(real)
+            with self.assertRaises(OSError):  # opened without following the link
+                pack.publish({Path(temp) / 'generated' / 'a.bin': b'new'})
+            self.assertEqual(list(real.iterdir()), [])
+
+    def test_pack_refuses_a_lock_that_is_not_a_regular_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bank = Path(temp) / 'generated'
+            bank.mkdir()
+            os.mkfifo(bank / pack.LOCK_FILE)
+            with self.assertRaises((ValueError, OSError)):  # refused at once, never blocked
+                pack.publish({bank / 'a.bin': b'new'})
+            self.assertFalse((bank / 'a.bin').exists())
 
     def test_pack_refuses_a_tracked_output_directory(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -414,6 +631,8 @@ class SoundTest(unittest.TestCase):
             (repo / '.gitignore').write_text('/private/\n/half/sc64_audio_sound_ids.json\n')
             (repo / 'private').mkdir()
             pack.refuse_tracked(repo / 'private' / 'bank')
+            (repo / '.gitignore').write_text('/private/\n/half/sc64_audio_sound_ids.json\n/scratch*/\n')
+            pack.refuse_tracked(repo, ('scratch-gen/', 'scratch-gen/x'))  # directory-only rule
             with self.assertRaises(ValueError):  # every bank output must be ignored, not one
                 pack.refuse_tracked(repo / 'half')
             with self.assertRaises(ValueError):
@@ -455,9 +674,12 @@ class RomContentTest(unittest.TestCase):
         for section in ('== opening censuses', '== iscript sequences', '== sounds', '== summary'):
             self.assertIn(section, text)
         units = {u['raw']: u for u in document['iscript']['units']}
-        if 0 in units:  # Marine: Walking is a nine-frame, one-tick-per-frame loop in the ROM
-            walk = next(r for r in units[0]['rows'] if r['animation'] == 'Walking')
-            self.assertEqual(walk.get('rom_waits'), [1] * 9)
+        walks = [r for r in units.get(0, {}).get('rows', []) if r['animation'] == 'Walking']
+        compared = [r for r in walks if r['verdict'] != 'absent']
+        if compared:  # Marine: Walking is a nine-frame, one-tick-per-frame loop in the ROM
+            self.assertEqual(compared[0].get('rom_waits'), [1] * 9)
+        elif walks:  # the walk bank is not prepared here: the row reads absent, never skipped
+            self.assertIn('walk bank', walks[0]['note'])
 
 
 if __name__ == '__main__':

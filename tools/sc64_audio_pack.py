@@ -59,7 +59,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
+import stat
 import json
 import os
 import re
@@ -571,8 +573,9 @@ def refuse_tracked(out_dir: Path, names=BANK_FILES) -> None:
     if top.returncode != 0:
         return
     for name in names:
-        target = out_dir.resolve() / name
-        ignored = subprocess.run(["git", "-C", top.stdout.strip(), "check-ignore", "-q", str(target)])
+        # A trailing slash asks about a folder (directory-only ignore rules).
+        target = str(out_dir.resolve() / name) + ("/" if name.endswith("/") else "")
+        ignored = subprocess.run(["git", "-C", top.stdout.strip(), "check-ignore", "-q", target])
         if ignored.returncode != 0:
             raise ValueError(f"{target} is not ignored by git; the audio bank and its sound id map are "
                              "private ROM-derived data")
@@ -584,32 +587,93 @@ def check_destination(path: Path) -> None:
         raise ValueError(f"{path} is a link or not a regular file; refusing to replace it")
 
 
+LOCK_FILE = ".sc64_audio_pack.lock"
+
+
 def publish(outputs: dict) -> None:
-    """Publish {path: bytes} as one generation: every destination is checked,
-    every file is staged in a unique temporary file beside it, and only then
-    are they renamed into place, so a failure leaves the old bank whole and
-    a link at a destination is replaced, never written through. A file keeps
-    the mode of the one it replaces (a new one gets the umask's default)."""
-    for path in outputs:
-        check_destination(path)
+    """Publish {path: bytes}, all in one bank folder, in their given order.
+
+    The folder stays where it is. Every file is staged in a unique temporary
+    file inside it and the staged files are renamed into place one by one, in
+    order, under a lock held inside the folder, so two packers never
+    interleave. The sound id map is renamed last: it pins the header's and
+    the blob's SHA-256, so it is the generation's commit record. A publish
+    that is interrupted, or a reader that looks mid-publish, sees an id map
+    whose digests do not match the header and blob beside it, and
+    tools/sc64_parity_content.py refuses that bank as stale (the manifest
+    also pins the blob). A ROM build reads the header and blob separately,
+    so do not pack while building. Destinations are checked first, a link is
+    replaced and never written through, and a file keeps the mode of the one
+    it replaces (a new one gets the umask's default)."""
+    dirs = {path.parent for path in outputs}
+    if len(dirs) != 1:
+        raise ValueError("a bank generation lives in one directory")
+    named = dirs.pop()
+    named.mkdir(parents=True, exist_ok=True)
+    names = [path.name for path in outputs]
     umask = os.umask(0)
     os.umask(umask)
+    # One descriptor for the folder, opened by the requested name without
+    # following a link there: the lock, staging, renames and cleanup all go
+    # through it. Before each step the privacy-checked path must still name
+    # this same folder, so a folder moved or swapped meanwhile is refused.
+    dfd = os.open(named, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     staged = []
+    lock = -1
     try:
-        for path, data in outputs.items():
-            fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-            staged.append((name, path))
+        opened = os.fstat(dfd)
+        out_dir = named.resolve()
+
+        def same_folder():
+            try:
+                now = os.stat(out_dir)
+            except OSError:
+                now = None
+            if now is None or (now.st_dev, now.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ValueError(f"{out_dir} no longer names the bank folder being written; refusing")
+        same_folder()
+        refuse_tracked(out_dir, (LOCK_FILE,))
+        same_folder()
+        lock = os.open(LOCK_FILE, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600,
+                       dir_fd=dfd)
+        if not stat.S_ISREG(os.fstat(lock).st_mode):
+            raise ValueError(f"{out_dir / LOCK_FILE} is not a regular file")
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        refuse_tracked(out_dir, tuple(names))  # the final names, checked again under the lock
+        same_folder()
+
+        def existing(name):
+            try:
+                return os.stat(name, dir_fd=dfd, follow_symlinks=False)
+            except FileNotFoundError:
+                return None
+        for name in names:
+            st = existing(name)
+            if st is not None and not stat.S_ISREG(st.st_mode):
+                raise ValueError(f"{out_dir / name} is a link or not a regular file; refusing to replace it")
+        for (path, data), name in zip(outputs.items(), names):
+            temp = f".{name}.{os.urandom(6).hex()}"
+            refuse_tracked(out_dir, (temp,))  # the staged file is private before it holds data
+            same_folder()
+            fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=dfd)
+            staged.append(temp)
             with os.fdopen(fd, "wb") as f:
-                # The staging file itself must be ignored before it holds anything.
-                refuse_tracked(path.parent, (Path(name).name,))
                 f.write(data)
-            mode = path.stat().st_mode & 0o777 if path.is_file() else 0o666 & ~umask
-            os.chmod(name, mode)
-        for name, path in staged:
-            os.replace(name, path)
+                st = existing(name)
+                os.fchmod(f.fileno(), st.st_mode & 0o777 if st is not None else 0o666 & ~umask)
+        for temp, name in zip(staged, names):
+            same_folder()
+            os.replace(temp, name, src_dir_fd=dfd, dst_dir_fd=dfd)
+        staged.clear()
     finally:
-        for name, _ in staged:
-            Path(name).unlink(missing_ok=True)
+        for temp in staged:
+            try:
+                os.unlink(temp, dir_fd=dfd)
+            except FileNotFoundError:
+                pass
+        if lock >= 0:
+            os.close(lock)
+        os.close(dfd)
 
 
 def c_array(name: str, ctype: str, values: list[int], width: int = 16) -> str:
@@ -851,6 +915,7 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
                                      "samples": sample_length[sample],
                                      "source_entry_sha256": NUKE_WARNING_SHA256}
     outputs[out_dir / "sc64_audio_manifest.json"] = (json.dumps(report, indent=2) + "\n").encode()
+    outputs[out_dir / SOUND_ID_FILE] = outputs.pop(out_dir / SOUND_ID_FILE)  # the commit record goes last
     publish(outputs)
     return report
 
