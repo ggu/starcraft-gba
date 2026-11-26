@@ -112,6 +112,51 @@ worker_continue_minerals(Unit *q)
     return 1;
 }
 
+#ifdef SC64_IMPORTED_MISSION
+/* StarCraft 64 starts the human's preplaced workers mining as a campaign
+ * mission begins (T3 and Z2 parity captures: the bank rises from tick 169
+ * and 163 with no input). Each idle human worker takes its nearest explored
+ * field within SC64_MINERAL_SEARCH_RADIUS that it can reach, and only while
+ * the human has a town hall; a worker with no such field stays idle. Call
+ * after the opening update_exploration(). At most four route checks per
+ * worker keep the start bounded. */
+static void __attribute__((noinline))
+sc64_start_human_workers_mining(void)
+{
+    if (owner_command_center(SIDE) < 0) return;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        int tried[4], tries = 0;
+        if (!q->alive || q->owner != SIDE || !IS_WORKER(q->type) ||
+            q->order != ORDER_IDLE || SC64_TRANSPORT_LOADED(q)) continue;
+        while (tries < 4) {
+            int best = -1, best_d = SC64_MINERAL_SEARCH_RADIUS * SC64_MINERAL_SEARCH_RADIUS + 1;
+            for (int j = 0; j < MAX_MINERALS; ++j) {
+                int d, cell, skip = 0;
+                if (m[j].amount <= 0 || m[j].x < 0 || m[j].y < 0 ||
+                    m[j].x >= WORLD_W || m[j].y >= WORLD_H) continue;
+                for (int k = 0; k < tries; ++k) skip |= tried[k] == j;
+                cell = m[j].x / 16 + (m[j].y / 16) * MAP_COLS;
+                if (skip || (!SC64_GRID_GET(explored, cell) && !SC64_GRID_GET(visible, cell)))
+                    continue;
+                d = dist2(q->x, q->y, m[j].x, m[j].y);
+                if (d < best_d) { best = j; best_d = d; }
+            }
+            if (best < 0) break;
+            int nx, ny;
+            if (path_next_tile(q->x, q->y, m[best].x, m[best].y, &nx, &ny)) {
+                q->order = ORDER_MINE;
+                q->target = best;
+                q->build = -1;
+                q->work_timer = 0;
+                break;
+            }
+            tried[tries++] = best;
+        }
+    }
+}
+#endif
+
 /* A resource wait advances only while the worker is at its target. Existing
  * saved nonzero timers remain remaining work; no new persistent state. */
 static int

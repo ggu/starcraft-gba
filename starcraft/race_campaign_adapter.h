@@ -1210,6 +1210,7 @@ race_campaign_init(void)
 #endif
 #endif
     update_exploration();
+    sc64_start_human_workers_mining();
 }
 
 static int
