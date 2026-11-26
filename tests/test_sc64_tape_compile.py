@@ -350,6 +350,24 @@ class LabRunnerArgsTest(unittest.TestCase):
         self.assertIn(('B', 1, 2, 0, 1, 0, 1, 1, 0), series['events'])
         self.assertEqual(series['frames'][0]['buildings'][2], (1, 600, 600, 1500, 0, 1500))   # owner, x, y, hp, shields, max
 
+    def test_gba_series_keeps_each_removal_with_its_last_row(self):
+        # A unit and a building removed one step after their rows: kind, step, slot, owner, x, y,
+        # hp at removal, max hp, last row's hp, cartridge type, engine type, last row's step.
+        trace = '\n'.join([
+            '#sc64-parity-trace 1', 'H schema=sc64-parity-trace/1',
+            'S 1 0 1 1 1 0 0 0 -1 -1 0', '+U 3 7 1',
+            'U 3 7 -1 1 -1 100 50 80 80 60 -1 0 100 50 -1 0 0 -1 0 0 0 0 0',
+            'B 2 0 -1 1 -1 300 300 1500 1500 0 0 0 0 1 1 0 -1 -1 -1 -1 0 0',
+            'S 2 1 2 2 1 0 0 0 -1 -1 0', '-U 3 7 1 -3', '-B 2 0 1 0',
+            'Z overflow=0 write_errors=0', ''])
+        import sc64_parity
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 't.trace'
+            path.write_text(trace)
+            series = sc64_parity.gba_series(path)
+        self.assertEqual(series['removals'], [('U', 2, 3, 1, 200, 100, -3, None, 80.0, -1, 7, None),
+                                              ('B', 2, 2, 1, 600, 600, 0, 1500, 1500, -1, 0, 1)])
+
 
 class LabMeasureTest(unittest.TestCase):
     def test_move_legs_turn_and_acceleration(self):
@@ -777,7 +795,24 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(verdicts(with_building(lambda sf: (1, 200, 100, 500 - 6 * (sf >= 28), 0, 1500))), calm)
         self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 400 - (sf >= 28), 0, 1500))), calm)
         self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 1, 0, 1500) if sf < 28 else None,
-                                                [('B', 35, 7, 4, 200, 100, 0, 1500, 1)])), calm)
+                                                [('B', 35, 7, 4, 200, 100, 0, 1500, 1, -1, 0, 34)])), calm)
+        # Burn explains a death only from what it could take since the building's last row: a
+        # shot that kills a building at 5 hp, or a burning one at 300, is a kill.
+        for last_hp, max_hp in ((5, 500), (300, 1500)):
+            self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, last_hp, 0, max_hp) if sf < 28 else None,
+                                                    [('B', 35, 7, 4, 200, 100, -5, max_hp, last_hp, -1, 0, 34)])), fought)
+        # A slot whose building left with hit points and was replaced by a weaker one between two
+        # samples holds two buildings: no drop.
+        self.assertEqual(verdicts(with_building(lambda sf: (4, 200, 100, 500 if sf < 28 else 200, 0, 1500),
+                                                [('B', 35, 7, 4, 200, 100, 500, 1500, 500, -1, 0, 30)])), calm)
+        # A foe born and killed inside one source frame is a foe kill, by its row's id or the
+        # runner's engine-type map: a fight with the foe, never an off-target one.
+        for record, raw_map in ((('U', 35, 9, 4, 170, 100, 0, None, 35, metrics.ZERGLING, 3, None), None),
+                                (('U', 35, 9, 4, 170, 100, 0, None, 35, -1, 3, None), [0, 0, 0, metrics.ZERGLING])):
+            series = with_drone({sf: 40.0 - 6 * (sf >= 28) for sf in range(0, 80)}, removals=[record])
+            result, _ = metrics.lab_attack_gba(spec)(series, golden, dict(report, unit_raw=raw_map))
+            self.assertEqual(result['measured']['off_target'], [])
+            self.assertEqual(result['measured']['inconclusive'], ['lab.cooldown', 'lab.damage'])
 
     def test_an_early_end_or_a_lost_subject_is_not_an_absence(self):
         import sc64_parity
@@ -801,6 +836,43 @@ class LabMeasureTest(unittest.TestCase):
         # The complete run keeps the no-fight baseline.
         self.assertEqual(verdicts({'subject': 1, 'lab': [[5, 4, 1, -1]], 'steps': 100}),
                          {'lab.damage': 'KNOWN', 'lab.survival': 'KNOWN'})
+
+    def test_a_lost_or_shielded_subject(self):
+        import sc64_parity
+        obs = [metrics.observation(c, 'Marine', v, v - 1, v + 1, '+-1', True, [], provenance='n64-ram', n_runs=2)
+               for c, v in (('lab.damage', 6), ('lab.survival', 50))]
+        golden = {'observations': obs}
+        baseline = {f'lab-x:{o["check"]}:{o["subject"]}': {'gba': metrics.ABSENT} for o in obs}
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        report = {'subject': 1, 'lab': [[5, 4, 1, -1]]}
+        spec = {'foe_type': metrics.ZERGLING}
+
+        def run(series):
+            result, _ = metrics.lab_attack_gba(spec)(series, golden, report)
+            rows = {r['check']: r['verdict'] for r in sc64_parity.judge('lab-x', golden, result['values'], {}, baseline)}
+            return result, rows
+        # The subject's row vanishes at 30. Its removal record with hit points left is a lost
+        # subject, not a death: survival is unmeasured. At 0 it is a death.
+        for hp_left, lost in ((40, True), (0, False)):
+            series = walk(pos, hp={1: {sf: 40.0 for sf in range(0, 30)}, 2: {sf: 35.0 for sf in range(0, 80)}},
+                          others=[(2, metrics.ZERGLING, 4, 900, 100)])
+            series['source'] = 'gba'
+            series['removals'] = [('U', 38, 1, 1, 100, 100, hp_left, None, 40, metrics.MARINE, 0, None)]
+            result, rows = run(series)
+            self.assertEqual(result['measured']['subject_lost'], lost)
+            if lost:
+                self.assertIsNone(result['measured']['survival'])
+                self.assertEqual(rows, {'lab.damage': 'REGRESSION', 'lab.survival': 'REGRESSION'})
+            else:
+                self.assertEqual(result['measured']['death'], 26)   # from the command frame, 4
+        # A hit on the subject's shields alone is a hit taken: a fight, never an absence.
+        series = walk(pos, hp={1: {sf: 40.0 for sf in range(0, 80)}, 2: {sf: 35.0 for sf in range(0, 80)}},
+                      others=[(2, metrics.ZERGLING, 4, 900, 100)])
+        for frame in series['frames']:
+            frame['shield'] = {1: 80.0 - 5 * (frame['sf'] >= 30)}
+        result, rows = run(series)
+        self.assertEqual(result['measured']['inconclusive'], ['lab.damage'])
+        self.assertEqual(rows['lab.damage'], 'REGRESSION')
 
     def test_a_changed_subject_leaves_its_checks_unmeasured(self):
         import sc64_parity

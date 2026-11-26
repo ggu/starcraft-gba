@@ -948,9 +948,15 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     # The subject's row going on in place as another unit (an owner change) is no death: the
     # fight is measured up to it and survival is left unmeasured.
     subject_changed = series['lifetime_end'].get(uid) == 'changed' and own[-1][1] > 0
-    if not subject_changed and (own[-1][0] < last_sf or own[-1][1] <= 0):
+    # A GBA row vanishes on its killing hit, so a missing row is a death, unless the trace's
+    # removal record shows the subject left with hit points (loaded, or removed by the mission):
+    # then it is lost, and survival is left unmeasured.
+    gone = next((r for r in series.get('removals', []) if r[0] == 'U' and r[2] == uid and
+                 (r[1] or 0) * 4 // 5 >= own[-1][0]), None) if own[-1][1] > 0 else None
+    subject_lost = not subject_changed and own[-1][0] < last_sf and gone is not None and gone[6] > 0
+    if not subject_changed and not subject_lost and (own[-1][0] < last_sf or own[-1][1] <= 0):
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
-    end = death if death is not None else (own[-1][0] if subject_changed else last_sf)
+    end = death if death is not None else (own[-1][0] if subject_changed or subject_lost else last_sf)
     window = [f for f in series['frames'] if t0 <= f['sf'] <= end]
     # Every row seen during the fight, with the first frame it was seen on: a unit born after
     # the command (a spawned enemy) is a victim, a barrier and a rival like any other.
@@ -1055,10 +1061,15 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     def burn_loss(frames):
         return (SC64_BURN_Q8 * max(1, frames) + 255) // 256
     # GBA enemy buildings in reach that lose shields, or more hit points than burning explains.
+    # A building slot removed or reborn between two samples holds two buildings: never compare them.
+    turnover = {(r[2], (r[1] or 0) * 4 // 5) for r in series.get('removals', []) if r[0] == 'B'}
+    turnover |= {(ev[2], (ev[1] or 0) * 4 // 5) for ev in series.get('events', []) if ev[0] in ('+B', '-B')}
     for before_, after_ in zip(window, window[1:]):
         for k, b in before_.get('buildings', {}).items():
             a = after_.get('buildings', {}).get(k)
             if b[0] == human or b[0] >= 8 or a is None or len(b) < 5 or len(a) < 5 or a[0] != b[0]:
+                continue
+            if any(slot == k and before_['sf'] < sf <= after_['sf'] for slot, sf in turnover):
                 continue
             drop, max_hp = b[3] - a[3], (b[5] if len(b) > 5 else None)
             hit = b[4] - a[4] >= 0.5 or (drop >= 0.5 and not (burning(b[3], max_hp) and
@@ -1067,13 +1078,26 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
                 nearby.add(after_['sf'])
     # GBA removals (a unit or building born and removed inside one source frame shows only here):
     # an enemy killed in reach of the subject, unless a burning building could have burned out.
-    for kind, step, slot, owner, x, y, hp, max_hp, last_hp in series.get('removals', []):
+    removed_foes = set()
+    for record in series.get('removals', []):
+        kind, step, slot, owner, x, y, hp, max_hp, last_hp, *rest = record
+        raw, etype_, last_step = (list(rest) + [None] * 3)[:3]
         sf = (step or 0) * 4 // 5
         if not t0 <= sf <= end or owner == human or owner >= 8 or hp > 0:
             continue
         barriers.add(sf)
-        if kind == 'B' and last_hp is not None and burning(last_hp, max_hp):
-            continue   # a burning building may have burned out
+        if kind == 'U' and foe_type is not None:
+            # The foe's cartridge id from the row, or from the runner's engine-type map.
+            cart = raw if raw is not None and raw >= 0 else (
+                unit_raw[etype_] if unit_raw and etype_ is not None and 0 <= etype_ < len(unit_raw) else None)
+            if cart == foe_type:
+                removed_foes.add(sf)   # a foe killed, even one born and killed inside one source frame
+                continue
+        # A burning Terran building whose last hit points its burn could have taken since its
+        # last row may have burned out; any other building death is a kill.
+        if kind == 'B' and last_hp is not None and last_step is not None and burning(last_hp, max_hp) and \
+                last_hp <= burn_loss(((step or 0) - last_step) * 4 // 5):
+            continue
         if point_near(sf, x, y):
             nearby.add(sf)
     unclear |= nearby
@@ -1091,6 +1115,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         barriers.update(events)
         if enemy(vid):
             foe_kills.update(events)
+    foe_kills |= removed_foes
     # GBA buildings carry no hit points in the series: an enemy building that disappears
     # during the fight was destroyed, and splits the timing too.
     for before_, after_ in zip(window, window[1:]):
@@ -1155,6 +1180,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
     gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:])
             if not any(a[0] < sf < b[0] for sf in unclear) and not any(a[0] <= sf <= b[0] for sf in barriers)]
     hp_hits = [d for _, _, d in landed if d]
+    # The subject was hit: hit points, or shields (a Protoss subject's first hits).
+    struck = bool(hits(own, lethal=True) or hits(hp_track(series, uid, t0, end, key='shield'), lethal=True))
     result = {
         'hits': len(landed), 'ambiguous_hits': ambiguous, 'damage_values': sorted(set(hp_hits)),
         'damage': statistics.median(hp_hits) if hp_hits else None,
@@ -1173,11 +1200,10 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # Evidence that a fight happened: any drop or kill of the foe, any drop or kill of another
         # enemy or enemy building in reach of the subject, or any hit on the subject (its death
         # included). With it, a check left without a value is inconclusive, never absent.
-        'combat': bool(victims_all or shielded_all or foe_kills or nearby or hits(own, lethal=True)
-                       or death is not None),
+        'combat': bool(victims_all or shielded_all or foe_kills or nearby or struck or death is not None),
         # The same without the drops near the subject: a fight with the foe, or one the subject took.
-        'foe_combat': bool(victims_all or shielded_all or foe_kills or hits(own, lethal=True) or death is not None),
-        'subject_changed': subject_changed,
+        'foe_combat': bool(victims_all or shielded_all or foe_kills or struck or death is not None),
+        'subject_changed': subject_changed, 'subject_lost': subject_lost,
         # A dying N64 row outlives its hit points (16 frames for a Marine); a GBA row goes in
         # the step of the killing hit, so that hit leaves no hit-point record there. A victim
         # counts as killed when its points reach 0 or its row is gone before the end.
@@ -1320,21 +1346,22 @@ def lab_attack_gba(spec):
         # those checks get no value (a gating REGRESSION, "not measured"), never ABSENT, which
         # a baseline recording no fight would otherwise accept.
         # An observation that ended early is no evidence of absence either: a subject that
-        # changed owner or type, a run that stopped before its requested steps (the mission left
-        # play), or a measure that found no subject. What it did not reach is unmeasured,
+        # changed owner or type or left with hit points, a run that stopped before its requested
+        # steps (the mission left play), or a measure that found no subject. What it did not reach is unmeasured,
         # survival included.
         requested, ran = golden.get('gba', {}).get('steps'), report.get('steps')
         truncated = requested is not None and ran is not None and int(ran) < int(requested)
         measured['truncated'] = truncated
         inconclusive, off_target = set(), False
-        if m is not None and m['combat'] and not m['foe_combat'] and not m['subject_changed'] and not truncated:
+        ended = m is None or m['subject_changed'] or m.get('subject_lost') or truncated
+        if not ended and m['combat'] and not m['foe_combat']:
             # The subject fought only other enemies: what it never did to the foe is the
             # OFF_TARGET marker, which only a baseline holding the same marker accepts.
             off_target = True
-        elif m is None or m['combat'] or m['subject_changed'] or truncated:
+        elif ended or m['combat']:
             # Survival is the one check whose absence is an outcome: the subject did not die.
             inconclusive = {obs['check'] for obs in golden['observations']} - set(values)
-            if m is not None and m['death'] is None and not m['subject_changed'] and not truncated:
+            if not ended and m['death'] is None:
                 inconclusive.discard('lab.survival')
         inconclusive &= {obs['check'] for obs in golden['observations']}
         measured['inconclusive'] = sorted(inconclusive)
