@@ -586,9 +586,11 @@ def tick_frames(cap):
     # one would be a tick the clock cannot place (the decoder adds skipped frames only before
     # in-mission records), so it is refused rather than dated.
     start = next((i for i, r in enumerate(cap.ticks) if r['table']), None)
-    entry = getattr(cap, 'first_table_tick', None)   # the first tick with a table, in either read
-    later = [table for (_, tick), table in zip(getattr(cap, 'change_reads', []), getattr(cap, 'change_tables', []))
-             if entry is not None and tick > entry]
+    # Mission entry: the frontend step of the first read with a table, in either phase (tick
+    # numbers can restart at launch); a change read at a later step must have one.
+    entry = getattr(cap, 'first_table_step', None)
+    later = [table for (step, _), table in zip(getattr(cap, 'change_reads', []), getattr(cap, 'change_tables', []))
+             if entry is not None and step > entry]
     if start is not None and (any(not r['table'] for r in cap.ticks[start:]) or not all(later) or
                               any(not table for _, _, table in getattr(cap, 'trailing_changes', []))):
         raise ValueError(f'{cap.run}: a read without a unit table after the mission started')
@@ -874,6 +876,7 @@ def make_measure_gba(scenario_id):
         got = values(m, horizon, frames)
         got_late = values(late, reach, frames) if late is not None else {}
         flat, late_waves = {}, []
+        past_end = []   # timings admitted past the run's end, for --explain
         for obs in golden['observations']:
             key = (obs['check'], obs['subject'])
             v = got.get(key)
@@ -888,6 +891,7 @@ def make_measure_gba(scenario_id):
                 after = got_late.get(key)
                 if after is not None and after != NEVER and horizon < after <= reach_of(obs):
                     v = after
+                    past_end.append(key)
                     if obs['check'] == 'attack.first_wave':
                         late_waves.append(key[1])
             flat[key] = v
@@ -900,8 +904,14 @@ def make_measure_gba(scenario_id):
                        for name in p['firsts'] if (f'build.first.{name}', label) not in
                        {(o['check'], o['subject']) for o in golden['observations']})
         measured = {label: {k: v for k, v in p.items() if k != 'series'} for label, p in m['players'].items()}
+        for check, label in past_end:   # the details show the times the verdicts used
+            if check.startswith('build.first.') and label in measured:
+                measured[label]['firsts'] = dict(measured[label]['firsts'], **{check[len('build.first.'):]: flat[(check, label)]})
+            elif check == 'attack.first_wave' and label in measured:
+                measured[label]['wave'] = flat[(check, label)]
         return {'values': flat, 'curves': gba_curves(m, golden),
                 'measured': {'players': measured, 'end': m['end'], 'gba_only_types': extra,
+                             'past_run_end': sorted(f'{c} {s}' for c, s in past_end),
                              'start_order': match.get('start_order')}}, None
     return measure_gba
 

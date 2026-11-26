@@ -344,6 +344,7 @@ class Capture:
         self.verified = self._verify_artifacts(tap)
         self.ticks = []          # follow-up records in tick order: dicts
         self.first_table_tick = None
+        self.first_table_step = None   # the frontend step of that read (tick numbers can restart)
         self.last_change = None
         self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0,
                        'skipped_ticks': 0, 'unexplained_skips': 0, 'interior_missing': 0}
@@ -367,6 +368,7 @@ class Capture:
                 self.faults['bad_links'] += 1
             if head['flags'] & FLAG_TABLE and self.first_table_tick is None:
                 self.first_table_tick = head['tick']   # the first tick with a unit table, in either read
+                self.first_table_step = head['step']
             if head['phase'] == 0:
                 self.last_change = head   # the capture's last change read (it may have no follow-up)
                 # The change record a follow-up read belongs to is the latest one
@@ -780,7 +782,8 @@ def same_bundle(a, b, allow_skips=False, same_watch=False):
         if getattr(a, 'trailing_changes', None) != getattr(b, 'trailing_changes', None):
             problems.append('the change reads after the last follow-up differ between the runs')
         # So do the change reads' unit-table flags, which decide which skipped ticks count.
-        if getattr(a, 'change_tables', None) != getattr(b, 'change_tables', None):
+        if list(zip(getattr(a, 'change_reads', []), getattr(a, 'change_tables', []))) != \
+                list(zip(getattr(b, 'change_reads', []), getattr(b, 'change_tables', []))):
             problems.append('the change reads\' unit-table flags differ between the runs')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
