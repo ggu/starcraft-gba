@@ -593,6 +593,8 @@ def lab_move_measure(series, uid, frames, targets, chord=None, floor_px=None):
         end = leg['settled_until']   # settling counts only through the last sample seen
         if end - leg['arrive'] < LAB_SETTLE:
             return None, f'leg {k}: the subject was still moving {end - leg["arrive"]} frames before the leg ended'
+        if k == 0 and leg['cruise'] <= 0:
+            return None, f'leg {k}: the subject never held a cruise speed'
         if leg['accel'] is None and k == 0:   # only the first leg's reading gates
             return None, f'leg {k}: the subject never reached {LAB_ACCEL_FRACTION:.0%} of its cruise speed'
         miss = math.hypot(leg['end'][0] - targets[k][0], leg['end'][1] - targets[k][1])
@@ -601,11 +603,18 @@ def lab_move_measure(series, uid, frames, targets, chord=None, floor_px=None):
                           f'{tuple(targets[k])} (allowed {LAB_ARRIVE_TOLERANCE})')
         leg['target_miss'] = round(miss, 2)
         legs.append(leg)
+    # The cruise band spans the legs that held a cruise: a later leg too short to (one that
+    # settles after a few moving frames reads cruise 0 or never reaches the cruise fraction)
+    # is left out, so it cannot drop the band's lower bound. Leg 0 always counts (gated above).
+    band = [leg for leg in legs if leg['cruise'] > 0 and leg['accel'] is not None]
     result = {'legs': [{k: (list(v) if isinstance(v, tuple) else v) for k, v in leg.items()} for leg in legs],
               'cruise': legs[0]['cruise'], 'accel': legs[0]['accel'], 'duration': legs[0]['duration'],
               'latency': legs[0]['latency'],
-              'cruise_min': min(leg['cruise'] for leg in legs), 'cruise_max': max(leg['cruise'] for leg in legs),
+              'cruise_min': min(leg['cruise'] for leg in band), 'cruise_max': max(leg['cruise'] for leg in band),
               'accel_chord': chord, 'accel_floor': floor_px}
+    left_out = [k for k, leg in enumerate(legs) if not (leg['cruise'] > 0 and leg['accel'] is not None)]
+    if left_out:
+        result['cruise_left_out'] = left_out
     if len(legs) > 1:
         # The turn costs whatever the reversal adds to the start latency; input lag cancels.
         result['turn_cost'] = legs[1]['latency'] - legs[0]['latency']
@@ -618,7 +627,9 @@ def lab_move_observations(m, name):
     obs = [
         observation('lab.cruise_speed', name, m['cruise'], m['cruise_min'] * (1 - MOVE_SPEED_TOLERANCE),
                     m['cruise_max'] * (1 + MOVE_SPEED_TOLERANCE), f'N64 range over both legs widened by '
-                    f'{MOVE_SPEED_TOLERANCE:.0%}', True, LAB_FIELDS, unit='N64 px per source frame'),
+                    f'{MOVE_SPEED_TOLERANCE:.0%}' + (
+                        f'; leg {", ".join(map(str, m["cruise_left_out"]))} left out: it never held a cruise speed'
+                        if m.get('cruise_left_out') else ''), True, LAB_FIELDS, unit='N64 px per source frame'),
         observation('lab.accel_frames', name, m['accel'], m['accel'] - t, m['accel'] + t, f'+-{t} source frames', True,
                     LAB_FIELDS, unit=f'source frames from the first movement to a {m.get("accel_chord", LAB_ACCEL_CHORD)}'
                     f'-frame chord at {LAB_ACCEL_FRACTION:.0%} of cruise'),

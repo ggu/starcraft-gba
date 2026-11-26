@@ -346,6 +346,32 @@ class LabMeasureTest(unittest.TestCase):
         self.assertTrue(obs['lab.turn_cost']['gating'])
         self.assertFalse(obs['lab.start_latency']['gating'])
 
+    def test_a_settled_short_return_leg_cannot_zero_the_cruise_band(self):
+        # The first leg cruises at 4 px/frame; the return leg moves two frames and settles. It
+        # reads cruise 0 (no whole chord fits), so it must not set the band's lower bound to 0,
+        # which would let an arbitrarily slow GBA pass lab.cruise_speed.
+        pos, x = {}, 100.0
+        for sf in range(0, 200):
+            if 10 <= sf < 50:
+                x = min(260, x + 4)
+            if sf in (104, 105):
+                x -= 2
+            pos[sf] = (round(x), 50)
+        m, err = metrics.lab_move_measure(walk(pos), 1, [9, 99], [(260, 50), (256, 50)])
+        self.assertIsNone(err)
+        self.assertEqual(m['legs'][1]['cruise'], 0.0)
+        self.assertEqual(m['cruise_left_out'], [1])
+        self.assertAlmostEqual(m['cruise_min'], m['cruise'])
+        self.assertGreater(m['cruise_min'], 3.5)
+        obs = {o['check']: o for o in metrics.lab_move_observations(m, 'Marine')}
+        self.assertGreater(obs['lab.cruise_speed']['lo'], 3.0)
+        self.assertIn('leg 1 left out', obs['lab.cruise_speed']['tolerance'])
+        # A first leg that never holds a cruise is a measurement error, not a zero band.
+        still = {sf: (100 + (2 if sf >= 12 else 0) + (2 if sf >= 13 else 0), 50) for sf in range(0, 100)}
+        m, err = metrics.lab_move_measure(walk(still), 1, [9], [(104, 50)])
+        self.assertIsNone(m)
+        self.assertIn('leg 0', err)
+
     @staticmethod
     def ramp_leg(speed, ramp, start=10, length=240, grid=None, phase=0.0, diagonal=True):
         """One diagonal leg: still until start, then the speed rises linearly over ramp frames to
