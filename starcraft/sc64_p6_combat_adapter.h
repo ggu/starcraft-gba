@@ -339,15 +339,21 @@ race_p6_combat_target_size(int raw, int type)
     return SC64_P6_SIZE_LARGE;
 }
 
+/* The caller already checked the P6 mission and the live slot. A clear
+ * persisted flag makes the raw unit lookup unnecessary. */
+static inline int
+race_p6_combat_has_burrow_flag(const Unit *q)
+{
+    if (!(q->flags & 2u)) return 0;
+    const int raw = race_p6_combat_raw_unit(q);
+    return raw == 37 || raw == 38 || raw == SC64_P6_RAW_INFESTED_TERRAN;
+}
+
 static int __attribute__((noinline))
 (race_p6_combat_unit_burrowed)(int slot)
 {
-    int raw;
-    if (!race_p6_active() || slot < 0 || slot >= MAX_UNITS || !u[slot].alive)
-        return 0;
-    raw = race_p6_combat_raw_unit(&u[slot]);
-    return (raw == 37 || raw == 38 || raw == SC64_P6_RAW_INFESTED_TERRAN) &&
-           (u[slot].flags & 2u) != 0;
+    return (unsigned)slot < MAX_UNITS && (u[slot].flags & 2u) &&
+           u[slot].alive && race_p6_active() && race_p6_combat_has_burrow_flag(&u[slot]);
 }
 
 /* Center-distance broad phase for the 96-pixel scripted burrow-release
@@ -434,26 +440,26 @@ race_p6_combat_burrow_release_tick(void)
     /* The release only asks whether any live hostile is in range.
      * Group by Y band to skip distant targets. Position, alive status
      * and ownership are stable throughout the pass. */
-    u16 band_heads[SC64_P6_BURROW_BANDS], next_target[MAX_UNITS];
-    for (int j = 0; j < MAX_UNITS; ++j) {
-        if (u[j].alive && (u[j].owner < SIDE || u[j].owner > 4 ||
-            (unsigned)u[j].y >= SC64_P6_BURROW_BAND_HEIGHT)) {
-            for (int i = 0; i < MAX_UNITS; ++i) {
-                if (!race_p6_combat_unit_burrowed(i)) continue;
-                released += race_p6_combat_burrow_release_one_fullscan(i);
-            }
-            return released;
-        }
+    u16 burrowers[MAX_UNITS], band_heads[SC64_P6_BURROW_BANDS], next_target[MAX_UNITS];
+    unsigned count = 0, owners = 0;
+    int grouped = 1;
+    for (int slot = 0; slot < MAX_UNITS; ++slot) {
+        const Unit *q = &u[slot];
+        if (!q->alive) continue;
+        if (q->owner < SIDE || q->owner > 4 ||
+            (unsigned)q->y >= SC64_P6_BURROW_BAND_HEIGHT)
+            grouped = 0;
+        if (!race_p6_combat_has_burrow_flag(q)) continue;
+        burrowers[count++] = (u16)slot;
+        if (q->owner >= SIDE && q->owner <= 4) owners |= 1u << q->owner;
+    }
+    if (!grouped) {
+        for (unsigned i = 0; i < count; ++i)
+            released += race_p6_combat_burrow_release_one_fullscan(burrowers[i]);
+        return released;
     }
     for (int owner = SIDE; owner <= 4; ++owner) {
-        int has_burrower = 0;
-        for (int i = 0; i < MAX_UNITS; ++i) {
-            if (u[i].owner == owner && race_p6_combat_unit_burrowed(i)) {
-                has_burrower = 1;
-                break;
-            }
-        }
-        if (!has_burrower) continue;
+        if (!(owners & (1u << owner))) continue;
         for (unsigned band = 0; band < SC64_P6_BURROW_BANDS; ++band)
             band_heads[band] = SC64_P6_BURROW_END;
         for (int j = 0; j < MAX_UNITS; ++j) {
@@ -462,16 +468,16 @@ race_p6_combat_burrow_release_tick(void)
             next_target[j] = band_heads[band];
             band_heads[band] = (u16)j;
         }
-        for (int i = 0; i < MAX_UNITS; ++i) {
-            if (u[i].owner != owner || !race_p6_combat_unit_burrowed(i))
-                continue;
-            released += race_p6_combat_burrow_release_one(i, band_heads, next_target);
+        for (unsigned i = 0; i < count; ++i) {
+            int slot = burrowers[i];
+            if (u[slot].owner == owner)
+                released += race_p6_combat_burrow_release_one(slot, band_heads, next_target);
         }
     }
 #else
     for (int i=0;i<MAX_UNITS;++i) {
         Unit *q=&u[i];
-        if (!race_p6_combat_unit_burrowed(i)) continue;
+        if (!q->alive || !race_p6_combat_has_burrow_flag(q)) continue;
         for (int j=0;j<MAX_UNITS;++j) {
             if (i==j || !u[j].alive) continue;
             if (!race_p6_combat_burrow_center_may_reach(q->x,q->y,u[j].x,u[j].y))

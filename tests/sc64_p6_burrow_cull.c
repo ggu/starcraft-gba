@@ -121,6 +121,37 @@ static void assert_matches_fullscan_reference(unsigned iteration)
     assert_current_world_matches_fullscan_reference();
 }
 
+static void lookup_preserves_live_actor_identity(void)
+{
+    reset_world();
+    Unit *q = &u[0];
+    q->alive = 1;
+    q->type = U_ZERGLING;
+    q->raw_type = -1;
+    q->flags = 2u;
+    assert((race_p6_combat_unit_burrowed)(0));
+
+    q->raw_type = 0; /* A pinned raw actor takes priority over its engine type. */
+    assert(!(race_p6_combat_unit_burrowed)(0));
+    q->raw_type = 37;
+    q->type = U_MARINE;
+    assert((race_p6_combat_unit_burrowed)(0));
+
+    q->flags = 16u;
+    assert(!(race_p6_combat_unit_burrowed)(0));
+    q->flags = 2u;
+    q->alive = 0;
+    assert(!(race_p6_combat_unit_burrowed)(0));
+    q->alive = 1;
+    race_mode = 1;
+    assert(!(race_p6_combat_unit_burrowed)(0));
+    race_mode = 0;
+    race_selected_mission = SC64_P6_GLOBAL_ID - 1;
+    assert(!(race_p6_combat_unit_burrowed)(0));
+    assert(!(race_p6_combat_unit_burrowed)(-1));
+    assert(!(race_p6_combat_unit_burrowed)(MAX_UNITS));
+}
+
 static void exact_radius_cases(void)
 {
     reset_world();
@@ -217,6 +248,7 @@ static void geometry_cull_is_conservative(void)
 
 int main(void)
 {
+    lookup_preserves_live_actor_identity();
     exact_radius_cases();
 #ifdef SC64_P6_BURROW_GROUPED
     grouped_owner_groups_and_invalid_fallback();
