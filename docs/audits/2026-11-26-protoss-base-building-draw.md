@@ -100,3 +100,37 @@ Two alternative mapped-sprite implementations were also tested from the P4
 pause. The generic ARM pair loop costs 0.98% more cycles. A WarpAnchor lookup
 with an identity row saves 0.70% and matches indexed pixels, but the current
 change is limited to the established packed-building path.
+
+## Composed release with the P6 burrow lookup
+
+The normal composer head `48399b10` includes release base `4c63a258`
+with the Z10 steering and P6 burrow changes. The same linked P4 tape
+reproduces the gain on both current holds.
+
+| Current normal product | Calls | Mean cycles, control → packed | p95 cycles, control → packed | Max cycles, control → packed |
+| --- | ---: | ---: | ---: | ---: |
+| P10, P4 from call 17275 | 128 | 799,018 → 769,862 | 885,026 → 852,862 | 936,385 → 907,244 |
+| P10, P4 from call 40127 | 128 | 1,017,846 → 1,009,832 | 1,051,129 → 1,047,363 | 1,156,849 → 1,150,413 |
+| Showcase, Blood Bath Melee against Protoss | 384 | 813,508 → 814,239 | 1,547,375 → 1,547,543 | 1,876,862 → 1,877,135 |
+
+All indexed pages, palette, camera and world state match. One early P4
+display-select change samples two pixel-identical pages. The later P4
+cut and four Showcase cuts select the adjacent completed page and match
+again at the next input. The nine visible-Pylon calls in Showcase still
+save an average of 4,351 actor-draw cycles. The complete Showcase mean
+increases by 0.09%.
+
+P10 also reproduced the full P6 victory from an earned P5 result. The
+ordinary tape matched 59 world checkpoints and 17 dialogue transitions.
+The terminal campaign state and re-exported victory SRAM match the P6
+burrow release byte for byte. Both builds take 52,269,325,339 guest cycles
+over 52,709 input calls. All three 128-interval captures match each other
+cycle for cycle.
+
+The four 32 MiB ROM verifiers and all three hot-IWRAM guards passed.
+T10 is the same packed ROM used for the moving T5 holdout. Z10 is
+byte-identical to the released steering build. The linked stack guards
+leave 128 B on T10, 432 B on Z10 and 384 B on P10. The P4 and P6 tests cover
+these campaign routes, and the T5 and Showcase pairs cover the stated
+combat windows. Other camera paths, full campaign rendering coverage and
+handheld timing remain outside these checks.
