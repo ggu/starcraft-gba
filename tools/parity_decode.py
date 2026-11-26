@@ -34,14 +34,39 @@ import sc64_parity_metrics as metrics  # noqa: E402
 
 LAYOUT = ROOT / 'tools' / 'parity' / 'sc64-usa-v1.json'
 MAGIC = b'SC64TAP\0'
+EXTRA_MAGIC = b'SC64XTR\0'
+MAX_CAPTURE_BYTES = 3 << 30   # tap.bin + extra.bin of one capture; golden writing holds two
 HEADER_FIELDS = ('step', 'tick', 'phase', 'live', 'seconds', 'pause', 'selector', 'running', 'countdown',
                  'table', 'flags', 'rows')
 FLAG_ROWS, FLAG_TABLE, FLAG_DUAL_DIFFER, FLAG_BAD_LINKS = 1, 2, 4, 8
 TYPES = {'u8': ('>B', 1), 'u16': ('>H', 2), 'u32': ('>I', 4)}
 
 
+def file_sha256(path):
+    """SHA-256 of a file, read in blocks (captures run to hundreds of MB)."""
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        for block in iter(lambda: handle.read(1 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 class LayoutError(Exception):
     """A field was asked for that the layout does not allow for that use."""
+
+
+# Layout keys that describe evidence or status rather than where and how a value is read:
+# editing them never changes what a golden decoded.
+NON_SEMANTIC = ('status', 'evidence', 'about')
+
+
+def semantic(value):
+    """A layout definition without its evidence, status and notes."""
+    if isinstance(value, dict):
+        return {k: semantic(v) for k, v in value.items() if k not in NON_SEMANTIC}
+    if isinstance(value, list):
+        return [semantic(v) for v in value]
+    return value
 
 
 def default_home():
@@ -63,7 +88,7 @@ class Layout:
         self.doc = json.loads(self.raw)
         self.name = self.doc['layout']
         self.sha256 = hashlib.sha256(self.raw).hexdigest()
-        self.used = set()
+        self.used, self.used_gating = set(), set()
 
     def unit_field(self, name, gating):
         field = self.doc['unit_fields'].get(name)
@@ -81,12 +106,74 @@ class Layout:
         return self._check(f'clock.{name}', self.doc['clock'][name], gating)
 
     def status(self, key):
-        """Status of a dependency key as observations name it: unit.<f>, banks.<a>, clock.<c>."""
+        """Status of a dependency key as observations name it: unit.<f>, banks.<a>, clock.<c>,
+        pool.<sprite|image|bullet|fog_tiles>, order.<value>, player.<table>, tables.dat."""
         kind, _, name = key.partition('.')
         table = {'unit': self.doc['unit_fields'], 'banks': self.doc['globals']['banks']['arrays'],
-                 'clock': self.doc['clock']}.get(kind, {})
+                 'clock': self.doc['clock'], 'pool': self.doc.get('pools', {}),
+                 'order': self.doc.get('orders', {}).get('values', {}),
+                 'player': self.doc.get('player_tables', {}),
+                 'tables': {'dat': self.doc.get('dat_tables', {})}}.get(kind, {})
         field = table.get(name)
         return field.get('status') if isinstance(field, dict) else None
+
+    def definition(self, key):
+        """The layout entry a dependency key names (None when the layout has no such entry).
+        A bank array carries its block's address and player count with it."""
+        kind, _, name = key.partition('.')
+        doc = self.doc
+        if kind == 'banks':
+            banks = doc['globals']['banks']
+            field = banks['arrays'].get(name)
+            return None if field is None else {'block': {k: banks[k] for k in ('address', 'players', 'type')},
+                                                'field': field}
+        table = {'unit': doc['unit_fields'], 'clock': doc['clock'], 'pool': doc.get('pools', {}),
+                 'order': doc.get('orders', {}).get('values', {}), 'player': doc.get('player_tables', {}),
+                 'tables': {'dat': doc.get('dat_tables')}}.get(kind)
+        return None if table is None else table.get(name)
+
+    def fields_digest(self, keys):
+        """SHA-256 of what decoding the named fields depends on: their definitions without
+        evidence or status, plus the decoder's fixed parts (the unit table locator and row size,
+        the bank block and the record rule). A golden stays valid under any layout edit that
+        leaves this digest unchanged (an added field, a promotion, a new evidence line)."""
+        payload = {'core': semantic({'unit_table': self.doc['unit_table'],
+                                     'banks': {k: self.doc['globals']['banks'][k] for k in ('address', 'players', 'type')},
+                                     'rng': self.doc['globals'].get('rng'),
+                                     'record_rule': self.doc['clock'].get('record_rule')}),
+                   'fields': {key: semantic(self.definition(key)) for key in sorted(set(keys))}}
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+    def pool(self, name, gating):
+        field = self.doc.get('pools', {}).get(name)
+        if not isinstance(field, dict):
+            raise LayoutError(f'{self.name}: no pool {name!r}')
+        return self._check(f'pool.{name}', field, gating)
+
+    def pool_field(self, pool, name, gating):
+        """(offset, struct format) of one field of a pool record, parsed from the layout's
+        "0xNN type ..." definition; a definition the decoders cannot honour raises LayoutError."""
+        fields = self.pool(pool, gating).get('fields', {})
+        text = fields.get(name)
+        words = text.split() if isinstance(text, str) else []
+        fmt = {'u8': '>B', 'u16': '>H', 'u32': '>I'}.get(words[1] if len(words) > 1 else None)
+        try:
+            offset = int(words[0], 16) if words else None
+        except ValueError:
+            offset = None
+        if offset is None or fmt is None or offset < 0 or offset + struct.calcsize(fmt) > self.pool(pool, gating)['record_bytes']:
+            raise LayoutError(f'{self.name}: pool.{pool} field {name!r} is {text!r}; the decoders need "0xNN u8|u16|u32" '
+                              'inside the record')
+        return offset, fmt
+
+    def order_name(self, value, gating):
+        """Name of an order value; gating use needs that value proven."""
+        field = self.doc.get('orders', {}).get('values', {}).get(str(value))
+        if field is None:
+            if gating:
+                raise LayoutError(f'{self.name}: order value {value} is not named')
+            return f'order{value}'
+        return self._check(f'order.{value}', field, gating)['name']
 
     def require_all(self, keys):
         """Raise unless every key is a proven field (and the unit table itself is proven)."""
@@ -101,6 +188,8 @@ class Layout:
             raise LayoutError(f'{self.name}: {key} is {field.get("status")!r}, not proven; '
                               'it cannot back a gating check')
         self.used.add(key)
+        if gating:
+            self.used_gating.add(key)
         return field
 
 
@@ -132,6 +221,32 @@ def read_tap(path):
         yield head, glob, rows
 
 
+def read_extra(path):
+    """extra.bin ("region ADDR BYTES" then "region on"): ([(KSEG0 address, bytes)],
+    yield of (step, tick, ordinal, [region bytes])). Format in capture_view.h."""
+    data = pathlib.Path(path).read_bytes()
+    if data[:8] != EXTRA_MAGIC:
+        raise ValueError(f'{path}: not an extra.bin file')
+    version, count = struct.unpack_from('<2I', data, 8)
+    if version != 1 or not 0 < count <= 16:
+        raise ValueError(f'{path}: unsupported extra.bin version {version} or region count {count}')
+    regions = [struct.unpack_from('<2I', data, 16 + 8 * k) for k in range(count)]
+    total = sum(n for _, n in regions)
+    at = 16 + 8 * count
+    records = []
+    while at < len(data):
+        if at + 12 + total > len(data):
+            raise ValueError(f'{path}: truncated record at byte {at}')
+        step, tick, ordinal = struct.unpack_from('<3I', data, at)
+        at += 12
+        blocks = []
+        for _, n in regions:
+            blocks.append(data[at:at + n])
+            at += n
+        records.append((step, tick, ordinal, blocks))
+    return regions, records
+
+
 class Capture:
     """One capture run: per-tick records keyed by tick value, the unpaused clock and a hash chain."""
 
@@ -139,12 +254,28 @@ class Capture:
         self.run = pathlib.Path(run)
         self.layout = layout or Layout()
         self.manifest = json.loads((self.run / 'manifest.json').read_text())
+        # Decoding holds a whole capture in memory: refuse clearly, before reading it, instead of
+        # exhausting memory.
+        limit = int(os.environ.get('SC64_PARITY_MAX_CAPTURE_BYTES') or MAX_CAPTURE_BYTES)
+        size = sum((self.run / name).stat().st_size for name in ('tap.bin', 'extra.bin') if (self.run / name).is_file())
+        if size > limit:
+            raise ValueError(f'{self.run}: tap.bin and extra.bin hold {size} bytes, more than the decoder holds in '
+                             f'memory ({limit}; SC64_PARITY_MAX_CAPTURE_BYTES); record a shorter window or every Kth tick')
         self.verified = self._verify_artifacts()
         self.ticks = []          # follow-up records in tick order: dicts
         self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0}
         change = {}
         chain = hashlib.sha256()
         last_tick = None
+        self.regions, self.extra, extra_faults, joined = [], {}, 0, set()
+        if (self.run / 'extra.bin').is_file():
+            self.regions, records = read_extra(self.run / 'extra.bin')
+            for step, tick, ordinal, blocks in records:
+                if step in self.extra:
+                    extra_faults += 1   # two extra records for one step
+                self.extra[step] = {'tick': tick, 'ordinal': ordinal, 'blocks': blocks}
+            # The region list joins the chain once, so equal payloads under other addresses differ.
+            chain.update(b'extra-regions' + b''.join(struct.pack('<2I', a, n) for a, n in self.regions))
         for head, glob, rows in read_tap(self.run / 'tap.bin'):
             if head['flags'] & FLAG_DUAL_DIFFER:
                 self.faults['dual_differ'] += 1
@@ -164,6 +295,7 @@ class Capture:
             paused = change.get(tick, head)['pause'] != 0
             record = {'tick': tick, 'step': head['step'], 'paused': paused, 'selector': head['selector'],
                       'seconds': head['seconds'], 'table': bool(head['flags'] & FLAG_TABLE),
+                      'table_offset': head['table'],
                       'globals': glob, 'rows': rows}
             self.ticks.append(record)
             # Everything the measurements read: the tick, the frontend step (the
@@ -171,13 +303,32 @@ class Capture:
             # unpaused clock), table presence, globals and rows.
             digest = hashlib.sha256()
             digest.update(struct.pack('<IIBB', tick, head['step'], paused, record['table']))
+            if self.regions:
+                # Extra-region decoders resolve unit pointers through the table offset: bind it.
+                # Captures without extra.bin keep the chain they always had.
+                digest.update(struct.pack('<I', head['table']))
             digest.update(glob)
             for index in sorted(rows):
                 digest.update(struct.pack('>H', index))
                 digest.update(rows[index])
+            # Extra regions (extra.bin) recorded at this follow-up read join the chain; a
+            # capture without extra.bin keeps the chain it always had.
+            if head['step'] in self.extra:
+                if self.extra[head['step']]['tick'] != tick:
+                    extra_faults += 1   # an extra record that is not this follow-up read's
+                elif head['step'] in joined:
+                    extra_faults += 1   # one extra record joined twice
+                else:
+                    record['extra'] = self.extra[head['step']]['blocks']
+                    joined.add(head['step'])
+                    for block in record['extra']:   # only joined blocks enter the chain
+                        digest.update(block)
             chain.update(digest.digest())
             record['chain'] = chain.hexdigest()
         self.chain = chain.hexdigest()
+        if (self.run / 'extra.bin').is_file():
+            # Every extra record must belong to exactly one follow-up record (step and tick).
+            self.faults['extra'] = extra_faults + sum(1 for step in self.extra if step not in joined)
         followed = {r['tick'] for r in self.ticks}
         self.faults['missing_follow'] = sum(1 for t in change if t not in followed)
         # Unpaused clock: one source frame per tick whose change-step read
@@ -192,8 +343,29 @@ class Capture:
         """tap.bin and tape.txt must be the files the capture wrote (manifest digests)."""
         problems = []
         recorded = self.manifest.get('outputs_sha256', {}).get('tap.bin')
-        if not recorded or recorded != hashlib.sha256((self.run / 'tap.bin').read_bytes()).hexdigest():
+        if not recorded or recorded != file_sha256(self.run / 'tap.bin'):
             problems.append('tap.bin does not match the manifest')
+        extra = self.run / 'extra.bin'
+        recorded_extra = self.manifest.get('outputs_sha256', {}).get('extra.bin')
+        if recorded_extra and not extra.is_file():
+            problems.append('extra.bin is recorded in the manifest but missing')
+        if extra.is_file() and (not recorded_extra or recorded_extra != file_sha256(extra)):
+            problems.append('extra.bin does not match the manifest')
+        if extra.is_file():
+            # Extra-region reads count their cache-alias conflicts into status.log's totals
+            # (the tap record flag covers only the clocks, banks and rows).
+            status = self.run / 'status.log'
+            recorded_status = self.manifest.get('outputs_sha256', {}).get('status.log')
+            text = status.read_text() if status.is_file() else ''
+            if not recorded_status or recorded_status != hashlib.sha256(status.read_bytes() if status.is_file() else b'').hexdigest():
+                problems.append('status.log does not match the manifest')
+            else:
+                summary = [line for line in text.splitlines() if line.startswith('tap_reads=')]
+                values = [w.split('=', 1)[1] for w in summary[0].split() if w.startswith('dual_differ=')] \
+                    if len(summary) == 1 else []
+                if values != ['0']:
+                    problems.append('a recorded read saw two different cache-alias copies, or status.log has no '
+                                    'single tap summary (dual_differ)')
         if self.manifest.get('tape_sha256') != hashlib.sha256((self.run / 'tape.txt').read_bytes()).hexdigest():
             problems.append('tape.txt does not match the manifest')
         if not self.manifest.get('run_id'):
@@ -231,7 +403,7 @@ class Capture:
                     problems.append(f'state input {words[1]} has no recorded producer (run id and binary)')
         for name, digest in states.items():
             staged = self.run / 'input' / name
-            if not staged.is_file() or hashlib.sha256(staged.read_bytes()).hexdigest() != digest:
+            if not staged.is_file() or file_sha256(staged) != digest:
                 problems.append(f'state input {name} does not match the manifest')
         return problems
 
@@ -244,6 +416,78 @@ class Capture:
         field = self.layout.unit_field(name, gating)
         fmt, _ = TYPES[field['type']]
         return struct.unpack_from(fmt, row_bytes, int(field['offset'], 16))[0]
+
+    def extra_bytes(self, record, address, length):
+        """Guest bytes [address, address + length) from this tick's extra.bin regions, or None
+        when no recorded region covers them."""
+        for (start, size), block in zip(self.regions, record.get('extra', ())):
+            if start <= address and address + length <= start + size:
+                return block[address - start:address - start + length]
+        return None
+
+    def fog(self, record, player, width, height, gating=True):
+        """(visible, explored) tile index sets (x + y * width) of one player at this tick,
+        read from the recorded fog tile block (the region of width * height * 4 bytes)."""
+        field = self.layout.pool('fog_tiles', gating)
+        size = width * height * field['record_bytes']
+        if sum(1 for _, n in self.regions if n == size) != 1:
+            raise LayoutError(f'{self.run.name}: not exactly one recorded region of {size} bytes for the fog tiles')
+        for (start, n), block in zip(self.regions, record.get('extra', ())):
+            if n == size:
+                step = field['record_bytes']
+                (ex, ex_fmt), (vi, vi_fmt) = (self.layout.pool_field('fog_tiles', 'explored_mask', gating),
+                                              self.layout.pool_field('fog_tiles', 'visible_mask', gating))
+                if ex_fmt != '>B' or vi_fmt != '>B':
+                    raise LayoutError(f'{self.layout.name}: the fog decoder reads one-byte player masks')
+                # The tiles a fog block holds: no player sees a tile it has not explored.
+                if any(~block[step * i + vi] & block[step * i + ex] & 0xFF for i in range(width * height)):
+                    raise LayoutError(f'{self.run.name}: the {size}-byte region at {start:08x} breaks the '
+                                      'visible-within-explored rule; it is not the fog block')
+                bit = 1 << player
+                visible = {i for i in range(width * height) if not block[step * i + vi] & bit}
+                explored = {i for i in range(width * height) if not block[step * i + ex] & bit}
+                return visible, explored
+        return None
+
+    def unit_images(self, record, index, gating=True):
+        """The images of one live unit at this tick, primary first: dicts of the layout's
+        image fields, through its sprite (both pools read from the extra regions). Links are
+        followed from the primary image (sprite +0x18) while they stay in recorded memory."""
+        sprite_pool, image_pool = self.layout.pool('sprite', gating), self.layout.pool('image', gating)
+        get = lambda blob, pool, name: struct.unpack_from((f := self.layout.pool_field(pool, name, gating))[1], blob, f[0])[0]
+        sprite = self.unit(record['rows'][index], 'sprite', gating)
+        blob = self.extra_bytes(record, sprite, sprite_pool['record_bytes'])
+        if blob is None:
+            return None
+        at, out = get(blob, 'sprite', 'image_primary'), []
+        while at and len(out) < 16:
+            image = self.extra_bytes(record, at, image_pool['record_bytes'])
+            if image is None:
+                # The primary must be recorded; a linked image outside the recorded regions
+                # (a selection circle from another pool, say) ends the list.
+                return out or None
+            frame = get(image, 'image', 'frame_and_direction')
+            out.append({'address': at, 'image_id': get(image, 'image', 'image_id'),
+                        'draw_function': get(image, 'image', 'draw_function'),
+                        'frame_set': get(image, 'image', 'frame_set_x4') // 4,
+                        'frame_index': frame >> 6, 'direction': frame & 63,
+                        'iscript_header': get(image, 'image', 'iscript_header'),
+                        'iscript_offset': get(image, 'image', 'iscript_offset'),
+                        'animation': get(image, 'image', 'animation'), 'wait': get(image, 'image', 'wait')})
+            at = get(image, 'image', 'next')
+        return out
+
+    def orders(self, index, gating=True):
+        """[(source frame, order value)] each time a row's order byte changes, in-mission ticks only."""
+        out = []
+        for record in self.ticks:
+            row = record['rows'].get(index)
+            if row is None or not record['table'] or record['sf'] < 0:
+                continue
+            value = self.unit(row, 'order', gating)
+            if not out or out[-1][1] != value:
+                out.append((record['sf'], value))
+        return out
 
     def seed(self):
         """The RNG words of the first in-mission tick (read back, never set)."""
@@ -282,12 +526,16 @@ class Capture:
             # unproven while this list is not empty.
             'verified': not self.verified and self.manifest.get('ok') is True,
             'capture_ok': self.manifest.get('ok') is True, 'verification_problems': list(self.verified),
+            'pokes': self.manifest.get('pokes', 0), 'n64_staged': bool(self.manifest.get('n64_staged')),
+            'extra_regions': ['%08x+%d' % r for r in self.regions],
+            'extra_records': sum(1 for r in self.ticks if 'extra' in r),
         }
 
 
-def same_bundle(a, b):
+def same_bundle(a, b, allow_skips=False):
     """Two captures form a golden bundle only if they are fresh processes of the same inputs
-    whose per-tick hash chains agree."""
+    whose per-tick hash chains agree. allow_skips admits ticks without a follow-up record (busy
+    missions run some ticks one step apart); only report-only scenarios may ask for it."""
     problems = []
     for key in ('binary_sha256', 'tape_sha256', 'rom_sha256', 'mode', 'flash_input_sha256'):
         if a.manifest.get(key) != b.manifest.get(key):
@@ -298,11 +546,11 @@ def same_bundle(a, b):
         problems.append('both runs carry the same run id: a copied capture is not a second capture')
     for cap in (a, b):
         problems += [f'{cap.run.name}: {p}' for p in cap.verified]
-        if cap.faults['tick_skips'] or cap.faults['missing_follow'] > 1:
+        if not allow_skips and (cap.faults['tick_skips'] or cap.faults['missing_follow'] > 1):
             problems.append(f'{cap.run.name}: ticks skipped or missing follow-up reads {cap.faults}')
         if not cap.manifest.get('ok'):
             problems.append(f'{cap.run.name}: capture did not finish cleanly')
-        if cap.faults['dual_differ'] or cap.faults['bad_links']:
+        if cap.faults['dual_differ'] or cap.faults['bad_links'] or cap.faults.get('extra'):
             problems.append(f'{cap.run.name}: read faults {cap.faults}')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
@@ -315,37 +563,110 @@ def same_bundle(a, b):
     return problems
 
 
+# What the capture frontend records at fixed addresses (experiments/ares-headless/capture.cpp:
+# kTick, kPause, kSeconds, kSelector, kBanks, kRng; the unit table rows). tap.bin holds those
+# bytes, so a golden can only be (re)written while the layout reads the same places.
+TAP_CONTRACT = {('clock', 'tick_counter'): '0x800B1E84', ('clock', 'pause_halfword'): '0x800F0C20',
+                ('clock', 'seconds'): '0x800B9368', ('clock', 'selector'): '0x800D13E4'}
+TAP_BANKS, TAP_RNG, TAP_ROWS = '0x800B1D44', '0x800EFF20', (900, 312)
+
+
+# The capture-time format as tap.bin holds it: the clock fields' addresses and widths, the
+# unit table locator, row size and liveness rule, and the recorded bank and RNG blocks (their
+# array offsets are decoded later and may change). Fixed by the frontend, not by the layout.
+TAP_FORMAT_SHA256 = '131ffcd2fc7d0c7c766b75613b64c5403ef58639be236ba6d7db00fb31f127fb'
+
+
+def tap_format(layout):
+    doc = layout.doc
+
+    def norm(value, key=None):   # addresses compare by value, however they are spelled
+        if isinstance(value, dict):
+            return {k: norm(v, k) for k, v in value.items()}
+        if isinstance(value, str) and key == 'address':
+            try:
+                return f'0x{int(value.strip(), 16):08X}'
+            except ValueError:
+                return value
+        return value
+    if 'record_rule' not in doc['clock']:
+        raise LayoutError(f'{layout.name}: the layout has no clock.record_rule; the tap format needs one')
+    return norm(semantic({'clock': {k: doc['clock'][k] for k in ('tick_counter', 'pause_halfword', 'seconds', 'selector',
+                                                                 'record_rule')},
+                          'unit_table': doc['unit_table'],
+                          'banks': {k: doc['globals']['banks'][k] for k in ('address', 'players', 'type')},
+                          'rng': doc['globals']['rng']}))
+
+
+def check_tap_contract(layout):
+    """Raise LayoutError when the layout describes recorded fields other than tap.bin holds them."""
+    doc = layout.doc
+    wrong = [f'{a}.{b}' for (a, b), address in TAP_CONTRACT.items()
+             if int(doc[a][b]['address'], 16) != int(address, 16)]
+    if int(doc['globals']['banks']['address'], 16) != int(TAP_BANKS, 16):
+        wrong.append('banks')
+    if int(doc['globals']['rng']['address'], 16) != int(TAP_RNG, 16):
+        wrong.append('rng')
+    if (doc['unit_table']['rows'], doc['unit_table']['row_bytes']) != TAP_ROWS:
+        wrong.append('unit_table')
+    if wrong:
+        raise LayoutError(f'{layout.name}: {", ".join(wrong)} moved from where the capture frontend records them; '
+                          'tap.bin holds the old addresses, so capture again with a frontend that reads the new ones')
+    digest = hashlib.sha256(json.dumps(tap_format(layout), sort_keys=True).encode()).hexdigest()
+    if digest != TAP_FORMAT_SHA256:
+        raise LayoutError(f'{layout.name}: the clock, unit table, bank or RNG definitions differ from the format the '
+                          'capture frontend records (TAP_FORMAT_SHA256); tap.bin holds the old reads, so capture again '
+                          'with a frontend that records the new ones')
+
+
 def write_golden(scenario_id, runs, home, layout, note=None):
     if scenario_id not in metrics.SCENARIOS:
         raise SystemExit(f'unknown scenario {scenario_id}; known: {", ".join(metrics.SCENARIOS)}')
+    check_tap_contract(layout)
+    layout.used, layout.used_gating = set(), set()   # the fields this measurement reads, recorded with each observation
     caps = [Capture(run, layout) for run in runs]
     if len(caps) < 2:
         raise SystemExit('a golden bundle needs two fresh-process captures')
     if len({c.run.resolve() for c in caps}) != len(caps) or len({c.manifest.get('run_id') for c in caps}) != len(caps):
         raise SystemExit('not golden: every capture must be a different run directory with its own run id')
+    spec = metrics.SCENARIOS[scenario_id]
+    allow_skips = bool(spec.get('tick_skips_ok'))
     problems = []
     for other in caps[1:]:
-        problems += same_bundle(caps[0], other)
+        problems += same_bundle(caps[0], other, allow_skips)
     if problems:
         raise SystemExit('not golden: ' + '; '.join(problems))
-    spec = metrics.SCENARIOS[scenario_id]
     marks = [metrics.tape_commands(c.run / 'tape.txt') for c in caps]
     if any(m != marks[0] for m in marks[1:]):
         raise SystemExit(f'not golden: tape marks resolve to different steps {marks}')
     tape_steps = marks[0]
     result = spec['measure_n64'](caps[0], tape_steps)
+    staged = any(c.manifest.get('pokes') or c.manifest.get('n64_staged') for c in caps)
+    if allow_skips and any(obs['gating'] for obs in result['observations']):
+        raise SystemExit(f'not golden: {scenario_id} admits tick skips, so none of its observations may gate')
     for obs in result['observations']:
         obs['n_runs'] = len(caps)
         obs['provenance'] = 'n64-ram'
         obs['layout_fields'] = sorted(set(obs.get('layout_fields', [])))
         if obs['gating']:
             layout.require_all(obs['layout_fields'])
+        # Every field the measurement read (qualification checks included) joins the digest.
+        obs['layout_reads'] = sorted(set(obs['layout_fields']) | layout.used)
+        if obs['gating']:
+            # Every field read under the proven rule must stay proven for the check to gate.
+            obs['layout_proven'] = sorted(set(obs['layout_fields']) | layout.used_gating)
+        obs['layout_fields_sha256'] = layout.fields_digest(obs['layout_reads'])
+        if staged:
+            obs['tags'] = sorted(set(obs.get('tags', [])) | {'n64-staged'})
     golden = {
         'format': 'sc64-parity-golden/1', 'id': scenario_id, 'scenario': spec['title'],
         'layout': layout.name, 'layout_sha256': layout.sha256,
         'timebase': 'source frames: N64 unpaused ticks; GBA simulation steps * 4 / 5',
         'observations': result['observations'], 'curves': result.get('curves', {}),
         'gba': result['gba'], 'notes': result.get('notes', []) + ([note] if note else []),
+        # A capture that wrote guest memory ("poke", owner decision 2026-11-26) is staged evidence.
+        'tags': ['n64-staged'] if staged else [],
+        'decoder_revision': spec.get('decoder_revision', 1),
         'bundle': {
             'runs': [c.run.name for c in caps], 'chain': caps[0].chain, 'seed': caps[0].seed(),
             'run_ids': [c.manifest['run_id'] for c in caps],
@@ -353,6 +674,8 @@ def write_golden(scenario_id, runs, home, layout, note=None):
             'rom_sha256': caps[0].manifest['rom_sha256'], 'mode': caps[0].manifest['mode'],
             'selectors': sorted({r['selector'] for r in caps[0].ticks if r['table']}),
             'records': len(caps[0].ticks), 'faults': caps[0].faults,
+            # v2: extra-region captures also hash their regions, region list and table offset.
+            'chain_format': 2 if caps[0].regions else 1,
         },
     }
     # Golden files carry ROM-derived curves: write them only where no checkout tracks

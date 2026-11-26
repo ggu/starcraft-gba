@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <vector>
 
 static void put32(std::uint8_t *p, std::uint32_t v) {
@@ -157,9 +158,62 @@ static void tap_header_is_little_endian() {
     assert(word[0] == 0x44 && word[1] == 0x33 && word[2] == 0x22 && word[3] == 0x11);
 }
 
+/* poke payloads and the coherent guest write. */
+static void writes_guest_bytes() {
+    std::uint8_t out[SC64_POKE_MAX + 1]{};
+    unsigned n = 0;
+    assert(sc64_capture_hex_bytes("0c0A0a", out, &n) && n == 3 && out[0] == 0x0C && out[1] == 0x0A && out[2] == 0x0A);
+    assert(!sc64_capture_hex_bytes("", out, &n) && !sc64_capture_hex_bytes("abc", out, &n));
+    assert(!sc64_capture_hex_bytes("0x0c", out, &n) && !sc64_capture_hex_bytes("0g", out, &n));
+    std::string longest(2 * SC64_POKE_MAX, 'f');
+    assert(sc64_capture_hex_bytes(longest.c_str(), out, &n) && n == SC64_POKE_MAX);
+    assert(!sc64_capture_hex_bytes((longest + "ff").c_str(), out, &n));
+    std::vector<std::uint8_t> ram(64, 0);
+    std::uint8_t line0[16]{}, line1[16]{};
+    bool hold0 = true, hold1 = false;   /* line 0 caches bytes 16..31; alias 1 holds nothing */
+    auto raw = [&](std::uint32_t a, std::uint8_t v) { ram[a] = v; };
+    auto line = [&](std::uint32_t a, int alias, std::uint8_t v) {
+        if (a < 16 || a >= 32) return false;
+        if (alias == 0 && hold0) { line0[a - 16] = v; return true; }
+        if (alias == 1 && hold1) { line1[a - 16] = v; return true; }
+        return false;
+    };
+    const std::uint8_t bytes[4] = {1, 2, 3, 4};
+    std::size_t cached = 99;
+    assert(sc64_capture_write(14, bytes, 4, ram.size(), raw, line, &cached) && cached == 2);
+    assert(ram[14] == 1 && ram[17] == 4 && line0[0] == 3 && line0[1] == 4 && line1[0] == 0);
+    assert(!sc64_capture_write(62, bytes, 4, ram.size(), raw, line, &cached));   /* past the end */
+    assert(ram[62] == 0);
+    assert(sc64_capture_region_ok(0x1000, 4096, 0, 0));
+    assert(!sc64_capture_region_ok(0x1000, 0, 0, 0) && !sc64_capture_region_ok(0x1000, 16, 0, SC64_EXTRA_MAX_REGIONS));
+    assert(!sc64_capture_region_ok(0x1000, 16, SC64_EXTRA_MAX_BYTES - 8, 1));
+    assert(!sc64_capture_region_ok(SC64_CAPTURE_RAM - 8, 16, 0, 0));
+    std::uint8_t header[16];
+    sc64_capture_extra_file_header(header, 3);
+    assert(std::memcmp(header, "SC64XTR\0", 8) == 0 && header[8] == SC64_EXTRA_VERSION && header[12] == 3);
+}
+
+/* The output budget and the free-space reserve. */
+static void output_budget() {
+    const std::uint64_t G = 1ull << 30;
+    assert(sc64_capture_budget_ok(0, 100, 8 * G, 20 * G, 0, 5 * G));
+    assert(!sc64_capture_budget_ok(8 * G - 50, 100, 8 * G, 20 * G, 0, 5 * G));       /* past the budget */
+    assert(!sc64_capture_budget_ok(0, 9 * G, 8 * G, 20 * G, 0, 5 * G));              /* one write too big */
+    assert(!sc64_capture_budget_ok(0, 100, 8 * G, 5 * G + 99, 0, 5 * G));            /* would dip into the reserve */
+    assert(!sc64_capture_budget_ok(0, 100, 8 * G, 6 * G, G, 5 * G));                /* counted since the last measure */
+    assert(!sc64_capture_budget_ok(0, 100, 8 * G, 50, 0, 0));                        /* not even the bytes free */
+    std::uint64_t v = 0;
+    assert(sc64_capture_u64("5368709120", &v) && v == 5 * G);                         /* ten digits */
+    assert(sc64_capture_u64("18446744073709551615", &v) && v == ~std::uint64_t(0));
+    assert(!sc64_capture_u64("18446744073709551616", &v) && !sc64_capture_u64("", &v));
+    assert(!sc64_capture_u64("-1", &v) && !sc64_capture_u64("12a", &v) && !sc64_capture_u64("0x10", &v));
+}
+
 int main() {
     pad_bits_are_distinct();
     tap_header_is_little_endian();
+    writes_guest_bytes();
+    output_budget();
     reader_overlays_cache_lines();
     locates_one_table();
     checks_links_and_liveness();

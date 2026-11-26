@@ -58,7 +58,7 @@ STEP_COUNT = re.compile(r'[+-]?[0-9]+')
 def tape_commands(path):
     """Step numbers of '# mark NAME' comments in a capture tape (the frontend skips comments).
 
-    A mark falls where the next step-advancing command (a pad line or `until`) began. When
+    A mark falls where the next step-advancing command (a pad line, `until` or `pulse`) began. When
     the run's commands.csv is beside the tape, those begin steps are the executed ones, which
     covers `load NAME STEP` renumbering and `until` waits of any length. Without it the pad
     steps are summed, which is only valid for tapes with neither command."""
@@ -88,14 +88,14 @@ def tape_commands(path):
                     marks[word] = begins[-1][0] + begins[-1][1]
                 else:
                     raise SystemExit(f'{tape}: mark {word} has no executed command')
-            elif kind == 'command' and (steps(word) or word == 'until'):
+            elif kind == 'command' and (steps(word) or word in ('until', 'pulse')):
                 index += 1
         if index != len(begins):
             raise SystemExit(f'{tape}: {index} step commands but {len(begins)} rows in commands.csv')
         return marks
     marks, step = {}, 0
     for kind, word in lines:
-        if kind == 'command' and word in ('load', 'until'):
+        if kind == 'command' and word in ('load', 'until', 'pulse'):
             raise SystemExit(f'{tape}: marks after load or until need the run\'s commands.csv')
         if kind == 'mark':
             marks[word] = step
@@ -334,7 +334,7 @@ def move_measure_gba(series, golden, report):
 # ---- Blood Bath worker income ---------------------------------------------
 
 INCOME_FIELDS = ['banks.minerals_gathered', 'banks.minerals', 'unit.type', 'unit.owner', 'unit.sprite',
-                 'clock.tick_counter', 'clock.pause_halfword']
+                 'unit.x', 'unit.y', 'clock.tick_counter', 'clock.pause_halfword']
 INCOME_HORIZON = 2000   # source frames from the first in-mission frame
 INCOME_WORKERS = 4
 INCOME_CLEAR_RADIUS = 320  # N64 px: no foreign unit this close to the human's workers during the window
@@ -459,3 +459,7 @@ SCENARIOS = {
     'bb-income': {'title': 'Blood Bath 1v1: passive human Zerg, four starting Drones mining', 'measure_n64': income_measure_n64,
                   'measure_gba': income_measure_gba, 'profile': 'zerg-z10', 'runner': 'income'},
 }
+
+# Field-map scenarios (orders, fog, animation; tools/sc64_parity_fieldmap.py) join the table.
+from sc64_parity_fieldmap import FIELD_SCENARIOS  # noqa: E402
+SCENARIOS.update(FIELD_SCENARIOS)

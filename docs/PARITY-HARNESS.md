@@ -19,7 +19,8 @@ main checkout's `.local/parity`. Only code, the layout file and the baseline
 | --- | --- | --- |
 | Capture | `experiments/ares-headless/capture.py` | Runs a tape in a fresh process; `tap tick rec` writes `tap.bin` |
 | Layout | `tools/parity/sc64-usa-v1.json` | Guest RAM fields, each `proven`, `candidate` or `unknown`, with evidence |
-| Decode | `tools/parity_decode.py` | Reads `tap.bin` against the layout; per-tick records, unpaused clock, hash chain |
+| Decode | `tools/parity_decode.py` | Reads `tap.bin` (and `extra.bin` regions) against the layout; per-tick records, unpaused clock, hash chain; fog, image, order decoders |
+| Field map | `tools/sc64_parity_fieldmap.py` | Mission-launch censuses against the CHK, the `.dat` table anchor, player upgrade and tech arrays, opening timelines ([audit](audits/2026-11-26-parity-field-map.md)) |
 | Golden | `tools/parity_decode.py golden` | Two agreeing captures become `$SC64_PARITY_HOME/golden/<id>.json` |
 | Measure | `tools/sc64_parity_metrics.py` | One measurement per check, used for both engines |
 | GBA run | `tests/sc64_parity_run.c` (`move`, `income`) | The same scenario through the injector and trace emitter |
@@ -51,6 +52,20 @@ lists the layout fields it read. Promoting a field needs an evidence line in
 the layout file: a controlled change, or a cross-check like the Blood Bath
 bank test below.
 
+Each observation also stores `layout_reads` (its listed fields plus every
+field the measurement read) and `layout_fields_sha256`: a digest of their
+definitions (offsets, types, addresses, names; not their status or evidence)
+plus the decoder's fixed parts (unit table locator, bank block, record rule).
+A layout edit that leaves those unchanged (a new field, a promotion, a new
+evidence line) keeps the golden gating. When they change, or the layout no
+longer proves a field a gating check reads, the observation is
+`STALE-GOLDEN` and `./dev parity` fails until the golden is regenerated from
+the same runs with `tools/parity_decode.py golden`; `--allow-stale` reports
+it instead, for recording work only. Regeneration refuses a layout that moves
+a field the frontend records at a fixed address (`TAP_CONTRACT`): that needs
+new captures. Goldens written before per-field digests compare the whole
+layout file.
+
 ## Golden format
 
 ```json
@@ -72,6 +87,7 @@ hash chain, seed words, binary, tape, ROM and mode.
 | REGRESSION | Outside the band and not in the baseline, or further out than the baseline | yes |
 | IMPROVED | In the baseline, now inside the band | notice |
 | STALE | Baseline line with no observation | notice |
+| STALE-GOLDEN | The golden was decoded against other definitions of the fields it reads | yes (REPORT with `--allow-stale`) |
 | REPORT | Non-gating observation, or a table-differ count | no |
 | SKIP | Private inputs absent | no |
 
@@ -90,6 +106,7 @@ judged). With no golden files the scenarios skip; if everything skipped while
 | --- | --- | --- | --- |
 | `t1-move` | Fresh boot to Wasteland, box-select the five Marines, C-Right (Move) then A on open ground | `terran`, `--scenario move`: the five Marines joined by type, owner and halved position get one group order to the target | cruise speed, first and last arrival, group spread; command latency (report only) |
 | `bb-income` | Scenario → Blood Bath, human Zerg, computer Terran, start; no further input | `zerg-z10`, `--scenario income`: Blood Bath, human Zerg against one Terran computer, no command | minerals gathered per frame over 2,000 frames, first delivery, minerals per delivery |
+| `t1-fields` | The campaign launch tape for T1 (below) recording the fog, image, sprite and bullet regions, then the t1-move box select and Move, then Stop, Hold, a second Move and an attack-move | `terran`, `--scenario move`, as t1-move | the t1-move checks on the first Move; order timing (command to Move, to the first and last Marine back in an idle order); fog (first newly visible tile, first dropped tile, visible and explored counts before the Stop); the Marine walk cycle (N64: the image's iscript Walking loop; GBA: stride phases) |
 
 The human player is resolved per scenario: T1's Marine owner; in Blood Bath
 the only owner of Drones (owner numbers and start corners are shuffled per
@@ -111,6 +128,20 @@ Times are measured from the last state before the command on both sides:
 on the N64 the last follow-up read taken at or before the tape's
 `# mark command`, on the GBA the step before the injected command, which
 must own its source frame (`gba_boundary_ok`).
+
+## Mission entry
+
+Every Episode I–III mission launches from a fresh boot with ordinary menu
+input once the six progress bytes at `0x800D13C4` (unlocked rows per episode)
+are set after the save loads: the launch tape pokes `0C 0A 0A` at step
+1,700, rotates the main-menu campaign carousel with the stick (once for
+Zerg, twice for Protoss), presses Start (and Start again on the
+episode-order warning), picks the row (Terran rows 2–11 are T1–T10 after
+the two tutorials; Zerg and Protoss rows 0–9), presses A, pulses Start until
+the map mode halfword `0x800A5AB4` reads 3, and dismisses text boxes with
+`pulse`. Such captures are `n64-staged`. The private generator and the
+30 launch results are described in the
+[field-map audit](audits/2026-11-26-parity-field-map.md).
 
 ## Adding a scenario
 

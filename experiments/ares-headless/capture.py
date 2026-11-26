@@ -29,12 +29,16 @@ ROM_SHA = 'e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 MOLTENVK = pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 MOLTENVK_SHA = '432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 ARES_COMMIT = '0aafd85789215e84e1e43415c07d4c88461b7899'
-LOCK = '/tmp/sc64-native-build-20261031.lock'
+# The shared native lock serialises captures and native builds across sessions. A session may
+# name its own lock in SC64_CAPTURE_LOCK to run its captures alongside others': emulation is
+# deterministic under host load (S1-S3), but compare such a run with a solo one before relying on it.
+LOCK = os.environ.get('SC64_CAPTURE_LOCK') or '/tmp/sc64-native-build-20261031.lock'
+BUDGET_ENV = b'SC64_CAPTURE_BUDGET_BYTES'
 FLASH_BYTES = 128 * 1024
 RESOURCES = ('ares/ares/resource/resource.cpp', 'ares/ares/resource/resource.hpp',
              'mia/resource/resource.cpp', 'mia/resource/resource.hpp')
 OUTPUTS = ('checkpoints.csv', 'regions.csv', 'ticks.csv', 'verify.csv', 'events.csv',
-           'commands.csv', 'status.log', 'polls.bin', 'ticks.raw', 'tap.bin', 'watch.csv')
+           'commands.csv', 'status.log', 'polls.bin', 'ticks.raw', 'tap.bin', 'watch.csv', 'extra.bin')
 STATE_LIMIT = 16 * 1024 * 1024  # a synchronized N64 state is 8,512,920 bytes
 NAME_CHARS = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-')
 
@@ -120,6 +124,25 @@ def state_recorded(state, digest, legacy_producer=False):
     return state_source(state, digest, legacy_producer) is not None
 
 
+def budget_supported(binary):
+    """True when the frontend build reads the output budget (capture.cpp names its variable)."""
+    return BUDGET_ENV in pathlib.Path(binary).read_bytes()
+
+
+def budget_acknowledged(status_text, budget):
+    """True when a finished frontend's status.log summary (the line with its pokes and output
+    totals) reports exactly one budget, the one the wrapper asked for."""
+    lines = [line for line in status_text.splitlines() if line.startswith('pokes=')]
+    if len(lines) != 1:
+        return False
+    field = lambda name: [w.split('=', 1)[1] for w in lines[0].split() if w.startswith(name + '=')]
+    budgets, written = field('output_budget'), field('output_written')
+    # Exactly one budget, the requested one, and a total that stayed within it.
+    if budgets != [str(budget)] or len(written) != 1 or not re.fullmatch('[0-9]{1,20}', written[0]):
+        return False
+    return int(written[0]) <= budget
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('binary', 'source', 'rom', 'tape', 'output'):
@@ -135,6 +158,9 @@ def main():
     parser.add_argument('--mode', choices=('jit', 'interp'), default='jit')
     parser.add_argument('--timeout', type=int, default=6 * 3600)
     parser.add_argument('--reserve-gib', type=int, default=5)
+    parser.add_argument('--output-budget-gib', type=int, default=8,
+                        help='most the frontend may write into the run directory; it stops with exit 10 past it, '
+                             'or before free space falls below --reserve-gib')
     args = parser.parse_args()
 
     def provenance():
@@ -165,11 +191,19 @@ def main():
     if len(set(folded)) != len(folded) or 'game.z64' in folded:
         raise SystemExit('state input names must be distinct, ignoring case, and not game.z64')
     provenance()
+    # The frontend must enforce the output budget this wrapper asks for: a build from before the
+    # budget would ignore SC64_CAPTURE_BUDGET_BYTES and could overrun with ok=true.
+    if not budget_supported(args.binary):
+        raise SystemExit('the frontend binary predates the output budget (no SC64_CAPTURE_BUDGET_BYTES); '
+                         'build capture.cpp from this tree')
     frontend = pathlib.Path(__file__).resolve().parent
     sources = {name: sha(frontend / name) for name in ('capture.cpp', 'capture_view.h', 'inject.cmake', 'capture.py')}
     with open(LOCK, 'a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         provenance()
+        if not budget_supported(args.binary):   # again under the lock: a build may have replaced it
+            raise SystemExit('the frontend binary predates the output budget (no SC64_CAPTURE_BUDGET_BYTES); '
+                             'build capture.cpp from this tree')
         parent = args.output.resolve().parent
         parent.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(parent).free < args.reserve_gib * 1024 ** 3:
@@ -182,7 +216,7 @@ def main():
         tape_copy = out / 'tape.txt'
         shutil.copyfile(args.tape, tape_copy)
         check_loads(tape_copy.read_bytes().decode('utf-8', 'surrogateescape'), names)   # the tape bytes the child will read
-        states, state_sources, legacy_sources = {}, {}, {}
+        states, state_sources, legacy_sources, staged_inputs = {}, {}, {}, []
         for state in args.state_input:
             staged = out / 'input' / state.name
             shutil.copyfile(state, staged)
@@ -193,6 +227,8 @@ def main():
             # manifest beside the source file must record this digest under this name. The same
             # read supplies the provenance recorded below.
             producer = state_source(state, states[state.name], args.legacy_producer)
+            if producer is not None and (producer.get('pokes') or producer.get('n64_staged')):
+                staged_inputs.append(state.name)   # the state carries the producer's guest edits
             if not args.unrecorded_state and producer is None:
                 raise SystemExit(f'state input is not recorded by a clean producer manifest: {state} '
                              '(a state from a capture made before run ids needs --legacy-producer)')
@@ -210,6 +246,17 @@ def main():
             flash.parent.mkdir()
             shutil.copyfile(args.flash_input, flash)
             flash_sha = sha(flash)
+            # A save a staged capture flushed carries its guest edits: find the run that wrote it
+            # (the manifest beside its saves folder) and inherit the tag.
+            for folder in list(pathlib.Path(args.flash_input).resolve().parents)[:3]:
+                try:
+                    writer = json.loads((folder / 'manifest.json').read_text())
+                except (OSError, ValueError):
+                    continue
+                if isinstance(writer, dict) and writer.get('flash_file_after_sha256') == flash_sha:
+                    if writer.get('pokes') or writer.get('n64_staged'):
+                        staged_inputs.append('flash')
+                    break   # the run that wrote this save; an unrelated manifest is passed over
         manifest = {
             'binary_sha256': sha(args.binary), 'frontend_sha256': sources, 'ares_commit': ARES_COMMIT,
             'generated_resource_sha256': {r: sha(args.source / r) for r in RESOURCES},
@@ -222,7 +269,10 @@ def main():
         }
         command = [str(args.binary.resolve()), str(rom.resolve()), str(out.resolve()), args.mode]
         started = time.monotonic()
-        env = {**os.environ, 'DYLD_LIBRARY_PATH': str(MOLTENVK.parent)}
+        env = {**os.environ, 'DYLD_LIBRARY_PATH': str(MOLTENVK.parent),
+               'SC64_CAPTURE_BUDGET_BYTES': str(args.output_budget_gib * 1024 ** 3),
+               'SC64_CAPTURE_RESERVE_BYTES': str(args.reserve_gib * 1024 ** 3)}
+        manifest['output_budget_bytes'] = int(env['SC64_CAPTURE_BUDGET_BYTES'])
         with open(tape_copy, 'rb') as tape, open(out / 'bridge.log', 'wb') as log, open(out / 'stderr.log', 'wb') as err:
             child = subprocess.Popen(command, cwd=out.resolve(), env=env, stdin=tape, stdout=log, stderr=err)
             try:
@@ -249,6 +299,14 @@ def main():
                 else:
                     mismatched.append(name)
         manifest['states_sha256'] = saved
+        # Guest writes ("poke"): a run with any is staged evidence (fixtures tagged n64-staged).
+        pokes = [line.split(',', 2)[2] for line in (events.read_text().split('\n')[1:] if events.is_file() else [])
+                 if line.split(',', 2)[1:2] == ['poke']]
+        manifest['pokes'] = len(pokes)
+        if pokes or staged_inputs:
+            manifest['n64_staged'] = True
+        if staged_inputs:
+            manifest['n64_staged_inputs'] = staged_inputs
         if mismatched:
             manifest['states_changed_after_save'] = mismatched
         flash_out = out / 'saves' / 'Nintendo 64' / 'game.flash'
@@ -261,8 +319,13 @@ def main():
         if args.unrecorded_state:
             # A refusal test only: such a run is never evidence, so it is never ok.
             manifest['unrecorded_state'] = True
+        # A finished frontend acknowledges the budget it enforced in status.log.
+        status = out / 'status.log'
+        acknowledged = status.is_file() and budget_acknowledged(status.read_text(), manifest['output_budget_bytes'])
+        if manifest['returncode'] == 0 and not acknowledged:
+            manifest['budget_not_acknowledged'] = True
         manifest['ok'] = (manifest['returncode'] == 0 and manifest['inputs_unchanged'] and not manifest.get('timeout')
-                          and not args.unrecorded_state
+                          and not args.unrecorded_state and acknowledged
                           and not manifest.get('states_changed_after_save'))
         (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         print(json.dumps({'ok': manifest['ok'], 'returncode': manifest['returncode'], 'seconds': manifest['seconds']}))
