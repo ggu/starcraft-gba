@@ -408,6 +408,14 @@ class ResultFrames(unittest.TestCase):
             cap.trailing_changes = [(15, False, False), (15, False, False), (16, True, True), (17, False, True),
                                     (18, False, True)]
             self.assertEqual(sk.tick_frames(cap)[1], 11)
+            # A last follow-up without a unit table (tick 15) adds no frame; order runs on from it.
+            cap.ticks = ticks + [{'tick': 15, 'step': 31, 'sf': 9, 'table': False, 'paused': False}]
+            cap.trailing_changes = [(16, False, False), (17, False, True), (18, False, True)]
+            self.assertEqual((sk.tick_frames(cap)[0](15), sk.tick_frames(cap)[1]), (9, 11))
+            cap.trailing_changes = [(17, False, True), (18, False, True)]
+            with self.assertRaises(ValueError):
+                sk.tick_frames(cap)
+            cap.ticks = ticks
             for bad in ([(15, False, False), (17, False, True), (18, False, True)],
                         [(15, False, False), (16, False, False), (15, False, False), (17, False, True),
                          (18, False, True)]):

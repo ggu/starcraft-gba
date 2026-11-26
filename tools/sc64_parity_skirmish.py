@@ -590,7 +590,9 @@ def tick_frames(cap):
     if not known:
         return None, None
     ticks = sorted(known)
-    covered = ticks[-1]
+    # Order is checked from the last follow-up of any kind (one without a unit table adds no
+    # frame, so the clock's base stays the last dated tick).
+    covered = max(ticks[-1], cap.ticks[-1]['tick']) if cap.ticks else ticks[-1]
     # Trailing tick -> (paused, in mission) from its latest read (the decoder's rule for a tick's
     # change read). Every read must keep the order, in mission or not; only unpaused in-mission
     # ticks advance the clock.
