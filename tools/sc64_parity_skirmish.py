@@ -591,19 +591,20 @@ def tick_frames(cap):
         return None, None
     ticks = sorted(known)
     covered = ticks[-1]
-    state = {}   # trailing tick -> paused, from its latest read (the decoder's rule for a tick's change read)
+    # Trailing tick -> (paused, in mission) from its latest read (the decoder's rule for a tick's
+    # change read). Every read must keep the order, in mission or not; only unpaused in-mission
+    # ticks advance the clock.
+    state = {}
     for tick, paused, table in getattr(cap, 'trailing_changes', []):
-        if not table:
-            continue
         if tick == covered:
             if tick in state:
-                state[tick] = paused   # another read of the same tick
+                state[tick] = (paused, table)   # another read of the same tick
             continue
         if tick != covered + 1:
             raise ValueError(f'{cap.run}: change reads after the last follow-up go from tick {covered} to {tick}')
-        state[tick] = paused
+        state[tick] = (paused, table)
         covered = tick
-    trailing = sorted(t for t, paused in state.items() if not paused)
+    trailing = sorted(t for t, (paused, table) in state.items() if table and not paused)
 
     def frame_of(tick):
         if tick in known:
@@ -859,7 +860,7 @@ def make_measure_gba(scenario_id):
         frames = {int(o['check'].split('@')[1]): int(o['frame']) for o in golden['observations'] if 'frame' in o}
         got = values(m, horizon, frames)
         got_late = values(late, reach, frames) if late is not None else {}
-        flat = {}
+        flat, late_waves = {}, []
         for obs in golden['observations']:
             key = (obs['check'], obs['subject'])
             v = got.get(key)
@@ -874,11 +875,14 @@ def make_measure_gba(scenario_id):
                 after = got_late.get(key)
                 if after is not None and after != NEVER and horizon < after <= reach_of(obs):
                     v = after
-                    if obs['check'] == 'attack.first_wave':   # its report-only supply, at the same frame
-                        late_supply = ('attack.supply_at_wave', key[1])
-                        if late_supply in got_late:
-                            flat[late_supply] = got_late[late_supply]
+                    if obs['check'] == 'attack.first_wave':
+                        late_waves.append(key[1])
             flat[key] = v
+        for label in late_waves:
+            # A wave admitted past the run's end reports its supply from the same measurement.
+            supply = ('attack.supply_at_wave', label)
+            if supply in got_late and supply in {(o['check'], o['subject']) for o in golden['observations']}:
+                flat[supply] = got_late[supply]
         extra = sorted(f'{label}: {name}' for label, p in m['players'].items() if label != 'human'
                        for name in p['firsts'] if (f'build.first.{name}', label) not in
                        {(o['check'], o['subject']) for o in golden['observations']})

@@ -404,6 +404,16 @@ class ResultFrames(unittest.TestCase):
                                     (18, False, True)]
             with self.assertRaises(ValueError):
                 sk.tick_frames(cap)
+            # Reads without a unit table keep the order too, and do not advance the clock.
+            cap.trailing_changes = [(15, False, False), (15, False, False), (16, True, True), (17, False, True),
+                                    (18, False, True)]
+            self.assertEqual(sk.tick_frames(cap)[1], 11)
+            for bad in ([(15, False, False), (17, False, True), (18, False, True)],
+                        [(15, False, False), (16, False, False), (15, False, False), (17, False, True),
+                         (18, False, True)]):
+                cap.trailing_changes = bad
+                with self.assertRaises(ValueError):
+                    sk.tick_frames(cap)
 
     def test_goldens_of_an_older_revision_are_stale(self):
         self.assertEqual(metrics.SCENARIOS['sk-zvt-w0']['decoder_revision'], sk.DECODER_REVISION)
