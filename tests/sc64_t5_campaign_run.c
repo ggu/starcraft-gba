@@ -489,6 +489,7 @@ static int command_force_to(int x, int y, int attack_move)
     tap_b();
     if (attack_move) tap(KEY_DOWN);
     tap(KEY_A);
+    if (mode == MODE_NORMAL || screen != SCREEN_PLAY) return 0;   /* the target cursor never opened */
     move_cursor(x, y);
     if (!selected_count()) return command_group_to(x, y, attack_move);
     tap(KEY_A);

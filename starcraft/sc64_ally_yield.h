@@ -19,9 +19,9 @@
  *     it already stands on, else the other side, else straight ahead. The
  *     mover takes its step if that cleared it, and steers as before
  *     otherwise.
- *  2. Give up: when no step of the 8 directions is free, a Move or
- *     attack-move within SC64_MOVE_GIVE_UP_RADIUS px of its own order point
- *     ends where it stands. Farther out the engine's bounded wait and repath
+ *  2. Give up: when no step of the 8 directions is free and no ally moved,
+ *     a Move within SC64_MOVE_GIVE_UP_RADIUS px of its own order point ends
+ *     where it stands. Farther out the engine's bounded wait and repath
  *     continue. A zero step (the stock motion's speed this update) neither
  *     pushes nor ends an order.
  *
@@ -63,6 +63,9 @@ sc64_ally_yield_candidate(const Unit *q, const Unit *a)
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active() && race_t6_unit_burrowed((int)(a - u))) return 0;
 #endif
+#ifdef SC64_SHARED_NUKE_PROBE
+    if (sc64_race_ordinary_ghost(a->type) && race_nuke_ghost_locked((int)(a - u))) return 0;
+#endif
 #ifdef SC64_EGG_RUNTIME
     if (a->type == SC64_EGG_ACTOR) return 0;
 #endif
@@ -79,7 +82,8 @@ sc64_ally_yield_candidate(const Unit *q, const Unit *a)
  * yet, and its slot's cached cell, left by the slot's previous occupant,
  * proves nothing; sc64_target_index_move() would then relink it through
  * stale links. Move only a row that is in its cell's chain: the chain's head,
- * or the successor of a live row of the same owner in the same cell. */
+ * or the successor of a live unit or building of the same owner in the same
+ * cell (the index chains both). */
 static int
 sc64_ally_yield_linked(const Unit *a)
 {
@@ -89,8 +93,10 @@ sc64_ally_yield_linked(const Unit *a)
         sc64_target_cell[entity] != cell) return 0;
     prev = sc64_target_prev[entity];
     if (prev == SC64_TARGET_NONE) return sc64_target_head[a->owner][cell] == entity;
-    return prev < MAX_UNITS && u[prev].alive && u[prev].owner == a->owner &&
-           sc64_target_cell[prev] == cell && sc64_target_next[prev] == entity;
+    if (prev < MAX_UNITS ? !u[prev].alive || u[prev].owner != a->owner
+                         : prev >= MAX_UNITS + MAX_BUILDINGS || !b[prev - MAX_UNITS].alive ||
+                           b[prev - MAX_UNITS].owner != a->owner) return 0;
+    return sc64_target_cell[prev] == cell && sc64_target_next[prev] == entity;
 }
 
 /* Move ally a one step aside from the mover's line q -> (nx, ny). */
@@ -122,18 +128,19 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
  * may take it after all (an idle ally stepped aside), else 0 and the engine
  * steers as before. A Move or attack-move mover only, with a nonzero step:
  *  1. Yield: the idle ally nearest the step that blocks it moves aside.
- *  2. Give up: with no ally moved, an order within SC64_MOVE_GIVE_UP_RADIUS
+ *  2. Give up: with no ally moved, a Move within SC64_MOVE_GIVE_UP_RADIUS
  *     of its own point whose mover has no free step in any of the 8
- *     directions (the probes the engine's steering makes) ends where it
- *     stands; the steering then finds no step either and waits. */
+ *     directions (the probes the engine's steering makes, at its stock
+ *     speed) ends where it stands; the steering then finds no step either
+ *     and waits. An attack-move is left alone: move_toward() also serves
+ *     its chase of an enemy, away from its point. */
 static int __attribute__((noinline))
 sc64_move_blocked(Unit *q, int nx, int ny)
 {
     static const s8 dx[8] = {1,1,0,-1,-1,-1,0,1};
     static const s8 dy[8] = {0,1,1,1,0,-1,-1,-1};
     int best = -1, best_distance = 0x7fffffff;
-    int speed = FAST_ABS(nx - q->x) > FAST_ABS(ny - q->y) ? FAST_ABS(nx - q->x) : FAST_ABS(ny - q->y);
-    if ((q->order != ORDER_MOVE && q->order != ORDER_ATTACK_MOVE) || !speed) return 0;
+    if ((q->order != ORDER_MOVE && q->order != ORDER_ATTACK_MOVE) || (nx == q->x && ny == q->y)) return 0;
     for (int i = 0; i < MAX_UNITS; ++i) {
         const Unit *a = &u[i];
         if (!a->alive || a->owner != q->owner || a->order != ORDER_IDLE) continue;
@@ -146,9 +153,12 @@ sc64_move_blocked(Unit *q, int nx, int ny)
         best = i;
         best_distance = d;
     }
-    if (best >= 0 && sc64_ally_yield_step(q, &u[best], nx, ny) && unit_step_clear(q, nx, ny)) return 1;
-    if (dist2(q->x, q->y, q->tx, q->ty) > SC64_MOVE_GIVE_UP_RADIUS * SC64_MOVE_GIVE_UP_RADIUS) return 0;
-    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
+    /* An ally that moved aside may need more shoves: the mover retries. */
+    if (best >= 0 && sc64_ally_yield_step(q, &u[best], nx, ny)) return unit_step_clear(q, nx, ny);
+    if (q->order != ORDER_MOVE ||
+        dist2(q->x, q->y, q->tx, q->ty) > SC64_MOVE_GIVE_UP_RADIUS * SC64_MOVE_GIVE_UP_RADIUS) return 0;
+    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS, speed = (int)sc64_unit_stock_step(q, q->path_x, q->path_y);
+    if (speed <= 0) return 0;
     for (int k = 0; k < 8; ++k) {
         int sx = q->x + dx[k] * speed, sy = q->y + dy[k] * speed;
         if (is_traversable(sx / 16, sy / 16, from_cell) && unit_step_clear(q, sx, sy)) return 0;
