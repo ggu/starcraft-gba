@@ -76,3 +76,63 @@ The emulator measured guest-clock cycles across each recorded route, including
 menu, save and load inputs. T1–T3 approach 30 main-loop updates/s; T4, T5
 and Z3 are slower. The figures do not measure display refreshes or GBA SP
 hardware and do not predict a crowded three-AI match.
+
+## All thirty missions played on the packaged release
+
+Every chapter on the `51c7f18f` release reached victory in mGBA under
+ordinary input. Each chapter either consumed the preceding packaged victory
+or an independently earned standard-cartridge save whose bytes matched it.
+The first chapter of each race started from HOME without a save. After every
+victory, a fresh emulator process loaded the result and exported the same
+32 KiB SRAM as the corresponding standard-cartridge run. These were chapter
+replays with verified handoffs, including the staged pause saves in the
+longer routes.
+
+| Cartridge | Chapters played | Verified terminal SRAM for the finale (SHA-256) |
+|---|---:|---|
+| Terran10 | 10 | `147b1f62ca27455d99094ae8f16f7d55df14094f7b4ddbbe49a4c88ca4063eb4` |
+| Zerg10 | 10 | `1123eb7c9e8977228e33d24db85f14953a202da2a4c731bfdb4b6d940768b954` |
+| Protoss10 | 10 | `020cde76c8fd953851c7eb1ec2282cad9d0990486079b68aebee9a82565e9e86` |
+
+The private combined receipts are retained as
+`packaged-51c7f18f-all-30-replays.json`. Their SHA-256 is
+`795756b148f0d2f13fef84d5824962b5b07d5f010857fbdede0deb6e78d7aad4`.
+
+## Release with defeat Overview and unknown-terrain drawing
+
+Release `b7e69893` includes the shared Custom Game defeat Overview and
+the opaque fill for wholly unknown terrain. All 30 previously earned
+victories fresh-loaded and advanced on the corresponding updated race ROM,
+including all three finale retries. Comparing against the standard ROMs
+matched the observed world, re-exported SRAM and next-chapter state.
+
+Each of the four updated ROMs ran 27 Custom Game cases: every human race
+against one, two and three explicitly selected CPU races, on Outpost and
+on Blood Bath under both Free for All and Melee. Each case saved at 60
+updates and matched 60 further inputs after a fresh reload. A passive
+Protoss human also lost a three-AI Blood Bath match at frame 15,348. The
+result loaded in a fresh process, A opened Overview, holding A preserved
+the screen and the next A restarted with the same seats. The older Terran
+defeat save retained the same behavior. Terran T10 played through victory
+and reproduced the earlier finale SRAM.
+
+These checks used mGBA. The 30 full campaign replays above apply to the
+preceding `51c7f18f` package, and the GBA SP has not been timed for this release.
+
+| Product | Cartridge SHA-256 |
+|---|---|
+| SC TERRAN 10 | `8f3ca435bd7b2c901e0205bda22f2475a1b8c2a92322fedefc44d3e454dc5f9e` |
+| SC ZERG Z10 | `46accd07a40c6b655709947c62ac50522ca7973d9c4a5724b6608080dc8c5cb0` |
+| SC PROTOSS10 | `705f79cdc4b24565eb69e856181c1b28a57c81c091e097036fbe49f38d2488e8` |
+| SC SHOWCASE | `ac97b2480b602c72e93bfa767fe68db01c482d3374d300e9f22c2649435c72ac` |
+
+## Release with Z10 ARM-mode steering
+
+Release `c23009f8` adds #958 to the guarded Zerg10 build. The other three
+packaged binaries are byte-identical to `b7e69893`. All 30 campaign victory
+comparisons were repeated. The updated Zerg ROM separately passed all 27
+Custom Game launch/save/continuation checks. The crowded Outpost three-AI
+sample used 1.21% fewer whole-loop cycles; the two Blood Bath windows improved
+by 0.39% and 0.45%. All three matched gameplay checkpoints, rendered page
+contents and fresh SRAM. These workload-specific improvements leave the
+30 fps target open. See [#958](https://github.com/ggu/starcraft-gba/pull/958).

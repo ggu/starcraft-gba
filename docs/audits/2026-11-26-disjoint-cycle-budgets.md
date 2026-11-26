@@ -80,3 +80,40 @@ Local receipts: `/private/tmp/sc64-release-815f-pacing/paced-<case>/pacing.json`
 | protoss-1-tzp | `19d1cfb354796fa7656080d29a60ff0fde5c62b8d58f25eeba7481cf1b88f81e` | `7ce86ddee0d5bffab611efa88c55eefb0010d74f9b3c69f01ae1438a1481e7d8` | `7ed2ae0c7b340f46be4e3f55f87d78926c1b369822327e933cb40ff0c20e0a16` | `480271d09d10155232cfbffbce42a26a207911fae677f50344a723a4820145f0` |
 | terran-0-zpt | `dc63f1e629bd5b4ccc416bca27493984a6da59220cace72ab2401c4af4c71f68` | `d57ecd53567170834ea3a88981e9f27b825fa616186e7dda5af54be20bf527a6` | `3158a004e1155afca7fbfdf494ae5c7e16f23aaeac3a8c06bc96bc8f0cae0caf` | `8e3800a8c4af4700d1ff87cc4a97ceb481731f98bf025ad5ff25dcc5434fb178` |
 | terran-1-zpt | `dc63f1e629bd5b4ccc416bca27493984a6da59220cace72ab2401c4af4c71f68` | `d57ecd53567170834ea3a88981e9f27b825fa616186e7dda5af54be20bf527a6` | `b62b6641ac52529da15eb30b830019980783c9c8c4cb7fd6a0871d24f99f323f` | `ab0f18323b802910d383819e203baa9c5050834a3e0aef2d19e2c7b870ce7990` |
+
+## Protoss mission 4 on the packaged race ROM
+
+The complete P4 replay on the November 26 packaged Protoss cartridge at
+`51c7f18f` averaged 15.07 emulated main-loop updates/s. Three 128-input
+samples from the same ordinary-input route separate orders from actor
+drawing. A fresh emulator loaded the earned P3 result and advanced with A.
+At each cut the frame, result flags, minerals and screen matched the recorded
+mission checkpoint. The comparison cartridge is the combined #955/#957
+build at `4230c2ec`. Both versions reached identical terminal world
+fingerprints and frame numbers in all three windows.
+
+| Tape call at start | Full simulation samples | Packaged loop cycles | Combined loop cycles | Packaged orders | Packaged actor drawing |
+|---:|---:|---:|---:|---:|---:|
+| 4,330 | 2 | 761,235 | 760,550 | 156,799 | 100,210 |
+| 17,275 | 128 | 801,506 | 802,010 | 264,873 | 122,437 |
+| 40,127 | 128 | 1,021,493 | 1,022,147 | 327,583 | 185,846 |
+
+Each mean uses full simulation updates. The first window also includes 122
+updates during P4's authored PauseGame and four inputs that did not advance
+the mission frame. While paused, the mission clock advances through trigger
+actions and the engine skips orders and combat. Their previous timer values
+remain in memory. Reading the source-pause flag **before** each input
+excludes those stale counters from the simulation breakdown.
+
+Orders, at 32% of the loop in the last window, are a larger target than
+terrain drawing there (43,140 cycles, or 4%). Keep both later P4 windows
+as campaign holdouts for optimizations first measured in Custom Game.
+The private archive `p4-paired-campaign-budgets.tar.gz` includes per-input
+guest timers, the input hashes and the measurement script. Its SHA-256 is
+`c199530bc68d48b149f949500f391aa5a90b8e7600909ab0d164c18cc13f69a3`.
+
+Full ordinary-input runs on the same package measured 15.55 updates/s
+on P6 and 23.91 on P5. The staged Z6 recovery route averaged 19.22,
+and Z5 averaged 20.02. The staged averages include input spent saving
+and loading. P4 and P6 warrant dedicated campaign profiling in addition
+to the crowded Blood Bath and Outpost benchmarks.
