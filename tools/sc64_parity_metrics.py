@@ -963,6 +963,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # then it is lost, and survival is left unmeasured.
     frame_at = {f['sf']: f for f in series['frames']}
     born_in = [(ev[2], ev[1] or 0) for ev in series.get('events', []) if ev[0] == '+U']
+    # GBA owner and type changes in place, step-stamped: a slot refilled inside one engine step.
+    changed_in = [(ev[2], ev[1] or 0) for ev in series.get('events', []) if ev[0] in ('OU', 'TU')]
 
     def removal_after(vid, slot, last_sf):
         # The removal of the unit last sampled at last_sf: after the engine step of that sample
@@ -1206,7 +1208,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             # the occupant, and a hit on an occupant no sample shows stays unresolved.
             before_step = at_frame.get(sf - 1, {}).get('step')
             reborn = any(slot_b == target and (before_step is None or step_b > before_step) and step_b <= step_
-                         for slot_b, step_b in born_in)
+                         for slot_b, step_b in born_in + changed_in)
             k = None
             for s_ in ((sf,) if reborn else (sf - 1, sf)):
                 k = next((k for k in at_frame.get(s_, {}).get('units', {}) if slot_of(k) == target), None)
@@ -1242,7 +1244,10 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # Several hit records on one unit in one frame show as one drop: no per-hit value, and no
     # interval touching that frame.
     multiple = {key for key, n in record_count.items() if n > 1}
-    unclear |= nearby | nearby_ambiguous | foe_unmatched | {sf for sf, _ in multiple}
+    # Only hits the subject could have dealt split its timing: on the foe, or on another enemy
+    # in its reach.
+    unclear |= nearby | nearby_ambiguous | foe_unmatched | {
+        sf for sf, k in multiple if k != uid and (enemy(k) or (any_enemy(k) and (near_subject(sf, k) or near_subject(sf - 1, k))))}
     foe_kills = set()
     for vid in seen:
         if not any_enemy(vid):

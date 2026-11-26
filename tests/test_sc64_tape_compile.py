@@ -1102,6 +1102,22 @@ class LabMeasureTest(unittest.TestCase):
         series['max_units'] = 100
         m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
         self.assertEqual((m['damage_values'], m['gaps']), ([6], []))
+        # Two records on a distant ally between the subject's hits split nothing.
+        series = as_gba(walk(pos, hp={1: marine, 2: ling, 6: {sf: 40.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 150, 100), (6, metrics.MARINE, 1, 900, 100)]))
+        series['hits'] = [(26, 2, 6, 0, 0), (45, 6, 3, 3, 3), (46, 6, 3, 3, 3), (66, 2, 6, 0, 0)]
+        series['max_units'] = 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual(m['gaps'], [16, 16])
+        # A friendly slot refilled by a foe inside one engine step (an owner change record, no
+        # birth), hit in the next step of the same source frame before any sample of the foe:
+        # unresolved, never discarded as a hit on the friendly unit.
+        series = as_gba(walk(pos, hp={1: marine, 2: calm_ling, 6: {sf: 40.0 for sf in range(0, 36)}},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100), (6, metrics.MARINE, 1, 600, 100)]))
+        series['events'] = [('OU', 45, 6, 1, 4)]
+        series['hits'], series['max_units'] = [(46, 6, 6, 0, 0)], 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['combat'], m['nearby_ambiguous']), (True, True))
 
     def test_neutral_removals_and_interval_endpoints(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}

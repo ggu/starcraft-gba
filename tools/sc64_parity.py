@@ -149,6 +149,9 @@ def gba_series(trace_path):
                 shield.pop(int(words[1]), None)
                 etype.pop(int(words[1]), None)
                 live.pop(int(words[1]), None)
+            elif tag in ('OU', 'TU') and len(words) == 4:
+                # An owner or type change in place: a slot refilled inside one engine step shows so.
+                events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
             elif tag in ('+U', '+B', '-B'):
                 events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
                 if tag == '-B':
