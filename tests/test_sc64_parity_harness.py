@@ -48,8 +48,11 @@ def write_capture(run, frames, pause_ticks=(), command_step=100, tamper_tick=Non
     out = bytearray(b'SC64TAP\0' + struct.pack('<4I', 1, 48, 0xCC, 314))
     for tick, units in enumerate(frames, start=1):
         step = 2 * tick + (1 if step_shift_tick is not None and tick >= step_shift_tick else 0)
-        if tick - 1 in skip_follow and not loose_skip:
-            step -= 1   # a genuine skip: this tick changed on the step after the skipped one
+        streak = 0
+        while tick - 1 - streak in skip_follow:
+            streak += 1
+        if streak and not loose_skip:
+            step -= streak   # a genuine skip: each tick after a skipped one changes on the very next step
         glob = bytearray(0xCC)
         gathered = 8 * (tick // 20)
         struct.pack_into('>I', glob, 4 * HUMAN, 50 + gathered)
@@ -156,6 +159,12 @@ class Decoder(unittest.TestCase):
             lead = parity_decode.Capture(n)
             self.assertEqual(lead.skipped_frames, [(2, 0)])
             self.assertEqual(lead.ticks[0]['sf'], 1)
+            # Two leading change-only ticks, each on the step before the next tick's change read.
+            q = pathlib.Path(temp) / 'q'
+            write_capture(q, marine_frames(30), skip_follow={1, 2})
+            two = parity_decode.Capture(q)
+            self.assertEqual([sf for _, sf in two.skipped_frames], [0, 1])
+            self.assertEqual(two.ticks[0]['sf'], 2)
             # A jump of more than eight ticks is never explained, change-step reads or not.
             f, g = pathlib.Path(temp) / 'f', pathlib.Path(temp) / 'g'
             write_capture(f, marine_frames(30), skip_follow=set(range(10, 20)))

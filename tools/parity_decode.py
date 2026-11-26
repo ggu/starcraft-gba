@@ -366,12 +366,17 @@ class Capture:
         # A capture can also start on a tick that ran inside one step, before any follow-up
         # read: the same proof (the next tick's change read on the very next step) admits it.
         if self.ticks:
+            leading, nxt = [], change.get(self.ticks[0]['tick'])
             lead = (self.ticks[0]['tick'] - 1) & 0xFFFFFFFF
-            head0 = change.get(self.ticks[0]['tick'])
-            if (lead in change and head0 is not None and head0['step'] == change[lead]['step'] + 1 and
-                    change[lead]['pause'] == 0 and change[lead]['flags'] & FLAG_TABLE):
-                extra.setdefault(0, []).insert(0, change[lead]['step'])
+            while nxt is not None and lead in change and nxt['step'] == change[lead]['step'] + 1:
+                leading.insert(0, change[lead])   # walk back through contiguous change-only ticks
+                nxt, lead = change[lead], (lead - 1) & 0xFFFFFFFF
+            for head in leading:
                 self.faults['skipped_ticks'] += 1
+                if head['pause'] == 0 and head['flags'] & FLAG_TABLE:
+                    extra.setdefault(0, []).append(head['step'])
+            if leading:
+                extra[0] = sorted(extra.get(0, []))
         # Unpaused clock: one source frame per tick whose change-step read
         # showed no pause; numbered from the first in-mission (table) tick.
         clock = -1

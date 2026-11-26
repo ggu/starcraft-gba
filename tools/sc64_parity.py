@@ -78,6 +78,7 @@ def gba_series(trace_path):
     (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
     [(sf, cell, visible, explored)]}, cells col + row * cols)."""
     units, hp, shield, etype, banks, frames = {}, {}, {}, {}, {}, []
+    buildings = {}   # slot -> (owner, x, y) in N64 px, for the labs' single-enemy check
     orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
     keyframe = {}
     # Births and building rows with engine type ids, for the passive train and build lab
@@ -90,7 +91,7 @@ def gba_series(trace_path):
             return
         sf = step * 4 // 5
         frame = {'sf': sf, 'step': step, 'units': dict(units), 'hp': dict(hp), 'shield': dict(shield),
-                 'etype': dict(etype),
+                 'etype': dict(etype), 'buildings': dict(buildings),
                  'banks': {o: (v, None) for o, v in banks.items()}}
         if frames and frames[-1]['sf'] == sf:
             frames[-1] = frame
@@ -133,7 +134,12 @@ def gba_series(trace_path):
                 etype.pop(int(words[1]), None)
             elif tag in ('+U', '+B', '-B'):
                 events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
+                if tag == '-B':
+                    buildings.pop(int(words[1]), None)
             elif tag == 'B':
+                raw_owner = int(words[5])
+                buildings[int(words[1])] = (raw_owner if raw_owner >= 0 else int(words[4]),
+                                            2 * int(words[6]), 2 * int(words[7]))
                 # slot, engine type, owner, under construction, queue count, queue progress, queue head
                 events.append(('B', step, int(words[1]), int(words[2]), int(words[4]), int(words[11]),
                                int(words[14]), int(words[15]), int(words[16])))

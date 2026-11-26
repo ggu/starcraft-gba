@@ -683,13 +683,15 @@ def n64_order_after(cap, row, step, expect, window=LAB_ORDER_WINDOW):
     expect = (expect,) if isinstance(expect, int) else tuple(expect)
     # The order before the press, then the first different order within `window` N64 ticks of it:
     # a byte already set before the press is no evidence of the press.
-    before = [r for r in cap.ticks if r['step'] <= step and row in r['rows']]
+    # A follow-up record is read one step after its tick began: a tick began before the press
+    # when its record's step - 1 is at or before the mark, and its order is boundary state.
+    before = [r for r in cap.ticks if r['step'] - 1 <= step and row in r['rows']]
     if not before:
         return None, []
     prior, tick0 = cap.unit(before[-1]['rows'][row], 'order'), before[-1]['tick']
     seen = []
     for record in cap.ticks:
-        if record['step'] <= step:
+        if record['step'] - 1 <= step:
             continue
         if (record['tick'] - tick0) & 0xFFFFFFFF > window:
             break
@@ -837,6 +839,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
         # A drop seen across a sampling gap may have come from a unit that left reach meanwhile.
         return near == [uid] and gaps_of.get(vid, {}).get(sf, 1) == 1
     unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
+    # A killing drop leaves no exact damage, but when it is not clearly the subject's it still
+    # splits the timing: no cooldown interval may span it.
+    for vid in victims:
+        for sf, _ in hits(hp_track(series, vid, t0, end), lethal=True):
+            if not ours(sf, vid):
+                unclear.add(sf)
     ambiguous = len({(sf, vid) for vid, got in list(victims.items()) + list(shielded.items())
                      for sf, _ in got if not ours(sf, vid)})
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
@@ -857,8 +865,13 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None):
             return False
         near = [k for k, u in units.items() if u[1] != human and u[1] < 8 and hp.get(k, 1) > 0
                 and math.hypot(u[2] - me[2], u[3] - me[3]) <= LAB_REACH]
+        # GBA buildings live outside the unit rows (the N64 table holds them as rows already).
+        near += [('B', k) for k, b in frame.get('buildings', {}).items()
+                 if b[0] != human and b[0] < 8 and math.hypot(b[1] - me[2], b[2] - me[3]) <= LAB_REACH]
         return len(near) == 1
-    taken_single = all(single_foe(sf) for sf, _ in taken)
+    own_gaps = drop_gaps(own)
+    # Each hit taken must come between consecutive samples with one enemy in reach.
+    taken_single = all(single_foe(sf) and own_gaps.get(sf, 1) == 1 for sf, _ in taken)
     # Survival runs from the first hit taken, the killing one included (a one-shot death is 0).
     first_taken = next((sf for sf, _ in hits(own, lethal=True)), None)
     # What the subject took is measured even when it never lands a hit.
@@ -1000,9 +1013,10 @@ def lab_attack_gba(spec):
                                ('survival', 'lab.survival')):
                 if m[key] is not None:
                     values[check] = m[key]
-            if not m.get('taken_single', False) and 'lab.counter_damage' in values:
-                # Hits taken from several enemies in reach cannot stand for one enemy's damage.
-                values['lab.counter_damage'] = ABSENT
+            if not m.get('taken_single', False):
+                # Hits taken from several enemies in reach cannot stand for one enemy's damage:
+                # absent_values() lists the check, so the verdict and the record agree.
+                values.pop('lab.counter_damage', None)
             # Exact checks hold for every hit, not the median: submit the GBA hit furthest from
             # the N64 value, so one wrong hit among right ones still fails.
             n64 = {obs['check']: obs['value'] for obs in golden['observations']

@@ -471,6 +471,18 @@ class LabMeasureTest(unittest.TestCase):
         # The hit first seen at 35 follows a gap: ambiguous, and no interval spans it.
         self.assertEqual((m['hits'], m['ambiguous_hits'], m['gaps']), (2, 1, []))
 
+    def test_enemy_buildings_count_for_damage_taken(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 - 5 * len([t for t in (20, 30) if t <= sf]) for sf in range(0, 80)}
+        ling = {sf: 35.0 for sf in range(0, 80)}
+        series = walk(pos, hp={1: marine, 2: ling}, others=[(2, metrics.ZERGLING, 4, 130, 100)])
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertTrue(m['taken_single'])
+        for frame in series['frames']:   # a GBA enemy building (e.g. a Sunken Colony) in reach
+            frame['buildings'] = {7: (4, 200, 100)}
+        m, _ = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)
+        self.assertFalse(m['taken_single'])
+
     def test_n64_order_must_match_the_replay(self):
         class Cap:
             ticks = [{'step': s, 'tick': t, 'rows': {9: o}}
