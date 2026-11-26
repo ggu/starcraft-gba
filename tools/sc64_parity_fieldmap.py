@@ -194,7 +194,9 @@ def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
                                            abs(o['y'] - r['y']) <= STACK_RADIUS for o in expected) else MOVED_RADIUS
              for r in expected}
     cheb = lambda r, n: max(abs(n['x'] - r['x']), abs(n['y'] - r['y']))
-    fits = lambda r, n: n['type'] == r['type'] and n['owner'] == r['owner'] and cheb(r, n) <= reach[id(r)]
+    # THG2 unit doodads may also stand on their exact spot under another owner (the cartridge's rule).
+    fits = lambda r, n: n['type'] == r['type'] and (
+        (n['owner'] == r['owner'] and cheb(r, n) <= reach[id(r)]) or (r.get('section') == 'THG2' and cheb(r, n) == 0))
     used, matched, amount_differs = set(), [], []
     out, taken = {'moved': [], 'displaced': []}, set()
     for r, n in max_pairs(expected, n64_rows, fits):
@@ -517,6 +519,11 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
     out, previous = [], {}
     hints = {k: int(v, 16) - RAM_BASE for k, v in (base_hint or {}).items() if isinstance(v, str) and v.startswith('0x')}
     position = {c[0]: k for k, c in enumerate(columns)}
+    suffix = {}   # bytes from a column's start to its table's end, 4-byte aligned per column
+    for k in range(len(columns) - 1, -1, -1):
+        name, raw = columns[k][0], columns[k][3]
+        later = columns[k + 1][0] if k + 1 < len(columns) and columns[k + 1][0].split('.')[0] == name.split('.')[0] else None
+        suffix[name] = align(len(raw)) + suffix[later] if later else len(raw)
 
     def corroboration(name, at, depth=3):
         """How many of the next `depth` columns of the same table match in sequence from `at`."""
@@ -556,7 +563,7 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                     break
                 spots, at = [], ram.find(blob)
                 while at >= 0 and len(spots) < 64:
-                    if at % 4 == 0:
+                    if at % 4 == 0 and at + suffix[name] <= len(ram):   # the rest of the table must fit
                         spots.append(at)
                     at = ram.find(blob, at + 1)
                 if spots:
@@ -569,8 +576,10 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
                     break
         if found:
             encoding, at, count = found[:3]
-            out.append({'column': name, 'address': f'{RAM_BASE + at:08x}', 'status': 'equal', 'encoding': encoding,
-                        'occurrences': count, **({'ambiguous': True} if 'ambiguous' in found[3:] else {})})
+            # A base two equally corroborated spots could hold is not a clean match.
+            status = 'ambiguous' if 'ambiguous' in found[3:] else 'equal'
+            out.append({'column': name, 'address': f'{RAM_BASE + at:08x}', 'status': status, 'encoding': encoding,
+                        'occurrences': count})
             previous[table] = align(at + size)
             continue
         entry = {'column': name, 'status': 'not found', 'address': None}
@@ -579,6 +588,9 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
             blob = big_endian(fmt, raw)
             got = ram[at:at + size]
             width = struct.calcsize('<' + fmt)
+            if len(got) < size:   # the expected spot runs past the end of RAM
+                out.append(dict(entry, status='not found', note='expected spot past the end of RAM'))
+                continue
             diffs = [{'row': i, 'rom': struct.unpack_from('>' + fmt, blob, i * width)[0],
                       'ram': struct.unpack_from('>' + fmt, got, i * width)[0]}
                      for i in range(rows) if blob[i * width:(i + 1) * width] != got[i * width:(i + 1) * width]]
@@ -856,7 +868,10 @@ def bullet_rows(block, table_address, layout=None, gating=False):
     read through the layout's pool.bullet field definitions."""
     import parity_decode as pdx
     layout = layout or pdx.Layout()
-    size = layout.pool('bullet', gating)['record_bytes']
+    pool = layout.pool('bullet', gating)
+    size = pool['record_bytes']
+    if len(block) != pool['records'] * size:
+        raise ValueError(f'bullet region of {len(block)} bytes is not {pool["records"]} records of {size}')
     f = {name: layout.pool_field('bullet', name, gating)
          for name in ('sprite', 'weapon', 'source', 'target', 'x', 'y', 'time_remaining')}
     get = lambda b, name: struct.unpack_from(f[name][1], b, f[name][0])[0]
@@ -877,7 +892,9 @@ def t3_measure_n64(cap, marks):
     import statistics
     ticks = [r for r in cap.ticks if r['table']]
     clock = tick_clock(ticks)
-    bullet_index = next((i for i, (a, n) in enumerate(cap.regions) if n == BULLET_POOL[0]), None)
+    bullet_pool = cap.layout.pool('bullet', gating=False)
+    bullet_index = next((i for i, (a, n) in enumerate(cap.regions)
+                         if n == bullet_pool['records'] * bullet_pool['record_bytes']), None)
     player_index = next((i for i, (a, n) in enumerate(cap.regions) if a == PLAYER_REGION), None)
     if bullet_index is None or player_index is None:
         raise SystemExit('t3-opening: the capture does not record the bullet pool and the player arrays')

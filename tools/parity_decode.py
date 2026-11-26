@@ -42,6 +42,15 @@ FLAG_ROWS, FLAG_TABLE, FLAG_DUAL_DIFFER, FLAG_BAD_LINKS = 1, 2, 4, 8
 TYPES = {'u8': ('>B', 1), 'u16': ('>H', 2), 'u32': ('>I', 4)}
 
 
+def file_sha256(path):
+    """SHA-256 of a file, read in blocks (captures run to hundreds of MB)."""
+    digest = hashlib.sha256()
+    with open(path, 'rb') as handle:
+        for block in iter(lambda: handle.read(1 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 class LayoutError(Exception):
     """A field was asked for that the layout does not allow for that use."""
 
@@ -152,7 +161,7 @@ class Layout:
             offset = int(words[0], 16) if words else None
         except ValueError:
             offset = None
-        if offset is None or fmt is None or offset + struct.calcsize(fmt) > self.pool(pool, gating)['record_bytes']:
+        if offset is None or fmt is None or offset < 0 or offset + struct.calcsize(fmt) > self.pool(pool, gating)['record_bytes']:
             raise LayoutError(f'{self.name}: pool.{pool} field {name!r} is {text!r}; the decoders need "0xNN u8|u16|u32" '
                               'inside the record')
         return offset, fmt
@@ -245,6 +254,13 @@ class Capture:
         self.run = pathlib.Path(run)
         self.layout = layout or Layout()
         self.manifest = json.loads((self.run / 'manifest.json').read_text())
+        # Decoding holds a whole capture in memory: refuse clearly, before reading it, instead of
+        # exhausting memory.
+        limit = int(os.environ.get('SC64_PARITY_MAX_CAPTURE_BYTES') or MAX_CAPTURE_BYTES)
+        size = sum((self.run / name).stat().st_size for name in ('tap.bin', 'extra.bin') if (self.run / name).is_file())
+        if size > limit:
+            raise ValueError(f'{self.run}: tap.bin and extra.bin hold {size} bytes, more than the decoder holds in '
+                             f'memory ({limit}; SC64_PARITY_MAX_CAPTURE_BYTES); record a shorter window or every Kth tick')
         self.verified = self._verify_artifacts()
         self.ticks = []          # follow-up records in tick order: dicts
         self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0}
@@ -252,12 +268,6 @@ class Capture:
         chain = hashlib.sha256()
         last_tick = None
         self.regions, self.extra, extra_faults, joined = [], {}, 0, set()
-        # Decoding holds a whole capture in memory: refuse clearly instead of exhausting it.
-        limit = int(os.environ.get('SC64_PARITY_MAX_CAPTURE_BYTES') or MAX_CAPTURE_BYTES)
-        size = sum((self.run / name).stat().st_size for name in ('tap.bin', 'extra.bin') if (self.run / name).is_file())
-        if size > limit:
-            raise ValueError(f'{self.run}: tap.bin and extra.bin hold {size} bytes, more than the decoder holds in '
-                             f'memory ({limit}; SC64_PARITY_MAX_CAPTURE_BYTES); record a shorter window or every Kth tick')
         if (self.run / 'extra.bin').is_file():
             self.regions, records = read_extra(self.run / 'extra.bin')
             for step, tick, ordinal, blocks in records:
@@ -333,13 +343,13 @@ class Capture:
         """tap.bin and tape.txt must be the files the capture wrote (manifest digests)."""
         problems = []
         recorded = self.manifest.get('outputs_sha256', {}).get('tap.bin')
-        if not recorded or recorded != hashlib.sha256((self.run / 'tap.bin').read_bytes()).hexdigest():
+        if not recorded or recorded != file_sha256(self.run / 'tap.bin'):
             problems.append('tap.bin does not match the manifest')
         extra = self.run / 'extra.bin'
         recorded_extra = self.manifest.get('outputs_sha256', {}).get('extra.bin')
         if recorded_extra and not extra.is_file():
             problems.append('extra.bin is recorded in the manifest but missing')
-        if extra.is_file() and (not recorded_extra or recorded_extra != hashlib.sha256(extra.read_bytes()).hexdigest()):
+        if extra.is_file() and (not recorded_extra or recorded_extra != file_sha256(extra)):
             problems.append('extra.bin does not match the manifest')
         if extra.is_file():
             # Extra-region reads count their cache-alias conflicts into status.log's totals
@@ -393,7 +403,7 @@ class Capture:
                     problems.append(f'state input {words[1]} has no recorded producer (run id and binary)')
         for name, digest in states.items():
             staged = self.run / 'input' / name
-            if not staged.is_file() or hashlib.sha256(staged.read_bytes()).hexdigest() != digest:
+            if not staged.is_file() or file_sha256(staged) != digest:
                 problems.append(f'state input {name} does not match the manifest')
         return problems
 
@@ -663,6 +673,8 @@ def write_golden(scenario_id, runs, home, layout, note=None):
             'rom_sha256': caps[0].manifest['rom_sha256'], 'mode': caps[0].manifest['mode'],
             'selectors': sorted({r['selector'] for r in caps[0].ticks if r['table']}),
             'records': len(caps[0].ticks), 'faults': caps[0].faults,
+            # v2: extra-region captures also hash their regions, region list and table offset.
+            'chain_format': 2 if caps[0].regions else 1,
         },
     }
     # Golden files carry ROM-derived curves: write them only where no checkout tracks

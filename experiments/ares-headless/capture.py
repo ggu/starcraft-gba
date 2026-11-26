@@ -130,8 +130,13 @@ def budget_supported(binary):
 
 
 def budget_acknowledged(status_text, budget):
-    """True when a finished frontend's status.log reports the budget the wrapper asked for."""
-    return f'output_budget={budget}' in status_text.split()
+    """True when a finished frontend's status.log summary (the line with its pokes and output
+    totals) reports exactly one budget, the one the wrapper asked for."""
+    lines = [line for line in status_text.splitlines() if line.startswith('pokes=')]
+    if len(lines) != 1:
+        return False
+    values = [w.split('=', 1)[1] for w in lines[0].split() if w.startswith('output_budget=')]
+    return values == [str(budget)]
 
 
 def main():
@@ -192,6 +197,9 @@ def main():
     with open(LOCK, 'a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         provenance()
+        if not budget_supported(args.binary):   # again under the lock: a build may have replaced it
+            raise SystemExit('the frontend binary predates the output budget (no SC64_CAPTURE_BUDGET_BYTES); '
+                             'build capture.cpp from this tree')
         parent = args.output.resolve().parent
         parent.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(parent).free < args.reserve_gib * 1024 ** 3:
@@ -241,10 +249,10 @@ def main():
                     writer = json.loads((folder / 'manifest.json').read_text())
                 except (OSError, ValueError):
                     continue
-                if isinstance(writer, dict) and writer.get('flash_file_after_sha256') == flash_sha and \
-                        (writer.get('pokes') or writer.get('n64_staged')):
-                    staged_inputs.append('flash')
-                break
+                if isinstance(writer, dict) and writer.get('flash_file_after_sha256') == flash_sha:
+                    if writer.get('pokes') or writer.get('n64_staged'):
+                        staged_inputs.append('flash')
+                    break   # the run that wrote this save; an unrelated manifest is passed over
         manifest = {
             'binary_sha256': sha(args.binary), 'frontend_sha256': sources, 'ares_commit': ARES_COMMIT,
             'generated_resource_sha256': {r: sha(args.source / r) for r in RESOURCES},

@@ -2,6 +2,7 @@
 """Asset-free checks of the N64 field map: extra.bin decoding, heap blocks, fog
 masks, image records, the launch census and bank joins, the table anchor and the
 t1-fields measures, on synthetic data only (no ROM, capture or GBA build)."""
+import json
 import pathlib
 import struct
 import sys
@@ -224,6 +225,15 @@ class CensusClasses(unittest.TestCase):
             r = fm.census_compare(chk, rows, {})
             self.assertEqual(len(r['amount_differs']), 2)   # nearest pairs: the swapped amounts show
 
+    def test_doodads_keep_their_exact_spot_across_owners(self):
+        unit = {'type': 205, 'owner': 6, 'x': 100, 'y': 10, 'resources': 0, 'section': 'UNIT'}
+        door = {'type': 205, 'owner': 6, 'x': 104, 'y': 10, 'resources': 0, 'section': 'THG2'}
+        live = [{'type': 205, 'owner': 11, 'x': 104, 'y': 10, 'resource_amount': 0},
+                {'type': 205, 'owner': 6, 'x': 92, 'y': 10, 'resource_amount': 0},
+                {'type': 205, 'owner': 6, 'x': 104, 'y': 10, 'resource_amount': 0}]
+        r = fm.census_compare([unit, door], live[:2], {})
+        self.assertEqual((r['verdict'], r['doodads']['rows']), ('exact', 1))
+
     def test_reowned_resource_amounts(self):
         chk = [{'type': 176, 'owner': 11, 'x': 5, 'y': 5, 'resources': 900, 'section': 'UNIT'}]
         same = fm.census_compare(chk, [{'type': 176, 'owner': 3, 'x': 5, 'y': 5, 'resource_amount': 900}], {})
@@ -249,9 +259,11 @@ class TableAnchor(unittest.TestCase):
         columns = [('t.a', 'H', 2, a), ('t.b', 'B', 4, b)]
         copy = struct.pack('>2H', 1, 2) + b
         found = fm.anchor_columns(copy + copy, columns)
-        self.assertTrue(found[0].get('ambiguous'))
+        self.assertEqual(found[0]['status'], 'ambiguous')
         found = fm.anchor_columns(copy + struct.pack('>2H', 1, 2) + b'\0' * 4, columns)
-        self.assertFalse(found[0].get('ambiguous'))
+        self.assertEqual((found[0]['status'], found[0]['address']), ('equal', f'{fm.RAM_BASE:08x}'))
+        # A decoy too close to the end of RAM for the rest of the table never wins.
+        found = fm.anchor_columns(copy + b'\xEE' * 4 + struct.pack('>2H', 1, 2) + bytes([4, 5]), columns)
         self.assertEqual(found[0]['address'], f'{fm.RAM_BASE:08x}')
 
     def test_columns_found_aligned_and_differences_listed(self):
@@ -375,6 +387,17 @@ class ExtraJoin(unittest.TestCase):
             finally:
                 del os.environ['SC64_PARITY_MAX_CAPTURE_BYTES']
 
+    def test_pool_fields_reject_negative_offsets_and_wrong_strides(self):
+        doc = json.loads(parity_decode.LAYOUT.read_text())
+        doc['pools']['image']['fields']['wait'] = '-0x01 u8'
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / 'layout.json'
+            path.write_text(json.dumps(doc))
+            with self.assertRaises(parity_decode.LayoutError):
+                parity_decode.Layout(path).pool_field('image', 'wait', gating=False)
+        with self.assertRaises(ValueError):
+            fm.bullet_rows(b'\0' * (100 * 112 - 112), 0x802E2340)
+
     def test_capture_wrapper_needs_the_budget(self):
         sys.path.insert(0, str(ROOT / 'experiments' / 'ares-headless'))
         import capture
@@ -385,6 +408,8 @@ class ExtraJoin(unittest.TestCase):
             self.assertEqual((capture.budget_supported(old), capture.budget_supported(new)), (False, True))
         self.assertTrue(capture.budget_acknowledged('pokes=0 output_written=5 output_budget=8589934592\n', 8589934592))
         self.assertFalse(capture.budget_acknowledged('pokes=0 output_written=5\n', 8589934592))
+        self.assertFalse(capture.budget_acknowledged('x output_budget=8589934592\npokes=0 output_budget=1\n', 8589934592))
+        self.assertFalse(capture.budget_acknowledged('pokes=0 output_budget=1 output_budget=8589934592\n', 8589934592))
 
     def test_fog_needs_one_region_of_its_size(self):
         with tempfile.TemporaryDirectory() as d:
