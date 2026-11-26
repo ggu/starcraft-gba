@@ -1101,7 +1101,12 @@ class LabMeasureTest(unittest.TestCase):
         series['hits'] = [(26, 2, 6, 0, 0), (45, 2, 3, 0, 0), (46, 2, 3, 0, 0), (66, 2, 6, 0, 0)]
         series['max_units'] = 100
         m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
-        self.assertEqual((m['damage_values'], m['gaps']), ([6], []))
+        # Among right hits, a frame that can hide a wrong one leaves exact damage unmeasured.
+        self.assertEqual((m['damage_values'], m['damage'], m['gaps']), ([], None, []))
+        # In the first hit's frame it also withholds the range.
+        series['hits'] = [(25, 2, 3, 0, 0), (26, 2, 3, 0, 0), (45, 2, 6, 0, 0), (66, 2, 6, 0, 0)]
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['range_first'], m['damage']), (None, None))
         # Two hits on a Drone in the step its slot is refilled by a friendly unit (a type and
         # owner change record in that step): their target is unknown, and they split the timing.
         # (the Drone in the subject's reach, out of the Zergling's)
@@ -1131,6 +1136,23 @@ class LabMeasureTest(unittest.TestCase):
         series['hits'], series['max_units'] = [(46, 6, 6, 0, 0)], 100
         m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
         self.assertEqual((m['combat'], m['nearby_ambiguous']), (True, True))
+
+    def test_gba_shield_regeneration_can_mask_part_of_a_hit(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        hydra = {sf: 80.0 for sf in range(0, 80)}
+        zealot = {sf: 100.0 for sf in range(0, 80)}
+        shields = {sf: 60.0 - 10 * len([t for t in (20, 36) if t <= sf]) for sf in range(0, 80)}
+
+        def measure(dealt):
+            series = as_gba(walk(pos, uid=1, typ=38, hp={1: hydra, 2: zealot},
+                                 others=[(2, 65, 4, 150, 100)]))
+            for frame in series['frames']:
+                frame['shield'] = {2: shields[frame['sf']]}
+            series['hits'], series['max_units'] = [(26, 2, dealt, 0, 0), (46, 2, dealt, 0, 0)], 100
+            return metrics.lab_attack_measure(series, 1, 5, 65)[0]   # 65: Zealot
+        self.assertEqual(measure(10)['shield_damage'], 10)   # drops equal to the hits' records
+        # 11 per hit with a whole point regained in the frame shows a drop of 10: not a value.
+        self.assertIsNone(measure(11)['shield_damage'])
 
     def test_neutral_removals_and_interval_endpoints(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}

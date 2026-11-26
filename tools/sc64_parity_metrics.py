@@ -500,6 +500,7 @@ LAB_STILL = 8.0              # N64 px a non-subject human unit of the subject's 
 LAB_ORDER_WINDOW = 12        # ticks after a press within which the subject's order must change
 ORDER_MOVE, ORDER_ATTACK_MOVE = 6, 14   # proven unit.order values (layout 'orders')
 TERRAN_BUILDINGS = (106, 127)   # cartridge ids: Command Center to Ion Cannon (units.dat order)
+SHIELD_REGEN_Q8 = 7   # Protoss shields regained per frame, 1/256 points (GBA whole points, remainder kept)
 SC64_BURN_Q8 = 20   # Terran building burn per source frame, 1/256 hp (starcraft/sc64_building_damage.h)
 LAB_REACH = 288.0            # N64 px: 9 tiles, past every weapon but siege mode, for single-attacker checks
 LAB_ARRIVE_TOLERANCE = 32.0  # N64 px a leg may settle from its order point: one tile, for the GBA's
@@ -1195,7 +1196,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # points left, a Drone consumed by construction, takes over nothing).
     removed_at = {(r[2], r[1]) for r in series.get('removals', []) if r[0] == 'U' and r[6] <= 0}
     record_count = {}
-    for step_, target, *_ in series.get('hits', []) if max_units is not None else ():
+    record_damage = {}
+    for step_, target, damage_, *_ in series.get('hits', []) if max_units is not None else ():
         sf = (step_ or 0) * 4 // 5
         # After the pre-command sample: a hit in its frame may come before the command.
         if not t0 < sf <= end:
@@ -1225,6 +1227,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                     nearby_ambiguous.add(sf)   # a hit nobody can place: unmeasured, never absent
                 continue
             record_count[(sf, k)] = record_count.get((sf, k), 0) + 1
+            record_damage[(sf, k)] = damage_
             if k == uid:
                 struck_by_record = True
             elif enemy(k):
@@ -1295,12 +1298,30 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     victims = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in victims.items()}
     shielded = {vid: [(sf, d) for sf, d in got if ours(sf, vid)] for vid, got in shielded.items()}
     shield_hits = sorted((sf, vid, round(d)) for vid, got in shielded.items() for sf, d in got)
+    def regen_masks(vid, sf, d):
+        # GBA shields are whole points regained 7/256 a frame: a whole point regained inside the
+        # sampled interval can hide part of a hit. With the hit's own record, a drop short of
+        # its damage by no more than regeneration explains is ambiguous.
+        dealt = record_damage.get((sf, vid))
+        if dealt is None or record_count.get((sf, vid), 0) != 1:
+            return False
+        gap = gaps_of.get(vid, {}).get(sf, 1)
+        return 0 < dealt - round(d) <= (SHIELD_REGEN_Q8 * gap + 255) // 256
     shield_exact = [d for vid, got in shielded.items() for sf, d in got
-                    if (vid, sf) not in clipped and (sf, vid) not in multiple]
+                    if (vid, sf) not in clipped and not regen_masks(vid, sf, d)]
+    # Several hit records on one unit in one frame show as one drop, which can hide a wrong hit:
+    # the exact per-hit values of that unit's kind of damage are then unmeasured.
+    hp_multi = any((sf, vid) in multiple for vid, got in victims.items() for sf, _ in got)
+    shield_multi = any((sf, vid) in multiple for vid, got in shielded.items() for sf, _ in got)
+    shield_masked = any(regen_masks(vid, sf, d) for vid, got in shielded.items() for sf, d in got)
+    if shield_multi or shield_masked:
+        shield_exact = []
     hp_frames = {(sf, vid) for vid, got in victims.items() for sf, _ in got}
     landed = sorted([(sf, vid, round(d)) for vid, got in victims.items() for sf, d in got] +
                     [(sf, vid, 0) for sf, vid, _ in shield_hits if (sf, vid) not in hp_frames])
-    taken = [(sf, round(d)) for sf, d in hits(own) if (sf, uid) not in multiple]
+    taken = [(sf, round(d)) for sf, d in hits(own)]
+    if any((sf, uid) in multiple for sf, _ in taken):
+        taken = []   # a frame with several hits taken can hide a wrong one
 
     def single_foe(sf):
         # The same single living enemy in reach on the sample before the drop and on the one
@@ -1340,7 +1361,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         sf0, v0, _ = landed[0]
         # Two hits in the first hit's frame leave its victim unknown (row order is no time
         # order): the frame stands, the range does not.
-        if sum(1 for hit in landed if hit[0] == sf0) == 1:
+        if sum(1 for hit in landed if hit[0] == sf0) == 1 and (sf0, v0) not in multiple:
             at = {f['sf']: f['units'] for f in series['frames']}
             su, vu = at[sf0].get(uid), at[sf0].get(v0)
             rng = math.hypot(su[2] - vu[2], su[3] - vu[3]) if su and vu else None
@@ -1348,7 +1369,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # Two hits in one frame are no interval: the samples cannot time them apart.
     gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:]) if b[0] > a[0]
             and not any(a[0] <= sf <= b[0] for sf in unclear | barriers)]
-    hp_hits = [d for sf, vid, d in landed if d and (sf, vid) not in multiple]
+    hp_hits = [] if hp_multi else [d for sf, vid, d in landed if d]
     # The subject was hit: hit points, or shields (a Protoss subject's first hits).
     struck = bool(hits(own, lethal=True) or hits(hp_track(series, uid, t0, end, key='shield'), lethal=True)
                   or struck_by_record)
