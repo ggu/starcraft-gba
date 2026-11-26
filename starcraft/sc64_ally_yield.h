@@ -32,7 +32,7 @@
  * evidence. 2 px is one ordinary ground step; 12 px is two of the 6 px
  * personal-space radii, enough for a mover pressed against a resting ally
  * on its own point. */
-enum { SC64_ALLY_YIELD_STEP = 2, SC64_MOVE_GIVE_UP_RADIUS = 12 };
+enum { SC64_ALLY_YIELD_STEP = 2, SC64_MOVE_GIVE_UP_RADIUS = 12, SC64_MOVE_GIVE_UP_PROBE_STEPS = 3 };
 
 static int
 sc64_ally_yield_radius(const Unit *q, const Unit *a)
@@ -131,9 +131,9 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
  * steers as before. A Move or attack-move mover only, with a nonzero step:
  *  1. Yield: the idle ally nearest the step that blocks it moves aside.
  *  2. Give up: with no ally moved, a Move within SC64_MOVE_GIVE_UP_RADIUS
- *     of its own point whose mover has no free step in any of the 8
- *     directions (the probes the engine's steering makes, at its stock
- *     speed) ends where it stands; the steering then finds no step either
+ *     of its own point whose mover has no free step of 1-3 px in any of the
+ *     8 directions (the probes the engine's steering makes, at every stock
+ *     step length) ends where it stands; the steering then finds no step either
  *     and waits. An attack-move is left alone: move_toward() also serves
  *     its chase of an enemy, away from its point. */
 static int __attribute__((noinline))
@@ -159,12 +159,15 @@ sc64_move_blocked(Unit *q, int nx, int ny)
     if (best >= 0 && sc64_ally_yield_step(q, &u[best], nx, ny)) return unit_step_clear(q, nx, ny);
     if (q->order != ORDER_MOVE ||
         dist2(q->x, q->y, q->tx, q->ty) > SC64_MOVE_GIVE_UP_RADIUS * SC64_MOVE_GIVE_UP_RADIUS) return 0;
-    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS, speed = (int)sc64_unit_stock_step(q, q->path_x, q->path_y);
-    if (speed <= 0) return 0;
-    for (int k = 0; k < 8; ++k) {
-        int sx = q->x + dx[k] * speed, sy = q->y + dy[k] * speed;
-        if (is_traversable(sx / 16, sy / 16, from_cell) && unit_step_clear(q, sx, sy)) return 0;
-    }
+    /* The stock step alternates between lengths from update to update: an
+     * order ends only when no length up to SC64_MOVE_GIVE_UP_PROBE_STEPS is
+     * free in any direction. */
+    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
+    for (int speed = 1; speed <= SC64_MOVE_GIVE_UP_PROBE_STEPS; ++speed)
+        for (int k = 0; k < 8; ++k) {
+            int sx = q->x + dx[k] * speed, sy = q->y + dy[k] * speed;
+            if (is_traversable(sx / 16, sy / 16, from_cell) && unit_step_clear(q, sx, sy)) return 0;
+        }
     q->order = ORDER_IDLE;
     return 0;
 }
