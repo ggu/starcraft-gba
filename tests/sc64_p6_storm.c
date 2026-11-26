@@ -104,9 +104,9 @@ static void test_cast_range_pause_and_pulses(void)
     assert(race_p6_storm_tick(1));
     assert(u[0].carry == paused_energy && race_p6.storm.storm[0].age_ticks == 19);
     assert(race_p6_storm_tick(0));
-    assert(u[1].hp == 36 && u[2].shield == 0 && u[2].hp == 11);
+    assert(u[1].hp == 50 - SC64_STORM_DAMAGE_PER_PULSE && u[2].shield == 0 && u[2].hp == 25 - SC64_STORM_DAMAGE_PER_PULSE);
     for (int i = 0; i < 10; ++i) assert(race_p6_storm_tick(0));
-    assert(u[1].hp == 22 && u[2].hp == 0 && !u[2].alive);
+    assert(u[1].hp == 50 - 2 * SC64_STORM_DAMAGE_PER_PULSE && u[2].hp == 0 && !u[2].alive);
     assert(death_count == 1 && supply_used == -2);
 }
 
@@ -118,7 +118,7 @@ static void test_friendly_fire_and_invincibility(void)
     assert(race_p6_storm_cast_selected(300, 300));
     for (int i = 0; i < 20; ++i) assert(race_p6_storm_tick(0));
     assert(u[1].hp == 50);
-    assert(u[2].hp == 11 && u[2].shield == 0);
+    assert(u[2].hp == 25 - SC64_STORM_DAMAGE_PER_PULSE && u[2].shield == 0);
     assert(death_count == 0);
 }
 

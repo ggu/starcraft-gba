@@ -14,13 +14,8 @@ int main(void)
         const Sc64StockUnitProfile *stock = sc64_stock_unit_profile(raw);
         assert(raw < 0 || stock); /* Every mapped identity must have a source row. */
         if (!stock) continue;
-        if (type == B_SUNKEN_COLONY) {
-            /* The USA N64 HP table gives this actor a different cap. */
-            assert(raw == 146 && stock->hp == 300);
-            assert(sc64_race_building_max_hp(type) == 400);
-        } else {
-            assert(sc64_race_building_max_hp(type) == (int)stock->hp);
-        }
+        /* The stock row holds the N64 cap for the Sunken Colony (400). */
+        assert(sc64_race_building_max_hp(type) == (int)stock->hp);
         assert(sc64_race_building_shields(type) == stock->shields);
         assert(sc64_race_building_armor(type) == stock->armor);
         ++checked;

@@ -127,7 +127,9 @@ test_gas_cargo_retarget_and_credit(int race, int worker_type,
     assert(u[worker].carry == 6 &&
            (u[worker].flags & SC64_WORKER_CARGO_KIND_MASK) == SC64_WORKER_CARGO_GAS);
     u[worker].x = m[patch].x; u[worker].y = m[patch].y;
-    for (int i = 0; i < 45; ++i) one_tick();
+    for (int i = 0; i < SC64_MINERAL_GATHER_UPDATES - 1; ++i) one_tick();
+    assert(u[worker].carry == 6 && m[patch].amount == 5); /* not yet */
+    one_tick();
     assert(u[worker].carry == 5 && m[patch].amount == 0);
     assert(!(u[worker].flags & SC64_WORKER_CARGO_KIND_MASK)); /* mineral kind */
     assert(minerals == 0 && gas == 0);

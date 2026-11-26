@@ -40,7 +40,7 @@ int main(void)
         B_P7_FLEET_BEACON,B_P7_ARBITER_TRIBUNAL,B_P7_ROBOTICS_SUPPORT_BAY,
         B_P7_SHIELD_BATTERY};
     static const int weapons[]={70,77,130,130};
-    static const int supply[]={8,8,12,2};
+    static const int supply[]={8,8,16,2};
     static const unsigned gaps[]={SC64_P7_NEEDS_ARCHON_RADIAL_SPLASH,
         SC64_P7_NEEDS_ARBITER_STASIS_AND_CLOAK_FIELD,
         SC64_P7_NEEDS_CARRIER_INTERCEPTORS,SC64_P7_NEEDS_OBSERVER_DETECTION_AND_CLOAK};

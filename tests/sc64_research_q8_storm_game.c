@@ -126,9 +126,12 @@ static void z6_hallucination(void)
     u[v].raw_type=79;u[v].raw_owner=2;
     assert(race_z6_hallucination_mark_slot((unsigned)v));isolate(v);
     unsigned before=(unsigned)u[v].maxhp*256u-64u;
-    assert(sc64_pr_q8_commit_hp(v,before)&&sc64_pr_q8_commit_shield(v,14*256+128));
+    /* One pulse plus half a point of shields: a single undoubled hit would
+     * leave shields; the doubled hallucination packet clears them. */
+    const unsigned shields=SC64_STORM_DAMAGE_PER_PULSE*256u+128u;
+    assert(sc64_pr_q8_commit_hp(v,before)&&sc64_pr_q8_commit_shield(v,shields));
     pulse(&race_z6.storm,u[v].x,u[v].y,2);assert(race_z6_storm_tick());
-    assert(hp(v)==before-(28*256-(14*256+128))&&!shield(v));
+    assert(hp(v)==before-(2u*SC64_STORM_DAMAGE_PER_PULSE*256u-shields)&&!shield(v));
     assert(sc64_pr_q8_commit_hp(v,128));
     pulse(&race_z6.storm,u[v].x,u[v].y,1);assert(race_z6_storm_tick());
     assert(!u[v].alive&&!u[v].hp&&!sc64_pr_hp_debt[v]);

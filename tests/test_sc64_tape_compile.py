@@ -3,6 +3,7 @@
 and of the unit-class lab measurements (tools/sc64_parity_metrics.py), on
 synthetic scenarios and series only: no ROM, capture or GBA build needed."""
 import json
+import math
 import pathlib
 import re
 import sys
@@ -371,6 +372,144 @@ class LabMeasureTest(unittest.TestCase):
         obs = {o['check']: o for o in metrics.lab_move_observations(m, 'Marine')}
         self.assertTrue(obs['lab.turn_cost']['gating'])
         self.assertFalse(obs['lab.start_latency']['gating'])
+
+    def test_a_settled_short_return_leg_cannot_zero_the_cruise_band(self):
+        # The first leg cruises at 4 px/frame; the return leg moves two frames and settles. It
+        # reads cruise 0 (no whole chord fits), so it must not set the band's lower bound to 0,
+        # which would let an arbitrarily slow GBA pass lab.cruise_speed.
+        pos, x = {}, 100.0
+        for sf in range(0, 200):
+            if 10 <= sf < 50:
+                x = min(260, x + 4)
+            if sf in (104, 105):
+                x -= 2
+            pos[sf] = (round(x), 50)
+        m, err = metrics.lab_move_measure(walk(pos), 1, [9, 99], [(260, 50), (256, 50)])
+        self.assertIsNone(err)
+        self.assertEqual(m['legs'][1]['cruise'], 0.0)
+        self.assertEqual(m['cruise_left_out'], [1])
+        self.assertAlmostEqual(m['cruise_min'], m['cruise'])
+        self.assertGreater(m['cruise_min'], 3.5)
+        obs = {o['check']: o for o in metrics.lab_move_observations(m, 'Marine')}
+        self.assertGreater(obs['lab.cruise_speed']['lo'], 3.0)
+        self.assertIn('leg 1 left out', obs['lab.cruise_speed']['tolerance'])
+        # A first leg that never holds a cruise is a measurement error, not a zero band.
+        still = {sf: (100 + (2 if sf >= 12 else 0) + (2 if sf >= 13 else 0), 50) for sf in range(0, 100)}
+        m, err = metrics.lab_move_measure(walk(still), 1, [9], [(104, 50)])
+        self.assertIsNone(m)
+        self.assertIn('leg 0', err)
+
+    @staticmethod
+    def ramp_leg(speed, ramp, start=10, length=240, grid=None, phase=0.0, diagonal=True):
+        """One diagonal leg: still until start, then the speed rises linearly over ramp frames to
+        cruise; grid: positions held on a GBA-like grid of that many N64 px per axis (a diagonal
+        step is then 2.83 N64 px, as an Overlord's), with a sub-step phase."""
+        pos, d = {}, 0.0
+        for sf in range(0, start + length + 40):
+            k = sf - start
+            if 0 <= k < length:
+                d += speed * min(1.0, (k + 1) / ramp) if ramp else speed
+            a = d / math.sqrt(2) if diagonal else d
+            shown = a if grid is None else grid * math.floor((a + phase) / grid)
+            pos[sf] = (round(100 + shown), round(50 + (shown if diagonal else 0)))
+        return pos
+
+    def accel(self, pos, chord=None, floor_px=None):
+        end = pos[max(pos)]
+        m, err = metrics.lab_move_measure(walk(pos), 1, [9], [end], chord, floor_px)
+        self.assertIsNone(err)
+        return m['accel'], m['accel_chord']
+
+    def reference(self, speed, ramp, diagonal=True):
+        """The N64 side: reading, chord and floor, as the golden records them."""
+        pos = self.ramp_leg(speed, ramp, diagonal=diagonal)
+        m, err = metrics.lab_move_measure(walk(pos), 1, [9], [pos[max(pos)]])
+        self.assertIsNone(err)
+        return m['accel'], m['accel_chord'], m['accel_floor']
+
+    def test_slow_grid_mover_reads_the_same_at_every_start_phase(self):
+        # An Overlord-like mover (0.84 N64 px a frame, no acceleration) on the GBA's 2-px grid: its
+        # reading must not depend on where the first grid step falls. A 4-frame chord holds one
+        # grid step or two by phase alone; the chord now spans two steps at cruise.
+        n64, chord = self.accel(self.ramp_leg(0.84, 0))
+        self.assertEqual(chord, metrics.lab_accel_chord(0.84))
+        self.assertGreaterEqual(chord * 0.84, metrics.LAB_ACCEL_GRID_STEPS * metrics.LAB_GBA_GRID)
+        readings = {self.accel(self.ramp_leg(0.84, 0, grid=2, phase=p / 4), chord)[0] for p in range(8)}
+        self.assertTrue(all(abs(r - n64) <= metrics.MOVE_TIME_TOLERANCE for r in readings), (n64, readings))
+        short = {self.accel(self.ramp_leg(0.84, 0, grid=2, phase=p / 4), metrics.LAB_ACCEL_CHORD)[0]
+                 for p in range(8)}
+        self.assertGreater(max(short) - min(short), metrics.MOVE_TIME_TOLERANCE)   # why the chord grew
+        # A fast mover keeps the shortest chord: its readings are unchanged.
+        self.assertEqual(metrics.lab_accel_chord(4.0), metrics.LAB_ACCEL_CHORD)
+
+    def test_constant_speed_reads_the_same_on_the_grid_at_any_speed(self):
+        # Straight constant-speed moves, axial and diagonal, slow and fast: the grid reading
+        # stays within the band of the N64's at every phase (the cutoff allows the whole-step
+        # rounding: an axial 0.90 px/frame mover covers 4 px in its 5-frame chord).
+        for speed in (0.5, 0.84, 0.9, 1.3, 2.0, 4.0, 6.5):
+            for diagonal in (False, True):
+                n64, chord, floor_px = self.reference(speed, 0, diagonal)
+                for p in range(8):
+                    gba, _ = self.accel(self.ramp_leg(speed, 0, grid=2, phase=p / 4, diagonal=diagonal),
+                                        chord, floor_px)
+                    self.assertLessEqual(abs(gba - n64), metrics.MOVE_TIME_TOLERANCE,
+                                         (speed, diagonal, p, n64, gba, chord))
+
+    def test_a_mover_that_takes_twice_as_long_to_cruise_still_fails(self):
+        # The longer chord must not blind the check: a GBA track reaching cruise in twice the
+        # N64's frames reads outside the +-2 frame band at every grid phase, for a fast mover
+        # and a slow one. (A slow mover's reading carries about one grid step of noise once it
+        # accelerates, so its ramp here is long enough to be resolved: 20 frames, then 40.)
+        for speed, ramp in ((4.0, 6), (0.84, 20)):
+            n64, chord, floor_px = self.reference(speed, ramp)
+            for p in range(8):
+                gba, _ = self.accel(self.ramp_leg(speed, 2 * ramp, grid=2, phase=p / 4), chord, floor_px)
+                self.assertGreater(gba - n64, metrics.MOVE_TIME_TOLERANCE, (speed, p, n64, gba, chord))
+
+    def test_a_slower_gba_cruise_cannot_lower_the_cutoff(self):
+        # 0.84 px/frame: the N64 reaches cruise in 6 frames, the GBA in 24, and the GBA's own
+        # cruise estimate comes out a little low (0.80). The floor is the N64's, so the slower
+        # ramp fails at every phase; with the GBA's own floor it passed at one phase. (A slow
+        # mover resolves about one grid step, 3-4 frames: 6 against 12 frames is not resolved.)
+        n64, chord, floor_px = self.reference(0.84, 6)
+        for p in range(8):
+            pos = self.ramp_leg(0.80, 24, grid=2, phase=p / 4)
+            gba, _ = self.accel(pos, chord, floor_px)
+            self.assertGreater(gba - n64, metrics.MOVE_TIME_TOLERANCE, (p, n64, gba, chord, floor_px))
+
+    def test_chord_covers_two_steps_after_rounding(self):
+        for cruise in (4 / 161, 4 / 7, 0.5, 0.84, 0.9, 1.0, 1.3):
+            chord = metrics.lab_accel_chord(cruise)
+            self.assertGreaterEqual(metrics.lab_accel_floor(cruise, chord),
+                                    metrics.LAB_ACCEL_GRID_STEPS * metrics.LAB_GBA_GRID, cruise)
+
+    def test_gba_side_uses_the_goldens_chord(self):
+        pos = self.ramp_leg(0.84, 0, grid=2)
+        report = {'subject': 1, 'lab': [[5, 9, 16, -1, pos[max(pos)][0] // 2, pos[max(pos)][1] // 2]]}
+        golden = {'gba': {'cmds': [[5, 0, 0, 0]], 'accel_chord': 5, 'accel_floor': 4.0}, 'decoder_revision': 2}
+        result, err = metrics.lab_move_gba({})(walk(pos), golden, report)
+        self.assertIsNone(err)
+        self.assertEqual(result['measured']['accel_chord'], 5)
+        legacy = {'gba': {'cmds': [[5, 0, 0, 0]]}}   # revision 1: the shortest chord
+        result, err = metrics.lab_move_gba({})(walk(pos), legacy, report)
+        self.assertEqual(result['measured']['accel_chord'], metrics.LAB_ACCEL_CHORD)
+        for bad in (None, 0, 2, 4.5, '5', 10 ** 400):
+            golden['gba']['accel_chord'] = bad
+            result, err = metrics.lab_move_gba({})(walk(pos), golden, report)
+            self.assertIn('acceleration chord', err)
+        golden['gba']['accel_chord'] = 5
+        for bad in (None, 0, 2.0, 3.0, float('inf'), float('nan'), '4', 10 ** 400):
+            golden['gba']['accel_floor'] = bad
+            result, err = metrics.lab_move_gba({})(walk(pos), golden, report)
+            self.assertIn('acceleration floor', err, bad)
+        # Revision 1 falls back only when both keys are absent, not when one is null.
+        for gba in ({'accel_chord': None}, {'accel_floor': None}, {'accel_chord': None, 'accel_floor': None}):
+            result, err = metrics.lab_move_gba({})(walk(pos), {'gba': dict(gba, cmds=[[5, 0, 0, 0]])}, report)
+            self.assertIn('acceleration', err, gba)
+        for revision in (None, '2', 0, -1):
+            result, err = metrics.lab_move_gba({})(walk(pos), {'gba': {'cmds': [[5, 0, 0, 0]]},
+                                                               'decoder_revision': revision}, report)
+            self.assertIn('decoder revision', err)
 
     def test_move_refuses_an_unsettled_leg(self):
         pos = {sf: (100 + 4 * sf, 50) for sf in range(0, 60)}

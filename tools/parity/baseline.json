@@ -4,11 +4,11 @@
  "known": [
   {
    "key": "bb-income:income.first_delivery:human workers x4",
-   "gba": 59
+   "gba": 105
   },
   {
    "key": "bb-income:income.rate:human workers x4",
-   "gba": 0.308
+   "gba": 0.212
   },
   {
    "key": "bb-train:train.duration:Barracks",
