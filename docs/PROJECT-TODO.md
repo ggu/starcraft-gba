@@ -271,7 +271,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   same-cartridge observations and won at frame 267,585.
   The previous Z8 recording diverges at call 9,696. The optional
   `--gather-west` controller cleared Z8 from HOME with Kerrigan at full
-  health. Qualify the same route from the linked Z7 result.
+  health. The earned Z7 save also cleared Z8 at frame 70,229 with all
+  29 checkpoints matching. Continue the earned chain through Z9 and Z10.
   [Z3–Z6 carried results and Z8 route](audits/2026-11-26-zerg-linked-middle.md).
   [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 

@@ -126,6 +126,11 @@ The newer packaged Z10 ROM at `51c7f18f` independently cleared the
 same HOME route and re-exported the identical journal. The recording SHA-256 is
 `f0479c6c302d377f792f23a7dfc5d61d8b22f12779f4e97e99dcd14440509685`.
 
+From the earned Z7 victory, the same recording matched all 29 checkpoints
+and won at frame 70,229 with both Nexuses destroyed and Kerrigan at 400 HP.
+The fresh-loaded victory re-exported byte for byte with SHA-256
+`39ef09adaccc4a8e3aabc01cfddbc4ed261ad714fa96225234a57ffe500b8739`.
+
 Use matching private generated inputs and a new output directory. Omit
 `--previous-victory` for the HOME replay. Supply the actual Z1–Z7
 completion journal to check the linked campaign instead.
