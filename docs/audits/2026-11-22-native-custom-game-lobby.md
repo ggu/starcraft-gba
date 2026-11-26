@@ -562,3 +562,45 @@ ASan and UBSan on each of the four profile vectors. It also checks
 CPU hostility and target choice in both match types, Random seats,
 match-word rejection, and preservation of diplomacy after SRAM load
 and match restart.
+
+## November 26 back and reentry comparison
+
+A fresh ares process loaded a retained Blood Bath Free for All lobby
+created with ordinary controller input. Two D-pad Down taps from the
+map row and D-pad Right changed the first CPU from Zerg to Terran.
+B returned to the Episode I menu after the transition. D-pad Right
+selected Scenario, and A on Setup Custom reopened the lobby at
+Melee on Challenger with Human Terran and one Zerg CPU. This establishes
+reentry via the Episode I and Scenario menus. In this trial B returned
+to Episode I, where A opened the tutorial. A direct Back-to-Setup route
+was not observed. Whether the earlier seat values return after manually
+reselecting Blood Bath remains untested. Two calibration
+attempts sampled the transition too early and then entered the tutorial
+by pressing A before selecting Scenario.
+
+On GBA source `97c29b13f`, a focused HOST driver called the normal
+frontend update with a release after each button. It initialized Human
+Terran with three CPU rows, opened Custom Game from HOME, chose Blood
+Bath and set the rows to Zerg, Terran and Protoss. Right on the first CPU
+changed it to Terran. B returned to HOME with Custom Game selected. A
+reopened the lobby at its map row and retained Blood Bath, Free for All
+and the edited Terran, Terran and Protoss lineup. The assertions passed
+with Clang AddressSanitizer and UndefinedBehaviorSanitizer under
+`SC64_UNIFIED`, `SC64_IMPORTED_SKIRMISH`, `SC64_NATIVE_MELEE_STARTS`
+and each of the three `SC64_CAMPAIGN_RACE` values. Cartridge rendering,
+launch and persistence are outside the sample.
+
+| Local native witness | SHA-256 |
+| --- | --- |
+| Initial Blood Bath lobby | `c1fee83fa9f13293cd75501dfa90a0cf37d85d6021ec6b658ed6306808d5789b` |
+| Edited first CPU row | `03fc05476adfdff55882aeb5fdaaf33bb7a70b1de9531e29520d33cff63dd592` |
+| Episode I after B | `2088ef38db92d36dac0306da821982c7914c218c63ef48ad0699f651d5030ab8` |
+| Melee on Challenger after reentry | `dd31d045d03d02bd03378ab9fcaccdcd6aaf333377349fcf5b3a2573dc6a743a` |
+
+The native emulator executable hashes to
+`4ce08c105b4f930d9a86bf03c8ea51c5867fa3e29c942997a868b2b158a4d51d`.
+The initial retained state hashes to
+`c1597d39bf99476c804635b6cbf36c4901a518f8f4f678bbf2a33e94108d9364`.
+The native build/emulation lock serialized the run. The owned USA ROM,
+emulator, source state and other input files matched their pre-run
+hashes after the process closed.
