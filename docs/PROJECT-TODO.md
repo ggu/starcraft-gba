@@ -76,8 +76,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 - **Packed Pylon, Gateway and Forge rendering.** The opt-in renderer saved
   0.64–3.29% of guest cycles across six regular P10 battle windows and
-  matched all sampled bitmap pages. Check busy Showcase play and handheld
-  presentation before enabling it by default.
+  matched all sampled bitmap pages. The normal builds also match a busy
+  Showcase replay. The linked P4 holds save 3.63% and 0.78%, and a camera
+  sweep from earned SRAM saves 1.26% across its scrolled calls. Measure
+  handheld presentation alongside other release pacing.
   [Cartridge evidence](audits/2026-11-26-protoss-base-building-draw.md).
 
 - **Zerg weapon lookup.** The Zerg release build omitted the indexed weapon

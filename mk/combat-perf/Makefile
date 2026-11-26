@@ -17,7 +17,7 @@ ifneq ($(filter $(CANONICAL_TERRAN_BUILDING_WORDS),0 1),$(CANONICAL_TERRAN_BUILD
 $(error CANONICAL_TERRAN_BUILDING_WORDS must be 0 or 1)
 endif
 # Opt in to packed Protoss base structures on Terran, P10 and Showcase.
-CANONICAL_PROTOSS_BASE_BUILDING_WORDS ?= 0
+CANONICAL_PROTOSS_BASE_BUILDING_WORDS ?= 1
 ifneq ($(words $(filter 0 1,$(CANONICAL_PROTOSS_BASE_BUILDING_WORDS))),1)
 $(error CANONICAL_PROTOSS_BASE_BUILDING_WORDS must be 0 or 1)
 endif
