@@ -238,15 +238,15 @@ static void test_authored_ai_paid_plan_and_reload(void)
     assert(b[stargate].queue_count==1&&
            b[stargate].queue[b[stargate].queue_head]==U_SCOUT);
     assert(race_z6.ai_plan_phase==3&&
-           race_minerals[ENEMY]==before_m-125-100-275&&
-           race_gas[ENEMY]==before_g-50-125);
+           race_minerals[ENEMY]==before_m-125-100-300&&
+           race_gas[ENEMY]==before_g-50-150);
     race_z6.ai_plan_ticks=1;
     assert(race_z6_authored_ai_advance(0));
     assert(b[robotics].queue_count==1&&
            b[robotics].queue[b[robotics].queue_head]==U_REAVER);
     assert(race_z6.ai_plan_phase==0&&
-           race_minerals[ENEMY]==before_m-125-100-275-200&&
-           race_gas[ENEMY]==before_g-50-125-100);
+           race_minerals[ENEMY]==before_m-125-100-300-200&&
+           race_gas[ENEMY]==before_g-50-150-100);
     assert(sc64_z6_persistent_state_valid(&race_z6));
     race_z6.ai_plan_phase=4;
     assert(!sc64_z6_persistent_state_valid(&race_z6));

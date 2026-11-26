@@ -39,7 +39,7 @@ int main(void)
     assert(battlecruiser != 0 && battlecruiser->raw == 12);
     assert(battlecruiser->hp == 500 && battlecruiser->shields == 0);
     assert(battlecruiser->armor == 3 && battlecruiser->minerals == 400);
-    assert(battlecruiser->gas == 300 && battlecruiser->build_frames == 2000);
+    assert(battlecruiser->gas == 300 && battlecruiser->build_frames == 2400);
     assert(battlecruiser->sight_px == 352);
     assert(battlecruiser->left == 37 && battlecruiser->up == 29);
     assert(battlecruiser->right == 37 && battlecruiser->down == 29);
@@ -55,9 +55,10 @@ int main(void)
     assert(sc64_race_unit_from_raw(12) == U_P5_BATTLECRUISER);
     assert(strcmp(sc64_race_unit_name(U_P5_BATTLECRUISER), "BATTLECRUISER") == 0);
     assert(bc_rule->race == R_TER && bc_rule->producer == 255);
-    assert(bc_rule->supply == 12 && bc_rule->hp == 500);
+    /* StarCraft 64 units.dat: 8 supply (doubled 16), 2,400 frames. */
+    assert(bc_rule->supply == 16 && bc_rule->hp == 500);
     assert(bc_rule->minerals == 400 && bc_rule->gas == 300);
-    assert(bc_rule->build_frames == 2000);
+    assert(bc_rule->build_frames == 2400);
 #else
 #ifndef SC64_TERRAN_LATE_ACTORS
     assert(SC_RU_COUNT == 28);

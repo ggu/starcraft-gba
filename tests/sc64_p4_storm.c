@@ -253,7 +253,7 @@ static void test_menu_cast_damage_and_friendly_fire(void)
     race_p4.storm.storm[1].pulses_left = SC64_STORM_PULSE_COUNT;
     race_p4.storm.storm[1].active = 1;
     assert(race_p4_storm_tick());
-    assert(u[ground].hp == 86 && u[air].hp == 86);
+    assert(u[ground].hp == 100 - SC64_STORM_DAMAGE_PER_PULSE && u[air].hp == 100 - SC64_STORM_DAMAGE_PER_PULSE);
     assert(u[protected_unit].hp == 100);
     assert(b[building].hp == 300);
     /* P4 Storm is friendly fire; the selected caster takes the pulse too. */
@@ -275,7 +275,7 @@ static void test_menu_cast_damage_and_friendly_fire(void)
     u[final_target].shield = 0;
     assert(race_p4_storm_world_state_valid());
     assert(race_p4_storm_tick());
-    assert(!race_p4.storm.storm[0].active && u[final_target].hp == 86);
+    assert(!race_p4.storm.storm[0].active && u[final_target].hp == 100 - SC64_STORM_DAMAGE_PER_PULSE);
 }
 
 static int encode_storm_test_unit(RaceSave *save, unsigned slot, const Unit *unit)

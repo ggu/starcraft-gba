@@ -3,8 +3,10 @@
 #define SC64_STOCK_PROFILES_H
 
 /* Numeric default-table facts extracted independently from pinned BWAPI
- * d727fed68558c506163048ea889131d8cbb33915. Values do not establish
- * native N64 equivalence. Do not copy BWAPI implementation code here.
+ * d727fed68558c506163048ea889131d8cbb33915, except the cells listed in
+ * sc64_n64_stock_overrides.h, which hold the StarCraft 64 rule-table value
+ * (the ROM-derived profiles follow the N64). Do not copy BWAPI
+ * implementation code here.
  * Unit records are indexed by public raw UnitType ID; raw IDs below None
  * (228) are addressable. Q10 speed is source pixels per source frame.
  */
@@ -35,7 +37,7 @@ static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS]
     [9] = { 0, 130, 130, 0, 0, 3, 1, 100, 225, 1200, 4, 0, 200, 0, 5120 }, /* Terran_Science_Vessel */
     [10] = { 0, 26, 130, 3, 0, 1, 3, 100, 50, 720, 0, 0, 160, 0, 4096 }, /* Hero_Gui_Montag */
     [11] = { 0, 130, 130, 0, 0, 3, 1, 100, 100, 750, 4, 0, 150, 0, 5601 }, /* Terran_Dropship */
-    [12] = { 0, 19, 20, 1, 1, 3, 3, 400, 300, 2000, 12, 0, 500, 0, 2560 }, /* Terran_Battlecruiser */
+    [12] = { 0, 19, 20, 1, 1, 3, 3, 400, 300, 2400, 16, 0, 500, 0, 2560 }, /* Terran_Battlecruiser */
     [13] = { 0, 6, 130, 1, 0, 1, 0, 1, 0, 1, 0, 0, 20, 0, 16384 }, /* Terran_Vulture_Spider_Mine */
     [14] = { 0, 130, 130, 0, 0, 0, 0, 200, 200, 1500, 16, 0, 100, 0, 34130 }, /* Terran_Nuclear_Missile */
     [15] = { 0, 130, 130, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40, 0, 4096 }, /* Terran_Civilian */
@@ -62,13 +64,13 @@ static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS]
     [36] = { 0, 130, 130, 0, 0, 2, 10, 1, 1, 1, 0, 0, 200, 0, 0 }, /* Zerg_Egg */
     [37] = { 0, 35, 130, 1, 0, 1, 0, 50, 0, 420, 1, 0, 35, 0, 5622 }, /* Zerg_Zergling */
     [38] = { 0, 38, 38, 1, 1, 2, 0, 75, 25, 420, 2, 0, 80, 0, 3748 }, /* Zerg_Hydralisk */
-    [39] = { 0, 40, 130, 1, 0, 3, 1, 200, 200, 900, 8, 0, 400, 0, 5243 }, /* Zerg_Ultralisk */
+    [39] = { 0, 40, 130, 1, 0, 3, 1, 200, 200, 900, 12, 0, 400, 0, 5243 }, /* Zerg_Ultralisk */
     [40] = { 0, 42, 130, 1, 0, 1, 0, 1, 1, 1, 0, 0, 30, 0, 6144 }, /* Zerg_Broodling */
     [41] = { 0, 43, 130, 1, 0, 1, 0, 50, 0, 300, 2, 0, 40, 0, 5038 }, /* Zerg_Drone */
     [42] = { 0, 130, 130, 0, 0, 3, 0, 100, 0, 600, 0, 16, 200, 0, 850 }, /* Zerg_Overlord */
     [43] = { 0, 48, 48, 1, 1, 1, 0, 100, 100, 600, 4, 0, 120, 0, 6830 }, /* Zerg_Mutalisk */
     [44] = { 0, 46, 130, 1, 0, 3, 2, 50, 100, 600, 4, 0, 150, 0, 2560 }, /* Zerg_Guardian */
-    [45] = { 0, 130, 130, 0, 0, 2, 0, 100, 100, 750, 4, 0, 120, 0, 6830 }, /* Zerg_Queen */
+    [45] = { 0, 130, 130, 0, 0, 2, 0, 100, 150, 750, 4, 0, 120, 0, 6830 }, /* Zerg_Queen */
     [46] = { 0, 130, 130, 0, 0, 2, 1, 50, 150, 750, 4, 0, 80, 0, 4096 }, /* Zerg_Defiler */
     [47] = { 0, 130, 55, 0, 1, 1, 0, 25, 75, 450, 1, 0, 25, 0, 6830 }, /* Zerg_Scourge */
     [48] = { 0, 41, 130, 1, 0, 3, 4, 400, 400, 1800, 0, 0, 800, 0, 5243 }, /* Hero_Torrasque */
@@ -81,21 +83,21 @@ static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS]
     [55] = { 0, 49, 49, 1, 1, 1, 3, 200, 200, 1200, 0, 0, 300, 0, 6830 }, /* Hero_Kukulza_Mutalisk */
     [56] = { 0, 47, 130, 1, 0, 3, 4, 100, 200, 1200, 0, 0, 400, 0, 2560 }, /* Hero_Kukulza_Guardian */
     [57] = { 0, 130, 130, 0, 0, 3, 4, 200, 0, 1200, 0, 60, 1000, 0, 850 }, /* Hero_Yggdrasill */
-    [58] = { 0, 130, 103, 0, 4, 3, 2, 250, 125, 750, 6, 0, 200, 0, 6758 }, /* Terran_Valkyrie */
+    [58] = { 0, 130, 103, 0, 4, 3, 2, 250, 125, 900, 6, 0, 200, 0, 6758 }, /* Terran_Valkyrie */
     [59] = { 0, 130, 130, 0, 0, 3, 0, 1, 1, 1, 0, 0, 200, 0, 0 }, /* Zerg_Cocoon */
     [60] = { 0, 130, 100, 0, 1, 2, 1, 150, 100, 600, 4, 0, 100, 80, 6830 }, /* Protoss_Corsair */
     [61] = { 0, 111, 130, 1, 0, 1, 1, 125, 100, 750, 4, 0, 80, 40, 5038 }, /* Protoss_Dark_Templar */
     [62] = { 0, 130, 104, 0, 1, 3, 2, 150, 50, 600, 4, 0, 250, 0, 5120 }, /* Zerg_Devourer */
     [63] = { 0, 130, 130, 0, 0, 3, 1, 0, 0, 300, 8, 0, 25, 200, 5038 }, /* Protoss_Dark_Archon */
     [64] = { 0, 62, 130, 1, 0, 1, 0, 50, 0, 300, 2, 0, 20, 20, 5038 }, /* Protoss_Probe */
-    [65] = { 0, 64, 130, 2, 0, 1, 1, 100, 0, 600, 4, 0, 100, 60, 4096 }, /* Protoss_Zealot */
-    [66] = { 0, 66, 66, 1, 1, 3, 1, 125, 50, 750, 4, 0, 100, 80, 5120 }, /* Protoss_Dragoon */
+    [65] = { 0, 64, 130, 2, 0, 1, 1, 100, 0, 600, 4, 0, 80, 80, 4096 }, /* Protoss_Zealot */
+    [66] = { 0, 66, 66, 1, 1, 3, 1, 125, 50, 600, 4, 0, 100, 80, 5120 }, /* Protoss_Dragoon */
     [67] = { 0, 130, 130, 0, 0, 1, 0, 50, 150, 750, 4, 0, 40, 40, 3277 }, /* Protoss_High_Templar */
     [68] = { 0, 70, 70, 1, 1, 3, 0, 0, 0, 300, 8, 0, 10, 350, 5038 }, /* Protoss_Archon */
     [69] = { 0, 130, 130, 0, 0, 3, 1, 200, 0, 900, 4, 0, 80, 60, 4536 }, /* Protoss_Shuttle */
-    [70] = { 0, 73, 74, 1, 1, 3, 0, 275, 125, 1200, 6, 0, 150, 100, 5120 }, /* Protoss_Scout */
+    [70] = { 0, 73, 74, 1, 1, 3, 0, 300, 150, 1200, 6, 0, 150, 100, 5120 }, /* Protoss_Scout */
     [71] = { 0, 77, 77, 1, 1, 3, 1, 100, 350, 2400, 8, 0, 200, 150, 5120 }, /* Protoss_Arbiter */
-    [72] = { 0, 130, 130, 0, 0, 3, 4, 350, 250, 2100, 12, 0, 300, 150, 3410 }, /* Protoss_Carrier */
+    [72] = { 0, 130, 130, 0, 0, 3, 4, 350, 250, 2100, 16, 0, 300, 150, 3410 }, /* Protoss_Carrier */
     [73] = { 0, 79, 79, 1, 1, 1, 0, 25, 0, 300, 0, 0, 40, 40, 13650 }, /* Protoss_Interceptor */
     [74] = { 0, 86, 130, 1, 0, 1, 0, 150, 150, 750, 2, 0, 40, 80, 5038 }, /* Hero_Dark_Templar */
     [75] = { 0, 85, 130, 1, 0, 1, 0, 100, 300, 1500, 0, 0, 60, 400, 5038 }, /* Hero_Zeratul */
@@ -135,11 +137,11 @@ static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS]
     [109] = { 1, 130, 130, 0, 0, 3, 1, 100, 0, 600, 0, 16, 500, 0, 0 }, /* Terran_Supply_Depot */
     [110] = { 1, 130, 130, 0, 0, 3, 1, 100, 0, 600, 0, 0, 750, 0, 0 }, /* Terran_Refinery */
     [111] = { 1, 130, 130, 0, 0, 3, 1, 150, 0, 1200, 0, 0, 1000, 0, 1024 }, /* Terran_Barracks */
-    [112] = { 1, 130, 130, 0, 0, 3, 1, 150, 0, 1200, 0, 0, 600, 0, 0 }, /* Terran_Academy */
+    [112] = { 1, 130, 130, 0, 0, 3, 1, 200, 0, 1200, 0, 0, 600, 0, 0 }, /* Terran_Academy */
     [113] = { 1, 130, 130, 0, 0, 3, 1, 200, 100, 1200, 0, 0, 1250, 0, 1024 }, /* Terran_Factory */
     [114] = { 1, 130, 130, 0, 0, 3, 1, 150, 100, 1050, 0, 0, 1300, 0, 1024 }, /* Terran_Starport */
     [115] = { 1, 130, 130, 0, 0, 3, 1, 50, 50, 600, 0, 0, 500, 0, 0 }, /* Terran_Control_Tower */
-    [116] = { 1, 130, 130, 0, 0, 3, 1, 100, 150, 900, 0, 0, 850, 0, 1024 }, /* Terran_Science_Facility */
+    [116] = { 1, 130, 130, 0, 0, 3, 1, 150, 200, 1200, 0, 0, 850, 0, 1024 }, /* Terran_Science_Facility */
     [117] = { 1, 130, 130, 0, 0, 3, 1, 50, 50, 600, 0, 0, 750, 0, 0 }, /* Terran_Covert_Ops */
     [118] = { 1, 130, 130, 0, 0, 3, 1, 50, 50, 600, 0, 0, 600, 0, 0 }, /* Terran_Physics_Lab */
     [119] = { 1, 130, 130, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0 }, /* Unused_Terran1 */
@@ -147,7 +149,7 @@ static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS]
     [121] = { 1, 130, 130, 0, 0, 3, 1, 1, 1, 1, 0, 0, 0, 0, 0 }, /* Unused_Terran2 */
     [122] = { 1, 130, 130, 0, 0, 3, 1, 125, 0, 900, 0, 0, 850, 0, 1024 }, /* Terran_Engineering_Bay */
     [123] = { 1, 130, 130, 0, 0, 3, 1, 100, 50, 1200, 0, 0, 750, 0, 0 }, /* Terran_Armory */
-    [124] = { 1, 130, 29, 0, 1, 3, 0, 75, 0, 450, 0, 0, 200, 0, 0 }, /* Terran_Missile_Turret */
+    [124] = { 1, 130, 29, 0, 1, 3, 0, 100, 0, 450, 0, 0, 200, 0, 0 }, /* Terran_Missile_Turret */
     [125] = { 1, 130, 130, 0, 0, 3, 1, 100, 0, 450, 0, 0, 350, 0, 0 }, /* Terran_Bunker */
     [126] = { 1, 130, 130, 0, 0, 3, 1, 800, 600, 4800, 0, 0, 700, 0, 0 }, /* Special_Crashed_Norad_II */
     [127] = { 1, 130, 130, 0, 0, 3, 1, 200, 0, 900, 0, 0, 2000, 0, 0 }, /* Special_Ion_Cannon */
@@ -165,11 +167,11 @@ static const Sc64StockUnitProfile sc64_stock_unit_profiles[SC64_STOCK_UNIT_ROWS]
     [139] = { 1, 130, 130, 0, 0, 3, 1, 75, 0, 600, 0, 0, 750, 0, 0 }, /* Zerg_Evolution_Chamber */
     [140] = { 1, 130, 130, 0, 0, 3, 1, 150, 200, 1200, 0, 0, 600, 0, 0 }, /* Zerg_Ultralisk_Cavern */
     [141] = { 1, 130, 130, 0, 0, 3, 1, 200, 150, 1800, 0, 0, 600, 0, 0 }, /* Zerg_Spire */
-    [142] = { 1, 130, 130, 0, 0, 3, 1, 200, 0, 1200, 0, 0, 750, 0, 0 }, /* Zerg_Spawning_Pool */
+    [142] = { 1, 130, 130, 0, 0, 3, 1, 150, 0, 1200, 0, 0, 750, 0, 0 }, /* Zerg_Spawning_Pool */
     [143] = { 1, 130, 130, 0, 0, 3, 0, 75, 0, 300, 0, 0, 400, 0, 0 }, /* Zerg_Creep_Colony */
     [144] = { 1, 130, 52, 0, 1, 3, 0, 50, 0, 300, 0, 0, 400, 0, 0 }, /* Zerg_Spore_Colony */
     [145] = { 1, 130, 130, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0 }, /* Unused_Zerg1 */
-    [146] = { 1, 53, 130, 1, 0, 3, 2, 50, 0, 300, 0, 0, 300, 0, 0 }, /* Zerg_Sunken_Colony */
+    [146] = { 1, 53, 130, 1, 0, 3, 0, 50, 0, 300, 0, 0, 400, 0, 0 }, /* Zerg_Sunken_Colony */
     [147] = { 1, 130, 130, 0, 0, 3, 1, 1, 1, 1, 0, 0, 5000, 0, 0 }, /* Special_Overmind_With_Shell */
     [148] = { 1, 130, 130, 0, 0, 3, 1, 1, 1, 1, 0, 0, 2500, 0, 0 }, /* Special_Overmind */
     [149] = { 1, 130, 130, 0, 0, 3, 1, 50, 0, 600, 0, 0, 750, 0, 0 }, /* Zerg_Extractor */
@@ -266,7 +268,7 @@ static const Sc64StockWeaponProfile sc64_stock_weapon_profiles[SC64_STOCK_WEAPON
     [4] = { 20, 2, 30, 0, 160, 1, 2 }, /* Fragmentation_Grenade */
     [5] = { 30, 2, 22, 0, 160, 1, 2 }, /* Fragmentation_Grenade_Jim_Raynor */
     [6] = { 125, 0, 22, 0, 10, 1, 1 }, /* Spider_Mines */
-    [7] = { 12, 1, 22, 0, 192, 1, 3 }, /* Twin_Autocannons */
+    [7] = { 12, 1, 22, 0, 160, 1, 3 }, /* Twin_Autocannons */
     [8] = { 10, 2, 22, 0, 160, 2, 1 }, /* Hellfire_Missile_Pack */
     [9] = { 24, 1, 22, 0, 160, 1, 3 }, /* Twin_Autocannons_Alan_Schezar */
     [10] = { 20, 1, 22, 0, 160, 2, 1 }, /* Hellfire_Missile_Pack_Alan_Schezar */
@@ -343,7 +345,7 @@ static const Sc64StockWeaponProfile sc64_stock_weapon_profiles[SC64_STOCK_WEAPON
     [81] = { 20, 0, 22, 0, 224, 1, 3 }, /* STA_Photon_Cannon */
     [82] = { 100, 25, 1, 0, 128, 1, 3 }, /* Scarab */
     [83] = { 0, 1, 1, 0, 288, 1, 0 }, /* Stasis_Field */
-    [84] = { 14, 1, 45, 0, 288, 1, 4 }, /* Psionic_Storm */
+    [84] = { 16, 1, 45, 0, 288, 1, 4 }, /* Psionic_Storm */
     [85] = { 100, 1, 22, 0, 15, 1, 3 }, /* Warp_Blades_Zeratul */
     [86] = { 45, 1, 30, 0, 15, 1, 3 }, /* Warp_Blades_Hero */
     [87] = { 7, 1, 22, 0, 128, 1, 1 }, /*  */
@@ -362,7 +364,7 @@ static const Sc64StockWeaponProfile sc64_stock_weapon_profiles[SC64_STOCK_WEAPON
     [100] = { 5, 1, 8, 0, 160, 1, 1 }, /* Neutron_Flare */
     [101] = { 0, 0, 22, 0, 288, 1, 4 }, /* Disruption_Web */
     [102] = { 20, 0, 22, 0, 192, 1, 4 }, /* Restoration */
-    [103] = { 6, 1, 64, 0, 192, 2, 1 }, /* Halo_Rockets */
+    [103] = { 5, 1, 64, 0, 192, 2, 1 }, /* Halo_Rockets */
     [104] = { 25, 2, 100, 0, 192, 1, 1 }, /* Corrosive_Acid */
     [105] = { 8, 1, 22, 0, 256, 1, 3 }, /* Mind_Control */
     [106] = { 8, 1, 22, 0, 320, 1, 4 }, /* Feedback */

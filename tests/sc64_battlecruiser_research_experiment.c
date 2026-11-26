@@ -33,11 +33,11 @@ int main(void)
     assert(b[lab].level==SC64_BC_TECH_YAMATO);
     assert(field_menu_count()==menu_base+1);
     assert(!strcmp(race_menu_label(menu_base),"CANCEL RESEARCH"));
-    assert(minerals==4900 && gas==4900);
+    assert(minerals==4800 && gas==4800);
     choose_by_buttons(menu_base);
     assert(!b[lab].level && minerals==5000 && gas==5000);
     choose_by_buttons(menu_base);
-    assert(b[lab].level==SC64_BC_TECH_YAMATO && minerals==4900 && gas==4900);
+    assert(b[lab].level==SC64_BC_TECH_YAMATO && minerals==4800 && gas==4800);
     assert(!race_bc_lab_start(lab2,SC64_BC_TECH_YAMATO));
     int expected=b[lab].queue_progress;
     for (int i=0;i<100;i++) {

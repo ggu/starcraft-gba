@@ -222,7 +222,7 @@ static void protoss_admission(void)
             ++scouts_before;
     old_minerals = minerals; old_gas = gas;
     assert(race_queue_unit(SIDE, stargate, unit_raw(70)));
-    assert(minerals == old_minerals - 275 && gas == old_gas - 125);
+    assert(minerals == old_minerals - 300 && gas == old_gas - 150);
     for (int tick = 0; tick < unit_build_time(unit_raw(70)) + 8 && b[stargate].queue_count;
          ++tick) race_tick_buildings();
     assert(!b[stargate].queue_count);
