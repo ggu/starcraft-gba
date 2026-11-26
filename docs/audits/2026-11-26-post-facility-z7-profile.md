@@ -71,3 +71,12 @@ observed preceding counter, 1,973 built two to seven routes and averaged
 Even the 1,185 inputs with zero new builds averaged 435,642 order cycles and
 1,133,956 total loop cycles. Prioritize the repeated one-to-seven-build updates
 and identify the remaining cost of movement and contacts on zero-build inputs.
+
+A separate instruction profile on the #978 ROM reproduced the guest cycle
+counts at inputs 136,789 through 136,792. At the peak (136,791), 26 calls
+to the wide cached fill performed 23 full linear floods. The floods spent
+12,004,803 direct cycles expanding and 2,573,049 packing the completed
+directions. On each of the two previous inputs there was one full flood.
+The subsequent input had none, but still took 1,117,259 cycles, including
+153,058 in uncached contact masks. Trace the destinations and changes to
+the obstacle grid before choosing a cache or algorithm change.
