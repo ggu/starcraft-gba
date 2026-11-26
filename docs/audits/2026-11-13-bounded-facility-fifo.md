@@ -151,3 +151,12 @@ and victory/reload SRAM matching the current control; it took
 145,473,761,161 versus 146,796,890,834 guest cycles. The corrected
 candidate full victory replay is still in progress; this measurement alone
 does not activate a product default.
+
+Additional corrected opt-in product checks: T4 frame 4968 plus 256 inputs
+matched cycles, state and save exactly; P4 frame 986 plus 256 inputs cost
++0.0813%, matching 65 state/video samples and SRAM. From a P6 Zeratul rescue
+save at frame 51300, the final 458 ordinary inputs reached victory at frame
+51746 in 354,311,203 cycles on each build, with 59 sampled full states,
+`race_p6`, video and fresh saves matching. These limited T/P windows do not
+establish a benefit for enabling their products. The corrected Z10 product
+also passed 45 lobby and ten chapter-result checks.
