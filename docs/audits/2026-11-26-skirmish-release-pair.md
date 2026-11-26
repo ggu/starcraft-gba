@@ -92,8 +92,13 @@ match averaged 21.21 emulated calls/s and the tail after the pause
 averaged 19.79.
 
 The Protoss Blood Bath Melee win against Terran and Zerg reached
-world frame 23,371 with physical inputs and wrote its pause and
-victory journals. The first fresh-pause continuation hit the
-headless backend’s 60-second command timeout. A separate
-continuation from that retained pause save checks only the
-unfinished phase.
+world frame 23,371 with physical inputs. The uninterrupted run
+passed 227 checkpoints and wrote its pause and victory journals.
+The first fresh-pause continuation hit the headless backend’s
+60-second command timeout. The retry started from the retained
+pause journal and limited each transport command to 32 updates.
+All 64 continuation checkpoints and the final RESULT fingerprint
+matched. The uninterrupted and resumed runs wrote identical victory SRAM, and a
+fresh HOME reload showed the same result and re-exported the
+journal byte for byte. The retry measured 15.78 emulated calls/s
+over its 8,033 calls.

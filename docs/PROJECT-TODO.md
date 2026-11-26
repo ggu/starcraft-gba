@@ -32,6 +32,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Three Blood Bath Melee pairs draw different valid starts. The exact
   packaged Z10 replay from the retained battle save matches its gameplay
   and bitmap data while reducing mean advancing cost by 2.08%.
+  New physical whole-match wins qualify Terran Outpost versus one Zerg
+  and Protoss Blood Bath Melee versus Terran and Zerg, including fresh
+  HOME reload of each victory.
 
 - **Busy three-opponent performance.** The release's six recorded battle
   windows measured 11.29–16.73 loop updates/s. The original controls and
