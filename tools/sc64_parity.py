@@ -339,7 +339,10 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['why'] = f'the outcome changed from the baseline ({known["gba"]})'
         else:
             was = 0 if known['gba'] in obs.get('also_ok', ()) else outside(known['gba'], obs['lo'], obs['hi'])
-            slack = max((obs['hi'] - obs['lo']) / 2, 1e-9)
+            # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each
+            # seed's band as seed_lo/seed_hi, and the N64's spread over seeds is no licence for
+            # the GBA to move further out.
+            slack = max((obs.get('seed_hi', obs['hi']) - obs.get('seed_lo', obs['lo'])) / 2, 1e-9)
             if gap > was + slack:
                 row['verdict'] = 'REGRESSION'
                 row['why'] = f'further outside the band than the baseline ({known["gba"]})'

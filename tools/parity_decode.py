@@ -488,6 +488,11 @@ class Capture:
             if record['table'] and not record['paused']:
                 clock += 1
             record['sf'] = clock
+        # Change reads after the last follow-up record, (tick, paused, in mission) in capture
+        # order: ticks no follow-up dates, which whole-match scenarios count while unpaused.
+        last_step = self.ticks[-1]['step'] if self.ticks else -1
+        self.trailing_changes = [(h['tick'], h['pause'] != 0, bool(h['flags'] & FLAG_TABLE))
+                                 for h in change_all if h['step'] > last_step]
 
     def _verify_artifacts(self, tap):
         """tap.bin and tape.txt must be the files the capture wrote (manifest digests)."""
@@ -767,6 +772,10 @@ def same_bundle(a, b, allow_skips=False, same_watch=False):
                 problems.append(f'{cap.run.name}: no recorded watch.csv, which this scenario reads')
         if a.manifest.get('outputs_sha256', {}).get('watch.csv') != b.manifest.get('outputs_sha256', {}).get('watch.csv'):
             problems.append('watch.csv differs')
+        # The run's end (and the result frames after the last follow-up) counts trailing
+        # unpaused ticks, whose change reads the chain does not cover.
+        if getattr(a, 'trailing_changes', None) != getattr(b, 'trailing_changes', None):
+            problems.append('the change reads after the last follow-up differ between the runs')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
     if a.faults != b.faults:

@@ -158,13 +158,18 @@ whatever the baseline says. Unit rows at 0 HP are left out of worker counts
 and waves on both engines (the N64 keeps a dying unit's row for a few
 frames; the HP field, proven by the field map's damage checks, also reads
 each type's full HP as its highest value over a match here, and the human's
-last town hall fell 1,500, 590, 138, 0 before its row left). The GBA side is measured over
-the N64 run's frames only. Where a lobby was captured
+last town hall fell 1,500, 590, 138, 0 before its row left). The GBA side is
+measured over the N64 run's frames, except that a finite timing counts
+through its band's upper edge, even past the run's last frame; a NEVER
+expectation and the checkpoints keep the run's cutoff. Result bytes are
+dated on the decoder's unpaused clock, so a change logged on a paused tick
+takes the last unpaused frame. Where a lobby was captured
 with several seeds, `envelope` widens each band to the union over the seeds,
 so the envelope is the tolerance exactly where the N64 varied; a timing some
 seeds never reached admits NEVER (`also_ok`) without stretching the numeric
 band, but only from a seed whose run lasted past the time another seed saw
-it. Goldens of one group must share a layout and differ in seed, and each
+it. A baseline line may move no further out than half the seed's own band
+(the measurement's tolerance), never half the envelope. Goldens of one group must share a layout and differ in seed, and each
 golden's tape must equal `lobby_tape()` for its lobby id byte for byte (all
 17 captured tapes do), which pins the rows and the launch delay.
 

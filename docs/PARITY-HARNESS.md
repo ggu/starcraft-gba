@@ -92,7 +92,7 @@ hash chain, seed words, binary, tape, ROM and mode.
 | Verdict | Meaning | Fails? |
 | --- | --- | --- |
 | PASS | Inside the N64 band | no |
-| KNOWN | Outside the band, in the baseline, not further out than recorded (half a band of slack) | no |
+| KNOWN | Outside the band, in the baseline, not further out than recorded (half a band of slack; for a skirmish seed envelope, half the seed's own band) | no |
 | REGRESSION | Outside the band and not in the baseline, or further out than the baseline | yes |
 | IMPROVED | In the baseline, now inside the band | notice |
 | STALE | Baseline line with no observation | notice |

@@ -288,6 +288,34 @@ class GbaTrace(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(values['values'][('build.first.Command Center', 'cpu Terran')], 0)
 
+    def test_a_timing_counts_through_its_bands_edge(self):
+        # The N64 run ends at frame 2 with the human defeated there (band 0-4); the GBA human
+        # falls at frame 3: past the run's last frame, inside the band.
+        tape = hashlib.sha256(sk.lobby_tape(*sk.LOBBIES['sk-zvt-w0']).encode()).hexdigest()
+
+        def defeat(lo, hi, value=2, extra=()):
+            golden = {'bundle': {'tape_sha256': tape}, 'gba': {'horizon': 2},
+                      'observations': [{'check': 'result.human_defeated', 'subject': 'human', 'value': value,
+                                        'lo': lo, 'hi': hi, 'gating': True},
+                                       {'check': 'workers@1000', 'subject': 'human', 'value': 1, 'lo': 1, 'hi': 1,
+                                        'gating': True}, *extra]}
+            import sc64_parity_selfgate as selfgate
+            check, selfgate.check_trace_complete = selfgate.check_trace_complete, lambda *a, **k: None
+            try:
+                values, error = metrics.SCENARIOS['sk-zvt-w0']['measure_gba'](
+                    sk.gba_series(self.trace, REPORT), golden, REPORT)
+            finally:
+                selfgate.check_trace_complete = check
+            self.assertIsNone(error)
+            return values['values'][('result.human_defeated', 'human')]
+        self.assertEqual(defeat(0, 4), 3)
+        self.assertEqual(defeat(0, 2), sk.NEVER)            # past both the run and the band
+        self.assertEqual(defeat(sk.NEVER, sk.NEVER, sk.NEVER), sk.NEVER)   # a NEVER keeps the run's cutoff
+        # A seed that never saw it, inside an envelope reaching past its run (another check
+        # extends the measurement): still the run's cutoff.
+        wave = {'check': 'attack.first_wave', 'subject': 'cpu Terran', 'value': 2, 'lo': 0, 'hi': 4, 'gating': True}
+        self.assertEqual(defeat(0, 4, sk.NEVER, [wave]), sk.NEVER)
+
     def test_runner_arguments(self):
         args = sk.gba_args('sk-ffa-w37', {'seed': 84421}, self.trace)
         self.assertEqual(args, ['--human', 't', '--bot', 'z', '--bot', 't', '--bot', 'p', '--seed', '84421',
@@ -307,6 +335,7 @@ class GbaTrace(unittest.TestCase):
 def golden(scenario_id, seed, end, obs):
     tape = hashlib.sha256(sk.lobby_tape(*sk.LOBBIES[scenario_id]).encode()).hexdigest()
     return {'id': scenario_id, 'gba': {'seed': seed, 'horizon': end}, 'layout_sha256': 'L',
+            'decoder_revision': sk.DECODER_REVISION,
             'bundle': {'tape_sha256': tape},
             'observations': [{'check': c, 'subject': s, 'value': v, 'lo': v - t, 'hi': v + t,
                               'tolerance': 'x', 'gating': True} for c, s, v, t in obs]}
@@ -338,8 +367,61 @@ class ResultFrames(unittest.TestCase):
             ticks = [{'tick': k + 1, 'step': 2 * k + 3, 'sf': k, 'table': True, 'paused': False}
                      for k in range(40) if k != 15]
             cap = type('Cap', (), {'run': run, 'ticks': ticks, 'skipped_frames': [(32, 15)],
+                                   'change_steps': {16: 32}, 'trailing_changes': [(41, False, True)],
                                    'layout': sc64_parity.parity_decode.Layout()})()
             self.assertEqual(sk.result_frames(cap), {2: (15, 2), 0: (40, 2)})
+            self.assertEqual(sk.tick_frames(cap)[1], 40)
+
+    def test_paused_ticks_add_no_frames(self):
+        with tempfile.TemporaryDirectory() as d:
+            run = pathlib.Path(d)
+            # Ticks 1-10 are frames 0-9; ticks 11-14 are paused (the result screen). The computer
+            # (owner 2) falls during paused tick 13; after the last read (tick 14) come paused
+            # ticks 15-16 and unpaused 17-18, and the human (owner 0) falls during tick 18.
+            (run / 'watch.csv').write_text('step,tick,address,bytes,value' + chr(10) + '10,0,800b936c,4,0' + chr(10) +
+                                           '30,13,800b936c,4,200' + chr(10) + '40,18,800b936c,4,2000200' + chr(10))
+            ticks = [{'tick': k + 1, 'step': 2 * k + 3, 'sf': min(k, 9), 'table': True, 'paused': k >= 10}
+                     for k in range(14)]
+            trailing = [(15, True, True), (16, True, True), (17, False, True), (18, False, True)]
+            cap = type('Cap', (), {'run': run, 'ticks': ticks, 'skipped_frames': [], 'change_steps': {},
+                                   'trailing_changes': trailing, 'layout': sc64_parity.parity_decode.Layout()})()
+            # A raw tick count would date them 12 and 17.
+            self.assertEqual(sk.result_frames(cap), {2: (9, 2), 0: (11, 2)})
+            self.assertEqual(sk.tick_frames(cap)[1], 11)
+            # A missing change read after the last follow-up leaves a pause state unknown.
+            cap.trailing_changes = [(15, True, True), (17, False, True), (18, False, True)]
+            with self.assertRaises(ValueError):
+                sk.tick_frames(cap)
+            # A result logged after the capture's last read has no frame.
+            cap.trailing_changes = trailing[:3]
+            with self.assertRaises(ValueError):
+                sk.result_frames(cap)
+            # A tick read again keeps its latest pause state; a tick that steps back is refused.
+            cap.trailing_changes = [(15, True, True), (15, False, True), (16, True, True), (17, False, True),
+                                    (18, False, True)]
+            self.assertEqual(sk.tick_frames(cap)[1], 12)
+            cap.trailing_changes = [(15, True, True), (16, False, True), (15, False, True), (17, False, True),
+                                    (18, False, True)]
+            with self.assertRaises(ValueError):
+                sk.tick_frames(cap)
+
+    def test_goldens_of_an_older_revision_are_stale(self):
+        self.assertEqual(metrics.SCENARIOS['sk-zvt-w0']['decoder_revision'], sk.DECODER_REVISION)
+        g = {'decoder_revision': 1, 'observations': [
+            {'check': 'result.human_defeated', 'subject': 'human', 'value': 12, 'lo': 10, 'hi': 14, 'gating': True,
+             'provenance': 'n64-ram', 'n_runs': 2, 'tolerance': 'x'}]}
+        rows = sc64_parity.judge('sk-zvt-w0', g, {('result.human_defeated', 'human'): 12}, {}, {})
+        self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
+        old, new = golden('sk-zvt-w0', 1, 50, []), golden('sk-zvt-w101', 2, 50, [])
+        old['decoder_revision'] = 1
+        with tempfile.TemporaryDirectory() as d:
+            paths = []
+            for doc in (old, new):
+                path = pathlib.Path(d) / f'{doc["id"]}.json'
+                path.write_text(json.dumps(doc))
+                paths.append(path)
+            with self.assertRaises(ValueError):
+                sk.envelope(paths)
 
 
 class LayoutDigest(unittest.TestCase):
@@ -517,7 +599,7 @@ class Envelope(unittest.TestCase):
 
 class Judge(unittest.TestCase):
     def test_values_keyed_by_subject_and_curve_steps(self):
-        g = {'observations': [
+        g = {'decoder_revision': sk.DECODER_REVISION, 'observations': [
             {'check': 'workers@1000', 'subject': 'human', 'value': 4, 'lo': 4, 'hi': 4, 'gating': True,
              'provenance': 'n64-ram', 'n_runs': 2, 'tolerance': 'exact'},
             {'check': 'workers@1000', 'subject': 'cpu Zerg', 'value': 9, 'lo': 9, 'hi': 9, 'gating': True,
@@ -542,7 +624,7 @@ class Judge(unittest.TestCase):
         self.assertEqual((rows[0]['verdict'], rows[0]['gba']), ('REPORT', 7))
 
     def test_also_ok_admits_never_only(self):
-        g = {'observations': [{'check': 'build.first.Bunker', 'subject': 'cpu Terran', 'value': 3000, 'lo': 2998,
+        g = {'decoder_revision': sk.DECODER_REVISION, 'observations': [{'check': 'build.first.Bunker', 'subject': 'cpu Terran', 'value': 3000, 'lo': 2998,
                                'hi': 3002, 'also_ok': [sk.NEVER], 'gating': True, 'provenance': 'n64-ram',
                                'n_runs': 2, 'tolerance': 'x'}]}
         verdict = lambda v: sc64_parity.judge('sk-zvt-w0', g, {('build.first.Bunker', 'cpu Terran'): v}, {}, {})[0]['verdict']
@@ -571,6 +653,28 @@ class Judge(unittest.TestCase):
 
 
 
+class EnvelopeSlack(unittest.TestCase):
+    def test_a_worse_result_is_a_regression_in_a_wide_envelope(self):
+        # Two seeds widen the band to 736-3245; each seed's own band is +-2 frames.
+        def golden(seed_lo, seed_hi):
+            return {'decoder_revision': sk.DECODER_REVISION, 'observations': [{'check': 'build.first.Spawning Pool', 'subject': 'cpu Zerg', 'value': 738,
+                                      'lo': 736, 'hi': 3245, 'seed_lo': seed_lo, 'seed_hi': seed_hi,
+                                      'gating': True, 'provenance': 'n64-ram', 'n_runs': 2, 'tolerance': 'x'}]}
+        known = {'sk-tvz-w0:build.first.Spawning Pool:cpu Zerg': {'gba': 3250}}
+
+        def verdict(g, v):
+            return sc64_parity.judge('sk-tvz-w0', g, {('build.first.Spawning Pool', 'cpu Zerg'): v}, {}, known)[0]['verdict']
+        g = golden(736, 740)
+        self.assertEqual(verdict(g, 4200), 'REGRESSION')
+        self.assertEqual(verdict(g, 3251), 'KNOWN')        # within the seed's own +-2
+        self.assertEqual(verdict(g, 3000), 'IMPROVED')
+        # Without seed bands (any other scenario) the band's own half width stays the slack.
+        plain = {'decoder_revision': sk.DECODER_REVISION, 'observations': [dict(golden(0, 0)['observations'][0])]}
+        for k in ('seed_lo', 'seed_hi'):
+            del plain['observations'][0][k]
+        self.assertEqual(verdict(plain, 4200), 'KNOWN')
+
+
 class Bundles(unittest.TestCase):
     """Skirmish goldens read watched words (supply, result) outside the hash chain, so both
     captures' watch.csv must match; whole-match captures may keep their tap compressed."""
@@ -593,6 +697,11 @@ class Bundles(unittest.TestCase):
             self.assertFalse([p for p in same_bundle(a, b) if 'watch' in p])
             self.assertTrue(any('no recorded watch.csv' in p for p in same_bundle(a, b, same_watch=True)))
             self.assertTrue(metrics.SCENARIOS['sk-zvt-w0']['same_watch'])
+            # Trailing change reads (the run's end) lie outside the chain as well.
+            self.assertFalse([p for p in same_bundle(a, b, same_watch=True) if 'after the last follow-up' in p])
+            b.trailing_changes = a.trailing_changes + [(999, False, True)]
+            self.assertIn('the change reads after the last follow-up differ between the runs',
+                          same_bundle(a, b, same_watch=True))
 
     def test_a_lost_first_tick_is_refused(self):
         import hashlib as _hashlib

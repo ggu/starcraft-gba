@@ -146,6 +146,7 @@ WAVE_RADIUS = 384                       # 12 tiles around the human's town hall
 WAVE_UNITS = 3
 CHECKPOINTS = (1000, 2000, 4000, 6000, 8000)
 TIME_TOLERANCE = 2                      # source frames, as the S4 intervals
+DECODER_REVISION = 2                     # the skirmish scenarios' measurement revision
 NEVER = 999999                          # a time not reached within the N64 run
 ENDED = -1                              # a GBA checkpoint after its match ended
 TRIP = 8                                # minerals per delivery
@@ -573,25 +574,65 @@ def read_watch_ticks(run, address):
     return out
 
 
+def tick_frames(cap):
+    """(frame_of, last): tick -> source frame on the decoder's unpaused clock. A follow-up record
+    gives its own frame (a paused tick keeps the last unpaused frame), a skipped unpaused tick
+    the frame its change read was counted at; a tick after the last follow-up adds the unpaused
+    in-mission change reads up to it; any other tick keeps the frame of the last dated tick
+    before it. last: the run's last unpaused frame, trailing ticks included. The ticks after the
+    last follow-up must run on without a gap (a missing change read leaves its pause state
+    unknown), and a tick past the capture's last read has no frame: both raise ValueError."""
+    known = {r['tick']: r['sf'] for r in cap.ticks if r['table'] and r['sf'] >= 0}
+    skipped = dict(getattr(cap, 'skipped_frames', []))
+    for tick, step in getattr(cap, 'change_steps', {}).items():
+        if step in skipped and tick not in known:
+            known[tick] = skipped[step]
+    if not known:
+        return None, None
+    ticks = sorted(known)
+    covered = ticks[-1]
+    state = {}   # trailing tick -> paused, from its latest read (the decoder's rule for a tick's change read)
+    for tick, paused, table in getattr(cap, 'trailing_changes', []):
+        if not table:
+            continue
+        if tick == covered:
+            if tick in state:
+                state[tick] = paused   # another read of the same tick
+            continue
+        if tick != covered + 1:
+            raise ValueError(f'{cap.run}: change reads after the last follow-up go from tick {covered} to {tick}')
+        state[tick] = paused
+        covered = tick
+    trailing = sorted(t for t, paused in state.items() if not paused)
+
+    def frame_of(tick):
+        if tick in known:
+            return known[tick]
+        if tick > covered:
+            raise ValueError(f'{cap.run}: tick {tick} is after the capture\'s last read (tick {covered})')
+        k = bisect.bisect_right(ticks, tick) - 1
+        if k < 0:
+            return 0
+        if k == len(ticks) - 1:
+            return known[ticks[-1]] + bisect.bisect_right(trailing, tick)
+        return known[ticks[k]]
+    return frame_of, known[ticks[-1]] + len(trailing)
+
+
 def result_frames(cap):
     """{owner: (source frame, value)} of each owner's first non-zero result byte. watch.csv names
-    the tick during which the byte changed; that tick's frame on the decoder's clock is the frame
-    of the last unpaused record at or before it plus the ticks between (skirmish ticks pause only
-    on the result screen), never past the run's last unpaused frame."""
+    the tick during which the byte changed; its frame is that tick's on the decoder's unpaused
+    clock (tick_frames), so paused ticks (the result screen) add nothing."""
     address = int(cap.layout.result_word(True)['address'], 16)
-    sampled = [(r['tick'], r['sf']) for r in cap.ticks if r['table'] and not r['paused'] and r['sf'] >= 0]
-    if not sampled:
+    frame_of, _ = tick_frames(cap)
+    if frame_of is None:
         return {}
-    ticks = [t for t, _ in sampled]
-    last = max([sampled[-1][1]] + [sf for _, sf in getattr(cap, 'skipped_frames', [])])
     out = {}
     for step, tick, word in read_watch_ticks(cap.run, address):
         for owner in range(4):
             value = (word >> (24 - 8 * owner)) & 0xFF
             if value and owner not in out:
-                k = bisect.bisect_right(ticks, tick) - 1
-                frame = 0 if k < 0 else sampled[k][1] + (tick - sampled[k][0])
-                out[owner] = (min(frame, last + max(0, tick - sampled[-1][0])), value)
+                out[owner] = (frame_of(tick), value)
     return out
 
 
@@ -607,7 +648,11 @@ def make_measure_n64(scenario_id):
         # Result bytes on the clock itself, so a change on a tick whose follow-up read was lost,
         # or on the last unpaused tick, is not missed.
         labels = {p['owner']: label for label, p in m['players'].items()}
-        results = result_frames(cap)
+        try:
+            results = result_frames(cap)
+            _, last = tick_frames(cap)
+        except ValueError as error:
+            raise SystemExit(f'{scenario_id}: {error}; capture again') from None
         m['results'] = {labels[o]: {'frame': sf, 'value': v} for o, (sf, v) in results.items() if o in labels}
         mine = results.get(m['human'])
         m['defeat'] = mine[0] if mine and mine[1] == DEFEAT else None
@@ -629,13 +674,9 @@ def make_measure_n64(scenario_id):
         if not m['results']:
             raise SystemExit(f'{scenario_id}: the capture ends before any result byte changes')
         # The run's last unpaused frame, sampled or skipped (a defeat can land on a skipped tick),
-        # including unpaused in-mission ticks after the last follow-up read.
-        trailing = 0
-        last = cap.last_change
-        last_sampled = next((r for r in reversed(cap.ticks) if r['table'] and not r['paused'] and r['sf'] >= 0), None)
-        if last and last_sampled and last['flags'] & 2 and not last['pause'] and last['tick'] > last_sampled['tick']:
-            trailing = last['tick'] - last_sampled['tick']
-        horizon = max([m['end'] + trailing] + [sf for _, sf in getattr(cap, 'skipped_frames', [])] +
+        # including the unpaused in-mission ticks after the last follow-up read (paused ones add
+        # nothing).
+        horizon = max([m['end'], last or 0] + [sf for _, sf in getattr(cap, 'skipped_frames', [])] +
                       [r['frame'] for r in m['results'].values()])
         gba = {'scenario': 'match', 'profile': PROFILE[human_race], 'at_step': 5, 'seed': seed,
                'horizon': horizon, 'steps': int((horizon + 40) * 5 / 4) + 10}
@@ -794,16 +835,30 @@ def make_measure_gba(scenario_id):
             check_trace_complete(pathlib.Path(series['trace']), report, verify_body=True)
         except (RuntimeError, KeyError, ValueError, IndexError) as error:
             return None, f'{series["trace"]}: incomplete trace ({error!r})' if isinstance(error, IndexError) else str(error)
+        horizon = int(golden['gba']['horizon'])
+        timed = ('build.first.', 'attack.first', 'result.')
+
+        def reach_of(obs):
+            # A finite timing band can end after the N64 run's last frame (a defeat on that
+            # frame, +-2): the GBA time counts through the band's upper edge. NEVER
+            # expectations and the checkpoints keep the run's own cutoff.
+            hi = obs.get('hi')
+            if obs['check'].startswith(timed) and isinstance(hi, (int, float)) and hi != NEVER \
+                    and obs.get('value') != NEVER:
+                return max(horizon, int(hi))
+            return horizon
+        reach = max([horizon] + [reach_of(o) for o in golden['observations']])
         try:
-            m = measure(gba_frames(series['trace'], series['gather'], report), human,
-                        int(golden['gba']['horizon']))
+            m = measure(gba_frames(series['trace'], series['gather'], report), human, horizon)
+            late = (measure(gba_frames(series['trace'], series['gather'], report), human, reach)
+                    if reach > horizon else None)
         except ValueError as error:
             return None, str(error)
-        horizon = int(golden['gba']['horizon'])
         if series['gather'] is None:
             return None, 'the runner wrote no --gather file'
         frames = {int(o['check'].split('@')[1]): int(o['frame']) for o in golden['observations'] if 'frame' in o}
         got = values(m, horizon, frames)
+        got_late = values(late, reach, frames) if late is not None else {}
         flat = {}
         for obs in golden['observations']:
             key = (obs['check'], obs['subject'])
@@ -814,6 +869,15 @@ def make_measure_gba(scenario_id):
                 roster = {type_name(t) for t in m['players'][key[1]]['roster']}
                 v = 0 if obs['check'][len('build.first.'):] in roster and obs['check'].startswith('build.first.') \
                     else NEVER
+            if v == NEVER and obs['check'].startswith(timed):
+                # The same events, measured on to the band's edge (frames up to the run's end agree).
+                after = got_late.get(key)
+                if after is not None and after != NEVER and horizon < after <= reach_of(obs):
+                    v = after
+                    if obs['check'] == 'attack.first_wave':   # its report-only supply, at the same frame
+                        late_supply = ('attack.supply_at_wave', key[1])
+                        if late_supply in got_late:
+                            flat[late_supply] = got_late[late_supply]
             flat[key] = v
         extra = sorted(f'{label}: {name}' for label, p in m['players'].items() if label != 'human'
                        for name in p['firsts'] if (f'build.first.{name}', label) not in
@@ -839,6 +903,9 @@ def scenarios():
             # Supply and result come from watch.csv, outside the hash chain: both captures' logs
             # must be identical (parity_decode.same_bundle).
             'same_watch': True,
+            # 2: result bytes and the run's end on the decoder's unpaused clock (paused and
+            # trailing ticks); goldens measured before are stale.
+            'decoder_revision': DECODER_REVISION,
         }
     return out
 
@@ -863,6 +930,10 @@ def envelope(goldens):
         human, cpus, wait = LOBBIES[doc['id']]
         if doc.get('bundle', {}).get('tape_sha256') != hashlib.sha256(lobby_tape(human, cpus, wait).encode()).hexdigest():
             raise ValueError(f'{doc["id"]}: captured with another tape than lobby_tape(); write it again')
+    revisions = {d.get('decoder_revision', 1) for d in docs}
+    if revisions != {DECODER_REVISION}:
+        raise ValueError(f'{[d["id"] for d in docs]}: goldens measured by decoder revisions {sorted(revisions)}, '
+                         f'the scenarios are at {DECODER_REVISION}; write them again')
     seeds = [d['gba']['seed'] for d in docs]
     if len(set(seeds)) != len(seeds):
         raise ValueError(f'{[d["id"] for d in docs]}: two goldens of one lobby share a seed ({sorted(seeds)})')
