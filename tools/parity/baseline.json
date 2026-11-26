@@ -11,6 +11,46 @@
    "gba": 0.308
   },
   {
+   "key": "t1-fields:anim.walk_cycle:Marine",
+   "gba": 6.0
+  },
+  {
+   "key": "t1-fields:fog.explored_at_rest:human, T1",
+   "gba": 665
+  },
+  {
+   "key": "t1-fields:fog.first_clear:human, T1",
+   "gba": 29
+  },
+  {
+   "key": "t1-fields:fog.first_reveal:human, T1",
+   "gba": 1
+  },
+  {
+   "key": "t1-fields:fog.visible_at_rest:human, T1",
+   "gba": 648
+  },
+  {
+   "key": "t1-fields:move.arrival_first:Marine x5",
+   "gba": 61
+  },
+  {
+   "key": "t1-fields:move.arrival_last:Marine x5",
+   "gba": 100
+  },
+  {
+   "key": "t1-fields:move.group_spread:Marine x5",
+   "gba": 21.3242
+  },
+  {
+   "key": "t1-fields:order.move_end_first:Marine x5",
+   "gba": 63
+  },
+  {
+   "key": "t1-fields:order.move_end_last:Marine x5",
+   "gba": 102
+  },
+  {
    "key": "t1-move:move.arrival_first:Marine x5",
    "gba": 65
   },

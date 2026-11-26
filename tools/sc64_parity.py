@@ -63,8 +63,16 @@ def default_home():
 # ---- GBA trace --------------------------------------------------------------
 
 def gba_series(trace_path):
-    """Normalise a sc64-parity-trace/1 file: last row per source frame, N64 pixels."""
+    """Normalise a sc64-parity-trace/1 file: last row per source frame, N64 pixels.
+
+    Also kept, for the field-map checks: each unit slot's order changes
+    (series['orders'][slot] = [(sf, engine order)]), stride phase and animation kind
+    changes (series['walks'][slot] = [(sf, walk, anim)]) and the human fog sets
+    (series['fog'] = {'cols', 'rows', 'keyframe': (sf, visible, explored), 'changes':
+    [(sf, cell, visible, explored)]}, cells col + row * cols)."""
     units, banks, frames = {}, {}, []
+    orders, walks, fog = {}, {}, {'cols': None, 'rows': None, 'keyframe': None, 'changes': []}
+    keyframe = {}
     step, complete = None, False
 
     def flush():
@@ -95,17 +103,37 @@ def gba_series(trace_path):
                 slot, raw_type, owner, raw_owner = int(words[1]), int(words[3]), int(words[4]), int(words[5])
                 x, y = int(words[6]), int(words[7])
                 units[slot] = (raw_type, raw_owner if raw_owner >= 0 else owner, 2 * x, 2 * y)
+                order = int(words[12]) if len(words) > 12 else None
+                history = orders.setdefault(slot, [])
+                if order is not None and (not history or history[-1][1] != order):
+                    history.append(((step or 0) * 4 // 5, order))
+                if len(words) > 23:
+                    walk = (int(words[22]), int(words[23]))   # stride phase, animation kind
+                    strides = walks.setdefault(slot, [])
+                    if not strides or strides[-1][1:] != walk:
+                        strides.append(((step or 0) * 4 // 5,) + walk)
             elif tag == '-U':
                 units.pop(int(words[1]), None)
             elif tag == 'P':
                 banks[int(words[1])] = int(words[2])
+            elif tag in ('FV', 'FE') and len(words) == 4:
+                cols, rows, bits = int(words[1]), int(words[2]), bytes.fromhex(words[3])
+                cells = {c for c in range(cols * rows) if bits[c >> 3] >> (c & 7) & 1}
+                fog['cols'], fog['rows'] = cols, rows
+                keyframe[tag] = (step, cells)
+                if tag == 'FE' and keyframe.get('FV', (None,))[0] == step:
+                    # A new keyframe (first step, or a new map size) restarts the change list.
+                    fog['keyframe'] = ((step or 0) * 4 // 5, keyframe['FV'][1], cells)
+                    fog['changes'] = []
+            elif tag == 'F' and len(words) == 4:
+                fog['changes'].append(((step or 0) * 4 // 5, int(words[1]), int(words[2]), int(words[3])))
             elif tag == 'Z':
                 fields = dict(w.split('=', 1) for w in words[1:] if '=' in w)
                 complete = fields.get('overflow') == '0' and fields.get('write_errors') == '0'
     flush()
     if not complete:
         raise ValueError(f'{trace_path}: incomplete trace (no clean Z line)')
-    return {'source': 'gba', 'scale': 2, 'frames': frames}
+    return {'source': 'gba', 'scale': 2, 'frames': frames, 'orders': orders, 'walks': walks, 'fog': fog}
 
 
 def gba_command(scenario_id, golden, trace):
@@ -114,6 +142,11 @@ def gba_command(scenario_id, golden, trace):
     spec = metrics.SCENARIOS[scenario_id]
     params = golden['gba']
     binary = PARITY_DIR / f'{spec["profile"]}-fast-trace'
+    if spec['runner'] == 'census':
+        # A campaign opening: menu launch of one catalog mission, then input-free steps.
+        return binary, [str(binary), '--scenario', 'census', '--mission', str(int(params['mission'])),
+                        '--steps', str(int(params['steps'])), '--trace', str(trace), '--no-route-checks',
+                        '--profile', spec['profile']]
     ints = [int(params['steps']), int(params['at_step'])]
     cmd = [str(binary), '--scenario', spec['runner'], '--steps', str(ints[0]), '--trace', str(trace),
            '--no-route-checks', '--profile', spec['profile'], '--at', str(ints[1])]
@@ -217,6 +250,9 @@ def run_scenario(scenario_id, golden_path, baseline, keep):
                     'command': cmd}
         report = json.loads(run.stdout.strip().splitlines()[-1])
         series = gba_series(trace)
+        if 'parse_gba' in spec:
+            # Scenarios that read more of the trace than the series keeps (buildings, hits).
+            report['parsed'] = spec['parse_gba'](trace)
     report['movers'] = [int(x) for x in report.get('movers', [])] if isinstance(report.get('movers'), list) else []
     measured, err = spec['measure_gba'](series, golden, report)
     if err:

@@ -4,9 +4,11 @@
 // tap of live unit rows and clock words, per-step watches of chosen fields,
 // closed-loop waits on a guest field, an in-process state round trip used only
 // to compare views, and whole-machine state files written by the core's own
-// serializer and loaded only before the first step. It never writes guest
-// memory directly and uses no host input API. Outputs are ROM-derived and
-// belong in a private directory.
+// serializer and loaded only before the first step. It writes guest memory
+// only through the explicit "poke" tape command (allowed for recording by the
+// owner on 2026-11-26), which is logged in events.csv and counted in
+// status.log, and uses no host input API. Outputs are ROM-derived and belong
+// in a private directory.
 #include "capture_view.h"
 #include <ares/ares.hpp>
 #include <n64/n64.hpp>
@@ -128,6 +130,16 @@ bool line_read(std::uint32_t at, int alias, std::uint8_t* out16) {
   for(unsigned i = 0; i < 16; ++i) out16[i] = line.bytes[i ^ 3u];
   return true;
 }
+// Guest writes for "poke": RDRAM plus any data-cache line holding the byte (see capture_view.h).
+void raw_write(std::uint32_t address, std::uint8_t value) { ares::Nintendo64::rdram.ram.data[address ^ 3u] = value; }
+bool line_write(std::uint32_t at, int alias, std::uint8_t value) {
+  using namespace ares::Nintendo64;
+  const std::uint32_t base = at & ~15u;
+  auto& line = cpu.dcache.line(((u64)base | 0x80000000ull) ^ (alias ? 0x1000ull : 0ull));
+  if(!line.hit(base)) return false;
+  line.bytes[(at & 15u) ^ 3u] = value;
+  return true;
+}
 bool guest_view(std::uint32_t address, std::size_t length, std::uint8_t* out, Sc64CaptureReadStats* stats) {
   return sc64_capture_read(address, length, ares::Nintendo64::rdram.ram.size, out, raw_read, line_read, stats);
 }
@@ -187,12 +199,18 @@ int main(int argc, char** argv) {
 
   std::ofstream checkpoints(out / "checkpoints.csv"), regions(out / "regions.csv"), commands(out / "commands.csv"),
                 ticks(out / "ticks.csv"), verifyLog(out / "verify.csv"), events(out / "events.csv");
-  std::ofstream rawRows, recFile;
+  std::ofstream rawRows, recFile, extraFile;
+  // "region": extra guest blocks recorded on each follow-up read into extra.bin.
+  struct Region { std::uint32_t offset = 0, bytes = 0; };
+  std::vector<Region> regionList; std::uint32_t regionBytes = 0; unsigned long long regionStride = 1, extraRecords = 0;
+  std::vector<std::uint8_t> regionBuffer;
+  unsigned long long pokes = 0, pokeBytes = 0, pokeCached = 0;
   // Required logs are checked whether or not they opened; the raw file only once requested.
   auto outputsOk = [&] {
     for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events}) { stream->flush(); if(!*stream) return false; }
     if(rawRows.is_open()) { rawRows.flush(); if(!rawRows) return false; }
     if(recFile.is_open()) { recFile.flush(); if(!recFile) return false; }
+    if(extraFile.is_open()) { extraFile.flush(); if(!extraFile) return false; }
     return (bool)std::cout;
   };
   checkpoints << "step,tick,sha256,cached_lines,dual_hits,dual_differ\n";
@@ -388,6 +406,21 @@ int main(int argc, char** argv) {
       recFile.write(reinterpret_cast<const char*>(bytes), sizeof bytes);
       recFile.write(reinterpret_cast<const char*>(s.globals), kBanksBytes + kRngBytes);
       if(withRows) recFile.write(reinterpret_cast<const char*>(rows.data()), (std::streamsize)rows.size());
+    }
+    if(extraFile.is_open() && !changed && phase == 1 && tickChanges % regionStride == 0) {
+      // extra.bin record (format in capture_view.h): the declared regions at the follow-up read.
+      std::uint8_t head[12];
+      sc64_capture_put_le32(head, (std::uint32_t)completed); sc64_capture_put_le32(head + 4, tick);
+      sc64_capture_put_le32(head + 8, (std::uint32_t)tickChanges);
+      extraFile.write(reinterpret_cast<const char*>(head), sizeof head);
+      for(auto& r : regionList) {
+        regionBuffer.resize(r.bytes);
+        Sc64CaptureReadStats regionStats;
+        guest_view(r.offset, r.bytes, regionBuffer.data(), &regionStats);
+        tapDual += regionStats.dual_hits; tapDualDiffer += regionStats.dual_differ;
+        extraFile.write(reinterpret_cast<const char*>(regionBuffer.data()), (std::streamsize)r.bytes);
+      }
+      ++extraRecords;
     }
     if(tapRaw && rawTick && (changed || !same)) {
       std::uint32_t head[4] = {(std::uint32_t)completed, tick, phase, s.live};
@@ -600,6 +633,41 @@ int main(int argc, char** argv) {
       if(!met) return 9;
       continue;
     }
+    if(word == "pulse") {
+      // "pulse ADDR BYTES OP VALUE STEPS MASK HOLD GAP": run exactly STEPS steps; while the field,
+      // read after the previous step, meets OP against VALUE, press MASK for HOLD steps then
+      // release it for GAP steps (the phase restarts each time the condition starts to hold);
+      // otherwise press nothing. Dismisses prompts that come at unknown times (text boxes:
+      // Start only while the pause halfword is set) without pressing outside them. Never misses.
+      std::string addressText, opText, valueText, holdText, gapText, extra; unsigned bytes = 0; long long limit = 0; long mask = 0;
+      std::uint32_t address = 0, target = 0, start = 0;
+      if(!(in >> addressText >> bytes >> opText >> valueText >> limit >> mask >> holdText >> gapText) || (in >> extra) ||
+         !parseAddress(addressText, &address) || (bytes != 1 && bytes != 2 && bytes != 4) || address % bytes ||
+         address + bytes > rdram.ram.size || !sc64_capture_hex32(valueText.c_str(), &target) || limit < 1 || limit > 10000000 ||
+         !sc64_capture_mask_allowed(mask) || !mask || !sc64_capture_decimal_ok(holdText.c_str()) || !sc64_capture_decimal_ok(gapText.c_str()) ||
+         !pendingShot.empty()) { std::cerr << "invalid command: " << line << "\n"; return 7; }
+      const long long hold = std::atoll(holdText.c_str()), gap = std::atoll(gapText.c_str());
+      Sc64UntilOp op = sc64_capture_until_op(opText.c_str());
+      if(hold < 1 || hold > 1000 || gap < 1 || gap > 1000 || op == Sc64UntilOp::invalid || op == Sc64UntilOp::changed ||
+         !field(address, bytes, &start)) { std::cerr << "invalid command: " << line << "\n"; return 7; }
+      const long long begin = completed; const auto cpuStarted = threadCpuUs();
+      std::uint32_t value = start; long long phase = 0, pressed = 0;
+      bool active = sc64_capture_until_met(op, value, target, start);
+      for(long long i = 0; i < limit; ++i) {
+        unsigned now = active && phase % (hold + gap) < hold ? (unsigned)mask : 0u;
+        pressed += now != 0;
+        if(int code = runStep(now, 0, 0, false)) return code;
+        if(!field(address, bytes, &value)) return 8;
+        bool next = sc64_capture_until_met(op, value, target, start);
+        phase = next && active ? phase + 1 : 0;
+        active = next;
+      }
+      commands << begin << ',' << (completed - begin) << ',' << mask << ",0,0\n"; commands.flush();
+      events << completed << ",pulse_while," << hold << ' ' << gap << ' ' << addressText << ' ' << opText << ' ' << valueText << ' ' << pressed << '\n';
+      if(!outputsOk() || (watchLog.is_open() && !watchLog.flush())) { std::cerr << "output write failure\n"; return 5; }
+      std::cout << "PULSE " << completed << ' ' << pressed << ' ' << std::hex << value << std::dec << ' ' << (threadCpuUs() - cpuStarted) / 1000 << std::endl;
+      continue;
+    }
     if(word == "save") {
       // Whole-machine state from the core's serializer, the same bytes desktop ares writes to a slot file.
       // Names end in ".state", so a state can never take the name of a log opened later.
@@ -633,7 +701,7 @@ int main(int argc, char** argv) {
       }
       // Also refused after a checkpoint or dump: a hash taken before the load would describe a
       // machine the rest of the run never continues.
-      if(completed != 0 || observed || loaded || tapMode || every || !watches.empty() || verifyEvery || !sc64_capture_file_name_ok(name.c_str()) ||
+      if(completed != 0 || observed || loaded || pokes || !regionList.empty() || tapMode || every || !watches.empty() || verifyEvery || !sc64_capture_file_name_ok(name.c_str()) ||
          std::strlen(name.c_str()) != name.size()) return 7;
       // A load-mode serializer zero-fills reads past its end, so a truncated or padded file must
       // be refused here: its size must equal this core's synchronized state size. At most one
@@ -669,6 +737,61 @@ int main(int argc, char** argv) {
       if(!outputsOk()) return 5;
       std::cout << "LOAD " << completed << ' ' << name << ' ' << digest << std::endl;
       continue;
+    }
+    if(word == "poke") {
+      // "poke ADDR HEX": write 1 to 256 guest bytes (an even number of hex digits) into RDRAM and
+      // any data-cache line holding them, then read them back through the guest view. Allowed for
+      // recording only (owner decision, 2026-11-26); a run with any poke is staged evidence.
+      std::string addressText, hexText, extra; in >> addressText >> hexText;
+      std::uint32_t address = 0; std::uint8_t bytes[SC64_POKE_MAX]{}, check[SC64_POKE_MAX]{}; unsigned count = 0;
+      if(!parseAddress(addressText, &address) || !sc64_capture_hex_bytes(hexText.c_str(), bytes, &count) ||
+         std::strlen(hexText.c_str()) != hexText.size() || (in >> extra) || address + count > rdram.ram.size) {
+        std::cerr << "invalid command: " << line << "\n"; return 7;
+      }
+      std::size_t cached = 0;
+      if(!sc64_capture_write(address, bytes, count, rdram.ram.size, raw_write, line_write, &cached) ||
+         !guest_view(address, count, check, nullptr) || std::memcmp(bytes, check, count) != 0) {
+        std::cerr << "poke read-back failure: " << line << "\n"; return 8;
+      }
+      ++pokes; pokeBytes += count; pokeCached += cached;
+      events << completed << ",poke," << std::hex << (0x80000000u | address) << std::dec << ' ' << hex_bytes(bytes, count) << ' ' << cached << '\n';
+      if(!outputsOk()) return 5;
+      std::cout << "POKE " << completed << ' ' << addressText << ' ' << count << ' ' << cached << std::endl;
+      continue;
+    }
+    if(word == "region") {
+      // "region ADDR BYTES" declares a guest block recorded into extra.bin on each follow-up read;
+      // "region every K" keeps every Kth tick change; "region on" opens the file (regions are fixed
+      // from then on). At most 16 regions, 1 MiB in all.
+      std::string first, second, extra; in >> first;
+      if(first == "every") {
+        if(!(in >> second) || !sc64_capture_decimal_ok(second.c_str()) || (in >> extra)) return 7;
+        regionStride = std::strtoull(second.c_str(), nullptr, 10);
+        if(regionStride < 1 || regionStride > 1000000) return 7;
+        std::cout << "OK " << completed << std::endl; continue;
+      }
+      if(first == "on") {
+        if((in >> extra) || regionList.empty() || extraFile.is_open() || std::filesystem::exists(out / "extra.bin")) return 7;
+        extraFile.open(out / "extra.bin", std::ios::binary);
+        if(!extraFile) { std::cerr << "output open failure: extra.bin\n"; return 5; }
+        std::uint8_t header[16];
+        sc64_capture_extra_file_header(header, (std::uint32_t)regionList.size());
+        extraFile.write(reinterpret_cast<const char*>(header), sizeof header);
+        for(auto& r : regionList) {
+          std::uint8_t pair[8];
+          sc64_capture_put_le32(pair, 0x80000000u | r.offset); sc64_capture_put_le32(pair + 4, r.bytes);
+          extraFile.write(reinterpret_cast<const char*>(pair), sizeof pair);
+        }
+        events << completed << ",region_on," << regionList.size() << ' ' << regionBytes << ' ' << regionStride << '\n';
+        if(!outputsOk()) return 5;
+        std::cout << "OK " << completed << std::endl; continue;
+      }
+      std::uint32_t address = 0;
+      if(extraFile.is_open() || !parseAddress(first, &address) || !(in >> second) || !sc64_capture_decimal_ok(second.c_str()) || (in >> extra)) return 7;
+      std::uint32_t bytes = (std::uint32_t)std::strtoul(second.c_str(), nullptr, 10);
+      if(!sc64_capture_region_ok(address, bytes, regionBytes, (unsigned)regionList.size()) || address + bytes > rdram.ram.size) return 7;
+      regionList.push_back({address, bytes}); regionBytes += bytes;
+      std::cout << "OK " << completed << std::endl; continue;
     }
     if(word == "flush") {
       // Write the cartridge save (FlashRAM) through the core, as desktop ares does on unload.
@@ -727,11 +850,14 @@ int main(int argc, char** argv) {
          << " first_read_torn=" << firstReadTorn << " reads_bad_links=" << tapBadLinks << " reads_asymmetric_links=" << tapAsymmetric
          << " dual_hits=" << tapDual << " dual_differ=" << tapDualDiffer << " reads_raw_differs=" << tapRawDiffers
          << " verify_count=" << verifyCount << " verify_failures=" << verifyFailures << " verify_view_differ=" << verifyViewDiffer << '\n';
+  status << "pokes=" << pokes << " poke_bytes=" << pokeBytes << " poke_cached=" << pokeCached
+         << " extra_records=" << extraRecords << " extra_regions=" << regionList.size() << '\n';
   status.close(); pollFile.close();
   if(!outputsOk() || !status || !pollFile) { std::cerr << "output write failure\n"; return 5; }
   for(std::ofstream* stream : {&checkpoints, &regions, &commands, &ticks, &verifyLog, &events}) { stream->close(); if(!*stream) return 5; }
   if(rawRows.is_open()) { rawRows.close(); if(!rawRows) return 5; }
   if(recFile.is_open()) { recFile.close(); if(!recFile) return 5; }
+  if(extraFile.is_open()) { extraFile.close(); if(!extraFile) return 5; }
   if(watchLog.is_open()) { watchLog.close(); if(!watchLog) return 5; }
   return p.failed ? 6 : 0;
 }

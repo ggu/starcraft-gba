@@ -232,6 +232,59 @@ constexpr bool sc64_capture_file_name_ok(const char *name) {
     return true;
 }
 
+/* "poke" payload: an even number of hex digits, 1 to SC64_POKE_MAX bytes, no prefix. */
+constexpr unsigned SC64_POKE_MAX = 256;
+constexpr bool sc64_capture_hex_bytes(const char *text, std::uint8_t *out, unsigned *count) {
+    if (!text || !out || !count) return false;
+    unsigned n = 0;
+    for (; text[n]; ++n) {
+        char c = text[n];
+        unsigned digit = c >= '0' && c <= '9' ? unsigned(c - '0') : c >= 'a' && c <= 'f' ? unsigned(c - 'a' + 10)
+                       : c >= 'A' && c <= 'F' ? unsigned(c - 'A' + 10) : 16u;
+        if (digit > 15 || n >= 2 * SC64_POKE_MAX) return false;
+        if (n % 2 == 0) out[n / 2] = std::uint8_t(digit << 4);
+        else out[n / 2] = std::uint8_t(out[n / 2] | digit);
+    }
+    if (!n || n % 2) return false;
+    *count = n / 2;
+    return true;
+}
+
+/* Guest write ("poke"): raw(address, byte) stores one guest byte in RDRAM, and
+ * line(address, alias, byte) stores it in the data-cache line that indexes the
+ * address (alias 0) or that index with virtual bit 12 flipped (alias 1), only if
+ * that line holds the address, and says whether it did. Both are written, so a
+ * later guest read sees the new byte whether or not the line is cached, and a
+ * dirty line's write-back keeps it. *cached gets the number of bytes a line held. */
+template<class Raw, class Line>
+bool sc64_capture_write(std::uint32_t address, const std::uint8_t *bytes, std::size_t length, std::size_t ram_size,
+                        Raw raw, Line line, std::size_t *cached) {
+    if (!bytes || ram_size == 0 || ram_size > SC64_CAPTURE_RAM ||
+        address >= ram_size || length > ram_size - address) return false;
+    std::size_t hits = 0;
+    for (std::size_t i = 0; i < length; ++i) {
+        std::uint32_t at = address + std::uint32_t(i);
+        raw(at, bytes[i]);
+        bool first = line(at, 0, bytes[i]);
+        bool second = line(at, 1, bytes[i]);
+        hits += first || second;
+    }
+    if (cached) *cached = hits;
+    return true;
+}
+
+/* extra.bin ("region ADDR BYTES" with "tap tick rec"): an 8-byte magic
+ * "SC64XTR\0", then little-endian u32 version and region count, then per region
+ * u32 KSEG0 address and u32 byte count; then one record per recorded follow-up
+ * read: u32 step, u32 tick, u32 tick-change ordinal, then each region's bytes in
+ * guest order, in declaration order. Regions are fixed once the file is opened. */
+constexpr unsigned SC64_EXTRA_VERSION = 1, SC64_EXTRA_MAX_REGIONS = 16;
+constexpr std::uint32_t SC64_EXTRA_MAX_BYTES = 1u << 20;   /* all regions together */
+inline bool sc64_capture_region_ok(std::uint32_t offset, std::uint32_t bytes, std::uint32_t used, unsigned count) {
+    return count < SC64_EXTRA_MAX_REGIONS && bytes > 0 && bytes <= SC64_EXTRA_MAX_BYTES &&
+           used <= SC64_EXTRA_MAX_BYTES - bytes && offset < SC64_CAPTURE_RAM && bytes <= SC64_CAPTURE_RAM - offset;
+}
+
 /* FNV-1a, used only to localise a full-RAM hash difference to a 64 KiB region. */
 inline std::uint64_t sc64_capture_fnv64(const std::uint8_t *p, std::size_t n) {
     std::uint64_t h = 1469598103934665603ull;
@@ -258,5 +311,10 @@ inline void sc64_capture_tap_file_header(std::uint8_t *out24, std::uint32_t glob
     sc64_capture_put_le32(out24 + 12, SC64_TAP_HEADER_WORDS * 4);
     sc64_capture_put_le32(out24 + 16, globals_bytes);
     sc64_capture_put_le32(out24 + 20, 2 + SC64_UNIT_BYTES);
+}
+inline void sc64_capture_extra_file_header(std::uint8_t *out16, std::uint32_t regions) {
+    std::memcpy(out16, "SC64XTR\0", 8);
+    sc64_capture_put_le32(out16 + 8, SC64_EXTRA_VERSION);
+    sc64_capture_put_le32(out16 + 12, regions);
 }
 #endif

@@ -82,8 +82,8 @@ class LayoutGate(unittest.TestCase):
         layout = parity_decode.Layout()
         layout.unit_field('x', gating=True)
         with self.assertRaises(parity_decode.LayoutError):
-            layout.unit_field('order', gating=True)
-        layout.unit_field('order', gating=False)
+            layout.unit_field('shields', gating=True)
+        layout.unit_field('shields', gating=False)
         with self.assertRaises(parity_decode.LayoutError):
             layout.bank_array('gas', gating=True)
         self.assertEqual(layout.bank_array('minerals_gathered', gating=True)['status'], 'proven')

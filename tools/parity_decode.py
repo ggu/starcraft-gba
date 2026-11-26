@@ -34,6 +34,7 @@ import sc64_parity_metrics as metrics  # noqa: E402
 
 LAYOUT = ROOT / 'tools' / 'parity' / 'sc64-usa-v1.json'
 MAGIC = b'SC64TAP\0'
+EXTRA_MAGIC = b'SC64XTR\0'
 HEADER_FIELDS = ('step', 'tick', 'phase', 'live', 'seconds', 'pause', 'selector', 'running', 'countdown',
                  'table', 'flags', 'rows')
 FLAG_ROWS, FLAG_TABLE, FLAG_DUAL_DIFFER, FLAG_BAD_LINKS = 1, 2, 4, 8
@@ -81,12 +82,31 @@ class Layout:
         return self._check(f'clock.{name}', self.doc['clock'][name], gating)
 
     def status(self, key):
-        """Status of a dependency key as observations name it: unit.<f>, banks.<a>, clock.<c>."""
+        """Status of a dependency key as observations name it: unit.<f>, banks.<a>, clock.<c>,
+        pool.<sprite|image|bullet|fog_tiles>, order.<value>, player.<table>, tables.dat."""
         kind, _, name = key.partition('.')
         table = {'unit': self.doc['unit_fields'], 'banks': self.doc['globals']['banks']['arrays'],
-                 'clock': self.doc['clock']}.get(kind, {})
+                 'clock': self.doc['clock'], 'pool': self.doc.get('pools', {}),
+                 'order': self.doc.get('orders', {}).get('values', {}),
+                 'player': self.doc.get('player_tables', {}),
+                 'tables': {'dat': self.doc.get('dat_tables', {})}}.get(kind, {})
         field = table.get(name)
         return field.get('status') if isinstance(field, dict) else None
+
+    def pool(self, name, gating):
+        field = self.doc.get('pools', {}).get(name)
+        if not isinstance(field, dict):
+            raise LayoutError(f'{self.name}: no pool {name!r}')
+        return self._check(f'pool.{name}', field, gating)
+
+    def order_name(self, value, gating):
+        """Name of an order value; gating use needs that value proven."""
+        field = self.doc.get('orders', {}).get('values', {}).get(str(value))
+        if field is None:
+            if gating:
+                raise LayoutError(f'{self.name}: order value {value} is not named')
+            return f'order{value}'
+        return self._check(f'order.{value}', field, gating)['name']
 
     def require_all(self, keys):
         """Raise unless every key is a proven field (and the unit table itself is proven)."""
@@ -132,6 +152,32 @@ def read_tap(path):
         yield head, glob, rows
 
 
+def read_extra(path):
+    """extra.bin ("region ADDR BYTES" then "region on"): ([(KSEG0 address, bytes)],
+    yield of (step, tick, ordinal, [region bytes])). Format in capture_view.h."""
+    data = pathlib.Path(path).read_bytes()
+    if data[:8] != EXTRA_MAGIC:
+        raise ValueError(f'{path}: not an extra.bin file')
+    version, count = struct.unpack_from('<2I', data, 8)
+    if version != 1 or not 0 < count <= 16:
+        raise ValueError(f'{path}: unsupported extra.bin version {version} or region count {count}')
+    regions = [struct.unpack_from('<2I', data, 16 + 8 * k) for k in range(count)]
+    total = sum(n for _, n in regions)
+    at = 16 + 8 * count
+    records = []
+    while at < len(data):
+        if at + 12 + total > len(data):
+            raise ValueError(f'{path}: truncated record at byte {at}')
+        step, tick, ordinal = struct.unpack_from('<3I', data, at)
+        at += 12
+        blocks = []
+        for _, n in regions:
+            blocks.append(data[at:at + n])
+            at += n
+        records.append((step, tick, ordinal, blocks))
+    return regions, records
+
+
 class Capture:
     """One capture run: per-tick records keyed by tick value, the unpaused clock and a hash chain."""
 
@@ -145,6 +191,15 @@ class Capture:
         change = {}
         chain = hashlib.sha256()
         last_tick = None
+        self.regions, self.extra, extra_faults, joined = [], {}, 0, set()
+        if (self.run / 'extra.bin').is_file():
+            self.regions, records = read_extra(self.run / 'extra.bin')
+            for step, tick, ordinal, blocks in records:
+                if step in self.extra:
+                    extra_faults += 1   # two extra records for one step
+                self.extra[step] = {'tick': tick, 'ordinal': ordinal, 'blocks': blocks}
+            # The region list joins the chain once, so equal payloads under other addresses differ.
+            chain.update(b'extra-regions' + b''.join(struct.pack('<2I', a, n) for a, n in self.regions))
         for head, glob, rows in read_tap(self.run / 'tap.bin'):
             if head['flags'] & FLAG_DUAL_DIFFER:
                 self.faults['dual_differ'] += 1
@@ -164,6 +219,7 @@ class Capture:
             paused = change.get(tick, head)['pause'] != 0
             record = {'tick': tick, 'step': head['step'], 'paused': paused, 'selector': head['selector'],
                       'seconds': head['seconds'], 'table': bool(head['flags'] & FLAG_TABLE),
+                      'table_offset': head['table'],
                       'globals': glob, 'rows': rows}
             self.ticks.append(record)
             # Everything the measurements read: the tick, the frontend step (the
@@ -175,9 +231,24 @@ class Capture:
             for index in sorted(rows):
                 digest.update(struct.pack('>H', index))
                 digest.update(rows[index])
+            # Extra regions (extra.bin) recorded at this follow-up read join the chain; a
+            # capture without extra.bin keeps the chain it always had.
+            if head['step'] in self.extra:
+                if self.extra[head['step']]['tick'] != tick:
+                    extra_faults += 1   # an extra record that is not this follow-up read's
+                elif head['step'] in joined:
+                    extra_faults += 1   # one extra record joined twice
+                else:
+                    record['extra'] = self.extra[head['step']]['blocks']
+                    joined.add(head['step'])
+                    for block in record['extra']:   # only joined blocks enter the chain
+                        digest.update(block)
             chain.update(digest.digest())
             record['chain'] = chain.hexdigest()
         self.chain = chain.hexdigest()
+        if (self.run / 'extra.bin').is_file():
+            # Every extra record must belong to exactly one follow-up record (step and tick).
+            self.faults['extra'] = extra_faults + sum(1 for step in self.extra if step not in joined)
         followed = {r['tick'] for r in self.ticks}
         self.faults['missing_follow'] = sum(1 for t in change if t not in followed)
         # Unpaused clock: one source frame per tick whose change-step read
@@ -194,6 +265,27 @@ class Capture:
         recorded = self.manifest.get('outputs_sha256', {}).get('tap.bin')
         if not recorded or recorded != hashlib.sha256((self.run / 'tap.bin').read_bytes()).hexdigest():
             problems.append('tap.bin does not match the manifest')
+        extra = self.run / 'extra.bin'
+        recorded_extra = self.manifest.get('outputs_sha256', {}).get('extra.bin')
+        if recorded_extra and not extra.is_file():
+            problems.append('extra.bin is recorded in the manifest but missing')
+        if extra.is_file() and (not recorded_extra or recorded_extra != hashlib.sha256(extra.read_bytes()).hexdigest()):
+            problems.append('extra.bin does not match the manifest')
+        if extra.is_file():
+            # Extra-region reads count their cache-alias conflicts into status.log's totals
+            # (the tap record flag covers only the clocks, banks and rows).
+            status = self.run / 'status.log'
+            recorded_status = self.manifest.get('outputs_sha256', {}).get('status.log')
+            text = status.read_text() if status.is_file() else ''
+            if not recorded_status or recorded_status != hashlib.sha256(status.read_bytes() if status.is_file() else b'').hexdigest():
+                problems.append('status.log does not match the manifest')
+            else:
+                summary = [line for line in text.splitlines() if line.startswith('tap_reads=')]
+                values = [w.split('=', 1)[1] for w in summary[0].split() if w.startswith('dual_differ=')] \
+                    if len(summary) == 1 else []
+                if values != ['0']:
+                    problems.append('a recorded read saw two different cache-alias copies, or status.log has no '
+                                    'single tap summary (dual_differ)')
         if self.manifest.get('tape_sha256') != hashlib.sha256((self.run / 'tape.txt').read_bytes()).hexdigest():
             problems.append('tape.txt does not match the manifest')
         if not self.manifest.get('run_id'):
@@ -245,6 +337,72 @@ class Capture:
         fmt, _ = TYPES[field['type']]
         return struct.unpack_from(fmt, row_bytes, int(field['offset'], 16))[0]
 
+    def extra_bytes(self, record, address, length):
+        """Guest bytes [address, address + length) from this tick's extra.bin regions, or None
+        when no recorded region covers them."""
+        for (start, size), block in zip(self.regions, record.get('extra', ())):
+            if start <= address and address + length <= start + size:
+                return block[address - start:address - start + length]
+        return None
+
+    def fog(self, record, player, width, height, gating=True):
+        """(visible, explored) tile index sets (x + y * width) of one player at this tick,
+        read from the recorded fog tile block (the region of width * height * 4 bytes)."""
+        field = self.layout.pool('fog_tiles', gating)
+        size = width * height * field['record_bytes']
+        if sum(1 for _, n in self.regions if n == size) != 1:
+            raise LayoutError(f'{self.run.name}: not exactly one recorded region of {size} bytes for the fog tiles')
+        for (start, n), block in zip(self.regions, record.get('extra', ())):
+            if n == size:
+                # The tiles a fog block holds: no player sees a tile it has not explored.
+                if any(~block[4 * i + 3] & block[4 * i + 2] & 0xFF for i in range(width * height)):
+                    raise LayoutError(f'{self.run.name}: the {size}-byte region at {start:08x} breaks the '
+                                      'visible-within-explored rule; it is not the fog block')
+                bit = 1 << player
+                visible = {i for i in range(width * height) if not block[4 * i + 3] & bit}
+                explored = {i for i in range(width * height) if not block[4 * i + 2] & bit}
+                return visible, explored
+        return None
+
+    def unit_images(self, record, index, gating=True):
+        """The images of one live unit at this tick, primary first: dicts of the layout's
+        image fields, through its sprite (both pools read from the extra regions). Links are
+        followed from the primary image (sprite +0x18) while they stay in recorded memory."""
+        sprite_pool, image_pool = self.layout.pool('sprite', gating), self.layout.pool('image', gating)
+        self.unit(record['rows'][index], 'sprite', gating)
+        sprite = struct.unpack_from('>I', record['rows'][index], 0x0C)[0]
+        blob = self.extra_bytes(record, sprite, sprite_pool['record_bytes'])
+        if blob is None:
+            return None
+        at, out = struct.unpack_from('>I', blob, 0x18)[0], []
+        while at and len(out) < 16:
+            image = self.extra_bytes(record, at, image_pool['record_bytes'])
+            if image is None:
+                # The primary must be recorded; a linked image outside the recorded regions
+                # (a selection circle from another pool, say) ends the list.
+                return out or None
+            out.append({'address': at, 'image_id': struct.unpack_from('>H', image, 0x08)[0],
+                        'draw_function': image[0x0B], 'frame_set': struct.unpack_from('>H', image, 0x0C)[0] // 4,
+                        'frame_index': struct.unpack_from('>H', image, 0x0E)[0] >> 6,
+                        'direction': struct.unpack_from('>H', image, 0x0E)[0] & 63,
+                        'iscript_header': struct.unpack_from('>H', image, 0x14)[0],
+                        'iscript_offset': struct.unpack_from('>H', image, 0x16)[0],
+                        'animation': image[0x1A], 'wait': image[0x1B]})
+            at = struct.unpack_from('>I', image, 0x04)[0]
+        return out
+
+    def orders(self, index, gating=True):
+        """[(source frame, order value)] each time a row's order byte changes, in-mission ticks only."""
+        out = []
+        for record in self.ticks:
+            row = record['rows'].get(index)
+            if row is None or not record['table'] or record['sf'] < 0:
+                continue
+            value = self.unit(row, 'order', gating)
+            if not out or out[-1][1] != value:
+                out.append((record['sf'], value))
+        return out
+
     def seed(self):
         """The RNG words of the first in-mission tick (read back, never set)."""
         for record in self.ticks:
@@ -282,12 +440,16 @@ class Capture:
             # unproven while this list is not empty.
             'verified': not self.verified and self.manifest.get('ok') is True,
             'capture_ok': self.manifest.get('ok') is True, 'verification_problems': list(self.verified),
+            'pokes': self.manifest.get('pokes', 0), 'n64_staged': bool(self.manifest.get('n64_staged')),
+            'extra_regions': ['%08x+%d' % r for r in self.regions],
+            'extra_records': sum(1 for r in self.ticks if 'extra' in r),
         }
 
 
-def same_bundle(a, b):
+def same_bundle(a, b, allow_skips=False):
     """Two captures form a golden bundle only if they are fresh processes of the same inputs
-    whose per-tick hash chains agree."""
+    whose per-tick hash chains agree. allow_skips admits ticks without a follow-up record (busy
+    missions run some ticks one step apart); only report-only scenarios may ask for it."""
     problems = []
     for key in ('binary_sha256', 'tape_sha256', 'rom_sha256', 'mode', 'flash_input_sha256'):
         if a.manifest.get(key) != b.manifest.get(key):
@@ -298,11 +460,11 @@ def same_bundle(a, b):
         problems.append('both runs carry the same run id: a copied capture is not a second capture')
     for cap in (a, b):
         problems += [f'{cap.run.name}: {p}' for p in cap.verified]
-        if cap.faults['tick_skips'] or cap.faults['missing_follow'] > 1:
+        if not allow_skips and (cap.faults['tick_skips'] or cap.faults['missing_follow'] > 1):
             problems.append(f'{cap.run.name}: ticks skipped or missing follow-up reads {cap.faults}')
         if not cap.manifest.get('ok'):
             problems.append(f'{cap.run.name}: capture did not finish cleanly')
-        if cap.faults['dual_differ'] or cap.faults['bad_links']:
+        if cap.faults['dual_differ'] or cap.faults['bad_links'] or cap.faults.get('extra'):
             problems.append(f'{cap.run.name}: read faults {cap.faults}')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
@@ -323,17 +485,20 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         raise SystemExit('a golden bundle needs two fresh-process captures')
     if len({c.run.resolve() for c in caps}) != len(caps) or len({c.manifest.get('run_id') for c in caps}) != len(caps):
         raise SystemExit('not golden: every capture must be a different run directory with its own run id')
+    spec = metrics.SCENARIOS[scenario_id]
+    allow_skips = bool(spec.get('tick_skips_ok'))
     problems = []
     for other in caps[1:]:
-        problems += same_bundle(caps[0], other)
+        problems += same_bundle(caps[0], other, allow_skips)
     if problems:
         raise SystemExit('not golden: ' + '; '.join(problems))
-    spec = metrics.SCENARIOS[scenario_id]
     marks = [metrics.tape_commands(c.run / 'tape.txt') for c in caps]
     if any(m != marks[0] for m in marks[1:]):
         raise SystemExit(f'not golden: tape marks resolve to different steps {marks}')
     tape_steps = marks[0]
     result = spec['measure_n64'](caps[0], tape_steps)
+    if allow_skips and any(obs['gating'] for obs in result['observations']):
+        raise SystemExit(f'not golden: {scenario_id} admits tick skips, so none of its observations may gate')
     for obs in result['observations']:
         obs['n_runs'] = len(caps)
         obs['provenance'] = 'n64-ram'
@@ -346,6 +511,8 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         'timebase': 'source frames: N64 unpaused ticks; GBA simulation steps * 4 / 5',
         'observations': result['observations'], 'curves': result.get('curves', {}),
         'gba': result['gba'], 'notes': result.get('notes', []) + ([note] if note else []),
+        # A capture that wrote guest memory ("poke", owner decision 2026-11-26) is staged evidence.
+        'tags': ['n64-staged'] if any(c.manifest.get('pokes') or c.manifest.get('n64_staged') for c in caps) else [],
         'bundle': {
             'runs': [c.run.name for c in caps], 'chain': caps[0].chain, 'seed': caps[0].seed(),
             'run_ids': [c.manifest['run_id'] for c in caps],

@@ -10,7 +10,10 @@ and can compare a tick under the JIT with the same tick replayed in the
 interpreter from an in-process state. It writes whole-machine state files
 with the core's own serializer and loads one only before the first step of
 a fresh process, and it can write the cartridge save through the core. It
-never writes guest memory directly and has no host-input or debugger API.
+writes guest memory only through the explicit `poke` tape command, which the
+owner allowed for recording on 2026-11-26 (a run with any poke is staged
+evidence: its manifest records `pokes` and `n64_staged`, and goldens built
+from it carry the tag `n64-staged`). It has no host-input or debugger API.
 Results are in
 [`docs/audits/2026-11-25-parity-capture-spikes.md`](../../docs/audits/2026-11-25-parity-capture-spikes.md)
 (S1–S3) and
@@ -24,6 +27,12 @@ pins, copies the ROM (and an optional 128 KiB cartridge save and any state
 files) into a new run directory, and records every input and output hash in
 `manifest.json`, including state files the tape wrote. Run
 directories hold ROM-derived data: keep them in an ignored private folder.
+The shared lock serialises every session's captures and native builds. A
+session may name its own lock file in `SC64_CAPTURE_LOCK` to run its captures
+alongside others'; emulation does not depend on host load (S1–S3, and the
+field-map pair below: a capture run in parallel gave the same per-tick hash
+chain as one run alone), but check a parallel run against a solo one before
+relying on it, and keep to two of your own captures at a time.
 
 ## Build
 
@@ -74,6 +83,9 @@ A tape is one command per line:
 | `verify N branch\|same [full]` | Every `N` tick changes, replay the next tick in the other CPU mode (`branch`) or round-trip the state in the same mode (`same`) and compare |
 | `mode jit\|interp` | Switch CPU mode through an in-process state round trip |
 | `rawcheck` | Check the direct RDRAM copy against the core's own debugger read for all 8 MiB |
+| `pulse ADDR BYTES OP VALUE STEPS MASK HOLD GAP` | Run exactly `STEPS` steps, pressing `MASK` (`HOLD` steps on, `GAP` off) only while the field, read after the previous step, meets `OP` against `VALUE`; otherwise press nothing. Never misses. Dismisses prompts that come at unknown times: `pulse 800F0C20 2 ne 0 N 2 3 60` presses Start only while a text box holds the pause halfword, so it cannot open the pause menu. Replies `PULSE step pressed value cpu_ms` |
+| `poke ADDR HEX` | Write 1 to 256 guest bytes (an even number of hex digits) into RDRAM and into any data-cache line holding them, then read them back through the guest view (exit 8 if they differ). Logged in `events.csv`, counted in `status.log` (`pokes=`); refused before a `load`. For data only: it does not invalidate recompiled blocks or the instruction cache, so never poke guest code. A state saved after a poke stays staged: a capture that loads it records `n64_staged` and `n64_staged_inputs` |
+| `region ADDR BYTES`, `region every K`, `region on` | Declare up to 16 guest blocks (1 MiB in all); `region on` opens `extra.bin` and fixes them. While `tap tick` runs, each block is written on every follow-up read (every `K`th tick change with `region every K`). Format in `capture_view.h`; `tools/parity_decode.py` joins the blocks to the tick's record and its hash chain |
 | `peek ADDR N`, `dump NAME`, `shot NAME`, `quit` | Diagnostics |
 | `# ...` | Comment; parity tapes mark the command step with `# mark command` |
 

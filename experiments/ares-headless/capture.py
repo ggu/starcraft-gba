@@ -29,12 +29,15 @@ ROM_SHA = 'e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 MOLTENVK = pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
 MOLTENVK_SHA = '432e8880bc83e068f26e47928d01cb34c501694769e8527f34118c93946e6f99'
 ARES_COMMIT = '0aafd85789215e84e1e43415c07d4c88461b7899'
-LOCK = '/tmp/sc64-native-build-20261031.lock'
+# The shared native lock serialises captures and native builds across sessions. A session may
+# name its own lock in SC64_CAPTURE_LOCK to run its captures alongside others': emulation is
+# deterministic under host load (S1-S3), but compare such a run with a solo one before relying on it.
+LOCK = os.environ.get('SC64_CAPTURE_LOCK') or '/tmp/sc64-native-build-20261031.lock'
 FLASH_BYTES = 128 * 1024
 RESOURCES = ('ares/ares/resource/resource.cpp', 'ares/ares/resource/resource.hpp',
              'mia/resource/resource.cpp', 'mia/resource/resource.hpp')
 OUTPUTS = ('checkpoints.csv', 'regions.csv', 'ticks.csv', 'verify.csv', 'events.csv',
-           'commands.csv', 'status.log', 'polls.bin', 'ticks.raw', 'tap.bin', 'watch.csv')
+           'commands.csv', 'status.log', 'polls.bin', 'ticks.raw', 'tap.bin', 'watch.csv', 'extra.bin')
 STATE_LIMIT = 16 * 1024 * 1024  # a synchronized N64 state is 8,512,920 bytes
 NAME_CHARS = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-')
 
@@ -182,7 +185,7 @@ def main():
         tape_copy = out / 'tape.txt'
         shutil.copyfile(args.tape, tape_copy)
         check_loads(tape_copy.read_bytes().decode('utf-8', 'surrogateescape'), names)   # the tape bytes the child will read
-        states, state_sources, legacy_sources = {}, {}, {}
+        states, state_sources, legacy_sources, staged_inputs = {}, {}, {}, []
         for state in args.state_input:
             staged = out / 'input' / state.name
             shutil.copyfile(state, staged)
@@ -193,6 +196,8 @@ def main():
             # manifest beside the source file must record this digest under this name. The same
             # read supplies the provenance recorded below.
             producer = state_source(state, states[state.name], args.legacy_producer)
+            if producer is not None and (producer.get('pokes') or producer.get('n64_staged')):
+                staged_inputs.append(state.name)   # the state carries the producer's guest edits
             if not args.unrecorded_state and producer is None:
                 raise SystemExit(f'state input is not recorded by a clean producer manifest: {state} '
                              '(a state from a capture made before run ids needs --legacy-producer)')
@@ -249,6 +254,14 @@ def main():
                 else:
                     mismatched.append(name)
         manifest['states_sha256'] = saved
+        # Guest writes ("poke"): a run with any is staged evidence (fixtures tagged n64-staged).
+        pokes = [line.split(',', 2)[2] for line in (events.read_text().split('\n')[1:] if events.is_file() else [])
+                 if line.split(',', 2)[1:2] == ['poke']]
+        manifest['pokes'] = len(pokes)
+        if pokes or staged_inputs:
+            manifest['n64_staged'] = True
+        if staged_inputs:
+            manifest['n64_staged_inputs'] = staged_inputs
         if mismatched:
             manifest['states_changed_after_save'] = mismatched
         flash_out = out / 'saves' / 'Nintendo 64' / 'game.flash'
