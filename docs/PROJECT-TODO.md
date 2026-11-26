@@ -1638,6 +1638,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   A [fresh native opening sample](audits/2026-11-22-steady-order-cost.md#matched-blood-bath-credit-and-elapsed-time)
   brackets the first service claim at ares steps 5,941–5,955.
   The November 23 normal Terran release exposes Blood Bath as Free for All.
+  The [matched Blood Bath defeat](audits/2026-11-26-blood-bath-defeat-parity.md)
+  pairs two retained N64 captures with a passive physical GBA match from
+  the same four start anchors. Both lose their final structure. The GBA
+  shows four living SCVs on its result panel and retries with A or goes
+  HOME with B after a byte-identical defeat reload. Verify the native
+  result controls and last-building defeat with living workers.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
   Free for All loads or Melee rejections. Random seats and four
