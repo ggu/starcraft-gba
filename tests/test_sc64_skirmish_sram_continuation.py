@@ -34,6 +34,32 @@ class Verdict(unittest.TestCase):
     def test_valid(self):
         self.assertTrue(sram.verdict(record())["ok"])
 
+    def test_rechecking_physical_receipt_rejects_changed_cpu_seats(self):
+        r = record()
+        lobby = {"race_mode": 1, "race_human": 2, "race_bots": 1, "race_skirmish_map": 1}
+        seats = {"mask": 4, "races": "t", "base_ids": [0, 3], "start_order": 0}
+        r.update(transport="physical-buttons", human="p", bots="t", map=1,
+                 seats="--t", melee=True, saved_game_type=1, restored_game_type=1,
+                 saved_lobby=lobby, restored_lobby=lobby, launch_seats=seats,
+                 saved_seats=seats, restored_seats=seats)
+        self.assertTrue(sram.verdict(r)["ok"])
+        r["restored_seats"] = dict(seats, mask=1)
+        self.assertFalse(sram.verdict(r)["ok"])
+
+    def test_opening_rejects_wrong_faction_units_and_hall(self):
+        buildings = [(0, 0, 13, 10, 10), (1, 1, 6, 20, 20)]
+        units = [(i, 0, 9) for i in range(4)] + [(i + 4, 1, 7) for i in range(4)] + [(8, 1, 8)]
+        game = SimpleNamespace(state=lambda: {"buildings": buildings, "units": units},
+                               u32=lambda name, offset=0: 2 if name == "race_human" else 10 + 10 * (offset // 4))
+        seats = {"mask": 1, "races": "z", "base_ids": [0, 1]}
+        sram.validate_launch_seats(game, "z--", seats)
+        units[0] = (0, 0, 0)
+        with self.assertRaisesRegex(sram.ContinuationError, "opening units"):
+            sram.validate_launch_seats(game, "z--", seats)
+        buildings[0] = (0, 0, 0, 10, 10)
+        with self.assertRaisesRegex(sram.ContinuationError, "opening halls"):
+            sram.validate_launch_seats(game, "z--", seats)
+
     def test_each_failure_fails_closed(self):
         cases = {
             "restored_matches_saved": lambda r: r["restored"].update(fingerprint="c" * 64),

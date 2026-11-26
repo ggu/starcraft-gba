@@ -34,7 +34,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   have 27 checked Custom Game launches, save loads and continuations apiece.
   Prioritize ground orders in P4 and crowded three-AI windows. In P6,
   the merged burrow optimization raised the full mission replay from 15.55 to
-  16.92 updates/s. Prioritize campaign triggers, validation and trap work.
+  16.92 updates/s. Trigger validation took it to 17.32, and trap filtering
+  to 17.89 with the same victory save. Keep profiling remaining simulation
+  and drawing costs on the full replay.
   Direct reads of door and trap state saved only about 2,000 cycles/update.
   Retest visible combat at input 17,341, where actor drawing also peaks.
   See the [P6 campaign measurements](audits/2026-11-26-p6-cycle-budgets.md).
@@ -66,6 +68,11 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   Compare total guest cycles, actual bitmap
   changes, save continuation and on-device pacing. See the
   [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
+
+- **Independent skirmish seats.** The `77179474` package passed 72 additional
+  ordinary-input cases covering separated and Random seats and repeated races.
+  Retain the actual starting rosters when qualifying future lobby changes.
+  [Seat choices and save checks](audits/2026-11-22-native-custom-game-lobby.md#november-26-packaged-seat-and-roster-checks).
 
 - **Protoss against three mixed CPUs.** At world frame 11,308, the P10
   Outpost and Blood Bath windows spent 59% and 62% of guest loop time in

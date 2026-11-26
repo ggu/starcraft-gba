@@ -604,3 +604,20 @@ The initial retained state hashes to
 The native build/emulation lock serialized the run. The owned USA ROM,
 emulator, source state and other input files matched their pre-run
 hashes after the process closed.
+
+## November 26 packaged seat and roster checks
+
+All four `77179474` ROMs passed 72 additional mGBA launch, save and fresh-load cases. Each product ran six seat layouts on Outpost Free for All, Blood Bath Free for All and Blood Bath Melee. The human race rotated across the cases.
+
+| CPU row choices, left to right | Behavior exercised |
+| --- | --- |
+| Closed, Closed, Protoss | One named opponent in the last row |
+| Closed, Zerg, Closed | One named opponent in the middle row |
+| Random, Closed, Random | Two random opponents separated by a closed row |
+| Closed, Random, Random | Two random opponents starting in the middle row |
+| Terran, Terran, Terran | Three opponents of the same named race |
+| Random, Random, Random | All three choices resolve at launch |
+
+At launch the verifier read each owner's actual building and units. It checked a Command Center with four SCVs, a Hatchery with four Drones and an Overlord, or a Nexus with four Probes as appropriate, at the selected start for that owner. Each match ran 60 updates before a pause save. Loading from HOME in a new emulator preserved resolved CPU races, occupied seats, starts, game type, world state and SRAM. The next 60 updates matched the uninterrupted control. These are GBA opening and continuation checks. Native lobby observations are recorded at the top of this audit.
+
+The previous 108 package receipts also passed a fresh check of their lobby and continuation fields. They predate the stored opening rosters.
