@@ -327,18 +327,40 @@ def physical_seats(game: PhysicalGame) -> dict:
             "start_order": order, "base_ids": starts}
 
 
-def validate_launch_seats(game: PhysicalGame, requested: str, seating: dict) -> None:
+def seats_match_request(requested: str, seating: dict) -> bool:
     mask = sum(1 << i for i, race in enumerate(requested) if race != "-")
-    choices = [race for race in requested if race != "-"]
-    if seating["mask"] != mask or any(expected != "r" and expected != actual
-                                     for expected, actual in zip(choices, seating["races"])):
+    choices = requested.replace("-", "")
+    resolved = seating.get("races")
+    return (mask == seating.get("mask") and isinstance(resolved, str) and
+            len(choices) == len(resolved) and
+            all(actual in RACES and expected in ("r", actual)
+                for expected, actual in zip(choices, resolved)))
+
+
+def validate_launch_seats(game: PhysicalGame, requested: str, seating: dict) -> dict:
+    if not seats_match_request(requested, seating):
         raise ContinuationError("launched computer seats do not match the lobby")
     owners = (0, 1, 3, 4)
-    halls = sorted((row[1], row[3], row[4]) for row in game.state()["buildings"])
-    expected = sorted((owner, game.u32("race_base_x", 4 * base), game.u32("race_base_y", 4 * base))
-                      for owner, base in zip(owners, seating["base_ids"]))
+    # The starting roster IDs are shared across the race products (race_rules.h).
+    hall_types = {"t": 0, "z": 6, "p": 13}  # Command Center, Hatchery, Nexus
+    worker_types = {"t": 0, "z": 7, "p": 9}  # SCV, Drone, Probe
+    races = RACES[game.u32("race_human")] + seating["races"]
+    state = game.state()
+    halls = sorted((row[1], row[2], row[3], row[4]) for row in state["buildings"])
+    expected = sorted((owner, hall_types[race], game.u32("race_base_x", 4 * base),
+                       game.u32("race_base_y", 4 * base))
+                      for owner, race, base in zip(owners, races, seating["base_ids"]))
     if halls != expected:
         raise ContinuationError(f"opening halls do not match resolved starts: {halls} vs {expected}")
+    expected_units = []
+    for owner, race in zip(owners, races):
+        expected_units.extend([(owner, worker_types[race])] * 4)
+        if race == "z":
+            expected_units.append((owner, 8))  # Overlord
+    units = sorted((row[1], row[2]) for row in state["units"])
+    if units != sorted(expected_units):
+        raise ContinuationError(f"opening units do not match the factions: {units} vs {sorted(expected_units)}")
+    return {"halls": halls, "units": units}
 
 
 def verdict(record: dict) -> dict:
@@ -365,6 +387,23 @@ def verdict(record: dict) -> dict:
         "continued": record["reference"]["frame"] > record["saved"]["frame"] and record["continue"] >= 60,
         "world_has_opponents": record["saved"].get("buildings", 0) > 0 and record["saved"].get("units", 0) > 0,
     }
+    if record.get("transport") == "physical-buttons":
+        expected_lobby = {"race_mode": 1, "race_human": RACES.index(record["human"]),
+                          "race_bots": len(record["bots"]), "race_skirmish_map": record["map"]}
+        checks["lobby_matches"] = record.get("saved_lobby") == record.get("restored_lobby") == expected_lobby
+        checks["game_updates_match"] = (
+            record["reference"]["frame"] - record["saved"]["frame"] == record["continue"] and
+            record["resumed"]["frame"] - record["restored"]["frame"] == record["continue"])
+        if "saved_game_type" in record or "restored_game_type" in record or record.get("melee"):
+            # Older receipts recorded the resolved game type only.
+            expected_type = int(record["melee"]) if "melee" in record else record.get("saved_game_type")
+            checks["game_type_matches"] = (expected_type in (0, 1) and
+                record.get("saved_game_type") == record.get("restored_game_type") == expected_type)
+        if "seats" in record:
+            launch = record.get("launch_seats")
+            checks["seats_and_resolved_starts_match"] = (isinstance(launch, dict) and
+                seats_match_request(record["seats"], launch) and
+                launch == record.get("saved_seats") == record.get("restored_seats"))
     return {"ok": all(checks.values()), "checks": checks}
 
 
@@ -402,7 +441,7 @@ def run(args) -> dict:
         game.launch(args.map, human, bots, **lobby_options)
         if seats is not None:
             record["launch_seats"] = physical_seats(game)
-            validate_launch_seats(game, seats, record["launch_seats"])
+            record["opening_roster"] = validate_launch_seats(game, seats, record["launch_seats"])
         game.step(0, args.play)
         if game.u32("screen") != SCREEN_PLAY:
             raise ContinuationError("match ended before the save point")
@@ -458,24 +497,10 @@ def run(args) -> dict:
     finally:
         game.close()
     record["sram_unchanged"] = after.read_bytes() == data
-    record.update(verdict(record))
     if use_physical:
         record["transport"] = "physical-buttons"
-        record["checks"]["lobby_matches"] = record["saved_lobby"] == record["restored_lobby"] == {
-            "race_mode": 1, "race_human": human, "race_bots": len(bots),
-            "race_skirmish_map": args.map}
-        record["checks"]["game_updates_match"] = (
-            record["reference"]["frame"] - record["saved"]["frame"] == args.continue_updates and
-            record["resumed"]["frame"] - record["restored"]["frame"] == args.continue_updates)
-        record["ok"] = record["ok"] and record["checks"]["lobby_matches"] and record["checks"]["game_updates_match"]
-        if "saved_game_type" in record or melee:
-            record["checks"]["game_type_matches"] = (
-                record.get("saved_game_type") == record.get("restored_game_type") == int(melee))
-            record["ok"] = record["ok"] and record["checks"]["game_type_matches"]
-    if seats is not None:
-        record["checks"]["seats_and_resolved_starts_match"] = (
-            record["launch_seats"] == record["saved_seats"] == record.get("restored_seats"))
-        record["ok"] = record["ok"] and record["checks"]["seats_and_resolved_starts_match"]
+        record["melee"] = melee
+    record.update(verdict(record))
     for home in out.glob("phase*/home"):
         for path in sorted(home.rglob("*"), reverse=True):
             path.unlink() if path.is_file() or path.is_symlink() else path.rmdir()
