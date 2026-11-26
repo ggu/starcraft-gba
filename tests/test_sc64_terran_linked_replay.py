@@ -34,6 +34,40 @@ class CheckpointTests(unittest.TestCase):
             linked.compare(7, {k: v for k, v in row.items() if k != 'race_completed'}, got, previous, 12)
 
 
+    def test_t8_checks_expected_fields_and_retains_prior_bits(self):
+        row = dict.fromkeys(linked.T8_FIELDS, 0)
+        previous = sum(1 << i for i in range(4, 11)) | (1 << 28)
+        row['race_completed'] = 1 << 11
+        got = dict(row, race_completed=previous | (1 << 11))
+        linked.compare(8, row, got, previous, -1)
+        got['hostile_buildings'] += 1
+        with self.assertRaises(ValueError):
+            linked.compare(8, row, got, previous, -1)
+
+    def test_t9_checks_every_field_with_inherited_bits(self):
+        row = dict.fromkeys(linked.T9_FIELDS, 0)
+        previous = sum(1 << i for i in range(4, 12)) | (1 << 28)
+        row['race_completed'] = 1 << 12
+        got = dict(row, race_completed=previous | (1 << 12))
+        linked.compare(9, row, got, previous, -1)
+        for field in linked.T9_FIELDS:
+            changed = dict(got)
+            changed[field] += 1
+            with self.assertRaises(ValueError):
+                linked.compare(9, row, changed, previous, -1)
+
+    def test_t10_checks_every_field_with_inherited_bits(self):
+        row = dict.fromkeys(linked.T10_FIELDS, 0)
+        previous = sum(1 << i for i in range(4, 13)) | (1 << 28)
+        row['race_completed'] = 1 << 13
+        got = dict(row, race_completed=previous | (1 << 13))
+        linked.compare(10, row, got, previous, -1)
+        for field in linked.T10_FIELDS:
+            changed = dict(got)
+            changed[field] += 1
+            with self.assertRaises(ValueError):
+                linked.compare(10, row, changed, previous, -1)
+
 
 if __name__ == '__main__':
     unittest.main()
