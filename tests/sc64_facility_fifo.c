@@ -158,7 +158,11 @@ static void run_map(int w, int h)
         query(10 + i, x, y, origin, i & 1 ? edge : 0, -1, 0);
     }
 #if defined(TEST_FACILITY_OVERFLOW)
+#ifdef SC64_ROUTE_FACILITY_FIFO_WIDE_ONLY
+    assert((fallbacks > before) == (w == 128 && h == 128));
+#else
     assert((fallbacks > before) == (w == 64 || w == 96 || w == 128));
+#endif
 #else
     assert(fallbacks == before);
 #endif

@@ -106,3 +106,62 @@ limited IWRAM reserve on this candidate.
 | Current P10 replay | `b7b4338b5fc5b30b34d835762ab3754cb3483d59bd24d3cc12f16f8789922804` |
 | Candidate P10 replay | `61715d3c51d11331ed4fcee71494eaada4ab3ace0e5a9cdfdeec0e747587d5ff` |
 | Identical 19 video and state samples | `be8a3a0d003d7f23ae90082b35c294ac39f56fe0a8843aca2bbd0dcb3775be7b` |
+
+## Current Z10 wide-only retest (November 26)
+
+On the `91171987` composition, the opt-in wide-only FIFO keeps its kernel
+in ROM and dispatches only on 128×128 maps. The 64×64 frontier optimization
+must remain enabled: the first build accidentally excluded it whenever the
+FIFO flag was present. In a paired Terran Outpost profile that lost 30
+frontier and 47 dense expansions and added 43,115,663 cycles to facility
+lookups. The corrected preprocessor condition permits both options; the
+frontier scratch is reserved only on 64×64 maps, with explicit bounds and
+point-tail lifetime guards, whereas the new FIFO dispatch is 128×128.
+
+In four 2,048-update, three-AI busy custom continuations beginning at frame
+10,000, corrected costs changed by +0.00087% (Terran Outpost), +0.00091%
+(Protoss Outpost), +0.00199% (Protoss Blood Bath), and +0.00268% (Zerg
+Blood Bath melee). All 256 sampled worlds, actors, fog, both framebuffer
+pages, palette and displayed page matched; fresh save reloads matched in
+all four. A whole-window profile retained the same 3,049 facility lookups,
+including 30 frontier and 47 dense expansion calls.
+
+The retained Z7 battle seed and 4,901 ordinary inputs cost 8,255,076,504
+cycles on the current control and 7,730,499,579 on the corrected candidate
+(−6.35%). All 72 sampled states, world arrays, both framebuffer pages and
+palettes matched. At one sample, tape tick 137187, the display page selector
+differed even though the page contents matched; this is an observed
+presentation-phase difference and is not counted as exact displayed-video
+agreement. An earlier Z6 continuation of the first candidate showed one
+such difference across neighboring inputs 70–110: at input 88, 225 of
+38,400 palette-resolved pixels differed, with matching state and page
+contents. Do not infer identical display timing from these results.
+
+These are emulated guest-cycle results, not physical GBA timing. Candidate
+Z10 ROM SHA-256 is
+`1dab164dbc409a63ec6db61ed2b3c93de165007a47444f674159ec367c7a776c`.
+The dedicated FIFO tests including overflow and sanitizer configurations
+pass. Corrected Z1, Z5, Z6, Z8 and Z9 256-input continuations each match
+all 65 sampled semantic snapshots and fresh-reload SRAM. Total cycles
+change by +0.0006%, 0.0000%, +0.0528%, −0.0595% and +0.0397%,
+respectively. Both pages and palettes match throughout; the Z9 displayed
+page differs at the sampled input 76 only. The original, frontier-disabled
+candidate completed the full Z7 route with all 45 state/world checkpoints
+and victory/reload SRAM matching the current control; it took
+145,473,761,161 versus 146,796,890,834 guest cycles. The corrected candidate also completed the full Z7 route with all 45
+state/world checkpoints matching the control, winning at frame 267585
+without faults. Its victory SRAM and fresh reload match the control
+(`4e8266b1564444a72c820568931c730875b82f29ae5b75cd3ba8f8951dd72722`).
+The full route took 145,496,243,147 versus 146,796,890,834 guest cycles
+(−0.886%). A normal Z10 make build on release base `062fdcac` produces
+the same `1dab164d` ROM and passes its stack and ROM checks. Enable this
+wide-only path in Z10; retain the existing defaults for the other products.
+
+Additional corrected opt-in product checks: T4 frame 4968 plus 256 inputs
+matched cycles, state and save exactly; P4 frame 986 plus 256 inputs cost
++0.0813%, matching 65 state/video samples and SRAM. From a P6 Zeratul rescue
+save at frame 51300, the final 458 ordinary inputs reached victory at frame
+51746 in 354,311,203 cycles on each build, with 59 sampled full states,
+`race_p6`, video and fresh saves matching. These limited T/P windows do not
+establish a benefit for enabling their products. The corrected Z10 product
+also passed 45 lobby and ten chapter-result checks.

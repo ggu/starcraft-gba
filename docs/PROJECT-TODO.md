@@ -3344,7 +3344,14 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the Z7 window and one 64×64 SRAM continuation pass. A current P10
   rerun with a smaller wide-only FIFO matches the win but raises mean
   cycles by 0.21%, with only 24 IWRAM bytes to the Showcase guard. Keep
-  it off. The [typed save reader](audits/2026-11-13-typed-save-reader.md)
+  it off. A November 26 Z10 wide-only retest now saves 6.35% over the
+  4,901-input Z7 battle while preserving the 64×64 frontier path; four
+  busy custom continuations change by +0.00087% to +0.00268%. One Z7
+  sample has a different displayed page despite matching framebuffers.
+  The [updated audit](audits/2026-11-13-bounded-facility-fifo.md#current-z10-wide-only-retest-november-26)
+  records the full corrected win, matching 45 checkpoints and fresh SRAM.
+  Enable it for Z10 only; other product benefit remains unproven. The
+  [typed save reader](audits/2026-11-13-typed-save-reader.md)
   cuts the P10 result update from 76.50M to 37.51M cycles with the same
   pause/result journals and fresh-load win. Keep it opt-in until broader
   save and hardware checks. Next: reduce facility grid conversion and the
