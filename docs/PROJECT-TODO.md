@@ -267,7 +267,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   64,147. Z5 then matched all 14 recorded stage worlds and won at frame
   18,974. The old Z6 route ended without victory. Paid reinforcements and
   a replacement assault cleared Z6 at frame 212,428 and its fresh result
-  reloaded with all six bits. Continue from the Z6 readback through Z7–Z10.
+  reloaded with all six bits. Z7 continued from that save, matched all 206
+  same-cartridge observations and won at frame 267,585.
   The previous Z8 recording diverges at call 9,696. The optional
   `--gather-west` controller cleared Z8 from HOME with Kerrigan at full
   health. Qualify the same route from the linked Z7 result.

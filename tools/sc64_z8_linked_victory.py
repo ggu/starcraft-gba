@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Replay a modal-aware Z8 controller trace from HOME or the linked Z7 victory."""
 import argparse
+from bisect import bisect_left
 import json
 from pathlib import Path
 
@@ -57,14 +58,22 @@ def main():
             first = checks[0]['call_index']
             cut = first - g.rsp.completed
             events = [(t - cut, key) for t, key in events if t >= first]
+        times = [tick for tick, _ in events]
         for ref in checks:
             tick = ref['call_index']
-            g.rsp.play_to(tick - cut, events)
+            # Keep a single debugger request short even when macOS is busy.
+            end = tick - cut
+            while g.rsp.completed < end:
+                first = g.rsp.completed
+                stop = min(end, first + 32)
+                g.rsp.play_to(stop, events[bisect_left(times, first):bisect_left(times, stop)])
+
             world = g.state()
             actual = observe(g, world)
             diff = {k: [ref[k], v] for k, v in actual.items() if ref[k] != v}
             require(not diff, f'Z8 call {tick}: {diff}')
             records.append(dict(tick=tick, **actual))
+            print(f"Matched Z8 call {tick}, frame {actual['frame']}", flush=True)
         require(g.u32('mission_unsupported_count') == 0 and actual['screen'] == 3 and actual['lost'] == 0
                 and actual['kerrigan'] > 0 and actual['nexus'] == [-1, -1]
                 and g.u32('race_completed') == prior | (1 << 19), 'incomplete Z8 victory')
