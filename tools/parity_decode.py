@@ -51,6 +51,12 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
+# Shield-bearing unit and building ids (units.dat order): Protoss units and heroes from the Corsair
+# (60) to Artanis (88) except the Zerg Devourer (62), and Protoss buildings from the Nexus (154) to
+# the Shield Battery (172) except the Stasis Cell/Prison (168).
+PROTOSS_TYPES = (frozenset(range(60, 89)) - {62}) | (frozenset(range(154, 173)) - {168})
+
+
 class LayoutError(Exception):
     """A field was asked for that the layout does not allow for that use."""
 
@@ -263,7 +269,9 @@ class Capture:
                              f'memory ({limit}; SC64_PARITY_MAX_CAPTURE_BYTES); record a shorter window or every Kth tick')
         self.verified = self._verify_artifacts()
         self.ticks = []          # follow-up records in tick order: dicts
-        self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0}
+        self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0,
+                       'skipped_ticks': 0, 'unexplained_skips': 0, 'interior_missing': 0}
+        skips = []   # (record index, skipped tick values) for ticks that began and ended inside one step
         change = {}
         chain = hashlib.sha256()
         last_tick = None
@@ -291,6 +299,12 @@ class Capture:
             tick = head['tick']
             if last_tick is not None and tick != (last_tick + 1) & 0xFFFFFFFF:
                 self.faults['tick_skips'] += 1
+                gap = (tick - last_tick) & 0xFFFFFFFF
+                if 0 < gap <= 8:
+                    skips.append((len(self.ticks), [(last_tick + k) & 0xFFFFFFFF for k in range(1, gap)]))
+                else:
+                    # A backward step or a long jump cannot be explained by change-step reads.
+                    self.faults['unexplained_skips'] += 1
             last_tick = tick
             paused = change.get(tick, head)['pause'] != 0
             record = {'tick': tick, 'step': head['step'], 'paused': paused, 'selector': head['selector'],
@@ -331,10 +345,32 @@ class Capture:
             self.faults['extra'] = extra_faults + sum(1 for step in self.extra if step not in joined)
         followed = {r['tick'] for r in self.ticks}
         self.faults['missing_follow'] = sum(1 for t in change if t not in followed)
+        # Interior misses only: the tap can start on a change step, and the run ends after one.
+        lo, hi = (min(followed), max(followed)) if followed else (0, -1)
+        self.faults['interior_missing'] = sum(1 for t in change if t not in followed and lo < t < hi)
+        # A tick that began and ended inside one frontend step has a change-step read (its
+        # pause state) but no follow-up record: it still advances the clock when it ran
+        # unpaused. A skipped tick with no change-step read leaves the clock unknown.
+        # A genuine skip: the next tick's change read comes on the very next frontend step, so
+        # there was no step left for a follow-up read. Anything else is data loss.
+        extra = {}
+        for index, skipped in skips:
+            self.faults['skipped_ticks'] += len(skipped)
+            for value in skipped:
+                nxt = change.get((value + 1) & 0xFFFFFFFF)
+                if value not in change or nxt is None or nxt['step'] != change[value]['step'] + 1:
+                    self.faults['unexplained_skips'] += 1
+                elif change[value]['pause'] == 0:
+                    extra.setdefault(index, []).append(change[value]['step'])
         # Unpaused clock: one source frame per tick whose change-step read
         # showed no pause; numbered from the first in-mission (table) tick.
         clock = -1
-        for record in self.ticks:
+        self.skipped_frames = []   # (frontend step of the change read, source frame) of skipped ticks
+        for index, record in enumerate(self.ticks):
+            if record['table'] and clock >= 0:
+                for step in extra.get(index, []):
+                    clock += 1
+                    self.skipped_frames.append((step, clock))
             if record['table'] and not record['paused']:
                 clock += 1
             record['sf'] = clock
@@ -406,6 +442,29 @@ class Capture:
             if not staged.is_file() or file_sha256(staged) != digest:
                 problems.append(f'state input {name} does not match the manifest')
         return problems
+
+    def world_point(self, step):
+        """The world point under the cursor (camera s32 + cursor u16, S6) before frontend step
+        `step`, from the run's watch.csv, which must be the log the capture wrote. A compiled
+        tape's order acts at this point, so the GBA lab replays it."""
+        watch = self.run / 'watch.csv'
+        recorded = self.manifest.get('outputs_sha256', {}).get('watch.csv')
+        if not watch.is_file() or recorded != hashlib.sha256(watch.read_bytes()).hexdigest():
+            raise ValueError(f'{self.run}: watch.csv is missing or does not match the manifest')
+        # Only full-width samples count: camera words are 4 bytes, cursor halfwords 2.
+        width = {'800a2ee8': '4', '800a2eec': '4', '800afdcc': '2', '800afdce': '2'}
+        last = {}
+        for line in watch.read_text().splitlines()[1:]:
+            at, _, address, nbytes, value = line.split(',')
+            if int(at) > step:
+                break
+            if width.get(address) == nbytes:
+                last[address] = int(value, 16)
+        need = tuple(width)
+        if any(a not in last for a in need):
+            raise ValueError(f'{self.run}: the tape did not watch the camera and cursor before step {step}')
+        signed = lambda v: v - (1 << 32) if v & 0x80000000 else v
+        return signed(last['800a2ee8']) + last['800afdcc'], signed(last['800a2eec']) + last['800afdce']
 
     def bank(self, record, array, owner, gating=True):
         field = self.layout.bank_array(array, gating)
@@ -496,8 +555,12 @@ class Capture:
                 return record['globals'][0xC0:0xCC].hex()
         return None
 
-    def series(self, gating=True):
-        """Normalised time series for tools/sc64_parity_metrics.py, N64 map pixels."""
+    def series(self, gating=True, hp=False, shields=False):
+        """Normalised time series for tools/sc64_parity_metrics.py, N64 map pixels.
+
+        With hp=True each frame also carries 'hp': {row: hit points} (the 8.8
+        fixed-point field divided by 256), and with shields=True 'shield' (the
+        same for +0x60), for the unit-class labs."""
         frames = []
         for record in self.ticks:
             if not record['table'] or record['paused'] or record['sf'] < 0:
@@ -508,9 +571,17 @@ class Capture:
                                 self.unit(row, 'x', gating), self.unit(row, 'y', gating))
             banks = {owner: (self.bank(record, 'minerals', owner, gating),
                              self.bank(record, 'minerals_gathered', owner, gating)) for owner in range(12)}
-            frames.append({'sf': record['sf'], 'step': record['step'], 'tick': record['tick'],
-                           'units': units, 'banks': banks})
-        return {'source': 'n64', 'scale': 1, 'frames': frames}
+            frame = {'sf': record['sf'], 'step': record['step'], 'tick': record['tick'],
+                     'units': units, 'banks': banks}
+            if hp:
+                frame['hp'] = {index: self.unit(row, 'hp', gating) / 256.0 for index, row in record['rows'].items()}
+            if shields:
+                # Protoss rows only: other races' rows hold a constant 100 there (layout evidence).
+                frame['shield'] = {index: self.unit(row, 'shields', gating) / 256.0
+                                   for index, row in record['rows'].items()
+                                   if units[index][0] in PROTOSS_TYPES}
+            frames.append(frame)
+        return {'source': 'n64', 'scale': 1, 'frames': frames, 'skipped': list(getattr(self, 'skipped_frames', []))}
 
     def summary(self):
         mission = [r for r in self.ticks if r['table']]
@@ -546,7 +617,10 @@ def same_bundle(a, b, allow_skips=False):
         problems.append('both runs carry the same run id: a copied capture is not a second capture')
     for cap in (a, b):
         problems += [f'{cap.run.name}: {p}' for p in cap.verified]
-        if not allow_skips and (cap.faults['tick_skips'] or cap.faults['missing_follow'] > 1):
+        # Skipped ticks are allowed only when each has its change-step read (so the clock is
+        # exact) and both runs skip the same ticks; scenarios that admit others gate nothing.
+        if not allow_skips and (cap.faults['unexplained_skips'] or
+                                cap.faults['interior_missing'] > cap.faults['skipped_ticks']):
             problems.append(f'{cap.run.name}: ticks skipped or missing follow-up reads {cap.faults}')
         if not cap.manifest.get('ok'):
             problems.append(f'{cap.run.name}: capture did not finish cleanly')
@@ -554,6 +628,11 @@ def same_bundle(a, b, allow_skips=False):
             problems.append(f'{cap.run.name}: read faults {cap.faults}')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
+    if a.faults != b.faults:
+        problems.append(f'read faults differ between the runs ({a.faults} vs {b.faults})')
+    # Skipped ticks advance the clock from their change-step reads, which the chain does not cover.
+    if [r['sf'] for r in a.ticks] != [r['sf'] for r in b.ticks] or a.skipped_frames != b.skipped_frames:
+        problems.append('the unpaused clocks differ between the runs')
     if len(a.ticks) != len(b.ticks):
         problems.append(f'record counts differ ({len(a.ticks)} vs {len(b.ticks)})')
     for ra, rb in zip(a.ticks, b.ticks):
@@ -640,13 +719,51 @@ def write_golden(scenario_id, runs, home, layout, note=None):
     if any(m != marks[0] for m in marks[1:]):
         raise SystemExit(f'not golden: tape marks resolve to different steps {marks}')
     tape_steps = marks[0]
+    # The chain covers unit rows, not the cursor: every mark must have been given at the same
+    # world point in each run. A run without a verified point beside one with it is refused;
+    # tapes that never watched the cursor (all runs without) are left to their measurement.
+    def watches_view(words):
+        # Any watch of a camera or cursor word, however its width is spelled: the frontend takes
+        # a physical offset or its KSEG0/KSEG1 alias, any case, optional 0x. world_point() then
+        # uses only full-width samples.
+        if len(words) < 2 or words[0] != 'watch':
+            return False
+        text = words[1][2:] if words[1][:2].lower() == '0x' else words[1]
+        try:
+            value = int(text, 16)
+        except ValueError:
+            return False
+        return value & 0x1FFFFFFF in (0x000A2EE8, 0x000A2EEC, 0x000AFDCC, 0x000AFDCE) and value >> 29 in (0, 4, 5)
+    tapes = [list(metrics.frontend_lines((c.run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape')))
+             for c in caps]
+    watched = [any(watches_view(w) for w in words) for words in tapes]
+    if any(watched) and any(w[:2] == ['watch', 'off'] for words in tapes for w in words):
+        raise SystemExit('not golden: a tape that watches the cursor clears its watches (`watch off`), '
+                         'so its logged points cannot be tied to the marks')
+    for name, step in tape_steps.items():
+        if not any(watched):
+            break   # a tape that never watched the cursor (the S4 tapes): nothing to compare
+        points = []
+        for c in caps:
+            try:
+                points.append(c.world_point(step))
+            except ValueError:
+                points.append(None)
+        if None in points or any(p != points[0] for p in points):
+            raise SystemExit(f'not golden: mark {name} has no single verified world point across the runs {points}')
     result = spec['measure_n64'](caps[0], tape_steps)
-    staged = any(c.manifest.get('pokes') or c.manifest.get('n64_staged') for c in caps)
     if allow_skips and any(obs['gating'] for obs in result['observations']):
         raise SystemExit(f'not golden: {scenario_id} admits tick skips, so none of its observations may gate')
+    # A tape that writes guest memory (`poke`, owner decision 2026-11-26) stages its
+    # situation: its evidence is labelled n64-staged, never plain n64-ram.
+    # A compiled tape whose start state came from such a run says so in a `# n64-staged` line.
+    tape_text = (caps[0].run / 'tape.txt').read_bytes().decode('utf-8', 'surrogateescape')
+    staged = (any(w[0] == 'poke' for w in metrics.frontend_lines(tape_text)) or
+              any(line.startswith('# n64-staged') for line in tape_text.split('\n')) or
+              any(c.manifest.get('pokes') or c.manifest.get('n64_staged') for c in caps))
     for obs in result['observations']:
         obs['n_runs'] = len(caps)
-        obs['provenance'] = 'n64-ram'
+        obs['provenance'] = 'n64-staged' if staged else 'n64-ram'
         obs['layout_fields'] = sorted(set(obs.get('layout_fields', [])))
         if obs['gating']:
             layout.require_all(obs['layout_fields'])

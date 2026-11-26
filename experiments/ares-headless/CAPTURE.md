@@ -99,6 +99,7 @@ A tape is one command per line:
 | `tap off\|tick\|step [raw [K]] [rec]` | Read rows and clocks on each tick change and the step after it, or every step; `raw` also writes live rows to `ticks.raw`, for every `K`th tick change only when a number `K` follows `raw`; `rec` writes `tap.bin` (clocks, the four bank arrays and RNG words on every read, live rows on the follow-up read; format in `capture_view.h`, decoded by `tools/parity_decode.py`). Options may come in either order |
 | `watch ADDR BYTES`, `watch off` | Log a 1, 2 or 4-byte field to `watch.csv` on every step where it changes (up to 32 fields); `off` clears them |
 | `until ADDR BYTES OP VALUE MAX MASK X Y [HOLD GAP]` | Hold the pad until the field, read after each step, meets `OP` (`eq`, `ne`, `ge`, `lt`, `changed`, `set`, `clear`) against hex `VALUE`, for at most `MAX` steps. With `HOLD GAP` the buttons are pulsed (pressed `HOLD` steps, released `GAP` steps) while the axes stay held. Replies `UNTIL step steps value cpu_ms`; a miss replies `UNTILMISS` and ends the run with exit code 9 |
+| `untilw x\|y OP VALUE MAX MASK X Y` | Like `until`, on the world point under the cursor: camera (s32 `0x800A2EE8`/`0x800A2EEC`) plus cursor (u16 `0x800AFDCC`/`0x800AFDCE`) on that axis, compared signed (`eq`, `ne`, `ge`, `lt`) with a signed decimal `VALUE`. The camera may scroll or pan during the wait, so a tape aims at world points without knowing where a pan stopped. Replies `UNTILW step steps value cpu_ms`; a miss replies `UNTILWMISS` and ends the run with exit code 9 |
 | `save NAME.state` | Write the whole-machine state (the bytes desktop ares writes to a slot file) to `NAME.state` in the run directory. Under the JIT this changes the rest of the run, because the pinned core resets its recompilers on serialize: a run compared with one that loads the state must save at the same step |
 | `load NAME [STEP]` | Before the first step only: restore `input/NAME` (staged with `--state-input`) and number later steps from `STEP`. The file must have this core's state size and header. The run keeps its current CPU mode (the startup mode, or one set by an earlier `mode` line). `capture.py` stages only states recorded in the `manifest.json` beside them (`states_sha256` of the run that wrote them), because the core trusts a state's payload |
 | `flush` | Write the cartridge save through the core to `saves/Nintendo 64/game.flash` |
@@ -110,6 +111,10 @@ A tape is one command per line:
 | `region ADDR BYTES`, `region every K`, `region on` | Declare up to 16 guest blocks (1 MiB in all); `region on` opens `extra.bin` and fixes them. While `tap tick` runs, each block is written on every follow-up read (every `K`th tick change with `region every K`). Format in `capture_view.h`; `tools/parity_decode.py` joins the blocks to the tick's record and its hash chain |
 | `peek ADDR N`, `dump NAME`, `shot NAME`, `quit` | Diagnostics |
 | `# ...` | Comment; parity tapes mark the command step with `# mark command` |
+
+Tapes for the parity labs are compiled from scenario files by
+`tools/sc64_tape_compile.py` rather than written by hand
+([`docs/PARITY-HARNESS.md`](../../docs/PARITY-HARNESS.md#tape-compiler)).
 
 Pad mask bits: A 1, Start 2, Down 4, C-Left 8, D-pad Right 16, R 32,
 C-Right 64, C-Up 128, C-Down 256, B 512, Z 1024, L 2048, D-pad Up 4096,

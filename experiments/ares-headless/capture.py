@@ -5,7 +5,7 @@
 The tape is passed to the child's stdin line by line. Lines are frontend
 commands ("steps mask x y", "hash", "every N", "tap off|tick|step [raw [K]] [rec]",
 "verify N branch|same [full]", "mode jit|interp", "watch ADDR BYTES|off",
-"until ADDR BYTES OP VALUE MAX MASK X Y [HOLD GAP]", "save NAME.state",
+"until ADDR BYTES OP VALUE MAX MASK X Y [HOLD GAP]", "untilw x|y OP VALUE MAX MASK X Y", "save NAME.state",
 "load NAME [STEP]",
 "flush", "peek ADDR N", "dump NAME", "shot NAME", "quit"); see CAPTURE.md.
 State files given with --state-input are copied into the run's input/

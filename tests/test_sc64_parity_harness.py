@@ -40,13 +40,16 @@ def row(x, y, owner=HUMAN, typ=metrics.MARINE):
     return bytes(data)
 
 
-def write_capture(run, frames, pause_ticks=(), command_step=100, tamper_tick=None, step_shift_tick=None):
+def write_capture(run, frames, pause_ticks=(), command_step=100, tamper_tick=None, step_shift_tick=None,
+                  skip_follow=(), skip_change=(), loose_skip=False):
     """A capture directory: tap.bin with one tick per two frontend steps, a
     manifest and a tape whose '# mark command' falls at command_step."""
     run.mkdir(parents=True)
     out = bytearray(b'SC64TAP\0' + struct.pack('<4I', 1, 48, 0xCC, 314))
     for tick, units in enumerate(frames, start=1):
         step = 2 * tick + (1 if step_shift_tick is not None and tick >= step_shift_tick else 0)
+        if tick - 1 in skip_follow and not loose_skip:
+            step -= 1   # a genuine skip: this tick changed on the step after the skipped one
         glob = bytearray(0xCC)
         gathered = 8 * (tick // 20)
         struct.pack_into('>I', glob, 4 * HUMAN, 50 + gathered)
@@ -56,6 +59,8 @@ def write_capture(run, frames, pause_ticks=(), command_step=100, tamper_tick=Non
         pause = 1 if tick in pause_ticks else 0
         rows = b''.join(struct.pack('>H', i) + row(*u) for i, u in sorted(units.items()))
         for phase, flags, data in ((0, 2, b''), (1, 3, rows)):
+            if (phase and tick in skip_follow) or (not phase and tick in skip_change):
+                continue   # a tick that began and ended inside one frontend step
             out += struct.pack('<12I', step + phase, tick, phase, len(units), 0, pause, 4, 1, 0, 0x300000, flags,
                                len(units) if phase else 0)
             out += glob + data
@@ -82,8 +87,8 @@ class LayoutGate(unittest.TestCase):
         layout = parity_decode.Layout()
         layout.unit_field('x', gating=True)
         with self.assertRaises(parity_decode.LayoutError):
-            layout.unit_field('shields', gating=True)
-        layout.unit_field('shields', gating=False)
+            layout.unit_field('order_state', gating=True)
+        layout.unit_field('order_state', gating=False)
         with self.assertRaises(parity_decode.LayoutError):
             layout.bank_array('gas', gating=True)
         self.assertEqual(layout.bank_array('minerals_gathered', gating=True)['status'], 'proven')
@@ -103,11 +108,54 @@ class Decoder(unittest.TestCase):
             write_capture(run, marine_frames(30), pause_ticks={5, 6})
             cap = parity_decode.Capture(run)
             self.assertEqual(len(cap.ticks), 30)
-            self.assertEqual(cap.faults, {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0})
+            self.assertEqual(cap.faults, {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0,
+                                          'skipped_ticks': 0, 'unexplained_skips': 0, 'interior_missing': 0})
             series = cap.series()
             self.assertEqual(len(series['frames']), 28)  # two paused ticks take no source frame
             self.assertEqual([f['sf'] for f in series['frames']][:5], [0, 1, 2, 3, 4])
             self.assertEqual(series['frames'][0]['units'][0], (metrics.MARINE, HUMAN, 100, 200))
+
+    def test_skipped_tick_keeps_the_clock(self):
+        with tempfile.TemporaryDirectory() as temp:
+            a, b = pathlib.Path(temp) / 'a', pathlib.Path(temp) / 'b'
+            write_capture(a, marine_frames(30), skip_follow={10})
+            write_capture(b, marine_frames(30), skip_follow={10})
+            cap = parity_decode.Capture(a)
+            self.assertEqual((cap.faults['tick_skips'], cap.faults['skipped_ticks'], cap.faults['unexplained_skips'],
+                              cap.faults['missing_follow']), (1, 1, 0, 1))
+            sfs = [f['sf'] for f in cap.series()['frames']]
+            self.assertEqual(len(sfs), 29)
+            self.assertEqual(sfs[7:10], [7, 8, 10])   # tick 10 ran unpaused: its frame is not sampled
+            self.assertEqual(parity_decode.same_bundle(cap, parity_decode.Capture(b)), [])
+            # Without the change-step read the skipped tick's pause state, and the clock, are unknown.
+            c, d = pathlib.Path(temp) / 'c', pathlib.Path(temp) / 'd'
+            write_capture(c, marine_frames(30), skip_follow={10}, skip_change={10})
+            write_capture(d, marine_frames(30), skip_follow={10}, skip_change={10})
+            problems = parity_decode.same_bundle(parity_decode.Capture(c), parity_decode.Capture(d))
+            self.assertTrue(any('ticks skipped' in p for p in problems), problems)
+            # A missing follow-up with a step to spare for it is data loss, not a skip.
+            h, k = pathlib.Path(temp) / 'h', pathlib.Path(temp) / 'k'
+            write_capture(h, marine_frames(30), skip_follow={10}, loose_skip=True)
+            write_capture(k, marine_frames(30), skip_follow={10}, loose_skip=True)
+            self.assertEqual(parity_decode.Capture(h).faults['unexplained_skips'], 1)
+            self.assertTrue(parity_decode.same_bundle(parity_decode.Capture(h), parity_decode.Capture(k)))
+            # A mark right after the skipped tick resolves to that tick's frame.
+            self.assertEqual(cap.series()['skipped'], [(20, 9)])
+            self.assertEqual(metrics.n64_command_frame(cap.series(), 20), 9)
+            self.assertEqual(metrics.n64_command_frame(cap.series(), 19), 8)
+            # A jump of more than eight ticks is never explained, change-step reads or not.
+            f, g = pathlib.Path(temp) / 'f', pathlib.Path(temp) / 'g'
+            write_capture(f, marine_frames(30), skip_follow=set(range(10, 20)))
+            write_capture(g, marine_frames(30), skip_follow=set(range(10, 20)))
+            self.assertEqual(parity_decode.Capture(f).faults['unexplained_skips'], 1)
+            problems = parity_decode.same_bundle(parity_decode.Capture(f), parity_decode.Capture(g))
+            self.assertTrue(any('ticks skipped' in p for p in problems), problems)
+            # Runs that skip different ticks never form a bundle.
+            e = pathlib.Path(temp) / 'e'
+            write_capture(e, marine_frames(30), skip_follow={11})
+            problems = parity_decode.same_bundle(cap, parity_decode.Capture(e))
+            self.assertTrue(any('read faults differ' in p or 'record counts' in p or 'hash chains' in p
+                                for p in problems), problems)
 
     def test_bundle_needs_identical_chains(self):
         with tempfile.TemporaryDirectory() as temp:

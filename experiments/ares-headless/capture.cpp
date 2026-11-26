@@ -714,6 +714,44 @@ int main(int argc, char** argv) {
       std::cout << "PULSE " << completed << ' ' << pressed << ' ' << std::hex << value << std::dec << ' ' << (threadCpuUs() - cpuStarted) / 1000 << std::endl;
       continue;
     }
+    if(word == "untilw") {
+      // "untilw x|y OP VALUE MAX MASK X Y": hold the pad until the world point under the cursor
+      // on that axis (camera s32 + cursor u16, signed, S6) meets OP (eq, ne, ge, lt) against the
+      // signed decimal VALUE, for at most MAX steps. The camera may scroll during the wait, so a
+      // tape aims at world points without knowing where a pan stopped. A miss ends the run (exit 9).
+      std::string axisText, opText, valueText; long long limit = 0; long mask = 0, x = 0, y = 0;
+      if(!(in >> axisText >> opText >> valueText >> limit >> mask >> x >> y) || (axisText != "x" && axisText != "y") ||
+         !sc64_capture_decimal_ok(valueText.c_str() + (valueText[0] == '-')) || valueText.size() > 7 ||
+         limit < 1 || limit > 10000000 || !sc64_capture_mask_allowed(mask) || x < -32767 || x > 32767 || y < -32767 || y > 32767 ||
+         !pendingShot.empty()) { std::cerr << "invalid command: " << line << "\n"; return 7; }
+      { std::string token; if(in >> token) { std::cerr << "invalid command: " << line << "\n"; return 7; } }
+      Sc64UntilOp op = sc64_capture_until_op(opText.c_str());
+      if(!sc64_capture_world_op_ok(op)) { std::cerr << "invalid command: " << line << "\n"; return 7; }
+      const std::int64_t target = std::atoll(valueText.c_str());
+      const std::uint32_t cameraAt = axisText == "x" ? 0x000A2EE8u : 0x000A2EECu;
+      const std::uint32_t cursorAt = axisText == "x" ? 0x000AFDCCu : 0x000AFDCEu;
+      auto world = [&](std::int64_t* out) -> bool {
+        std::uint32_t camera = 0, cursor = 0;
+        if(!field(cameraAt, 4, &camera) || !field(cursorAt, 2, &cursor)) return false;
+        *out = sc64_capture_world(camera, cursor); return true;
+      };
+      std::int64_t value = 0;
+      if(!world(&value)) return 7;
+      const long long begin = completed; const auto cpuStarted = threadCpuUs();
+      bool met = false;
+      for(long long i = 0; i < limit && !met; ++i) {
+        if(int code = runStep((unsigned)mask, (int)x, (int)y, false)) return code;
+        if(!world(&value)) return 8;
+        met = sc64_capture_world_met(op, value, target);
+      }
+      commands << begin << ',' << (completed - begin) << ',' << mask << ',' << x << ',' << y << '\n'; commands.flush();
+      events << completed << ",untilw," << (met ? "met" : "miss") << ' ' << axisText << ' ' << opText << ' ' << valueText << ' ' << value << '\n';
+      if(!outputsOk() || (watchLog.is_open() && !watchLog.flush())) { std::cerr << "output write failure\n"; return 5; }
+      std::cout << (met ? "UNTILW " : "UNTILWMISS ") << completed << ' ' << (completed - begin) << ' ' << value
+                << ' ' << (threadCpuUs() - cpuStarted) / 1000 << std::endl;
+      if(!met) return 9;
+      continue;
+    }
     if(word == "save") {
       // Whole-machine state from the core's serializer, the same bytes desktop ares writes to a slot file.
       // Names end in ".state", so a state can never take the name of a log opened later.

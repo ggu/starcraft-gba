@@ -30,6 +30,13 @@ static_assert(sc64_capture_until_met(Sc64UntilOp::lt, 4, 5, 0) && !sc64_capture_
 static_assert(sc64_capture_until_met(Sc64UntilOp::changed, 7, 0, 6) && !sc64_capture_until_met(Sc64UntilOp::changed, 6, 0, 6));
 static_assert(sc64_capture_until_met(Sc64UntilOp::set, 0x13, 0x03, 0) && !sc64_capture_until_met(Sc64UntilOp::set, 0x11, 0x03, 0));
 static_assert(sc64_capture_until_met(Sc64UntilOp::clear, 0x10, 0x03, 0) && !sc64_capture_until_met(Sc64UntilOp::clear, 0x12, 0x03, 0));
+// untilw: camera (signed, -32 at the map's top-left edge) plus cursor, compared signed.
+static_assert(sc64_capture_world(0xFFFFFFE0u, 200) == 168 && sc64_capture_world(0x320u, 0x10FB) == 0x320 + 0x10FB);
+static_assert(sc64_capture_world(0xFFFFFFE0u, 0x12345) == -32 + 0x2345);
+static_assert(sc64_capture_world_met(Sc64UntilOp::ge, -10, -32) && !sc64_capture_world_met(Sc64UntilOp::lt, -10, -32));
+static_assert(sc64_capture_world_met(Sc64UntilOp::lt, -40, -32) && sc64_capture_world_met(Sc64UntilOp::eq, 7, 7));
+static_assert(sc64_capture_world_op_ok(Sc64UntilOp::ne) && !sc64_capture_world_op_ok(Sc64UntilOp::changed) &&
+              !sc64_capture_world_op_ok(Sc64UntilOp::set) && !sc64_capture_world_op_ok(Sc64UntilOp::invalid));
 static_assert(!sc64_capture_until_met(Sc64UntilOp::invalid, 0, 0, 0));
 static void parses_addresses() {
     std::uint32_t v = 0;
