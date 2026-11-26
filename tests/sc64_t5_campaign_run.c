@@ -472,6 +472,34 @@ static int controller_order_actor(int slot, int x, int y, int attack_move)
 static int command_actor_to(int slot, int x, int y)
 { return controller_order_actor(slot, x, y, 0); }
 
+/* One order for the whole force: a drag selection, then the command. Units
+ * given one at a time leave as their turn comes and string out along the
+ * route, so the first ones meet the defenders alone. Falls back to
+ * command_group_to() when the selection is not the human force alone. */
+static int command_force_to(int x, int y, int attack_move)
+{
+    int force = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && sc64_game_unit_selectable(u[i].type)) {
+            if (IS_WORKER(u[i].type) || SC64_TRANSPORT_LOADED(&u[i])) return command_group_to(x, y, attack_move);
+            ++force;
+        }
+    if (!force || !controller_normalize_field() || !select_human_group() || selected_count() != force)
+        return command_group_to(x, y, attack_move);
+    tap_b();
+    if (attack_move) tap(KEY_DOWN);
+    tap(KEY_A);
+    if (mode == MODE_NORMAL || screen != SCREEN_PLAY) return 0;   /* the target cursor never opened */
+    move_cursor(x, y);
+    if (!selected_count()) return command_group_to(x, y, attack_move);
+    tap(KEY_A);
+    /* The command is taken once the target cursor closes; a tap the tick
+     * budget or the match end swallowed leaves it open. */
+    if (mode != MODE_NORMAL || screen != SCREEN_PLAY) return 0;
+    fprintf(stderr, "T5 force order issued=%d attack=%d at %d,%d\n", force, attack_move, x, y);
+    return 1;
+}
+
 static int command_actor_attack_to(int slot, int x, int y)
 { return controller_order_actor(slot, x, y, 1); }
 
@@ -2251,7 +2279,7 @@ int main(int argc, char **argv)
         }
         fprintf(stderr, "T5 controller escorts to Command Center retry=%u distance=%d point=%d,%d\n",
                 retry, distance, x, y);
-        if (!command_group_to(x, y, 1)) break;
+        if (!command_force_to(x, y, 1)) break;
         wait_frames(1400);
     }
     if (trace_file || dump_final) checkpoint("command-center-attempt");

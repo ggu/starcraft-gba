@@ -4253,6 +4253,10 @@ sc64_steer_best_direction(Unit *q, int speed, int from_cell,
 }
 #endif
 
+#ifdef SC64_RACES
+#include "sc64_ally_yield.h"
+#endif
+
 static void GBA_HOT
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -4333,7 +4337,11 @@ move_toward(Unit * q, int tx, int ty)
 #endif
 	return;
     }
-    if (!unit_step_clear(q, nx, ny)) {
+    if (!unit_step_clear(q, nx, ny)
+#ifdef SC64_RACES
+        && !sc64_move_blocked(q, nx, ny)
+#endif
+       ) {
 	static const s8 dx[8] = {1,1,0,-1,-1,-1,0,1};
 	static const s8 dy[8] = {0,1,1,1,0,-1,-1,-1};
 	int best = -1;
