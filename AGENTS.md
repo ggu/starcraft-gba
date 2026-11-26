@@ -6,6 +6,7 @@
 - GBA startup, memory setup, display, and input support are in `common/`.
 - Optional ROM-derived modes compile the same StarCraft sources under `SC64_*` flags. Campaign, race, and profile adapters live in headers such as `starcraft/race_campaign_adapter.h`, `starcraft/race_adapter.h`, `starcraft/sc64_backwater_adapter.h`, and `starcraft/skirmish_adapter.h`. Imported maps, art, and generated headers stay in ignored local folders.
 - Host-side rule and behavior checks are in `tests/`. Build and verification recipes are in `Makefile`; the `dev` wrapper provides the documented workflows. Import, conversion, replay, and smoke-check utilities live in `tools/`.
+- The N64 parity harness (`./dev parity`) is in `tools/sc64_parity*.py`, `tools/parity_decode.py`, `tools/parity/` and `tests/sc64_parity_run.c`. It is described in `docs/PARITY-HARNESS.md`.
 - Read `CONTRIBUTING.md` before changing asset handling or licensing, and `docs/DEVELOPMENT.md` for setup and profile-specific commands.
 
 ## Make changes safely
@@ -58,6 +59,81 @@ replay and fresh-process SRAM qualification are separate checks described in
 profile limits.
 
 Do not fetch or generate private game inputs just to complete a default-profile task. If an optional check cannot run because its local inputs are absent, say so in the handoff and report the default checks completed.
+
+## Check gameplay against StarCraft 64 with the parity harness
+
+The ROM-derived (`SC64_*`) profiles aim to match StarCraft 64 on the N64.
+The parity harness checks this against reference values recorded once from
+the N64 cartridge. It runs only the GBA host engine and never needs the N64
+or an emulator. Always use it:
+
+- Run `./dev parity` before and after any change that can affect gameplay:
+  `starcraft/` game code, SC64 adapters and tables, AI, movement, economy,
+  combat, fog, animation or sound timing. It takes under a minute. Report
+  the scorecard line (counts per verdict and the fixture-set hash) in the PR
+  or handoff.
+- A `REGRESSION` fails the check. Fix the change; do not widen a band or
+  edit a golden to make it pass.
+- A `STALE-GOLDEN` also fails. It means a golden was decoded against older
+  definitions of the fields it reads, usually after a change to
+  `tools/parity/sc64-usa-v1.json` or a decoder. Regenerate it from its
+  recorded runs with `tools/parity_decode.py golden`, as
+  `docs/PARITY-HARNESS.md` describes. While your change is unmerged, write
+  regenerated goldens to a private copy of the fixture home: set
+  `SC64_PARITY_HOME=DIR` for both `tools/parity_decode.py golden` and
+  `./dev parity`. Regenerating them in the shared home makes them stale for
+  main and for every other worktree. Update the shared home only after your
+  layout or decoder change lands.
+  If the change also alters what the
+  capture frontend records, the old runs cannot be re-decoded: make two
+  fresh captures with the updated frontend. `--allow-stale` is for
+  recording work only, never for a verification run. If a field a golden
+  gates on is no longer `proven`, regenerating does not help. Restore the
+  field's evidence in the layout file, or change the check so it no longer
+  reads that field.
+- The GBA follows the N64 ROM, not PC StarCraft or BWAPI values (owner
+  decision, 2026-11-26). Every `KNOWN` line in `tools/parity/baseline.json`
+  and every ROM-table difference is a GBA defect to fix toward the N64
+  value, not an accepted difference. The exceptions are table rows the
+  engine never uses for play, such as hero costs or doors that are never
+  offered for production. Say why in the PR. `./dev parity` prints
+  ROM-table differences only as counts, which do not gate. When you change
+  tables, compare the detailed `make parity-tables` report before and
+  after.
+- When a fix moves a check inside its band, it shows as `IMPROVED`. Then run
+  `./dev parity --only ID --accept` for each scenario you fixed, check that
+  the baseline diff only removes or narrows the lines you fixed, re-run the
+  full `./dev parity` without `--accept`, and commit the baseline with the
+  fix. Never use `--accept` to hide a gap that your change opened or
+  widened.
+- Use `--only ID` and `--explain ID` while iterating on one scenario.
+  `--keep DIR` keeps the GBA traces.
+- When you add a gameplay feature with no scenario, say so in the handoff.
+  Record new references only with the recipe in `docs/PARITY-HARNESS.md`
+  (two fresh captures with identical hash chains), and run at most two
+  captures at a time on this machine. Keep a new scenario's goldens in a
+  private fixture home the same way until its measurement code lands. A new
+  scenario's out-of-band gating
+  results start as `REGRESSION`. Before accepting them, check each against
+  the N64 evidence. List each one in the PR as a GBA defect it now records
+  as `KNOWN`. Accept them with `./dev parity --only ID --accept`, in a
+  commit that changes no game code.
+- The reference fixtures are private. They live in one home shared by every
+  worktree, `$SC64_PARITY_HOME` (by default the main checkout's
+  `.local/parity`). Never copy them into the source tree. A scenario shows
+  `SKIP` when its fixtures are absent (for example in a fresh clone or a
+  cloud session). It shows `ERROR` when its GBA runner cannot build because
+  the worktree lacks the prepared SC64 profile inputs. Read the reason the
+  scorecard prints: a `SKIP` can also mean the checkout has no measurement
+  code for a golden, and an `ERROR` can be a real runner failure, which
+  must be investigated. Report absent inputs in the handoff, along with the
+  checks that did run. Scenarios come from the golden files present, so a
+  missing golden gives no row at all. Check that
+  the scorecard lists every scenario you expected, and name any that is
+  missing. Do not fetch or generate private inputs only to run it for a
+  default-profile change.
+
+See `docs/PARITY-HARNESS.md` for scenarios, verdicts and the golden format.
 
 ## Clean up scratch data when the work is done
 
