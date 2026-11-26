@@ -79,8 +79,9 @@ and Protoss P10 Blood Bath against Terran, wins on the same frame as on
 `d8c535a2`.
 
 With the plans unchanged, 18 of the 19 lobbies still won. The exception was
-Zerg Blood Bath against three Zerg, which lost at frame 25,452; its HOST
-author reproduces that loss exactly. In a HOST sweep of 72 plans around the
+Zerg Blood Bath against three Zerg. Its HOST author lost at frame 25,452,
+so the matrix stopped before an ARM replay; the sweep below reproduced that
+HOST loss exactly. In a HOST sweep of 72 plans around the
 old one, all at start order 156 (the order this cartridge resolves with no
 Launch-row wait), 10 won. `QUALIFIED` now uses the winner closest to the old
 plan, which differs only in `FIRST_ATTACK=5500` (was 6500).
@@ -125,7 +126,7 @@ three Zerg row is from the requalified plan. Emulator evidence only.
 On the skirmish AI matrix (`tools/sc64_skirmish_ai_matrix.py`, profiles
 terran, zerg, protoss, showcase and protoss-p10), base and branch each pass
 544 of 611 cases. Base here is `d8c535a2`'s engine sources in the same tree.
-The 66 failures common to both are already on `codex/source-release`, and 90
+The 66 failures common to both are already on `codex/source-release`, and 89
 of the 611 case records change.
 
 - `match-terran-1-1-zz` now passes.
@@ -136,7 +137,7 @@ of the 611 case records change.
 ## Current base (`d8c535a2`)
 
 On `codex/source-release` at `d8c535a2` (Larva and Eggs, finite gas and
-native Zealot vitals all merged), all 19 lobbies of this change's `QUALIFIED`
+native Zealot vitals all merged), all 19 lobbies of that change's `QUALIFIED`
 win from the lobby with physical buttons on the cartridges built from that
 commit: main's 18, plus the Protoss Outpost plan below, which this change
 adds (on `d8c535a2` itself, pass it in `CUSTOM_FULL_MATCH_CASES`). Each
@@ -145,7 +146,12 @@ result and victory SRAM, and its victory save reopens RESULT without changing
 SRAM. The private standard and cover skirmish packs were regenerated with the
 commit's `tools/sc64_skirmish_pack.py` first (see [Reproduce](#reproduce)).
 
-Eighteen plans are the ones #913 qualified. Their victory frames, pause
+Eighteen plans are the ones #913 qualified. On `d8c535a2` Zerg against
+three Zerg used `FIRST_ATTACK=6500`; `QUALIFIED` now holds the
+`FIRST_ATTACK=5500` plan from
+[Egg pairs counted as two](#egg-pairs-counted-as-two-after-b3d6d437), so
+pass the old plan in `CUSTOM_FULL_MATCH_CASES` to reproduce the 61,183 win
+below. Their victory frames, pause
 frames, units on screen and checks after the save all match the Larva and
 Egg audit's table, and the three-Zerg tape is byte-identical to its recorded
 SHA-256. Protoss on Outpost against Terran and Zerg, one of the original 11

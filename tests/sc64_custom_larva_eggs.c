@@ -385,15 +385,25 @@ static void lifecycle(void)
         row = race_context_command_base(RACE_CONTEXT_EGG);
         CHECK(row < race_skirmish_command_count() && !strcmp(race_menu_label(row), "CANCEL EGG"));
         CHECK(menu_to(row));
-        tap(KEY_A);
-        /* Workers keep delivering during the taps, each delivery one whole
-         * load of 8 from a full patch, so the refund is exact up to whole
-         * loads (a second Scourge refund, 25, is not one). The owner has no
-         * Extractor, so gas is exact. */
-        CHECK(!u[eggs[0]].alive && gas == vespene + scourge->gas);
+        /* Workers keep delivering while the cancel is pressed. A delivery
+         * empties a worker's load into the bank, so the cargo every worker
+         * gives up over the press is counted and the refund checked exactly.
+         * The owner has no Extractor, so gas is exact as it stands. */
         {
-            int delivered = minerals - bank - scourge->minerals;
-            CHECK(delivered >= 0 && delivered % 8 == 0 && delivered <= 8 * 4);
+            int carry[MAX_UNITS], delivered = 0;
+            bank = minerals;
+            for (int step = 0; step < 2; ++step) {
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    carry[i] = u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) ? u[i].carry : 0;
+                input(step ? 0 : KEY_A);
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    if (carry[i] > 0) {
+                        CHECK(u[i].alive);
+                        if (u[i].carry < carry[i]) delivered += carry[i] - u[i].carry;
+                    }
+            }
+            CHECK(!u[eggs[0]].alive && gas == vespene + scourge->gas);
+            CHECK(minerals == bank + scourge->minerals + delivered);
         }
         CHECK(supply_used == used - 2 * scourge->supply && b[hall].larva <= larva + 1);
         n = units_of(SIDE, U_SCOURGE);
