@@ -19,6 +19,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 
 ## Current integration priorities
 
+- **Crowded Z7 movement.** Copying aligned route fields four words per loop
+  saves 1.39% across the 4,901-input battle on top of the wide-field cache.
+  Only three updates in this window fit the 30 Hz guest-cycle budget. Prioritize
+  facility routing (#896) and full-grid expansion. These ranked first in
+  both systematic guest profiles of the battle. See the [movement-field measurements](audits/2026-11-25-wide-point-reuse.md#copying-cached-fields).
+
 - **Wholly unknown terrain.** The shared world-depth cache skips per-tile
   drawing for completely unvisited viewports. The late Z10 Outpost camera
   sweep cuts mean full-loop time by 7.15% and the measured linked P10 window

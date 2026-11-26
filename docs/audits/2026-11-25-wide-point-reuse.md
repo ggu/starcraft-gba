@@ -85,3 +85,47 @@ required margin with 5,172 hot bytes. A fresh Z10 ROM build with
 | Z10 with wide cache and aligned comparisons | `aadcf119ebc4840a0c3a807b7ea815dcdf8dd5473961eb9f1ac572a2948baabf` |
 | Archived Z7 battle SRAM | `2879841d6fbe26a27c35ea1316302419d0271abbcc395177393c8f1723be9bf5` |
 | Archived Z7 ordinary-input trace | `022d0f08d4020ab86b3ac69fcb8dfe430b7837c3817d37ae785e241a62cd3ad1` |
+
+## Copying cached fields
+
+The four individually profiled Z7 inputs spent 98,418–492,056 guest cycles
+in bytewise memcpy on release `6b01df0e`. Completed movement fields live in
+ordinary RAM. The 6,144-byte copy can use aligned words when both ends allow
+it. Unaligned slots use the existing byte copy. The scalar BFS oracle checks
+all four slot alignments, packet contents, packed directions and canaries
+under ASan and UBSan.
+
+| 4,901-input Z7 replay | Total guest cycles | 95th percentile | Maximum |
+| --- | ---: | ---: | ---: |
+| Release | 8,371,236,926 | 3,548,716 | 20,172,878 |
+| Word copy | 8,264,447,987 | 3,550,138 | 20,024,545 |
+| Word copy unrolled four times | 8,255,076,504 | 3,544,214 | 20,001,582 |
+
+All 72 sampled game states, actor arrays, both indexed bitmap pages, the
+selected page, palette, camera and menus matched the release in the unrolled
+trial. Five additional 256-input mission windows (Z1, Z5, Z6, Z8 and Z9)
+matched all 325 state and video samples and re-exported identical SRAM after
+a fresh load. The hard IWRAM guard leaves 432 bytes beyond the required
+margin. These are mGBA measurements. The dense battle still advances at
+about 10 updates/s. On the release build, the slowest 49 updates account for
+3.85% of all cycles in the window.
+
+Two systematic profiles of the release sampled every 67th input, starting
+at offsets 1 and 34 in the 4,901-input window. All 147 individual clock
+totals matched the normal runner. Of 264,994,911 sampled cycles, facility
+routing accounted for 14.13% directly (10.28% and 17.75% per sample) and
+linear point expansion for 8.68%. These were the top two functions in each
+sample. Contact queries accounted for another 5.32%. The facility FIFO in
+#896 is a higher-priority trial than further tuning the copy loop. Recheck
+its effect on 64×64 custom maps as well as its 128×128 campaign gains.
+
+The updated Zerg ROM also restored all ten archived chapter victories with
+matching handoffs. Both custom maps passed 27 fixed-lobby and 18 sparse or
+random seat tests, including fresh SRAM loads and continued gameplay.
+
+The unrolled copy completed the late Z7 route at frame 267,585. All 45
+state and world checkpoints matched the release, including the same deviations
+from the historical gas observations. Total guest cycles fell from
+147,257,735,147 to 146,796,890,834 (0.31%). The victory save and its fresh
+reload matched the release byte for byte (SHA-256
+`4e8266b1564444a72c820568931c730875b82f29ae5b75cd3ba8f8951dd72722`).
