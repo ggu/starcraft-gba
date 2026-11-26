@@ -402,7 +402,13 @@ class ResultFrames(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     sk.tick_frames(cap)
             cap.trailing_changes = [(15, False, True)]
-            cap.change_tables = [True] * 5 + [False] + [True] * 9
+            # Interior change reads: the mission starts at the first tick with a table in either
+            # read (here tick 1, found by its follow-up); a later read without one is refused.
+            cap.first_table_tick = 1
+            cap.change_reads = [(2 * k + 2, k + 1) for k in range(15)]
+            cap.change_tables = [False] + [True] * 14
+            self.assertEqual(sk.tick_frames(cap)[1], 10)
+            cap.change_tables = [False, False] + [True] * 13
             with self.assertRaises(ValueError):
                 sk.tick_frames(cap)
             cap.change_tables = [True] * 15
@@ -711,6 +717,11 @@ class Bundles(unittest.TestCase):
             b.trailing_changes = a.trailing_changes + [(999, False, True)]
             self.assertIn('the change reads after the last follow-up differ between the runs',
                           same_bundle(a, b, same_watch=True))
+            b.trailing_changes = a.trailing_changes
+            b.change_tables = a.change_tables[:-1] + [not a.change_tables[-1]]
+            for pair in ((a, b), (b, a)):
+                self.assertIn("the change reads' unit-table flags differ between the runs",
+                              same_bundle(*pair, same_watch=True))
 
     def test_a_lost_first_tick_is_refused(self):
         import hashlib as _hashlib

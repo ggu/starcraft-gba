@@ -586,9 +586,10 @@ def tick_frames(cap):
     # one would be a tick the clock cannot place (the decoder adds skipped frames only before
     # in-mission records), so it is refused rather than dated.
     start = next((i for i, r in enumerate(cap.ticks) if r['table']), None)
-    tables = getattr(cap, 'change_tables', [])
-    entered = tables.index(True) if True in tables else len(tables)
-    if start is not None and (any(not r['table'] for r in cap.ticks[start:]) or not all(tables[entered:]) or
+    entry = getattr(cap, 'first_table_tick', None)   # the first tick with a table, in either read
+    later = [table for (_, tick), table in zip(getattr(cap, 'change_reads', []), getattr(cap, 'change_tables', []))
+             if entry is not None and tick > entry]
+    if start is not None and (any(not r['table'] for r in cap.ticks[start:]) or not all(later) or
                               any(not table for _, _, table in getattr(cap, 'trailing_changes', []))):
         raise ValueError(f'{cap.run}: a read without a unit table after the mission started')
     known = {r['tick']: r['sf'] for r in cap.ticks if r['table'] and r['sf'] >= 0}

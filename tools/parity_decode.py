@@ -779,6 +779,9 @@ def same_bundle(a, b, allow_skips=False, same_watch=False):
         # unpaused ticks, whose change reads the chain does not cover.
         if getattr(a, 'trailing_changes', None) != getattr(b, 'trailing_changes', None):
             problems.append('the change reads after the last follow-up differ between the runs')
+        # So do the change reads' unit-table flags, which decide which skipped ticks count.
+        if getattr(a, 'change_tables', None) != getattr(b, 'change_tables', None):
+            problems.append('the change reads\' unit-table flags differ between the runs')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
     if a.faults != b.faults:
