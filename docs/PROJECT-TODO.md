@@ -1643,8 +1643,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the same four start anchors. Both lose their final structure. The GBA
   shows four living SCVs on its result panel and retries with A or goes
   HOME with B after a byte-identical defeat reload. The earlier native
-  survivor capture records neutral ownership at defeat. Verify the
-  native score and controls after a Blood Bath defeat.
+  survivor capture records neutral ownership at defeat. A on native
+  defeat opens the four-player Overview score page. Check its other
+  tabs, exit controls and elapsed-time accounting.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
   Free for All loads or Melee rejections. Random seats and four
