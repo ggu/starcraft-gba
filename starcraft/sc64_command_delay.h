@@ -168,6 +168,14 @@ sc64_move_order_due(const Unit *q)
     return ((unsigned)frame + (unsigned)(q - u)) % SC64_MOVE_ORDER_PHASE_UPDATES == 0u;
 }
 
+/* An arrived Move ends on its phase. Out of line: update_orders() is IWRAM
+ * code with little room. */
+static void __attribute__((noinline))
+sc64_move_arrive(Unit *q)
+{
+    if (sc64_move_order_due(q)) q->order = ORDER_IDLE;
+}
+
 /* The player's Move or attack-move. Returns the number of selected units
  * the command will reach (the value callers use for their ping), or
  * issue_order()'s refusal at once when nothing is selected. */
