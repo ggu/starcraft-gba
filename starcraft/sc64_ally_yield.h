@@ -13,9 +13,10 @@
  * When a Move or attack-move mover's intended nonzero step is taken,
  * move_toward() calls sc64_move_blocked() (one out-of-line call: move_toward
  * is IWRAM code):
- *  1. Yield: the idle ally of its owner nearest that step that blocks it
- *     (a unit the step does not move away from, as in unit_step_clear())
- *     moves SC64_ALLY_YIELD_STEP px aside: to the side of the mover's line
+ *  1. Yield: of the idle allies of its owner that block that step (a unit
+ *     the step does not move away from, as in unit_step_clear()), the
+ *     nearest of up to SC64_ALLY_YIELD_TRIES that can moves
+ *     SC64_ALLY_YIELD_STEP px aside: to the side of the mover's line
  *     it already stands on, else the other side, else straight ahead. The
  *     mover takes its step if that cleared it, and steers as before
  *     otherwise.
@@ -36,7 +37,7 @@
  * resting ally on its own point; 16 px covers a 6 px radius plus the 3 px
  * longest probe step around the mover, with margin. */
 enum { SC64_ALLY_YIELD_STEP = 2, SC64_MOVE_GIVE_UP_RADIUS = 12, SC64_MOVE_GIVE_UP_PROBE_STEPS = 3,
-       SC64_MOVE_GIVE_UP_REACH = 16, SC64_MOVE_GIVE_UP_PHASES = 32 };
+       SC64_MOVE_GIVE_UP_REACH = 16, SC64_MOVE_GIVE_UP_PHASES = 32, SC64_ALLY_YIELD_TRIES = 4 };
 
 static int
 sc64_ally_yield_radius(const Unit *q, const Unit *a)
@@ -131,21 +132,23 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
 }
 
 /* The longest step the mover's stock motion takes over the next
- * SC64_MOVE_GIVE_UP_PHASES updates, at most SC64_MOVE_GIVE_UP_PROBE_STEPS:
- * the give-up probes only lengths the mover can use. */
+ * SC64_MOVE_GIVE_UP_PHASES updates in its current waypoint's motion mode,
+ * at most SC64_MOVE_GIVE_UP_PROBE_STEPS: the give-up probes only lengths
+ * the mover can use. */
 static int
 sc64_move_longest_step(const Unit *q)
 {
     int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type), longest = 1;
-    for (unsigned f = 0; f < SC64_MOVE_GIVE_UP_PHASES; ++f)
-        for (int diagonal = 0; diagonal < 2; ++diagonal) {
+    /* The motion mode (straight or diagonal) of the current waypoint. */
+    int diagonal = q->path_x != q->x && q->path_y != q->y;
+    for (unsigned f = 0; f < SC64_MOVE_GIVE_UP_PHASES; ++f) {
 #ifdef SC64_CONTACT_CACHE
-            int s = (int)sc64_contact_stock_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
+        int s = (int)sc64_contact_stock_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
 #else
-            int s = (int)sc64_stock_motion_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
+        int s = (int)sc64_stock_motion_step(raw, (unsigned)frame + f, (unsigned)(q - u), diagonal);
 #endif
-            if (s > longest) longest = s;
-        }
+        if (s > longest) longest = s;
+    }
     return longest < SC64_MOVE_GIVE_UP_PROBE_STEPS ? longest : SC64_MOVE_GIVE_UP_PROBE_STEPS;
 }
 
@@ -166,8 +169,10 @@ sc64_move_blocked(Unit *q, int nx, int ny)
 {
     static const s8 dx[8] = {1,1,0,-1,-1,-1,0,1};
     static const s8 dy[8] = {0,1,1,1,0,-1,-1,-1};
-    int best = -1, best_distance = 0x7fffffff;
+    int near[SC64_ALLY_YIELD_TRIES], near_distance[SC64_ALLY_YIELD_TRIES], count = 0;
     if ((q->order != ORDER_MOVE && q->order != ORDER_ATTACK_MOVE) || (nx == q->x && ny == q->y)) return 0;
+    /* The SC64_ALLY_YIELD_TRIES nearest blockers, nearest first (slot order
+     * on ties); the first that can step aside does. */
     for (int i = 0; i < MAX_UNITS; ++i) {
         const Unit *a = &u[i];
         if (!a->alive || a->owner != q->owner || a->order != ORDER_IDLE) continue;
@@ -175,13 +180,17 @@ sc64_move_blocked(Unit *q, int nx, int ny)
         if (a->x - nx >= radius || nx - a->x >= radius || a->y - ny >= radius || ny - a->y >= radius) continue;
         int d = dist2(nx, ny, a->x, a->y);
         /* As unit_step_clear(): a unit the step moves away from does not block. */
-        if (d >= radius * radius || d >= best_distance || d > dist2(q->x, q->y, a->x, a->y) ||
+        if (d >= radius * radius || d > dist2(q->x, q->y, a->x, a->y) ||
+            (count == SC64_ALLY_YIELD_TRIES && d >= near_distance[count - 1]) ||
             !sc64_ally_yield_candidate(q, a)) continue;
-        best = i;
-        best_distance = d;
+        int k = count < SC64_ALLY_YIELD_TRIES ? count++ : count - 1;
+        while (k > 0 && near_distance[k - 1] > d) { near[k] = near[k - 1]; near_distance[k] = near_distance[k - 1]; --k; }
+        near[k] = i;
+        near_distance[k] = d;
     }
     /* An ally that moved aside may need more shoves: the mover retries. */
-    if (best >= 0 && sc64_ally_yield_step(q, &u[best], nx, ny)) return unit_step_clear(q, nx, ny);
+    for (int k = 0; k < count; ++k)
+        if (sc64_ally_yield_step(q, &u[near[k]], nx, ny)) return unit_step_clear(q, nx, ny);
     if (q->order != ORDER_MOVE ||
         dist2(q->x, q->y, q->tx, q->ty) > SC64_MOVE_GIVE_UP_RADIUS * SC64_MOVE_GIVE_UP_RADIUS) return 0;
     /* The stock step alternates between lengths from update to update: an
