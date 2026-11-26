@@ -203,7 +203,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         # A golden that checks nothing never passes quietly.
         return [{'key': f'{scenario_id}:golden:-', 'check': 'golden', 'subject': '-', 'n64': None, 'gba': None,
                  'provenance': '-', 'gating': False, 'n_runs': 0, 'tolerance': '-',
-                 'verdict': 'REPORT' if allow_stale else 'STALE-GOLDEN',
+                 'verdict': 'REPORT' if allow_stale else 'STALE-GOLDEN', 'stale': True,
                  'why': 'the golden has no observations; ' + STALE_WHY}]
     for obs in golden['observations']:
         gating = obs['gating']
@@ -223,6 +223,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # A stale golden fails unless recording work asks for it (--allow-stale); either way it never gates.
             # So does a gating check whose fields the layout no longer proves.
             row['verdict'] = 'REPORT' if allow_stale else 'STALE-GOLDEN'
+            row['stale'] = True   # --accept refuses any run with a stale row, --allow-stale or not
             row['why'] = STALE_WHY + (f'; the layout no longer proves {", ".join(unproven)}' if unproven else '') + \
                 (f'; measured by decoder revision {golden.get("decoder_revision", 1)}, the scenario is at {revision}'
                  if old_decoder else '') + (' (--allow-stale)' if allow_stale else '')
@@ -512,7 +513,7 @@ def main(argv=None):
     if args.json:
         args.json.write_text(json.dumps({'results': results, 'fixture_set': fixture_hash(goldens)}, indent=1, default=str) + '\n')
     if args.accept:
-        if any(row.get('why', '').startswith(STALE_WHY) for r in results for row in r.get('rows', [])):
+        if any(row.get('stale') for r in results for row in r.get('rows', [])):
             print('parity: not accepting while a golden was decoded against other layout field definitions; '
                   'regenerate it first. The baseline is unchanged', file=sys.stderr)
             return 1

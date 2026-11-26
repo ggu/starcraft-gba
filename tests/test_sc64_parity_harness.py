@@ -328,7 +328,37 @@ class Golden(unittest.TestCase):
         self.assertEqual(row['verdict'], 'STALE-GOLDEN')
         self.assertIn('decoder revision 1', row['why'])
         empty = sc64_parity.judge('t3-opening', {'bundle': {}, 'observations': []}, {}, {}, {}, layout)
-        self.assertEqual([r['verdict'] for r in empty], ['STALE-GOLDEN'])
+        self.assertEqual([(r['verdict'], r['stale']) for r in empty], [('STALE-GOLDEN', True)])
+        loose = sc64_parity.judge('t3-opening', {'bundle': {}, 'observations': []}, {}, {}, {}, layout, allow_stale=True)
+        self.assertEqual([(r['verdict'], r['stale']) for r in loose], [('REPORT', True)])
+
+    def test_accept_refuses_stale_goldens(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            (temp / 'golden').mkdir()
+            (temp / 'golden' / 't3-opening.json').write_text(json.dumps({'bundle': {}, 'observations': [],
+                                                                         'gba': {'at_step': 5}}))
+            baseline = temp / 'baseline.json'
+            baseline.write_text(json.dumps({'known': [{'key': 't3-opening:x:s', 'gba': 1}]}))
+            before = baseline.read_bytes()
+            calls = []
+            original = sc64_parity.run_scenario
+
+            def fake(scenario_id, golden_path, base, keep, allow_stale=False):
+                calls.append(scenario_id)
+                rows = sc64_parity.judge(scenario_id, json.loads(golden_path.read_text()), {}, {}, base,
+                                         parity_decode.Layout(), allow_stale)
+                return {'id': scenario_id, 'status': 'RUN', 'rows': rows}
+            sc64_parity.run_scenario = fake
+            try:
+                for extra in ([], ['--accept'], ['--accept', '--allow-stale']):
+                    code = sc64_parity.main(['--home', str(temp), '--baseline', str(baseline), '--no-tables',
+                                             '--no-build'] + extra)
+                    self.assertEqual(code, 1, extra)
+                    self.assertEqual(baseline.read_bytes(), before)
+            finally:
+                sc64_parity.run_scenario = original
+            self.assertEqual(calls, ['t3-opening'] * 3)
 
     def test_staged_tag_reaches_each_row(self):
         golden = {'tags': ['n64-staged'], 'observations': [
