@@ -360,6 +360,17 @@ class LabMeasureTest(unittest.TestCase):
         m, err = metrics.lab_move_measure(walk(pos), 1, [9], [(150, 60)])   # within one tile: fine
         self.assertIsNone(err)
 
+    def test_gba_arrival_uses_the_issued_point(self):
+        # A relative order past the map edge: the runner clamps it to x=8 (16 N64 px) and says so.
+        pos = {sf: (max(16, 200 - 4 * max(0, sf - 6)), 100) for sf in range(0, 120)}
+        golden = {'gba': {'cmds': [[5, 16, -112, 0]]}}
+        report = {'subject': 1, 'subject_start': [100, 50], 'lab': [[5, 3, 16, -1, 8, 50]]}
+        result, err = metrics.lab_move_gba({})(walk(pos), golden, report)
+        self.assertIsNone(err)
+        self.assertEqual(result['measured']['legs'][0]['target_miss'], 0.0)
+        result, err = metrics.lab_move_gba({})(walk(pos), golden, {'subject': 1, 'lab': [[5, 3, 16, -1]]})
+        self.assertIn('did not report where', err)
+
     def test_gba_steps_keep_offsets(self):
         steps = metrics.lab_gba_steps([40, 140, 151])
         self.assertEqual(steps[0], 5)
@@ -413,7 +424,8 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(m['hits'], 6)
 
     def test_exact_damage_needs_every_hit(self):
-        golden = {'observations': [{'check': 'lab.damage', 'value': 6}, {'check': 'lab.range_first', 'value': 50}]}
+        golden = {'observations': [{'check': 'lab.damage', 'value': 6, 'lo': 6, 'hi': 6, 'gating': True},
+                                   {'check': 'lab.range_first', 'value': 50, 'lo': 42, 'hi': 58, 'gating': True}]}
         pos = {sf: (100, 100) for sf in range(0, 80)}
         marine = {sf: 40.0 for sf in range(0, 80)}
         drops = {20: 4, 35: 6, 50: 8}   # median 6, but two hits are wrong

@@ -626,6 +626,7 @@ static struct {
     int by_raw, raw, x, y, slot, start_x, start_y, n;
     unsigned long step[PR_LAB_CAP];
     int kind[PR_LAB_CAP], tx[PR_LAB_CAP], ty[PR_LAB_CAP], target[PR_LAB_CAP], done[PR_LAB_CAP];
+    int ix[PR_LAB_CAP], iy[PR_LAB_CAP]; /* the point each order was issued at, after clamping */
 } lab = { .slot = -1, .x = -1 };
 
 static int pr_setup_lab(void)
@@ -664,6 +665,8 @@ static void pr_scenario_lab(unsigned long step)
         y = lab.ty[k] + (lab.kind[k] & PR_LAB_RELATIVE ? lab.start_y : 0);
         x = pr_clamp_x(x);
         y = pr_clamp_y(y);
+        lab.ix[k] = x;
+        lab.iy[k] = y;
         if (!u[lab.slot].alive) { sc64_pi_fail("lab", "the subject died before command %d", k); continue; }
         if (kind == PR_LAB_MOVE) sc64_pi_move(lab.slot, x, y);
         else if (kind == PR_LAB_STOP) sc64_pi_stop(lab.slot);
@@ -939,8 +942,9 @@ int main(int argc, char **argv)
             snprintf(lab_json, sizeof(lab_json), ",\"subject\":%d,\"subject_start\":[%d,%d],\"lab\":[", lab.slot,
                      lab.start_x, lab.start_y);
             for (int k = 0; k < lab.n; ++k)
-                snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "%s[%lu,%lu,%d,%d]",
-                         k ? "," : "", lab.step[k], (lab.step[k] - 1) * 4ul / 5ul, lab.kind[k], lab.target[k]);
+                snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "%s[%lu,%lu,%d,%d,%d,%d]",
+                         k ? "," : "", lab.step[k], (lab.step[k] - 1) * 4ul / 5ul, lab.kind[k], lab.target[k],
+                         lab.ix[k], lab.iy[k]);
             snprintf(lab_json + strlen(lab_json), sizeof(lab_json) - strlen(lab_json), "]");
         }
         /* Engine type -> cartridge unit id, so traces whose rows carry no raw ids

@@ -667,10 +667,11 @@ def lab_move_gba(spec):
         frames = lab_report_frames(report)
         if uid is None or len(frames) != len(golden['gba']['cmds']):
             return None, 'the runner reported no subject or a different number of orders'
-        # Order points in N64 px: an offset from the subject's start when the golden gives one.
-        start = report.get('subject_start') or [0, 0]
-        targets = [(2 * (x + (start[0] if kind & 16 else 0)), 2 * (y + (start[1] if kind & 16 else 0)))
-                   for _, kind, x, y in golden['gba']['cmds']]
+        # The points the runner issued the orders at (after clamping to the map), in N64 px.
+        issued = report.get('lab', [])
+        if any(len(entry) < 6 for entry in issued):
+            return None, 'the runner did not report where it issued its orders'
+        targets = [(2 * entry[4], 2 * entry[5]) for entry in issued]
         m, err = lab_move_measure(series, uid, frames, targets)
         if err:
             return None, err
@@ -925,7 +926,8 @@ def lab_attack_gba(spec):
                     values[check] = m[key]
             # Exact checks hold for every hit, not the median: submit the GBA hit furthest from
             # the N64 value, so one wrong hit among right ones still fails.
-            n64 = {obs['check']: obs['value'] for obs in golden['observations']}
+            n64 = {obs['check']: obs['value'] for obs in golden['observations']
+                   if obs['gating'] and obs['lo'] == obs['hi']}
             for check, sizes in (('lab.damage', m['damage_values']), ('lab.shield_damage', m['shield_values']),
                                  ('lab.counter_damage', m['counter_values'])):
                 if sizes and check in n64:
