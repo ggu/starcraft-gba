@@ -10031,6 +10031,11 @@ select_combat_group(void)
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE &&
+#ifdef SC64_EGG_RUNTIME
+            /* An Egg is a paid order, not a fighter. Where it has no actor
+             * facts (the Terran cartridge) the default below would take it. */
+            u[i].type != SC64_EGG_ACTOR &&
+#endif
 	    (u[i].type == U_MARINE || u[i].type == U_FIREBAT || u[i].type == U_MEDIC
 #ifdef SC64_RACES
              ||(!IS_WORKER(u[i].type)&&u[i].type!=U_OVERLORD&&u[i].type!=U_CHRYSALIS)
