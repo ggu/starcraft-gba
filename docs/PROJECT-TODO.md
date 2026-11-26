@@ -67,6 +67,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   changes, save continuation and on-device pacing. See the
   [GBA measurements and native N64 field count](audits/2026-11-26-three-opponent-battle-pacing.md).
 
+- **Protoss against three mixed CPUs.** At world frame 11,308, the P10
+  Outpost and Blood Bath windows spent 59% and 62% of guest loop time in
+  orders. Nearest-target search costs far more on Outpost, while movement
+  and contact checks matter on both maps. Compare changes on both and
+  retain opponents, camera, SRAM and displayed-page checks.
+  [Two-map comparison and reproduction](audits/2026-11-26-p10-mixed-skirmish.md).
+
 - **Packed Pylon, Gateway and Forge rendering.** The opt-in renderer saved
   0.64–3.29% of guest cycles across six regular P10 battle windows and
   matched all sampled bitmap pages. Check busy Showcase play and handheld
