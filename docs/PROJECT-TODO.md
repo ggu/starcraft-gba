@@ -102,8 +102,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   P2 carried that save to victory at frame 39,217. Its 42 checkpoints
   and fresh cartridge reload passed. P3 carried the P2 result to victory at frame
   48,801, with its primary objective complete and all three completion bits retained.
-  Continue from this P3 result into P4.
-  [P2 replay and evidence](audits/2026-11-26-protoss-opening-continuation.md).
+  The same save then carried P4 to victory at frame 84,220, with both
+  heroes in extraction and a byte-identical fresh result readback. P5 then
+  cleared at frame 5,057 and retained all five completion bits after a fresh
+  load. P6 followed at frame 51,746, retaining the first six completion
+  bits after a fresh load. Continue from P6 into Homeland.
+  [Linked Protoss replay and evidence](audits/2026-11-26-protoss-opening-continuation.md).
   Use
   [the pinned-input verifier](../tools/sc64_early_protoss_home_replay.py)
   to reproduce the HOME-to-result and fresh-load checks.
