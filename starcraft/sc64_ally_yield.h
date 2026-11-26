@@ -79,24 +79,23 @@ sc64_ally_yield_candidate(const Unit *q, const Unit *a)
 }
 
 /* A row born earlier in this update may not be linked in the target index
- * yet, and its slot's cached cell, left by the slot's previous occupant,
- * proves nothing; sc64_target_index_move() would then relink it through
- * stale links. Move only a row that is in its cell's chain: the chain's head,
- * or the successor of a live unit or building of the same owner in the same
- * cell (the index chains both). */
+ * yet, and its slot's cached cell and links, left by the slot's previous
+ * occupants, prove nothing; sc64_target_index_move() would then relink it
+ * through stale links. Move only a row found by walking its cell's chain
+ * from the head (bounded by the entity count). */
 static int
 sc64_ally_yield_linked(const Unit *a)
 {
-    int entity = (int)(a - u), cell, prev;
+    int entity = (int)(a - u), cell;
     if (!sc64_target_index_active) return 1;
     if ((unsigned)a->owner >= 5u || !sc64_target_cell_for(a->x, a->y, &cell) ||
         sc64_target_cell[entity] != cell) return 0;
-    prev = sc64_target_prev[entity];
-    if (prev == SC64_TARGET_NONE) return sc64_target_head[a->owner][cell] == entity;
-    if (prev < MAX_UNITS ? !u[prev].alive || u[prev].owner != a->owner
-                         : prev >= MAX_UNITS + MAX_BUILDINGS || !b[prev - MAX_UNITS].alive ||
-                           b[prev - MAX_UNITS].owner != a->owner) return 0;
-    return sc64_target_cell[prev] == cell && sc64_target_next[prev] == entity;
+    unsigned i = sc64_target_head[a->owner][cell];
+    for (int n = 0; n < SC64_TARGET_ENTITY_COUNT && i != SC64_TARGET_NONE; ++n, i = sc64_target_next[i]) {
+        if (i >= SC64_TARGET_ENTITY_COUNT) return 0;
+        if ((int)i == entity) return 1;
+    }
+    return 0;
 }
 
 /* Move ally a one step aside from the mover's line q -> (nx, ny). */
@@ -112,7 +111,10 @@ sc64_ally_yield_step(const Unit *q, Unit *a, int nx, int ny)
     if (!sc64_ally_yield_linked(a)) return 0;
     for (int k = 0; k < 3; ++k) {
         int sx = a->x + option[k][0] * SC64_ALLY_YIELD_STEP, sy = a->y + option[k][1] * SC64_ALLY_YIELD_STEP;
+        /* Each shove must clear the step further, so shoves cannot shuttle
+         * an ally between two sideways spots. */
         if ((!option[k][0] && !option[k][1]) || sx < 0 || sy < 0 || sx >= WORLD_W || sy >= WORLD_H ||
+            dist2(sx, sy, nx, ny) <= dist2(a->x, a->y, nx, ny) ||
             !is_traversable(sx / 16, sy / 16, from_cell) || !unit_step_clear(a, sx, sy))
             continue;
         a->x = sx;
