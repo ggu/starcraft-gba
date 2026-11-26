@@ -26,3 +26,15 @@ includes per-stage guest cycles and elapsed updates.
 python3 tools/sc64_z3_linked_victory.py --rom "$Z10_ROM" --elf "$Z10_ELF" \
   --runner "$RUNNER" --previous-victory "$Z2_SAVE" --out "$OUT"
 ```
+
+## Z4 from the Z3 result
+
+A fresh instance loaded that Z3 result and advanced to Z4 at frame zero.
+The recorded opening left the mission active at frame 28,754. Eight
+subsequent controller stages carried the campaign through rebuilding the
+Spawning Pool, completing the Lair and Spire, massing air units and attacking
+the objective. The result showed victory at frame 64,147, zero mission faults
+and all four completion bits (0xc003). A fresh emulator loaded the same
+93-unit, 66-building world and re-exported the same 32 KiB journal.
+The Z4 victory and readback SHA-256 was
+`d1daba6a15928cebeea2ee9158ff860c7708325cd1d8798e58d722801e609b0d`.

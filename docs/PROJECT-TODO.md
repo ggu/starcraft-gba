@@ -249,7 +249,8 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   delivered the Chrysalis and reloaded with both completion bits. The linked
   Z3 paid route won at frame 68,639, with the Chrysalis at 170 HP. A fresh
   boot re-exported identical SRAM and A advanced to Z4 with all three bits.
-  Continue the same save through Z4–Z10.
+  Z4 carried that result through victory and a fresh SRAM reload at frame
+  64,147. Continue from Z4 through Z5–Z10.
   [Z3 route and victory](audits/2026-11-26-zerg-linked-middle.md). [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
