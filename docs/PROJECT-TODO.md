@@ -82,12 +82,13 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   [Zerg](audits/2026-11-26-z10-fifo-normal.md).
 
 - **Terran campaign after the Custom Game Larva merge.** The standard
-  cartridge cleared T1–T7 from blank SRAM with ordinary result advances,
-  fresh mid-mission loads and identical victory re-exports. The T5 paid
-  air route is replayable from the T4 result using the committed button
-  recording. T6 and T7 carried that exact victory forward. Continue from T7 through T10. The T4
-  main loop averaged 24.60 Hz on this route.
-  [Opening route and timing](audits/2026-11-26-terran-linked-opening.md) and [linked T6/T7 victories](audits/2026-11-26-terran-t6-t7-linked.md).
+  cartridge cleared T1–T10 from blank SRAM. T5 used the committed paid
+  air route. Each subsequent mission loaded the preceding victory; T10
+  retained all ten completion bits (0x3ff0) after a fresh boot. Performance
+  remains open: the T4 main loop averaged 24.60 updates/s on this route.
+  [T1–T5](audits/2026-11-26-terran-linked-opening.md),
+  [T6–T7](audits/2026-11-26-terran-t6-t7-linked.md) and
+  [T8–T10](audits/2026-11-26-terran-t8-t10-linked.md).
 
 - **Standard Protoss cartridge after the Custom Game Larva merge.** P1 cleared
   from HOME on cartridge SHA-256
