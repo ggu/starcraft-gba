@@ -78,7 +78,6 @@ static int race_spawn_product_from(int owner, int type, int x, int y, int source
 
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
-static const int race_bot_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
 static int race_base_x[4] = { 160, 864, 864, 160 };
 static int race_base_y[4] = { 160, 864, 160, 864 };
 

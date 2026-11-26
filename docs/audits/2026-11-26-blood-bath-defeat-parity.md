@@ -130,3 +130,22 @@ report; the existing golden parity gates are unchanged.
 | Matching GBA ELF | `463d0e2819b83266b435e831340e9961257af987a5bec3f5aece939d2d67ec7a` |
 | GBA defeat and fresh re-export | `9682d6364895e1b8d18097d34b82c5523ce06ee4ead14f6c6ae6109152424325` |
 | Private qualification archive | `173be2c27b9ff302021c72d7ac6cdd5d38fd6bd0ba605def3faf07c59413aad0` |
+
+## GBA Custom Game defeat overview
+
+In the updated shared GBA runtime, the first A press on a Custom Game
+defeat opens an overview. The player rows report living units, surviving
+buildings, and mineral and gas banks at defeat. The panel marks lifetime
+scores as unavailable because the runtime and its saves do not record the
+required match totals. A fresh A press retries the same matchup. B from
+either panel returns to the title. Custom Game wins and campaign results
+keep their existing controls.
+
+The standard Terran build restored the earlier Blood Bath defeat SRAM at
+frame 24222. Holding A kept the overview open and left the SRAM byte
+identical. The next A press retried at frame 0 with the same four seats
+and start order. B returned to the title from either panel, and loading
+the save again opened the original defeat panel. An earlier T1 victory
+save advanced to T2 on the first A press. The private qualification archive
+`.local/qualification-20261126/gba-custom-defeat-overview.tar.gz`
+contains the recheck script, decoded readback and 240×160 screenshots.
