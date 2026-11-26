@@ -9,8 +9,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 extern int sc64_test_sram_transfer(const char *,int);
+/* The controller's witness: the update the Yamato flight is first seen, and
+ * the impact. The pause opens 2 updates after the flight, and the save shows
+ * 2 later. The start record is written on update 24. */
+enum { BC_FLIGHT_TICK=23045, BC_END_TICK=23064, BC_START_TICK=24 };
+#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
+#define BC_SAVE_TAG SC64_TRANSPORT_SAVE_VERSION /* as race_impact_save_read() */
+#else
+#define BC_SAVE_TAG SAVE_VERSION
+#endif
 int main(int argc,char **argv) {
-    assert(argc==3 || argc==4); FILE *f=fopen(argv[1],"r"); assert(f); unsigned end=(unsigned)strtoul(argv[2],NULL,10); assert(end==17921 || end==17937);
+    assert(argc==3 || argc==4); FILE *f=fopen(argv[1],"r"); assert(f); unsigned end=(unsigned)strtoul(argv[2],NULL,10); assert(end==BC_FLIGHT_TICK || end==BC_END_TICK);
     unsigned tick,held,pressed,next_tick=0,next_held=0,next_pressed=0,prev_tick=0,rows=0;
     int have=fscanf(f,"%u %u %u",&next_tick,&next_held,&next_pressed)==3;
     u16 previous=0,current=0; unsigned first_cruiser_tick=0; int saw_flight=0,saved_flight=0,flight_hp=0,flight_target=-1; gba_init();game_init();
@@ -23,23 +32,23 @@ int main(int argc,char **argv) {
         held=current; pressed=(u16)(held & (u16)~previous); game_update(held,pressed); previous=(u16)held;
         if(!first_cruiser_tick) for(int i=0;i<MAX_UNITS;++i)
             if(u[i].alive && u[i].owner==SIDE && sc64_race_raw_unit(u[i].type)==12) {first_cruiser_tick=tick;break;}
-        if(tick==17921) {
+        if(tick==BC_FLIGHT_TICK) {
             for(int i=0;i<SC64_BC_SHOT_LIMIT;++i) if(sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT) {
                 assert(!saw_flight); saw_flight=1; flight_target=sc64_bc_shots[i].target;
             }
             assert(flight_target>=0 && flight_target<MAX_UNITS+MAX_BUILDINGS && target_alive(flight_target));
             flight_hp=flight_target<MAX_UNITS?u[flight_target].hp:b[flight_target-MAX_UNITS].hp;
         }
-        if(end==17937 && tick==17923) {
+        if(end==BC_END_TICK && tick==BC_FLIGHT_TICK+2) {
             static unsigned char prior[sizeof(race_impact_record)]; u32 length=0;
-            assert(!save_read_latest(prior,(u32)sizeof(prior),SAVE_VERSION,&length));
+            assert(!save_read_latest(prior,(u32)sizeof(prior),BC_SAVE_TAG,&length));
         }
-        if(end==17937 && tick==17925) {
+        if(end==BC_END_TICK && tick==BC_FLIGHT_TICK+4) {
             static unsigned char saved[sizeof(race_impact_record)]; u32 length=0;
-            saved_flight=screen==SCREEN_PAUSE && (pause_notice & 0xc0)==UI_NOTICE_SAVED && (pause_notice & 0x3f)>0 && saw_flight && save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&length) && length>0;
+            saved_flight=screen==SCREEN_PAUSE && (pause_notice & 0xc0)==UI_NOTICE_SAVED && (pause_notice & 0x3f)>0 && saw_flight && save_read_latest(saved,(u32)sizeof(saved),BC_SAVE_TAG,&length) && length>0;
             if(argc==4) assert(saved_flight && sc64_test_sram_transfer(argv[3],1));
         }
-        if(tick==20) assert(screen==SCREEN_PLAY && race_mode && race_human==R_TER && race_bots==1 && minerals==200 && gas==0);
+        if(tick==BC_START_TICK) assert(screen==SCREEN_PLAY && race_mode && race_human==R_TER && race_bots==1 && minerals==50 && gas==0);
     }
     assert(!have && feof(f)); fclose(f);
     int cruiser=-1,flight=0;
@@ -47,7 +56,7 @@ int main(int argc,char **argv) {
     for(int i=0;i<SC64_BC_SHOT_LIMIT;++i) if(sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT) flight=1;
     fprintf(stderr,"replay ticks=%u transitions=%u first_cruiser_tick=%u cruiser=%d research=%u flight=%d won=%d lost=%d\n",tick-1,rows,first_cruiser_tick,cruiser,(unsigned)sc64_battlecruiser_tech_bits,flight,won,lost);
     assert(cruiser>=0 && first_cruiser_tick>0 && saw_flight && !won && !lost);
-    if(end==17921) assert(flight);
+    if(end==BC_FLIGHT_TICK) assert(flight);
     else {
         int after_hp=flight_target<MAX_UNITS?u[flight_target].hp:b[flight_target-MAX_UNITS].hp;
         int alive=target_alive(flight_target);
