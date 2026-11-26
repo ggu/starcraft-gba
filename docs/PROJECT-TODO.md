@@ -27,10 +27,12 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
 - **Disjoint cycle budgets.** The two flagged Outpost samples reconcile using the guest loop timer. Measure simulation and actor-rendering changes together against the 30 fps budget across products, idle and combat; verify saves and both display pages. The Zerg, Terran and Protoss replay ceilings and their limits are in the [cycle-budget audit](audits/2026-11-26-disjoint-cycle-budgets.md).
 
 - **Packaged race ROM save compatibility.** The `51c7f18f` package loaded
-  26 earned campaign victories (T1–T10, Z1–Z6 and P1–P10). All observed
+  all 30 earned campaign victories (ten per race). All observed
   result worlds, SRAM re-exports and chapter advances matched the standard
-  cartridges used to earn them. Extend the comparison as the remaining Zerg
-  journals become available.
+  cartridges used to earn them. Seven missions also passed full packaged replays
+  (T9–T10, Z8–Z10, P9–P10). T1–T5 and Z3 now also pass packaged route
+  replay, with guest-cycle measurements. Profile the slower T4, T5 and Z3
+  cases alongside crowded skirmishes.
   [Results and reproduction](audits/2026-11-26-packaged-campaign-results.md).
 
 - **Custom Game defense targeting.** Skipping cells that contain only friendly
@@ -298,8 +300,10 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   The previous Z8 recording diverges at call 9,696. The optional
   `--gather-west` controller cleared Z8 from HOME with Kerrigan at full
   health. The earned Z7 save also cleared Z8 at frame 70,229 with all
-  29 checkpoints matching. Continue the earned chain through Z9 and Z10.
-  [Z3–Z6 carried results and Z8 route](audits/2026-11-26-zerg-linked-middle.md).
+  29 checkpoints matching. The Z8 result carried into Z9 and Z10, which
+  matched 30 and 26 checkpoints and won at frames 67,745 and 57,633.
+  The fresh Z10 result retained all ten completion bits (`0x3fc003`).
+  [Z3–Z10 carried results](audits/2026-11-26-zerg-linked-middle.md).
   [Z1 replay and Z2 handoff](audits/2026-11-13-z1-normal-home.md).
 
 - **Zerg campaign progression.** Z1 now wins from HOME on the packaged
@@ -1648,8 +1652,9 @@ Keep N64 observations, pinned PC references and hypotheses clearly separate.
   the same four start anchors. Both lose their final structure. The GBA
   shows four living SCVs on its result panel and retries with A or goes
   HOME with B after a byte-identical defeat reload. The earlier native
-  survivor capture records neutral ownership at defeat. Verify the
-  native score and controls after a Blood Bath defeat.
+  survivor capture records neutral ownership at defeat. A on native
+  defeat opens the four-player Overview score page. Check its other
+  tabs, exit controls and elapsed-time accounting.
   The [current four-profile Melee preview](audits/2026-11-22-native-custom-game-lobby.md#november-23-preview-on-current-cartridge-inputs)
   passes 20 ordinary save continuations and 20 cross-version
   Free for All loads or Melee rejections. Random seats and four
