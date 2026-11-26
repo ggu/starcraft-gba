@@ -122,3 +122,10 @@ its effect on 64×64 custom maps as well as its 128×128 campaign gains.
 The updated Zerg ROM also restored all ten archived chapter victories with
 matching handoffs. Both custom maps passed 27 fixed-lobby and 18 sparse or
 random seat tests, including fresh SRAM loads and continued gameplay.
+
+The unrolled copy completed the late Z7 route at frame 267,585. All 45
+state and world checkpoints matched the release, including the same deviations
+from the historical gas observations. Total guest cycles fell from
+147,257,735,147 to 146,796,890,834 (0.31%). The victory save and its fresh
+reload matched the release byte for byte (SHA-256
+`4e8266b1564444a72c820568931c730875b82f29ae5b75cd3ba8f8951dd72722`).
