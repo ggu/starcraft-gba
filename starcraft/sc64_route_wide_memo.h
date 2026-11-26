@@ -21,6 +21,20 @@ static struct {
 
 static void sc64_wide_memo_reset(void) { sc64_wide_memo.reached = 0; }
 
+/* Packed fields occupy normal RAM. A route slot can begin at any byte. */
+static void sc64_wide_copy_field(u8 *dst, const u8 *src)
+{
+    typedef u32 CopyWord __attribute__((__may_alias__));
+    if (((uintptr_t)dst | (uintptr_t)src) & 3u) {
+        memcpy(dst, src, SC64_MEMO_BYTES);
+        return;
+    }
+    CopyWord *out = (CopyWord *)(void *)dst;
+    const CopyWord *in = (const CopyWord *)(const void *)src;
+    for (unsigned i = 0; i < SC64_MEMO_BYTES / sizeof(*in); ++i)
+        out[i] = in[i];
+}
+
 static int __attribute__((noinline))
 sc64_route_fill_wide_cached(u8 *field, int goal)
 {
@@ -28,14 +42,14 @@ sc64_route_fill_wide_cached(u8 *field, int goal)
         return sc64_route_fill_linear(field, goal);
     if (sc64_wide_memo.reached) {
         if (sc64_wide_memo.goal == goal) {
-            memcpy(field, sc64_wide_memo.field, SC64_MEMO_BYTES);
+            sc64_wide_copy_field(field, sc64_wide_memo.field);
             return sc64_wide_memo.reached;
         }
         for (unsigned i = 0; i < sc64_wide_memo.used; ++i) {
             const Sc64WideDifference *entry = &sc64_wide_memo.diff[i];
             if (!entry->reached || entry->goal != goal) continue;
             const u8 *bytes = sc64_wide_memo.packets + entry->offset;
-            memcpy(field, sc64_wide_memo.field, SC64_MEMO_BYTES);
+            sc64_wide_copy_field(field, sc64_wide_memo.field);
             for (unsigned e = 0; e < entry->count;) {
                 unsigned at = bytes[e] | (unsigned)bytes[e + 1] << 8;
                 unsigned size = bytes[e + 2];
@@ -51,7 +65,7 @@ sc64_route_fill_wide_cached(u8 *field, int goal)
     /* A large flood supplies the anchor. Rotate when repeatedly queried
      * destinations are too different for a bounded packet. */
     if (!sc64_wide_memo.reached || sc64_wide_memo.misses >= SC64_MEMO_ROTATE_AFTER) {
-        memcpy(sc64_wide_memo.field, field, SC64_MEMO_BYTES);
+        sc64_wide_copy_field(sc64_wide_memo.field, field);
         sc64_wide_memo.goal = goal;
         sc64_wide_memo.reached = reached;
         sc64_wide_memo.used = sc64_wide_memo.next = sc64_wide_memo.misses = 0;
