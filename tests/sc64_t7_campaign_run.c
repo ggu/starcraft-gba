@@ -813,6 +813,88 @@ static int clear_route_goliath_with_ground_force(void)
     return !u[threat].alive;
 }
 
+/* The Wraiths' centroid, or 0 when none is alive. */
+static int wraith_centroid(int *cx,int *cy)
+{
+    int n=0,sx=0,sy=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_WRAITH){sx+=u[i].x;sy+=u[i].y;++n;}
+    if(n){*cx=sx/n;*cy=sy/n;}
+    return n;
+}
+
+static void order_wraiths(int x,int y,int attack)
+{
+    (void)order_visible_type_mode(U_WRAITH,x,y,attack);
+    (void)order_every_type(U_WRAITH,x,y,attack);
+}
+
+/* A hostile unit with a strong air weapon (a volley of 10 or more: Goliath,
+   Wraith, Battlecruiser; not Marines) whose air range (plus 48 px) covers
+   the drop point; *range is that air range in px. */
+static int drop_defender(int i,int gx,int gy,int *range)
+{
+    Sc64StockAttack attack;
+    if(!t7_source_wraith_can_attack(i)||!sc64_stock_attack_select(u[i].raw_type,1,&attack))return 0;
+    if(sc64_stock_attack_damage_per_impact(&attack,0)*(int)sc64_stock_attack_impact_count(&attack)<10)return 0;
+    int r=attack.weapon->max_range/2;
+    if(dist2(u[i].x,u[i].y,gx,gy)>(r+48)*(r+48))return 0;
+    *range=r;return 1;
+}
+
+/* Before the Dropship leaves, a Wraith group clears the air defenders of the
+   drop point: it gathers, flies the risk-aware air route to just outside the
+   nearest defender's air range, and attack-moves onto it as one group (equal
+   160 px ranges; eight Wraiths kill a Goliath in one volley). Up to three
+   waves of up to eight. Returns 1 when no defender covers the drop point. */
+static int strike_drop_defenders(void)
+{
+    int gx=1848,gy=840;
+    if(!clear_point_in_location(1,&gx,&gy))return 0;
+    for(int wave=0;wave<3&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;wave++){
+        int have=current_count_type(U_WRAITH);
+        if(have<8)(void)build_wraith_escorts(8-have);
+        int starport=raw_building(114,SIDE),cx,cy;
+        if(starport>=0&&wraith_centroid(&cx,&cy)){
+            order_wraiths(b[starport].x,b[starport].y-32,0);
+            for(int t=0;t<1500&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++)step(0);
+        }
+        for(int pass=0;pass<12&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;pass++){
+            int target=-1,range=0,best=0x7fffffff;
+            if(!wraith_centroid(&cx,&cy))break;
+            for(int i=0;i<MAX_UNITS;i++){
+                int r;
+                if(!drop_defender(i,gx,gy,&r))continue;
+                int d=dist2(cx,cy,u[i].x,u[i].y);
+                if(d<best){best=d;target=i;range=r;}
+            }
+            if(target<0){
+                fprintf(stderr,"T7 drop point clear of air defenders Wraiths=%d tick=%u\n",current_count_type(U_WRAITH),host_tick);
+                return 1;
+            }
+            fprintf(stderr,"T7 Wraith strike wave=%d target slot=%d raw=%d at=%d,%d hp=%d Wraiths=%d tick=%u\n",
+              wave,target,u[target].raw_type,u[target].x,u[target].y,u[target].hp,current_count_type(U_WRAITH),host_tick);
+            /* Approach along the planner's route, stopping outside its range. */
+            for(int leg=0;leg<64&&u[target].alive&&wraith_centroid(&cx,&cy)&&
+                dist2(cx,cy,u[target].x,u[target].y)>(range+40)*(range+40)&&
+                host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;leg++){
+                int wx,wy;
+                if(!air_next_waypoint(cx,cy,u[target].x,u[target].y,&wx,&wy))break;
+                order_wraiths(wx,wy,0);
+                for(int t=0;t<240&&wraith_centroid(&cx,&cy)&&dist2(cx,cy,wx,wy)>48*48&&
+                    host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++)step(0);
+            }
+            if(!u[target].alive)continue;
+            if(!wraith_centroid(&cx,&cy))break;
+            order_wraiths(u[target].x,u[target].y,1);
+            for(int t=0;t<3000&&u[target].alive&&current_count_type(U_WRAITH)>0&&
+                host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++)step(0);
+            fprintf(stderr,"T7 Wraith strike result target alive=%d hp=%d Wraiths=%d tick=%u\n",
+              u[target].alive,u[target].hp,current_count_type(U_WRAITH),host_tick);
+        }
+    }
+    return 0;
+}
+
 static int stage_emitter_carrier(void)
 {
     int carrier=race_late.emitter_carrier;
@@ -883,7 +965,13 @@ static u32 air_cell_risk(int x,int y)
     for(int i=0;i<MAX_BUILDINGS;i++)if(t7_hostile_source_building(i)&&building_complete(i)){
         if(b[i].type==B_MISSILE_TURRET||b[i].type==B_PHOTON_CANNON||
            b[i].type==B_SPORE_COLONY||b[i].type==B_BUNKER){
-            int weapon=56,margin=weapon+32,d=dist2(x,y,b[i].x,b[i].y);
+            /* The defence's own air weapon range where the stock tables have
+               one (a Missile Turret reaches about 112 px, not 56). */
+            Sc64StockAttack attack;
+            int weapon=56;
+            if(b[i].raw_type>=0&&sc64_stock_attack_select(b[i].raw_type,1,&attack)&&
+               attack.weapon->max_range/2>weapon)weapon=attack.weapon->max_range/2;
+            int margin=weapon+32,d=dist2(x,y,b[i].x,b[i].y);
             if(d<margin*margin){
                 risk+=(u32)(margin*margin-d)/(u32)(margin*4)+1u;
                 if(d<(weapon+32)*(weapon+32))risk+=4000u;
@@ -1034,8 +1122,8 @@ static int controller_air_deliver_emitter(int emitter)
           ship,u[ship].alive,u[ship].x,u[ship].y,u[ship].order,u[ship].tx,u[ship].ty);
         return 0;
     }
-    fprintf(stderr,"T7 Dropship reached goal ship=%d pos=%d,%d cargo=%d selected=%d count=%d mode=%d menu=%d\n",
-      ship,u[ship].x,u[ship].y,race_transport_cargo_space(ship),u[ship].selected,selected_count(),mode,menu_open);
+    fprintf(stderr,"T7 Dropship reached goal ship=%d pos=%d,%d hp=%d/%d cargo=%d selected=%d count=%d mode=%d menu=%d\n",
+      ship,u[ship].x,u[ship].y,u[ship].hp,u[ship].maxhp,race_transport_cargo_space(ship),u[ship].selected,selected_count(),mode,menu_open);
     if(!select_unit(ship)){
         fprintf(stderr,"T7 Dropship select for unload failed selected=%d count=%d building=%d mode=%d menu=%d\n",
           u[ship].selected,selected_count(),selected_building,mode,menu_open);
@@ -1176,6 +1264,10 @@ static void progress_until_terminal(void)
             }
             controller_assign_gas_workers();
             (void)controller_assign_minerals();
+            /* Clear the drop point's air defenders first: a delivery through
+               them survives only by luck. */
+            if(!strike_drop_defenders())
+                fprintf(stderr,"T7 drop point still defended after the Wraith strike; deliver anyway\n");
             if(controller_air_deliver_emitter(emitter)) goto delivery_complete;
             /* Gather the Marines already supplied by the scenario and clear
                only a source-hostile Goliath that can reach the drop point.
