@@ -49,3 +49,54 @@ byte-identical pause saves and matched queue and world state after a fresh
 load and 128 further updates. All three tested products fit in 32 MiB.
 The P10 and Terran stack guards retained 816 and 240 bytes respectively
 beyond their required margins.
+
+## P4 campaign and normal cartridge builds
+
+The normal release at `b7e69893` served as the control. The paired build
+changes the canonical pack selection for Pylon, Gateway and Forge. The
+existing generated sidecar and packed compositor preserve the source art,
+clip and painter order.
+
+The P4 replay loads an earned P3 result through HOME and uses the ordinary
+linked input tape. At tape call 17275, a guest call-stack profile of 16
+updates assigns 55,275 cycles per update to byte-sprite blits from the
+completed-building renderer. A Forge and Gateway are in view. At call 40127,
+the same compositor costs 20,564 cycles, and the mapped construction image
+costs another 60,542 cycles. The P4 checkpoint at call 40127 yields an
+ordinary pause journal at world frame 39600. After loading it anew, a
+56-position camera sweep keeps visible actors and surrounding fog in view.
+
+| Normal product and window | Calls | Mean cycles, control → packed | p95 cycles, control → packed | Max cycles, control → packed |
+| --- | ---: | ---: | ---: | ---: |
+| P10, P4 from call 17275 | 128 | 802,420 → 773,269 | 885,365 → 856,210 | 939,764 → 906,838 |
+| P10, P4 from call 40127 | 128 | 1,022,558 → 1,014,581 | 1,058,829 → 1,052,214 | 1,161,591 → 1,155,002 |
+| P10, P4 from fresh SRAM with camera sweep | 128 | 1,071,479 → 1,060,520 | 1,194,635 → 1,184,508 | 1,269,194 → 1,264,670 |
+| P10, scrolled calls from that sweep | 56 | 1,135,527 → 1,121,187 | 1,214,353 → 1,203,717 | 1,269,194 → 1,264,670 |
+| T10, earned T5 assault journal and camera sweep | 128 | 592,943 → 592,943 | 712,859 → 712,859 | 767,194 → 767,194 |
+| Showcase, Blood Bath Melee against Protoss | 384 | 815,697 → 815,697 | 1,547,471 → 1,547,372 | 1,873,592 → 1,874,008 |
+
+The P4 cuts at tape calls 17275 and 40127 gain 3.63% and 0.78% respectively.
+Whole-loop cycles in the scrolled portion fall 1.26%. The Showcase pair
+plays the same physical Blood Bath tape with the same two native start
+anchors. It ends with 57 units and 12 buildings. In nine boundaries from
+calls 9013 through 9021, the camera brings an enemy Pylon across the right
+clip. Actor draw cost on that segment falls from 254,985 to 248,996 cycles
+per call. The complete 384-call mean stays level.
+
+Both indexed bitmap pages, palette, world state, camera and sampled fog
+match all applicable checks. At one late P4 input boundary the display bit
+selects the adjacent completed frame, and both builds present the same page again at the
+next boundary. Hardware pacing is unmeasured.
+
+The three profile-specific ASan/UBSan packed-word oracles passed 720 Terran,
+720 Showcase and 1,080 P10 pixel cases with clipped and phase-shifted source
+frames. The four normal builds passed the ROM verifiers. The Z10 ROM
+matches the control byte for byte because it already packs these buildings.
+The three linked stack guards pass with unchanged hot-byte counts and spare
+space. ROM contents grow by 52,920 bytes on T10, 52,912 on P10 and 57,336 on
+Showcase. The four products fit their normal 32 MiB cartridges.
+
+Two alternative mapped-sprite implementations were also tested from the P4
+pause. The generic ARM pair loop costs 0.98% more cycles. A WarpAnchor lookup
+with an identity row saves 0.70% and matches indexed pixels, but the current
+change is limited to the established packed-building path.
