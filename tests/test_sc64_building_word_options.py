@@ -21,6 +21,17 @@ PACKED = (
     'showcase-terran-base-building-words',
 )
 STOCK = ('', 'generated', 'p10-hatchery-overmind-nexus-words', '')
+DEFAULT = (
+    'terran-command_center-barracks-supply_depot-pylon-gateway-forge-words',
+    PACKED[1],
+    'p10-hatchery-overmind-nexus-command_center-barracks-supply_depot-pylon-gateway-forge-words',
+    'showcase-command_center-barracks-supply_depot-pylon-gateway-forge-words',
+)
+PROTOSS_ONLY = (
+    'terran-pylon-gateway-forge-words', STOCK[1],
+    'p10-hatchery-overmind-nexus-pylon-gateway-forge-words',
+    'showcase-pylon-gateway-forge-words',
+)
 
 
 class BuildingWordOptionsTest(unittest.TestCase):
@@ -39,32 +50,26 @@ class BuildingWordOptionsTest(unittest.TestCase):
         return tuple(Path(line).parent.name if line else '' for line in plan.stdout.splitlines())
 
     def test_normal_and_rollback_use_the_expected_banks(self):
-        self.assertEqual(self.banks(), PACKED)
-        self.assertEqual(self.banks('CANONICAL_TERRAN_BUILDING_WORDS=0'), STOCK)
-        self.assertNotEqual(self.plan('CANONICAL_TERRAN_BUILDING_WORDS=2').returncode, 0)
+        self.assertEqual(self.banks(), DEFAULT)
+        self.assertEqual(self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=0'), PACKED)
+        self.assertEqual(self.banks('CANONICAL_TERRAN_BUILDING_WORDS=0'), PROTOSS_ONLY)
+        self.assertEqual(self.banks('CANONICAL_TERRAN_BUILDING_WORDS=0',
+                                    'CANONICAL_PROTOSS_BASE_BUILDING_WORDS=0'), STOCK)
+        for option in ('CANONICAL_TERRAN_BUILDING_WORDS', 'CANONICAL_PROTOSS_BASE_BUILDING_WORDS'):
+            with self.subTest(option=option):
+                self.assertNotEqual(self.plan(f'{option}=2').returncode, 0)
 
     def test_profile_overrides_preserve_other_bank_selections(self):
-        for index, option in enumerate(('TERRAN_BUILDING_WORDS', 'Z10_TERRAN_BUILDING_WORDS',
-                                        'P10_TERRAN_BUILDING_WORDS', 'SHOWCASE_TERRAN_BUILDING_WORDS')):
-            with self.subTest(option=option):
-                expected = PACKED[:index] + (STOCK[index],) + PACKED[index + 1:]
-                self.assertEqual(self.banks(f'{option}=0'), expected)
+        options = ('TERRAN_BUILDING_WORDS', 'Z10_TERRAN_BUILDING_WORDS',
+                   'P10_TERRAN_BUILDING_WORDS', 'SHOWCASE_TERRAN_BUILDING_WORDS')
+        for protoss, enabled, disabled in ((1, DEFAULT, PROTOSS_ONLY), (0, PACKED, STOCK)):
+            for index, option in enumerate(options):
+                with self.subTest(protoss=protoss, option=option):
+                    expected = enabled[:index] + (disabled[index],) + enabled[index + 1:]
+                    self.assertEqual(self.banks(f'CANONICAL_PROTOSS_BASE_BUILDING_WORDS={protoss}',
+                                                f'{option}=0'), expected)
 
-    def test_opt_in_adds_exactly_the_protoss_base_roster(self):
-        banks = self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1')
-        self.assertEqual(banks, (
-            'terran-command_center-barracks-supply_depot-pylon-gateway-forge-words',
-            PACKED[1],
-            'p10-hatchery-overmind-nexus-command_center-barracks-supply_depot-pylon-gateway-forge-words',
-            'showcase-command_center-barracks-supply_depot-pylon-gateway-forge-words',
-        ))
-        self.assertEqual(self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1',
-                                    'CANONICAL_TERRAN_BUILDING_WORDS=0'), (
-            'terran-pylon-gateway-forge-words', STOCK[1],
-            'p10-hatchery-overmind-nexus-pylon-gateway-forge-words',
-            'showcase-pylon-gateway-forge-words',
-        ))
-        self.assertNotEqual(self.plan('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=2').returncode, 0)
+    def test_incompatible_renderer_skips_protoss_extension(self):
         self.assertEqual(self.banks('CANONICAL_PROTOSS_BASE_BUILDING_WORDS=1',
                                     'CFLAGS=-DSC64_TILE_RENDERER'), ('', 'generated', '', ''))
 
@@ -83,4 +88,4 @@ class BuildingWordOptionsTest(unittest.TestCase):
         self.assertEqual(self.banks('CFLAGS=-DSC64_TILE_RENDERER=1'), ('', 'generated', '', ''))
         self.assertEqual(self.banks('SHOWCASE_UNIT_WORD_FLAGS=')[-1], '')
         self.assertEqual(self.banks('TERRAN_UNIT_WORD_FLAGS=')[0], '')
-        self.assertEqual(self.banks('SHOWCASE_UNIT_WORD_FLAGS=-DSC64_UNIT_WORD_SPRITES=1'), PACKED)
+        self.assertEqual(self.banks('SHOWCASE_UNIT_WORD_FLAGS=-DSC64_UNIT_WORD_SPRITES=1'), DEFAULT)
