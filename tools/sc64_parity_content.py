@@ -197,6 +197,7 @@ def collapsed_index(steps, raw_index: int) -> int:
 
 
 HOLD_LAST = 0xFF  # SC64_CONSTRUCTION_HOLD_LAST
+MAX_ATTACK_TICKS = 1024  # far above the attack importer's 255-tick bound
 
 
 def per_tick(steps, ticks: int, hold=None) -> list:
@@ -1008,6 +1009,9 @@ def compare_attack(scripts: Scripts, raw: int, actor: dict, frames: dict) -> lis
         # The declared duration is an exclusive bound: the runtime never shows
         # a row keyed at or after it.
         ticks = mode.get('full_duration_source_ticks') or starts[-1] + 1
+        if not isinstance(ticks, int) or not 0 < ticks <= MAX_ATTACK_TICKS:  # before any expansion
+            rows.append(dict(row, verdict='absent', note=f'engine timeline of {ticks} ticks is implausible'))
+            continue
         timeline = [(t, f) for t, f in timeline if t < ticks]
         bounds = [t for t, _ in timeline][1:] + [ticks]
         eng = [f for (t, f), stop in zip(timeline, bounds) for _ in range(stop - t)]
@@ -1040,9 +1044,10 @@ def compare_attack(scripts: Scripts, raw: int, actor: dict, frames: dict) -> lis
         else:
             hold = seq['last_frame']  # no ToIdle: ignorerest keeps the attack frame
         path = list(seq['steps']) + tail
-        if seq['end'] == 'loop' and seq.get('cycle'):  # a looping path repeats its steady cycle
-            while sum(low for _, low, _ in path) < ticks and sum(low for _, low, _ in seq['cycle']):
-                path += list(seq['cycle'])
+        cycle_ticks = sum(low for _, low, _ in seq.get('cycle') or [])
+        if seq['end'] == 'loop' and cycle_ticks:  # a looping path repeats its steady cycle
+            short = ticks - sum(low for _, low, _ in path)
+            path += list(seq['cycle']) * max(0, -(-short // cycle_ticks))
         rom = per_tick(path, ticks, hold)
         if seq['end'] == 'hold' and len(rom) < ticks:  # ignorerest holds a frame we may not know
             rom += [hold] * (ticks - len(rom))
@@ -1209,6 +1214,8 @@ def compare_construction(scripts: Scripts, stage: dict, baked: dict) -> dict:
         notes.append(f'ROM stops ({seq["end"]}); engine loops back to step {eng_loop}')
     elif seq['end'] == 'loop' and eng_loop != rom_loop:
         notes.append(f'loop entry differs (ROM step {rom_loop}, engine step {eng_loop})')
+    elif seq['end'] == 'hold' and seq['last_frame'] is None:
+        notes.append('ROM path ends by holding an inherited frame; termination not compared')
     elif seq['end'] in ('end', 'hold') and eng and seq['last_frame'] != eng[-1][0]:
         notes.append(f"held frame differs (ROM {seq['last_frame']}, engine {eng[-1][0]})")
     elif seq['end'] == 'end':
@@ -1284,6 +1291,10 @@ def iscript_section(scripts: Scripts, root: Path, banks: dict, names: dict) -> d
                         ('construction', construction_rows)):
         bank_rows(name, build)
     missing = {name: state for name, state in status.items() if state != 'ok'}
+    for raw in range(UNIT_COUNT):  # every unit with an animation a bank models appears, rows or not
+        present = scripts.animations(scripts.unit_image(raw))
+        if any(name in present for name in MODELLED) or scripts.construction[raw]:
+            unit(raw)
     stages_by_raw: dict = {}
     if 'construction' in missing:  # the stages the construction importer would bake
         for st in source_stage_inputs(scripts.tables, scripts.payload):

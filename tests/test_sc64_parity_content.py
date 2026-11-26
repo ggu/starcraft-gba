@@ -405,6 +405,8 @@ class SkippedComparisonTest(unittest.TestCase):
                                                 'full_duration_source_ticks': 4}]}
         two_cycles = {(5, 'ground'): [(0, 1), (1, 2), (2, 1), (3, 2)]}
         self.assertEqual(pc.compare_attack(fake, 5, actor, two_cycles)[0]['verdict'], 'match')
+        huge = dict(actor, modes=[dict(actor['modes'][0], full_duration_source_ticks=10_000)])
+        self.assertEqual(pc.compare_attack(fake, 5, huge, {(5, 'ground'): [(0, 1)]})[0]['verdict'], 'absent')
 
     def test_walk_without_a_steady_loop_is_not_compared(self):
         entry = {'unit_id': 0, 'image_id': 1, 'cycle_ticks': 2, 'steps': [{'tick': 0, 'pose': 1}, {'tick': 1, 'pose': 2}]}
@@ -438,6 +440,19 @@ class SkippedComparisonTest(unittest.TestCase):
                 return pc.rom_sequence(wait(3) + playfram(1) + wait(2) + op(48), 0)
         held = {(106, 0): {'steps': [(0, 3), (1, 2)], 'loop_start': pc.HOLD_LAST, 'frame_count': 3}}
         self.assertEqual(pc.compare_construction(Leading(), stage, held)['verdict'], 'not compared')
+
+        class Inherited:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(wait(3) + op(48), 0)
+        same = {(106, 0): {'steps': [(0, 3)], 'loop_start': pc.HOLD_LAST, 'frame_count': 3}}
+        longer = {(106, 0): {'steps': [(0, 4)], 'loop_start': pc.HOLD_LAST, 'frame_count': 3}}
+        self.assertEqual(pc.compare_construction(Inherited(), stage, same)['verdict'], 'not compared')
+        self.assertEqual(pc.compare_construction(Inherited(), stage, longer)['verdict'], 'differs')
+
+        class Removed:
+            def sequence(self, image, animation):
+                return pc.rom_sequence(wait(3) + op(22), 0)
+        self.assertEqual(pc.compare_construction(Removed(), stage, same)['verdict'], 'differs')
 
     def test_unknown_resource_type_disabled_rows_and_start_locations(self):
         always = [{'name': 'Always', 'comparison': 0, 'amount': 0, 'player_group': 0, 'unit_type': 0, 'flags': 0}]
