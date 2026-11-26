@@ -37,13 +37,19 @@ Three tape commands and one environment variable; tests in
 | `region ADDR BYTES` / `region every K` / `region on` | Extra guest blocks recorded into `extra.bin` on every follow-up read of `tap tick`; `parity_decode.py` joins them to the tick's record and to its hash chain, so captures without `extra.bin` keep their old chains |
 | `pulse ADDR BYTES OP VALUE STEPS MASK HOLD GAP` | Press a button only while a field meets a condition, for a fixed number of steps. `pulse 800F0C20 2 ne 0 N 2 3 60` dismisses every text box (Start only while the pause halfword is set) without ever opening the pause menu |
 | `SC64_CAPTURE_LOCK` | Lets a session use its own lock file instead of the shared native lock |
+| Output budget | The frontend counts every byte it writes and stops with exit 10 before passing `--output-budget-gib` (default 8) or leaving less than `--reserve-gib` free (re-measured every 16 MiB) |
 
 Binaries (SHA-256): `9363c669a872da374e71f9775693d3c605cc0980096f807e07db97572e8ad998`
-(`poke` and `region`; menu exploration only) and
+(`poke` and `region`; menu exploration only),
 `db9de872a12ee159bdd5aa1f0df51088dbd528cb28b00734ab2a0ead8f9e603c`
-(adds `pulse`; every capture below). The tracked `capture.cpp`,
-`capture_view.h`, `capture.py` and `inject.cmake` are byte for byte the
-sources of the second build.
+(adds `pulse`; the 30 launches, the timelines and the first golden pairs) and
+`8d81e37dc6dff192c7acc788e117dc0220932da6df8c3f5a3b11356afcb0b0ea`
+(adds the output budget; the golden pairs `f-t1-3/4` and `tl-T3c/d`). The
+tracked `capture.cpp`, `capture_view.h`, `capture.py` and `inject.cmake` are
+byte for byte the sources of the last build. Both golden pairs give the same
+per-tick hash chain under `db9de872` and `8d81e37d`, so the budget changes
+nothing in the emulation; a zero budget stops a run at its first record with
+exit 10.
 
 **Parallel captures.** For most of the afternoon a long-running capture
 service of another session held the shared lock, so the queue stalled for
@@ -326,7 +332,14 @@ runtime values.
 `./dev parity` judges two new scenarios (`tools/sc64_parity_metrics.py`
 `SCENARIOS`, measured in `tools/sc64_parity_fieldmap.py`).
 
-**`t1-fields`** (golden from `f-t1-1` and `f-t1-2`, identical chains): the
+Every observation stores a digest of the layout definitions it reads
+(`layout_fields_sha256`), so a layout edit that leaves those definitions alone
+keeps a golden gating, and one that changes them fails the run as
+`STALE-GOLDEN` until the golden is regenerated (`docs/PARITY-HARNESS.md`,
+layout gate). The `n64-staged` tag of a bundle is carried on each observation
+and into the scorecard's provenance column.
+
+**`t1-fields`** (golden from `f-t1-3` and `f-t1-4`, identical chains): the
 t1-move checks on the capture's first Move, plus order, fog and animation
 checks. The GBA side is the existing `move` runner with the same parameters.
 
@@ -351,7 +364,7 @@ The N64 move values agree with the S4 t1-move capture within a frame or two
 regions or skipped ticks inside the window, and the GBA run is sized to
 reach the rest frame.
 
-**`t3-opening`** (golden from two T3 opening captures): research, bullet and
+**`t3-opening`** (golden from the T3 opening captures `tl-T3c` and `tl-T3d`): research, bullet and
 timeline numbers, report only. T3 is busy enough that 40 of 4,436 ticks fall
 one frontend step apart and get no follow-up record, and about one follow-up
 read in eleven sees a tick half done (the Hatchery's timer reads the same

@@ -285,6 +285,18 @@ inline bool sc64_capture_region_ok(std::uint32_t offset, std::uint32_t bytes, st
            used <= SC64_EXTRA_MAX_BYTES - bytes && offset < SC64_CAPTURE_RAM && bytes <= SC64_CAPTURE_RAM - offset;
 }
 
+/* Output budget: the frontend counts every byte it writes to its run directory (tap.bin,
+ * extra.bin, ticks.raw, dumps, states, frames) and stops with exit 10 before a write would
+ * pass the budget, or leave less than the reserve free on the output volume (`available` is
+ * the free space last measured, `since` the bytes written after that measurement). */
+constexpr std::uint64_t SC64_OUTPUT_CHECK_BYTES = 16ull << 20;   /* re-measure free space this often */
+constexpr bool sc64_capture_budget_ok(std::uint64_t written, std::uint64_t bytes, std::uint64_t budget,
+                                      std::uint64_t available, std::uint64_t since, std::uint64_t reserve) {
+    if (bytes > budget || written > budget - bytes) return false;
+    const std::uint64_t used = since + bytes;
+    return available >= used && available - used >= reserve;
+}
+
 /* FNV-1a, used only to localise a full-RAM hash difference to a 64 KiB region. */
 inline std::uint64_t sc64_capture_fnv64(const std::uint8_t *p, std::size_t n) {
     std::uint64_t h = 1469598103934665603ull;

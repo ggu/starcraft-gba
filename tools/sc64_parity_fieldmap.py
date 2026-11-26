@@ -202,30 +202,24 @@ def census_compare(chk_rows: list, n64_rows: list, subunits: dict) -> dict:
     doodad_owner = [{'chk_owner': r['owner'], 'n64_owner': n['owner'], 'disabled': bool(r.get('disabled'))}
                     for r, n in matched if r.get('section') == 'THG2']
     # Units already moving on the first tick: same type and owner within MOVED_RADIUS px.
-    free = defaultdict(list)
-    for key, indices in pool.items():
-        for i in indices:
-            free[key[:2]].append(i)
     out = {}
     stacked = lambda r: any(o is not r and abs(o['x'] - r['x']) <= STACK_RADIUS and abs(o['y'] - r['y']) <= STACK_RADIUS
                             for o in expected)
+    index_of = {id(n): i for i, n in enumerate(n64_rows)}
     for label, radius in (('moved', MOVED_RADIUS), ('displaced', DISPLACE_RADIUS)):
-        out[label], still = [], []
-        for r in missing:
-            if label == 'displaced' and not stacked(r):
-                still.append(r)   # an isolated placement has nothing to be spread from
-                continue
-            near = [i for i in free[(r['type'], r['owner'])] if i not in used and
-                    max(abs(n64_rows[i]['x'] - r['x']), abs(n64_rows[i]['y'] - r['y'])) <= radius]
-            if near:
-                i = min(near, key=lambda i: abs(n64_rows[i]['x'] - r['x']) + abs(n64_rows[i]['y'] - r['y']))
-                used.add(i)
-                matched.append((r, n64_rows[i]))
-                out[label].append({'type': r['type'], 'owner': r['owner'], 'chk': [r['x'], r['y']],
-                                   'n64': [n64_rows[i]['x'], n64_rows[i]['y']]})
-            else:
-                still.append(r)
-        missing = still
+        out[label] = []
+        # An isolated placement has nothing to be spread from, so only stacked ones may be displaced.
+        eligible = [r for r in missing if label == 'moved' or stacked(r)]
+        free_rows = [n for i, n in enumerate(n64_rows) if i not in used]
+        fits = lambda r, n: (n['type'], n['owner']) == (r['type'], r['owner']) and \
+            max(abs(n['x'] - r['x']), abs(n['y'] - r['y'])) <= radius
+        taken = set()
+        for r, n in max_pairs(eligible, free_rows, fits):   # most pairs, then the least distance
+            used.add(index_of[id(n)])
+            taken.add(id(r))
+            matched.append((r, n))
+            out[label].append({'type': r['type'], 'owner': r['owner'], 'chk': [r['x'], r['y']], 'n64': [n['x'], n['y']]})
+        missing = [r for r in missing if id(r) not in taken]
     moved, displaced = out['moved'], out['displaced']
     missing = [{k: r[k] for k in ('type', 'owner', 'x', 'y', 'section', 'resources')} for r in missing]
     spots = {(r['x'], r['y'], subunits.get(r['type'])) for r, _ in matched if subunits.get(r['type'])}
@@ -493,6 +487,12 @@ def table_columns(tables: dict) -> list:
     return out
 
 
+def table_hints() -> dict:
+    """The first-column addresses the layout records (tools/parity/sc64-usa-v1.json dat_tables)."""
+    import parity_decode as pdx
+    return {k: v for k, v in pdx.Layout().doc.get('dat_tables', {}).items() if '.' in k}
+
+
 def big_endian(fmt: str, raw: bytes) -> bytes:
     """A little-endian column re-encoded big-endian, one value at a time. Columns that
     pack u16 halves (placement, addon, dimensions) are stored per u16 instead (per_u16)."""
@@ -508,9 +508,23 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
     """Locate each column in a full-RAM image. A column is 'equal' where its
     big-endian (or per-u16) encoding occurs; otherwise it is expected right after
     the previous column of the same table (columns follow file order, each starting on
-    a 4-byte boundary), and the rows that differ there are listed."""
+    a 4-byte boundary), and the rows that differ there are listed. A table's first column
+    is taken at base_hint[column] (KSEG0 address, the layout's dat_tables) when it matches
+    there; otherwise at a 4-byte aligned occurrence, preferring one whose next column also
+    matches right after it."""
     align = lambda a: (a + 3) & ~3
     out, previous = [], {}
+    hints = {k: int(v, 16) - RAM_BASE for k, v in (base_hint or {}).items() if isinstance(v, str) and v.startswith('0x')}
+    following = {columns[k][0]: columns[k + 1] for k in range(len(columns) - 1)
+                 if columns[k][0].split('.')[0] == columns[k + 1][0].split('.')[0]}
+
+    def next_matches(name, at):
+        nxt = following.get(name)
+        if nxt is None:
+            return False
+        blob = big_endian(nxt[1], nxt[3])
+        return ram[at:at + len(blob)] == blob
+
     for name, fmt, rows, raw in columns:
         table = name.split('.')[0]
         size = len(raw)
@@ -525,10 +539,19 @@ def anchor_columns(ram: bytes, columns: list, base_hint: dict | None = None) -> 
             found = next(((enc, expected, ram.count(blob)) for enc, blob in candidates
                           if ram[expected:expected + size] == blob), None)
         else:
+            hint = hints.get(name)
             for enc, blob in candidates:
-                at = ram.find(blob)
-                if at >= 0:
-                    found = (enc, at, ram.count(blob))
+                if hint is not None and ram[hint:hint + size] == blob:
+                    found = (enc, hint, ram.count(blob))
+                    break
+                spots, at = [], ram.find(blob)
+                while at >= 0 and len(spots) < 64:
+                    if at % 4 == 0:
+                        spots.append(at)
+                    at = ram.find(blob, at + 1)
+                if spots:
+                    best = next((a for a in spots if next_matches(name, align(a + size))), spots[0])
+                    found = (enc, best, ram.count(blob))
                     break
         if found:
             encoding, at, count = found
@@ -972,7 +995,7 @@ def launch_report(run: pathlib.Path, label: str, inputs, columns, t1_tables=None
     dump = run / 'start.ram'
     if dump.is_file():
         ram = dump.read_bytes()
-        anchor = anchor_columns(ram, columns)
+        anchor = anchor_columns(ram, columns, table_hints())
         entry['tables'] = {'equal': sum(1 for f in anchor if f['status'] == 'equal'),
                            'differs': {f['column']: f.get('rows_differ') for f in anchor if f['status'] != 'equal'},
                            'diffs': {f['column']: f.get('diffs') for f in anchor if f['status'] != 'equal'}}
@@ -1116,7 +1139,7 @@ def n64_timeline(cap, humans: set) -> dict:
 def gba_timeline(trace_path, humans: set) -> dict:
     """The same from a GBA census trace (tests/sc64_parity_trace.h): unit and building rows
     with raw types and source owners, D hit records and P banks (engine owners)."""
-    live, raw_owner_of, samples, banks = {}, {}, [], defaultdict(list)
+    live, gone, raw_owner_of, samples, banks = {}, {}, {}, [], defaultdict(list)
     first_hit, step, max_units = None, None, None
 
     def flush():
@@ -1142,18 +1165,23 @@ def gba_timeline(trace_path, humans: set) -> dict:
             elif tag == 'S':
                 flush()
                 step = int(w[1])
+                gone = {}
             elif tag in ('U', 'B') and len(w) > 5:
                 key = (tag, int(w[1]))
                 raw_owner = int(w[5]) if int(w[5]) >= 0 else int(w[4])
                 live[key] = (raw_owner, int(w[3]))
                 raw_owner_of[int(w[4])] = raw_owner
             elif tag in ('-U', '-B'):
-                live.pop((tag[1], int(w[1])), None)
+                # Removals are written before the step's hits: keep the row for this step so a
+                # first hit that kills still finds its victim.
+                key = (tag[1], int(w[1]))
+                if key in live:
+                    gone[key] = live.pop(key)
             elif tag == 'D' and first_hit is None and step is not None and max_units is not None:
                 # The target is a unit slot, or max_units + a building slot.
                 target = int(w[1])
                 key = ('U', target) if target < max_units else ('B', target - max_units)
-                row = live.get(key)
+                row = live.get(key) or gone.get(key)
                 if row is not None and row[0] in humans:
                     first_hit = {'sf': step * 4 // 5, 'type': row[1], 'owner': row[0]}
             elif tag == 'P' and step is not None:
@@ -1220,7 +1248,7 @@ def main(argv=None) -> int:
         return timeline_command(args.run, args.mission, args.out, inputs)
     columns = table_columns(inputs[2])
     for dump in args.dumps:
-        found = anchor_columns(dump.read_bytes(), columns)
+        found = anchor_columns(dump.read_bytes(), columns, table_hints())
         tally = Counter(f['status'] for f in found)
         print(json.dumps({'dump': dump.name, 'tally': tally,
                           'first': {f['column']: f['address'] for f in found if f['column'].endswith(('.flingy', '.mineral_base', '.minerals', '.label', '.sprite'))},

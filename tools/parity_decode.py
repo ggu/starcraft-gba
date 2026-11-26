@@ -45,6 +45,20 @@ class LayoutError(Exception):
     """A field was asked for that the layout does not allow for that use."""
 
 
+# Layout keys that describe evidence or status rather than where and how a value is read:
+# editing them never changes what a golden decoded.
+NON_SEMANTIC = ('status', 'evidence', 'about')
+
+
+def semantic(value):
+    """A layout definition without its evidence, status and notes."""
+    if isinstance(value, dict):
+        return {k: semantic(v) for k, v in value.items() if k not in NON_SEMANTIC}
+    if isinstance(value, list):
+        return [semantic(v) for v in value]
+    return value
+
+
 def default_home():
     env = os.environ.get('SC64_PARITY_HOME')
     if env:
@@ -92,6 +106,33 @@ class Layout:
                  'tables': {'dat': self.doc.get('dat_tables', {})}}.get(kind, {})
         field = table.get(name)
         return field.get('status') if isinstance(field, dict) else None
+
+    def definition(self, key):
+        """The layout entry a dependency key names (None when the layout has no such entry).
+        A bank array carries its block's address and player count with it."""
+        kind, _, name = key.partition('.')
+        doc = self.doc
+        if kind == 'banks':
+            banks = doc['globals']['banks']
+            field = banks['arrays'].get(name)
+            return None if field is None else {'block': {k: banks[k] for k in ('address', 'players', 'type')},
+                                                'field': field}
+        table = {'unit': doc['unit_fields'], 'clock': doc['clock'], 'pool': doc.get('pools', {}),
+                 'order': doc.get('orders', {}).get('values', {}), 'player': doc.get('player_tables', {}),
+                 'tables': {'dat': doc.get('dat_tables')}}.get(kind)
+        return None if table is None else table.get(name)
+
+    def fields_digest(self, keys):
+        """SHA-256 of what decoding the named fields depends on: their definitions without
+        evidence or status, plus the decoder's fixed parts (the unit table locator and row size,
+        the bank block and the record rule). A golden stays valid under any layout edit that
+        leaves this digest unchanged (an added field, a promotion, a new evidence line)."""
+        payload = {'core': semantic({'unit_table': self.doc['unit_table'],
+                                     'banks': {k: self.doc['globals']['banks'][k] for k in ('address', 'players', 'type')},
+                                     'rng': self.doc['globals'].get('rng'),
+                                     'record_rule': self.doc['clock'].get('record_rule')}),
+                   'fields': {key: semantic(self.definition(key)) for key in sorted(set(keys))}}
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     def pool(self, name, gating):
         field = self.doc.get('pools', {}).get(name)
@@ -497,6 +538,7 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         raise SystemExit(f'not golden: tape marks resolve to different steps {marks}')
     tape_steps = marks[0]
     result = spec['measure_n64'](caps[0], tape_steps)
+    staged = any(c.manifest.get('pokes') or c.manifest.get('n64_staged') for c in caps)
     if allow_skips and any(obs['gating'] for obs in result['observations']):
         raise SystemExit(f'not golden: {scenario_id} admits tick skips, so none of its observations may gate')
     for obs in result['observations']:
@@ -505,6 +547,9 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         obs['layout_fields'] = sorted(set(obs.get('layout_fields', [])))
         if obs['gating']:
             layout.require_all(obs['layout_fields'])
+        obs['layout_fields_sha256'] = layout.fields_digest(obs['layout_fields'])
+        if staged:
+            obs['tags'] = sorted(set(obs.get('tags', [])) | {'n64-staged'})
     golden = {
         'format': 'sc64-parity-golden/1', 'id': scenario_id, 'scenario': spec['title'],
         'layout': layout.name, 'layout_sha256': layout.sha256,
@@ -512,7 +557,7 @@ def write_golden(scenario_id, runs, home, layout, note=None):
         'observations': result['observations'], 'curves': result.get('curves', {}),
         'gba': result['gba'], 'notes': result.get('notes', []) + ([note] if note else []),
         # A capture that wrote guest memory ("poke", owner decision 2026-11-26) is staged evidence.
-        'tags': ['n64-staged'] if any(c.manifest.get('pokes') or c.manifest.get('n64_staged') for c in caps) else [],
+        'tags': ['n64-staged'] if staged else [],
         'bundle': {
             'runs': [c.run.name for c in caps], 'chain': caps[0].chain, 'seed': caps[0].seed(),
             'run_ids': [c.manifest['run_id'] for c in caps],

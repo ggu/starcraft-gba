@@ -193,10 +193,22 @@ static void writes_guest_bytes() {
     assert(std::memcmp(header, "SC64XTR\0", 8) == 0 && header[8] == SC64_EXTRA_VERSION && header[12] == 3);
 }
 
+/* The output budget and the free-space reserve. */
+static void output_budget() {
+    const std::uint64_t G = 1ull << 30;
+    assert(sc64_capture_budget_ok(0, 100, 8 * G, 20 * G, 0, 5 * G));
+    assert(!sc64_capture_budget_ok(8 * G - 50, 100, 8 * G, 20 * G, 0, 5 * G));       /* past the budget */
+    assert(!sc64_capture_budget_ok(0, 9 * G, 8 * G, 20 * G, 0, 5 * G));              /* one write too big */
+    assert(!sc64_capture_budget_ok(0, 100, 8 * G, 5 * G + 99, 0, 5 * G));            /* would dip into the reserve */
+    assert(!sc64_capture_budget_ok(0, 100, 8 * G, 6 * G, G, 5 * G));                /* counted since the last measure */
+    assert(!sc64_capture_budget_ok(0, 100, 8 * G, 50, 0, 0));                        /* not even the bytes free */
+}
+
 int main() {
     pad_bits_are_distinct();
     tap_header_is_little_endian();
     writes_guest_bytes();
+    output_budget();
     reader_overlays_cache_lines();
     locates_one_table();
     checks_links_and_liveness();

@@ -138,6 +138,9 @@ def main():
     parser.add_argument('--mode', choices=('jit', 'interp'), default='jit')
     parser.add_argument('--timeout', type=int, default=6 * 3600)
     parser.add_argument('--reserve-gib', type=int, default=5)
+    parser.add_argument('--output-budget-gib', type=int, default=8,
+                        help='most the frontend may write into the run directory; it stops with exit 10 past it, '
+                             'or before free space falls below --reserve-gib')
     args = parser.parse_args()
 
     def provenance():
@@ -227,7 +230,10 @@ def main():
         }
         command = [str(args.binary.resolve()), str(rom.resolve()), str(out.resolve()), args.mode]
         started = time.monotonic()
-        env = {**os.environ, 'DYLD_LIBRARY_PATH': str(MOLTENVK.parent)}
+        env = {**os.environ, 'DYLD_LIBRARY_PATH': str(MOLTENVK.parent),
+               'SC64_CAPTURE_BUDGET_BYTES': str(args.output_budget_gib * 1024 ** 3),
+               'SC64_CAPTURE_RESERVE_BYTES': str(args.reserve_gib * 1024 ** 3)}
+        manifest['output_budget_bytes'] = int(env['SC64_CAPTURE_BUDGET_BYTES'])
         with open(tape_copy, 'rb') as tape, open(out / 'bridge.log', 'wb') as log, open(out / 'stderr.log', 'wb') as err:
             child = subprocess.Popen(command, cwd=out.resolve(), env=env, stdin=tape, stdout=log, stderr=err)
             try:

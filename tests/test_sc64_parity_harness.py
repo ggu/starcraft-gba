@@ -216,6 +216,54 @@ class Golden(unittest.TestCase):
             rows = sc64_parity.judge('t1-move', golden, {'move.cruise_speed': 99.0}, {}, {}, parity_decode.Layout(weak))
             self.assertEqual(rows[0]['verdict'], 'REPORT')
 
+    def test_layout_edits_keep_or_stale_a_golden_per_field(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            for name in 'ab':
+                write_capture(temp / name, marine_frames())
+            _, golden = parity_decode.write_golden('t1-move', [temp / 'a', temp / 'b'], temp / 'home',
+                                                   parity_decode.Layout())
+            self.assertTrue(all(len(o['layout_fields_sha256']) == 64 for o in golden['observations']))
+            regression = {'move.cruise_speed': 99.0}
+
+            def judged(doc):
+                path = temp / f'layout-{len(list(temp.glob("layout-*")))}.json'
+                path.write_text(json.dumps(doc))
+                return {r['check']: r for r in sc64_parity.judge('t1-move', golden, regression, {}, {},
+                                                                 parity_decode.Layout(path))}
+            doc = json.loads(parity_decode.LAYOUT.read_text())
+            # Additive: a new field, a reworded evidence line and a promotion elsewhere.
+            doc['unit_fields']['brand_new'] = {'offset': '0x99', 'type': 'u8', 'status': 'candidate', 'evidence': 'x'}
+            doc['unit_fields']['x']['evidence'] = 'reworded'
+            doc['unit_fields']['shields']['status'] = 'proven'
+            rows = judged(doc)
+            self.assertEqual(rows['move.cruise_speed']['verdict'], 'REGRESSION')   # still gating, still caught
+            # A field the golden reads moves: every observation reading it is stale and fails.
+            doc['unit_fields']['x']['offset'] = '0x2C'
+            rows = judged(doc)
+            self.assertEqual(rows['move.cruise_speed']['verdict'], 'STALE-GOLDEN')
+            self.assertIn('parity_decode.py golden', rows['move.cruise_speed']['why'])
+            self.assertIn('STALE-GOLDEN', sc64_parity.FAILING)
+            path = temp / 'moved.json'
+            path.write_text(json.dumps(doc))
+            loose = sc64_parity.judge('t1-move', golden, regression, {}, {}, parity_decode.Layout(path), allow_stale=True)
+            self.assertEqual({r['verdict'] for r in loose}, {'REPORT'})
+            # A golden from before per-field digests falls back to the whole layout.
+            legacy = json.loads(json.dumps(golden))
+            for obs in legacy['observations']:
+                del obs['layout_fields_sha256']
+            rows = sc64_parity.judge('t1-move', legacy, regression, {}, {}, parity_decode.Layout(path))
+            self.assertEqual(rows[0]['verdict'], 'STALE-GOLDEN')
+            rows = sc64_parity.judge('t1-move', legacy, regression, {}, {}, parity_decode.Layout())
+            self.assertEqual(rows[0]['verdict'], 'REGRESSION')
+
+    def test_staged_tag_reaches_each_row(self):
+        golden = {'tags': ['n64-staged'], 'observations': [
+            {'check': 'x.a', 'subject': 's', 'value': 1, 'lo': 0, 'hi': 2, 'gating': True, 'n_runs': 2,
+             'provenance': 'n64-ram', 'tolerance': '1'}]}
+        row = sc64_parity.judge('demo', golden, {'x.a': 1}, {}, {})[0]
+        self.assertEqual((row['provenance'], row['tags'], row['verdict']), ('n64-ram n64-staged', ['n64-staged'], 'PASS'))
+
     def test_one_capture_is_not_golden(self):
         with tempfile.TemporaryDirectory() as temp:
             temp = pathlib.Path(temp)

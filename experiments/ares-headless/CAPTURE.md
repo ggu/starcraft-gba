@@ -34,6 +34,15 @@ field-map pair below: a capture run in parallel gave the same per-tick hash
 chain as one run alone), but check a parallel run against a solo one before
 relying on it, and keep to two of your own captures at a time.
 
+The frontend counts every byte it writes into the run directory. `capture.py`
+passes `--output-budget-gib` (default 8) and `--reserve-gib` (default 5) to it
+as `SC64_CAPTURE_BUDGET_BYTES` and `SC64_CAPTURE_RESERVE_BYTES`; before a
+write would pass the budget or leave less than the reserve free (free space is
+measured again every 16 MiB written) the run stops with exit code 10, so the
+manifest's `ok` is false and the capture is incomplete (like other failure
+exits, no `status.log` is written). A run that finishes records
+`output_written` and `output_budget` in `status.log`.
+
 ## Build
 
 Use a clean clone of ares at `0aafd85789215e84e1e43415c07d4c88461b7899` in a

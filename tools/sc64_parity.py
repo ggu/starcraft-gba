@@ -13,7 +13,12 @@ trace with the same code that measured the N64 capture
   KNOWN       outside the band, listed in the baseline, and not further out
               than the baseline recorded
   REGRESSION  outside the band and not in the baseline, or further out than
-              the baseline recorded; the only verdict that fails the run
+              the baseline recorded; fails the run
+  STALE-GOLDEN  the golden was decoded against other definitions of the
+              layout fields it reads (offsets, types, names; evidence and
+              status edits do not count); fails the run until the golden is
+              regenerated with tools/parity_decode.py golden, or reports with
+              --allow-stale (recording work only)
   IMPROVED    in the baseline but now inside the band (notice)
   STALE       a baseline line whose observation no longer exists (notice)
   REPORT      a non-gating observation (never fails)
@@ -47,7 +52,9 @@ import sc64_parity_metrics as metrics  # noqa: E402
 
 BASELINE = ROOT / 'tools' / 'parity' / 'baseline.json'
 PARITY_DIR = ROOT / 'build' / 'parity'
-FAILING = {'REGRESSION'}
+FAILING = {'REGRESSION', 'STALE-GOLDEN'}
+STALE_WHY = ('golden decoded against other definitions of the layout fields it reads; '
+             'regenerate it with tools/parity_decode.py golden')
 
 
 def default_home():
@@ -173,11 +180,33 @@ def first_divergence(n64, gba, tolerance):
     return None
 
 
-def judge(scenario_id, golden, values, curves, baseline, layout=None):
+def stale(obs, golden, layout):
+    """True when the layout no longer decodes this observation's fields as the golden did:
+    its per-field digest differs, or (goldens from before per-field digests) the whole layout
+    changed."""
+    if layout is None:
+        return False
+    want = obs.get('layout_fields_sha256')
+    if want is None:
+        return golden.get('layout_sha256') != layout.sha256
+    return want != layout.fields_digest(obs.get('layout_fields', []))
+
+
+def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False):
     rows = []
     for obs in golden['observations']:
         gating = obs['gating']
         unproven = []
+        if stale(obs, golden, layout):
+            key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
+            row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
+                   'n64': obs['value'], 'gba': values.get(obs['check']), 'provenance': provenance(obs, golden),
+                   'gating': False, 'n_runs': obs['n_runs'], 'tolerance': obs['tolerance']}
+            # A stale golden fails unless recording work asks for it (--allow-stale); either way it never gates.
+            row['verdict'] = 'REPORT' if allow_stale else 'STALE-GOLDEN'
+            row['why'] = STALE_WHY + (' (--allow-stale)' if allow_stale else '')
+            rows.append(row)
+            continue
         if gating and layout is not None:
             unproven = [k for k in obs.get('layout_fields', []) if layout.status(k) != 'proven']
             if layout.doc['unit_table'].get('status') != 'proven':
@@ -185,8 +214,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None):
         key = f'{scenario_id}:{obs["check"]}:{obs["subject"]}'
         value = values.get(obs['check'])
         row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
-               'n64': obs['value'], 'gba': value, 'provenance': obs['provenance'], 'gating': obs['gating'],
-               'n_runs': obs['n_runs'], 'tolerance': obs['tolerance']}
+               'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden), 'gating': obs['gating'],
+               'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}
         if unproven:
             # The layout no longer proves a field this check read: it cannot gate.
             gating = row['gating'] = False
@@ -230,7 +259,18 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None):
     return rows
 
 
-def run_scenario(scenario_id, golden_path, baseline, keep):
+def golden_tags(obs, golden):
+    """Tags an observation carries: its own and its bundle's (n64-staged: the captures wrote
+    guest memory, owner decision 2026-11-26)."""
+    return sorted(set(obs.get('tags', [])) | set(golden.get('tags', [])))
+
+
+def provenance(obs, golden):
+    tags = golden_tags(obs, golden)
+    return obs['provenance'] + ''.join(f' {t}' for t in tags)
+
+
+def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     golden = json.loads(golden_path.read_text())
     spec = metrics.SCENARIOS.get(scenario_id)
     result = {'id': scenario_id, 'golden': str(golden_path), 'golden_sha256': hashlib.sha256(golden_path.read_bytes()).hexdigest()}
@@ -258,14 +298,7 @@ def run_scenario(scenario_id, golden_path, baseline, keep):
     if err:
         return {**result, 'status': 'ERROR', 'why': 'GBA measurement: ' + err}
     layout = parity_decode.Layout()
-    rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout)
-    if golden.get('layout_sha256') != layout.sha256:
-        # Decoded against another layout revision: offsets may have moved, so nothing gates.
-        for row in rows:
-            if row['gating']:
-                row['gating'] = False
-                row['verdict'] = 'REPORT'
-                row['why'] = 'golden decoded with another layout revision; re-run parity_decode.py golden'
+    rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout, allow_stale)
     return {**result, 'status': 'RUN', 'rows': rows, 'gba_measured': measured.get('measured'),
             'gba_cpu_seconds': report.get('cpu_seconds'), 'command': cmd}
 
@@ -410,6 +443,9 @@ def main(argv=None):
     parser.add_argument('--explain', metavar='ID', help='print the full measurements of one scenario')
     parser.add_argument('--jobs', type=int, default=4)
     parser.add_argument('--no-build', action='store_true', help='use the GBA binaries as they are')
+    parser.add_argument('--allow-stale', action='store_true',
+                        help='report goldens decoded against other layout field definitions instead of failing '
+                             '(recording work only)')
     args = parser.parse_args(argv)
     home = args.home or default_home()
     baseline = load_baseline(args.baseline)
@@ -431,7 +467,7 @@ def main(argv=None):
             if profile in broken:
                 jobs.append(pool.submit(lambda p=path, why=broken[profile]: {'id': p.stem, 'status': 'ERROR', 'why': why}))
             else:
-                jobs.append(pool.submit(run_scenario, path.stem, path, baseline, args.keep))
+                jobs.append(pool.submit(run_scenario, path.stem, path, baseline, args.keep, args.allow_stale))
         results = [job.result() for job in jobs]
     ran_ids = {r['id'] for r in results if r['status'] == 'RUN'}
     seen = {row['key'] for r in results for row in r.get('rows', [])}
@@ -451,8 +487,8 @@ def main(argv=None):
     if args.json:
         args.json.write_text(json.dumps({'results': results, 'fixture_set': fixture_hash(goldens)}, indent=1, default=str) + '\n')
     if args.accept:
-        if any('another layout revision' in row.get('why', '') for r in results for row in r.get('rows', [])):
-            print('parity: not accepting while a golden was decoded with another layout revision; '
+        if any(row.get('why', '').startswith(STALE_WHY) for r in results for row in r.get('rows', [])):
+            print('parity: not accepting while a golden was decoded against other layout field definitions; '
                   'regenerate it first. The baseline is unchanged', file=sys.stderr)
             return 1
         if any(r['status'] == 'ERROR' for r in results):
