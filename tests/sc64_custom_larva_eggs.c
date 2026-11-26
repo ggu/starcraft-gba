@@ -319,6 +319,62 @@ static void lifecycle(void)
     CHECK(units_of(SIDE, U_SCOURGE) == n + 2);
     printf("pairs: a Zergling Egg and a Scourge Egg each hatched two\n");
 
+    /* Army selection: R in the field, with a unit selected, takes the army
+     * and never an Egg. The Terran cartridge has no actor facts for the Egg,
+     * so only the explicit exclusion keeps it out there. */
+    minerals = 600; gas = 300; b[hall].larva = SC64_LARVA_CAP;   /* HOST fixture: bank and Larva */
+    CHECK(order(hall, U_ZERGLING));
+    eggs[0] = newest_egg(SIDE);
+    CHECK(order(hall, U_SCOURGE));
+    eggs[1] = newest_egg(SIDE);
+    CHECK(eggs[0] >= 0 && eggs[1] >= 0 && eggs[0] != eggs[1]);
+    {
+        int zergling = -1, picked = 0;
+        for (int i = 0; i < MAX_UNITS && zergling < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_ZERGLING) zergling = i;
+        CHECK(zergling >= 0);
+        if (menu_open) tap(KEY_B);
+        CHECK(select_unit(zergling));
+        tap(KEY_R);
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].selected) {
+                CHECK(!is_egg(&u[i]));
+                ++picked;
+            }
+        /* Every born Zergling and Scourge is in the army, and no Egg. */
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && (u[i].type == U_ZERGLING || u[i].type == U_SCOURGE))
+                CHECK(u[i].selected);
+        CHECK(picked >= units_of(SIDE, U_ZERGLING) + units_of(SIDE, U_SCOURGE));
+        CHECK(!u[eggs[0]].selected && !u[eggs[1]].selected);
+    }
+    printf("army selection: the army without its %d Eggs\n", eggs_of(SIDE));
+
+    /* The computer opponent's planner counts an Egg as the units it hatches,
+     * as it counts them once born: a Scourge Egg is two Scourge against the
+     * Scourge limit, in its census and at the order itself. The human's side
+     * stands in for the census here (HOST fixture: direct planner calls). */
+    {
+        RaceAiCensus c;
+        int born = units_of(SIDE, U_SCOURGE), pairs = 0, before;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            pairs += u[i].owner == SIDE && is_egg(&u[i]) && u[i].target == U_SCOURGE;
+        CHECK(pairs >= 1);
+        race_ai_census(SIDE, &c);
+        CHECK(c.have[AK_SCOURGE] == born && c.pend[AK_SCOURGE] == 2 * pairs);
+        CHECK(race_ai_count(&c, AK_SCOURGE) == born + 2 * pairs);
+        minerals = 600; gas = 300; b[hall].larva = SC64_LARVA_CAP;   /* HOST fixture: bank and Larva */
+        before = c.pend[AK_SCOURGE];
+        CHECK(race_ai_try_queue(&c, hall, sc64_race_raw_unit(U_SCOURGE), 0));
+        CHECK(c.pend[AK_SCOURGE] == before + 2);
+        race_ai_census(SIDE, &c);
+        CHECK(c.pend[AK_SCOURGE] == 2 * (pairs + 1));
+        printf("planner: %d Scourge Eggs count as %d Scourge\n", pairs + 1, c.pend[AK_SCOURGE]);
+    }
+    /* Let the extra Eggs hatch before the cancel and death cases. */
+    wait_updates(sc64_z7_egg_duration(U_SCOURGE) + 4);
+    CHECK(eggs_of(SIDE) == 0);
+
     /* Cancel: the whole price back, the Egg and its Larva gone, its supply
      * released (OpenBW cancel_building_unit, 2383-2427). */
     wait_updates(SC64_LARVA_PERIOD * SC64_LARVA_CAP);
@@ -333,8 +389,26 @@ static void lifecycle(void)
         row = race_context_command_base(RACE_CONTEXT_EGG);
         CHECK(row < race_skirmish_command_count() && !strcmp(race_menu_label(row), "CANCEL EGG"));
         CHECK(menu_to(row));
-        tap(KEY_A);
-        CHECK(!u[eggs[0]].alive && minerals == bank + scourge->minerals && gas == vespene + scourge->gas);
+        /* Workers keep delivering while the cancel is pressed. A delivery
+         * empties a worker's load into the bank, so the cargo every worker
+         * gives up over the press is counted and the refund checked exactly.
+         * The owner has no Extractor, so gas is exact as it stands. */
+        {
+            int carry[MAX_UNITS], delivered = 0;
+            bank = minerals;
+            for (int step = 0; step < 2; ++step) {
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    carry[i] = u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) ? u[i].carry : 0;
+                input(step ? 0 : KEY_A);
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    if (carry[i] > 0) {
+                        CHECK(u[i].alive);
+                        if (u[i].carry < carry[i]) delivered += carry[i] - u[i].carry;
+                    }
+            }
+            CHECK(!u[eggs[0]].alive && gas == vespene + scourge->gas);
+            CHECK(minerals == bank + scourge->minerals + delivered);
+        }
         CHECK(supply_used == used - 2 * scourge->supply && b[hall].larva <= larva + 1);
         n = units_of(SIDE, U_SCOURGE);
         wait_updates(sc64_z7_egg_duration(U_SCOURGE) + 4);
