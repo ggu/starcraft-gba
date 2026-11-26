@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 
 ROM_SHA = 'e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020'
 MOLTENVK = pathlib.Path('/Applications/ares.app/Contents/Frameworks/libMoltenVK.dylib')
@@ -28,7 +29,7 @@ FLASH_BYTES = 128 * 1024
 RESOURCES = ('ares/ares/resource/resource.cpp', 'ares/ares/resource/resource.hpp',
              'mia/resource/resource.cpp', 'mia/resource/resource.hpp')
 OUTPUTS = ('checkpoints.csv', 'regions.csv', 'ticks.csv', 'verify.csv', 'events.csv',
-           'commands.csv', 'status.log', 'polls.bin', 'ticks.raw')
+           'commands.csv', 'status.log', 'polls.bin', 'ticks.raw', 'tap.bin')
 
 
 def sha(path):
@@ -88,6 +89,8 @@ def main():
             'generated_resource_sha256': {r: sha(args.source / r) for r in RESOURCES},
             'rom_sha256': ROM_SHA, 'moltenvk_sha256': MOLTENVK_SHA, 'tape_sha256': sha(tape_copy),
             'flash_input_sha256': flash_sha, 'mode': args.mode,
+            # A fresh id per process, so a copied run directory never counts as a second capture.
+            'run_id': str(uuid.uuid4()),
         }
         command = [str(args.binary.resolve()), str(rom.resolve()), str(out.resolve()), args.mode]
         started = time.monotonic()

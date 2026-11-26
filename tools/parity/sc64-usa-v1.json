@@ -1,0 +1,53 @@
+{
+  "layout": "sc64-usa-v1",
+  "version": 1,
+  "rom_sha256": "e7d21880c13953b45b8f8db6b2b6cfa02daa29d35b23799a967e96f21001b020",
+  "about": "Guest RAM layout of the USA StarCraft 64 cartridge as read by experiments/ares-headless/capture.cpp ('tap tick rec' writes tap.bin). Addresses are KSEG0; multi-byte values are big-endian. Each field is proven (validated by a controlled change or a cross-check in a tracked audit), candidate (read in retained states, never validated by a controlled change) or unknown. tools/parity_decode.py refuses to build a gating check from a field that is not proven. Changing an offset or a status needs a new evidence line; a new layout gets a new version.",
+  "clock": {
+    "tick_counter": {"address": "0x800B1E84", "type": "u32", "status": "proven",
+      "evidence": "S1-S3 (docs/audits/2026-11-25-parity-capture-spikes.md): advances once per game tick, also in text boxes and the pause menu; never skipped in 58,215 reads"},
+    "pause_halfword": {"address": "0x800F0C20", "type": "u16", "status": "proven",
+      "evidence": "S2: 1 through both T1 opening text boxes and the pause menu; unit timers frozen exactly while it is set (355 of 355 ticks)"},
+    "seconds": {"address": "0x800B9368", "type": "u32", "status": "proven",
+      "evidence": "S2: floor(unpaused ticks / 16) over 58,213 ticks when read on the follow-up step"},
+    "selector": {"address": "0x800D13E4", "type": "u32", "status": "proven",
+      "evidence": "S2: 4 in a fresh campaign mission; 4 -> 6 when the Game Speed slider moved"},
+    "record_rule": "A tick's record is the read one step after the counter changes to it (S3: the change-step read is torn about 1.3% of the time). Unpaused ticks count ticks whose change-step read shows a zero pause halfword."
+  },
+  "unit_table": {
+    "status": "proven",
+    "locator": "one heap block: u32 size word 0x448E0 (900 x 312) then three 0xBABEFACE guard words; rows follow; exactly one match or no table (menus)",
+    "rows": 900, "row_bytes": 312,
+    "evidence": "Nov 17 and Nov 19 census states (T10, Z1, Z8, skirmish); S1-S3: found in every in-mission read, links never bad or asymmetric in 116,437 reads",
+    "live_rule": "a row is live only while its sprite pointer (+0x0C) is nonzero; free rows keep stale bytes"
+  },
+  "unit_fields": {
+    "prev":         {"offset": "0x00", "type": "u32", "status": "proven", "evidence": "S3 link checks: every link is zero or a row start and symmetric"},
+    "next":         {"offset": "0x04", "type": "u32", "status": "proven", "evidence": "S3 link checks"},
+    "hp":           {"offset": "0x08", "type": "u32", "scale": "8.8 fixed point", "status": "candidate", "evidence": "Nov 19 census parse (PC CUnit layout); no controlled damage observed yet"},
+    "sprite":       {"offset": "0x0C", "type": "u32", "status": "proven", "evidence": "liveness rule; census counts matched Z8 placed rows exactly"},
+    "x":            {"offset": "0x28", "type": "u16", "unit": "N64 map pixels", "status": "proven", "evidence": "census: placed buildings at their CHK source x; S4 move captures: Marines move toward the ordered point"},
+    "y":            {"offset": "0x2A", "type": "u16", "unit": "N64 map pixels", "status": "proven", "evidence": "as x"},
+    "owner":        {"offset": "0x4C", "type": "u8", "status": "proven", "evidence": "census: placed rows by CHK owner; skirmish human stuck at 4 workers"},
+    "order":        {"offset": "0x4D", "type": "u8", "status": "candidate", "evidence": "census reads only; values not mapped to order names"},
+    "shields":      {"offset": "0x60", "type": "u32", "status": "candidate", "evidence": "one read-only scan of retained states (design review); gated by type"},
+    "type":         {"offset": "0x64", "type": "u16", "status": "proven", "evidence": "census type ids matched CHK placements; S2 Marine row (type 0)"},
+    "queue":        {"offset": "0x94", "type": "bytes", "status": "candidate", "evidence": "one read-only scan"},
+    "energy":       {"offset": "0x9E", "type": "u16", "status": "candidate", "evidence": "one read-only scan; gated by type"},
+    "build_timer":  {"offset": "0xA8", "type": "u16", "status": "proven", "evidence": "S2: Marine timer counted 360 -> 0 over 360 unpaused ticks, frozen while paused"},
+    "status":       {"offset": "0xD8", "type": "u32", "status": "proven", "evidence": "S2: bit 31 clear while the Marine trained, set when complete"}
+  },
+  "globals": {
+    "about": "tap.bin carries these bytes in guest order on every tapped read; owner index k is the k-th u32 of each array (12 players).",
+    "banks": {"address": "0x800B1D44", "players": 12, "type": "u32[12]",
+      "arrays": {
+        "minerals":          {"offset": "0x00", "status": "proven", "evidence": "S4 Blood Bath captures: rises by 8 at each human worker delivery while nothing is spent, together with minerals_gathered"},
+        "gas":               {"offset": "0x30", "status": "candidate", "evidence": "census and static reading; no gas mined in S4"},
+        "gas_gathered":      {"offset": "0x60", "status": "candidate", "evidence": "as gas"},
+        "minerals_gathered": {"offset": "0x90", "status": "proven", "evidence": "S4 Blood Bath captures: cumulative, +8 per delivery, never decreases; equals the bank rise while nothing is spent"}
+      }},
+    "rng": {"address": "0x800EFF20", "bytes": 12, "status": "candidate", "evidence": "seed, draw count and state words named by static reading; not validated against a launch"}
+  },
+  "unknown": ["image pool", "bullet pool", "fog tiles", "upgrade and tech state", "cursor", "camera", "selection", "sprite pool layout beyond the row pointer"],
+  "human_player": "resolved per scenario (see tools/sc64_parity_metrics.py SCENARIOS): T1 = the owner of the Marines and SCVs; Blood Bath = the owner of the human race's workers when the computer plays another race"
+}

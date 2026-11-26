@@ -152,4 +152,25 @@ inline std::uint64_t sc64_capture_fnv64(const std::uint8_t *p, std::size_t n) {
     for (std::size_t i = 0; i < n; ++i) { h ^= p[i]; h *= 1099511628211ull; }
     return h;
 }
+/* tap.bin ("tap tick rec"): an 8-byte magic, then little-endian u32 version,
+ * record-header bytes, globals bytes and row bytes. Each record is
+ * SC64_TAP_HEADER_WORDS little-endian u32 (step, tick, phase, live, seconds,
+ * pause halfword, selector, running byte, countdown, table offset, flags, rows
+ * written), the globals in guest byte order (the four 12-player bank arrays at
+ * 0x800B1D44, then the 12 RNG bytes at 0x800EFF20), then the rows written, each
+ * a big-endian u16 index and 312 bytes as sc64_capture_live_rows gives them.
+ * Flags: 1 rows written (the follow-up read one step after a tick change),
+ * 2 table present, 4 a dual cache-alias read differed, 8 bad or asymmetric links.
+ * tools/parity_decode.py reads it. */
+constexpr unsigned SC64_TAP_HEADER_WORDS = 12, SC64_TAP_FILE_HEADER_BYTES = 24, SC64_TAP_VERSION = 1;
+inline void sc64_capture_put_le32(std::uint8_t *p, std::uint32_t v) {
+    p[0] = std::uint8_t(v); p[1] = std::uint8_t(v >> 8); p[2] = std::uint8_t(v >> 16); p[3] = std::uint8_t(v >> 24);
+}
+inline void sc64_capture_tap_file_header(std::uint8_t *out24, std::uint32_t globals_bytes) {
+    std::memcpy(out24, "SC64TAP\0", 8);
+    sc64_capture_put_le32(out24 + 8, SC64_TAP_VERSION);
+    sc64_capture_put_le32(out24 + 12, SC64_TAP_HEADER_WORDS * 4);
+    sc64_capture_put_le32(out24 + 16, globals_bytes);
+    sc64_capture_put_le32(out24 + 20, 2 + SC64_UNIT_BYTES);
+}
 #endif
