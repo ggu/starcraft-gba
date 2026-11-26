@@ -129,3 +129,45 @@ of spare IWRAM in Terran, 360 in Z10 and 384 in P10 beyond the
 512-byte margin. The P10 checker warns that its configured IWRAM
 limit is above the computed safe maximum. Terran and Z10 each use
 88 additional linked IWRAM bytes in the paired build.
+
+### Terran IWRAM placement
+
+Keeping the defense search and cell builder in IWRAM retains the
+combat saving. The Terran link runs the depth projectile child
+classifier from ROM to recover the 88 bytes added by the owner mask.
+Terran's IWRAM end returns to `0x03005d28`, with 128 bytes beyond
+the unchanged 7,768-byte main stack bound and 512-byte margin. The
+IRQ stack bound remains 264 of 416 bytes. The Z10 link and its
+measured battle performance are unaffected by this Terran placement.
+
+Two Terran Custom Game pause saves were replayed for 512 neutral
+updates per variant. The sparse Outpost save has 14 units and three
+buildings. The three-opponent Blood Bath save has 81 units and
+26 buildings. Mean interval cycles differ by at most 0.01 in both
+cases. The p95, p99 and maximum differences are at most 16 cycles.
+One more interval in each run crosses the two-VBlank boundary.
+Both pages, palette, displayed page, world samples and endpoint
+fingerprints agree at all 513 sampled boundaries per case.
+
+A projectile-active Terran T5 run loaded the earned stage 34 save
+and played inputs 401–1300 of stage 35 in the
+[paid route fixture](../../tests/fixtures/terran-t5-paid-route.json).
+At 643 of 900 sampled boundaries a live source-profile tracer had
+a start or end point in the viewport, with up to 32 such traces.
+The tracer state, both Mode 4 pages, palette, camera, displayed page,
+raw unit and building arrays and final fingerprint all agree.
+
+| T5 interval metric | IWRAM classifier | ROM classifier |
+| --- | ---: | ---: |
+| Mean cycles | 711,834 | 712,459 |
+| P95 cycles | 866,503 | 867,212 |
+| P99 cycles | 954,762 | 956,067 |
+| Maximum cycles | 1,065,560 | 1,066,261 |
+| Intervals over two VBlanks | 770 / 899 | 770 / 899 |
+
+Packing the cell heads and owner masks into halfwords used eight
+more linked IWRAM bytes on Z10. Moving the cell builder to ROM
+recovered 168 bytes on Terran but added 2,321 simulation cycles
+per update in the crowded Terran window. The projectile placement
+preserves the Terran simulation improvement and costs 0.088% in
+the sampled T5 effect-heavy rendering window.

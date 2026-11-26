@@ -36,4 +36,3 @@ gfx_frame_sides
 audio_mixer_sum
 sc64_unit_buckets_begin
 sc64_target_index_begin_owner_lists
-sc64_depth_projectile_child_part
