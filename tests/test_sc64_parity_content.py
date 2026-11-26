@@ -230,6 +230,16 @@ class CensusTest(unittest.TestCase):
         amount = pc.compare_census([chk(176, 11, 10, 10, 1500)], gba(minerals=[(5, 5, 1000)]))
         self.assertEqual(amount['minerals']['amount_differs'], [{'half': [5, 5], 'rom': 1500, 'gba': 1000}])
 
+    def test_extra_resources_and_doodad_caps(self):
+        rows = [chk(0, 1, 10, 10), chk(176, 11, 100, 100, 1500)]
+        extra = pc.compare_census(rows, gba(units=[(0, 1, 5, 5)], minerals=[(50, 50, 1500), (80, 80, 1500)]))
+        self.assertEqual(extra['verdict'], 'differs')  # an extra mineral is never exact
+        self.assertIn('extra 1', pc.resource_text(extra))
+        door = dict(chk(209, 6, 400, 400), section='THG2')
+        capped = pc.compare_census([door], gba(units=[(0, 1, 5, 5)], buildings=[(106, 1, 9, 9)],
+                                               max_units=8, max_buildings=1))
+        self.assertEqual(capped['counts']['cap-dropped'], 1)  # against the building table, not units
+
     def test_thg2_units_are_placements_and_sprites_are_not(self):
         payload = struct.pack('<HHHBBH', 209, 320, 96, 6, 0, 0x0000) + \
             struct.pack('<HHHBBH', 119, 64, 64, 6, 0, 0x1000) + \
@@ -336,6 +346,9 @@ class CensusTest(unittest.TestCase):
         self.assertTrue(pc.compare_banks(rows[1:], shared, {2: 1, 3: 1})[0]['verdict'].startswith('not compared'))
         # A computer's grant may live in a campaign wallet the trace lacks.
         self.assertTrue(pc.compare_banks(rows[1:], census, {2: 1})[0]['verdict'].startswith('not compared'))
+        # A census stopped early by a modal cannot show a grant that never arrived.
+        stopped = dict(census, last_step=3, requested_steps=120)
+        self.assertTrue(pc.compare_banks(rows[1:], stopped, {2: 0})[0]['verdict'].startswith('not compared'))
         # Mining that later reaches the granted total does not match it.
         mined = {'step': 0, 'last_step': 120, 'bank_history': {0: [
             {'step': 0, 'minerals': 0, 'gas': 0}, {'step': 20, 'minerals': 8, 'gas': 0},
@@ -654,6 +667,17 @@ class SoundTest(unittest.TestCase):
                 pack.refuse_tracked(repo / 'src' / 'bank')
         with tempfile.TemporaryDirectory() as temp:
             pack.refuse_tracked(Path(temp) / 'bank')  # outside any work tree
+        from unittest import mock
+        failed = subprocess.CompletedProcess([], 128, '', 'fatal: detected dubious ownership')
+        with tempfile.TemporaryDirectory() as temp, mock.patch('subprocess.run', return_value=failed):
+            with self.assertRaises(ValueError):  # an unverifiable destination is refused
+                pack.refuse_tracked(Path(temp) / 'bank')
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+            with mock.patch.dict(os.environ, {'GIT_DIR': str(repo / 'no-such-git-dir')}):
+                with self.assertRaises(ValueError):  # an inherited GIT_DIR cannot make it look outside
+                    pack.refuse_tracked(repo / 'src' / 'bank')
 
 
 class SkipTest(unittest.TestCase):
@@ -695,6 +719,34 @@ class RomContentTest(unittest.TestCase):
             self.assertEqual(compared[0].get('rom_waits'), [1] * 9)
         elif walks:  # the walk bank is not prepared here: the row reads absent, never skipped
             self.assertIn('walk bank', walks[0]['note'])
+
+
+class RomCensusTest(unittest.TestCase):
+    """Runs the real census through each prepared profile binary (Terran, Zerg
+    Z10, Protoss P10), only where the private inputs and the binaries exist."""
+
+    def test_every_profile_runs_its_censuses(self):
+        try:
+            pt.find_input(ROOT, '.local/sc64/rom/StarCraft64-USA.z64', None)
+            pt.find_input(ROOT, 'references/sc64-maps/extract_sc64_maps.py', None)
+        except pt.InputsMissing as missing:
+            self.skipTest(f'private ROM inputs absent: {missing}')
+        binaries = ROOT / 'build/parity'
+        profiles = ('terran', 'zerg-z10', 'protoss-p10')
+        if not all((binaries / f'{p}-fast-trace').is_file() for p in profiles):
+            self.skipTest('census binaries not built (make parity-content builds them)')
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'content'
+            run = subprocess.run(['python3', 'tools/sc64_parity_content.py', '--binaries', str(binaries),
+                                  '--out', str(out)], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            missions = json.loads((out / 'l0-content.json').read_text())['census']['missions']
+        for profile in profiles:
+            ran = [m for m in missions if m['profile'] == profile and m['verdict'] != 'absent']
+            self.assertTrue(ran, f'no {profile} census ran: '
+                            f"{[m.get('note') for m in missions if m['profile'] == profile][:2]}")
+            self.assertTrue(all(m.get('gba_binary_sha256') for m in ran), profile)
+        self.assertEqual(len(missions), 31)
 
 
 if __name__ == '__main__':

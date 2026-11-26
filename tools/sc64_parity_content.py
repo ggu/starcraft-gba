@@ -509,6 +509,8 @@ def compare_census(chk: list[dict], gba: dict) -> dict:
     halved position. Returns the verdict, per-class rows and counts."""
     actors = [r for r in chk if r['type'] not in MINERALS and r['type'] not in (GEYSER, START_LOCATION)]
     rom = [(r['type'], r['owner'], r['x'] // 2, r['y'] // 2) for r in actors]
+    # Doors and traps placed by THG2 live in the GBA building table.
+    doodad_keys = {(r['type'], r['owner'], r['x'] // 2, r['y'] // 2) for r in actors if r.get('section') == 'THG2'}
     gba_rows = [(g['raw_type'], g['raw_owner'], g['x'], g['y'], 'B' if kind == 'buildings' else 'U')
                 for kind in ('units', 'buildings') for g in gba[kind]]
     left = Counter(r[:4] for r in gba_rows)
@@ -576,7 +578,8 @@ def compare_census(chk: list[dict], gba: dict) -> dict:
         classes['moved'].append({'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]),
                                  'gba': list(cand[2:]), 'offset': [cand[2] - key[2], cand[3] - key[3]]})
     for key in left_rom:
-        building = key[0] in building_types or (key[0] not in unit_types and key[0] in BUILDING_RAW)
+        building = key in doodad_keys or key[0] in building_types or \
+            (key[0] not in unit_types and key[0] in BUILDING_RAW)
         full = full_buildings if building else full_units
         classes['cap-dropped' if full else 'missing'].append(
             {'type': key[0], 'owner': key[1], 'rom_half': list(key[2:]), 'stacked': stacked[key]})
@@ -604,7 +607,9 @@ def compare_census(chk: list[dict], gba: dict) -> dict:
                'placed': sum((rom_gey & gba_gey).values()),
                'missing': [list(p) for p, n in (rom_gey - gba_gey).items() for _ in range(n)],
                'extra': [list(p) for p, n in (gba_gey - rom_gey).items() for _ in range(n)]}
-    if classes['moved'] or classes['missing'] or classes['extra']:
+    resources_bad = (minerals['missing'] or minerals['extra'] or minerals['amount_differs']
+                     or geysers['missing'] or geysers['extra'])
+    if classes['moved'] or classes['missing'] or classes['extra'] or resources_bad:
         verdict = 'differs'
     elif classes['cap-dropped']:
         verdict = 'cap-dropped'
@@ -673,6 +678,10 @@ def compare_banks(rows: list[dict], gba: dict, owners: dict) -> list[dict]:
                 verdict = 'match at launch'
             elif first_change and first_change[1] == want:
                 verdict = f'match at step {first_change[0]}'
+            elif gba['last_step'] - gba['step'] < gba.get('requested_steps', 0):
+                # The run stopped early (a modal text box): the grant may not have run yet.
+                verdict = (f"not compared (the census stopped at step {gba['last_step']}, before the "
+                           f"{gba['requested_steps']} input-free steps a grant needs)")
             elif engine != HUMAN_OWNER:
                 # Campaign computers keep mission-specific wallets per source
                 # slot (race_p10.wallet_*, for one) that the trace does not
@@ -789,7 +798,9 @@ def run_census(binary: Path, mission: str, profile: str, work: Path) -> dict:
     if proc.returncode != 0:
         raise RuntimeError(f'{binary.name} --mission {mission} exited {proc.returncode}: '
                            f'{proc.stderr.strip()[-300:]}')
-    return parse_census_trace(trace.read_text())
+    census = parse_census_trace(trace.read_text())
+    census['requested_steps'] = BANK_STEPS  # so a run a modal stopped early reads incomplete
+    return census
 
 
 def census_section(maps: dict, binaries: Path | None, extractor, absent_profiles=(), root: Path = ROOT) -> dict:
@@ -891,7 +902,8 @@ def load_manifest(path: Path, header: Path, sections=()) -> tuple[dict | None, s
         return None, f'absent ({path.parent})'
     try:
         manifest = json.loads(path.read_text())
-        digest = hashlib.sha256(header.read_bytes()).hexdigest()
+        header_bytes = header.read_bytes()
+        digest = hashlib.sha256(header_bytes).hexdigest()
     except (OSError, ValueError) as error:
         return None, f'unavailable: {path} or its header does not read ({error})'
     if not isinstance(manifest, dict):
@@ -908,6 +920,8 @@ def load_manifest(path: Path, header: Path, sections=()) -> tuple[dict | None, s
     bad = [key for key in sections if not isinstance(manifest.get(key), list) or not manifest.get(key)]
     if bad:
         return None, f"unavailable: {path} has no {', '.join(bad)} entries"
+    # The readers parse these bytes, the ones the digest covered.
+    manifest['_header_text'] = header_bytes.decode('ascii', 'replace')
     return manifest, 'ok'
 
 
@@ -1268,7 +1282,7 @@ def iscript_section(scripts: Scripts, root: Path, banks: dict, names: dict) -> d
             unit(entry['unit_id'])['rows'].append(compare_walk(scripts, entry))
 
     def attack_rows():
-        frames = engine_attack_frames(banks['attack'][1].read_text()) if attack else {}
+        frames = engine_attack_frames(attack['_header_text']) if attack else {}
         for actor in (attack or {}).get('actors', []):
             unit(actor['raw_unit'])['rows'].extend(compare_attack(scripts, actor['raw_unit'], actor, frames))
 
@@ -1278,7 +1292,7 @@ def iscript_section(scripts: Scripts, root: Path, banks: dict, names: dict) -> d
             unit(actor['raw_unit_id'])['rows'].extend(compare_death(scripts, actor['raw_unit_id'], actor, images))
 
     def construction_rows():
-        programs = engine_construction(banks['construction'][1].read_text()) if construction else {}
+        programs = engine_construction(construction['_header_text']) if construction else {}
         found = set()
         for stage in (construction or {}).get('stages', []):
             row = compare_construction(scripts, stage, programs)
@@ -1499,6 +1513,13 @@ def sound_section(scripts: Scripts, units: list, audio_dir: Path, lengths: list,
 MISMATCH_SOUND = ('partial', 'absent', 'extra')
 
 
+def resource_text(m: dict) -> str:
+    mi, ge = m['minerals'], m['geysers']
+    return (f"minerals {mi['placed']}/{mi['rom']} (missing {len(mi['missing'])}, extra {len(mi['extra'])}, "
+            f"amount differs {len(mi['amount_differs'])}, GBA cap {mi['cap']}) "
+            f"geysers {ge['placed']}/{ge['rom']} (missing {len(ge['missing'])}, extra {len(ge['extra'])})")
+
+
 def report_lines(result: dict) -> list[str]:
     lines = []
     census = result['census']
@@ -1510,13 +1531,10 @@ def report_lines(result: dict) -> list[str]:
             head += (f" ROM {m['rom_actors']} GBA {m['gba_actors']} matched {m['matched']}"
                      f" collision {c['collision']} moved {c['moved']} cap-dropped {c['cap-dropped']}"
                      f" missing {c['missing']} extra {c['extra']}"
-                     f" | minerals {m['minerals']['placed']}/{m['minerals']['rom']}"
-                     f" (amount differs {len(m['minerals']['amount_differs'])}, GBA cap {m['minerals']['cap']})"
-                     f" geysers {m['geysers']['placed']}/{m['geysers']['rom']}")
+                     f" | {resource_text(m)}")
         elif 'start_locations' in m:
             head += (f" starts {m['start_locations']} GBA halls on starts {m['occupied_by_gba_town_halls']}"
-                     f" | minerals {m['minerals']['placed']}/{m['minerals']['rom']} (GBA {m['minerals']['gba']})"
-                     f" geysers {m['geysers']['placed']}/{m['geysers']['rom']}")
+                     f" | {resource_text(m)}")
         if m.get('note'):
             head += f" ({m['note']})"
         lines.append(head)

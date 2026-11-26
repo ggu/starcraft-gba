@@ -568,14 +568,24 @@ def refuse_tracked(out_dir: Path, names=BANK_FILES) -> None:
     probe = out_dir.resolve()
     while not probe.exists():
         probe = probe.parent
-    top = subprocess.run(["git", "-C", str(probe), "rev-parse", "--show-toplevel"],
-                         capture_output=True, text=True)
+    # Git runs without inherited GIT_* overrides (GIT_DIR, GIT_WORK_TREE...),
+    # which could point discovery or the ignore check somewhere else.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        top = subprocess.run(["git", "-C", str(probe), "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, env=env)
+    except OSError as error:
+        raise ValueError(f"cannot verify that {out_dir} is private: git did not run ({error})")
     if top.returncode != 0:
-        return
+        # Only git's own outside-a-work-tree diagnostic counts as outside; any
+        # other failure leaves the destination unverified, so nothing is written.
+        if "not a git repository (or any of the parent directories)" in top.stderr:
+            return
+        raise ValueError(f"cannot verify that {out_dir} is private: {top.stderr.strip() or 'git failed'}")
     for name in names:
         # A trailing slash asks about a folder (directory-only ignore rules).
         target = str(out_dir.resolve() / name) + ("/" if name.endswith("/") else "")
-        ignored = subprocess.run(["git", "-C", top.stdout.strip(), "check-ignore", "-q", target])
+        ignored = subprocess.run(["git", "-C", top.stdout.strip(), "check-ignore", "-q", target], env=env)
         if ignored.returncode != 0:
             raise ValueError(f"{target} is not ignored by git; the audio bank and its sound id map are "
                              "private ROM-derived data")
