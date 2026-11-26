@@ -629,6 +629,11 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [15])   # N64: a morph
         series['source'] = 'gba'   # the GBA can kill and reuse a slot in one step: a removal
         self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
+        # Zerg-profile rows carry no raw type (-1): the engine type alone shows the replacement.
+        for frame in series['frames']:
+            frame['units'][3] = (-1, 4, 900, 100)
+            frame['etype'] = {3: 7 if frame['sf'] < 28 else 9}
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['gaps'], [])
 
     def test_a_replaced_subject_is_not_the_subject(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
