@@ -447,22 +447,34 @@ class Capture:
     def world_point(self, step):
         """The world point under the cursor (camera s32 + cursor u16, S6) before frontend step
         `step`, from the run's watch.csv, which must be the log the capture wrote. A compiled
-        tape's order acts at this point, so the GBA lab replays it."""
-        watch = self.run / 'watch.csv'
-        recorded = self.manifest.get('outputs_sha256', {}).get('watch.csv')
-        if not watch.is_file() or recorded != hashlib.sha256(watch.read_bytes()).hexdigest():
+        tape's order acts at this point, so the GBA lab replays it. The log is hashed in blocks
+        and read once per capture, as a stream of full-width camera and cursor samples."""
+        if not hasattr(self, '_view_samples'):
+            watch = self.run / 'watch.csv'
+            recorded = self.manifest.get('outputs_sha256', {}).get('watch.csv')
+            self._view_samples = None
+            if watch.is_file() and recorded:
+                # One pass: the bytes parsed are the bytes hashed, and the samples are kept only
+                # when that digest is the manifest's. Only full-width samples count: camera
+                # words are 4 bytes, cursor halfwords 2.
+                width = {b'800a2ee8': b'4', b'800a2eec': b'4', b'800afdcc': b'2', b'800afdce': b'2'}
+                digest, samples = hashlib.sha256(), []
+                with open(watch, 'rb') as handle:
+                    for number, line in enumerate(handle):
+                        digest.update(line)
+                        fields = line.rstrip(b'\n').split(b',')
+                        if number and len(fields) == 5 and width.get(fields[2]) == fields[3]:
+                            samples.append((int(fields[0]), fields[2].decode(), int(fields[4], 16)))
+                if digest.hexdigest() == recorded:
+                    self._view_samples = samples
+        if self._view_samples is None:
             raise ValueError(f'{self.run}: watch.csv is missing or does not match the manifest')
-        # Only full-width samples count: camera words are 4 bytes, cursor halfwords 2.
-        width = {'800a2ee8': '4', '800a2eec': '4', '800afdcc': '2', '800afdce': '2'}
         last = {}
-        for line in watch.read_text().splitlines()[1:]:
-            at, _, address, nbytes, value = line.split(',')
-            if int(at) > step:
+        for at, address, value in self._view_samples:
+            if at > step:
                 break
-            if width.get(address) == nbytes:
-                last[address] = int(value, 16)
-        need = tuple(width)
-        if any(a not in last for a in need):
+            last[address] = value
+        if any(a not in last for a in ('800a2ee8', '800a2eec', '800afdcc', '800afdce')):
             raise ValueError(f'{self.run}: the tape did not watch the camera and cursor before step {step}')
         signed = lambda v: v - (1 << 32) if v & 0x80000000 else v
         return signed(last['800a2ee8']) + last['800afdcc'], signed(last['800a2eec']) + last['800afdce']
@@ -797,6 +809,9 @@ def write_golden(scenario_id, runs, home, layout, note=None):
             'rom_sha256': caps[0].manifest['rom_sha256'], 'mode': caps[0].manifest['mode'],
             'selectors': sorted({r['selector'] for r in caps[0].ticks if r['table']}),
             'records': len(caps[0].ticks), 'faults': caps[0].faults,
+            # Skipped ticks advance the clock from their change-step reads, which the chain does
+            # not cover: record where each fell, so equal chains with other timings differ here.
+            'skipped_frames': [list(x) for x in caps[0].skipped_frames],
             # v2: extra-region captures also hash their regions, region list and table offset.
             'chain_format': 2 if caps[0].regions else 1,
         },
