@@ -9,9 +9,9 @@ The table lists the results available for comparison.
 |---|---:|---|
 | Terran10 | T1–T10 | T1–T9 advanced one chapter. A at T10 restarted T10 at frame zero. |
 | Zerg10 | Z1–Z6 | Each result advanced one chapter at frame zero. |
-| Protoss10 | P1–P8 | Each result advanced one chapter at frame zero. |
+| Protoss10 | P1–P10 | P1–P9 advanced one chapter. A at P10 restarted P10 at frame zero. |
 
-All 24 comparisons matched the observed terminal world, including live units,
+All 26 comparisons matched the observed terminal world, including live units,
 buildings and their queues, mineral fields and resource balances. Each result
 had the expected cumulative mission mask, victory flag, zero mission faults
 and no defeat flag. Re-exporting immediately after HOME L reproduced the
