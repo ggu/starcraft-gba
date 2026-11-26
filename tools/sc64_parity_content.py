@@ -1226,7 +1226,8 @@ def compare_construction(scripts: Scripts, stage: dict, baked: dict) -> dict:
             notes.append(f'{label}: frame order differs')
             continue
         waits = [(w, d) for (_, w), (_, d) in zip(rom, engine_part)]
-        if any(w != d for w, d in waits):
+        # A waitrand is a range [low, high] the engine's hold must fall in.
+        if any(not w[0] <= d <= w[1] if isinstance(w, list) else w != d for w, d in waits):
             deltas = [d - w if isinstance(w, int) else f'{d} vs {w}' for w, d in waits]
             notes.append(f'{label}: per-frame wait differs (engine minus ROM ticks per frame: {deltas})')
     if seq['end'] == 'loop' and eng_loop is None:
