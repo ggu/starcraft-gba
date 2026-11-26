@@ -260,32 +260,54 @@ static void zerg_morph_chain(void)
     assert(race_owner_supply_cap(SIDE) >= 2);
     assert(race_site_creep(SIDE, b[hatch].x + 48, b[hatch].y));
 
-    /* Morphing halls continue to regenerate and spend their own larva. The
-     * queued Drone must finish before the longer Lair morph and completion
-     * must preserve the remaining larva instead of restoring a full batch. */
-    if (unit_raw(41) >= 0) {
-        const Sc64RaceUnitRule *drone_rule = sc64_race_unit_rule(unit_raw(41));
+    /* The hall regenerates and spends larva during its Lair morph. The
+     * Custom Game Egg or legacy hall order must mature before that morph. */
+    drone = unit_raw(41);
+    if (drone >= 0) {
+        const Sc64RaceUnitRule *drone_rule = sc64_race_unit_rule(drone);
         int old_minerals = minerals, old_gas = gas;
         drones_before = 0;
         for (int i = 0; i < MAX_UNITS; ++i)
             if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 41)
                 ++drones_before;
-        b[hatch].larva = 1; b[hatch].larva_timer = 427;
+        b[hatch].larva = 1;
+        b[hatch].larva_timer = SC64_LARVA_PERIOD - 1;
         race_tick_state();
         assert(b[hatch].under_construction && b[hatch].larva == 2 &&
                b[hatch].larva_timer == 0);
-        assert(drone_rule && race_queue_unit(SIDE, hatch, unit_raw(41)));
-        assert(b[hatch].larva == 1 && b[hatch].queue_count == 1);
+        assert(drone_rule && race_queue_unit(SIDE, hatch, drone));
+        assert(b[hatch].larva == 1);
         assert(minerals == old_minerals - drone_rule->minerals &&
                gas == old_gas - drone_rule->gas);
-        for (int tick = 0; tick < unit_build_time(unit_raw(41)) + 8; ++tick) {
-            int count = 0;
-            for (int i = 0; i < MAX_UNITS; ++i)
-                if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 41)
-                    ++count;
-            if (count > drones_before) break;
+
+#ifdef SC64_CUSTOM_LARVA_EGGS
+        int egg = -1;
+        int duration = sc64_z7_egg_duration(drone);
+        assert(b[hatch].queue_count == 0 && duration > 1);
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == SC64_EGG_ACTOR) {
+                assert(egg < 0);
+                egg = i;
+            }
+        assert(egg >= 0 && u[egg].raw_type == 36 && u[egg].target == drone);
+        assert(u[egg].work_timer == duration);
+        for (int tick = 0; tick < duration - 1; ++tick) {
+            race_z7_egg_tick_unit(egg);
             race_tick_buildings();
         }
+        assert(u[egg].alive && u[egg].type == SC64_EGG_ACTOR && u[egg].work_timer == 1);
+        race_z7_egg_tick_unit(egg);
+        race_tick_buildings();
+        assert(u[egg].alive && u[egg].type == drone && u[egg].owner == SIDE);
+        assert(b[hatch].queue_count == 0);
+#else
+        assert(b[hatch].queue_count == 1 && b[hatch].queue[b[hatch].queue_head] == drone);
+        for (int tick = 0; tick < unit_build_time(drone) + 8 && b[hatch].queue_count;
+             ++tick) race_tick_buildings();
+        assert(b[hatch].queue_count == 0);
+#endif
+        assert(minerals == old_minerals - drone_rule->minerals &&
+               gas == old_gas - drone_rule->gas);
         {
             int count = 0;
             for (int i = 0; i < MAX_UNITS; ++i)
@@ -294,6 +316,11 @@ static void zerg_morph_chain(void)
             assert(count == drones_before + 1);
         }
         assert(b[hatch].under_construction && b[hatch].larva == 1);
+#ifdef SC64_CUSTOM_LARVA_EGGS
+        puts("morphing Lair produced a Drone through an independent Egg PASS");
+#else
+        puts("morphing Lair produced a Drone through the legacy hall queue PASS");
+#endif
     }
     for (int tick = 0; tick < building_build_time(b[hatch].type) + 8 &&
          !building_complete(hatch); ++tick) race_tick_buildings();
