@@ -917,6 +917,28 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(sk.never_time(wave, wave['observations'][0], 9000), (sk.NEVER, 9001))
         self.assertEqual(sk.never_time(wave, wave['observations'][0], 15000), (sk.NEVER, 12001))
 
+    def test_an_allowed_never_counts_only_from_a_run_that_reached_the_band(self):
+        # sk-ffa-w0's Gateway: band 2,249-2,253 with NEVER allowed by the seed envelope. Runs that all
+        # ended at 2,149 never reached the band: KNOWN with or without a baseline line, never PASS or
+        # IMPROVED (which --accept would drop).
+        gate = dict(self.golden(2251, 2249, 2253, check='build.first.Gateway', subject='cpu Protoss',
+                                also_ok=[sk.NEVER]), gba={'horizon': 9000})
+        key = ('build.first.Gateway', 'cpu Protoss')
+        line = 'sk-pvt-w0:build.first.Gateway:cpu Protoss'
+        known = {line: {'key': line, 'gba': 1794, 'gba_offsets': [1794, 1804, 1804]}}
+
+        def verdict(cutoffs, baseline):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', gate, {key: sk.NEVER}, {}, baseline, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(verdict([2149] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([2149] * 3, {}), 'KNOWN')
+        self.assertEqual(verdict([2149, 2300, 2300], {}), 'KNOWN')
+        # Runs that reached the band without building it: the allowed NEVER counts.
+        self.assertEqual(verdict([2300] * 3, known), 'IMPROVED')
+        self.assertEqual(verdict([2300] * 3, {}), 'PASS')
+        self.assertEqual(verdict(None, {}), 'PASS')
+
     def test_a_single_runs_line_speaks_for_offset_0_only(self):
         defeat = dict(self.golden(10076, 10074, 10078, check='result.human_defeated', subject='human'),
                       gba={'horizon': 10676})

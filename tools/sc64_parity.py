@@ -423,7 +423,14 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 # ended early might still have seen it in the band).
                 return max(0, nv[1] - obs['hi'])
             return None
-        gaps = [gap(v) for v in spread]
+        def gap_at(i, v):
+            # An allowed NEVER counts as inside the band only from a run that reached it: one cut
+            # short before the band's lower edge (an early defeat) has not shown it. Such a reading is
+            # neither inside nor shown outside (its time distance is 0), so the line stays KNOWN.
+            if v in also_ok and own[i] is not None and v == own[i][0] and own[i][1] - 1 < obs['lo']:
+                return outside(own[i][1], obs['lo'], obs['hi'])
+            return gap(v)
+        gaps = [gap_at(i, v) for i, v in enumerate(spread)]
         every = ' at every frame offset' if len(spread) > 1 else ''
         known = baseline.get(key)
         # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
