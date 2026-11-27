@@ -859,12 +859,17 @@ def load_baseline(path):
                                  'and equal to gba')
         if 'gba_cutoffs' in line:
             cut = line['gba_cutoffs']
+            # A cutoff stands only behind its scenario's NEVER (when this checkout knows the scenario).
+            spec = metrics.SCENARIOS.get(line['key'].split(':', 1)[0])
+            never_value = spec.get('never_value') if spec is not None else None
             if not isinstance(line.get('gba_offsets'), list) or not isinstance(cut, list) or \
                     len(cut) != len(line['gba_offsets']) or \
                     not all(c is None or (isinstance(c, int) and not isinstance(c, bool) and 0 <= c <= BASELINE_LIMIT)
-                            for c in cut) or all(c is None for c in cut):
+                            for c in cut) or all(c is None for c in cut) or \
+                    (spec is not None and any(c is not None and v != never_value
+                                              for c, v in zip(cut, line['gba_offsets']))):
                 raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_cutoffs: one source '
-                                 'frame or null per gba_offsets entry, at least one frame')
+                                 'frame or null per gba_offsets entry, at least one frame, frames only behind NEVER')
     return {line['key']: line for line in doc.get('known', [])}
 
 

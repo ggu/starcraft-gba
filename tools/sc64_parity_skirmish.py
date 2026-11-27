@@ -965,6 +965,7 @@ def scenarios():
             # spread over these offsets (tools/sc64_parity.py judge).
             'frame_offsets': FRAME_OFFSETS,
             'never_time': never_time,
+            'never_value': NEVER,   # the only baseline value a gba_cutoffs entry may stand behind
             'frame_noise': FRAME_NOISE,
             # A seed whose own band is NEVER, in a finite envelope: times keep their +-2 frames.
             'sentinel_slack': lambda obs: TIME_TOLERANCE,

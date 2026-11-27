@@ -1226,6 +1226,14 @@ class FrameOffsets(unittest.TestCase):
             path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_cutoffs': [9000]}]}))
             with self.assertRaises(SystemExit):
                 sc64_parity.load_baseline(path)
+            # A cutoff behind a finite time is refused; behind the NEVER it is kept.
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, sk.NEVER, 132],
+                                                   'gba_cutoffs': [9000, None, None]}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, sk.NEVER, 132],
+                                                   'gba_cutoffs': [None, 9000, None]}]}))
+            self.assertEqual(sc64_parity.load_baseline(path)[self.KEY]['gba_cutoffs'], [None, 9000, None])
             # A line of a scenario this checkout does not know is kept as it is.
             path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': [1, 2]}]}))
             self.assertEqual(sc64_parity.load_baseline(path)['gone-lab:x:s']['gba_offsets'], [1, 2])
