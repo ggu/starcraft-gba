@@ -1076,7 +1076,8 @@ class FrameOffsets(unittest.TestCase):
             return sc64_parity.judge('sk-pvt-w0', defeat, {key: spread[0]}, {}, legacy, more=more)[0]['verdict']
         self.assertEqual(verdict([sk.NEVER, 1000, 1001]), 'KNOWN')       # offsets +1, +2 were never recorded
         self.assertEqual(verdict([1000, sk.NEVER, sk.NEVER]), 'REGRESSION')
-        # The numbers comparison too: a legacy Gateway line (2,239 at offset 0) says nothing about +1 and +2.
+        # The whole-spread numbers comparison keeps every matching reading: against a legacy Gateway
+        # line (2,239), numbers that all moved 1,200 frames earlier fail even beside an allowed NEVER.
         gate = dict(self.golden(2251, 2249, 2253, check='build.first.Gateway', subject='cpu Protoss',
                                 also_ok=[sk.NEVER]), gba={'horizon': 9000})
         gkey = ('build.first.Gateway', 'cpu Protoss')
@@ -1086,8 +1087,21 @@ class FrameOffsets(unittest.TestCase):
             more = [(1, {gkey: spread[1]}), (2, {gkey: spread[2]})]
             return sc64_parity.judge('sk-pvt-w0', gate, {gkey: spread[0]}, {}, {gline: {'key': gline, 'gba': 2239}},
                                      more=more)[0]['verdict']
-        self.assertEqual(gate_verdict([sk.NEVER, 1000, 1001]), 'KNOWN')
-        self.assertEqual(gate_verdict([1000, 1001, 1002]), 'REGRESSION')   # offset 0 itself moved
+        self.assertEqual(gate_verdict([sk.NEVER, 1000, 1001]), 'REGRESSION')
+        self.assertEqual(gate_verdict([1000, 1001, 1002]), 'REGRESSION')
+        self.assertEqual(gate_verdict([sk.NEVER, 2238, 2240]), 'KNOWN')
+        # Codex: a legacy timing of 10,079 (band ends 9,541, two frames of slack).
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        wkey = ('attack.first_wave', 'cpu Terran')
+        wline = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+
+        def wave_verdict(spread):
+            more = [(1, {wkey: spread[1]}), (2, {wkey: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', wave, {wkey: spread[0]}, {}, {wline: {'key': wline, 'gba': 10079}},
+                                     more=more)[0]['verdict']
+        self.assertEqual(wave_verdict([10082, 10079, 10079]), 'KNOWN')
+        self.assertEqual(wave_verdict([10082, 10082, 10082]), 'REGRESSION')
 
     def test_a_newly_finite_time_is_compared_with_the_outcome_it_replaced(self):
         # Codex: the only recorded time becomes NEVER and the newly finite defeats are nearer the band

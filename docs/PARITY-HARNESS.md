@@ -149,9 +149,12 @@ edge), and compares as the frame after it. At several frame offsets:
   run that reached the band's lower edge (for a NEVER band, the run's
   reach), so an early end never makes such a line IMPROVED and drops it; on
   a line with no baseline line it passes as before. `--accept` keeps a
-  line's recorded value at every offset whose NEVER an early end cut short.
-- Only offsets the baseline recorded are evidence for the per-offset check:
-  a single run's line (no `gba_offsets`) speaks for offset 0 alone.
+  line's recorded value at every offset whose NEVER an early end cut short,
+  except on a REGRESSION: a run that showed the line moved (no event by a
+  frame past the recorded times) is recorded as seen.
+- Only offsets the baseline recorded are evidence for the per-offset check
+  of a newly finite time: a single run's line (no `gba_offsets`) speaks for
+  offset 0 alone there. The whole-spread comparisons keep every reading.
 - A seed whose own band is NEVER, in an envelope other seeds made finite,
   keeps the timing tolerance (±2 frames) as its slack.
 

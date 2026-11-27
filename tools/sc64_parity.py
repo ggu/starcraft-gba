@@ -577,7 +577,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # must clear the family's.
             unstable = never is not None and len({kind(b) for b in base}) > 1
             compared = [i for i, v in enumerate(spread)
-                        if kind(v) == 'number' and (never is None or (i < recorded and not changed(i, v)))]
+                        if kind(v) == 'number' and (never is None or not changed(i, v))]
             numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
                 beyond([(gaps[i], slack + (allowance if unstable else 0)) for i in compared],
                        [gap(b) for b in base if kind(b) == 'number'])
