@@ -138,8 +138,8 @@ edge), and compares as the frame after it. At several frame offsets:
   (ENDED, a marker) is a REGRESSION at any distance, when every offset is
   outside the band.
 - A NEVER is a lower bound on the time: the frame after the run's reach,
-  or after that GBA run's own last measured frame when its trace ended
-  first. It is as far out as that bound lies past the band, and no
+  or after that GBA run's own last measured frame when it ended first in
+  the human's defeat (a win or the step limit leaves the reach). It is as far out as that bound lies past the band, and no
   distance at all while the bound lies below the band's upper edge, so an
   early end is gated by the result check, not by every timing it cut
   short.

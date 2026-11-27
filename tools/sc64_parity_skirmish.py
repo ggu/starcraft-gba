@@ -917,8 +917,10 @@ def make_measure_gba(scenario_id):
             elif check == 'attack.first_wave' and label in measured:
                 measured[label]['wave'] = flat[(check, label)]
         return {'values': flat, 'curves': gba_curves(m, golden),
-                # The last source frame the measurement saw: the GBA trace can end before the reach.
-                'cutoff': (late if late is not None else m)['end'],
+                # The last source frame the measurement saw, when the GBA run ended in the human's
+                # defeat (which result.human_defeated gates): it bounds the timings the defeat cut
+                # short. Any other end (a win, the step limit) leaves the run's reach.
+                'cutoff': (late if late is not None else m)['end'] if report.get('lost') else None,
                 'measured': {'players': measured, 'end': m['end'], 'gba_only_types': extra,
                              'past_run_end': sorted(f'{c} {s}' for c, s in past_end),
                              'start_order': match.get('start_order')}}, None

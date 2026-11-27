@@ -293,7 +293,7 @@ class GbaTrace(unittest.TestCase):
         # falls at frame 3: past the run's last frame, inside the band.
         tape = hashlib.sha256(sk.lobby_tape(*sk.LOBBIES['sk-zvt-w0']).encode()).hexdigest()
 
-        def defeat(lo, hi, value=2, extra=()):
+        def defeat(lo, hi, value=2, extra=(), report=REPORT):
             golden = {'bundle': {'tape_sha256': tape}, 'gba': {'horizon': 2},
                       'observations': [{'check': 'result.human_defeated', 'subject': 'human', 'value': value,
                                         'lo': lo, 'hi': hi, 'gating': True},
@@ -303,7 +303,7 @@ class GbaTrace(unittest.TestCase):
             check, selfgate.check_trace_complete = selfgate.check_trace_complete, lambda *a, **k: None
             try:
                 values, error = metrics.SCENARIOS['sk-zvt-w0']['measure_gba'](
-                    sk.gba_series(self.trace, REPORT), golden, REPORT)
+                    sk.gba_series(self.trace, report), golden, report)
             finally:
                 selfgate.check_trace_complete = check
             self.assertIsNone(error)
@@ -312,9 +312,14 @@ class GbaTrace(unittest.TestCase):
         cutoffs = []
         self.assertEqual(defeat(0, 4), 3)
         self.assertEqual(defeat(0, 2), sk.NEVER)            # past both the run and the band
-        # The last frame each measurement saw: through the band's edge, or the run's cutoff.
-        self.assertTrue(isinstance(cutoffs[0], int) and 3 <= cutoffs[0] <= 4, cutoffs)
-        self.assertTrue(isinstance(cutoffs[1], int) and cutoffs[1] <= 2, cutoffs)
+        # A run that ended in the human's defeat reports the last frame its measurement saw (through
+        # the band's edge, or the run's cutoff); any other end reports none.
+        self.assertEqual(cutoffs, [None, None])
+        lost = dict(REPORT, lost=1)
+        defeat(0, 4, report=lost)
+        defeat(0, 2, report=lost)
+        self.assertTrue(isinstance(cutoffs[2], int) and 3 <= cutoffs[2] <= 4, cutoffs)
+        self.assertTrue(isinstance(cutoffs[3], int) and cutoffs[3] <= 2, cutoffs)
         self.assertEqual(defeat(sk.NEVER, sk.NEVER, sk.NEVER), sk.NEVER)   # a NEVER keeps the run's cutoff
         # A seed that never saw it, inside an envelope reaching past its run (another check
         # extends the measurement): still the run's cutoff.
