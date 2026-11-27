@@ -1365,6 +1365,15 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                     [(sf, vid, 0) for sf, vid, _ in shield_hits if (sf, vid) not in hp_frames])
     taken = [(sf, round(d)) for sf, d in hits(own)]
 
+    def foe_source(stype):
+        cart = unit_raw[stype] if unit_raw and stype is not None and 0 <= stype < len(unit_raw) else None
+        return foe_type is None or cart == foe_type
+    # A hit taken whose records come from no unit of the foe's type was not the foe's: left out
+    # of the single-foe gate and of the values alike.
+    foreign = {sf for sf, _ in taken
+               if sources_at.get((sf, uid)) and not any(not ours_source(o) and foe_source(t)
+                                                        for o, t, _ in sources_at[(sf, uid)])}
+
     def single_foe(sf):
         # The same single living enemy in reach on the sample before the drop and on the one
         # that shows it, and a unit of the configured foe type on both: a lone building, another
@@ -1390,7 +1399,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         return near[0] if len(near) == 1 else None
     own_gaps = drop_gaps(own)
     # Each hit taken must come between consecutive samples with one enemy in reach.
-    taken_single = all(single_foe(sf) and own_gaps.get(sf, 1) == 1 for sf, _ in taken)
+    taken_single = all(single_foe(sf) and own_gaps.get(sf, 1) == 1 for sf, _ in taken if sf not in foreign)
     # Survival runs from the first hit taken, the killing one included (a one-shot death is 0).
     # (the earliest confirmed hit: a drop in its hit points or shields, or an accepted hit record)
     first_taken = min([sf for sf, _ in hits(own, lethal=True)] +
@@ -1422,9 +1431,6 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # the subject's own hits on the foe (credited as its drops are, from the subject's owner) and
     # each foe hit on it: a wrong hit no sampled drop can show (inside a lethal frame, offset by
     # regeneration, behind a clipped shield) still fails them. Lethal hits show only what was left.
-    def foe_source(stype):
-        cart = unit_raw[stype] if unit_raw and stype is not None and 0 <= stype < len(unit_raw) else None
-        return foe_type is None or cart == foe_type
     # Applied per-hit values by frame and row: the subject's credited hits on the foe, and hits on
     # it from a unit of the foe's type with that foe alone in reach. A sampled drop with them in
     # its frame reads them instead (regeneration between hit and sample, or several hits in one
@@ -1466,10 +1472,6 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                             if (vid, sf) not in clipped], applied_sh_at,
                            multiple | {(sf, vid) for vid, got in shielded.items() for sf, d in got
                                        if regen_masks(vid, sf, d)})
-    # A hit taken whose records come from no unit of the foe's type was not the foe's: left out.
-    foreign = {sf for sf, _ in taken
-               if sources_at.get((sf, uid)) and not any(not ours_source(o) and foe_source(t)
-                                                        for o, t, _ in sources_at[(sf, uid)])}
     taken_values = [] if taken_unplaced else merged([(sf, d) for sf, d in taken if sf not in foreign],
                                                     applied_taken_at, {sf for sf, k in multiple if k == uid})
     result = {

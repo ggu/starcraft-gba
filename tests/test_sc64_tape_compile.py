@@ -1286,10 +1286,14 @@ class LabMeasureTest(unittest.TestCase):
         self.assertIn(3, m['counter_values'])
         # A hit from a unit of another type (a Photon Cannon, engine type 7) is left out, not a
         # reason to drop the foe's own hits.
-        series['applied'] = [(26, 1, 5, 0, 35, 3, 3), (36, 1, 5, 0, 30, 7, 3)]
-        series['removals'] = []
+        cannon = {sf: 40.0 - 5 * (sf >= 20) - 20 * (sf >= 28) for sf in range(0, 80)}
+        series = as_gba(walk(pos, hp={1: cannon, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 130, 100)]))
+        for frame in series['frames']:
+            frame['live'] = {1: 0, 2: 3}
+        series['applied'], series['max_units'] = [(26, 1, 5, 0, 35, 3, 3), (36, 1, 20, 0, 15, 7, 3)], 100
         m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
-        self.assertEqual(m['counter_values'], [5])
+        self.assertEqual((m['counter_values'], m['taken_single']), ([5], True))
 
     def test_the_self_gate_validates_applied_hit_records(self):
         import sc64_parity_selfgate
