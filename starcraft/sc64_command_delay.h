@@ -61,8 +61,8 @@ static u8 sc64_command_delay_applying;
  * it: no pending command may reach that slot any more. Every path that
  * replaces a unit's order for the player calls this for that unit (through
  * SC64_CMD_FORGET): issue_order() itself, Stop, gather, build, repair,
- * boarding and unloading, direct attack, recharge, spells, Nydus, nukes,
- * morphs and the mission scripts' own orders. Orders the simulation gives
+ * boarding and unloading, direct attack, recharge, spells, Nydus, the
+ * player's nuclear strike and abort, and morphs. Orders the simulation gives
  * on its own (auto-acquire, arrival, AI) do not cancel the player's
  * command, as on the N64, where it lands after its latency regardless. */
 static void
@@ -198,6 +198,9 @@ sc64_command_delay_apply(Sc64DelayedCommand *c)
     selected_building = building;
     toast_id = line;
     toast_timer = line_timer;
+#ifdef SC64_COMMAND_DELAY_AUDIT
+    sc64_command_delay_input_begin(); /* a command applied during input is not a missed forget */
+#endif
 }
 
 /* In the order given: every command runs, and a later one for the same

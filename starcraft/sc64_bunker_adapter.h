@@ -96,7 +96,7 @@ static int __attribute__((noinline)) race_bunker_request_unload(int slot)
     int target=MAX_UNITS+slot;
     for (int i=0;i<MAX_UNITS;++i)
         if (u[i].alive && u[i].order==ORDER_TRANSPORTED && u[i].target==target)
-            done+=race_bunker_unload_one(i,slot);
+            if (race_bunker_unload_one(i,slot)) { SC64_CMD_FORGET(i); ++done; }
     return done;
 }
 static void __attribute__((noinline)) race_bunker_kill_passenger(int unit,int killer_owner)

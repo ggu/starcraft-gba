@@ -151,5 +151,28 @@ int main(void)
     }
     assert(!sc64_delayed_commands[0].active && !sc64_delayed_commands[1].active);
     puts("command delay: boarding replaces a pending Move: ok");
+
+    /* A Move given while a Marine walks into a Bunker is still pending when
+     * it boards. Unloading it before the Move falls due is the newer
+     * command: the Marine stays at its landing point. */
+    int bunker_marine = player_marine(1);
+    int bx = u[bunker_marine].x + 36, by = u[bunker_marine].y;
+    int bunker = spawn_build(SIDE, sc64_race_building_from_raw(125), bx, by, 0);
+    assert(bunker >= 0 && race_bunker_carrier_valid(bunker));
+    select_only(bunker_marine, -1);
+    assert(race_bunker_request_board(bunker_marine, bunker));
+    move_x = u[bunker_marine].x - 60; move_y = u[bunker_marine].y + 40;
+    player_move(move_x, move_y);
+    assert(u[bunker_marine].order == ORDER_BOARD);
+    for (int k = 0; k < SC64_COMMAND_DELAY_UPDATES && u[bunker_marine].order != ORDER_TRANSPORTED; ++k) input(0);
+    assert(u[bunker_marine].order == ORDER_TRANSPORTED);
+    assert(sc64_delayed_commands[0].active || sc64_delayed_commands[1].active);
+    assert(race_bunker_request_unload(bunker) == 1);
+    for (int k = 0; k < 3 * SC64_COMMAND_DELAY_UPDATES; ++k) {
+        input(0);
+        assert(u[bunker_marine].order == ORDER_IDLE);
+    }
+    assert(!sc64_delayed_commands[0].active && !sc64_delayed_commands[1].active);
+    puts("command delay: unloading a Bunker replaces a pending Move: ok");
     return 0;
 }

@@ -6944,7 +6944,7 @@ choose_command(int choice)
             else if (action == NUKE_MENU_ARMED) toast(NUKE_TOAST_ARMED);
             else if (action == NUKE_MENU_ABORT) {
                 for (int i = 0; i < MAX_UNITS; ++i)
-                    if (u[i].selected && u[i].owner == SIDE) (void)race_nuke_abort(i);
+                    if (u[i].selected && u[i].owner == SIDE && race_nuke_abort(i)) SC64_CMD_FORGET(i);
             }
             return;
         }

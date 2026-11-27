@@ -314,7 +314,6 @@ static int race_nuke_abort(int slot)
     if (race_nuke_ghost_eligible(slot, f->strike.owner)) {
         u[slot].order = ORDER_IDLE;
         u[slot].target = -1;
-        SC64_CMD_FORGET(slot);
     }
     if (f->strike.owner == SIDE) toast(NUKE_TOAST_ABORTED);
     race_nuke_retire(f);
