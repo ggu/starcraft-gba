@@ -1053,6 +1053,27 @@ class FrameOffsets(unittest.TestCase):
             self.assertEqual(accepted[line]['gba_offsets'], [sk.NEVER] * 3)
             rerun = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more, cutoffs=[10500] * 3)[0]
             self.assertEqual(rerun['verdict'], 'KNOWN')
+            # The accepted NEVERs keep the frame they were shown to ...
+            self.assertEqual(accepted[line]['gba_cutoffs'], [10500] * 3)
+            self.assertIn('"gba_cutoffs": [10500, 10500, 10500]\n', path.read_text())
+            # ... so a later run that goes on to 12,000 without a wave is a regression against them,
+            # where a full-window NEVER on record (a line without cutoffs) would have excused it.
+            later = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more, cutoffs=None)[0]
+            self.assertEqual(later['verdict'], 'REGRESSION')
+            whole = {line: {'key': line, 'gba': sk.NEVER, 'gba_offsets': [sk.NEVER] * 3}}
+            self.assertEqual(sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, whole, more=more)[0]['verdict'],
+                             'KNOWN')
+            # A run cut short no later than the recorded cutoff keeps the line, and its cutoff, as it is.
+            again = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more,
+                                      cutoffs=[10400, 10500, None])[0]
+            self.assertEqual(again['verdict'], 'KNOWN')
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [again]}], {})
+            self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_cutoffs'], [10500, 10500, None])
+            # A run that reaches the event again records a time and no cutoff for it.
+            back = sc64_parity.judge('sk-pvt-w0', wave, {key: 10079}, {}, accepted,
+                                     more=[(1, {key: 10078}), (2, {key: 10077})])[0]
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [back]}], {})
+            self.assertNotIn('gba_cutoffs', sc64_parity.load_baseline(path)[line])
             # A single run's line keeps its offset-0 value when offset 0 is cut short.
             legacy = {line: {'key': line, 'gba': 10079}}
             row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, legacy, more=[(1, {key: 10080}), (2, {key: 10081})],
@@ -1196,6 +1217,15 @@ class FrameOffsets(unittest.TestCase):
                 path.write_text(text)
                 with self.assertRaises(SystemExit):
                     sc64_parity.load_baseline(path)
+            # gba_cutoffs: one source frame or null per offset, at least one frame, with gba_offsets.
+            for cut in ([10500], [None, None, None], [10500, 'x', None], [10500, -1, None], [True, None, None], 10500):
+                path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': sk.NEVER,
+                                                       'gba_offsets': [sk.NEVER] * 3, 'gba_cutoffs': cut}]}))
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_cutoffs': [9000]}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
             # A line of a scenario this checkout does not know is kept as it is.
             path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': [1, 2]}]}))
             self.assertEqual(sc64_parity.load_baseline(path)['gone-lab:x:s']['gba_offsets'], [1, 2])

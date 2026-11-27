@@ -151,7 +151,10 @@ edge), and compares as the frame after it. At several frame offsets:
   a line with no baseline line it passes as before. `--accept` keeps a
   line's recorded value at every offset whose run an early end stopped
   before that recorded time; a run that went past it without the event
-  showed the move, and that is recorded.
+  showed the move, and that is recorded. An accepted NEVER from a run cut
+  short keeps that run's last frame in `gba_cutoffs` (one source frame or
+  null per offset), so it reads "not before that frame", never "not within
+  the whole window"; lines without it keep the full-window meaning.
 - Only offsets the baseline recorded are evidence for the per-offset check
   of a newly finite time: a single run's line (no `gba_offsets`) speaks for
   offset 0 alone there. The whole-spread comparisons keep every reading.
