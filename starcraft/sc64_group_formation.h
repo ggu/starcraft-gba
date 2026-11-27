@@ -40,8 +40,8 @@ sc64_group_formation_begin(int order, int group_order, int tx, int ty)
 }
 
 /* The n-th selected unit's destination for a group order to (tx, ty).
- * With check_tile a translated ground slot on blocked terrain takes its grid
- * slot. Both callers set it: the reachable-formation route check can count
+ * With check_tile a translated ground slot on blocked terrain, or under a
+ * building or door, takes its grid slot. Both callers set it: the reachable-formation route check can count
  * a blocked tile reachable through a neighbour and keep a point no unit
  * reaches. */
 static inline void
@@ -55,7 +55,11 @@ sc64_group_formation_slot(const Sc64GroupFormation *f, const Unit *q, int n,
 #ifdef SC64_RACES
             sc64_race_unit_flying(q->type) ||
 #endif
-            !terrain_blocked(*slot_x / 16, *slot_y / 16)) return;
+            (!terrain_blocked(*slot_x / 16, *slot_y / 16) &&
+             /* Buildings and doors, from the walk grid when it is current:
+              * rebuilding it here would change route state. */
+             (!path_grid_valid ||
+              SC64_GRID_GET(path_walkable, *slot_x / 16 + (*slot_y / 16) * MAP_COLS)))) return;
     }
     *slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
     *slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);

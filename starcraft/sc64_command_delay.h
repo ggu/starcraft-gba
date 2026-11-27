@@ -73,11 +73,16 @@ sc64_command_delay_forget(int slot)
 static u8 sc64_command_delay_seen[MAX_UNITS];
 static u8 sc64_command_delay_watching;
 
+/* The timers are in it because a command repeated as it stands (Gather on
+ * the same patch, say) still resets them; the input phase runs no
+ * simulation, so nothing else changes them there. */
 static inline u8
 sc64_command_delay_hash(const Unit *q)
 {
     return (u8)((unsigned)q->order * 37u + (unsigned)q->target * 11u +
-                (unsigned)q->tx * 3u + (unsigned)q->ty * 7u + (unsigned)q->alive);
+                (unsigned)q->tx * 3u + (unsigned)q->ty * 7u + (unsigned)q->alive +
+                (unsigned)q->path_timer * 13u + (unsigned)q->path_retry * 17u +
+                (unsigned)q->work_timer * 19u);
 }
 
 static void __attribute__((noinline))

@@ -528,6 +528,10 @@ double_tap_selection_tests(void)
     { int i; for (i = 0; i < 5; i++) input(KEY_RIGHT); }
     input(0);
     tap(KEY_A);
+#ifdef SC64_IMPORTED_MISSION
+    /* The player's Move lands after the command delay. */
+    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES && u[0].order != ORDER_MOVE; ++k) input(0);
+#endif
     if (selection_mask() != 1 || u[0].order != ORDER_MOVE || u[1].selected) return 14;
 
     /* A building's A actions retain selection/queue semantics and never

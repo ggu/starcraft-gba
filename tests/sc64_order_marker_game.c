@@ -45,7 +45,8 @@ static void settle_order(int a, int order, int tx, int ty)
 #ifdef SC64_IMPORTED_MISSION
     /* This synthetic match has no buildings, so play is resumed each
      * update, as the lifetime loop above does. */
-    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES + 1 && u[a].order != order; ++k) {
+    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES + 1 &&
+                    (u[a].order != order || u[a].tx != tx || u[a].ty != ty); ++k) {
         screen = SCREEN_PLAY;
         game_update(0, 0);
     }
