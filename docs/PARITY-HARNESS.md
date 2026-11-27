@@ -106,9 +106,35 @@ observation outside its band becomes a known line holding the GBA value
 `gba_offsets`, offset 0 first and also in `gba`).
 
 A marker or sentinel (an absent event, an off-target fight, a skirmish
-NEVER or ENDED) is an outcome, not a number: a line whose outcomes share
-none with the baseline's is a REGRESSION at any distance, and numbers are
-compared only with numbers. Against a band that is itself an outcome (the
+NEVER or ENDED) is an outcome, not a number, and numbers are compared only
+with numbers. A skirmish NEVER for a timing has a time, "not before the
+measurement's reach" (the N64 run's last frame, or a finite band's upper
+edge), and compares as the frame after it. At several frame offsets:
+
+- A new finite time where the baseline recorded another outcome at that
+  offset (a defeat where the human survived) is judged on its own. It is a
+  REGRESSION when it lies beyond the band and every recorded value by more
+  than the slack plus the GBA's own frame noise for checks of its kind: the
+  widest spread over offsets on any baseline line of the family (in the
+  current baseline 1,352 frames for build-order firsts, 516 for first
+  waves, 507 for defeats), whatever the other offsets kept. A defeat
+  between the band and "never" is nearer the N64 than surviving, so it is
+  not worse.
+- NEVER where a time was recorded only bounds the time from below, so it is
+  judged with the whole spread: every offset's time (NEVER as that bound)
+  further out than every recorded time. A wave at the very end of the run
+  that slips past it at one offset is noise.
+- Numbers alone are also compared spread against spread, so an offset that
+  kept NEVER does not excuse numbers that all moved further out. A number
+  inside the band at any offset keeps the comparison KNOWN: the noise
+  still reaches the N64's value (only a newly finite timing is judged on
+  its own).
+- A line whose outcomes share none with the baseline's and have no time
+  (ENDED, a marker) is a REGRESSION at any distance.
+- A seed whose own band is NEVER, in an envelope other seeds made finite,
+  keeps the timing tolerance (±2 frames) as its slack.
+
+Against a band that is itself an outcome (the
 N64 never built the type), every GBA time is the same wrong outcome, so a
 time that moves is no regression; a line with no baseline line still fails
 while it is outside.
@@ -135,11 +161,13 @@ the band, where one recorded offset was outside). The price: a shift of
 every offset by no more than the line's own spread reads KNOWN. Comparing
 the ranked offsets instead (each offset's gap against the same rank of the
 baseline's) would catch that, but flipped 0–3 lines of pure frame noise in
-the same test. A line with an offset inside the band (an `also_ok` NEVER
-included) is never a REGRESSION, and an outcome new at some offsets (an
-ENDED checkpoint where the baseline had numbers) is noise while the other
-offsets share the baseline's outcome; the match's own end is gated by its
-`result.*` line.
+the same test. An ENDED checkpoint at some offsets, where the baseline had
+numbers, is noise while the other offsets share the baseline's outcome:
+the match's end is gated by its own `result.*` line, which compares a new
+defeat by its time. Baseline lines must hold one finite value per
+configured offset; a single run's line (no `gba_offsets`) stays valid.
+`--explain` and `--json` list each offset's command, CPU time, measurements
+and first curve divergences under `offset_runs`.
 Offsets are GBA-side only; the N64 goldens are unchanged. `--jobs` (one
 per CPU by default) runs the GBA runs and their measurement in worker
 processes.

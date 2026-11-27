@@ -38,8 +38,12 @@ REGRESSION only when every offset is further out than every value the
 baseline recorded (by more than the slack), or, with no baseline line, when
 every offset is outside the band. Anything between is KNOWN: within the
 GBA's noise of the baseline (a line with no baseline line yet gets one on
---accept). Baseline lines of such scenarios keep the value at each offset
-(gba_offsets); gba is offset 0's.
+--accept). A new finite time where the baseline recorded another outcome at
+that offset (a defeat where the human survived) is judged on its own: beyond
+the band, every recorded value and the GBA's frame noise for checks of its
+kind (offset_noise), it is a REGRESSION whatever the other offsets kept. NEVER
+compares as the frame after the run's reach (the scenario's never_time). Baseline lines of such scenarios keep the value at each offset
+(gba_offsets, one finite number per offset); gba is offset 0's.
 
 The scorecard prints, per observation, the first divergent source frame (for
 checks with an N64 curve), the band, the GBA value and the provenance, then the
@@ -52,6 +56,7 @@ import concurrent.futures
 import concurrent.futures.process
 import hashlib
 import json
+import math
 import multiprocessing
 import os
 import pathlib
@@ -300,11 +305,34 @@ def offset_label(offsets):
     return ', '.join(f'+{k}' for k in offsets)
 
 
+def check_family(check):
+    """A check's kind across players, types and checkpoints: build.first.Factory -> build.first,
+    econ.gathered@8000 -> econ.gathered."""
+    return 'build.first' if check.startswith('build.first.') else check.split('@')[0]
+
+
+def offset_noise(baseline):
+    """{check family: the widest spread of numbers over frame offsets on any baseline line of it}:
+    how far the GBA's own one-frame noise has moved a value of that kind (sentinels left out)."""
+    noise = {}
+    for key, line in baseline.items():
+        spec = metrics.SCENARIOS.get(key.split(':')[0], {})
+        if not spec.get('frame_offsets'):
+            continue   # only scenarios this checkout runs at offsets, whose sentinels it knows
+        values = [v for v in line.get('gba_offsets', ()) if v not in spec.get('sentinels', ()) and
+                  v not in metrics.MARKERS]
+        if len(values) > 1:
+            family = check_family(key.split(':')[1])
+            noise[family] = max(noise.get(family, 0), max(values) - min(values))
+    return noise
+
+
 def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=()):
     """Rows for every observation of one golden. values are the GBA's (offset 0); more lists
     (frame offset, values) for the scenario's other frame offsets, judged as one spread."""
     rows = []
     offsets = [0] + [k for k, _ in more]
+    noise = offset_noise(baseline) if more else {}
     revision = metrics.SCENARIOS.get(scenario_id, {}).get('decoder_revision', 1)
     if not golden.get('observations'):
         # A golden that checks nothing never passes quietly.
@@ -375,24 +403,85 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         if obs['value'] and value not in metrics.MARKERS:
             row['ratio'] = round(value / obs['value'], 3)
         also_ok = obs.get('also_ok', ())
+        # A marker or sentinel (absent event, off-target fight, skirmish NEVER and ENDED) is an
+        # outcome, not a number. Numbers are compared with numbers; an outcome with a time (a
+        # skirmish NEVER: not before the run's reach) is compared by that time.
+        specials = set(metrics.MARKERS) | set(obs.get('sentinels', ()))
+        never = metrics.SCENARIOS.get(scenario_id, {}).get('never_time')
+        never = never(golden, obs) if never else None     # (sentinel, the earliest time it stands for)
+
+        def kind(v):
+            return v if v in specials else 'number'
 
         def gap(v):
             # 0 for an outcome outside the numeric band that the N64 also showed (skirmish NEVER).
             return 0 if v in also_ok else outside(v, obs['lo'], obs['hi'])
+
+        def time_gap(v):
+            # The distance of an outcome by its time; None for one with no time (ENDED, a marker).
+            if v in also_ok:
+                return 0
+            if kind(v) == 'number':
+                return outside(v, obs['lo'], obs['hi'])
+            if never is not None and v == never[0]:
+                return outside(never[1], obs['lo'], obs['hi'])
+            return None
         gaps = [gap(v) for v in spread]
         every = ' at every frame offset' if len(spread) > 1 else ''
         known = baseline.get(key)
+        # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
+        # band as seed_lo/seed_hi, and the N64's spread over seeds is no licence to move further out.
+        seed_lo, seed_hi = obs.get('seed_lo', obs['lo']), obs.get('seed_hi', obs['hi'])
+        if seed_lo in specials and seed_hi in specials:
+            # A seed that never reached the event, in an envelope other seeds made finite: its own
+            # band has no width, so the measurement's own tolerance is the slack.
+            tolerance = metrics.SCENARIOS.get(scenario_id, {}).get('sentinel_slack')
+            slack = max(tolerance(obs) if tolerance else 0, 1e-9)
+        else:
+            slack = max((seed_hi - seed_lo) / 2, 1e-9)
+        # A band that is itself an outcome (the N64 never built the type: [NEVER, NEVER]) puts every
+        # GBA time at the same wrong outcome: a frame earlier is not further out.
+        outcome_band = obs['lo'] == obs['hi'] and obs['lo'] in specials
+        if known is not None:
+            base = known.get('gba_offsets', [known['gba']])
+            was_times = [g for g in (time_gap(b) for b in base) if g is not None]
+        else:
+            # No baseline line: the line passed, so the band's outcomes (its own value, the allowed
+            # outcomes, and a time wherever the band is finite) are what it recorded, at no distance.
+            base = [obs['value']] + list(also_ok) + ([obs['lo']] if obs['lo'] not in specials else [])
+            was_times = [0]
+        was_kinds = {kind(b) for b in base}
+
+        def changed(i, v):
+            # The offset's outcome differs from the baseline's at the same offset, or (a single run's
+            # line) from every outcome the baseline recorded.
+            if known is not None and len(base) == len(spread):
+                return kind(v) != kind(base[i])
+            return kind(v) not in was_kinds
+        # A new finite time where the baseline had another outcome at that offset (a defeat where
+        # the human survived) is judged on its own: beyond the band, every recorded value and the
+        # GBA's own frame noise for checks of its kind (the widest spread over offsets on any
+        # baseline line of the family), it is a regression whatever the other offsets kept. NEVER
+        # where a time was recorded only bounds the time from below (the run's reach), so it is
+        # judged with the whole spread below.
+        # Timings only (the scenario's never_time names them): a checkpoint count that an offset
+        # reaches again after its match ended there stays under the spread comparison.
+        allowance = noise.get(check_family(obs['check']), 0)
+        jumps = [(k, v) for i, (k, v) in enumerate(zip(offsets, spread))
+                 if never is not None and kind(v) == 'number' and changed(i, v) and not outcome_band and was_times
+                 and time_gap(v) > max(was_times) + slack + allowance]
+        # Offsets whose new outcome has no time to compare (ENDED, a marker), or a baseline without one.
+        untimed = [v for v in spread if kind(v) not in was_kinds and (time_gap(v) is None or not was_times)]
         if not gating:
             row['verdict'] = 'REPORT'
         elif max(gaps) == 0:
             row['verdict'] = 'IMPROVED' if known else 'PASS'
-        elif known is not None and min(gaps) == 0:
-            # An offset inside the band (an also_ok NEVER included) is never a regression: the
-            # GBA's own noise still reaches the N64's outcome.
-            row['verdict'] = 'KNOWN'
-            row['baseline'] = known['gba']
-            if 'gba_offsets' in known:
-                row['baseline_offsets'] = known['gba_offsets']
+        elif jumps:
+            row['verdict'] = 'REGRESSION'
+            row['why'] = ('a new outcome ' + ', '.join(f'{fmt(v)}' + (f' at frame offset +{k}' if every else '')
+                                                       for k, v in jumps) +
+                          ' lies beyond the band and every recorded value (' +
+                          (fmt_spread(base) if known is not None else 'none: the line passed') + ')')
         elif known is None:
             if min(gaps) > 0:
                 row['verdict'] = 'REGRESSION'
@@ -404,49 +493,46 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 row['why'] = ('outside the band only at frame offset ' +
                               offset_label(k for k, g in zip(offsets, gaps) if g) + ' (GBA frame noise); '
                               'no baseline line yet')
-        else:
-            base = known.get('gba_offsets', [known['gba']])
-            # A marker or sentinel (absent event, off-target fight, skirmish NEVER and ENDED) is an
-            # outcome, not a number: a line whose outcomes share none with the baseline's has
-            # changed, at any distance. Numbers are compared with numbers only.
-            specials = set(metrics.MARKERS) | set(obs.get('sentinels', ()))
-
-            def kind(v):
-                return v if v in specials else 'number'
-            if not {kind(v) for v in spread} & {kind(b) for b in base}:
-                now, was = value, base[0]
-                row['verdict'] = 'REGRESSION'
-                if now in metrics.MARKERS or was in metrics.MARKERS:
-                    # An event the GBA now produces, or no longer produces, is never the known gap,
-                    # and neither is a fight with other enemies where the baseline recorded none.
-                    row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' +
-                                  ('a fight with other enemies' if was == metrics.OFF_TARGET else 'a measurement'),
-                                  metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' +
-                                  ('no fight' if was == metrics.ABSENT else 'a measurement')}.get(
-                        now, 'the baseline records the event as ' +
-                        ('absent' if was == metrics.ABSENT else 'a fight with other enemies') +
-                        ' on the GBA; it is now measured outside the band')
-                else:
-                    row['why'] = f'the outcome changed from the baseline ({fmt_spread(base)})'
-                row['why'] += every
+        elif untimed and not {kind(v) for v in spread} & was_kinds:
+            # Every offset changed to or from an outcome with no time: changed at any distance.
+            now, was = value, base[0]
+            row['verdict'] = 'REGRESSION'
+            if now in metrics.MARKERS or was in metrics.MARKERS:
+                # An event the GBA now produces, or no longer produces, is never the known gap,
+                # and neither is a fight with other enemies where the baseline recorded none.
+                row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' +
+                              ('a fight with other enemies' if was == metrics.OFF_TARGET else 'a measurement'),
+                              metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' +
+                              ('no fight' if was == metrics.ABSENT else 'a measurement')}.get(
+                    now, 'the baseline records the event as ' +
+                    ('absent' if was == metrics.ABSENT else 'a fight with other enemies') +
+                    ' on the GBA; it is now measured outside the band')
             else:
-                # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each
-                # seed's band as seed_lo/seed_hi, and the N64's spread over seeds is no licence for
-                # the GBA to move further out.
-                slack = max((obs.get('seed_hi', obs['hi']) - obs.get('seed_lo', obs['lo'])) / 2, 1e-9)
-                now = [g for v, g in zip(spread, gaps) if kind(v) == 'number']
-                was = [gap(b) for b in base if kind(b) == 'number']
-                # A band that is itself an outcome (the N64 never built the type: [NEVER, NEVER]) puts
-                # every GBA time at the same wrong outcome: a frame earlier is not further out.
-                outcome_band = obs['lo'] == obs['hi'] and obs['lo'] in specials
-                if now and was and not outcome_band and min(now) > max(was) + slack:
-                    row['verdict'] = 'REGRESSION'
-                    row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
-                else:
-                    row['verdict'] = 'KNOWN'
-                    row['baseline'] = known['gba']
-                    if 'gba_offsets' in known:
-                        row['baseline_offsets'] = base
+                row['why'] = f'the outcome changed from the baseline ({fmt_spread(base)})'
+            row['why'] += every
+        else:
+            # Whole spread against whole spread, by numbers alone and by time (NEVER as the frame
+            # after the run's reach): every offset further out than every recorded value. A time
+            # newly finite at its offset brings no measured spread of its own, so it must also clear
+            # the family's frame noise, as a jump does.
+            def margin(i, v):
+                return slack + (allowance if never is not None and kind(v) == 'number' and changed(i, v) else 0)
+
+            def beyond(now, was):
+                return bool(now) and bool(was) and all(g > max(was) + m for g, m in now)
+            numbers = beyond([(g, margin(i, v)) for i, (v, g) in enumerate(zip(spread, gaps)) if kind(v) == 'number'],
+                             [gap(b) for b in base if kind(b) == 'number'])
+            timed = None not in [time_gap(v) for v in spread] and \
+                beyond([(time_gap(v), margin(i, v)) for i, v in enumerate(spread)],
+                       [g for g in (time_gap(b) for b in base) if g is not None])
+            if not outcome_band and (numbers or timed):
+                row['verdict'] = 'REGRESSION'
+                row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
+            else:
+                row['verdict'] = 'KNOWN'
+                row['baseline'] = known['gba']
+                if 'gba_offsets' in known:
+                    row['baseline_offsets'] = base
         for name, curve in golden.get('curves', {}).items():
             # A curve belongs to the checks it explains: arrival for the move, rate for income.
             explains = {'move.remaining': ('move.arrival_first', 'move.arrival_last'),
@@ -556,6 +642,24 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     if more and out['status'] == 'RUN':
         out['frame_offsets'] = offsets
         out['gba_cpu_seconds'] = sum(run['report'].get('cpu_seconds') or 0 for run in runs)
+        # --explain and --json: each offset's command, CPU time, measurements and first divergences.
+        # gba_cpu_seconds above is the sum over the offsets; offset 0's measurements also stay at
+        # the top level (gba_measured, command), as for a single run.
+        out['offset_runs'] = [{'frame_offset': k, 'command': run['cmd'],
+                               'gba_cpu_seconds': run['report'].get('cpu_seconds'),
+                               'gba_measured': run['measured'].get('measured'),
+                               'first_divergent_frames': curve_divergence(golden, run['measured'].get('curves', {}))}
+                              for k, run in zip(offsets, runs)]
+    return out
+
+
+def curve_divergence(golden, curves):
+    """{curve name: first divergent source frame or None} for the golden's curves a run measured."""
+    out = {}
+    for name, curve in golden.get('curves', {}).items():
+        if name in curves:
+            k = first_divergence(curve['n64'], curves[name], curve['tolerance'])
+            out[name] = None if k is None else k * curve.get('step', 1)
     return out
 
 
@@ -619,18 +723,36 @@ def tables_result(run, out):
          'provenance': 'rom-table', 'verdict': 'REPORT', 'gating': False}]}
 
 
+def finite_number(v):
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return False
+    try:
+        return math.isfinite(v)
+    except OverflowError:   # an integer past the float range
+        return False
+
+
 def load_baseline(path):
     if not path.exists():
         return {}
     doc = json.loads(path.read_text())
     for line in doc.get('known', []):
-        if not isinstance(line.get('gba'), (int, float)) or isinstance(line.get('gba'), bool):
-            raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no numeric GBA value')
-        spread = line.get('gba_offsets')
-        if 'gba_offsets' in line and (not isinstance(spread, list) or not spread or spread[0] != line['gba'] or
-                                      any(not isinstance(v, (int, float)) or isinstance(v, bool) for v in spread)):
-            raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_offsets '
-                             '(numbers, offset 0 first and equal to gba)')
+        if not finite_number(line.get('gba')):
+            raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no finite numeric GBA value')
+        if 'gba_offsets' in line:
+            # One finite value per frame offset its scenario runs, offset 0 first and equal to gba.
+            # A line without gba_offsets (a single run's) stays valid.
+            spread = line['gba_offsets']
+            scenario = str(line.get('key', '')).split(':')[0]
+            # A scenario this checkout does not know keeps its line (write_baseline preserves the lines
+            # of scenarios that did not run); its offset count cannot be checked here.
+            want = metrics.SCENARIOS[scenario].get('frame_offsets') if scenario in metrics.SCENARIOS else \
+                (spread if isinstance(spread, list) else None)
+            if not want or not isinstance(spread, list) or len(spread) != len(want) or \
+                    not all(finite_number(v) for v in spread) or spread[0] != line['gba']:
+                raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_offsets: one finite '
+                                 f'number per frame offset of its scenario ({list(want or ())}), offset 0 first '
+                                 'and equal to gba')
     return {line['key']: line for line in doc.get('known', [])}
 
 
@@ -641,11 +763,11 @@ def write_baseline(path, results, old):
         for row in result.get('rows', []):
             seen.add(row['key'])
             if row['gating'] and row['verdict'] in ('REGRESSION', 'KNOWN'):
-                if not isinstance(row['gba'], (int, float)):
+                if not finite_number(row['gba']):
                     raise ValueError(f'{row["key"]}: no GBA value to accept')
                 line = {'key': row['key'], 'gba': row['gba']}
                 if 'gba_offsets' in row:
-                    if not all(isinstance(v, (int, float)) for v in row['gba_offsets']):
+                    if not all(finite_number(v) for v in row['gba_offsets']):
                         raise ValueError(f'{row["key"]}: no GBA value to accept at every frame offset')
                     line['gba_offsets'] = row['gba_offsets']
                 note = old.get(row['key'], {}).get('note')

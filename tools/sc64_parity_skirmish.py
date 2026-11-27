@@ -918,6 +918,19 @@ def make_measure_gba(scenario_id):
     return measure_gba
 
 
+def never_time(golden, obs):
+    """The judge's hook: a GBA NEVER for a timing means "not before the measurement's reach" (the
+    N64 run's last frame, or the band's upper edge for a finite band; measure_gba), so it compares
+    as the frame after it. None for checks that are not times."""
+    horizon = golden.get('gba', {}).get('horizon')
+    if horizon is None or not obs['check'].startswith(('build.first.', 'attack.first', 'result.')):
+        return None
+    hi = obs.get('hi')
+    reach = max(int(horizon), int(hi)) if obs.get('value') != NEVER and isinstance(hi, (int, float)) and hi != NEVER \
+        else int(horizon)
+    return NEVER, reach + 1
+
+
 def scenarios():
     """Entries for tools/sc64_parity_metrics.py SCENARIOS."""
     out = {}
@@ -939,6 +952,10 @@ def scenarios():
             # computer's supply cap by 16, its first wave by hundreds of frames): judged on the
             # spread over these offsets (tools/sc64_parity.py judge).
             'frame_offsets': FRAME_OFFSETS,
+            'never_time': never_time,
+            'sentinels': (NEVER, ENDED),
+            # A seed whose own band is NEVER, in a finite envelope: times keep their +-2 frames.
+            'sentinel_slack': lambda obs: TIME_TOLERANCE,
         }
     return out
 
