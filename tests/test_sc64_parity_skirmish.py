@@ -913,6 +913,8 @@ class FrameOffsets(unittest.TestCase):
         # A newly finite time inside the band keeps the numbers KNOWN, as any in-band number does.
         exact = dict(envelope('result.human_defeated', 'human', 3198, 3202))
         self.assertEqual(self.verdict([3200, 2300, 2300], [sk.NEVER, 3562, 3562], exact), 'KNOWN')
+        # ... but not a second newly finite time far beyond the noise.
+        self.assertEqual(self.verdict([3200, 1000, sk.NEVER], [sk.NEVER, sk.NEVER, sk.NEVER], exact), 'REGRESSION')
 
     def test_a_value_missing_at_one_offset_fails(self):
         key = ('supply.cap@8000', 'cpu Terran')
@@ -961,6 +963,9 @@ class FrameOffsets(unittest.TestCase):
             path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 1e308, 'gba_offsets': [1e308, -1e308, 1e308]}]}))
             with self.assertRaises(SystemExit):
                 sc64_parity.load_baseline(path)
+            colon = 'sk-pvt-w0:x.a:cpu Terran: west'   # a subject may hold a colon
+            path.write_text(json.dumps({'known': [{'key': colon, 'gba': 1}]}))
+            self.assertIn(colon, sc64_parity.load_baseline(path))
             for bad_key in ('sk-zvz-w0', 'sk-pvt-w0::cpu Terran', ':x:s', 'sk-pvt-w0:x:'):   # not scenario:check:subject
                 path.write_text(json.dumps({'known': [{'key': bad_key, 'gba': 1}]}))
                 with self.assertRaises(SystemExit):
