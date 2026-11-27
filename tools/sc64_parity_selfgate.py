@@ -283,7 +283,7 @@ FOOTER_FIELDS = ("steps", "host_ticks", "births", "removals", "damage", "sounds"
 # Fields after the tag, for every record kind whose shape is fixed.
 RECORD_FIELDS = {b"S": 11, b"W": 3, b"U": 23, b"B": 22, b"+U": 3, b"-U": 4, b"+B": 3, b"-B": 4,
                  b"OU": 3, b"OB": 3, b"TU": 3, b"TB": 3, b"P": 5, b"M": 4, b"F": 3,
-                 b"D": 4, b"A": 6, b"X": 4}
+                 b"D": 4, b"DA": 6, b"A": 6, b"X": 4}
 INTEGER = re.compile(rb"-?[0-9]+")
 
 

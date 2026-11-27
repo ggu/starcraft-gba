@@ -375,6 +375,28 @@ class LabRunnerArgsTest(unittest.TestCase):
         # step, target (max_units + building slot 7), damage, source engine type, source owner
         self.assertEqual((series['max_units'], series['hits']), (173, [(1, 180, 10, 3, 1)]))
 
+    def test_gba_series_reads_applied_hits_and_the_neutral_owner(self):
+        trace = '\n'.join([
+            '#sc64-parity-trace 1', 'H schema=sc64-parity-trace/1',
+            'H max_units=173 max_buildings=64 max_minerals=8 owners=5 cell_cap=4 neutral=2',
+            'S 1 0 1 1 1 0 0 0 -1 -1 0', '+U 3 7 2',
+            'U 3 7 -1 2 -1 100 50 80 80 0 -1 0 100 50 -1 0 0 -1 0 0 0 0 0',
+            'D 180 10 3 1', 'DA 180 0 10 0 3 1',
+            'Z overflow=0 write_errors=0', ''])
+        import sc64_parity
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 't.trace'
+            path.write_text(trace)
+            series = sc64_parity.gba_series(path)
+        # step, target, hp lost, shields lost, hp after, source engine type, source owner
+        self.assertEqual(series['applied'], [(1, 180, 0, 10, 0, 3, 1)])
+        self.assertEqual(series['frames'][0]['units'][3][1], 11)   # the engine's neutral (2) reads as 11
+        # A trace from before DA records names no neutral owner: no applied list at all.
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 't.trace'
+            path.write_text(trace.replace(' neutral=2', ''))
+            self.assertIsNone(sc64_parity.gba_series(path)['applied'])
+
     def test_gba_series_keeps_each_removal_with_its_last_row(self):
         # A unit and a building removed one step after their rows: kind, step, slot, owner, x, y,
         # hp at removal, max hp, last row's hp, cartridge type, engine type, last row's step.
@@ -693,7 +715,7 @@ class LabMeasureTest(unittest.TestCase):
     def test_an_attack_golden_without_a_gating_check_fails(self):
         import sc64_parity
         golden = {'observations': [metrics.observation('lab.first_hit', 'Marine on Zergling', 40, 38, 42, 'report',
-                                                       False, [], provenance='n64-ram', n_runs=2)], 'decoder_revision': 2}
+                                                       False, [], provenance='n64-ram', n_runs=2)], 'decoder_revision': 3}
         rows = sc64_parity.judge('lab-marine-zergling', golden, {'lab.first_hit': 40}, {}, {})
         self.assertEqual([r['verdict'] for r in rows], ['REGRESSION'])
         golden['observations'].append(metrics.observation('lab.damage', 'Marine on Zergling', 6, 6, 6, 'exact', True, [],
@@ -1153,6 +1175,156 @@ class LabMeasureTest(unittest.TestCase):
         self.assertEqual(measure(10)['shield_damage'], 10)   # drops equal to the hits' records
         # 11 per hit with a whole point regained in the frame shows a drop of 10: not a value.
         self.assertIsNone(measure(11)['shield_damage'])
+
+    def test_accepted_hits_from_the_subjects_side_only(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        calm_ling = {sf: 35.0 for sf in range(0, 80)}
+        wounded = {sf: 40.0 - 6 * (sf >= 28) for sf in range(0, 80)}
+
+        def measure(applied, hits=(), drone=wounded):
+            series = as_gba(walk(pos, hp={1: marine, 2: calm_ling, 4: drone},
+                                 others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)]))
+            for frame in series['frames']:
+                frame['live'] = {1: 0, 2: 3, 4: 3}
+            series['applied'], series['hits'], series['max_units'] = applied, list(hits), 100
+            return metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        # The Drone's drop came from another enemy (owner 2): no fight of the subject's, even
+        # though a sampled drop matches; from the subject's owner (0) it is an off-target fight.
+        self.assertFalse(measure([(35, 4, 6, 0, 34, 9, 2)])['combat'])
+        m = measure([(35, 4, 6, 0, 34, 0, 0)])
+        self.assertEqual((m['combat'], m['foe_combat']), (True, False))
+        # A hit the engine rejected writes no DA record: its D record alone is no evidence.
+        steady = {sf: 40.0 for sf in range(0, 80)}
+        self.assertFalse(measure([], hits=[(35, 4, 6, 0, 0)], drone=steady)['combat'])
+        self.assertTrue(measure([(35, 4, 6, 0, 34, 0, 0)], drone=steady)['combat'])
+
+    def test_a_building_hit_names_the_building_at_its_step(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        series = as_gba(walk(pos, hp={1: {sf: 40.0 for sf in range(0, 80)}, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100)]))
+        for frame in series['frames']:   # an enemy building, replaced by a human one at step 35
+            frame['buildings'] = {7: (4 if frame['sf'] < 28 else 1, 200, 100, 500, 0, 1500, 3, 154, 0)}
+        series['events'] = [('-B', 35, 7, 0, 4), ('+B', 35, 7, 0, 1)]
+        # A hit at step 36 (source frame 28, after the turnover) is on the human building.
+        series['applied'], series['max_units'] = [(36, 107, 6, 0, 494, 0, 0)], 100
+        self.assertFalse(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['combat'])
+        # In the turnover's own step it is unresolved.
+        series['applied'] = [(35, 107, 6, 0, 494, 0, 0)]
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]
+        self.assertEqual((m['combat'], m['nearby_ambiguous']), (True, True))
+
+    def test_survival_and_exact_values_from_accepted_hits(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        # The subject is hit at 20 by a record no sampled drop shows, again at 30, and dies at 40.
+        own = {sf: 40.0 - 5 * (sf >= 30) for sf in range(0, 40)}
+        series = as_gba(walk(pos, hp={1: own, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 130, 100)]),
+                        [('U', 50, 1, 1, 100, 100, -1, None, 35, metrics.MARINE, 0, None, None)])
+        series['applied'], series['max_units'] = [(25, 1, 5, 0, 35, 3, 3), (37, 1, 5, 0, 35, 3, 3)], 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        self.assertEqual((m['death'], m['survival']), (35, 20))
+        # A wrong hit no sample shows (3, in a frame whose drop is lethal) is still among the values.
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 36) if t <= sf]) for sf in range(0, 52)}
+        series = as_gba(walk(pos, hp={1: {sf: 40.0 for sf in range(0, 80)}, 2: ling},
+                             others=[(2, metrics.ZERGLING, 4, 150, 100)]),
+                        [('U', 65, 2, 4, 150, 100, -1, None, 23, metrics.ZERGLING, 0, None, None)])
+        series['applied'] = [(26, 2, 6, 0, 29, 0, 0), (46, 2, 6, 0, 23, 0, 0), (65, 2, 3, 0, 20, 0, 0),
+                             (65, 2, 20, 0, 0, 0, 0)]
+        series['max_units'] = 100
+        self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['damage_values'], [3, 6])
+
+    def test_hit_sources_decide_whose_fight_it_is(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 36) if t <= sf]) for sf in range(0, 80)}
+
+        def measure(applied, hp=None, others=None, removals=()):
+            series = as_gba(walk(pos, hp=hp or {1: marine, 2: ling},
+                                 others=others or [(2, metrics.ZERGLING, 4, 150, 100)]), removals)
+            for frame in series['frames']:
+                frame['live'] = {1: 0, 2: 3, 4: 3}
+            series['applied'], series['max_units'] = applied, 100
+            return metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        # The Zergling's drops came from another owner: none is the subject's, so they give no
+        # damage, cooldown or range (a fight, so those checks are unmeasured).
+        m = measure([(26, 2, 6, 0, 29, 9, 2), (46, 2, 6, 0, 23, 9, 2)])
+        self.assertEqual((m['hits'], m['damage'], m['gaps'], m['foe_combat']), (0, None, [], True))
+        # The subject's own: credited, and an applied 6 sampled as a 5 (a regenerated point) reads 6.
+        regen = {sf: 35.0 - 6 * (sf >= 20) - 5 * (sf >= 36) for sf in range(0, 80)}
+        m = measure([(26, 2, 6, 0, 29, 0, 0), (46, 2, 6, 0, 24, 0, 0)], hp={1: marine, 2: regen})
+        self.assertEqual((m['damage_values'], m['gaps']), ([6], [16]))
+        # A kill in the subject's reach by another owner's lethal hit is no fight of the subject's.
+        gone = {sf: 40.0 for sf in range(0, 28)}
+        m = measure([(35, 4, 40, 0, 0, 9, 2)], hp={1: marine, 2: {sf: 35.0 for sf in range(0, 80)}, 4: gone},
+                    others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)],
+                    removals=[('U', 35, 4, 4, 160, 100, 0, None, 40, metrics.DRONE, 0, None, None)])
+        self.assertFalse(m['combat'])
+        # A hit taken whose record names a source of another type is no counter damage of the foe's.
+        hit = {sf: 40.0 - 5 * (sf >= 28) for sf in range(0, 80)}
+        m = measure([(35, 1, 5, 0, 35, 7, 3)], hp={1: hit, 2: {sf: 35.0 for sf in range(0, 80)}},
+                    others=[(2, metrics.ZERGLING, 4, 130, 100)])
+        self.assertEqual((m['counter_values'], m['counter_damage']), ([], None))
+        m = measure([(35, 1, 5, 0, 35, 3, 3)], hp={1: hit, 2: {sf: 35.0 for sf in range(0, 80)}},
+                    others=[(2, metrics.ZERGLING, 4, 130, 100)])
+        self.assertEqual(m['counter_values'], [5])
+
+    def test_every_foe_hit_taken_counts_for_the_exact_check(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        # Five-point bites at 20 and 28, then in frame 36 (steps 45 and 46) a 3-point bite and a
+        # killing one: the Marine's row is gone from that frame.
+        own = {sf: 40.0 - 5 * len([t for t in (20, 28) if t <= sf]) for sf in range(0, 36)}
+        series = as_gba(walk(pos, hp={1: own, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 130, 100)]),
+                        [('U', 46, 1, 1, 100, 100, -2, None, 30, metrics.MARINE, 0, None, None)])
+        for frame in series['frames']:
+            frame['live'] = {1: 0, 2: 3}
+        series['applied'] = [(26, 1, 5, 0, 35, 3, 3), (36, 1, 5, 0, 30, 3, 3), (45, 1, 3, 0, 27, 3, 3),
+                             (46, 1, 29, 0, -2, 3, 3)]
+        series['max_units'] = 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        self.assertIn(3, m['counter_values'])
+        # A hit from a unit of another type (a Photon Cannon, engine type 7) is left out, not a
+        # reason to drop the foe's own hits.
+        cannon = {sf: 40.0 - 5 * (sf >= 20) - 20 * (sf >= 28) for sf in range(0, 80)}
+        series = as_gba(walk(pos, hp={1: cannon, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 130, 100)]))
+        for frame in series['frames']:
+            frame['live'] = {1: 0, 2: 3}
+        series['applied'], series['max_units'] = [(26, 1, 5, 0, 35, 3, 3), (36, 1, 20, 0, 15, 7, 3)], 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        self.assertEqual((m['counter_values'], m['taken_single']), ([5], True))
+
+    def test_the_self_gate_validates_applied_hit_records(self):
+        import sc64_parity_selfgate
+        self.assertTrue(sc64_parity_selfgate.record_ok(b'DA 180 0 10 0 3 1'))
+        self.assertFalse(sc64_parity_selfgate.record_ok(b'DA 180 0 10'))
+
+    def test_a_matched_live_removal_outweighs_a_rebirth(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        obs = [metrics.observation('lab.survival', 'Marine', 50, 46, 54, '+-4', True, [], provenance='n64-ram', n_runs=2)]
+        series = as_gba(walk(pos, hp={1: {sf: 40.0 for sf in range(0, 32)}, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 900, 100)]),
+                        [('U', 40, 1, 1, 100, 100, 40, None, 40, metrics.MARINE, 0, None, None)])
+        # The subject leaves with hit points at step 40 and a new unit takes the slot at 41 (both
+        # source frame 32): it was lost, not killed.
+        series['events'] = [('+U', 41, 1, 0, 1)]
+        for frame in series['frames']:
+            if frame['sf'] >= 32:
+                frame['units'][1] = (metrics.SCV, 1, 300, 300)
+                frame['hp'][1] = 60.0
+        result, _ = metrics.lab_attack_gba({'foe_type': metrics.ZERGLING})(series, {'observations': obs},
+                                                                          {'subject': 1, 'lab': [[5, 4, 1, -1]]})
+        self.assertEqual((result['measured']['subject_lost'], result['measured']['death']), (True, None))
+
+    def test_a_rescued_unit_is_no_enemy_in_reach(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 - 5 * len([t for t in (20, 30) if t <= sf]) for sf in range(0, 80)}
+        series = as_gba(walk(pos, hp={1: marine, 2: {sf: 35.0 for sf in range(0, 80)}, 6: {sf: 40.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 130, 100), (6, metrics.MARINE, 4, 160, 100)]))
+        for frame in series['frames']:
+            frame['live'] = {1: 0, 2: 3, 6: 0}   # row 6 keeps its cartridge owner but fights for the human
+        self.assertTrue(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['taken_single'])
 
     def test_neutral_removals_and_interval_endpoints(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}

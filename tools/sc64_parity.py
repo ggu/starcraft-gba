@@ -86,6 +86,9 @@ def gba_series(trace_path):
     hits = []        # (step, target, damage, source engine type, source owner): weapon hits as the damage
     #                  path saw them; target is a unit slot or max_units + a building slot
     max_units = None
+    neutral = None   # the engine's NEUTRAL owner: named by traces whose emitter writes DA records
+    applied = []     # (step, target, hp lost, shields lost, hp after, source engine type, source owner):
+    #                  what each accepted hit applied (a rejected hit writes no DA record)
     removals = []    # (kind 'U' or 'B', step, slot, owner, x, y, hp at removal, max hp or None, last row's hp,
     #                  cartridge type (-1 when the row has none), engine type, step of the last row or None,
     #                  under construction at the last row or None)
@@ -125,7 +128,8 @@ def gba_series(trace_path):
                 # The cartridge's ids: raw_type, and raw_owner where the profile has one.
                 slot, raw_type, owner, raw_owner = int(words[1]), int(words[3]), int(words[4]), int(words[5])
                 x, y = int(words[6]), int(words[7])
-                units[slot] = (raw_type, raw_owner if raw_owner >= 0 else owner, 2 * x, 2 * y)
+                # A row with no cartridge owner: the engine's neutral reads as the cartridge's (11).
+                units[slot] = (raw_type, raw_owner if raw_owner >= 0 else (11 if owner == neutral else owner), 2 * x, 2 * y)
                 order = int(words[12]) if len(words) > 12 else None
                 history = orders.setdefault(slot, [])
                 if order is not None and (not history or history[-1][1] != order):
@@ -149,7 +153,7 @@ def gba_series(trace_path):
                 shield.pop(int(words[1]), None)
                 etype.pop(int(words[1]), None)
                 live.pop(int(words[1]), None)
-            elif tag in ('OU', 'TU') and len(words) == 4:
+            elif tag in ('OU', 'TU', 'OB', 'TB') and len(words) == 4:
                 # An owner or type change in place: a slot refilled inside one engine step shows so.
                 events.append((tag, step, int(words[1]), int(words[2]), int(words[3])))
             elif tag in ('+U', '+B', '-B'):
@@ -163,19 +167,23 @@ def gba_series(trace_path):
             elif tag == 'B':
                 raw_owner = int(words[5])
                 building_step[int(words[1])] = step
-                buildings[int(words[1])] = (raw_owner if raw_owner >= 0 else int(words[4]),
+                buildings[int(words[1])] = (raw_owner if raw_owner >= 0 else (11 if int(words[4]) == neutral else int(words[4])),
                                             2 * int(words[6]), 2 * int(words[7]),
                                             int(words[8]), max(0, int(words[10])), int(words[9]),
                                             int(words[2]), int(words[3]), int(words[11]), int(words[4]))
                 # slot, engine type, owner, under construction, queue count, queue progress, queue head
                 events.append(('B', step, int(words[1]), int(words[2]), int(words[4]), int(words[11]),
                                int(words[14]), int(words[15]), int(words[16])))
+            elif tag == 'DA' and len(words) == 7:
+                applied.append((step,) + tuple(int(w) for w in words[1:]))
             elif tag == 'D' and len(words) == 5:
                 hits.append((step, int(words[1]), int(words[2]), int(words[3]), int(words[4])))
             elif tag == 'H':
                 fields = dict(w.split('=', 1) for w in words[1:] if '=' in w)
                 if 'max_units' in fields:
                     max_units = int(fields['max_units'])
+                if 'neutral' in fields:
+                    neutral = int(fields['neutral'])
             elif tag == 'P':
                 banks[int(words[1])] = int(words[2])
             elif tag in ('FV', 'FE') and len(words) == 4:
@@ -196,7 +204,8 @@ def gba_series(trace_path):
     if not complete:
         raise ValueError(f'{trace_path}: incomplete trace (no clean Z line)')
     return {'source': 'gba', 'scale': 2, 'frames': frames, 'orders': orders, 'walks': walks, 'fog': fog,
-            'events': events, 'removals': removals, 'hits': hits, 'max_units': max_units}
+            'events': events, 'removals': removals, 'hits': hits, 'max_units': max_units,
+            'applied': applied if neutral is not None else None}
 
 
 def gba_command(scenario_id, golden, trace):
