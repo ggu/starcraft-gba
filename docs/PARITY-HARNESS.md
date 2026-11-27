@@ -214,6 +214,10 @@ judged). With no golden files the scenarios skip; if everything skipped while
 | `t1-fields` | The campaign launch tape for T1 (below) recording the fog, image, sprite and bullet regions, then the t1-move box select and Move, then Stop, Hold, a second Move and an attack-move | `terran`, `--scenario move`, as t1-move | the t1-move checks on the first Move; order timing (command to Move, to the first and last Marine back in an idle order); fog (first newly visible tile, first dropped tile, visible and explored counts before the Stop); the Marine walk cycle (N64: the image's iscript Walking loop; GBA: stride phases) |
 | `sk-*` (17 lobbies) | Lobby state → race rows → Start after a delay; no further input, to the end of the match | the human race's profile, `--scenario match`: the same races and the N64 seed, no command | start corners; each computer's build order, first wave; gathered minerals, supply, workers at 1,000–8,000 frames; minerals per frame by worker count (report); each player's elimination |
 
+What these scenarios cover of the three races and the 30 missions, and
+the scenarios planned for the rest, are in the
+[coverage map](audits/2026-11-27-parity-coverage-map.md).
+
 The human player is resolved per scenario: T1's Marine owner; in Blood Bath
 the only owner of Drones (owner numbers and start corners are shuffled per
 launch). Both engines start skirmish workers mining by themselves, so the
