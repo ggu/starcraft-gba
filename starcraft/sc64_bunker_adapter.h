@@ -87,6 +87,7 @@ static int __attribute__((noinline)) race_bunker_unload_one(int unit,int slot)
     int x,y;if (!race_bunker_land_point(unit,slot,&x,&y)) return 0;
     Unit *q=&u[unit];q->x=x;q->y=y;q->order=ORDER_IDLE;q->target=-1;q->build=-1;
     q->path_timer=q->path_retry=0;
+    SC64_CMD_FORGET(unit); /* unload or destroyed Bunker: as a Dropship landing */
     race_transport_changed();return 1;
 }
 static int __attribute__((noinline)) race_bunker_request_unload(int slot)
@@ -96,7 +97,7 @@ static int __attribute__((noinline)) race_bunker_request_unload(int slot)
     int target=MAX_UNITS+slot;
     for (int i=0;i<MAX_UNITS;++i)
         if (u[i].alive && u[i].order==ORDER_TRANSPORTED && u[i].target==target)
-            if (race_bunker_unload_one(i,slot)) { SC64_CMD_FORGET(i); ++done; } /* as a Dropship landing */
+            done+=race_bunker_unload_one(i,slot);
     return done;
 }
 static void __attribute__((noinline)) race_bunker_kill_passenger(int unit,int killer_owner)
