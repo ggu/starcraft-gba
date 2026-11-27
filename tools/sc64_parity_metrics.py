@@ -1549,15 +1549,27 @@ def lab_attack_observations(m, name, foe):
     return obs
 
 
+def lab_human(series, spec):
+    """The N64 human player: the one owner of spec['human_type'] at the lab's first frame, or, where
+    every type the human fields also has an enemy owner (Zerg against Zerg in Z7), the map's human
+    slot spec['human_owner'], which must then own a unit of the subject's type."""
+    units = series['frames'][0]['units'].values()
+    if 'human_owner' in spec:
+        if not any(u[1] == spec['human_owner'] and u[0] == spec['subject_type'] for u in units):
+            raise SystemExit(f'{spec["id"]}: owner {spec["human_owner"]} has no unit of type {spec["subject_type"]}')
+        return spec['human_owner']
+    owners = {u[1] for u in units if u[0] == spec['human_type']}
+    if len(owners) != 1:
+        raise SystemExit(f'{spec["id"]}: units of type {spec["human_type"]} belong to {sorted(owners)}')
+    return owners.pop()
+
+
 def lab_attack_n64(spec):
     def measure(cap, marks):
         series = cap.series(gating=True, hp=True, shields=spec.get('shields', False))
         t0, = lab_command_frames(series, marks, ['command'])
         first = next(f['units'] for f in series['frames'] if f['sf'] >= t0)
-        owners = {u[1] for u in series['frames'][0]['units'].values() if u[0] == spec['human_type']}
-        if len(owners) != 1:
-            raise SystemExit(f'{spec["id"]}: units of type {spec["human_type"]} belong to {sorted(owners)}')
-        human = owners.pop()
+        human = lab_human(series, spec)
         uid, err = lab_subject(series, t0, spec['subject_type'], human)
         if err:
             raise SystemExit(f'{spec["id"]}: {err}')
@@ -1713,6 +1725,39 @@ LAB_SPECS = [
      'subject_type': 38,
      'human_type': DRONE, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 1, 'shields': True,
      'title': 'Z2 lab: one Hydralisk attacks a Zealot (explosive on small, shields then hit points)'},
+    # Enemy labs (phase 2 of the coverage map): the cartridge has no attack on own units, so each
+    # subject attack-moves onto an enemy's own position. Each target was picked from an exploration
+    # capture of the lab state and stands on its CHK placement when the lab starts.
+    {'id': 'lab-hydralisk-dragoon', 'kind': 'attack', 'name': 'Hydralisk', 'foe': 'Dragoon', 'foe_type': 66,
+     'subject_type': 38, 'human_type': DRONE, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 1,
+     'shields': True, 'title': 'Z2 lab: one Hydralisk attack-moves onto a lone Dragoon (explosive, shields)'},
+    {'id': 'lab-mutalisk-dragoon', 'kind': 'attack', 'name': 'Mutalisk', 'foe': 'Dragoon', 'foe_type': 66,
+     'subject_type': 43, 'human_type': DRONE, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 1,
+     'shields': True, 'title': 'Z2 lab: one Mutalisk attack-moves onto a lone Dragoon (air on ground, shields)'},
+    {'id': 'lab-marine-marine', 'kind': 'attack', 'name': 'Marine', 'foe': 'Marine', 'foe_type': MARINE,
+     'subject_type': MARINE, 'human_type': 19, 'profile': 'terran', 'runner': 'lab-mission', 'mission': 8,
+     'title': 'T5 lab: one Marine attack-moves into a lone enemy Marine (normal on small)'},
+    # Zerg against Zerg: every type the human fields also has an enemy owner, so the human is the
+    # map's human slot.
+    {'id': 'lab-mutalisk-hydralisk', 'kind': 'attack', 'name': 'Mutalisk', 'foe': 'Hydralisk', 'foe_type': 38,
+     'subject_type': 43, 'human_owner': 3, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 18,
+     'title': 'Z7 lab: one Mutalisk attack-moves onto a lone Hydralisk (air on ground, normal on medium)'},
+    {'id': 'lab-marine-hydralisk', 'kind': 'attack', 'name': 'Marine', 'foe': 'Hydralisk', 'foe_type': 38,
+     'subject_type': MARINE, 'human_type': MARINE, 'profile': 'terran', 'runner': 'lab-mission', 'mission': 6,
+     'title': 'T3 lab: one Marine attack-moves into a lone Hydralisk (normal on medium, explosive on small)'},
+    {'id': 'lab-vulture-hydralisk', 'kind': 'attack', 'name': 'Vulture', 'foe': 'Hydralisk', 'foe_type': 38,
+     'subject_type': 2, 'human_type': MARINE, 'profile': 'terran', 'runner': 'lab-mission', 'mission': 6,
+     'title': 'T3 lab: one Vulture attack-moves into a lone Hydralisk (concussive on medium)'},
+    {'id': 'lab-guardian-zealot', 'kind': 'attack', 'name': 'Guardian', 'foe': 'Zealot', 'foe_type': 65,
+     'subject_type': 44, 'human_type': 38, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 17,
+     'shields': True, 'title': 'Z6 lab: one Guardian attack-moves onto a Zealot pair (air on ground, range, shields)'},
+    {'id': 'lab-zergling-goliath', 'kind': 'attack', 'name': 'Zergling', 'foe': 'Goliath', 'foe_type': 3,
+     'subject_type': ZERGLING, 'human_type': ZERGLING, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 0,
+     'title': 'Z1 lab: one Zergling attack-moves into a Goliath (melee on large, armour)'},
+    # P1's allied Protoss rows (owners 1 and 2) stay over 1,200 px from this fight.
+    {'id': 'lab-dragoon-zergling-pack', 'kind': 'attack', 'name': 'Dragoon', 'foe': 'Zergling', 'foe_type': ZERGLING,
+     'subject_type': 66, 'human_type': 65, 'profile': 'protoss-p10', 'runner': 'lab-mission', 'mission': 2,
+     'shields': True, 'title': 'P1 lab: one Dragoon attack-moves into three Zerglings (explosive on small, melee on shields)'},
 ]
 for _spec in LAB_SPECS:
     _make = (lab_move_n64, lab_move_gba) if _spec['kind'] == 'move' else (lab_attack_n64, lab_attack_gba)

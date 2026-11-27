@@ -666,6 +666,58 @@ class LabMeasureTest(unittest.TestCase):
             s = metrics.lab_gba_steps([0, delta])[1]
             self.assertIn((s - 1) * 4 // 5 - base - delta, (0, 1))
 
+    def test_lab_human_by_type_or_map_slot(self):
+        # Zerg against Zerg (Z7): every type has two owners, so no type names the human.
+        units = {1: (43, 3, 0, 0), 2: (43, 4, 50, 0), 3: (41, 3, 9, 0), 4: (41, 4, 9, 9), 5: (37, 4, 0, 9)}
+        series = {'frames': [{'sf': 0, 'units': units}]}
+        with self.assertRaises(SystemExit):
+            metrics.lab_human(series, {'id': 'z7', 'human_type': 41, 'subject_type': 43})
+        self.assertEqual(metrics.lab_human(series, {'id': 'z7', 'human_type': 37, 'subject_type': 43}), 4)
+        # The map's human slot wins over the type rule, but it must own a unit of the subject's type.
+        self.assertEqual(metrics.lab_human(series, {'id': 'z7', 'human_owner': 3, 'human_type': 37,
+                                                    'subject_type': 43}), 3)
+        with self.assertRaises(SystemExit):
+            metrics.lab_human(series, {'id': 'z7', 'human_owner': 3, 'subject_type': 37})
+
+    def test_enemy_lab_specs_are_complete(self):
+        # Every attack lab names its foe, subject and a way to find the human, and runs a mission
+        # through the lab runner with a mission id.
+        for spec in metrics.LAB_SPECS:
+            if spec['kind'] != 'attack':
+                continue
+            self.assertTrue({'foe', 'foe_type', 'subject_type', 'profile', 'runner', 'title'} <= set(spec), spec['id'])
+            self.assertTrue('human_type' in spec or 'human_owner' in spec, spec['id'])
+            if spec['runner'] == 'lab-mission':
+                self.assertIn(spec['mission'], range(30), spec['id'])
+            self.assertEqual(metrics.SCENARIOS[spec['id']]['decoder_revision'], 3, spec['id'])
+
+    def test_enemy_labs_are_pinned(self):
+        # The nine enemy labs (docs/audits/2026-11-27-parity-enemy-labs.md): mission, profile and
+        # the way the human is found. A removed lab or a changed mission fails here.
+        # id: (mission, profile, human selector, subject id, foe id, shields measured); literal
+        # cartridge unit ids (Marine 0, Zergling 37, Drone 41), so a changed shared constant fails too.
+        expected = {
+            'lab-hydralisk-dragoon': (1, 'zerg-z10', ('human_type', 41), 38, 66, True),
+            'lab-mutalisk-dragoon': (1, 'zerg-z10', ('human_type', 41), 43, 66, True),
+            'lab-marine-marine': (8, 'terran', ('human_type', 19), 0, 0, False),
+            'lab-mutalisk-hydralisk': (18, 'zerg-z10', ('human_owner', 3), 43, 38, False),
+            'lab-marine-hydralisk': (6, 'terran', ('human_type', 0), 0, 38, False),
+            'lab-vulture-hydralisk': (6, 'terran', ('human_type', 0), 2, 38, False),
+            'lab-guardian-zealot': (17, 'zerg-z10', ('human_type', 38), 44, 65, True),
+            'lab-zergling-goliath': (0, 'zerg-z10', ('human_type', 37), 37, 3, False),
+            'lab-dragoon-zergling-pack': (2, 'protoss-p10', ('human_type', 65), 66, 37, True),
+        }
+        specs = {spec['id']: spec for spec in metrics.LAB_SPECS}
+        for lab, (mission, profile, (key, value), subject, foe, shields) in expected.items():
+            spec = specs[lab]
+            self.assertEqual((spec['runner'], spec['mission'], spec['profile'], spec[key]),
+                             ('lab-mission', mission, profile, value), lab)
+            # Exactly one way to find the human: lab_human() lets human_owner win over human_type.
+            self.assertEqual({'human_type', 'human_owner'} & set(spec), {key}, lab)
+            self.assertEqual((spec['subject_type'], spec['foe_type'], spec.get('shields', False)),
+                             (subject, foe, shields), lab)
+            self.assertEqual(metrics.SCENARIOS[lab]['profile'], profile, lab)
+
     def test_attack_hits_cooldown_range_and_death(self):
         pos = {sf: (100, 100) for sf in range(0, 120)}
         marine = {sf: 40.0 for sf in range(0, 120)}
