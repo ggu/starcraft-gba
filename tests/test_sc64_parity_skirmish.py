@@ -935,8 +935,8 @@ class FrameOffsets(unittest.TestCase):
 
     def test_an_allowed_never_counts_only_from_a_run_that_reached_the_band(self):
         # sk-ffa-w0's Gateway: band 2,249-2,253 with NEVER allowed by the seed envelope. Runs that all
-        # ended at 2,149 never reached the band: KNOWN with or without a baseline line, never PASS or
-        # IMPROVED (which --accept would drop).
+        # ended at 2,149 never reached the band: with a baseline line KNOWN, never IMPROVED (which
+        # --accept would drop); without one PASS, as before (an early end adds no lines).
         gate = dict(self.golden(2251, 2249, 2253, check='build.first.Gateway', subject='cpu Protoss',
                                 also_ok=[sk.NEVER]), gba={'horizon': 9000})
         key = ('build.first.Gateway', 'cpu Protoss')
@@ -948,12 +948,10 @@ class FrameOffsets(unittest.TestCase):
             return sc64_parity.judge('sk-pvt-w0', gate, {key: sk.NEVER}, {}, baseline, more=more,
                                      cutoffs=cutoffs)[0]['verdict']
         self.assertEqual(verdict([2149] * 3, known), 'KNOWN')
-        self.assertEqual(verdict([2149] * 3, {}), 'KNOWN')
-        self.assertEqual(verdict([2149, 2300, 2300], {}), 'KNOWN')
+        self.assertEqual(verdict([2149, 2300, 2300], known), 'KNOWN')
+        self.assertEqual(verdict([2149] * 3, {}), 'PASS')
         # The edge: a run whose last measured frame is just before the band has not reached it.
-        self.assertEqual(verdict([2248] * 3, {}), 'KNOWN')
         self.assertEqual(verdict([2248] * 3, known), 'KNOWN')
-        self.assertEqual(verdict([2249] * 3, {}), 'PASS')
         self.assertEqual(verdict([2249] * 3, known), 'IMPROVED')
         # Runs that reached the band without building it: the allowed NEVER counts.
         self.assertEqual(verdict([2300] * 3, known), 'IMPROVED')
@@ -976,7 +974,7 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([9000] * 3, known), 'KNOWN')
         self.assertEqual(verdict([10675] * 3, known), 'KNOWN')
         self.assertEqual(verdict([10676] * 3, known), 'IMPROVED')
-        self.assertEqual(verdict([9000] * 3, {}), 'KNOWN')
+        self.assertEqual(verdict([9000] * 3, {}), 'PASS')     # no line: the result check gates the end
         self.assertEqual(verdict([10676] * 3, {}), 'PASS')
         # Accepting those cut-short runs records NEVER at every offset; a Factory built later at every
         # offset is then still a change of outcome.

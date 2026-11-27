@@ -423,19 +423,24 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 # ended early might still have seen it in the band).
                 return max(0, nv[1] - obs['hi'])
             return None
+        known = baseline.get(key)
+
         def gap_at(i, v):
             # A NEVER the band admits (an also_ok NEVER, or a band that is NEVER itself) counts as
-            # inside it only from a run that went far enough to show the absence: past the band's
-            # lower edge, or for a NEVER band to the run's reach. One cut short by an early defeat is
-            # neither inside nor shown outside (its time distance is 0), so the line stays KNOWN.
-            if own[i] is not None and v == own[i][0] and gap(v) == 0:
+            # inside it, for a line with a baseline line, only from a run that went far enough to show
+            # the absence: past the band's lower edge, or for a NEVER band to the run's reach. One
+            # cut short by an early defeat is neither inside nor shown outside (its time distance is
+            # 0), so the line stays KNOWN rather than IMPROVED, and --accept keeps it. On a line with
+            # no baseline line an admitted NEVER still passes, as before: the result check gates the
+            # early end (sk-pvz-w0's GBA human falls 2,000 frames before the N64's, which would
+            # otherwise turn 64 never-built types from PASS to KNOWN).
+            if known is not None and own[i] is not None and v == own[i][0] and gap(v) == 0:
                 needed = obs['lo'] if obs['lo'] not in specials else (never[1] - 1 if never else None)
                 if needed is not None and own[i][1] - 1 < needed:
                     return needed - (own[i][1] - 1)   # frames short: never 0
             return gap(v)
         gaps = [gap_at(i, v) for i, v in enumerate(spread)]
         every = ' at every frame offset' if len(spread) > 1 else ''
-        known = baseline.get(key)
         # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
         # band as seed_lo/seed_hi, and the N64's spread over seeds is no licence to move further out.
         seed_lo, seed_hi = obs.get('seed_lo', obs['lo']), obs.get('seed_hi', obs['hi'])

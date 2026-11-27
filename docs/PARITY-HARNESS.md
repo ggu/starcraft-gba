@@ -142,9 +142,13 @@ edge), and compares as the frame after it. At several frame offsets:
   the human's defeat (a win or the step limit leaves the reach). It is as far out as that bound lies past the band, and no
   distance at all while the bound lies below the band's upper edge, so an
   early end is gated by the result check, not by every timing it cut
-  short. A line with no baseline line that is only cut short reads KNOWN
-  (recorded on `--accept`), never PASS, and an `also_ok` NEVER counts as
-  inside the band only from a run that reached the band's lower edge.
+  short. A NEVER the band does not admit, cut short at every offset, reads
+  KNOWN on a line with no baseline line (recorded on `--accept`) instead of
+  REGRESSION. A NEVER the band admits (`also_ok`, or a band that is NEVER
+  itself) counts as inside it on a line with a baseline line only from a
+  run that reached the band's lower edge (for a NEVER band, the run's
+  reach), so an early end never makes such a line IMPROVED and drops it; on
+  a line with no baseline line it passes as before.
 - Only offsets the baseline recorded are evidence for the per-offset check:
   a single run's line (no `gba_offsets`) speaks for offset 0 alone.
 - A seed whose own band is NEVER, in an envelope other seeds made finite,
