@@ -912,6 +912,21 @@ class FrameOffsets(unittest.TestCase):
         self.assertIn('outside the band at frame offset +1;', row['why'])
         self.assertNotIn('noise', row['why'])
         self.assertIn('cut short by the human\'s defeat before it could show the band at +0, +2', row['why'])
+        # In-band and cut-short offsets with none outside: both groups named.
+        gate = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        row = sc64_parity.judge('sk-pvt-w0', gate, {key: 9539}, {}, {}, cutoffs=[None, 9000, None],
+                                more=[(1, {key: sk.NEVER}), (2, {key: 9540})])[0]
+        self.assertEqual(row['verdict'], 'KNOWN')
+        self.assertIn('outside the band at no offset, inside at +0, +2', row['why'])
+        self.assertIn('show the band at +1', row['why'])
+        # A regression the numbers show at offset 0 alone, the others cut short, names offset 0.
+        line = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+        row = sc64_parity.judge('sk-pvt-w0', gate, {key: 11000}, {}, known, cutoffs=[None, 9000, 9000],
+                                more=[(1, {key: sk.NEVER}), (2, {key: sk.NEVER})])[0]
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertTrue(row['why'].endswith('at frame offset +0'), row['why'])
         self.assertEqual(unlisted([9600, 9600, 9600]), 'REGRESSION')
         self.assertEqual(unlisted([9600, 9000, 9600]), 'KNOWN')          # each run's own cutoff
         self.assertEqual(unlisted(None), 'REGRESSION')

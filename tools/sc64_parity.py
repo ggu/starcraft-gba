@@ -506,9 +506,9 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 out = [k for k, s_ in zip(offsets, shown) if s_]
                 short = [k for k, g, s_ in zip(offsets, gaps, shown) if g and not s_]
                 inside = [k for k, g in zip(offsets, gaps) if not g]
-                row['why'] = ((f'outside the band at frame offset {offset_label(out)}' +
-                               (f', inside at {offset_label(inside)} (GBA frame noise)' if inside else '')
-                               if out else 'outside the band at no offset') +
+                row['why'] = ((f'outside the band at frame offset {offset_label(out)}' if out else
+                               'outside the band at no offset') +
+                              (f', inside at {offset_label(inside)} (GBA frame noise)' if inside else '') +
                               (f'; cut short by the human\'s defeat before it could show the band at '
                                f'{offset_label(short)}' if short else '') + '; no baseline line yet')
         elif outcome_band and all(kind(v) == 'number' for v in spread) and 'number' not in was_kinds:
@@ -552,16 +552,19 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # is as unstable as the GBA gets: its few numbers do not measure its noise, so they too
             # must clear the family's.
             unstable = never is not None and len({kind(b) for b in base}) > 1
+            compared = [i for i, v in enumerate(spread)
+                        if kind(v) == 'number' and (never is None or (i < recorded and not changed(i, v)))]
             numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
-                beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
-                        if kind(v) == 'number' and (never is None or (i < recorded and not changed(i, v)))],
+                beyond([(gaps[i], slack + (allowance if unstable else 0)) for i in compared],
                        [gap(b) for b in base if kind(b) == 'number'])
             timed = None not in [time_gap(v, i) for i, v in enumerate(spread)] and \
                 beyond([(time_gap(v, i), margin(i, v)) for i, v in enumerate(spread)],
                        [g for g in (time_gap(b) for b in base) if g is not None])
             if not outcome_band and (numbers or timed):
                 row['verdict'] = 'REGRESSION'
-                row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
+                at = every if timed or len(compared) == len(spread) else \
+                    f' at frame offset {offset_label(offsets[i] for i in compared)}'
+                row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + at
             else:
                 row['verdict'] = 'KNOWN'
                 row['baseline'] = known['gba']
