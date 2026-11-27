@@ -147,6 +147,13 @@ WAVE_UNITS = 3
 CHECKPOINTS = (1000, 2000, 4000, 6000, 8000)
 TIME_TOLERANCE = 2                      # source frames, as the S4 intervals
 DECODER_REVISION = 2                     # the skirmish scenarios' measurement revision
+# The GBA's frame noise per timing family: the widest spread of a time over frame offsets 0-4 on
+# any sk-* line of the family (main a0339024, all 17 lobbies). A time newly finite at an offset (a
+# defeat where the human survived) must clear it to be a regression (tools/sc64_parity.py judge).
+FRAME_NOISE = {'build.first': 1352, 'attack.first_wave': 516, 'attack.first_contact': 203,
+               'result.human_defeated': 508, 'result.eliminated': 508}
+FRAME_OFFSETS = (0, 1, 2)               # GBA runs per scenario, the engine's frame counter advanced this far
+                                        # after launch: the spread of a line is the GBA's own one-frame noise
 NEVER = 999999                          # a time not reached within the N64 run
 ENDED = -1                              # a GBA checkpoint after its match ended
 TRIP = 8                                # minerals per delivery
@@ -916,6 +923,19 @@ def make_measure_gba(scenario_id):
     return measure_gba
 
 
+def never_time(golden, obs):
+    """The judge's hook: a GBA NEVER for a timing means "not before the measurement's reach" (the
+    N64 run's last frame, or the band's upper edge for a finite band; measure_gba), so it compares
+    as the frame after it. None for checks that are not times."""
+    horizon = golden.get('gba', {}).get('horizon')
+    if horizon is None or not obs['check'].startswith(('build.first.', 'attack.first', 'result.')):
+        return None
+    hi = obs.get('hi')
+    reach = max(int(horizon), int(hi)) if obs.get('value') != NEVER and isinstance(hi, (int, float)) and hi != NEVER \
+        else int(horizon)
+    return NEVER, reach + 1
+
+
 def scenarios():
     """Entries for tools/sc64_parity_metrics.py SCENARIOS."""
     out = {}
@@ -933,6 +953,14 @@ def scenarios():
             # 2: result bytes and the run's end on the decoder's unpaused clock (paused and
             # trailing ticks); goldens measured before are stale.
             'decoder_revision': DECODER_REVISION,
+            # The GBA's outcomes move by more than a band under a one-frame phase shift (a
+            # computer's supply cap by 16, its first wave by hundreds of frames): judged on the
+            # spread over these offsets (tools/sc64_parity.py judge).
+            'frame_offsets': FRAME_OFFSETS,
+            'never_time': never_time,
+            'frame_noise': FRAME_NOISE,
+            # A seed whose own band is NEVER, in a finite envelope: times keep their +-2 frames.
+            'sentinel_slack': lambda obs: TIME_TOLERANCE,
         }
     return out
 

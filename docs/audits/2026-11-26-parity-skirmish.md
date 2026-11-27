@@ -369,6 +369,61 @@ rest are unchanged; 522 differ.
 
 The goldens did not change: #992 touches game code only.
 
+### GBA frame-phase noise (frame offsets)
+
+On main 27f82f76 the engine session advanced the GBA's frame counter by 1
+and 2 frames right after the launch (same seed, same corners) and found
+some outcomes moving by far more than a band: `sk-pvt-w0` Terran supply cap
+at 8,000 frames 116 / 132 / 116 (N64 84), its gathered minerals 5,256 /
+5,144 / 5,256 (N64 2,984), `sk-zvz-w0` Zerg first wave 14,122 / 14,023 /
+14,539 (N64 17,045) and the human's defeat 14,468 / 14,392 / 14,899 (N64
+17,609), while others held to a frame (`sk-tvt-w0` first wave 10,079 /
+10,078 / 10,077). The runner's new `--frame-offset K` reproduces these
+numbers exactly.
+
+Measured over offsets 0–4 for all 17 scenarios: 230 of the 1,328 gating
+lines change with the offset, mostly computer build-order firsts (141 of
+the 218 known lines that vary) and gathered minerals (50). The largest
+spreads are about 1,350 frames (`sk-zvp-w0` Protoss Stargate 5,698 /
+7,050 / 7,049) and 1,230 frames (`sk-tvz-w101` Zerg Hydralisk). A single
+run judged these lines more tightly than the GBA's own noise: against the
+baseline then on main, runs at offsets +1 to +4 read 51, 52, 74 and 113
+REGRESSION lines; over every pair of offsets (baseline from one, run at
+another) 18–113.
+
+The `sk-*` scenarios now run at offsets 0, 1 and 2 and are judged on the
+spread (docs/PARITY-HARNESS.md, frame offsets). Judging every window of
+three consecutive offsets in 0–4 against a baseline accepted at 0–2 gives
+no REGRESSION; three lines read IMPROVED because every offset of the
+window is inside the band where one recorded offset was not (a Protoss
+Fleet Beacon in `sk-pvp-w0` and a Scout in `sk-zvp-w0` that only one
+recorded offset builds, and `sk-zvz-w0` Zerg workers at 8,000 frames).
+Part of the single-run flips (about half against main's baseline) came
+from times compared against a NEVER band, where a time a frame earlier
+counted as further out; the judge now treats such a band as an outcome.
+
+The accepted baseline keeps every offset's value (`gba_offsets`) on each
+of the 522 `sk-*` lines, with offset 0 unchanged, and adds two lines that
+pass at offset 0 but not at the others. Both are GBA defects against the
+N64 evidence:
+
+- `sk-pvp-w0` Protoss Scout: the N64 never builds one within its 8,945
+  frames; the GBA does not at offset 0, but does at 8,264 and 8,263 at +1
+  and +2 (defects 3 and 6: early Protoss tech, a type the N64 never makes).
+- `sk-tvz-w101` Zerg Lair: N64 7,643 (7,561–7,645 over the three seeds);
+  GBA 7,641 / 6,949 / 7,371, so at +1 and +2 the Lair is 612 and 190
+  frames early (defect 4: the late-pool Zerg reaches its tech early).
+
+The goldens and the N64 side are unchanged: the offsets are GBA runs only.
+
+Cost: the 51 matches take about 530 s of CPU against 170 s for 17. The GBA
+runs and their measurement now run in worker processes (they were threads,
+so the pure-Python measurement used one core), and the trace's record check
+matches each record with one expression instead of one per field (3x
+faster on a 32 MB trace, same results on every record). Back to back on
+this machine under other agents' load (15–44), `./dev parity --no-build`
+took 84 s and 75 s on main and 72 s and 75 s with this change.
+
 ## Defects
 
 Each line is a GBA defect against the N64 ROM, with its numbers above. All
@@ -462,7 +517,7 @@ marks the skirmish goldens stale, and an unrelated edit does not.
 | --- | --- |
 | N64 captures | 34 (17 pairs), 18,222–66,570 frontend steps, 78–500 s wall each under load; about 300 MB of tap.bin per whole match before compression |
 | Private data kept | 516 MB of run directories (taps as `tap.bin.zst`, ROM and lobby state hard-linked to the master copies), 17 golden files |
-| GBA side | One match runs in 6–8 s of CPU (`--no-route-checks`, render on); the 17 skirmish scenarios take about 2 minutes of `./dev parity` |
+| GBA side | One match runs in 5–9 s of CPU (`--no-route-checks`, render on); each scenario runs at three frame offsets, 51 matches, measured in worker processes (see the frame-offset section for the `./dev parity` wall time) |
 | Shipped ROMs | `StarCraft-GBA`, Terran, Zerg Z10, Protoss P10 and Showcase Transport1 ROMs are byte-identical with and without this change's `game.c` |
 
 Every capture held the shared native lock, so none ran beside another

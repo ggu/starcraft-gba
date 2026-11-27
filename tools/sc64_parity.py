@@ -29,6 +29,22 @@ every gating observation outside its band becomes a KNOWN line with its GBA
 value; IMPROVED and STALE lines are dropped. The baseline holds only GBA
 values and verdict keys; N64 numbers stay in the private fixture home.
 
+Frame offsets: a scenario whose spec lists frame_offsets (the skirmish
+matches, whose outcomes the GBA's own one-frame noise moves) runs once per
+offset, the engine's frame counter advanced that far after the launch (the
+runner's --frame-offset), and is judged on the spread of its values. A line
+is PASS (or IMPROVED) only when every offset is inside the band, and a
+REGRESSION only when every offset is further out than every value the
+baseline recorded (by more than the slack), or, with no baseline line, when
+every offset is outside the band. Anything between is KNOWN: within the
+GBA's noise of the baseline (a line with no baseline line yet gets one on
+--accept). A new finite time where the baseline recorded another outcome at
+that offset (a defeat where the human survived) is judged on its own: beyond
+the band, every recorded value and the GBA's frame noise for checks of its
+kind (the scenario's frame_noise), it is a REGRESSION whatever the other offsets kept. NEVER
+compares as the frame after the run's reach (the scenario's never_time). Baseline lines of such scenarios keep the value at each offset
+(gba_offsets, one finite number per offset); gba is offset 0's.
+
 The scorecard prints, per observation, the first divergent source frame (for
 checks with an N64 curve), the band, the GBA value and the provenance, then the
 fixture-set hash: a SHA-256 over the golden files it judged against. A run
@@ -37,10 +53,14 @@ private setup never reads as a pass.
 """
 import argparse
 import concurrent.futures
+import concurrent.futures.process
 import hashlib
 import json
+import math
+import multiprocessing
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -208,10 +228,14 @@ def gba_series(trace_path):
             'applied': applied if neutral is not None else None}
 
 
-def gba_command(scenario_id, golden, trace):
+def gba_command(scenario_id, golden, trace, frame_offset=0):
     """The runner command. Binary and runner scenario come from SCENARIOS, never
-    from the golden file; the golden supplies only integers."""
+    from the golden file; the golden supplies only integers. frame_offset (one of
+    the spec's frame_offsets) is passed to the match runner only when it is not 0,
+    so offset 0 runs exactly the command of a single-run scenario."""
     spec = metrics.SCENARIOS[scenario_id]
+    if frame_offset and (spec['runner'] != 'match' or frame_offset not in spec.get('frame_offsets', ())):
+        raise ValueError(f'{scenario_id}: no frame offset {frame_offset} for runner {spec["runner"]}')
     params = golden['gba']
     binary = PARITY_DIR / f'{spec["profile"]}-fast-trace'
     if spec['runner'] == 'census':
@@ -228,6 +252,8 @@ def gba_command(scenario_id, golden, trace):
         cmd += ['--target', f'{int(params["target"][0])},{int(params["target"][1])}']
     if 'gba_args' in spec:
         cmd += spec['gba_args'](scenario_id, params, trace)
+    if frame_offset:
+        cmd += ['--frame-offset', str(int(frame_offset))]
     # Unit-class labs: the subject (an exact point, or a cartridge unit id) and timed orders,
     # passed only to the lab runners that take them.
     if not spec['runner'].startswith('lab-'):
@@ -275,8 +301,24 @@ def stale(obs, golden, layout):
     return want != layout.fields_digest(obs.get('layout_reads', obs.get('layout_fields', [])))
 
 
-def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False):
+def offset_label(offsets):
+    return ', '.join(f'+{k}' for k in offsets)
+
+
+def check_family(check):
+    """A check's kind across players, types and checkpoints: build.first.Factory -> build.first,
+    econ.gathered@8000 -> econ.gathered."""
+    return 'build.first' if check.startswith('build.first.') else check.split('@')[0]
+
+
+def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=()):
+    """Rows for every observation of one golden. values are the GBA's (offset 0); more lists
+    (frame offset, values) for the scenario's other frame offsets, judged as one spread."""
     rows = []
+    offsets = [0] + [k for k, _ in more]
+    # The GBA's own frame noise per check family, calibrated once by the scenario (fixed, so no
+    # accept elsewhere in the baseline can tighten or loosen it).
+    noise = metrics.SCENARIOS.get(scenario_id, {}).get('frame_noise', {}) if more else {}
     revision = metrics.SCENARIOS.get(scenario_id, {}).get('decoder_revision', 1)
     if not golden.get('observations'):
         # A golden that checks nothing never passes quietly.
@@ -293,7 +335,10 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
     for obs in golden['observations']:
         gating = obs['gating']
         # A scenario with several subjects per check keys its values by (check, subject).
-        value = values.get((obs['check'], obs['subject']), values.get(obs['check']))
+        def lookup(got):
+            return got.get((obs['check'], obs['subject']), got.get(obs['check']))
+        value = lookup(values)
+        spread = [value] + [lookup(got) for _, got in more]
         unproven = []
         if gating and layout is not None:
             unproven = [k for k in obs.get('layout_proven', obs.get('layout_fields', [])) if layout.status(k) != 'proven']
@@ -319,13 +364,22 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden), 'gating': obs['gating'],
                'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}
-        if value is None:
-            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
-            row['why'] = 'not measured on the GBA' if obs['value'] is not None else 'recorded on neither engine'
-            rows.append(row)
-            continue
         if isinstance(value, float):
             row['gba'] = round(value, 4)
+        if len(spread) > 1:
+            row['gba_offsets'] = [round(v, 4) if isinstance(v, float) else v for v in spread]
+            row['frame_offsets'] = offsets
+        if any(v is None for v in spread):
+            # A row with any offset unmeasured keeps its incomplete spread, so --accept refuses it
+            # rather than recording the offsets that were measured.
+            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
+            if all(v is None for v in spread):
+                row['why'] = 'not measured on the GBA' if obs['value'] is not None else 'recorded on neither engine'
+            else:
+                row['why'] = 'not measured on the GBA at frame offset ' + \
+                    offset_label(k for k, v in zip(offsets, spread) if v is None)
+            rows.append(row)
+            continue
         if obs['value'] is None or obs['lo'] is None or obs['hi'] is None:
             # An event only the GBA recorded (a report-only observation the N64 never saw) has no band.
             row['verdict'] = 'REGRESSION' if gating else 'REPORT'
@@ -334,45 +388,148 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             continue
         if obs['value'] and value not in metrics.MARKERS:
             row['ratio'] = round(value / obs['value'], 3)
-        gap = outside(value, obs['lo'], obs['hi'])
-        if value in obs.get('also_ok', ()):
-            gap = 0  # an outcome outside the numeric band that the N64 also showed (skirmish NEVER)
+        also_ok = obs.get('also_ok', ())
+        # A marker or sentinel (absent event, off-target fight, skirmish NEVER and ENDED) is an
+        # outcome, not a number. Numbers are compared with numbers; an outcome with a time (a
+        # skirmish NEVER: not before the run's reach) is compared by that time.
+        specials = set(metrics.MARKERS) | set(obs.get('sentinels', ()))
+        never = metrics.SCENARIOS.get(scenario_id, {}).get('never_time')
+        never = never(golden, obs) if never else None     # (sentinel, the earliest time it stands for)
+
+        def kind(v):
+            return v if v in specials else 'number'
+
+        def gap(v):
+            # 0 for an outcome outside the numeric band that the N64 also showed (skirmish NEVER).
+            return 0 if v in also_ok else outside(v, obs['lo'], obs['hi'])
+
+        def time_gap(v):
+            # The distance of an outcome by its time; None for one with no time (ENDED, a marker).
+            if v in also_ok:
+                return 0
+            if kind(v) == 'number':
+                return outside(v, obs['lo'], obs['hi'])
+            if never is not None and v == never[0]:
+                return outside(never[1], obs['lo'], obs['hi'])
+            return None
+        gaps = [gap(v) for v in spread]
+        every = ' at every frame offset' if len(spread) > 1 else ''
         known = baseline.get(key)
+        # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
+        # band as seed_lo/seed_hi, and the N64's spread over seeds is no licence to move further out.
+        seed_lo, seed_hi = obs.get('seed_lo', obs['lo']), obs.get('seed_hi', obs['hi'])
+        if seed_lo in specials and seed_hi in specials:
+            # A seed that never reached the event, in an envelope other seeds made finite: its own
+            # band has no width, so the measurement's own tolerance is the slack.
+            tolerance = metrics.SCENARIOS.get(scenario_id, {}).get('sentinel_slack')
+            slack = max(tolerance(obs) if tolerance else 0, 1e-9)
+        else:
+            slack = max((seed_hi - seed_lo) / 2, 1e-9)
+        # A band that is itself an outcome (the N64 never built the type: [NEVER, NEVER]) puts every
+        # GBA time at the same wrong outcome: a frame earlier is not further out.
+        outcome_band = obs['lo'] == obs['hi'] and obs['lo'] in specials
+        if known is not None:
+            base = known.get('gba_offsets', [known['gba']])
+            was_times = [g for g in (time_gap(b) for b in base) if g is not None]
+        else:
+            # No baseline line: the line passed, so the band's outcomes (its own value, the allowed
+            # outcomes, and a time wherever the band is finite) are what it recorded, at no distance.
+            base = [obs['value']] + list(also_ok) + ([obs['lo']] if obs['lo'] not in specials else [])
+            was_times = [0]
+        was_kinds = {kind(b) for b in base}
+
+        def changed(i, v):
+            # The offset's outcome differs from the baseline's at the same offset, or (a single run's
+            # line) from every outcome the baseline recorded.
+            if known is not None and len(base) == len(spread):
+                return kind(v) != kind(base[i])
+            return kind(v) not in was_kinds
+        # A new finite time where the baseline had another outcome at that offset (a defeat where
+        # the human survived) is judged on its own: beyond the band, every recorded value and the
+        # GBA's own frame noise for checks of its kind (the scenario's frame_noise), it is a
+        # regression whatever the other offsets kept. NEVER
+        # where a time was recorded only bounds the time from below (the run's reach), so it is
+        # judged with the whole spread below.
+        # Timings only (the scenario's never_time names them): a checkpoint count that an offset
+        # reaches again after its match ended there stays under the spread comparison.
+        allowance = noise.get(check_family(obs['check']), 0)
+        jumps = [(k, v) for i, (k, v) in enumerate(zip(offsets, spread))
+                 if never is not None and kind(v) == 'number' and changed(i, v) and not outcome_band and was_times
+                 and time_gap(v) > max(was_times) + slack + allowance]
+        # Offsets whose new outcome has no time to compare (ENDED, a marker), or a baseline without one.
+        untimed = [v for v in spread if kind(v) not in was_kinds and (time_gap(v) is None or not was_times)]
         if not gating:
             row['verdict'] = 'REPORT'
-        elif gap == 0:
+        elif max(gaps) == 0:
             row['verdict'] = 'IMPROVED' if known else 'PASS'
+        elif jumps:
+            row['verdict'] = 'REGRESSION'
+            row['why'] = ('a new outcome ' + ', '.join(f'{fmt(v)}' + (f' at frame offset +{k}' if every else '')
+                                                       for k, v in jumps) +
+                          ' lies beyond the band and every recorded value (' +
+                          (fmt_spread(base) if known is not None else 'none: the line passed') + ')')
         elif known is None:
-            row['verdict'] = 'REGRESSION'
-            row['why'] = 'outside the band and not in the baseline'
-        elif (value in metrics.MARKERS or known['gba'] in metrics.MARKERS) and value != known['gba']:
-            # An event the GBA now produces, or no longer produces, is never the known gap, and
-            # neither is a fight with other enemies where the baseline recorded none (or the reverse).
-            row['verdict'] = 'REGRESSION'
-            row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' +
-                          ('a fight with other enemies' if known['gba'] == metrics.OFF_TARGET else 'a measurement'),
-                          metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' +
-                          ('no fight' if known['gba'] == metrics.ABSENT else 'a measurement')}.get(
-                value, 'the baseline records the event as ' +
-                ('absent' if known['gba'] == metrics.ABSENT else 'a fight with other enemies') +
-                ' on the GBA; it is now measured outside the band')
-        elif value != known['gba'] and (value in obs.get('sentinels', ()) or known['gba'] in obs.get('sentinels', ())):
-            # A sentinel (skirmish NEVER, ENDED) is an outcome, not a number: changing to or from one is
-            # never within the baseline's slack.
-            row['verdict'] = 'REGRESSION'
-            row['why'] = f'the outcome changed from the baseline ({known["gba"]})'
-        else:
-            was = 0 if known['gba'] in obs.get('also_ok', ()) else outside(known['gba'], obs['lo'], obs['hi'])
-            # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each
-            # seed's band as seed_lo/seed_hi, and the N64's spread over seeds is no licence for
-            # the GBA to move further out.
-            slack = max((obs.get('seed_hi', obs['hi']) - obs.get('seed_lo', obs['lo'])) / 2, 1e-9)
-            if gap > was + slack:
+            if min(gaps) > 0:
                 row['verdict'] = 'REGRESSION'
-                row['why'] = f'further outside the band than the baseline ({known["gba"]})'
+                row['why'] = 'outside the band and not in the baseline' + every
+            else:
+                # Inside the band at some offsets: the GBA's own noise reaches the band. --accept
+                # records the line, so its spread is tracked from then on.
+                row['verdict'] = 'KNOWN'
+                row['why'] = ('outside the band only at frame offset ' +
+                              offset_label(k for k, g in zip(offsets, gaps) if g) + ' (GBA frame noise); '
+                              'no baseline line yet')
+        elif untimed and not {kind(v) for v in spread} & was_kinds and min(gaps) > 0:
+            # (An offset now inside the band, a checkpoint the match reaches again, is not this.)
+            # Every offset changed to or from an outcome with no time: changed at any distance.
+            now, was = value, base[0]
+            row['verdict'] = 'REGRESSION'
+            if now in metrics.MARKERS or was in metrics.MARKERS:
+                # An event the GBA now produces, or no longer produces, is never the known gap,
+                # and neither is a fight with other enemies where the baseline recorded none.
+                row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' +
+                              ('a fight with other enemies' if was == metrics.OFF_TARGET else 'a measurement'),
+                              metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' +
+                              ('no fight' if was == metrics.ABSENT else 'a measurement')}.get(
+                    now, 'the baseline records the event as ' +
+                    ('absent' if was == metrics.ABSENT else 'a fight with other enemies') +
+                    ' on the GBA; it is now measured outside the band')
+            else:
+                row['why'] = f'the outcome changed from the baseline ({fmt_spread(base)})'
+            row['why'] += every
+        else:
+            # Whole spread against whole spread, by numbers alone and by time (NEVER as the frame
+            # after the run's reach): every offset further out than every recorded value. For a
+            # timing the numbers are those of offsets that recorded a number (a time newly finite at
+            # its offset replaced another outcome and is compared with it, by time); a checkpoint
+            # count keeps every reading. Any number inside the band keeps the numbers KNOWN: the
+            # noise still reaches the N64's value. In the time comparison a newly finite time brings
+            # no measured spread of its own, so it must also clear the family's frame noise, as a
+            # jump does.
+            def margin(i, v):
+                return slack + (allowance if never is not None and kind(v) == 'number' and changed(i, v) else 0)
+
+            def beyond(now, was):
+                return bool(now) and bool(was) and all(g > max(was) + m for g, m in now)
+            # A timing whose outcome itself differed between offsets (a time at some, NEVER at others)
+            # is as unstable as the GBA gets: its few numbers do not measure its noise, so they too
+            # must clear the family's.
+            unstable = never is not None and len({kind(b) for b in base}) > 1
+            numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
+                beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
+                        if kind(v) == 'number' and (never is None or not changed(i, v))],
+                       [gap(b) for b in base if kind(b) == 'number'])
+            timed = None not in [time_gap(v) for v in spread] and \
+                beyond([(time_gap(v), margin(i, v)) for i, v in enumerate(spread)],
+                       [g for g in (time_gap(b) for b in base) if g is not None])
+            if not outcome_band and (numbers or timed):
+                row['verdict'] = 'REGRESSION'
+                row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
             else:
                 row['verdict'] = 'KNOWN'
                 row['baseline'] = known['gba']
+                if 'gba_offsets' in known:
+                    row['baseline_offsets'] = base
         for name, curve in golden.get('curves', {}).items():
             # A curve belongs to the checks it explains: arrival for the move, rate for income.
             explains = {'move.remaining': ('move.arrival_first', 'move.arrival_last'),
@@ -400,46 +557,115 @@ def provenance(obs, golden):
     return obs['provenance'] + ''.join(f' {t}' for t in tags)
 
 
-def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
-    golden = json.loads(golden_path.read_text())
-    spec = metrics.SCENARIOS.get(scenario_id)
-    result = {'id': scenario_id, 'golden': str(golden_path), 'golden_sha256': hashlib.sha256(golden_path.read_bytes()).hexdigest()}
-    if spec is None:
-        return {**result, 'status': 'SKIP', 'why': 'no measurement code for this scenario id'}
-    if not all(metrics.gba_boundary_ok(int(step)) for step in
-               [golden['gba']['at_step']] + [entry[0] for entry in golden['gba'].get('cmds', [])]):
-        return {**result, 'status': 'ERROR', 'why': f'GBA command step {golden["gba"]["at_step"]} shares a source frame '
-                'with its pre-command step'}
+# Worker processes for the GBA runs and their measurement (pure Python, so threads would share
+# one core); main() sets it. Without it (tests, direct calls) runs happen in the calling thread.
+RUN_POOL = None
+
+
+def run_gba(scenario_id, golden, keep, frame_offset=0):
+    """One GBA run of a scenario at one frame offset, measured: {'measured', 'report', 'cmd'} or
+    {'status': 'ERROR', 'why'}. A top-level function, so a worker process can run it."""
+    spec = metrics.SCENARIOS[scenario_id]
     with tempfile.TemporaryDirectory(prefix=f'sc64-parity-{scenario_id}-') as temp:
-        trace = pathlib.Path(keep or temp) / f'{scenario_id}.trace'
-        binary, cmd = gba_command(scenario_id, golden, trace)
+        name = scenario_id + (f'+{frame_offset}' if frame_offset else '')
+        trace = pathlib.Path(keep or temp) / f'{name}.trace'
+        binary, cmd = gba_command(scenario_id, golden, trace, frame_offset)
         if not binary.exists():
-            return {**result, 'status': 'ERROR', 'why': f'{binary} is missing; build it with make (mk/parity/Makefile)'}
+            return {'status': 'ERROR', 'why': f'{binary} is missing; build it with make (mk/parity/Makefile)'}
         run = subprocess.run(cmd, capture_output=True, text=True)
         if run.returncode != 0:
-            return {**result, 'status': 'ERROR', 'why': f'GBA run exited {run.returncode}: {run.stderr.strip()[-400:]}',
+            return {'status': 'ERROR', 'why': f'GBA run exited {run.returncode}: {run.stderr.strip()[-400:]}',
                     'command': cmd}
         report = json.loads(run.stdout.strip().splitlines()[-1])
+        if frame_offset and report.get('match', {}).get('frame_offset') != frame_offset:
+            return {'status': 'ERROR', 'why': f'the runner did not apply frame offset {frame_offset}', 'command': cmd}
         if 'gba_series' in spec:
             # Scenarios that stream their own trace (skirmish): measured inside the temporary
             # directory, which holds the trace the series reads lazily.
             series = spec['gba_series'](trace, report)
             measured, err = spec['measure_gba'](series, golden, report)
-            return finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale)
+            return {'measured': measured, 'err': err, 'report': report, 'cmd': cmd}
         series = gba_series(trace)
         if 'parse_gba' in spec:
             # Scenarios that read more of the trace than the series keeps (buildings, hits).
             report['parsed'] = spec['parse_gba'](trace)
     report['movers'] = [int(x) for x in report.get('movers', [])] if isinstance(report.get('movers'), list) else []
     measured, err = spec['measure_gba'](series, golden, report)
-    return finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale)
+    return {'measured': measured, 'err': err, 'report': report, 'cmd': cmd}
 
 
-def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False):
+def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
+    raw = golden_path.read_bytes()
+    golden = json.loads(raw)
+    spec = metrics.SCENARIOS.get(scenario_id)
+    result = {'id': scenario_id, 'golden': str(golden_path), 'golden_sha256': hashlib.sha256(raw).hexdigest()}
+    if spec is None:
+        return {**result, 'status': 'SKIP', 'why': 'no measurement code for this scenario id'}
+    if not all(metrics.gba_boundary_ok(int(step)) for step in
+               [golden['gba']['at_step']] + [entry[0] for entry in golden['gba'].get('cmds', [])]):
+        return {**result, 'status': 'ERROR', 'why': f'GBA command step {golden["gba"]["at_step"]} shares a source frame '
+                'with its pre-command step'}
+    offsets = list(spec.get('frame_offsets', (0,)))
+    if offsets[0] != 0 or len(set(offsets)) != len(offsets):
+        return {**result, 'status': 'ERROR', 'why': f'frame offsets {offsets} must start at 0 and not repeat'}
+    if RUN_POOL is None:
+        runs = [run_gba(scenario_id, golden, keep, k) for k in offsets]
+    else:
+        try:
+            jobs = {k: RUN_POOL.submit(run_gba, scenario_id, golden, keep, k) for k in offsets}
+        except concurrent.futures.process.BrokenProcessPool as error:
+            return {**result, 'status': 'ERROR', 'why': f'the GBA worker pool broke while this scenario submitted its runs: {error!r}'}
+        runs = []
+        for k, job in jobs.items():
+            try:
+                runs.append(job.result())
+            except concurrent.futures.process.BrokenProcessPool as error:
+                # A worker died (killed, out of memory): every pending run fails with it, so the
+                # offset is not the cause. The scenario is an ERROR and the run exits 1.
+                return {**result, 'status': 'ERROR', 'why': f'the GBA worker pool broke during this scenario: {error!r}'}
+            except Exception as error:   # this run raised in its worker
+                runs.append({'status': 'ERROR', 'why': f'GBA run failed in its worker: {error!r}'})
+    for k, run in zip(offsets, runs):
+        if run.get('status') == 'ERROR':
+            at = f' (frame offset +{k})' if k else ''
+            return {**result, **{key: v for key, v in run.items() if key != 'why'}, 'why': run['why'] + at}
+        if run['err']:
+            return {**result, 'status': 'ERROR', 'why': 'GBA measurement' + (f' at frame offset +{k}' if k else '') +
+                    ': ' + run['err']}
+    first = runs[0]
+    more = [(k, run['measured']['values']) for k, run in zip(offsets[1:], runs[1:])]
+    out = finish_scenario(scenario_id, golden, result, first['measured'], first['err'], baseline, first['report'],
+                          first['cmd'], allow_stale, more)
+    if more and out['status'] == 'RUN':
+        out['frame_offsets'] = offsets
+        out['gba_cpu_seconds'] = sum(run['report'].get('cpu_seconds') or 0 for run in runs)
+        # --explain and --json: each offset's command, CPU time, measurements and first divergences.
+        # gba_cpu_seconds above is the sum over the offsets; offset 0's measurements also stay at
+        # the top level (gba_measured, command), as for a single run.
+        out['offset_runs'] = [{'frame_offset': k, 'command': run['cmd'],
+                               'gba_cpu_seconds': run['report'].get('cpu_seconds'),
+                               'gba_measured': run['measured'].get('measured'),
+                               'first_divergent_frames': curve_divergence(golden, run['measured'].get('curves', {}))}
+                              for k, run in zip(offsets, runs)]
+    return out
+
+
+def curve_divergence(golden, curves):
+    """{curve name: first divergent source frame or None} for the golden's curves a run measured."""
+    out = {}
+    for name, curve in golden.get('curves', {}).items():
+        if name in curves:
+            k = first_divergence(curve['n64'], curves[name], curve['tolerance'])
+            out[name] = None if k is None else k * curve.get('step', 1)
+    return out
+
+
+def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False, more=()):
     if err:
         return {**result, 'status': 'ERROR', 'why': 'GBA measurement: ' + err}
     layout = parity_decode.Layout()
-    rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout, allow_stale)
+    rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout, allow_stale,
+                 more)
     return {**result, 'status': 'RUN', 'rows': rows, 'gba_measured': measured.get('measured'),
             'gba_cpu_seconds': report.get('cpu_seconds'), 'command': cmd}
 
@@ -494,13 +720,44 @@ def tables_result(run, out):
          'provenance': 'rom-table', 'verdict': 'REPORT', 'gating': False}]}
 
 
+BASELINE_LIMIT = 1e9   # every GBA value (frames, minerals, counts, rates; NEVER is 999999) is far below
+
+
+def finite_number(v):
+    """A number a baseline line may hold: finite and within BASELINE_LIMIT, so no spread of them
+    overflows."""
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return False
+    try:
+        return math.isfinite(v) and abs(v) <= BASELINE_LIMIT
+    except OverflowError:   # an integer past the float range
+        return False
+
+
 def load_baseline(path):
     if not path.exists():
         return {}
     doc = json.loads(path.read_text())
     for line in doc.get('known', []):
-        if not isinstance(line.get('gba'), (int, float)) or isinstance(line.get('gba'), bool):
-            raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no numeric GBA value')
+        if not isinstance(line.get('key'), str) or len(line['key'].split(':', 2)) != 3 or \
+                not all(line['key'].split(':', 2)):
+            raise SystemExit(f'{path}: baseline line {line.get("key")!r} is not scenario:check:subject')
+        if not finite_number(line.get('gba')):
+            raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no finite numeric GBA value')
+        if 'gba_offsets' in line:
+            # One finite value per frame offset its scenario runs, offset 0 first and equal to gba.
+            # A line without gba_offsets (a single run's) stays valid.
+            spread = line['gba_offsets']
+            scenario = str(line.get('key', '')).split(':')[0]
+            # A scenario this checkout does not know keeps its line (write_baseline preserves the lines
+            # of scenarios that did not run); its offset count cannot be checked here.
+            want = metrics.SCENARIOS[scenario].get('frame_offsets') if scenario in metrics.SCENARIOS else \
+                (spread if isinstance(spread, list) else None)
+            if not want or not isinstance(spread, list) or len(spread) != len(want) or \
+                    not all(finite_number(v) for v in spread) or spread[0] != line['gba']:
+                raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_offsets: one finite '
+                                 f'number per frame offset of its scenario ({list(want or ())}), offset 0 first '
+                                 'and equal to gba')
     return {line['key']: line for line in doc.get('known', [])}
 
 
@@ -511,9 +768,13 @@ def write_baseline(path, results, old):
         for row in result.get('rows', []):
             seen.add(row['key'])
             if row['gating'] and row['verdict'] in ('REGRESSION', 'KNOWN'):
-                if not isinstance(row['gba'], (int, float)):
+                if not finite_number(row['gba']):
                     raise ValueError(f'{row["key"]}: no GBA value to accept')
                 line = {'key': row['key'], 'gba': row['gba']}
+                if 'gba_offsets' in row:
+                    if not all(finite_number(v) for v in row['gba_offsets']):
+                        raise ValueError(f'{row["key"]}: no GBA value to accept at every frame offset')
+                    line['gba_offsets'] = row['gba_offsets']
                 note = old.get(row['key'], {}).get('note')
                 if note:
                     line['note'] = note
@@ -527,7 +788,11 @@ def write_baseline(path, results, old):
     doc = {'format': 'sc64-parity-baseline/1',
            'about': 'Known GBA/N64 parity gaps: GBA values only (N64 bands stay in the private fixture home). '
                     'Rewritten by ./dev parity --accept.', 'known': known}
-    path.write_text(json.dumps(doc, indent=1) + '\n')
+    # A line's frame offsets on one line, so a change reads as one line.
+    text = re.sub(r'("gba_offsets": )\[\s+([-0-9.e+,\s]*?)\s+\]',
+                  lambda m: m.group(1) + '[' + ', '.join(v.strip() for v in m.group(2).split(',')) + ']',
+                  json.dumps(doc, indent=1))
+    path.write_text(text + '\n')
 
 
 def fixture_hash(goldens):
@@ -549,6 +814,10 @@ def fmt(v):
     return str(v)
 
 
+def fmt_spread(values):
+    return '/'.join(fmt(v) for v in values)
+
+
 def scorecard(results, home, goldens):
     lines = []
     counts = {}
@@ -563,6 +832,8 @@ def scorecard(results, home, goldens):
             extra = []
             if row.get('ratio') is not None and row['verdict'] not in ('PASS',):
                 extra.append(f'GBA/N64 {row["ratio"]}')
+            if row.get('gba_offsets') and row['verdict'] != 'PASS':
+                extra.append(f'frame offsets {offset_label(row["frame_offsets"])}: {fmt_spread(row["gba_offsets"])}')
             if row.get('first_divergent_frame') is not None:
                 extra.append(f'first divergent source frame {row["first_divergent_frame"]}')
             if row.get('why'):
@@ -586,7 +857,8 @@ def main(argv=None):
     parser.add_argument('--keep', type=pathlib.Path, help='keep GBA traces in this directory')
     parser.add_argument('--json', type=pathlib.Path, help='also write the full results here')
     parser.add_argument('--explain', metavar='ID', help='print the full measurements of one scenario')
-    parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--jobs', type=int, default=os.cpu_count() or 4,
+                        help='GBA runs at once (default: one per CPU)')
     parser.add_argument('--no-build', action='store_true', help='use the GBA binaries as they are')
     parser.add_argument('--allow-stale', action='store_true',
                         help='report goldens decoded against other layout field definitions instead of failing '
@@ -604,7 +876,13 @@ def main(argv=None):
     built = {} if args.no_build else build_binaries(goldens)
     broken = {p: why for p, why in built.items() if why}
     jobs = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+    global RUN_POOL
+    # Scenario threads only wait (on the differ's process, or on their runs in RUN_POOL), so
+    # every scenario gets one; --jobs bounds the GBA runs measured at once.
+    # spawn: workers never fork a process whose scenario threads hold locks.
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, args.jobs),
+                                                mp_context=multiprocessing.get_context('spawn')) as RUN_POOL, \
+            concurrent.futures.ThreadPoolExecutor(max_workers=len(goldens) + 1) as pool:
         if not args.no_tables and not args.explain and not args.only:
             jobs.append(pool.submit(run_tables, home))
         for path in goldens:
@@ -614,6 +892,7 @@ def main(argv=None):
             else:
                 jobs.append(pool.submit(run_scenario, path.stem, path, baseline, args.keep, args.allow_stale))
         results = [job.result() for job in jobs]
+    RUN_POOL = None
     ran_ids = {r['id'] for r in results if r['status'] == 'RUN'}
     seen = {row['key'] for r in results for row in r.get('rows', [])}
     stale = [{'key': key, 'check': key.split(':')[1], 'subject': key.split(':', 2)[2], 'gba': line.get('gba'),

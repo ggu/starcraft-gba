@@ -13,7 +13,8 @@
  *   sc64_parity_run --scenario lab-t1|lab-bb --subject X,Y|--subject-raw ID
  *                   --cmd STEP,KIND,X,Y [--cmd ...] ...
  *   sc64_parity_run --scenario lab-mission --mission ID --subject ... --cmd ...
- *   sc64_parity_run --scenario match --human t|z|p --bot t|z|p [--bot ...] [--seed MS] ...
+ *   sc64_parity_run --scenario match --human t|z|p --bot t|z|p [--bot ...] [--seed MS]
+ *                   [--frame-offset K] ...
  *
  * move and income are the N64 parity scenarios (tools/sc64_parity.py passes
  * their parameters from a golden file). move launches T1 and gives the
@@ -26,6 +27,12 @@
  * start corners from the milliseconds since power-on, as the cartridge does
  * from 0x800EFF20), and gives no command until the match ends; its report
  * adds each owner's race and start, and the supply a queued unit reserves.
+ * --frame-offset K (0-4) advances the engine's frame counter by K right after
+ * the launch (whose release update takes step 1): the same seed and corners
+ * with every task phased on that counter (the 5:4 source cadence among them)
+ * K frames out of phase from step 2 on. The step count, and so the
+ * source-frame clock, is unchanged. tools/sc64_parity.py runs each skirmish scenario at a few fixed
+ * offsets to measure the GBA's own one-frame noise.
  *
  * lab-t1 (T1), lab-bb (Blood Bath, human Zerg against one Terran computer)
  * and lab-mission (catalog mission ID, single-race campaign products) are
@@ -747,6 +754,7 @@ static int pr_parse_cmd(const char *text)
 /* match: Blood Bath Free for All, a passive human against computer seats. */
 enum { PR_MATCH_SEATS = 3 };
 static int pr_match_human = -1, pr_match_bots[PR_MATCH_SEATS], pr_match_nbots, pr_match_seed_given;
+static int pr_match_frame_offset; /* --frame-offset: engine frames skipped after the launch */
 static unsigned long pr_match_seed;
 
 static int pr_race_arg(const char *text)
@@ -791,6 +799,8 @@ static int pr_launch_match(void)
     if (screen != SCREEN_PLAY || !race_mode || race_human != pr_match_human || race_bots != pr_match_nbots) return 0;
     for (int k = 0; k < pr_match_nbots; ++k)
         if (race_bot_races[k] != pr_match_bots[k]) return 0;
+    /* Outside pr_update, so no step is counted: only the phase moves. */
+    frame += pr_match_frame_offset;
     return 1;
 }
 
@@ -800,8 +810,8 @@ static void pr_match_json(char *out, size_t size)
 {
     size_t n = 0;
 #define PR_PUT(...) do { if (n < size) n += (size_t)snprintf(out + n, size - n, __VA_ARGS__); } while (0)
-    PR_PUT(",\"match\":{\"seed\":%lu,\"seed_given\":%d,\"start_order\":%u,\"owners\":[",
-           pr_match_seed, pr_match_seed_given, (unsigned)race_skirmish_start_order);
+    PR_PUT(",\"match\":{\"seed\":%lu,\"seed_given\":%d,\"frame_offset\":%d,\"start_order\":%u,\"owners\":[",
+           pr_match_seed, pr_match_seed_given, pr_match_frame_offset, (unsigned)race_skirmish_start_order);
     for (int k = -1; k < pr_match_nbots; ++k) {
         int owner = k < 0 ? SIDE : race_bot_owner_ids[k], base = race_skirmish_owner_base(owner);
         PR_PUT("%s{\"owner\":%d,\"human\":%d,\"race\":%d,\"base\":%d,\"x\":%d,\"y\":%d}", k < 0 ? "" : ",", owner, k < 0,
@@ -955,6 +965,11 @@ int main(int argc, char **argv)
             if (*text < '0' || *text > '9' || *end || pr_match_seed > 0xfffffffful) { scenario = 0; break; }
             pr_match_seed_given = 1; match_args = 1;
         }
+        else if (!strcmp(argv[i], "--frame-offset") && i + 1 < argc) {
+            const char *text = argv[++i];
+            if (text[0] < '0' || text[0] > '4' || text[1]) { scenario = 0; break; }
+            pr_match_frame_offset = text[0] - '0'; match_args = 1;
+        }
         else { scenario = 0; break; }
     }
     for (const char *c = profile; *c; ++c)
@@ -986,7 +1001,8 @@ int main(int argc, char **argv)
                 "       %s --scenario income [--at STEP] ...\n"
                 "       %s --scenario lab-t1|lab-bb --subject X,Y|--subject-raw ID --cmd STEP,KIND,X,Y ...\n"
                 "       %s --scenario lab-mission --mission ID --subject X,Y|--subject-raw ID --cmd ...\n"
-                "       %s --scenario match --human t|z|p --bot t|z|p [--bot ...] [--seed MS] [--gather PATH] ...\n"
+                "       %s --scenario match --human t|z|p --bot t|z|p [--bot ...] [--seed MS] [--frame-offset K]\n"
+                "       [--gather PATH] ...\n"
                 "       %s --scenario census --mission ID|skirmish --trace PATH [--steps N] [--profile NAME]\n",
                 argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 64;

@@ -92,16 +92,90 @@ hash chain, seed words, binary, tape, ROM and mode.
 | Verdict | Meaning | Fails? |
 | --- | --- | --- |
 | PASS | Inside the N64 band | no |
-| KNOWN | Outside the band, in the baseline, not further out than recorded (half a band of slack; for a skirmish seed envelope, half the seed's own band) | no |
-| REGRESSION | Outside the band and not in the baseline, or further out than the baseline | yes |
-| IMPROVED | In the baseline, now inside the band | notice |
+| KNOWN | Outside the band, in the baseline, not further out than recorded (half a band of slack; for a skirmish seed envelope, half the seed's own band). A scenario run at several frame offsets: outside the band at some offset, and not wholly further out than the baseline; with no baseline line yet, inside the band at another offset | no |
+| REGRESSION | Outside the band and not in the baseline, or further out than the baseline. At several frame offsets: every offset outside the band (no baseline line), or every offset further out than every recorded offset | yes |
+| IMPROVED | In the baseline, now inside the band (at every frame offset) | notice |
 | STALE | Baseline line with no observation | notice |
 | STALE-GOLDEN | The golden was decoded against other definitions of the fields it reads | yes (REPORT with `--allow-stale`) |
 | REPORT | Non-gating observation, or a table-differ count | no |
 | SKIP | Private inputs absent | no |
 
 `./dev parity --accept` rewrites `tools/parity/baseline.json`: every gating
-observation outside its band becomes a known line holding the GBA value.
+observation outside its band becomes a known line holding the GBA value
+(for a scenario run at several frame offsets, the value at each offset in
+`gba_offsets`, offset 0 first and also in `gba`).
+
+A marker or sentinel (an absent event, an off-target fight, a skirmish
+NEVER or ENDED) is an outcome, not a number, and numbers are compared only
+with numbers. A skirmish NEVER for a timing has a time, "not before the
+measurement's reach" (the N64 run's last frame, or a finite band's upper
+edge), and compares as the frame after it. At several frame offsets:
+
+- A new finite time where the baseline recorded another outcome at that
+  offset (a defeat where the human survived) is judged on its own. It is a
+  REGRESSION when it lies beyond the band and every recorded value by more
+  than the slack plus the GBA's own frame noise for checks of its kind
+  (`FRAME_NOISE`, calibrated once: the widest spread over offsets 0–4 on
+  any line of the family, 1,352 frames for build-order firsts, 516 for
+  first waves, 508 for defeats; fixed, so accepting a line elsewhere never
+  changes it), whatever the other offsets kept. A defeat
+  between the band and "never" is nearer the N64 than surviving, so it is
+  not worse.
+- NEVER where a time was recorded only bounds the time from below, so it is
+  judged with the whole spread: every offset's time (NEVER as that bound)
+  further out than every recorded time. A wave at the very end of the run
+  that slips past it at one offset is noise.
+- Numbers alone (of offsets that recorded a number) are also compared
+  spread against spread, so an offset that kept NEVER does not excuse
+  numbers that all moved further out. A timing whose recorded outcome
+  itself differed between offsets (a time at some, NEVER at others) is as
+  unstable as the GBA gets, so its numbers must also clear the family's
+  frame noise. A number
+  inside the band at any offset keeps the comparison KNOWN: the noise
+  still reaches the N64's value (only a newly finite timing is judged on
+  its own).
+- A line whose outcomes share none with the baseline's and have no time
+  (ENDED, a marker) is a REGRESSION at any distance.
+- A seed whose own band is NEVER, in an envelope other seeds made finite,
+  keeps the timing tolerance (±2 frames) as its slack.
+
+Against a band that is itself an outcome (the
+N64 never built the type), every GBA time is the same wrong outcome, so a
+time that moves is no regression; a line with no baseline line still fails
+while it is outside.
+
+### Frame offsets
+
+The GBA's skirmish outcomes are chaotic in its own frame phase: with the
+same seed and corners, advancing the engine's frame counter by one or two
+frames right after the launch moves a computer's supply cap at 8,000 frames
+by 16 and its first wave by up to 500 frames (`sk-pvt-w0`, `sk-zvz-w0`).
+A single run therefore judged some lines more tightly than the game's own
+noise: a run one to four frames out of phase flipped 18–113 of the 1,328
+gating `sk-*` lines to REGRESSION (51–113 against the baseline then on
+main), as an engine change that shifted timing by a frame would. Each `sk-*` scenario now runs at
+frame offsets 0, 1 and 2 (`FRAME_OFFSETS`; the runner's `--frame-offset K`
+advances the frame counter K frames right after the launch, whose release
+update takes step 1, and leaves the step count, and so the source-frame
+clock, unchanged) and is judged on the spread: REGRESSION only when the whole spread moves further out than the
+whole recorded spread, PASS or IMPROVED only when every offset is inside
+the band. In the same test (offsets 0–4, every window of three
+consecutive offsets judged against a baseline accepted at 0–2), no line
+flipped to REGRESSION; three noise lines read IMPROVED (every offset inside
+the band, where one recorded offset was outside). The price: a shift of
+every offset by no more than the line's own spread reads KNOWN. Comparing
+the ranked offsets instead (each offset's gap against the same rank of the
+baseline's) would catch that, but flipped 0–3 lines of pure frame noise in
+the same test. An ENDED checkpoint at some offsets, where the baseline had
+numbers, is noise while the other offsets share the baseline's outcome:
+the match's end is gated by its own `result.*` line, which compares a new
+defeat by its time. Baseline lines must hold one finite value per
+configured offset; a single run's line (no `gba_offsets`) stays valid.
+`--explain` and `--json` list each offset's command, CPU time, measurements
+and first curve divergences under `offset_runs`.
+Offsets are GBA-side only; the N64 goldens are unchanged. `--jobs` (one
+per CPU by default) runs the GBA runs and their measurement in worker
+processes.
 `--explain ID` prints one scenario's full measurements; `--keep DIR` keeps the
 GBA traces.
 

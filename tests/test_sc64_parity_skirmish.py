@@ -691,6 +691,368 @@ class EnvelopeSlack(unittest.TestCase):
         self.assertEqual(verdict(plain, 4200), 'KNOWN')
 
 
+class FrameOffsets(unittest.TestCase):
+    """Skirmish lines are judged on the spread of three GBA runs whose frame counters start 0, 1
+    and 2 frames apart (the GBA's own one-frame noise)."""
+    KEY = 'sk-pvt-w0:supply.cap@8000:cpu Terran'
+
+    def golden(self, value=84, lo=84, hi=84, **extra):
+        return {'decoder_revision': sk.DECODER_REVISION, 'observations': [dict(
+            {'check': 'supply.cap@8000', 'subject': 'cpu Terran', 'value': value, 'lo': lo, 'hi': hi,
+             'sentinels': [sk.NEVER, sk.ENDED], 'gating': True, 'provenance': 'n64-ram', 'n_runs': 2,
+             'tolerance': 'exact'}, **extra)]}
+
+    def row(self, spread, baseline=None, golden=None):
+        golden = golden or self.golden()
+        obs = golden['observations'][0]
+        key = (obs['check'], obs['subject'])
+        name = f'sk-pvt-w0:{obs["check"]}:{obs["subject"]}'
+        more = [(k, {key: v}) for k, v in zip((1, 2), spread[1:])]
+        known = {} if baseline is None else {name: {'key': name, 'gba': baseline[0], 'gba_offsets': baseline}}
+        return sc64_parity.judge('sk-pvt-w0', golden, {key: spread[0]}, {}, known, more=more)[0]
+
+    def verdict(self, spread, baseline=None, golden=None):
+        return self.row(spread, baseline, golden)['verdict']
+
+    def test_offsets_are_the_scenarios_and_reach_the_runner(self):
+        spec = metrics.SCENARIOS['sk-pvt-w0']
+        self.assertEqual(spec['frame_offsets'], (0, 1, 2))
+        golden = {'gba': {'steps': 100, 'at_step': 5, 'seed': 7}}
+        _, plain = sc64_parity.gba_command('sk-pvt-w0', golden, pathlib.Path('x.trace'))
+        _, shifted = sc64_parity.gba_command('sk-pvt-w0', golden, pathlib.Path('x.trace'), 2)
+        self.assertNotIn('--frame-offset', plain)       # offset 0 is the single-run command
+        self.assertEqual(shifted, plain + ['--frame-offset', '2'])
+        with self.assertRaises(ValueError):
+            sc64_parity.gba_command('sk-pvt-w0', golden, pathlib.Path('x.trace'), 3)
+        self.assertNotIn('frame_offsets', metrics.SCENARIOS['bb-train'])
+        with self.assertRaises(ValueError):
+            sc64_parity.gba_command('bb-train', {'gba': {'steps': 10, 'at_step': 5}}, pathlib.Path('x.trace'), 1)
+
+    def test_jitter_within_the_noise_never_flips(self):
+        # The engine session's measurement: 116 / 132 / 116 against the N64's 84.
+        base = [116, 132, 116]
+        for spread in ([132, 132, 116], [132, 116, 132], [116, 116, 116], [132, 132, 132], [100, 116, 132]):
+            row = self.row(spread, base)
+            self.assertEqual(row['verdict'], 'KNOWN', spread)
+            self.assertEqual((row['gba'], row['gba_offsets'], row['baseline_offsets']), (spread[0], spread, base))
+        # A single run of the same noise against a single-run baseline flips both ways.
+        self.assertEqual(self.verdict([132], [116]), 'REGRESSION')
+
+    def test_a_consistent_shift_still_reads_regression(self):
+        base = [116, 132, 116]
+        row = self.row([140, 148, 140], base)
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('at every frame offset', row['why'])
+        self.assertEqual(self.verdict([132, 148, 140], base), 'KNOWN')     # one offset still at the baseline's edge
+        # The price of robustness: a shift no larger than the line's own spread reads KNOWN.
+        self.assertEqual(self.verdict([132, 148, 132], base), 'KNOWN')
+        # A line with no baseline: a regression when every offset is outside the band ...
+        self.assertEqual(self.verdict([90, 92, 91]), 'REGRESSION')
+        # ... and KNOWN (recorded by --accept) while the noise still reaches the band.
+        row = self.row([84, 92, 84])
+        self.assertEqual(row['verdict'], 'KNOWN')
+        self.assertIn('frame offset +1 ', row['why'])
+        self.assertNotIn('baseline', row)
+
+    def test_improved_only_when_every_offset_is_inside(self):
+        self.assertEqual(self.verdict([84, 84, 100], [116, 132, 116]), 'KNOWN')
+        self.assertEqual(self.verdict([84, 84, 84], [116, 132, 116]), 'IMPROVED')
+        self.assertEqual(self.verdict([84, 84, 84]), 'PASS')
+
+    def test_the_seed_bands_slack_still_holds(self):
+        # The #988 case: two seeds widen the band to 736-3245, each seed's own band is +-2.
+        golden = self.golden(738, 736, 3245, seed_lo=736, seed_hi=740)
+        base = [3250, 3260, 3255]                               # 5, 15, 10 frames out
+        self.assertEqual(self.verdict([3261, 3262, 3250], base, golden), 'KNOWN')
+        self.assertEqual(self.verdict([3262, 3262, 3262], base, golden), 'KNOWN')       # 17 = 15 + 2
+        self.assertEqual(self.verdict([3263, 3264, 3263], base, golden), 'REGRESSION')  # 18 > 15 + 2
+
+    def test_outcomes_are_compared_as_outcomes(self):
+        wave = self.golden(17045, 17043, 17047)
+        # Some offsets never reach the event: noise as long as an outcome is shared with the baseline.
+        self.assertEqual(self.verdict([sk.NEVER, 15000, sk.NEVER], [sk.NEVER, sk.NEVER, 14000], wave), 'KNOWN')
+        self.assertEqual(self.verdict([14000, 14000, 14000], [sk.NEVER, 14000, 14100], wave), 'KNOWN')
+        row = self.row([8000, 8100, 8050], [sk.NEVER, sk.NEVER, sk.NEVER], wave)
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('outcome changed', row['why'])
+        self.assertEqual(self.verdict([sk.NEVER] * 3, [8000, 8100, 8050], wave), 'REGRESSION')
+        # An offset that keeps an allowed outcome (an also_ok NEVER) or lands in the band hides nothing:
+        # numbers that all moved past the recorded numbers, or a new outcome, still fail.
+        allowed = self.golden(17045, 17043, 17047, also_ok=[sk.NEVER])
+        self.assertEqual(self.verdict([sk.NEVER, 15950, 16010], [sk.NEVER, 16000, 15900], allowed), 'KNOWN')
+        self.assertEqual(self.verdict([sk.NEVER, 12000, 12000], [sk.NEVER, 16000, 15900], allowed), 'REGRESSION')
+        # A check that is not a timing (no time for NEVER): an in-band offset keeps it KNOWN ...
+        self.assertEqual(self.verdict([17045, 12000, 12000], [sk.NEVER] * 3, wave), 'KNOWN')
+        # ... while for a timing the far-early offsets are judged on their own.
+        timed = dict(self.golden(17045, 17043, 17047, check='attack.first_wave', subject='cpu Zerg'),
+                     gba={'horizon': 17600})
+        self.assertEqual(self.verdict([17045, 12000, 12000], [sk.NEVER] * 3, timed), 'REGRESSION')
+        self.assertEqual(self.verdict([17045, 17044, 17046], [sk.NEVER] * 3, wave), 'IMPROVED')
+        # A checkpoint some offsets no longer reach (the GBA match ended) is noise while another offset
+        # keeps the baseline's outcome; the match's end is gated by its own result line.
+        self.assertEqual(self.verdict([116, sk.ENDED, sk.ENDED], [116, 132, 116]), 'KNOWN')
+        self.assertEqual(self.verdict([sk.ENDED] * 3, [116, 132, 116]), 'REGRESSION')
+        # Against a band that is itself an outcome (the N64 never built it), a time a frame earlier
+        # is not further out; a line with no baseline still fails when every offset builds it.
+        never = self.golden(sk.NEVER, sk.NEVER, sk.NEVER)
+        self.assertEqual(self.verdict([8262, 8261, sk.NEVER], [sk.NEVER, 8264, 8263], never), 'KNOWN')
+        self.assertEqual(self.verdict([5000, 5000, 5000], [sk.NEVER, 8264, 8263], never), 'KNOWN')
+        self.assertEqual(self.verdict([8262, 8261, 8260], None, never), 'REGRESSION')
+        self.assertEqual(self.verdict([sk.NEVER] * 3, [sk.NEVER, 8264, 8263], never), 'IMPROVED')
+
+    def test_a_changed_outcome_is_judged_by_its_own_time(self):
+        # sk-tvt-w0: the N64 human falls at 10,076; on the GBA the human survived the run (NEVER, "not
+        # before frame 10,677") at every recorded offset.
+        defeat = dict(self.golden(10076, 10074, 10078, check='result.human_defeated', subject='human'),
+                      gba={'horizon': 10676})
+        self.assertEqual(sk.never_time(defeat, defeat['observations'][0]), (sk.NEVER, 10677))
+        survived = [sk.NEVER] * 3
+        row = self.row([sk.NEVER, 1000, 1001], survived, defeat)        # Codex's case: two offsets fall 9,000 early
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('1000 at frame offset +1', row['why'])
+        self.assertEqual(self.verdict([1000] * 3, survived, defeat), 'REGRESSION')
+        # A defeat between the band and "never" is nearer the N64 than surviving: not worse.
+        self.assertEqual(self.verdict([sk.NEVER, 10500, sk.NEVER], survived, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([10500] * 3, survived, defeat), 'KNOWN')
+        # A small shift of an existing defeat, an offset now surviving included, stays within noise.
+        late = [10300, 10320, sk.NEVER]
+        self.assertEqual(self.verdict([10310, sk.NEVER, 10330], late, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([10302, 10322, 10318], late, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([1000, 10320, sk.NEVER], late, defeat), 'KNOWN')   # numbers: whole range
+        self.assertEqual(self.verdict([1000, 1010, sk.NEVER], late, defeat), 'REGRESSION')
+        # The offset that survived now falls 9,000 frames early: judged against its own offset.
+        self.assertEqual(self.verdict([10300, 10320, 1000], late, defeat), 'REGRESSION')
+        # Time to NEVER only bounds the time from below (the run's reach): sk-tvt-w0's wave at
+        # 10,077-10,079 reads NEVER at offsets +3 and +4 of the same engine, so one offset is noise ...
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 10080})
+        self.assertEqual(self.verdict([sk.NEVER, 10078, 10077], [10079, 10078, 10077], wave), 'KNOWN')
+        self.assertEqual(self.verdict([10077, sk.NEVER, sk.NEVER], [10079, 10078, 10077], wave), 'KNOWN')
+        # ... and every offset past the run's reach is a regression once the reach lies beyond every
+        # recorded time by more than the slack: not with a run that ended a frame after the wave
+        # (NEVER reads 10,081, 2 frames past 10,079), but with one that went on to 10,085.
+        self.assertEqual(self.verdict([sk.NEVER] * 3, [10079, 10078, 10077], wave), 'KNOWN')
+        longer = dict(wave, gba={'horizon': 10085})
+        self.assertEqual(self.verdict([sk.NEVER] * 3, [10079, 10078, 10077], longer), 'REGRESSION')
+        # A line with no baseline: its band's outcome at some offset keeps it KNOWN (recorded by --accept).
+        self.assertEqual(self.verdict([10076, sk.NEVER, 10075], None, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([10076, 10090, 10075], None, defeat), 'KNOWN')
+
+    def test_a_new_time_must_clear_the_gba_noise_of_its_kind(self):
+        # sk-pvt-w0's Factory: the N64 builds it at 9,126; the GBA never does at offsets 0-2 but does at
+        # 8,059 at +4 of the same engine. Build-order firsts move up to 1,352 frames with the offset
+        # (sk-zvp-w0's Stargate), so 1,067 frames early is within noise; 4,126 is not.
+        self.assertEqual(metrics.SCENARIOS['sk-pvt-w0']['frame_noise'], sk.FRAME_NOISE)
+        self.assertEqual(sk.FRAME_NOISE['build.first'], 1352)
+        factory = dict(self.golden(9126, 9124, 9128, check='build.first.Factory', subject='cpu Terran'),
+                       gba={'horizon': 9300})
+        key = ('build.first.Factory', 'cpu Terran')
+        line = 'sk-pvt-w0:build.first.Factory:cpu Terran'
+        baseline = {line: {'key': line, 'gba': sk.NEVER, 'gba_offsets': [sk.NEVER] * 3}}
+
+        def verdict(spread, known):
+            return sc64_parity.judge('sk-pvt-w0', factory, {key: spread[0]}, {}, known,
+                                     more=[(1, {key: spread[1]}), (2, {key: spread[2]})])[0]['verdict']
+        self.assertEqual(verdict([sk.NEVER, sk.NEVER, 8059], baseline), 'KNOWN')
+        self.assertEqual(verdict([sk.NEVER, sk.NEVER, 5000], baseline), 'REGRESSION')
+        # The allowance is a fixed calibration: other baseline lines (accepted, removed, or absurd)
+        # never change it.
+        other = 'sk-zvp-w0:build.first.Stargate:cpu Protoss'
+        for extra in ({}, {other: {'key': other, 'gba': 0, 'gba_offsets': [0, 1000000000, 0]}}):
+            self.assertEqual(verdict([sk.NEVER, sk.NEVER, 5000], dict(baseline, **extra)), 'REGRESSION')
+            self.assertEqual(verdict([sk.NEVER, sk.NEVER, 8059], dict(baseline, **extra)), 'KNOWN')
+        # A finite time moving between offsets of a mixed baseline: within the noise it stays KNOWN,
+        # beyond it it fails.
+        mixed = {line: {'key': line, 'gba': sk.NEVER, 'gba_offsets': [sk.NEVER, 8059, sk.NEVER]}}
+        self.assertEqual(verdict([8056, sk.NEVER, sk.NEVER], mixed), 'KNOWN')
+        self.assertEqual(verdict([8056, 8055, sk.NEVER], mixed), 'KNOWN')
+        self.assertEqual(verdict([sk.NEVER, 8050, sk.NEVER], mixed), 'KNOWN')
+        self.assertEqual(verdict([5000, sk.NEVER, sk.NEVER], mixed), 'REGRESSION')
+        self.assertEqual(verdict([sk.NEVER, 5000, sk.NEVER], mixed), 'REGRESSION')
+
+    def test_a_newly_finite_time_is_compared_with_the_outcome_it_replaced(self):
+        # Codex: the only recorded time becomes NEVER and the newly finite defeats are nearer the band
+        # than the NEVER they replaced (reach 12,000): not worse.
+        defeat = dict(self.golden(10076, 10074, 10078, check='result.human_defeated', subject='human'),
+                      gba={'horizon': 12000})
+        self.assertEqual(self.verdict([sk.NEVER, 11000, 11001], [10100, sk.NEVER, sk.NEVER], defeat), 'KNOWN')
+        self.assertEqual(self.verdict([sk.NEVER, 1000, 1001], [10100, sk.NEVER, sk.NEVER], defeat), 'REGRESSION')
+
+    def test_a_checkpoint_reached_again_keeps_its_spread_verdict(self):
+        # An offset whose match ended before the checkpoint now reaches it: counts are not timings.
+        self.assertEqual(self.verdict([200, 116, 132], [sk.ENDED, 116, 132]), 'KNOWN')
+        self.assertEqual(self.verdict([200, 150, 150], [sk.ENDED, 116, 132]), 'REGRESSION')
+        # Counts keep every reading in the spread, a newly reached one included.
+        self.assertEqual(self.verdict([200, sk.ENDED, sk.ENDED], [sk.ENDED, 116, 132]), 'REGRESSION')
+        self.assertEqual(self.verdict([84, 150, 150], [sk.ENDED, 116, 132]), 'KNOWN')
+        # Every offset now reaches it where none did: one in the band keeps it KNOWN; none in it fails.
+        self.assertEqual(self.verdict([84, 118, 118], [sk.ENDED] * 3), 'KNOWN')
+        self.assertEqual(self.verdict([116, 118, 118], [sk.ENDED] * 3), 'REGRESSION')
+
+    def test_a_seed_that_never_saw_the_event_in_a_finite_envelope(self):
+        # sk-ffa-w37: this seed's own band is NEVER, other seeds made the envelope finite.
+        def envelope(check, subject, lo, hi):
+            return dict(self.golden(sk.NEVER, lo, hi, check=check, subject=subject, also_ok=[sk.NEVER],
+                                    seed_lo=sk.NEVER, seed_hi=sk.NEVER), gba={'horizon': 4000})
+        wave = envelope('attack.first_wave', 'cpu Zerg', 2950, 2960)
+        # Both a time and NEVER are this band's outcomes: one frame out at one offset is noise.
+        self.assertEqual(self.verdict([2950, 2949, sk.NEVER], None, wave), 'KNOWN')
+        # Times keep the measurement's +-2 frames of slack, not the NEVER seed band's zero width.
+        defeat = envelope('result.human_defeated', 'human', 3000, 3400)
+        stable = [3562] * 3
+        self.assertEqual(self.verdict([3563, 3564, 3564], stable, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([3565, 3565, 3566], stable, defeat), 'REGRESSION')
+        # A defeat that some offsets never reach is as unstable as the GBA gets: its times must also
+        # clear the family's frame noise (508 frames for defeats).
+        mixed = [sk.NEVER, 3562, 3562]
+        self.assertEqual(self.verdict([sk.NEVER, 3570, 3570], mixed, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([sk.NEVER, 4100, 4100], mixed, defeat), 'REGRESSION')
+        # The edge: 162 frames recorded, + 2 slack + 508 noise = 672.
+        self.assertEqual(self.verdict([sk.NEVER, 3400 + 672, 3400 + 672], mixed, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([sk.NEVER, 3400 + 673, 3400 + 673], mixed, defeat), 'REGRESSION')
+        # A newly finite time inside the band keeps the numbers KNOWN, as any in-band number does.
+        exact = dict(envelope('result.human_defeated', 'human', 3198, 3202))
+        self.assertEqual(self.verdict([3200, 2300, 2300], [sk.NEVER, 3562, 3562], exact), 'KNOWN')
+        # ... but not a second newly finite time far beyond the noise.
+        self.assertEqual(self.verdict([3200, 1000, sk.NEVER], [sk.NEVER, sk.NEVER, sk.NEVER], exact), 'REGRESSION')
+
+    def test_a_value_missing_at_one_offset_fails(self):
+        key = ('supply.cap@8000', 'cpu Terran')
+        row = sc64_parity.judge('sk-pvt-w0', self.golden(), {key: 116}, {}, {}, more=[(1, {key: 120}), (2, {})])[0]
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('frame offset +2', row['why'])
+        # --accept refuses it, rather than recording offset 0 alone.
+        self.assertEqual(row['gba_offsets'], [116, 120, None])
+        # Offset 0 missing: the spread is kept and names the offset.
+        first = sc64_parity.judge('sk-pvt-w0', self.golden(), {}, {}, {}, more=[(1, {key: 120}), (2, {key: 116})])[0]
+        self.assertEqual((first['verdict'], first['gba_offsets']), ('REGRESSION', [None, 120, 116]))
+        self.assertIn('frame offset +0', first['why'])
+        with tempfile.TemporaryDirectory() as temp:
+            for bad in (row, first):
+                with self.assertRaises(ValueError):
+                    sc64_parity.write_baseline(pathlib.Path(temp) / 'b.json', [{'id': 'sk-pvt-w0', 'status': 'RUN',
+                                                                                'rows': [bad]}], {})
+
+    def test_baseline_lines_keep_every_offset(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'baseline.json'
+            results = [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [
+                {'key': self.KEY, 'gba': 116, 'gba_offsets': [116, 132, 116], 'gating': True, 'verdict': 'KNOWN'}]}]
+            sc64_parity.write_baseline(path, results, {})
+            self.assertEqual(json.loads(path.read_text())['known'],
+                             [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, 132, 116]}])
+            self.assertIn('"gba_offsets": [116, 132, 116]\n', path.read_text())   # one line per entry's offsets
+            self.assertEqual(sc64_parity.load_baseline(path)[self.KEY]['gba_offsets'], [116, 132, 116])
+            for bad in ([132, 116, 116], [], [116, 'x'], 116, None, [116, 132], [116, 132, 116, 116],
+                        [116, 132, float('inf')], [116, True, 116]):
+                path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': bad}]}))
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
+            # A value past the float range parses as infinity: refused too, for gba itself as well.
+            for text in ('{"known": [{"key": "%s", "gba": 116, "gba_offsets": [116, 132, 1e309]}]}' % self.KEY,
+                         '{"known": [{"key": "%s", "gba": 1e309}]}' % self.KEY,
+                         '{"known": [{"key": "bb-train:x:s", "gba": 1, "gba_offsets": [1]}]}',
+                         '{"known": [{"key": "%s", "gba": 116, "gba_offsets": [116, 132, 1%s]}]}' % (self.KEY, '0' * 309)):
+                path.write_text(text)
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
+            # A line of a scenario this checkout does not know is kept as it is.
+            path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': [1, 2]}]}))
+            self.assertEqual(sc64_parity.load_baseline(path)['gone-lab:x:s']['gba_offsets'], [1, 2])
+            # Finite but absurd values would overflow a spread (and the noise allowance): refused.
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 1e308, 'gba_offsets': [1e308, -1e308, 1e308]}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
+            colon = 'sk-pvt-w0:x.a:cpu Terran: west'   # a subject may hold a colon
+            path.write_text(json.dumps({'known': [{'key': colon, 'gba': 1}]}))
+            self.assertIn(colon, sc64_parity.load_baseline(path))
+            for bad_key in ('sk-zvz-w0', 'sk-pvt-w0::cpu Terran', ':x:s', 'sk-pvt-w0:x:'):   # not scenario:check:subject
+                path.write_text(json.dumps({'known': [{'key': bad_key, 'gba': 1}]}))
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
+            path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': 1}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
+            # A single run's line (no gba_offsets) stays valid for a scenario with offsets.
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116}]}))
+            self.assertEqual(sc64_parity.load_baseline(path)[self.KEY], {'key': self.KEY, 'gba': 116})
+            # Only the offsets are compacted: other text in a line (a note) is written as it is.
+            note = {'key': 'demo:x:s', 'gba': 1, 'note': 'see [ 1,2 ] and [\n 3 ]'}
+            sc64_parity.write_baseline(path, [], {'demo:x:s': note})
+            self.assertEqual(sc64_parity.load_baseline(path)['demo:x:s'], note)
+
+    def test_a_scenario_runs_once_per_offset(self):
+        key = ('supply.cap@8000', 'cpu Terran')
+        calls = []
+
+        def fake(scenario_id, golden, keep, frame_offset=0):
+            calls.append(frame_offset)
+            if frame_offset == 2 and fail:
+                return {'status': 'ERROR', 'why': 'GBA run exited 3: x'}
+            return {'measured': {'values': {key: 116 + 16 * (frame_offset == 1)}}, 'err': None,
+                    'report': {'cpu_seconds': 1.0}, 'cmd': ['runner', str(frame_offset)]}
+        original = sc64_parity.run_gba
+        sc64_parity.run_gba = fake
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                path = pathlib.Path(temp) / 'sk-pvt-w0.json'
+                layout = sc64_parity.parity_decode.Layout().sha256   # judged as current, never stale
+                path.write_text(json.dumps(dict(self.golden(), gba={'at_step': 5}, layout_sha256=layout)))
+                fail = False
+                out = sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+                self.assertEqual((calls, out['frame_offsets'], out['gba_cpu_seconds']), ([0, 1, 2], [0, 1, 2], 3.0))
+                self.assertEqual((out['rows'][0]['gba_offsets'], out['command']), ([116, 132, 116], ['runner', '0']))
+                self.assertEqual([(r['frame_offset'], r['command'], r['gba_cpu_seconds']) for r in out['offset_runs']],
+                                 [(0, ['runner', '0'], 1.0), (1, ['runner', '1'], 1.0), (2, ['runner', '2'], 1.0)])
+                fail = True
+                out = sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+                self.assertEqual(out['status'], 'ERROR')
+                self.assertTrue(out['why'].endswith('(frame offset +2)'))
+        finally:
+            sc64_parity.run_gba = original
+
+    def test_a_worker_failure_is_this_scenarios_error(self):
+        import concurrent.futures.process
+
+        class Pool:
+            def __init__(self, error):
+                self.error = error
+
+            def submit(self, fn, scenario_id, golden, keep, k):
+                job = concurrent.futures.Future()
+                if k == 1:
+                    job.set_exception(self.error)
+                else:
+                    job.set_result({'measured': {'values': {}}, 'err': None, 'report': {}, 'cmd': []})
+                return job
+
+        class Broken:
+            def submit(self, *args):
+                raise concurrent.futures.process.BrokenProcessPool('gone')
+
+        def run(pool):
+            sc64_parity.RUN_POOL = pool
+            try:
+                return sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+            finally:
+                sc64_parity.RUN_POOL = None
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'sk-pvt-w0.json'
+            path.write_text(json.dumps(dict(self.golden(), gba={'at_step': 5})))
+            # A run that raised in its worker: that offset's error.
+            out = run(Pool(ValueError('bad trace')))
+            self.assertEqual(out['status'], 'ERROR')
+            self.assertIn('bad trace', out['why'])
+            self.assertTrue(out['why'].endswith('(frame offset +1)'))
+            # A worker that died breaks every pending run: the pool, not the offset, is named.
+            out = run(Pool(concurrent.futures.process.BrokenProcessPool('worker died')))
+            self.assertEqual(out['status'], 'ERROR')
+            self.assertIn('worker pool broke during this scenario', out['why'])
+            out = run(Broken())
+            self.assertEqual(out['status'], 'ERROR')
+            self.assertIn('while this scenario submitted its runs', out['why'])
+
+
 class Bundles(unittest.TestCase):
     """Skirmish goldens read watched words (supply, result) outside the hash chain, so both
     captures' watch.csv must match; whole-match captures may keep their tap compressed."""
