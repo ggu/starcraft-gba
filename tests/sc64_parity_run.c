@@ -13,13 +13,19 @@
  *   sc64_parity_run --scenario lab-t1|lab-bb --subject X,Y|--subject-raw ID
  *                   --cmd STEP,KIND,X,Y [--cmd ...] ...
  *   sc64_parity_run --scenario lab-mission --mission ID --subject ... --cmd ...
+ *   sc64_parity_run --scenario match --human t|z|p --bot t|z|p [--bot ...] [--seed MS] ...
  *
  * move and income are the N64 parity scenarios (tools/sc64_parity.py passes
  * their parameters from a golden file). move launches T1 and gives the
  * human Marines standing exactly at the --unit points one group move order
  * to --target at step --at. income launches Blood Bath, human Zerg against
  * one Terran computer, and gives no command: the skirmish starts the human's
- * Drones mining, as the cartridge does.
+ * Drones mining, as the cartridge does. match launches Blood Bath Free for
+ * All with the human race and one to three computer seats in seat order,
+ * sets the host launch clock to --seed first (native Blood Bath draws the
+ * start corners from the milliseconds since power-on, as the cartridge does
+ * from 0x800EFF20), and gives no command until the match ends; its report
+ * adds each owner's race and start, and the supply a queued unit reserves.
  *
  * lab-t1 (T1), lab-bb (Blood Bath, human Zerg against one Terran computer)
  * and lab-mission (catalog mission ID, single-race campaign products) are
@@ -70,6 +76,20 @@ static int sc64_pt_text_box(unsigned trigger, unsigned action, unsigned long str
 #define SC64_TEXT_BOX_POSTED(row, pushed) \
     sc64_pt_text_box((row)->trigger, (row)->action, (row)->string_id, (pushed))
 #endif
+
+/* Worker deliveries per owner: the cartridge's cumulative gathered arrays
+ * (0x800B1D44 + 0x90 and + 0x60) have no engine counterpart, so the match
+ * scenario counts them here and writes them to its --gather file. */
+static long pr_gathered[5][2];
+static int pr_gather_changed;
+static void pr_gather(int owner, int ore, int vespene)
+{
+    if (owner < 0 || owner >= 5 || (ore <= 0 && vespene <= 0)) return;
+    pr_gathered[owner][0] += ore > 0 ? ore : 0;
+    pr_gathered[owner][1] += vespene > 0 ? vespene : 0;
+    pr_gather_changed = 1;
+}
+#define SC64_TEST_GATHER_OBSERVER(owner, ore, vespene) pr_gather((owner), (ore), (vespene))
 
 #include "../starcraft/game.c"
 #define ROUTE_PURE_DISABLE 1
@@ -223,6 +243,8 @@ static int pr_hash_selftest(void)
  * gates always run with it; --no-route-checks is for throughput only, since
  * the hashing (byte-wise over every route region) costs more than a step. */
 static int pr_render = 1, pr_chain_on = 1, pr_checks_on = 1;
+static FILE *pr_gather_out;
+static int pr_gather_errors;
 static unsigned long pr_host_ticks, pr_steps;
 static u16 pr_prev_held;
 static uint64_t pr_chain = 1469598103934665603ull, pr_route_after;
@@ -266,6 +288,18 @@ static void pr_update(u16 held)
 #ifdef SC64_PARITY_TRACE
         sc64_pt_step(pr_steps, pr_host_ticks);
 #endif
+        /* --gather: "step owner minerals gas" when an owner's totals change. */
+        if (pr_gather_out && pr_gather_changed) {
+            static long written[5][2];
+            for (int o = 0; o < 5; ++o)
+                if (pr_gathered[o][0] != written[o][0] || pr_gathered[o][1] != written[o][1]) {
+                    if (fprintf(pr_gather_out, "%lu %d %ld %ld\n", pr_steps, o, pr_gathered[o][0], pr_gathered[o][1]) < 0)
+                        pr_gather_errors = 1;
+                    written[o][0] = pr_gathered[o][0];
+                    written[o][1] = pr_gathered[o][1];
+                }
+            pr_gather_changed = 0;
+        }
     } else {
         if (pr_checks_on) pr_route_after = route_purity_hash();
         pr_route_valid = 1;
@@ -702,6 +736,80 @@ static int pr_parse_cmd(const char *text)
     return 1;
 }
 
+/* match: Blood Bath Free for All, a passive human against computer seats. */
+enum { PR_MATCH_SEATS = 3 };
+static int pr_match_human = -1, pr_match_bots[PR_MATCH_SEATS], pr_match_nbots, pr_match_seed_given;
+static unsigned long pr_match_seed;
+
+static int pr_race_arg(const char *text)
+{
+    return !strcmp(text, "t") ? R_TER : !strcmp(text, "z") ? R_ZERG : !strcmp(text, "p") ? R_PROTOSS : -1;
+}
+
+static int pr_launch_match(void)
+{
+    game_init();
+    pr_press(KEY_DOWN);
+    pr_press(KEY_A);
+    if (screen != SCREEN_TITLE || race_front.page != SC_FRONT_SKIRMISH) return 0;
+    while (race_front.row > 0) pr_press(KEY_UP);
+    for (int n = 0; race_front.map != SC64_MAP_BLOOD_BATH && n <= SC64_SKIRMISH_IMPORTED_COUNT; ++n) pr_press(KEY_RIGHT);
+    if (race_front.map != SC64_MAP_BLOOD_BATH) return 0;
+    pr_press(KEY_DOWN);
+    for (int n = 0; race_front.race != pr_match_human && n < 4; ++n) pr_press(KEY_RIGHT);
+    if (race_front.race != pr_match_human) return 0;
+    pr_press(KEY_DOWN);
+    for (int n = 0; race_front.bots != pr_match_nbots && n < 3; ++n) pr_press(KEY_RIGHT);
+    if (race_front.bots != pr_match_nbots) return 0;
+    for (int k = 0; k < pr_match_nbots; ++k) {
+        pr_press(KEY_DOWN);
+        if (race_front.row != SC_FRONT_BOT_FIRST_ROW + k) return 0;
+        for (int n = 0; race_front.bot_races[k] != pr_match_bots[k] && n < 5; ++n) pr_press(KEY_RIGHT);
+        if (race_front.bot_races[k] != pr_match_bots[k]) return 0;
+    }
+#ifdef SC64_NATIVE_MELEE_STARTS
+    if (race_front.skirmish_melee) return 0; /* Free for All, as the N64 lobby is set */
+#endif
+    while (race_front.row < SC_FRONT_SKIRMISH_LAUNCH_ROW) pr_press(KEY_DOWN);
+    if (pr_match_seed_given) {
+#if defined(SC64_NATIVE_MELEE_STARTS) && defined(SC64_IMPORTED_SKIRMISH)
+        gba_test_set_elapsed_milliseconds((u32)pr_match_seed);
+#else
+        fputs("match: --seed needs a build with native Blood Bath starts\n", stderr);
+        return 0;
+#endif
+    }
+    pr_press(KEY_A);
+    if (screen != SCREEN_PLAY || !race_mode || race_human != pr_match_human || race_bots != pr_match_nbots) return 0;
+    for (int k = 0; k < pr_match_nbots; ++k)
+        if (race_bot_races[k] != pr_match_bots[k]) return 0;
+    return 1;
+}
+
+/* The match report: owners with race and start, and the supply a queued unit
+ * reserves (every report carries the type id maps). */
+static void pr_match_json(char *out, size_t size)
+{
+    size_t n = 0;
+#define PR_PUT(...) do { if (n < size) n += (size_t)snprintf(out + n, size - n, __VA_ARGS__); } while (0)
+    PR_PUT(",\"match\":{\"seed\":%lu,\"seed_given\":%d,\"start_order\":%u,\"owners\":[",
+           pr_match_seed, pr_match_seed_given, (unsigned)race_skirmish_start_order);
+    for (int k = -1; k < pr_match_nbots; ++k) {
+        int owner = k < 0 ? SIDE : race_bot_owner_ids[k], base = race_skirmish_owner_base(owner);
+        PR_PUT("%s{\"owner\":%d,\"human\":%d,\"race\":%d,\"base\":%d,\"x\":%d,\"y\":%d}", k < 0 ? "" : ",", owner, k < 0,
+               race_owner_identity(owner), base, base >= 0 ? race_base_x[base] : -1, base >= 0 ? race_base_y[base] : -1);
+    }
+    /* Supply a queued unit reserves, as race_owner_queued_supply() counts it. */
+    PR_PUT("],\"unit_supply\":[");
+    for (int t = 0; t < SC_RU_COUNT; ++t) {
+        const Sc64RaceUnitRule *r = sc64_race_unit_rule(t);
+        PR_PUT("%s%d", t ? "," : "", r ? r->supply * sc64_race_product_count(t) : 0);
+    }
+    PR_PUT("]}");
+#undef PR_PUT
+    if (n >= size) out[0] = 0;
+}
+
 static int pr_parse_point(const char *text, int *x, int *y)
 {
     char *end;
@@ -797,9 +905,9 @@ static int pr_census(const char *mission_arg, const char *trace_path, const char
 
 int main(int argc, char **argv)
 {
-    const char *scenario = 0, *trace_path = 0, *profile = "unnamed", *mission_arg = 0;
+    const char *scenario = 0, *trace_path = 0, *profile = "unnamed", *mission_arg = 0, *gather_path = 0;
     unsigned long limit = 3000;
-    int skirmish, kind, steps_given = 0, steps_ok = 1, move_args = 0, lab_args = 0, lab_mission = -1;
+    int skirmish, kind, steps_given = 0, steps_ok = 1, move_args = 0, lab_args = 0, lab_mission = -1, match_args = 0;
     double t0, t1, c0, c1;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--scenario") && i + 1 < argc) scenario = argv[++i];
@@ -811,6 +919,7 @@ int main(int argc, char **argv)
             steps_ok = *text >= '0' && *text <= '9' && !*end && limit <= 1000000ul;
         }
         else if (!strcmp(argv[i], "--trace") && i + 1 < argc) trace_path = argv[++i];
+        else if (!strcmp(argv[i], "--gather") && i + 1 < argc) gather_path = argv[++i];
         else if (!strcmp(argv[i], "--profile") && i + 1 < argc) profile = argv[++i];
         else if (!strcmp(argv[i], "--mission") && i + 1 < argc) mission_arg = argv[++i];
         else if (!strcmp(argv[i], "--no-render")) pr_render = 0;
@@ -828,6 +937,16 @@ int main(int argc, char **argv)
             lab.by_raw = 1; lab.raw = (int)raw; lab_args = 1;
         }
         else if (!strcmp(argv[i], "--cmd") && i + 1 < argc && pr_parse_cmd(argv[i + 1])) { ++i; lab_args = 1; }
+        else if (!strcmp(argv[i], "--human") && i + 1 < argc && (pr_match_human = pr_race_arg(argv[i + 1])) >= 0) { ++i; match_args = 1; }
+        else if (!strcmp(argv[i], "--bot") && i + 1 < argc && pr_match_nbots < PR_MATCH_SEATS &&
+                 (pr_match_bots[pr_match_nbots] = pr_race_arg(argv[i + 1])) >= 0) { ++pr_match_nbots; ++i; match_args = 1; }
+        else if (!strcmp(argv[i], "--seed") && i + 1 < argc) {
+            char *end = 0;
+            const char *text = argv[++i];
+            pr_match_seed = strtoul(text, &end, 10);
+            if (*text < '0' || *text > '9' || *end || pr_match_seed > 0xfffffffful) { scenario = 0; break; }
+            pr_match_seed_given = 1; match_args = 1;
+        }
         else { scenario = 0; break; }
     }
     for (const char *c = profile; *c; ++c)
@@ -835,13 +954,14 @@ int main(int argc, char **argv)
             scenario = 0; /* the name goes into JSON and the trace header unescaped */
             break;
         }
-    if (scenario && !strcmp(scenario, "census") && mission_arg && steps_ok && !move_args && !lab_args)
+    if (scenario && !strcmp(scenario, "census") && mission_arg && steps_ok && !move_args && !lab_args && !match_args &&
+        !gather_path)
         return pr_census(mission_arg, trace_path, profile, steps_given ? limit : 0ul);
-    /* kind: 0 t1, 1 skirmish, 2 move, 3 income, 4 lab-t1, 5 lab-bb */
+    /* kind: 0 t1, 1 skirmish, 2 move, 3 income, 4 lab-t1, 5 lab-bb, 6 lab-mission, 7 match */
     kind = !scenario ? -1 : !strcmp(scenario, "t1") ? 0 : !strcmp(scenario, "skirmish") ? 1 :
            !strcmp(scenario, "move") ? 2 : !strcmp(scenario, "income") ? 3 :
            !strcmp(scenario, "lab-t1") ? 4 : !strcmp(scenario, "lab-bb") ? 5 :
-           !strcmp(scenario, "lab-mission") ? 6 : -1;
+           !strcmp(scenario, "lab-mission") ? 6 : !strcmp(scenario, "match") ? 7 : -1;
     if (kind == 6) {
         char *end = 0;
         long v = mission_arg ? strtol(mission_arg, &end, 10) : -1;
@@ -849,19 +969,21 @@ int main(int argc, char **argv)
         else lab_mission = (int)v;
     }
     if (kind < 0 || !limit || !steps_ok || (mission_arg && kind != 6) || (kind == 2 && (!pr_group_n || pr_target_x < 0)) ||
-        (lab_args && kind < 4) ||
-        (kind >= 4 && (pr_group_n || pr_target_x >= 0 || !lab.n || (!lab.by_raw) == (lab.x < 0)))) {
+        (lab_args && (kind < 4 || kind > 6)) ||
+        (kind >= 4 && kind <= 6 && (pr_group_n || pr_target_x >= 0 || !lab.n || (!lab.by_raw) == (lab.x < 0))) ||
+        (kind == 7) != (match_args != 0) || (kind == 7 && (pr_match_human < 0 || !pr_match_nbots))) {
         fprintf(stderr, "usage: %s --scenario t1|skirmish [--steps N] [--trace PATH] [--no-render] [--no-chain]\n"
                 "       [--no-route-checks] [--profile NAME]\n"
                 "       %s --scenario move --unit X,Y [--unit X,Y ...] --target X,Y [--at STEP] ...\n"
                 "       %s --scenario income [--at STEP] ...\n"
                 "       %s --scenario lab-t1|lab-bb --subject X,Y|--subject-raw ID --cmd STEP,KIND,X,Y ...\n"
                 "       %s --scenario lab-mission --mission ID --subject X,Y|--subject-raw ID --cmd ...\n"
+                "       %s --scenario match --human t|z|p --bot t|z|p [--bot ...] [--seed MS] [--gather PATH] ...\n"
                 "       %s --scenario census --mission ID|skirmish --trace PATH [--steps N] [--profile NAME]\n",
-                argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
+                argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 64;
     }
-    skirmish = kind == 1 || kind == 3 || kind == 5;
+    skirmish = kind == 1 || kind == 3 || kind == 5 || kind == 7;
 #ifdef SC64_PARITY_TRACE
     sc64_pt_route_checks = pr_checks_on;
     if (trace_path) {
@@ -873,8 +995,14 @@ int main(int argc, char **argv)
 #else
     if (trace_path) { fprintf(stderr, "this build has no trace emitter (SC64_PARITY_TRACE)\n"); return 64; }
 #endif
+    if (gather_path) {
+        pr_gather_out = fopen(gather_path, "w");
+        if (!pr_gather_out) { perror(gather_path); return 66; }
+        fputs("# sc64-parity-gather 1: step owner minerals_gathered gas_gathered (worker deliveries)\n", pr_gather_out);
+    }
     t0 = pr_now(); c0 = pr_cpu();
-    if (!(skirmish ? pr_launch_skirmish(R_ZERG, R_TER) : kind == 6 ? pr_launch_mission(lab_mission) : pr_launch_t1())) {
+    if (!(kind == 7 ? pr_launch_match() : skirmish ? pr_launch_skirmish(R_ZERG, R_TER) :
+          kind == 6 ? pr_launch_mission(lab_mission) : pr_launch_t1())) {
         fprintf(stderr, "%s: menu launch failed (screen=%d page=%d)\n", scenario, screen, race_front.page);
         return 66;
     }
@@ -882,7 +1010,7 @@ int main(int argc, char **argv)
     {
         uint64_t route = route_purity_hash();
         if (!(kind == 0 ? pr_setup_t1() : kind == 1 ? pr_setup_skirmish() : kind == 2 ? pr_setup_move() :
-              kind == 3 ? pr_setup_income() : pr_setup_lab()))
+              kind == 3 ? pr_setup_income() : kind == 7 ? 1 : pr_setup_lab()))
             return 66;
         ++pr_route_checks;
         if (route_purity_hash() != route) { fputs("parity runner: scenario setup changed route state\n", stderr); abort(); }
@@ -906,6 +1034,7 @@ int main(int argc, char **argv)
             else if (kind == 1) pr_scenario_skirmish(dispatched);
             else if (kind == 2) pr_scenario_move(dispatched);
             else if (kind == 3) pr_scenario_income(dispatched);
+            else if (kind == 7) { /* match: the human stays passive */ }
             else pr_scenario_lab(dispatched);
             if (pr_checks_on) {
                 ++pr_route_checks;
@@ -927,17 +1056,18 @@ int main(int argc, char **argv)
     /* Every scripted command must have been issued, not left waiting. */
     if (kind == 2 && !sc64_pi_status.failures && !pr_command_step)
         sc64_pi_fail("scenario", "run ended at step %lu before the command step %lu", pr_steps, pr_at_step);
-    for (int k = 0; kind >= 4 && k < lab.n && !sc64_pi_status.failures; ++k)
+    for (int k = 0; kind >= 4 && kind <= 6 && k < lab.n && !sc64_pi_status.failures; ++k)
         if (!lab.done[k]) sc64_pi_fail("lab", "run ended at step %lu before command %d (step %lu)", pr_steps, k, lab.step[k]);
     if (!sc64_pi_status.failures && ((sc.train.armed && !sc.train.done) || (sc.build.armed && !sc.build.done)))
         sc64_pi_fail("scenario", "run ended at step %lu before the train or build command was issued", pr_steps);
     {
         uint64_t world = pr_world_hash();
-        char movers[PR_GROUP_CAP * 8 + 1] = "", lab_json[4096] = "";
+        char movers[PR_GROUP_CAP * 8 + 1] = "", lab_json[4096] = "", match[4096] = "";
         /* The command goes in before step pr_command_step, so the last state
          * without it is that of the step before. */
         unsigned long command_sf = pr_command_step ? (pr_command_step - 1) * 4ul / 5ul : 0;
-        if (kind >= 4) {
+        if (kind == 7) pr_match_json(match, sizeof(match));
+        if (kind >= 4 && kind <= 6) {
             /* Each order's last state without it: the step before its own. */
             snprintf(lab_json, sizeof(lab_json), ",\"subject\":%d,\"subject_start\":[%d,%d],\"lab\":[", lab.slot,
                      lab.start_x, lab.start_y);
@@ -961,6 +1091,10 @@ int main(int argc, char **argv)
         if (strlen(lab_json) + 1 >= sizeof(lab_json)) { fputs("parity runner: report buffer too small\n", stderr); return 74; }
         for (int k = 0; (kind == 2 || kind == 3) && k < pr_group_n; ++k)
             snprintf(movers + strlen(movers), sizeof(movers) - strlen(movers), "%s%d", k ? "," : "", pr_group_slot[k]);
+        if (pr_gather_out && (fprintf(pr_gather_out, "# end %lu\n", pr_steps) < 0 || fclose(pr_gather_out) || pr_gather_errors)) {
+            fprintf(stderr, "%s: gather write failed\n", gather_path);
+            return 74;
+        }
 #ifdef SC64_PARITY_TRACE
         if (pr_trace) {
             int bad = sc64_pt_close(pr_steps, pr_host_ticks, world, pr_chain) != 0;
@@ -975,7 +1109,7 @@ int main(int argc, char **argv)
                "\"gas_assigned\":%d,\"gas_pickup\":%d,\"gas_delivered\":%d,"
                "\"verbs\":%u,\"setup_failures\":%u,\"command_step\":%lu,\"command_sf\":%lu,\"human_owner\":%d,\"movers\":[%s],"
                "\"first_failure\":\"%s\",\"attack_mode\":\"%s\",\"wall_seconds\":%.6f,\"cpu_seconds\":%.6f,"
-               "\"updates_per_cpu_second\":%.1f%s}\n",
+               "\"updates_per_cpu_second\":%.1f%s%s}\n",
                profile, scenario,
 #ifdef SC64_PARITY_TRACE
                1,
@@ -990,7 +1124,7 @@ int main(int argc, char **argv)
                sc64_pi_status.issued,
                sc64_pi_status.failures, pr_command_step, command_sf, SIDE, movers,
                sc64_pi_status.first_failure, sc64_pi_attack_mode(),
-               t1 - t0, c1 - c0, c1 > c0 ? (double)pr_host_ticks / (c1 - c0) : 0.0, lab_json);
+               t1 - t0, c1 - c0, c1 > c0 ? (double)pr_host_ticks / (c1 - c0) : 0.0, lab_json, match);
     }
     return sc64_pi_status.failures ? 3 : 0;
 }

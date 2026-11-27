@@ -99,6 +99,2094 @@
    "gba": 42
   },
   {
+   "key": "sk-ffa-w0:build.first.Barracks:cpu Terran",
+   "gba": 1700
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Extractor:cpu Zerg",
+   "gba": 2538
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Gateway:cpu Protoss",
+   "gba": 1794
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Marine:cpu Terran",
+   "gba": 3290
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Pylon:cpu Protoss",
+   "gba": 695
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Refinery:cpu Terran",
+   "gba": 2277
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Spawning Pool:cpu Zerg",
+   "gba": 1428
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Supply Depot:cpu Terran",
+   "gba": 857
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Zealot:cpu Protoss",
+   "gba": 3312
+  },
+  {
+   "key": "sk-ffa-w0:build.first.Zergling:cpu Zerg",
+   "gba": 3223
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@1000:cpu Protoss",
+   "gba": 256
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@1000:cpu Terran",
+   "gba": 256
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@1000:cpu Zerg",
+   "gba": 264
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@1000:human",
+   "gba": 200
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@2000:cpu Protoss",
+   "gba": 632
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@2000:cpu Terran",
+   "gba": 672
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@2000:cpu Zerg",
+   "gba": 704
+  },
+  {
+   "key": "sk-ffa-w0:econ.gathered@2000:human",
+   "gba": 416
+  },
+  {
+   "key": "sk-ffa-w0:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-ffa-w0:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-ffa-w0:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-ffa-w0:supply.used@2000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-ffa-w0:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-ffa-w0:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-ffa-w0:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-ffa-w0:workers@2000:cpu Terran",
+   "gba": 10
+  },
+  {
+   "key": "sk-ffa-w0:workers@2000:cpu Zerg",
+   "gba": 9
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Academy:cpu Terran",
+   "gba": 3624
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Assimilator:cpu Protoss",
+   "gba": 4490
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Barracks:cpu Terran",
+   "gba": 1700
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Creep Colony:cpu Zerg",
+   "gba": 4131
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Cybernetics Core:cpu Protoss",
+   "gba": 4896
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Extractor:cpu Zerg",
+   "gba": 2538
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Gateway:cpu Protoss",
+   "gba": 1808
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Marine:cpu Terran",
+   "gba": 3290
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Pylon:cpu Protoss",
+   "gba": 656
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Refinery:cpu Terran",
+   "gba": 2277
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Shield Battery:cpu Protoss",
+   "gba": 4445
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Spawning Pool:cpu Zerg",
+   "gba": 1428
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Sunken Colony:cpu Zerg",
+   "gba": 4454
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Supply Depot:cpu Terran",
+   "gba": 857
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Zealot:cpu Protoss",
+   "gba": 3312
+  },
+  {
+   "key": "sk-ffa-w37:build.first.Zergling:cpu Zerg",
+   "gba": 3223
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@1000:cpu Protoss",
+   "gba": 264
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@1000:cpu Terran",
+   "gba": 256
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@1000:cpu Zerg",
+   "gba": 264
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@1000:human",
+   "gba": 200
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@2000:cpu Protoss",
+   "gba": 648
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@2000:cpu Terran",
+   "gba": 672
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@2000:cpu Zerg",
+   "gba": 704
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@2000:human",
+   "gba": 416
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@4000:cpu Protoss",
+   "gba": 2048
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@4000:cpu Terran",
+   "gba": 1800
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@4000:cpu Zerg",
+   "gba": 1640
+  },
+  {
+   "key": "sk-ffa-w37:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-ffa-w37:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-ffa-w37:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-ffa-w37:supply.cap@4000:cpu Protoss",
+   "gba": 50
+  },
+  {
+   "key": "sk-ffa-w37:supply.cap@4000:cpu Terran",
+   "gba": 52
+  },
+  {
+   "key": "sk-ffa-w37:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-ffa-w37:supply.used@2000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-ffa-w37:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-ffa-w37:supply.used@4000:cpu Protoss",
+   "gba": 46
+  },
+  {
+   "key": "sk-ffa-w37:supply.used@4000:cpu Terran",
+   "gba": 40
+  },
+  {
+   "key": "sk-ffa-w37:supply.used@4000:cpu Zerg",
+   "gba": 26
+  },
+  {
+   "key": "sk-ffa-w37:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-ffa-w37:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-ffa-w37:workers@2000:cpu Terran",
+   "gba": 10
+  },
+  {
+   "key": "sk-ffa-w37:workers@2000:cpu Zerg",
+   "gba": 9
+  },
+  {
+   "key": "sk-ffa-w37:workers@4000:cpu Protoss",
+   "gba": 16
+  },
+  {
+   "key": "sk-ffa-w37:workers@4000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-ffa-w37:workers@4000:cpu Zerg",
+   "gba": 9
+  },
+  {
+   "key": "sk-pvp-w0:attack.first_wave:cpu Protoss",
+   "gba": 8848
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Assimilator:cpu Protoss",
+   "gba": 4350
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Cybernetics Core:cpu Protoss",
+   "gba": 4433
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Dragoon:cpu Protoss",
+   "gba": 7012
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Fleet Beacon:cpu Protoss",
+   "gba": 7236
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Gateway:cpu Protoss",
+   "gba": 1802
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Pylon:cpu Protoss",
+   "gba": 708
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Shield Battery:cpu Protoss",
+   "gba": 4288
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Stargate:cpu Protoss",
+   "gba": 5943
+  },
+  {
+   "key": "sk-pvp-w0:build.first.Zealot:cpu Protoss",
+   "gba": 3325
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@1000:cpu Protoss",
+   "gba": 256
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@2000:cpu Protoss",
+   "gba": 632
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@4000:cpu Protoss",
+   "gba": 2008
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@4000:human",
+   "gba": 864
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@6000:cpu Protoss",
+   "gba": 3844
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@6000:human",
+   "gba": 1288
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@8000:cpu Protoss",
+   "gba": 5904
+  },
+  {
+   "key": "sk-pvp-w0:econ.gathered@8000:human",
+   "gba": 1736
+  },
+  {
+   "key": "sk-pvp-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvp-w0:supply.cap@6000:cpu Protoss",
+   "gba": 98
+  },
+  {
+   "key": "sk-pvp-w0:supply.cap@8000:cpu Protoss",
+   "gba": 130
+  },
+  {
+   "key": "sk-pvp-w0:supply.used@2000:cpu Protoss",
+   "gba": 20
+  },
+  {
+   "key": "sk-pvp-w0:supply.used@4000:cpu Protoss",
+   "gba": 46
+  },
+  {
+   "key": "sk-pvp-w0:supply.used@6000:cpu Protoss",
+   "gba": 82
+  },
+  {
+   "key": "sk-pvp-w0:supply.used@8000:cpu Protoss",
+   "gba": 122
+  },
+  {
+   "key": "sk-pvp-w0:workers@4000:cpu Protoss",
+   "gba": 16
+  },
+  {
+   "key": "sk-pvp-w0:workers@6000:cpu Protoss",
+   "gba": 22
+  },
+  {
+   "key": "sk-pvp-w0:workers@8000:cpu Protoss",
+   "gba": 25
+  },
+  {
+   "key": "sk-pvt-w0:attack.first_wave:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Academy:cpu Terran",
+   "gba": 3654
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Barracks:cpu Terran",
+   "gba": 1676
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Bunker:cpu Terran",
+   "gba": 7501
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Factory:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Firebat:cpu Terran",
+   "gba": 5312
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Marine:cpu Terran",
+   "gba": 3277
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Medic:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Refinery:cpu Terran",
+   "gba": 2264
+  },
+  {
+   "key": "sk-pvt-w0:build.first.Supply Depot:cpu Terran",
+   "gba": 844
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@1000:cpu Terran",
+   "gba": 256
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@2000:cpu Terran",
+   "gba": 648
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@4000:cpu Terran",
+   "gba": 1696
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@6000:cpu Terran",
+   "gba": 3236
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@6000:human",
+   "gba": 1272
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@8000:cpu Terran",
+   "gba": 5256
+  },
+  {
+   "key": "sk-pvt-w0:econ.gathered@8000:human",
+   "gba": 1720
+  },
+  {
+   "key": "sk-pvt-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvt-w0:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-pvt-w0:supply.cap@4000:cpu Terran",
+   "gba": 52
+  },
+  {
+   "key": "sk-pvt-w0:supply.cap@6000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-pvt-w0:supply.cap@8000:cpu Terran",
+   "gba": 116
+  },
+  {
+   "key": "sk-pvt-w0:supply.used@1000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-pvt-w0:supply.used@2000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-pvt-w0:supply.used@4000:cpu Terran",
+   "gba": 40
+  },
+  {
+   "key": "sk-pvt-w0:supply.used@6000:cpu Terran",
+   "gba": 74
+  },
+  {
+   "key": "sk-pvt-w0:supply.used@8000:cpu Terran",
+   "gba": 96
+  },
+  {
+   "key": "sk-pvt-w0:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-pvt-w0:workers@2000:cpu Terran",
+   "gba": 10
+  },
+  {
+   "key": "sk-pvt-w0:workers@4000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-pvt-w0:workers@6000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-pvt-w0:workers@8000:cpu Terran",
+   "gba": 24
+  },
+  {
+   "key": "sk-pvz-w0:attack.first_wave:cpu Zerg",
+   "gba": 14470
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Creep Colony:cpu Zerg",
+   "gba": 4131
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Extractor:cpu Zerg",
+   "gba": 2538
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Hydralisk Den:cpu Zerg",
+   "gba": 5959
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Hydralisk:cpu Zerg",
+   "gba": 7792
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Lair:cpu Zerg",
+   "gba": 7296
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Lurker:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Queen's Nest:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Spawning Pool:cpu Zerg",
+   "gba": 1428
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Spire:cpu Zerg",
+   "gba": 8869
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Sunken Colony:cpu Zerg",
+   "gba": 4454
+  },
+  {
+   "key": "sk-pvz-w0:build.first.Zergling:cpu Zerg",
+   "gba": 3223
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@1000:cpu Zerg",
+   "gba": 264
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@2000:cpu Zerg",
+   "gba": 704
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@4000:cpu Zerg",
+   "gba": 1624
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@4000:human",
+   "gba": 864
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@6000:cpu Zerg",
+   "gba": 2412
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@6000:human",
+   "gba": 1296
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@8000:cpu Zerg",
+   "gba": 3844
+  },
+  {
+   "key": "sk-pvz-w0:econ.gathered@8000:human",
+   "gba": 1744
+  },
+  {
+   "key": "sk-pvz-w0:result.human_defeated:human",
+   "gba": 14776
+  },
+  {
+   "key": "sk-pvz-w0:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-pvz-w0:supply.cap@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-pvz-w0:supply.cap@8000:cpu Zerg",
+   "gba": 70
+  },
+  {
+   "key": "sk-pvz-w0:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-pvz-w0:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-pvz-w0:supply.used@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-pvz-w0:supply.used@8000:cpu Zerg",
+   "gba": 62
+  },
+  {
+   "key": "sk-pvz-w0:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-pvz-w0:workers@4000:cpu Zerg",
+   "gba": 9
+  },
+  {
+   "key": "sk-pvz-w0:workers@6000:cpu Zerg",
+   "gba": 11
+  },
+  {
+   "key": "sk-pvz-w0:workers@8000:cpu Zerg",
+   "gba": 17
+  },
+  {
+   "key": "sk-tvp-w0:attack.first_wave:cpu Protoss",
+   "gba": 8924
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Assimilator:cpu Protoss",
+   "gba": 4195
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Cybernetics Core:cpu Protoss",
+   "gba": 4194
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Dragoon:cpu Protoss",
+   "gba": 6397
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Gateway:cpu Protoss",
+   "gba": 1799
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Pylon:cpu Protoss",
+   "gba": 656
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Stargate:cpu Protoss",
+   "gba": 5804
+  },
+  {
+   "key": "sk-tvp-w0:build.first.Zealot:cpu Protoss",
+   "gba": 3325
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@1000:cpu Protoss",
+   "gba": 272
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@2000:cpu Protoss",
+   "gba": 672
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@2000:human",
+   "gba": 416
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@4000:cpu Protoss",
+   "gba": 2088
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@6000:cpu Protoss",
+   "gba": 3924
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@6000:human",
+   "gba": 1272
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@8000:cpu Protoss",
+   "gba": 6104
+  },
+  {
+   "key": "sk-tvp-w0:econ.gathered@8000:human",
+   "gba": 1712
+  },
+  {
+   "key": "sk-tvp-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvp-w0:supply.cap@6000:cpu Protoss",
+   "gba": 98
+  },
+  {
+   "key": "sk-tvp-w0:supply.used@4000:cpu Protoss",
+   "gba": 50
+  },
+  {
+   "key": "sk-tvp-w0:supply.used@6000:cpu Protoss",
+   "gba": 86
+  },
+  {
+   "key": "sk-tvp-w0:workers@4000:cpu Protoss",
+   "gba": 16
+  },
+  {
+   "key": "sk-tvp-w0:workers@6000:cpu Protoss",
+   "gba": 22
+  },
+  {
+   "key": "sk-tvp-w0:workers@8000:cpu Protoss",
+   "gba": 24
+  },
+  {
+   "key": "sk-tvp-w101:attack.first_wave:cpu Protoss",
+   "gba": 8907
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Assimilator:cpu Protoss",
+   "gba": 4198
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Cybernetics Core:cpu Protoss",
+   "gba": 4237
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Dragoon:cpu Protoss",
+   "gba": 6666
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Gateway:cpu Protoss",
+   "gba": 1848
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Pylon:cpu Protoss",
+   "gba": 714
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Shield Battery:cpu Protoss",
+   "gba": 4169
+  },
+  {
+   "key": "sk-tvp-w101:build.first.Zealot:cpu Protoss",
+   "gba": 3364
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@1000:cpu Protoss",
+   "gba": 248
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@2000:cpu Protoss",
+   "gba": 640
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@2000:human",
+   "gba": 440
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@4000:cpu Protoss",
+   "gba": 1968
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@4000:human",
+   "gba": 896
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@6000:cpu Protoss",
+   "gba": 3660
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@6000:human",
+   "gba": 1352
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@8000:cpu Protoss",
+   "gba": 5320
+  },
+  {
+   "key": "sk-tvp-w101:econ.gathered@8000:human",
+   "gba": 1824
+  },
+  {
+   "key": "sk-tvp-w101:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvp-w101:supply.cap@6000:cpu Protoss",
+   "gba": 98
+  },
+  {
+   "key": "sk-tvp-w101:supply.cap@8000:cpu Protoss",
+   "gba": 146
+  },
+  {
+   "key": "sk-tvp-w101:supply.used@4000:cpu Protoss",
+   "gba": 50
+  },
+  {
+   "key": "sk-tvp-w101:supply.used@6000:cpu Protoss",
+   "gba": 80
+  },
+  {
+   "key": "sk-tvp-w101:supply.used@8000:cpu Protoss",
+   "gba": 128
+  },
+  {
+   "key": "sk-tvp-w101:workers@4000:cpu Protoss",
+   "gba": 16
+  },
+  {
+   "key": "sk-tvp-w101:workers@6000:cpu Protoss",
+   "gba": 20
+  },
+  {
+   "key": "sk-tvp-w101:workers@8000:cpu Protoss",
+   "gba": 20
+  },
+  {
+   "key": "sk-tvp-w37:attack.first_wave:cpu Protoss",
+   "gba": 9012
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Assimilator:cpu Protoss",
+   "gba": 4350
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Cybernetics Core:cpu Protoss",
+   "gba": 4433
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Dragoon:cpu Protoss",
+   "gba": 7012
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Gateway:cpu Protoss",
+   "gba": 1802
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Pylon:cpu Protoss",
+   "gba": 708
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Shield Battery:cpu Protoss",
+   "gba": 4288
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Stargate:cpu Protoss",
+   "gba": 5943
+  },
+  {
+   "key": "sk-tvp-w37:build.first.Zealot:cpu Protoss",
+   "gba": 3325
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@1000:cpu Protoss",
+   "gba": 256
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@2000:cpu Protoss",
+   "gba": 632
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@2000:human",
+   "gba": 440
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@4000:cpu Protoss",
+   "gba": 2008
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@4000:human",
+   "gba": 896
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@6000:cpu Protoss",
+   "gba": 3844
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@6000:human",
+   "gba": 1352
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@8000:cpu Protoss",
+   "gba": 5912
+  },
+  {
+   "key": "sk-tvp-w37:econ.gathered@8000:human",
+   "gba": 1824
+  },
+  {
+   "key": "sk-tvp-w37:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvp-w37:supply.cap@6000:cpu Protoss",
+   "gba": 98
+  },
+  {
+   "key": "sk-tvp-w37:supply.cap@8000:cpu Protoss",
+   "gba": 130
+  },
+  {
+   "key": "sk-tvp-w37:supply.used@4000:cpu Protoss",
+   "gba": 46
+  },
+  {
+   "key": "sk-tvp-w37:supply.used@6000:cpu Protoss",
+   "gba": 82
+  },
+  {
+   "key": "sk-tvp-w37:supply.used@8000:cpu Protoss",
+   "gba": 130
+  },
+  {
+   "key": "sk-tvp-w37:workers@4000:cpu Protoss",
+   "gba": 16
+  },
+  {
+   "key": "sk-tvp-w37:workers@6000:cpu Protoss",
+   "gba": 22
+  },
+  {
+   "key": "sk-tvp-w37:workers@8000:cpu Protoss",
+   "gba": 25
+  },
+  {
+   "key": "sk-tvt-w0:attack.first_wave:cpu Terran",
+   "gba": 10079
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Academy:cpu Terran",
+   "gba": 3674
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Barracks:cpu Terran",
+   "gba": 1678
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Bunker:cpu Terran",
+   "gba": 7070
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Factory:cpu Terran",
+   "gba": 7582
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Firebat:cpu Terran",
+   "gba": 5312
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Machine Shop:cpu Terran",
+   "gba": 8793
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Marine:cpu Terran",
+   "gba": 3239
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Medic:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Refinery:cpu Terran",
+   "gba": 2390
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Supply Depot:cpu Terran",
+   "gba": 950
+  },
+  {
+   "key": "sk-tvt-w0:build.first.Vulture:cpu Terran",
+   "gba": 9243
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@1000:cpu Terran",
+   "gba": 240
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@1000:human",
+   "gba": 200
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@2000:cpu Terran",
+   "gba": 608
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@2000:human",
+   "gba": 416
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@4000:cpu Terran",
+   "gba": 1632
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@4000:human",
+   "gba": 864
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@6000:cpu Terran",
+   "gba": 3012
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@6000:human",
+   "gba": 1304
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@8000:cpu Terran",
+   "gba": 4352
+  },
+  {
+   "key": "sk-tvt-w0:econ.gathered@8000:human",
+   "gba": 1752
+  },
+  {
+   "key": "sk-tvt-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvt-w0:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-tvt-w0:supply.cap@4000:cpu Terran",
+   "gba": 52
+  },
+  {
+   "key": "sk-tvt-w0:supply.cap@6000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-tvt-w0:supply.cap@8000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-tvt-w0:supply.used@2000:cpu Terran",
+   "gba": 20
+  },
+  {
+   "key": "sk-tvt-w0:supply.used@4000:cpu Terran",
+   "gba": 38
+  },
+  {
+   "key": "sk-tvt-w0:supply.used@6000:cpu Terran",
+   "gba": 62
+  },
+  {
+   "key": "sk-tvt-w0:supply.used@8000:cpu Terran",
+   "gba": 82
+  },
+  {
+   "key": "sk-tvt-w0:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-tvt-w0:workers@2000:cpu Terran",
+   "gba": 9
+  },
+  {
+   "key": "sk-tvt-w0:workers@4000:cpu Terran",
+   "gba": 15
+  },
+  {
+   "key": "sk-tvt-w0:workers@6000:cpu Terran",
+   "gba": 18
+  },
+  {
+   "key": "sk-tvt-w0:workers@8000:cpu Terran",
+   "gba": 18
+  },
+  {
+   "key": "sk-tvz-w0:attack.first_wave:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w0:build.first.Extractor:cpu Zerg",
+   "gba": 2470
+  },
+  {
+   "key": "sk-tvz-w0:build.first.Zergling:cpu Zerg",
+   "gba": 3223
+  },
+  {
+   "key": "sk-tvz-w0:econ.gathered@1000:cpu Zerg",
+   "gba": 264
+  },
+  {
+   "key": "sk-tvz-w0:econ.gathered@2000:cpu Zerg",
+   "gba": 712
+  },
+  {
+   "key": "sk-tvz-w0:econ.gathered@2000:human",
+   "gba": 408
+  },
+  {
+   "key": "sk-tvz-w0:econ.gathered@4000:cpu Zerg",
+   "gba": 1552
+  },
+  {
+   "key": "sk-tvz-w0:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-tvz-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w0:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-tvz-w0:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-tvz-w0:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-tvz-w0:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Creep Colony:cpu Zerg",
+   "gba": 4093
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Evolution Chamber:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Extractor:cpu Zerg",
+   "gba": 2452
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Hydralisk Den:cpu Zerg",
+   "gba": 5840
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Hydralisk:cpu Zerg",
+   "gba": 8215
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Lurker:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Queen's Nest:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Spire:cpu Zerg",
+   "gba": 9328
+  },
+  {
+   "key": "sk-tvz-w101:build.first.Sunken Colony:cpu Zerg",
+   "gba": 4454
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@1000:cpu Zerg",
+   "gba": 280
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@2000:cpu Zerg",
+   "gba": 728
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@2000:human",
+   "gba": 440
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@4000:cpu Zerg",
+   "gba": 1656
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@4000:human",
+   "gba": 896
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@6000:cpu Zerg",
+   "gba": 2428
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@6000:human",
+   "gba": 1352
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@8000:cpu Zerg",
+   "gba": 3556
+  },
+  {
+   "key": "sk-tvz-w101:econ.gathered@8000:human",
+   "gba": 1824
+  },
+  {
+   "key": "sk-tvz-w101:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-tvz-w101:supply.cap@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-tvz-w101:supply.cap@8000:cpu Zerg",
+   "gba": 70
+  },
+  {
+   "key": "sk-tvz-w101:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-tvz-w101:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-tvz-w101:supply.used@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-tvz-w101:supply.used@8000:cpu Zerg",
+   "gba": 56
+  },
+  {
+   "key": "sk-tvz-w101:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-tvz-w101:workers@6000:cpu Zerg",
+   "gba": 10
+  },
+  {
+   "key": "sk-tvz-w101:workers@8000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Creep Colony:cpu Zerg",
+   "gba": 4121
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Extractor:cpu Zerg",
+   "gba": 2538
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Hydralisk Den:cpu Zerg",
+   "gba": 5959
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Hydralisk:cpu Zerg",
+   "gba": 7639
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Lair:cpu Zerg",
+   "gba": 7104
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Lurker:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Queen's Nest:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Spire:cpu Zerg",
+   "gba": 8984
+  },
+  {
+   "key": "sk-tvz-w37:build.first.Sunken Colony:cpu Zerg",
+   "gba": 4454
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@1000:cpu Zerg",
+   "gba": 264
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@2000:cpu Zerg",
+   "gba": 704
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@2000:human",
+   "gba": 416
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@4000:cpu Zerg",
+   "gba": 1624
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@6000:cpu Zerg",
+   "gba": 2404
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@6000:human",
+   "gba": 1272
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@8000:cpu Zerg",
+   "gba": 3716
+  },
+  {
+   "key": "sk-tvz-w37:econ.gathered@8000:human",
+   "gba": 1712
+  },
+  {
+   "key": "sk-tvz-w37:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-tvz-w37:supply.cap@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-tvz-w37:supply.cap@8000:cpu Zerg",
+   "gba": 70
+  },
+  {
+   "key": "sk-tvz-w37:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-tvz-w37:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-tvz-w37:supply.used@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-tvz-w37:supply.used@8000:cpu Zerg",
+   "gba": 64
+  },
+  {
+   "key": "sk-tvz-w37:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-tvz-w37:workers@6000:cpu Zerg",
+   "gba": 11
+  },
+  {
+   "key": "sk-tvz-w37:workers@8000:cpu Zerg",
+   "gba": 17
+  },
+  {
+   "key": "sk-zvp-w0:attack.first_wave:cpu Protoss",
+   "gba": 9008
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Assimilator:cpu Protoss",
+   "gba": 4198
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Cybernetics Core:cpu Protoss",
+   "gba": 4238
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Dragoon:cpu Protoss",
+   "gba": 6666
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Fleet Beacon:cpu Protoss",
+   "gba": 8230
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Gateway:cpu Protoss",
+   "gba": 1849
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Pylon:cpu Protoss",
+   "gba": 714
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Scout:cpu Protoss",
+   "gba": 8648
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Shield Battery:cpu Protoss",
+   "gba": 4168
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Stargate:cpu Protoss",
+   "gba": 5698
+  },
+  {
+   "key": "sk-zvp-w0:build.first.Zealot:cpu Protoss",
+   "gba": 3364
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@1000:cpu Protoss",
+   "gba": 248
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@2000:cpu Protoss",
+   "gba": 640
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@4000:cpu Protoss",
+   "gba": 1968
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@4000:human",
+   "gba": 864
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@6000:cpu Protoss",
+   "gba": 3676
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@6000:human",
+   "gba": 1288
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@8000:cpu Protoss",
+   "gba": 5320
+  },
+  {
+   "key": "sk-zvp-w0:econ.gathered@8000:human",
+   "gba": 1736
+  },
+  {
+   "key": "sk-zvp-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvp-w0:supply.cap@2000:cpu Protoss",
+   "gba": 34
+  },
+  {
+   "key": "sk-zvp-w0:supply.cap@6000:cpu Protoss",
+   "gba": 98
+  },
+  {
+   "key": "sk-zvp-w0:supply.cap@8000:cpu Protoss",
+   "gba": 130
+  },
+  {
+   "key": "sk-zvp-w0:supply.used@2000:cpu Protoss",
+   "gba": 20
+  },
+  {
+   "key": "sk-zvp-w0:supply.used@4000:cpu Protoss",
+   "gba": 50
+  },
+  {
+   "key": "sk-zvp-w0:supply.used@6000:cpu Protoss",
+   "gba": 80
+  },
+  {
+   "key": "sk-zvp-w0:supply.used@8000:cpu Protoss",
+   "gba": 118
+  },
+  {
+   "key": "sk-zvp-w0:workers@4000:cpu Protoss",
+   "gba": 16
+  },
+  {
+   "key": "sk-zvp-w0:workers@6000:cpu Protoss",
+   "gba": 20
+  },
+  {
+   "key": "sk-zvp-w0:workers@8000:cpu Protoss",
+   "gba": 20
+  },
+  {
+   "key": "sk-zvt-w0:attack.first_wave:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Academy:cpu Terran",
+   "gba": 3615
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Barracks:cpu Terran",
+   "gba": 1676
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Factory:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Firebat:cpu Terran",
+   "gba": 5197
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Marine:cpu Terran",
+   "gba": 3239
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Medic:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Refinery:cpu Terran",
+   "gba": 2264
+  },
+  {
+   "key": "sk-zvt-w0:build.first.Supply Depot:cpu Terran",
+   "gba": 844
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@1000:cpu Terran",
+   "gba": 256
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@2000:cpu Terran",
+   "gba": 656
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@4000:cpu Terran",
+   "gba": 1720
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@6000:cpu Terran",
+   "gba": 3220
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@6000:human",
+   "gba": 1272
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@8000:cpu Terran",
+   "gba": 5276
+  },
+  {
+   "key": "sk-zvt-w0:econ.gathered@8000:human",
+   "gba": 1720
+  },
+  {
+   "key": "sk-zvt-w0:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w0:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-zvt-w0:supply.cap@4000:cpu Terran",
+   "gba": 52
+  },
+  {
+   "key": "sk-zvt-w0:supply.cap@6000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-zvt-w0:supply.cap@8000:cpu Terran",
+   "gba": 132
+  },
+  {
+   "key": "sk-zvt-w0:supply.used@1000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-zvt-w0:supply.used@2000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-zvt-w0:supply.used@4000:cpu Terran",
+   "gba": 40
+  },
+  {
+   "key": "sk-zvt-w0:supply.used@6000:cpu Terran",
+   "gba": 76
+  },
+  {
+   "key": "sk-zvt-w0:supply.used@8000:cpu Terran",
+   "gba": 98
+  },
+  {
+   "key": "sk-zvt-w0:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-zvt-w0:workers@2000:cpu Terran",
+   "gba": 10
+  },
+  {
+   "key": "sk-zvt-w0:workers@4000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-zvt-w0:workers@6000:cpu Terran",
+   "gba": 23
+  },
+  {
+   "key": "sk-zvt-w0:workers@8000:cpu Terran",
+   "gba": 24
+  },
+  {
+   "key": "sk-zvt-w101:attack.first_wave:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Academy:cpu Terran",
+   "gba": 3615
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Barracks:cpu Terran",
+   "gba": 1676
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Factory:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Firebat:cpu Terran",
+   "gba": 5197
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Marine:cpu Terran",
+   "gba": 3239
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Medic:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Refinery:cpu Terran",
+   "gba": 2264
+  },
+  {
+   "key": "sk-zvt-w101:build.first.Supply Depot:cpu Terran",
+   "gba": 844
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@1000:cpu Terran",
+   "gba": 256
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@2000:cpu Terran",
+   "gba": 656
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@4000:cpu Terran",
+   "gba": 1720
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@4000:human",
+   "gba": 864
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@6000:cpu Terran",
+   "gba": 3228
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@6000:human",
+   "gba": 1304
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@8000:cpu Terran",
+   "gba": 5292
+  },
+  {
+   "key": "sk-zvt-w101:econ.gathered@8000:human",
+   "gba": 1752
+  },
+  {
+   "key": "sk-zvt-w101:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w101:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-zvt-w101:supply.cap@4000:cpu Terran",
+   "gba": 52
+  },
+  {
+   "key": "sk-zvt-w101:supply.cap@6000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-zvt-w101:supply.cap@8000:cpu Terran",
+   "gba": 132
+  },
+  {
+   "key": "sk-zvt-w101:supply.used@1000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-zvt-w101:supply.used@2000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-zvt-w101:supply.used@4000:cpu Terran",
+   "gba": 40
+  },
+  {
+   "key": "sk-zvt-w101:supply.used@6000:cpu Terran",
+   "gba": 76
+  },
+  {
+   "key": "sk-zvt-w101:supply.used@8000:cpu Terran",
+   "gba": 98
+  },
+  {
+   "key": "sk-zvt-w101:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-zvt-w101:workers@2000:cpu Terran",
+   "gba": 10
+  },
+  {
+   "key": "sk-zvt-w101:workers@4000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-zvt-w101:workers@6000:cpu Terran",
+   "gba": 23
+  },
+  {
+   "key": "sk-zvt-w101:workers@8000:cpu Terran",
+   "gba": 24
+  },
+  {
+   "key": "sk-zvt-w37:attack.first_wave:cpu Terran",
+   "gba": 10328
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Academy:cpu Terran",
+   "gba": 3557
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Barracks:cpu Terran",
+   "gba": 1705
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Bunker:cpu Terran",
+   "gba": 7095
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Factory:cpu Terran",
+   "gba": 7604
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Firebat:cpu Terran",
+   "gba": 5197
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Machine Shop:cpu Terran",
+   "gba": 8832
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Marine:cpu Terran",
+   "gba": 3277
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Medic:cpu Terran",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Refinery:cpu Terran",
+   "gba": 2338
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Supply Depot:cpu Terran",
+   "gba": 868
+  },
+  {
+   "key": "sk-zvt-w37:build.first.Vulture:cpu Terran",
+   "gba": 9281
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@1000:cpu Terran",
+   "gba": 248
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@2000:cpu Terran",
+   "gba": 640
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@4000:cpu Terran",
+   "gba": 1696
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@4000:human",
+   "gba": 848
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@6000:cpu Terran",
+   "gba": 3124
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@6000:human",
+   "gba": 1272
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@8000:cpu Terran",
+   "gba": 5104
+  },
+  {
+   "key": "sk-zvt-w37:econ.gathered@8000:human",
+   "gba": 1720
+  },
+  {
+   "key": "sk-zvt-w37:result.human_defeated:human",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvt-w37:supply.cap@2000:cpu Terran",
+   "gba": 36
+  },
+  {
+   "key": "sk-zvt-w37:supply.cap@4000:cpu Terran",
+   "gba": 52
+  },
+  {
+   "key": "sk-zvt-w37:supply.cap@6000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-zvt-w37:supply.cap@8000:cpu Terran",
+   "gba": 132
+  },
+  {
+   "key": "sk-zvt-w37:supply.used@2000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-zvt-w37:supply.used@4000:cpu Terran",
+   "gba": 40
+  },
+  {
+   "key": "sk-zvt-w37:supply.used@6000:cpu Terran",
+   "gba": 74
+  },
+  {
+   "key": "sk-zvt-w37:supply.used@8000:cpu Terran",
+   "gba": 100
+  },
+  {
+   "key": "sk-zvt-w37:workers@1000:cpu Terran",
+   "gba": 7
+  },
+  {
+   "key": "sk-zvt-w37:workers@2000:cpu Terran",
+   "gba": 10
+  },
+  {
+   "key": "sk-zvt-w37:workers@4000:cpu Terran",
+   "gba": 16
+  },
+  {
+   "key": "sk-zvt-w37:workers@6000:cpu Terran",
+   "gba": 22
+  },
+  {
+   "key": "sk-zvt-w37:workers@8000:cpu Terran",
+   "gba": 26
+  },
+  {
+   "key": "sk-zvz-w0:attack.first_wave:cpu Zerg",
+   "gba": 14122
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Creep Colony:cpu Zerg",
+   "gba": 4089
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Extractor:cpu Zerg",
+   "gba": 2488
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Hydralisk Den:cpu Zerg",
+   "gba": 5929
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Hydralisk:cpu Zerg",
+   "gba": 7869
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Lair:cpu Zerg",
+   "gba": 7411
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Lurker:cpu Zerg",
+   "gba": 999999
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Spawning Pool:cpu Zerg",
+   "gba": 1388
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Spire:cpu Zerg",
+   "gba": 9070
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Sunken Colony:cpu Zerg",
+   "gba": 4454
+  },
+  {
+   "key": "sk-zvz-w0:build.first.Zergling:cpu Zerg",
+   "gba": 3223
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@1000:cpu Zerg",
+   "gba": 280
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@1000:human",
+   "gba": 208
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@2000:cpu Zerg",
+   "gba": 736
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@2000:human",
+   "gba": 424
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@4000:cpu Zerg",
+   "gba": 1648
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@4000:human",
+   "gba": 864
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@6000:cpu Zerg",
+   "gba": 2404
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@6000:human",
+   "gba": 1288
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@8000:cpu Zerg",
+   "gba": 3628
+  },
+  {
+   "key": "sk-zvz-w0:econ.gathered@8000:human",
+   "gba": 1736
+  },
+  {
+   "key": "sk-zvz-w0:result.human_defeated:human",
+   "gba": 14468
+  },
+  {
+   "key": "sk-zvz-w0:supply.cap@2000:cpu Zerg",
+   "gba": 34
+  },
+  {
+   "key": "sk-zvz-w0:supply.cap@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-zvz-w0:supply.cap@8000:cpu Zerg",
+   "gba": 70
+  },
+  {
+   "key": "sk-zvz-w0:supply.used@1000:cpu Zerg",
+   "gba": 18
+  },
+  {
+   "key": "sk-zvz-w0:supply.used@2000:cpu Zerg",
+   "gba": 20
+  },
+  {
+   "key": "sk-zvz-w0:supply.used@6000:cpu Zerg",
+   "gba": 38
+  },
+  {
+   "key": "sk-zvz-w0:supply.used@8000:cpu Zerg",
+   "gba": 62
+  },
+  {
+   "key": "sk-zvz-w0:workers@1000:cpu Zerg",
+   "gba": 8
+  },
+  {
+   "key": "sk-zvz-w0:workers@4000:cpu Zerg",
+   "gba": 9
+  },
+  {
+   "key": "sk-zvz-w0:workers@6000:cpu Zerg",
+   "gba": 10
+  },
+  {
+   "key": "sk-zvz-w0:workers@8000:cpu Zerg",
+   "gba": 18
+  },
+  {
    "key": "t1-fields:anim.walk_cycle:Marine",
    "gba": 6.0
   },

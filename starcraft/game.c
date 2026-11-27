@@ -8159,9 +8159,17 @@ static int __attribute__((noinline)) race_late_worker_home(Unit *worker)
 }
 #endif
 #ifndef SC64_SKIRMISH
+#if defined(SC64_TEST_GATHER_OBSERVER) && !defined(GBA_HOST)
+#error "SC64_TEST_GATHER_OBSERVER is a host-only parity hook"
+#endif
+/* Only worker deliveries call this; the parity runner counts them as the
+ * cartridge's gathered totals through the host-only observer. */
 static void
 add_owner_resources(int owner, int ore, int vespene)
 {
+#ifdef SC64_TEST_GATHER_OBSERVER
+    SC64_TEST_GATHER_OBSERVER(owner, ore, vespene);
+#endif
 #ifdef SC64_RACES
     race_add_owner_resources(owner,ore,vespene);
 #else

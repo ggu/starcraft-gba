@@ -217,6 +217,8 @@ def gba_command(scenario_id, golden, trace):
         cmd += ['--unit', f'{int(x)},{int(y)}']
     if 'target' in params:
         cmd += ['--target', f'{int(params["target"][0])},{int(params["target"][1])}']
+    if 'gba_args' in spec:
+        cmd += spec['gba_args'](scenario_id, params, trace)
     # Unit-class labs: the subject (an exact point, or a cartridge unit id) and timed orders,
     # passed only to the lab runners that take them.
     if not spec['runner'].startswith('lab-'):
@@ -324,6 +326,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         if obs['value'] and value not in metrics.MARKERS:
             row['ratio'] = round(value / obs['value'], 3)
         gap = outside(value, obs['lo'], obs['hi'])
+        if value in obs.get('also_ok', ()):
+            gap = 0  # an outcome outside the numeric band that the N64 also showed (skirmish NEVER)
         known = baseline.get(key)
         if not gating:
             row['verdict'] = 'REPORT'
@@ -343,9 +347,17 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 value, 'the baseline records the event as ' +
                 ('absent' if known['gba'] == metrics.ABSENT else 'a fight with other enemies') +
                 ' on the GBA; it is now measured outside the band')
+        elif value != known['gba'] and (value in obs.get('sentinels', ()) or known['gba'] in obs.get('sentinels', ())):
+            # A sentinel (skirmish NEVER, ENDED) is an outcome, not a number: changing to or from one is
+            # never within the baseline's slack.
+            row['verdict'] = 'REGRESSION'
+            row['why'] = f'the outcome changed from the baseline ({known["gba"]})'
         else:
-            was = outside(known['gba'], obs['lo'], obs['hi'])
-            slack = max((obs['hi'] - obs['lo']) / 2, 1e-9)
+            was = 0 if known['gba'] in obs.get('also_ok', ()) else outside(known['gba'], obs['lo'], obs['hi'])
+            # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each
+            # seed's band as seed_lo/seed_hi, and the N64's spread over seeds is no licence for
+            # the GBA to move further out.
+            slack = max((obs.get('seed_hi', obs['hi']) - obs.get('seed_lo', obs['lo'])) / 2, 1e-9)
             if gap > was + slack:
                 row['verdict'] = 'REGRESSION'
                 row['why'] = f'further outside the band than the baseline ({known["gba"]})'
@@ -356,8 +368,12 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # A curve belongs to the checks it explains: arrival for the move, rate for income.
             explains = {'move.remaining': ('move.arrival_first', 'move.arrival_last'),
                         'income.gathered': ('income.rate', 'income.first_delivery')}.get(name, ())
+            if 'explains' in curve:  # [[check, subject], ...], written with the curve
+                explains = [c for c, subject in curve['explains'] if subject == obs['subject']]
             if obs['check'] in explains and name in curves:
                 k = first_divergence(curve['n64'], curves[name], curve['tolerance'])
+                if k is not None:
+                    k *= curve.get('step', 1)  # curves sampled every `step` source frames
                 row['first_divergent_frame'] = k
                 row['curve'] = name
         rows.append(row)
@@ -395,12 +411,22 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
             return {**result, 'status': 'ERROR', 'why': f'GBA run exited {run.returncode}: {run.stderr.strip()[-400:]}',
                     'command': cmd}
         report = json.loads(run.stdout.strip().splitlines()[-1])
+        if 'gba_series' in spec:
+            # Scenarios that stream their own trace (skirmish): measured inside the temporary
+            # directory, which holds the trace the series reads lazily.
+            series = spec['gba_series'](trace, report)
+            measured, err = spec['measure_gba'](series, golden, report)
+            return finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale)
         series = gba_series(trace)
         if 'parse_gba' in spec:
             # Scenarios that read more of the trace than the series keeps (buildings, hits).
             report['parsed'] = spec['parse_gba'](trace)
     report['movers'] = [int(x) for x in report.get('movers', [])] if isinstance(report.get('movers'), list) else []
     measured, err = spec['measure_gba'](series, golden, report)
+    return finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale)
+
+
+def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False):
     if err:
         return {**result, 'status': 'ERROR', 'why': 'GBA measurement: ' + err}
     layout = parity_decode.Layout()

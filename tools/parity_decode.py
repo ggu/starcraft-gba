@@ -21,6 +21,7 @@ file holds derived numbers only and is written only under the fixture home.
 """
 import argparse
 import hashlib
+import io
 import json
 import os
 import pathlib
@@ -111,6 +112,30 @@ class Layout:
     def clock(self, name, gating):
         return self._check(f'clock.{name}', self.doc['clock'][name], gating)
 
+    def result_word(self, gating):
+        field = self.doc['globals'].get('result')
+        if field is None:
+            raise LayoutError(f'{self.name}: no result word')
+        return self._check('result.word', field, gating)
+
+    def rng_field(self, name, gating):
+        field = self.doc['globals'].get('seed') if name == 'seed' else None
+        if field is None:
+            raise LayoutError(f'{self.name}: no rng field {name!r}')
+        return self._check(f'rng.{name}', field, gating)
+
+    def supply_array(self, name, gating):
+        field = self.doc['globals'].get('supply', {}).get('arrays', {}).get(name)
+        if field is None:
+            raise LayoutError(f'{self.name}: no supply array {name!r}')
+        return self._check(f'supply.{name}', field, gating)
+
+    def supply_address(self, name, race, owner):
+        """KSEG0 address of one owner's word in a race's supply array (race 0 Zerg, 1 Terran, 2 Protoss)."""
+        block = self.doc['globals']['supply']
+        field = block['arrays'][name]
+        return int(block['address'], 16) + race * int(block['race_stride'], 16) + int(field['offset'], 16) + 4 * owner
+
     def status(self, key):
         """Status of a dependency key as observations name it: unit.<f>, banks.<a>, clock.<c>,
         pool.<sprite|image|bullet|fog_tiles>, order.<value>, player.<table>, tables.dat."""
@@ -119,7 +144,10 @@ class Layout:
                  'clock': self.doc['clock'], 'pool': self.doc.get('pools', {}),
                  'order': self.doc.get('orders', {}).get('values', {}),
                  'player': self.doc.get('player_tables', {}),
-                 'tables': {'dat': self.doc.get('dat_tables', {})}}.get(kind, {})
+                 'tables': {'dat': self.doc.get('dat_tables', {})},
+                 'supply': self.doc['globals'].get('supply', {}).get('arrays', {}),
+                 'rng': {'seed': self.doc['globals'].get('seed')},
+                 'result': {'word': self.doc['globals'].get('result')}}.get(kind, {})
         field = table.get(name)
         return field.get('status') if isinstance(field, dict) else None
 
@@ -133,9 +161,15 @@ class Layout:
             field = banks['arrays'].get(name)
             return None if field is None else {'block': {k: banks[k] for k in ('address', 'players', 'type')},
                                                 'field': field}
+        if kind == 'supply':
+            supply = doc['globals'].get('supply', {})
+            field = supply.get('arrays', {}).get(name)
+            return None if field is None else {'block': {k: v for k, v in supply.items() if k not in ('arrays', 'about')},
+                                                'field': field}
         table = {'unit': doc['unit_fields'], 'clock': doc['clock'], 'pool': doc.get('pools', {}),
                  'order': doc.get('orders', {}).get('values', {}), 'player': doc.get('player_tables', {}),
-                 'tables': {'dat': doc.get('dat_tables')}}.get(kind)
+                 'tables': {'dat': doc.get('dat_tables')},
+                 'rng': {'seed': doc['globals'].get('seed')}, 'result': {'word': doc['globals'].get('result')}}.get(kind)
         return None if table is None else table.get(name)
 
     def fields_digest(self, keys):
@@ -199,9 +233,46 @@ class Layout:
         return field
 
 
-def read_tap(path):
+def tap_bytes(path, limit=None):
+    """A capture's tap.bin bytes; a run directory may keep it zstd-compressed as tap.bin.zst
+    (the manifest digest is always that of the uncompressed file). limit: stop reading one byte
+    past it and refuse the capture, whatever the frames declare."""
+    path = pathlib.Path(path)
+    packed = path.with_name(path.name + '.zst')
+    if path.is_file() or not packed.is_file():
+        return path.read_bytes()
+    def drain(handle):
+        # Chunks, so memory follows the data, not the budget; stop one byte past the limit.
+        out, size = io.BytesIO(), 0
+        while limit is None or size <= limit:
+            chunk = handle.read(1 << 22 if limit is None else min(1 << 22, limit + 1 - size))
+            if not chunk:
+                break
+            out.write(chunk)
+            size += len(chunk)
+        return out.getvalue()   # shares the buffer on CPython: no second full copy
+    try:
+        from compression import zstd  # Python 3.14
+    except ImportError:
+        zstd = None
+    if zstd is not None:
+        with zstd.open(packed, 'rb') as handle:
+            data = drain(handle)
+    else:
+        child = subprocess.Popen(['zstd', '-dc', str(packed)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        data = drain(child.stdout)
+        child.stdout.close()
+        if child.wait() != 0 and (limit is None or len(data) <= limit):
+            raise ValueError(f'{packed}: needs Python 3.14 or the zstd tool to decompress')
+    if limit is not None and len(data) > limit:
+        raise ValueError(f'{packed}: decompresses to more than the decoder holds in memory ({limit} bytes)')
+    return data
+
+
+def read_tap(path, data=None):
     """Yield (header dict, globals bytes, {row index: 312 bytes})."""
-    data = pathlib.Path(path).read_bytes()
+    if data is None:
+        data = tap_bytes(path)
     if data[:8] != MAGIC:
         raise ValueError(f'{path}: not a tap.bin file')
     version, header_bytes, globals_bytes, row_bytes = struct.unpack_from('<4I', data, 8)
@@ -267,8 +338,14 @@ class Capture:
         if size > limit:
             raise ValueError(f'{self.run}: tap.bin and extra.bin hold {size} bytes, more than the decoder holds in '
                              f'memory ({limit}; SC64_PARITY_MAX_CAPTURE_BYTES); record a shorter window or every Kth tick')
-        self.verified = self._verify_artifacts()
+        # tap.bin, or tap.bin.zst decompressed within what the limit leaves after extra.bin.
+        tap = tap_bytes(self.run / 'tap.bin', limit - size + (self.run / 'tap.bin').stat().st_size
+                        if (self.run / 'tap.bin').is_file() else limit - size)
+        self.verified = self._verify_artifacts(tap)
         self.ticks = []          # follow-up records in tick order: dicts
+        self.first_table_tick = None
+        self.first_table_step = None   # the frontend step of that read (tick numbers can restart)
+        self.last_change = None
         self.faults = {'dual_differ': 0, 'bad_links': 0, 'missing_follow': 0, 'tick_skips': 0,
                        'skipped_ticks': 0, 'unexplained_skips': 0, 'interior_missing': 0}
         skips = []   # (record index, skipped tick values) for ticks that began and ended inside one step
@@ -284,12 +361,16 @@ class Capture:
                 self.extra[step] = {'tick': tick, 'ordinal': ordinal, 'blocks': blocks}
             # The region list joins the chain once, so equal payloads under other addresses differ.
             chain.update(b'extra-regions' + b''.join(struct.pack('<2I', a, n) for a, n in self.regions))
-        for head, glob, rows in read_tap(self.run / 'tap.bin'):
+        for head, glob, rows in read_tap(self.run / 'tap.bin', tap):
             if head['flags'] & FLAG_DUAL_DIFFER:
                 self.faults['dual_differ'] += 1
             if head['flags'] & FLAG_BAD_LINKS:
                 self.faults['bad_links'] += 1
+            if head['flags'] & FLAG_TABLE and self.first_table_tick is None:
+                self.first_table_tick = head['tick']   # the first tick with a unit table, in either read
+                self.first_table_step = head['step']
             if head['phase'] == 0:
+                self.last_change = head   # the capture's last change read (it may have no follow-up)
                 # The change record a follow-up read belongs to is the latest one
                 # for its tick (a tick value can repeat if the counter restarts).
                 change[head['tick']] = head
@@ -409,13 +490,27 @@ class Capture:
             if record['table'] and not record['paused']:
                 clock += 1
             record['sf'] = clock
+        # Change reads after the last follow-up record, (tick, paused, in mission) in capture
+        # order: ticks no follow-up dates, which whole-match scenarios count while unpaused.
+        last_step = self.ticks[-1]['step'] if self.ticks else -1
+        self.trailing_changes = [(h['tick'], h['pause'] != 0, bool(h['flags'] & FLAG_TABLE))
+                                 for h in change_all if h['step'] > last_step]
+        # Every change read's unit-table flag in capture order, for scenarios that never leave
+        # their mission (a skipped tick without a table adds no frame).
+        self.change_tables = [bool(h['flags'] & FLAG_TABLE) for h in change_all]
 
-    def _verify_artifacts(self):
+    def _verify_artifacts(self, tap):
         """tap.bin and tape.txt must be the files the capture wrote (manifest digests)."""
         problems = []
         recorded = self.manifest.get('outputs_sha256', {}).get('tap.bin')
-        if not recorded or recorded != file_sha256(self.run / 'tap.bin'):
+        if not recorded or recorded != hashlib.sha256(tap).hexdigest():
             problems.append('tap.bin does not match the manifest')
+        # A watch.csv that is present must be the log the capture wrote; scenarios that read it
+        # (skirmish supply and result) also require it (same_bundle(..., same_watch)).
+        watch = self.run / 'watch.csv'
+        recorded_watch = self.manifest.get('outputs_sha256', {}).get('watch.csv')
+        if watch.is_file() and (not recorded_watch or recorded_watch != file_sha256(watch)):
+            problems.append('watch.csv does not match the manifest')
         extra = self.run / 'extra.bin'
         recorded_extra = self.manifest.get('outputs_sha256', {}).get('extra.bin')
         if recorded_extra and not extra.is_file():
@@ -651,10 +746,12 @@ class Capture:
         }
 
 
-def same_bundle(a, b, allow_skips=False):
+def same_bundle(a, b, allow_skips=False, same_watch=False):
     """Two captures form a golden bundle only if they are fresh processes of the same inputs
     whose per-tick hash chains agree. allow_skips admits ticks without a follow-up record (busy
-    missions run some ticks one step apart); only report-only scenarios may ask for it."""
+    missions run some ticks one step apart); only report-only scenarios may ask for it.
+    same_watch: the scenario measures watched words (skirmish supply and result), which lie
+    outside the hash chain, so both captures' watch.csv must be identical."""
     problems = []
     for key in ('binary_sha256', 'tape_sha256', 'rom_sha256', 'mode', 'flash_input_sha256'):
         if a.manifest.get(key) != b.manifest.get(key):
@@ -674,10 +771,26 @@ def same_bundle(a, b, allow_skips=False):
             problems.append(f'{cap.run.name}: capture did not finish cleanly')
         if cap.faults['dual_differ'] or cap.faults['bad_links'] or cap.faults.get('extra'):
             problems.append(f'{cap.run.name}: read faults {cap.faults}')
+    if same_watch:
+        for cap in (a, b):
+            if not (cap.run / 'watch.csv').is_file() or not cap.manifest.get('outputs_sha256', {}).get('watch.csv'):
+                problems.append(f'{cap.run.name}: no recorded watch.csv, which this scenario reads')
+        if a.manifest.get('outputs_sha256', {}).get('watch.csv') != b.manifest.get('outputs_sha256', {}).get('watch.csv'):
+            problems.append('watch.csv differs')
+        # The run's end (and the result frames after the last follow-up) counts trailing
+        # unpaused ticks, whose change reads the chain does not cover.
+        if getattr(a, 'trailing_changes', None) != getattr(b, 'trailing_changes', None):
+            problems.append('the change reads after the last follow-up differ between the runs')
+        # So do the change reads' unit-table flags, which decide which skipped ticks count.
+        if list(zip(getattr(a, 'change_reads', []), getattr(a, 'change_tables', []))) != \
+                list(zip(getattr(b, 'change_reads', []), getattr(b, 'change_tables', []))):
+            problems.append('the change reads\' unit-table flags differ between the runs')
     if a.run.resolve() == b.run.resolve():
         problems.append('the two runs are the same directory')
     if a.faults != b.faults:
         problems.append(f'read faults differ between the runs ({a.faults} vs {b.faults})')
+    if a.first_table_tick != b.first_table_tick:
+        problems.append(f'the unit table first appears at different ticks ({a.first_table_tick} vs {b.first_table_tick})')
     # Skipped ticks advance the clock from their change-step reads, which the chain does not cover.
     if [r['sf'] for r in a.ticks] != [r['sf'] for r in b.ticks] or a.skipped_frames != b.skipped_frames:
         problems.append('the unpaused clocks differ between the runs')
@@ -760,7 +873,7 @@ def write_golden(scenario_id, runs, home, layout, note=None):
     allow_skips = bool(spec.get('tick_skips_ok'))
     problems = []
     for other in caps[1:]:
-        problems += same_bundle(caps[0], other, allow_skips)
+        problems += same_bundle(caps[0], other, allow_skips, bool(spec.get('same_watch')))
     if problems:
         raise SystemExit('not golden: ' + '; '.join(problems))
     marks = [metrics.tape_commands(c.run / 'tape.txt') for c in caps]

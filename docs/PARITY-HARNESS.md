@@ -24,7 +24,8 @@ main checkout's `.local/parity`. Only code, the layout file and the baseline
 | Field map | `tools/sc64_parity_fieldmap.py` | Mission-launch censuses against the CHK, the `.dat` table anchor, player upgrade and tech arrays, opening timelines ([audit](audits/2026-11-26-parity-field-map.md)) |
 | Golden | `tools/parity_decode.py golden` | Two agreeing captures become `$SC64_PARITY_HOME/golden/<id>.json` |
 | Measure | `tools/sc64_parity_metrics.py` | One measurement per check, used for both engines |
-| GBA run | `tests/sc64_parity_run.c` (`move`, `income`, `lab-t1`, `lab-bb`, `lab-mission`) | The same scenario through the injector and trace emitter |
+| GBA run | `tests/sc64_parity_run.c` (`move`, `income`, `lab-t1`, `lab-bb`, `lab-mission`, `match`) | The same scenario through the injector and trace emitter |
+| Skirmish | `tools/sc64_parity_skirmish.py` | Blood Bath lobbies: frame streams of both engines, per-player measurements, seed envelopes |
 | Judge | `tools/sc64_parity.py` | Verdicts against the band and the baseline; scorecard |
 | Loop | `./dev parity` (`make parity`) | Table differ plus every golden scenario, in parallel |
 
@@ -91,7 +92,7 @@ hash chain, seed words, binary, tape, ROM and mode.
 | Verdict | Meaning | Fails? |
 | --- | --- | --- |
 | PASS | Inside the N64 band | no |
-| KNOWN | Outside the band, in the baseline, not further out than recorded (half a band of slack) | no |
+| KNOWN | Outside the band, in the baseline, not further out than recorded (half a band of slack; for a skirmish seed envelope, half the seed's own band) | no |
 | REGRESSION | Outside the band and not in the baseline, or further out than the baseline | yes |
 | IMPROVED | In the baseline, now inside the band | notice |
 | STALE | Baseline line with no observation | notice |
@@ -115,6 +116,7 @@ judged). With no golden files the scenarios skip; if everything skipped while
 | `t1-move` | Fresh boot to Wasteland, box-select the five Marines, C-Right (Move) then A on open ground | `terran`, `--scenario move`: the five Marines joined by type, owner and halved position get one group order to the target | cruise speed, first and last arrival, group spread; command latency (report only) |
 | `bb-income` | Scenario → Blood Bath, human Zerg, computer Terran, start; no further input | `zerg-z10`, `--scenario income`: Blood Bath, human Zerg against one Terran computer, no command | minerals gathered per frame over 2,000 frames, first delivery, minerals per delivery |
 | `t1-fields` | The campaign launch tape for T1 (below) recording the fog, image, sprite and bullet regions, then the t1-move box select and Move, then Stop, Hold, a second Move and an attack-move | `terran`, `--scenario move`, as t1-move | the t1-move checks on the first Move; order timing (command to Move, to the first and last Marine back in an idle order); fog (first newly visible tile, first dropped tile, visible and explored counts before the Stop); the Marine walk cycle (N64: the image's iscript Walking loop; GBA: stride phases) |
+| `sk-*` (17 lobbies) | Lobby state → race rows → Start after a delay; no further input, to the end of the match | the human race's profile, `--scenario match`: the same races and the N64 seed, no command | start corners; each computer's build order, first wave; gathered minerals, supply, workers at 1,000–8,000 frames; minerals per frame by worker count (report); each player's elimination |
 
 The human player is resolved per scenario: T1's Marine owner; in Blood Bath
 the only owner of Drones (owner numbers and start corners are shuffled per
@@ -131,6 +133,56 @@ Tolerances, from the S4 data:
 | Group spread (RMS about the centroid at rest) | N64 value ±4 N64 px |
 | Income rate | ±(workers × 8 minerals) over the window |
 | Minerals per delivery | exact |
+
+## Skirmish lobbies
+
+The `sk-*` scenarios (WP11, with the WP9 economy curves) each name one N64
+Blood Bath Free for All lobby with a passive human: `sk-<human>v<computer>`
+for a 1v1 (two computer rows Closed), `sk-ffa` for the human Terran against
+the default Zerg, Terran and Protoss rows, and `-w<N>` for a Start press
+`N` frontend steps late, which moves the seed. The table of lobbies is
+`LOBBIES` in `tools/sc64_parity_skirmish.py`; the measured gaps are in
+[`audits/2026-11-26-parity-skirmish.md`](audits/2026-11-26-parity-skirmish.md).
+
+Each tape loads one lobby state (the Scenario tab with Free For All and
+Blood Bath already chosen), sets the race rows with presses held 10 steps,
+waits, presses Start, records every tick and stops 600 steps after the
+result word (`0x800B936C`, one byte per owner) changes: a whole 1v1, or a
+free-for-all up to its first defeat. `watch` lines log the result and
+supply words, which tap.bin does not carry, and the seed (which tap.bin
+does carry; the golden reads it from there); `parity_decode.py` requires both captures' `watch.csv` to be
+identical as well as their hash chains. In a whole match about 3% of ticks
+lose their follow-up read, because the next step changes the tick again;
+the decoder's clock still counts such a tick from its change read (see the
+skipped-tick rule above). A checkpoint reads the first sampled frame at or
+after it, recorded in the golden as `frame` for the GBA side. A run directory may keep its tap as
+`tap.bin.zst` (about 30x smaller); the decoder checks the manifest digest of
+the decompressed bytes.
+
+On the GBA the `match` runner scenario launches the same lobby and sets the
+host launch clock to the N64 seed, so the native start draw puts every
+player in the same corner (`start.corner`, gated). Players are joined by
+role and race: the human is the only player whose bank never falls (the
+GBA side is told), and lobbies never repeat a computer race. The same code
+(`measure`) reads both engines' normalised frames: build-order firsts
+(buildings when placed, units when complete), minerals gathered, supply
+used and provided, complete workers at fixed source frames, minerals per
+frame at each worker count, the first wave (three units with a weapon
+within 12 tiles of the human's town hall) and each player's elimination.
+A time not reached within the N64 run reads `999999` (NEVER) on either
+engine, so it matches only NEVER; a GBA checkpoint after its match ended
+reads `-1`, which no band admits.
+
+Bands are the N64 value widened by quantisation only (times ±2 frames,
+gathered minerals ±one trip per worker, counts exact). After the goldens of
+a lobby group exist, `python3 tools/sc64_parity_skirmish.py envelope`
+unions each band over the group's seeds, so the seed envelope is the
+tolerance exactly where the N64 itself varies; each seed's own band stays
+in the golden (`seed_lo`, `seed_hi`) for later re-runs. The start corner
+stays exact per seed. NEVER is never the top of a range: when some seeds
+never reached a time, the band covers the others and the observation lists
+NEVER under `also_ok`, which the judge treats as inside the band. Goldens
+decoded with different layouts are not merged.
 
 Times are measured from the last state before the command on both sides:
 on the N64 the last follow-up read taken at or before the tape's
@@ -246,4 +298,7 @@ stops with exit 9 instead of ordering the wrong unit.
    same numbers from a trace.
 4. Add the GBA scenario to `tests/sc64_parity_run.c` if no existing one fits.
 5. `python3 tools/parity_decode.py golden --scenario ID RUN_A RUN_B`, then
-   `./dev parity`, and `--accept` the known gaps.
+   `./dev parity`, and `--accept` the known gaps. For a skirmish seed, add
+   the lobby to `LOBBIES`, write its golden, then run
+   `tools/sc64_parity_skirmish.py envelope` before accepting.
+

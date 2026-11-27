@@ -6,11 +6,12 @@ only. This page covers the GBA half: a command injector, a per-step trace
 emitter, a demonstration runner and its self-gates. The comparator, golden
 files and baseline are separate work.
 
-Everything here is host-only. Two shipped headers gain one hook each, and both
-hooks compile to nothing unless a host build defines them (`GAME_AUDIO_REQUEST`
-in `starcraft/game_audio.h`, `SC64_TEXT_BOX_POSTED` in
-`starcraft/sc64_text_box_runtime.h`; either one defined without `GBA_HOST` is
-an `#error`). `game.c` is unchanged.
+Everything here is host-only. Two shipped headers and `game.c` gain one hook
+each, and every hook compiles to nothing unless a host build defines it
+(`GAME_AUDIO_REQUEST` in `starcraft/game_audio.h`, `SC64_TEXT_BOX_POSTED` in
+`starcraft/sc64_text_box_runtime.h`, `SC64_TEST_GATHER_OBSERVER` in
+`starcraft/game.c`; any one defined without `GBA_HOST` is an `#error`).
+`game.c` also keeps the older `SC64_TEST_HIT_OBSERVER` hook.
 
 | File | Role |
 | --- | --- |
@@ -46,9 +47,37 @@ of every generated input header its dependency file (`<binary>.d`, from a
 separate `clang -M` pass over all its sources) names. A change to the compile
 command rebuilds the binary (`<binary>.cmd`).
 
-The runner's `move` and `income` scenarios are the N64 parity scenarios;
-`tools/sc64_parity.py` runs them with the parameters of their golden files
-([`PARITY-HARNESS.md`](PARITY-HARNESS.md)).
+The runner's `move`, `income` and `match` scenarios are the N64 parity
+scenarios; `tools/sc64_parity.py` runs them with the parameters of their
+golden files ([`PARITY-HARNESS.md`](PARITY-HARNESS.md)).
+
+`match` launches Blood Bath Free for All through the lobby with a human race
+and one to three computer seats, and gives no command:
+
+```sh
+build/parity/zerg-z10-fast-trace --scenario match --human z --bot t --seed 100837 \
+  --steps 20000 --trace m.trace --gather m.trace.gather --no-route-checks
+```
+
+`--seed` sets the host launch clock (`gba_test_set_elapsed_milliseconds`)
+before the launch press. Native Blood Bath (`SC64_NATIVE_MELEE_STARTS`) draws
+the start corners from that clock as the cartridge draws them from its seed
+word, so the N64 seed gives the same corners. The report gains a `match`
+block: the seed, the start order, each owner's race and start, and three maps
+indexed by engine type: `unit_raw` and `building_raw` (cartridge type ids,
+from `sc64_race_raw_unit` and `sc64_race_raw_building`) and `unit_supply`
+(the supply a queued unit reserves, as `race_owner_queued_supply` counts it).
+Skirmish rows carry no raw type in the trace, so the maps join them to
+cartridge ids.
+
+`--gather PATH` writes worker deliveries, the counterpart of the cartridge's
+cumulative gathered arrays, which the engine does not keep: one
+`step owner minerals_gathered gas_gathered` line whenever an owner's totals
+change, then `# end STEP`. They come from a host-only hook,
+`SC64_TEST_GATHER_OBSERVER` in `add_owner_resources` (`starcraft/game.c`),
+whose only callers are the two worker delivery sites; it is an `#error`
+without `GBA_HOST`, so the ROMs are unchanged. The file is separate from the
+trace, whose record shapes are fixed.
 
 One runner run:
 

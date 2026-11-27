@@ -24,7 +24,7 @@
   "unit_fields": {
     "prev":         {"offset": "0x00", "type": "u32", "status": "proven", "evidence": "S3 link checks: every link is zero or a row start and symmetric"},
     "next":         {"offset": "0x04", "type": "u32", "status": "proven", "evidence": "S3 link checks"},
-    "hp":           {"offset": "0x08", "type": "u32", "scale": "8.8 fixed point", "status": "proven", "evidence": "field map (docs/audits/2026-11-26-parity-field-map.md), T3 opening: a Zergling's integer part fell 35 -> 29 on the tick a Marine Gauss Rifle bullet (6 damage) appeared on it, and 35 -> 15 when a Vulture grenade (20 damage) reached its target; unit labs (docs/audits/2026-11-26-parity-unit-labs.md): reads 40, 35, 60 and 80 x 256 for Marine, Zergling, SCV and Vulture rows at rest; in T1 a Marine ordered to attack took exactly 5 x 256 per Zergling hit (8 hits, 40 -> 0) while the Zergling it shot lost exactly 6 x 256 per hit, the two weapons' table damage"},
+    "hp":           {"offset": "0x08", "type": "u32", "scale": "8.8 fixed point", "status": "proven", "evidence": "field map (docs/audits/2026-11-26-parity-field-map.md), T3 opening: a Zergling's integer part fell 35 -> 29 on the tick a Marine Gauss Rifle bullet (6 damage) appeared on it, and 35 -> 15 when a Vulture grenade (20 damage) reached its target; unit labs (docs/audits/2026-11-26-parity-unit-labs.md): reads 40, 35, 60 and 80 x 256 for Marine, Zergling, SCV and Vulture rows at rest; in T1 a Marine ordered to attack took exactly 5 x 256 per Zergling hit (8 hits, 40 -> 0) while the Zergling it shot lost exactly 6 x 256 per hit, the two weapons' table damage; skirmish captures (docs/audits/2026-11-26-parity-skirmish.md): each type's highest reading over a whole match is its full HP (Supply Depot 500, Academy 600, Refinery 750, Barracks 1,000, Command Center 1,500, Hatchery 1,250, Bunker 350), and the human's last town hall fell 1,500 -> 590 -> 138 -> 0 before its row left the table"},
     "sprite":       {"offset": "0x0C", "type": "u32", "status": "proven", "evidence": "liveness rule; census counts matched Z8 placed rows exactly"},
     "x":            {"offset": "0x28", "type": "u16", "unit": "N64 map pixels", "status": "proven", "evidence": "census: placed buildings at their CHK source x; S4 move captures: Marines move toward the ordered point"},
     "y":            {"offset": "0x2A", "type": "u16", "unit": "N64 map pixels", "status": "proven", "evidence": "as x"},
@@ -51,7 +51,20 @@
         "gas_gathered":      {"offset": "0x60", "status": "candidate", "evidence": "as gas"},
         "minerals_gathered": {"offset": "0x90", "status": "proven", "evidence": "S4 Blood Bath captures: cumulative, +8 per delivery, never decreases; equals the bank rise while nothing is spent"}
       }},
-    "rng": {"address": "0x800EFF20", "bytes": 12, "status": "candidate", "evidence": "seed, draw count and state words named by static reading; not validated against a launch"}
+    "supply": {"address": "0x800B3AC0", "players": 12, "type": "u32[12]", "races": ["zerg", "terran", "protoss"], "race_stride": "0x90",
+      "about": "Doubled supply units (a Marine is 2), one block per race at address + race * race_stride; not in tap.bin: skirmish tapes log these words with watch lines (watch.csv)",
+      "arrays": {
+        "available": {"offset": "0x00", "status": "proven", "evidence": "Blood Bath 1v1 x-zt dumps at three steps (docs/audits/2026-11-26-parity-skirmish.md): Zerg 18 for a Hatchery and an Overlord; Terran 20 for a Command Center, then 36 once a Supply Depot completed"},
+        "used":      {"offset": "0x30", "status": "proven", "evidence": "same dumps: Zerg 8 for four Drones; Terran 8, 14 and 24 for 4, 7 and 12 units counting the one in training"},
+        "max":       {"offset": "0x60", "status": "candidate", "evidence": "400 for every player in those dumps; never changed"}
+      }},
+    "result": {"address": "0x800B936C", "type": "u8[4]", "status": "proven",
+      "about": "One result byte per owner 0-3 (read as a big-endian u32, owner 0 is the most significant byte); 2 when that owner is defeated, 0 before. A copy is at 0x8010DBE0. Not in tap.bin: skirmish tapes watch the word and stop 600 steps after it changes",
+      "evidence": "S8 (docs/audits/2026-11-26-parity-scenario-spikes.md): 0x00020000 at tick 12,960 in both full-match runs, when the passive human (owner 1) was defeated; every skirmish capture in docs/audits/2026-11-26-parity-skirmish.md: the passive human's own byte became 2 (0x02000000 for owner 0, 0x00020000 for owner 1, 0x00000002 for owner 3) within a few frames of its last building reaching 0 HP or leaving the table, never back to zero"},
+    "rng": {"address": "0x800EFF20", "bytes": 12, "status": "candidate", "evidence": "seed, draw count and state words named by static reading; not validated against a launch"},
+    "seed": {"address": "0x800EFF20", "type": "u32", "status": "proven",
+      "about": "The launch seed: the first word of the rng block, read back from tap.bin (milliseconds since power-on at launch)",
+      "evidence": "S8 (docs/audits/2026-11-26-parity-scenario-spikes.md): milliseconds since power-on at launch, moving 16.7 ms per step of launch delay; the generator state reproduces from it; the GBA's native Blood Bath start draw given this word put every player of every captured skirmish lobby in the N64 corner (docs/audits/2026-11-26-parity-skirmish.md)"}
   },
   "orders": {
     "about": "Values of unit.order (+0x4D). Only values seen under a controlled command are proven; the numbering is the PC orders.dat one, which every proven value follows.",
