@@ -328,9 +328,9 @@ is sent against an enemy. The lab state is the mission after its opening transmi
 selected and given B at the enemy's own position, which the cartridge makes an
 attack-move (order 14). The GBA replays the same attack-move. Targets and attackers were
 picked from exploration captures, never from the CHK alone: the CHK placements do not
-show which enemies guard the route. Where both sides field every unit type (Zerg against
-Zerg, Protoss against Protoss), no unit type identifies the human. The spec then names
-the map's human slot (`human_owner`), which must own a unit of the subject's type. The
+show which enemies guard the route. Where every unit type the human fields also has an
+enemy owner (Zerg against Zerg in Z7), no unit type identifies the human. The spec then
+names the map's human slot (`human_owner`), which must own a unit of the subject's type. The
 labs and results are in
 [`audits/2026-11-27-parity-enemy-labs.md`](audits/2026-11-27-parity-enemy-labs.md).
 

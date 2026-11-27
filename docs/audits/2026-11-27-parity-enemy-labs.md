@@ -32,8 +32,8 @@ was built in four steps:
    so an attack-move is also the only order every GBA profile replays alike.
 
 The human player is the one owner of a unit type that only the human fields at the lab's
-first frame. In Z7, Zerg against Zerg, every type has two owners, so the spec names the
-map's human slot instead (`human_owner`). That slot must own a unit of the subject's type.
+first frame. In Z7, Zerg against Zerg, every type the human fields also has an enemy
+owner, so the spec names the map's human slot instead (`human_owner`). That slot must own a unit of the subject's type.
 
 ### What the CHK scan could not show
 
@@ -69,7 +69,7 @@ Rejected for this reason or others:
 | P3 Dragoon on Zergling | The Zergling it fought was born after the lab state |
 | P8 Dragoon on Zealot | The N64 subject moved about 90 px before its command, so the GBA finds no unit at its launch point |
 | Z1 Zergling on Marine | The GBA Zergling dies after one hit. Its cooldown has no GBA value, and the harness cannot accept a missing value |
-| P1 Zealot on Zerglings | The GBA applies both Zealot blades in one frame, so neither its cooldown nor its first-hit range has a GBA value. On the N64 the blades land 2 frames apart (gaps 2, 21, 2, 2, 18 …), and each blade does 8. This is a GBA defect, but no golden can hold it until the measurement can time paired hits |
+| P1 Zealot on Zerglings | The N64 golden gates the cooldown and first-hit range: its blades land 2 frames apart (gaps 2, 21, 2, 2, 18 …), 8 each. The GBA applies both blades in one frame, so neither check gets a GBA value, and a missing value cannot be accepted into the baseline. This is a GBA defect; the lab waits for a measurement that times a pair of hits in one frame as one attack |
 
 ## Labs
 
@@ -77,7 +77,7 @@ Rejected for this reason or others:
 | --- | --- | --- | --- |
 | `lab-hydralisk-dragoon` | Z2 | Hydralisk → Dragoon | explosive, on shields |
 | `lab-mutalisk-dragoon` | Z2 | Mutalisk → Dragoon | air-to-ground glave, on shields |
-| `lab-marine-marine` | T5 | Marine → enemy Marine | normal on small, both ways |
+| `lab-marine-marine` | T5 | Marine → enemy Marine | normal on small |
 | `lab-mutalisk-hydralisk` | Z7 | Mutalisk → Hydralisk | normal on medium |
 | `lab-marine-hydralisk` | T3 | Marine → Hydralisk | normal on medium; explosive on small (damage taken) |
 | `lab-vulture-hydralisk` | T3 | Vulture → Hydralisk | concussive on medium (half damage) |
@@ -106,8 +106,8 @@ frames, distances N64 px centre to centre.
 | Dragoon → Zerglings | 10 PASS | **N64 27.5, GBA 30** | **N64 49.2, GBA 127.3** | **N64 329, GBA absent** | not measured on the GBA (report) |
 
 The first-hit time is report-only, as in every attack lab (it includes the walk and the
-N64 input lag), so it is left out of the table. Every damage value matches the N64
-exactly. These include the explosive and concussive size multipliers (10 for the Dragoon
+N64 input lag), so it is left out of the table. Every gating damage value matches the
+N64 exactly. These include the explosive and concussive size multipliers (10 for the Dragoon
 and 10 for the Vulture, both half damage) and the Goliath's 1 point of armour.
 
 ### GBA defects (accepted as KNOWN)
@@ -124,8 +124,10 @@ and 10 for the Vulture, both half damage) and the Goliath's 1 point of armour.
    Dragoon), or does not die in the run (`absent`: Mutalisk on Hydralisk, Guardian,
    Dragoon on Zerglings).
 3. **Cooldown with no variation (2 lines).** GBA cooldowns are fixed, 30 for both the
-   Mutalisk and the Dragoon. The N64 gaps vary: Mutalisk 28–32 (median 32 against the
-   Dragoon, 31 against the Hydralisk, which passes) and Dragoon 24–32 (median 27.5).
+   Mutalisk and the Dragoon. The N64's short gaps vary: Mutalisk 28–32 (the Dragoon
+   fight also has gaps of 63 and 90 frames; medians 32 against
+   the Dragoon and 31 against the Hydralisk, which passes) and Dragoon 24–32 (median
+   27.5).
 
 ### Wall time
 

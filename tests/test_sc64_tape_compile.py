@@ -691,6 +691,27 @@ class LabMeasureTest(unittest.TestCase):
                 self.assertIn(spec['mission'], range(30), spec['id'])
             self.assertEqual(metrics.SCENARIOS[spec['id']]['decoder_revision'], 3, spec['id'])
 
+    def test_enemy_labs_are_pinned(self):
+        # The nine enemy labs (docs/audits/2026-11-27-parity-enemy-labs.md): mission, profile and
+        # the way the human is found. A removed lab or a changed mission fails here.
+        expected = {
+            'lab-hydralisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE)),
+            'lab-mutalisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE)),
+            'lab-marine-marine': (8, 'terran', ('human_type', 19)),
+            'lab-mutalisk-hydralisk': (18, 'zerg-z10', ('human_owner', 3)),
+            'lab-marine-hydralisk': (6, 'terran', ('human_type', metrics.MARINE)),
+            'lab-vulture-hydralisk': (6, 'terran', ('human_type', metrics.MARINE)),
+            'lab-guardian-zealot': (17, 'zerg-z10', ('human_type', 38)),
+            'lab-zergling-goliath': (0, 'zerg-z10', ('human_type', metrics.ZERGLING)),
+            'lab-dragoon-zergling-pack': (2, 'protoss-p10', ('human_type', 65)),
+        }
+        specs = {spec['id']: spec for spec in metrics.LAB_SPECS}
+        for lab, (mission, profile, (key, value)) in expected.items():
+            spec = specs[lab]
+            self.assertEqual((spec['runner'], spec['mission'], spec['profile'], spec[key]),
+                             ('lab-mission', mission, profile, value), lab)
+            self.assertEqual(metrics.SCENARIOS[lab]['profile'], profile, lab)
+
     def test_attack_hits_cooldown_range_and_death(self):
         pos = {sf: (100, 100) for sf in range(0, 120)}
         marine = {sf: 40.0 for sf in range(0, 120)}

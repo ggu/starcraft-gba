@@ -1551,8 +1551,8 @@ def lab_attack_observations(m, name, foe):
 
 def lab_human(series, spec):
     """The N64 human player: the one owner of spec['human_type'] at the lab's first frame, or, where
-    both sides field every type (Zerg against Zerg in Z7), the map's human slot spec['human_owner'],
-    which must then own a unit of the subject's type."""
+    every type the human fields also has an enemy owner (Zerg against Zerg in Z7), the map's human
+    slot spec['human_owner'], which must then own a unit of the subject's type."""
     units = series['frames'][0]['units'].values()
     if 'human_owner' in spec:
         if not any(u[1] == spec['human_owner'] and u[0] == spec['subject_type'] for u in units):
@@ -1736,8 +1736,9 @@ LAB_SPECS = [
      'shields': True, 'title': 'Z2 lab: one Mutalisk attack-moves onto a lone Dragoon (air on ground, shields)'},
     {'id': 'lab-marine-marine', 'kind': 'attack', 'name': 'Marine', 'foe': 'Marine', 'foe_type': MARINE,
      'subject_type': MARINE, 'human_type': 19, 'profile': 'terran', 'runner': 'lab-mission', 'mission': 8,
-     'title': 'T5 lab: one Marine attack-moves into a lone enemy Marine (normal on small, both ways)'},
-    # Zerg against Zerg: both sides field every type, so the human is the map's human slot.
+     'title': 'T5 lab: one Marine attack-moves into a lone enemy Marine (normal on small)'},
+    # Zerg against Zerg: every type the human fields also has an enemy owner, so the human is the
+    # map's human slot.
     {'id': 'lab-mutalisk-hydralisk', 'kind': 'attack', 'name': 'Mutalisk', 'foe': 'Hydralisk', 'foe_type': 38,
      'subject_type': 43, 'human_owner': 3, 'profile': 'zerg-z10', 'runner': 'lab-mission', 'mission': 18,
      'title': 'Z7 lab: one Mutalisk attack-moves onto a lone Hydralisk (air on ground, normal on medium)'},
