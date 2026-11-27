@@ -440,6 +440,12 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                     return needed - (own[i][1] - 1)   # frames short: never 0
             return gap(v)
         gaps = [gap_at(i, v) for i, v in enumerate(spread)]
+        # What --accept records: an offset the early end left inconclusive keeps its recorded value.
+        recorded_offsets = known.get('gba_offsets') if known is not None else None
+        if recorded_offsets is not None and len(recorded_offsets) == len(spread) and 'gba_offsets' in row and \
+                any(g != gap(v) for g, v in zip(gaps, spread)):
+            row['accept_offsets'] = [b if g != gap(v) else r for b, g, v, r in
+                                     zip(recorded_offsets, gaps, spread, row['gba_offsets'])]
         every = ' at every frame offset' if len(spread) > 1 else ''
         # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
         # band as seed_lo/seed_hi, and the N64's spread over seeds is no licence to move further out.
@@ -818,9 +824,11 @@ def write_baseline(path, results, old):
                     raise ValueError(f'{row["key"]}: no GBA value to accept')
                 line = {'key': row['key'], 'gba': row['gba']}
                 if 'gba_offsets' in row:
-                    if not all(finite_number(v) for v in row['gba_offsets']):
+                    # Offsets an early defeat left inconclusive keep their recorded values.
+                    spread = row.get('accept_offsets', row['gba_offsets'])
+                    if not all(finite_number(v) for v in spread):
                         raise ValueError(f'{row["key"]}: no GBA value to accept at every frame offset')
-                    line['gba_offsets'] = row['gba_offsets']
+                    line['gba'], line['gba_offsets'] = spread[0], spread
                 note = old.get(row['key'], {}).get('note')
                 if note:
                     line['note'] = note

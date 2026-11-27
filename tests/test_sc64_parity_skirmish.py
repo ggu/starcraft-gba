@@ -986,6 +986,27 @@ class FrameOffsets(unittest.TestCase):
         mixed = sc64_parity.judge('sk-pvt-w0', never, {key: sk.NEVER}, {}, cut, more=more, cutoffs=[9000] * 3)[0]
         self.assertEqual(mixed['verdict'], 'KNOWN')
 
+    def test_accept_keeps_values_an_early_end_left_inconclusive(self):
+        never = dict(self.golden(sk.NEVER, sk.NEVER, sk.NEVER, check='build.first.Factory', subject='cpu Terran'),
+                     gba={'horizon': 10676})
+        key = ('build.first.Factory', 'cpu Terran')
+        line = 'sk-pvt-w0:build.first.Factory:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'baseline.json'
+            for cutoffs, spread, want in (([9000] * 3, [sk.NEVER] * 3, [10079, 10078, 10077]),
+                                          ([None, 9000, None], [10070, sk.NEVER, 10071], [10070, 10078, 10071])):
+                more = [(1, {key: spread[1]}), (2, {key: spread[2]})]
+                row = sc64_parity.judge('sk-pvt-w0', never, {key: spread[0]}, {}, known, more=more, cutoffs=cutoffs)[0]
+                self.assertEqual(row['verdict'], 'KNOWN')
+                sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+                accepted = sc64_parity.load_baseline(path)
+                self.assertEqual((accepted[line]['gba'], accepted[line]['gba_offsets']), (want[0], want))
+                # Replaying the original timings against what was accepted stays KNOWN.
+                again = sc64_parity.judge('sk-pvt-w0', never, {key: 10079}, {}, accepted,
+                                          more=[(1, {key: 10078}), (2, {key: 10077})])[0]
+                self.assertEqual(again['verdict'], 'KNOWN')
+
     def test_a_checkpoint_against_a_single_runs_line_keeps_every_offset(self):
         line = 'sk-pvt-w0:supply.cap@8000:cpu Terran'
         legacy = {line: {'key': line, 'gba': 116}}
