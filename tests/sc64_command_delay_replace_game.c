@@ -103,11 +103,103 @@ static void check_stale_grid_formation(int building)
     sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
     assert(sx == limit(tx - 16, 8, WORLD_W - 8) && sy == limit(ty - 8, 8, WORLD_H - 8));
     assert(!path_grid_valid);
-    /* The same translation onto open ground keeps the slot. */
-    f.dx = 0; f.dy = 0;
-    sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
-    assert(sx == u[a].x && sy == u[a].y && !path_grid_valid);
+    /* A translation onto open ground beside the building, connected to the
+     * ordered point, keeps the slot. */
+    static const int near[4][2] = {{48, 0}, {-48, 0}, {0, 48}, {0, -48}};
+    int kept = 0;
+    for (int k = 0; k < 4 && !kept; ++k) {
+        int ox = tx + near[k][0], oy = ty + near[k][1];
+        if (terrain_blocked(ox / 16, oy / 16) || sc64_formation_cell_built(ox / 16, oy / 16)) continue;
+        f.dx = ox - u[a].x; f.dy = oy - u[a].y;
+        sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
+        assert(sx == ox && sy == oy && !path_grid_valid);
+        kept = 1;
+    }
+    assert(kept);
     puts("command delay: stale-grid formation slot under a building takes its grid slot: ok");
+}
+
+/* Four-neighbour components of the current walk grid, for the cliff test. */
+static short cliff_component[256 * 256]; /* MAP_COLS is a variable in large-map builds */
+static void label_components(void)
+{
+    static int queue[256 * 256];
+    int label = 0;
+    assert(MAP_COLS * MAP_ROWS <= 256 * 256);
+    build_path_grid();
+    for (int i = 0; i < MAP_COLS * MAP_ROWS; ++i) cliff_component[i] = -1;
+    for (int s0 = 0; s0 < MAP_COLS * MAP_ROWS; ++s0) {
+        if (cliff_component[s0] >= 0 || !SC64_GRID_GET(path_walkable, s0)) continue;
+        int head = 0, tail = 0;
+        queue[tail++] = s0; cliff_component[s0] = (short)label;
+        while (head < tail) {
+            int c = queue[head++], x = c % MAP_COLS, y = c / MAP_COLS;
+            static const int dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+            for (int d = 0; d < 4; ++d) {
+                int nx = x + dx[d], ny = y + dy[d], n;
+                if (nx < 0 || ny < 0 || nx >= MAP_COLS || ny >= MAP_ROWS) continue;
+                n = nx + ny * MAP_COLS;
+                if (cliff_component[n] >= 0 || !SC64_GRID_GET(path_walkable, n)) continue;
+                cliff_component[n] = (short)label; queue[tail++] = n;
+            }
+        }
+        ++label;
+    }
+}
+static int component_at(int x, int y) { return cliff_component[x / 16 + (y / 16) * MAP_COLS]; }
+
+/* A group beside a cliff: the ordered point is reachable, but one Marine's
+ * translated slot is open ground the point does not connect to. Every unit
+ * gets a destination in its own component and arrives there. */
+static void check_cliff_formation(void)
+{
+    label_components();
+    for (int c = 0; c < MAP_COLS * MAP_ROWS; ++c) {
+        if (cliff_component[c] < 0) continue;
+        int cxp = (c % MAP_COLS) * 16 + 8, cyp = (c / MAP_COLS) * 16 + 8, k = cliff_component[c];
+        for (int vy = -3; vy <= 3; ++vy) for (int vx = -3; vx <= 3; ++vx) {
+            if (FAST_ABS(vx) + FAST_ABS(vy) < 2) continue;
+            int sx = cxp + vx * 16, sy = cyp + vy * 16;
+            if (sx < 8 || sy < 8 || sx >= WORLD_W - 8 || sy >= WORLD_H - 8) continue;
+            int ks = component_at(sx, sy);
+            if (ks < 0 || ks == k) continue;
+            /* Marine A stands where its slot is the far point; B mirrors it
+             * (slot_A = point + v, slot_B = point - v, centre = A - v). Both
+             * stand in the point's component, away from the point. */
+            for (int off = 3; off <= 12; ++off) for (int sgn = -1; sgn <= 1; sgn += 2) {
+                int ax = cxp + sgn * off * 16, ay = cyp + vy * 16 + 4 * 16;
+                int bx = ax - 2 * vx * 16, by = ay - 2 * vy * 16;
+                if (ax < 8 || ay < 8 || bx < 8 || by < 8 || ax >= WORLD_W - 8 || bx >= WORLD_W - 8 ||
+                    ay >= WORLD_H - 8 || by >= WORLD_H - 8) continue;
+                if (component_at(ax, ay) != k || component_at(bx, by) != k) continue;
+                int left = ax < bx ? ax : bx, right = ax < bx ? bx : ax;
+                int top = ay < by ? ay : by, bottom = ay < by ? by : ay;
+                if (cxp >= left && cxp <= right && cyp >= top && cyp <= bottom) continue;
+                if (right - left > SC64_GROUP_FORMATION_MAX_SPAN || bottom - top > SC64_GROUP_FORMATION_MAX_SPAN) continue;
+                int a = spawn_unit(SIDE, sc64_race_unit_from_raw(0), ax, ay);
+                int b2 = spawn_unit(SIDE, sc64_race_unit_from_raw(0), bx, by);
+                assert(a >= 0 && b2 >= 0);
+                select_only(a, b2);
+                /* The translation the formation would apply puts A on the far side. */
+                Sc64GroupFormation f = sc64_group_formation_begin(ORDER_MOVE, 1, cxp, cyp);
+                assert(f.keep && component_at(u[a].x + f.dx, u[a].y + f.dy) == ks);
+                assert(issue_order(ORDER_MOVE, cxp, cyp) == 2);
+                printf("cliff formation: point %d,%d, slot %d,%d across terrain; "
+                       "A %d,%d -> %d,%d, B %d,%d -> %d,%d\n", cxp, cyp, u[a].x + f.dx, u[a].y + f.dy,
+                       u[a].x, u[a].y, u[a].tx, u[a].ty, u[b2].x, u[b2].y, u[b2].tx, u[b2].ty);
+                assert(component_at(u[a].tx, u[a].ty) == k && component_at(u[b2].tx, u[b2].ty) == k);
+                for (int t = 0; t < 600 && (dist2(u[a].x, u[a].y, u[a].tx, u[a].ty) > 6 * 6 ||
+                                            dist2(u[b2].x, u[b2].y, u[b2].tx, u[b2].ty) > 6 * 6); ++t)
+                    input(0);
+                assert(dist2(u[a].x, u[a].y, u[a].tx, u[a].ty) <= 6 * 6);
+                assert(dist2(u[b2].x, u[b2].y, u[b2].tx, u[b2].ty) <= 6 * 6);
+                puts("command delay: a group beside a cliff keeps every destination reachable: ok");
+                u[a].selected = u[b2].selected = 0;
+                return;
+            }
+        }
+    }
+    assert(!"no cliff geometry found in T1");
 }
 
 static void launch_t4(void)
@@ -236,5 +328,7 @@ int main(void)
     assert(!sc64_delayed_commands[0].active && !sc64_delayed_commands[1].active);
     assert(u[runner].tx == last_x && u[runner].ty == last_y);
     puts("command delay: three quick Moves land in order: ok");
+
+    check_cliff_formation();
     return 0;
 }

@@ -12,7 +12,74 @@
  * profiles, after sc64_command_delay.h; it reads u[] and the selection. */
 enum { SC64_GROUP_FORMATION_MAX_SPAN = 128 }; /* GBA px (256 source px) */
 
-typedef struct { int keep, dx, dy; } Sc64GroupFormation;
+/* A kept formation's slots lie within half the span of the ordered point
+ * (4 tiles). A slot is accepted only if it connects to the ordered point
+ * through open tiles inside a window of SC64_FORMATION_REACH_RADIUS tiles
+ * around it, so a slot across a cliff or wall, which the unit could reach
+ * only by a long detour or not at all, is not kept. Reached through the
+ * ordered point, a slot is reachable from the unit whenever the point is.
+ * Bounded: one 13 x 13 flood per group order, no route queries and no grid
+ * rebuild (route state is unchanged). */
+enum { SC64_FORMATION_REACH_RADIUS = 6,
+       SC64_FORMATION_REACH_SIDE = 2 * SC64_FORMATION_REACH_RADIUS + 1,
+       SC64_FORMATION_REACH_CELLS = SC64_FORMATION_REACH_SIDE * SC64_FORMATION_REACH_SIDE };
+
+typedef struct {
+    int keep, dx, dy, col0, row0;
+    u8 reach[(SC64_FORMATION_REACH_CELLS + 7) / 8];
+} Sc64GroupFormation;
+
+/* Open for the formation: terrain, and buildings or doors from the walk grid
+ * when it is current, else from b[] (sc64_formation_cell_built below). */
+static int sc64_formation_cell_built(int col, int row);
+static int
+sc64_formation_cell_open(int col, int row, int buildings)
+{
+    if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS || terrain_blocked(col, row))
+        return 0;
+    if (path_grid_valid) return SC64_GRID_GET(path_walkable, col + row * MAP_COLS);
+    return !buildings || !sc64_formation_cell_built(col, row);
+}
+
+/* Four-neighbour flood from the ordered point's tile over the window, on
+ * terrain and a current walk grid (a stale grid's buildings are left to the
+ * slot's own footprint test). Returns 0 when the point itself is blocked. */
+static int __attribute__((noinline))
+sc64_group_formation_flood(Sc64GroupFormation *f, int tx, int ty)
+{
+    u8 queue[SC64_FORMATION_REACH_CELLS];
+    int head = 0, tail = 0, col = tx / 16, row = ty / 16;
+    f->col0 = col - SC64_FORMATION_REACH_RADIUS;
+    f->row0 = row - SC64_FORMATION_REACH_RADIUS;
+    memset(f->reach, 0, sizeof f->reach);
+    if (!sc64_formation_cell_open(col, row, 0)) return 0;
+    queue[tail++] = (u8)(SC64_FORMATION_REACH_RADIUS * SC64_FORMATION_REACH_SIDE + SC64_FORMATION_REACH_RADIUS);
+    f->reach[queue[0] >> 3] |= (u8)(1u << (queue[0] & 7));
+    while (head < tail) {
+        static const s8 step_x[4] = {1, -1, 0, 0}, step_y[4] = {0, 0, 1, -1};
+        int at = queue[head++], ax = at % SC64_FORMATION_REACH_SIDE, ay = at / SC64_FORMATION_REACH_SIDE;
+        for (int d = 0; d < 4; ++d) {
+            int nx = ax + step_x[d], ny = ay + step_y[d], next;
+            if (nx < 0 || ny < 0 || nx >= SC64_FORMATION_REACH_SIDE || ny >= SC64_FORMATION_REACH_SIDE) continue;
+            next = nx + ny * SC64_FORMATION_REACH_SIDE;
+            if ((f->reach[next >> 3] >> (next & 7)) & 1) continue;
+            if (!sc64_formation_cell_open(f->col0 + nx, f->row0 + ny, 0)) continue;
+            f->reach[next >> 3] |= (u8)(1u << (next & 7));
+            queue[tail++] = (u8)next;
+        }
+    }
+    return 1;
+}
+
+static int
+sc64_group_formation_reaches(const Sc64GroupFormation *f, int x, int y)
+{
+    int col = x / 16 - f->col0, row = y / 16 - f->row0, at;
+    if (col < 0 || row < 0 || col >= SC64_FORMATION_REACH_SIDE || row >= SC64_FORMATION_REACH_SIDE)
+        return 0;
+    at = col + row * SC64_FORMATION_REACH_SIDE;
+    return (f->reach[at >> 3] >> (at & 7)) & 1;
+}
 
 /* Move orders only: an attack-move keeps gathering on its point, so no unit
  * stops outside acquisition range of it. The group moves by one translation,
@@ -20,7 +87,8 @@ typedef struct { int keep, dx, dy; } Sc64GroupFormation;
 static inline Sc64GroupFormation
 sc64_group_formation_begin(int order, int group_order, int tx, int ty)
 {
-    Sc64GroupFormation f = {0, 0, 0};
+    Sc64GroupFormation f;
+    memset(&f, 0, sizeof f);
     int left = WORLD_W, top = WORLD_H, right = -1, bottom = -1;
     if (!group_order || order != ORDER_MOVE) return f;
     for (int i = 0; i < MAX_UNITS; ++i) {
@@ -33,6 +101,8 @@ sc64_group_formation_begin(int order, int group_order, int tx, int ty)
     if (right < 0 || right - left > SC64_GROUP_FORMATION_MAX_SPAN ||
         bottom - top > SC64_GROUP_FORMATION_MAX_SPAN ||
         (tx >= left && tx <= right && ty >= top && ty <= bottom)) return f;
+    /* An ordered point on blocked ground gathers on the grid, as before. */
+    if (!sc64_group_formation_flood(&f, tx, ty)) return f;
     f.keep = 1;
     f.dx = limit(tx - (left + right) / 2, 8 - left, WORLD_W - 8 - right);
     f.dy = limit(ty - (top + bottom) / 2, 8 - top, WORLD_H - 8 - bottom);
@@ -101,30 +171,38 @@ sc64_formation_cell_built(int col, int row)
 }
 
 /* The n-th selected unit's destination for a group order to (tx, ty).
- * With check_tile a translated ground slot on blocked terrain, or under a
- * building or door, takes its grid slot. Both callers set it: the
+ * With check_tile, a kept formation's ground slot must be open (terrain,
+ * buildings and doors: the walk grid when it is current, else b[]
+ * directly) and connect to the ordered point (the flood above); otherwise
+ * the unit takes its grid slot, or the ordered point itself when that
+ * grid slot does not connect either. Both callers set check_tile: the
  * reachable-formation route check can count a blocked tile reachable
- * through a neighbour and keep a point no unit reaches. Buildings and doors
- * come from the walk grid when it is current, else from b[] directly. */
+ * through a neighbour and keep a point no unit reaches. */
 static inline void
 sc64_group_formation_slot(const Sc64GroupFormation *f, const Unit *q, int n,
                           int tx, int ty, int check_tile, int *slot_x, int *slot_y)
 {
     if (f->keep) {
-        int col, row;
         *slot_x = q->x + f->dx;
         *slot_y = q->y + f->dy;
-        col = *slot_x / 16; row = *slot_y / 16;
         if (!check_tile ||
 #ifdef SC64_RACES
             sc64_race_unit_flying(q->type) ||
 #endif
-            (!terrain_blocked(col, row) &&
-             (path_grid_valid ? SC64_GRID_GET(path_walkable, col + row * MAP_COLS)
-                              : !sc64_formation_cell_built(col, row)))) return;
+            (sc64_formation_cell_open(*slot_x / 16, *slot_y / 16, 1) &&
+             sc64_group_formation_reaches(f, *slot_x, *slot_y))) return;
     }
     *slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
     *slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
+    if (f->keep && check_tile &&
+#ifdef SC64_RACES
+        !sc64_race_unit_flying(q->type) &&
+#endif
+        !(sc64_formation_cell_open(*slot_x / 16, *slot_y / 16, 1) &&
+          sc64_group_formation_reaches(f, *slot_x, *slot_y))) {
+        *slot_x = tx;
+        *slot_y = ty;
+    }
 }
 
 #endif
