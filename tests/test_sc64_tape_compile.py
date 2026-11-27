@@ -694,17 +694,18 @@ class LabMeasureTest(unittest.TestCase):
     def test_enemy_labs_are_pinned(self):
         # The nine enemy labs (docs/audits/2026-11-27-parity-enemy-labs.md): mission, profile and
         # the way the human is found. A removed lab or a changed mission fails here.
-        # id: (mission, profile, human selector, subject id, foe id, shields measured)
+        # id: (mission, profile, human selector, subject id, foe id, shields measured); literal
+        # cartridge unit ids (Marine 0, Zergling 37, Drone 41), so a changed shared constant fails too.
         expected = {
-            'lab-hydralisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE), 38, 66, True),
-            'lab-mutalisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE), 43, 66, True),
-            'lab-marine-marine': (8, 'terran', ('human_type', 19), metrics.MARINE, metrics.MARINE, False),
+            'lab-hydralisk-dragoon': (1, 'zerg-z10', ('human_type', 41), 38, 66, True),
+            'lab-mutalisk-dragoon': (1, 'zerg-z10', ('human_type', 41), 43, 66, True),
+            'lab-marine-marine': (8, 'terran', ('human_type', 19), 0, 0, False),
             'lab-mutalisk-hydralisk': (18, 'zerg-z10', ('human_owner', 3), 43, 38, False),
-            'lab-marine-hydralisk': (6, 'terran', ('human_type', metrics.MARINE), metrics.MARINE, 38, False),
-            'lab-vulture-hydralisk': (6, 'terran', ('human_type', metrics.MARINE), 2, 38, False),
+            'lab-marine-hydralisk': (6, 'terran', ('human_type', 0), 0, 38, False),
+            'lab-vulture-hydralisk': (6, 'terran', ('human_type', 0), 2, 38, False),
             'lab-guardian-zealot': (17, 'zerg-z10', ('human_type', 38), 44, 65, True),
-            'lab-zergling-goliath': (0, 'zerg-z10', ('human_type', metrics.ZERGLING), metrics.ZERGLING, 3, False),
-            'lab-dragoon-zergling-pack': (2, 'protoss-p10', ('human_type', 65), 66, metrics.ZERGLING, True),
+            'lab-zergling-goliath': (0, 'zerg-z10', ('human_type', 37), 37, 3, False),
+            'lab-dragoon-zergling-pack': (2, 'protoss-p10', ('human_type', 65), 66, 37, True),
         }
         specs = {spec['id']: spec for spec in metrics.LAB_SPECS}
         for lab, (mission, profile, (key, value), subject, foe, shields) in expected.items():
