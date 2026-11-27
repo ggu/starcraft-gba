@@ -85,6 +85,9 @@ static struct {
     __typeof__(u[0].target) target;
     __typeof__(u[0].tx) tx;
     __typeof__(u[0].ty) ty;
+    __typeof__(u[0].path_timer) path_timer;
+    __typeof__(u[0].path_retry) path_retry;
+    __typeof__(u[0].work_timer) work_timer;
 } sc64_command_delay_audit_seen[MAX_UNITS];
 static int
 sc64_command_delay_pending(int slot)
@@ -102,6 +105,9 @@ sc64_command_delay_input_begin(void)
         sc64_command_delay_audit_seen[i].target = u[i].target;
         sc64_command_delay_audit_seen[i].tx = u[i].tx;
         sc64_command_delay_audit_seen[i].ty = u[i].ty;
+        sc64_command_delay_audit_seen[i].path_timer = u[i].path_timer;
+        sc64_command_delay_audit_seen[i].path_retry = u[i].path_retry;
+        sc64_command_delay_audit_seen[i].work_timer = u[i].work_timer;
     }
 }
 static void
@@ -112,7 +118,11 @@ sc64_command_delay_input_end(void)
             (sc64_command_delay_audit_seen[i].order != u[i].order ||
              sc64_command_delay_audit_seen[i].target != u[i].target ||
              sc64_command_delay_audit_seen[i].tx != u[i].tx ||
-             sc64_command_delay_audit_seen[i].ty != u[i].ty)) {
+             sc64_command_delay_audit_seen[i].ty != u[i].ty ||
+             /* a command repeated as it stands still resets these */
+             sc64_command_delay_audit_seen[i].path_timer != u[i].path_timer ||
+             sc64_command_delay_audit_seen[i].path_retry != u[i].path_retry ||
+             sc64_command_delay_audit_seen[i].work_timer != u[i].work_timer)) {
             fprintf(stderr, "command delay audit: unit %d (type %d) order %d -> %d "
                     "target %d -> %d at frame %u while a command is pending\n",
                     i, (int)u[i].type, (int)sc64_command_delay_audit_seen[i].order,
