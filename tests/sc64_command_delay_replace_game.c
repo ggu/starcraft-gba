@@ -87,35 +87,35 @@ static void check_footprints(const char *where)
 }
 
 /* With the walk grid stale, a group Move's translated slot under a
- * building falls back to its grid slot, open ground keeps the formation,
- * and nothing rebuilds the grid. */
+ * building falls back to an open slot connected to the ordered point, a
+ * slot on open ground beside it is kept, and nothing rebuilds the grid. */
 static void check_stale_grid_formation(int building)
 {
-    int a = player_marine(0), c = player_marine(1);
+    static const int near[4][2] = {{48, 0}, {-48, 0}, {0, 48}, {0, -48}};
+    int a = player_marine(0), c = player_marine(1), ox = -1, oy = -1;
     select_only(a, c);
     invalidate_path_grid();
     assert(!path_grid_valid);
-    Sc64GroupFormation f = sc64_group_formation_begin(ORDER_MOVE, 1, b[building].x, b[building].y);
-    assert(f.keep);
-    /* Translate the group so the first Marine's slot is the building's centre. */
-    f.dx = b[building].x - u[a].x; f.dy = b[building].y - u[a].y;
-    int sx, sy, tx = b[building].x, ty = b[building].y;
-    sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
-    assert(sx == limit(tx - 16, 8, WORLD_W - 8) && sy == limit(ty - 8, 8, WORLD_H - 8));
-    assert(!path_grid_valid);
-    /* A translation onto open ground beside the building, connected to the
-     * ordered point, keeps the slot. */
-    static const int near[4][2] = {{48, 0}, {-48, 0}, {0, 48}, {0, -48}};
-    int kept = 0;
-    for (int k = 0; k < 4 && !kept; ++k) {
-        int ox = tx + near[k][0], oy = ty + near[k][1];
-        if (terrain_blocked(ox / 16, oy / 16) || sc64_formation_cell_built(ox / 16, oy / 16)) continue;
-        f.dx = ox - u[a].x; f.dy = oy - u[a].y;
-        sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
-        assert(sx == ox && sy == oy && !path_grid_valid);
-        kept = 1;
+    for (int k = 0; k < 4 && ox < 0; ++k) {
+        int x = b[building].x + near[k][0], y = b[building].y + near[k][1];
+        if (!terrain_blocked(x / 16, y / 16) && !sc64_formation_cell_built(x / 16, y / 16)) { ox = x; oy = y; }
     }
-    assert(kept);
+    assert(ox >= 0);
+    Sc64GroupFormation f = sc64_group_formation_begin(ORDER_MOVE, 1, ox, oy);
+    assert(f.keep && f.ground && !path_grid_valid);
+    int sx, sy;
+    /* Translate so the first Marine's slot is the building's centre. */
+    f.dx = b[building].x - u[a].x; f.dy = b[building].y - u[a].y;
+    sc64_group_formation_slot(&f, &u[a], 0, ox, oy, 1, &sx, &sy);
+    assert(sx != b[building].x || sy != b[building].y);
+    assert(!sc64_formation_cell_built(sx / 16, sy / 16) && sc64_group_formation_reaches(&f, sx, sy));
+    /* A slot on the open ordered point itself is kept. */
+    f.dx = ox - u[a].x; f.dy = oy - u[a].y;
+    sc64_group_formation_slot(&f, &u[a], 0, ox, oy, 1, &sx, &sy);
+    assert(sx == ox && sy == oy && !path_grid_valid);
+    /* Ordered onto the building itself, ground units gather on the grid. */
+    f = sc64_group_formation_begin(ORDER_MOVE, 1, b[building].x, b[building].y);
+    assert(f.keep && !f.ground && !path_grid_valid);
     puts("command delay: stale-grid formation slot under a building takes its grid slot: ok");
 }
 
@@ -200,6 +200,61 @@ static void check_cliff_formation(void)
         }
     }
     assert(!"no cliff geometry found in T1");
+}
+
+/* A Dropship and a Marine ordered onto a blocked tile: the flyer keeps the
+ * translation, the Marine gathers on its grid slot. A wide group ordered
+ * to open ground at the map's left edge keeps its formation after the
+ * clamp (every slot inside the flood window). */
+static void check_flyer_and_edge_formation(void)
+{
+    label_components();
+    int blocked = -1, open_row = -1;
+    for (int c = 0; c < MAP_COLS * MAP_ROWS && blocked < 0; ++c) {
+        int x = c % MAP_COLS, y = c / MAP_COLS;
+        if (x > 8 && y > 8 && x < MAP_COLS - 8 && y < MAP_ROWS - 8 && terrain_blocked(x, y)) {
+            int ok = 1;
+            for (int dx = -3; dx <= -1 && ok; ++dx) ok = cliff_component[c + dx] >= 0;
+            if (ok && cliff_component[c - 3] == cliff_component[c - 1]) blocked = c;
+        }
+    }
+    assert(blocked >= 0);
+    int bxp = (blocked % MAP_COLS) * 16 + 8, byp = (blocked / MAP_COLS) * 16 + 8;
+    int ship = spawn_unit(SIDE, sc64_race_unit_from_raw(11), bxp - 48, byp);
+    int walker = spawn_unit(SIDE, sc64_race_unit_from_raw(0), bxp - 40, byp);
+    assert(ship >= 0 && walker >= 0);
+    select_only(ship, walker);
+    Sc64GroupFormation f = sc64_group_formation_begin(ORDER_MOVE, 1, bxp, byp);
+    assert(f.keep && !f.ground);
+    int sx, sy;
+    sc64_group_formation_slot(&f, &u[ship], 0, bxp, byp, 1, &sx, &sy);
+    assert(sx == u[ship].x + f.dx && sy == u[ship].y + f.dy);
+    sc64_group_formation_slot(&f, &u[walker], 1, bxp, byp, 1, &sx, &sy);
+    assert(sx == limit(bxp - 8, 8, WORLD_W - 8) && sy == limit(byp - 8, 8, WORLD_H - 8));
+    u[ship].selected = u[walker].selected = 0;
+    puts("command delay: a flyer keeps its formation over blocked ground: ok");
+
+    /* A row whose first nine tiles and a 128 px span further in are one
+     * open component. */
+    for (int y = 2; y < MAP_ROWS - 2 && open_row < 0; ++y) {
+        int k = cliff_component[y * MAP_COLS], ok = k >= 0;
+        for (int x = 0; x < 20 && ok; ++x) ok = cliff_component[x + y * MAP_COLS] == k;
+        if (ok) open_row = y;
+    }
+    if (open_row < 0) { puts("command delay: no open map-edge row in T1; edge case skipped"); return; }
+    int y = open_row * 16 + 8;
+    int left = spawn_unit(SIDE, sc64_race_unit_from_raw(0), 8 * 16 + 8, y);
+    int right = spawn_unit(SIDE, sc64_race_unit_from_raw(0), 8 * 16 + 8 + 120, y);
+    assert(left >= 0 && right >= 0);
+    select_only(left, right);
+    f = sc64_group_formation_begin(ORDER_MOVE, 1, 4, y);
+    assert(f.keep && f.ground);
+    sc64_group_formation_slot(&f, &u[left], 0, 4, y, 1, &sx, &sy);
+    assert(sx == u[left].x + f.dx && sx == 8);
+    sc64_group_formation_slot(&f, &u[right], 1, 4, y, 1, &sx, &sy);
+    assert(sx == u[right].x + f.dx && sx == 128);
+    u[left].selected = u[right].selected = 0;
+    puts("command delay: a wide group keeps its formation at the map edge: ok");
 }
 
 static void launch_t4(void)
@@ -330,5 +385,6 @@ int main(void)
     puts("command delay: three quick Moves land in order: ok");
 
     check_cliff_formation();
+    check_flyer_and_edge_formation();
     return 0;
 }

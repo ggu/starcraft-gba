@@ -58,11 +58,21 @@ delayed_command_pending(void)
 #endif
 }
 
+/* Unit w keeps its order through the delay and takes the command on the
+ * due update (the tap's own update counts as the first). */
 static void
-land_delayed_commands(void)
+land_delayed_commands(int w)
 {
 #ifdef SC64_IMPORTED_MISSION
-    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES; ++k) sc64_command_delay_tick();
+    int before = u[w].order;
+    for (int k = 0; k < SC64_COMMAND_DELAY_UPDATES; ++k) {
+        sc64_command_delay_tick();
+        assert(u[w].order == before && delayed_command_pending());
+    }
+    sc64_command_delay_tick();
+    assert(!delayed_command_pending());
+#else
+    (void)w;
 #endif
 }
 
@@ -376,10 +386,10 @@ test_interrupt_unknown_depleted_and_priority(int race, int worker_type,
     m[patch].x = 300; m[patch].y = 300; m[patch].amount = 12;
     tap_a(300, 300);
     assert(!(u[worker].flags & SC64_WORKER_GATHER_PENDING));
-    if (delayed_command_pending()) {
-        assert(u[worker].order == ORDER_IDLE); /* acknowledged, not yet applied */
-        land_delayed_commands();
-    }
+#ifdef SC64_IMPORTED_MISSION
+    assert(delayed_command_pending() && u[worker].order == ORDER_IDLE); /* acknowledged */
+#endif
+    land_delayed_commands(worker);
     assert(u[worker].order == ORDER_ATTACK_MOVE);
     assert(!(u[worker].flags & SC64_WORKER_GATHER_PENDING));
     (void)depot_type;
@@ -427,7 +437,7 @@ test_hidden_mineral_context(void)
     tap_a(300,300);
 #ifdef SC64_IMPORTED_MISSION
     assert(delayed_command_pending() && u[worker].order==ORDER_IDLE); /* acknowledged */
-    land_delayed_commands();
+    land_delayed_commands(worker);
 #endif
     assert(u[worker].order==ORDER_MOVE && u[worker].target==-1);
     assert(u[worker].tx==300 && u[worker].ty==300);
