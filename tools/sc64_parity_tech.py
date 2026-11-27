@@ -137,7 +137,7 @@ def n64_production(cap):
 def poke_window(cap):
     """Source frames of the first and last guest edit of the run (events.csv), on the capture's clock."""
     events = cap.run / 'events.csv'
-    manifest = json.loads((cap.run / 'manifest.json').read_text())
+    manifest = getattr(cap, 'manifest', None) or json.loads((cap.run / 'manifest.json').read_text())
     want = manifest.get('outputs_sha256', {}).get('events.csv')
     data = events.read_bytes()   # hashed and parsed from the same bytes
     if want is None or hashlib.sha256(data).hexdigest() != want:

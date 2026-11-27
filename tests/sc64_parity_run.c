@@ -936,7 +936,8 @@ static void pr_scenario_tech(unsigned long step)
         if (tech.state[k] != PR_TECH_TRAVEL) continue;
         placed = pr_tech_placed(k);
         if (placed > 0) { tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = step; }   /* in the last update */
-        else if (placed < 0) tech.state[k] = PR_TECH_PENDING;   /* cancelled on arrival: give it again */
+        else if (placed < 0)   /* cancelled on arrival: give it again, unless its time is up */
+            tech.state[k] = step >= tech.step[k] + PR_TECH_PATIENCE ? PR_TECH_REFUSED : PR_TECH_PENDING;
         else if (step >= tech.step[k] + PR_TECH_PATIENCE) {
             /* The same deadline as a refusal: the worker drops this command's own pending build,
                so nothing is placed or paid for after the command is reported refused. */
