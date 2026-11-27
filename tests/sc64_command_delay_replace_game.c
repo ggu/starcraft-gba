@@ -86,6 +86,30 @@ static void check_footprints(const char *where)
     assert(built > 0);
 }
 
+/* With the walk grid stale, a group Move's translated slot under a
+ * building falls back to its grid slot, open ground keeps the formation,
+ * and nothing rebuilds the grid. */
+static void check_stale_grid_formation(int building)
+{
+    int a = player_marine(0), c = player_marine(1);
+    select_only(a, c);
+    invalidate_path_grid();
+    assert(!path_grid_valid);
+    Sc64GroupFormation f = sc64_group_formation_begin(ORDER_MOVE, 1, b[building].x, b[building].y);
+    assert(f.keep);
+    /* Translate the group so the first Marine's slot is the building's centre. */
+    f.dx = b[building].x - u[a].x; f.dy = b[building].y - u[a].y;
+    int sx, sy, tx = b[building].x, ty = b[building].y;
+    sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
+    assert(sx == limit(tx - 16, 8, WORLD_W - 8) && sy == limit(ty - 8, 8, WORLD_H - 8));
+    assert(!path_grid_valid);
+    /* The same translation onto open ground keeps the slot. */
+    f.dx = 0; f.dy = 0;
+    sc64_group_formation_slot(&f, &u[a], 0, tx, ty, 1, &sx, &sy);
+    assert(sx == u[a].x && sy == u[a].y && !path_grid_valid);
+    puts("command delay: stale-grid formation slot under a building takes its grid slot: ok");
+}
+
 static void launch_t4(void)
 {
     game_init();
@@ -109,9 +133,11 @@ int main(void)
     check_footprints("T4 closed doors");
 
     launch_t1();
-    assert(spawn_build(SIDE, B_COMMAND, u[2].x + 120, u[2].y + 60, 0) >= 0);
+    int command_center = spawn_build(SIDE, B_COMMAND, u[2].x + 120, u[2].y + 60, 0);
+    assert(command_center >= 0);
     assert(spawn_build(SIDE, B_DEPOT, u[2].x + 40, u[2].y + 120, 0) >= 0);
     check_footprints("T1 with buildings");
+    check_stale_grid_formation(command_center);
     int marine = player_marine(0), witness = player_marine(1);
 
     /* Put a player Dropship in slot 22 (an idle Zergling far from the
