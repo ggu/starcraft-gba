@@ -232,6 +232,21 @@ static void check_flyer_and_edge_formation(void)
      * near its grid slot, never a point inside the wall. */
     sc64_group_formation_slot(&f, &u[walker], 1, bxp, byp, 1, &sx, &sy);
     assert(!terrain_blocked(sx / 16, sy / 16) && SC64_GRID_GET(path_walkable, sx / 16 + (sy / 16) * MAP_COLS));
+    {
+        /* Exactly the open tile centre nearest the grid slot in pixels,
+         * the first in scan order on a tie. */
+        int gx = limit(bxp - 8, 8, WORLD_W - 8), gy = limit(byp - 8, 8, WORLD_H - 8);
+        int best = -1, ex = gx, ey = gy;
+        for (int dy = -2; dy <= 2; ++dy) for (int dx = -2; dx <= 2; ++dx) {
+            int c = gx / 16 + dx, r = gy / 16 + dy, d;
+            if ((!dx && !dy) || c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS ||
+                !SC64_GRID_GET(path_walkable, c + r * MAP_COLS)) continue;
+            d = dist2(gx, gy, c * 16 + 8, r * 16 + 8);
+            if (best < 0 || d < best) { best = d; ex = c * 16 + 8; ey = r * 16 + 8; }
+        }
+        assert(!SC64_GRID_GET(path_walkable, gx / 16 + (gy / 16) * MAP_COLS) && best >= 0);
+        assert(sx == ex && sy == ey);
+    }
     assert(issue_order(ORDER_MOVE, bxp, byp) == 2);
     assert(u[walker].tx == sx && u[walker].ty == sy);
     for (int t = 0; t < 400 && u[walker].order == ORDER_MOVE; ++t) input(0);
