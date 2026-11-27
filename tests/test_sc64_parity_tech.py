@@ -212,10 +212,12 @@ class GbaTest(unittest.TestCase):
         self.assertEqual(sc64_parity.fmt(metrics.REFUSED), 'refused')
 
     def test_runner_arguments(self):
-        params = {'seed': 123, 'starve': [10, 900], 'tech_cmds': [[2, 0, 0, 10000, 10000], [364, 1, 109, 824, 176]]}
+        params = {'seed': 123, 'steps': 7000, 'starve': [10, 900],
+                  'tech_cmds': [[2, 0, 0, 10000, 10000], [364, 1, 109, 824, 176]]}
         args = tech.gba_args('tech-terran', params, '/tmp/x.trace')
         self.assertEqual(args[:4], ['--human', 't', '--bot', 'z'])
-        self.assertIn('--starve', args)
+        # Starved to the end of the run, whatever cutoff the golden saved.
+        self.assertEqual(args[args.index('--starve') + 1], '10,7001')
         self.assertEqual(args[-4:], ['--tcmd', '2,0,0,10000,10000', '--tcmd', '364,1,109,824,176'])
         self.assertIn('tech-terran', metrics.SCENARIOS)
         self.assertIn(metrics.REFUSED, metrics.MARKERS)

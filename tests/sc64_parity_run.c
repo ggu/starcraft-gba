@@ -828,6 +828,7 @@ static struct {
     int n;
     unsigned long step[PR_TECH_CAP], issued[PR_TECH_CAP];
     int kind[PR_TECH_CAP], raw[PR_TECH_CAP], x[PR_TECH_CAP], y[PR_TECH_CAP], state[PR_TECH_CAP], slot[PR_TECH_CAP];
+    int tx[PR_TECH_CAP], ty[PR_TECH_CAP];   /* a travelling build's site as the engine stored it */
 } tech;
 static unsigned long pr_tech_last_step;
 static unsigned long pr_starve_from, pr_starve_to;
@@ -854,7 +855,9 @@ static int pr_tech_placed(int k)
 {
     int w = tech.slot[k], type = sc64_race_building_from_raw(tech.raw[k]), t;
     if (w < 0 || w >= MAX_UNITS || !u[w].alive) return -1;
-    if (u[w].order == ORDER_BUILD_PENDING) return 0;
+    /* Still this command's own pending build (the worker may since have taken another). */
+    if (u[w].order == ORDER_BUILD_PENDING)
+        return u[w].target == type && u[w].tx == tech.tx[k] && u[w].ty == tech.ty[k] ? 0 : -1;
     t = u[w].target;
     if (u[w].order == ORDER_BUILD && t >= 0 && t < MAX_BUILDINGS && b[t].alive && b[t].owner == SIDE &&
         b[t].type == type) return 1;
@@ -889,6 +892,7 @@ static int pr_tech_try(int k)
             if (u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) &&
                 race_start_build(SIDE, i, type, tech.x[k], tech.y[k])) {
                 tech.slot[k] = i;
+                tech.tx[k] = u[i].tx; tech.ty[k] = u[i].ty;
                 tech.state[k] = PR_TECH_TRAVEL;
                 return 0;   /* taken only when the foundation appears */
             }
@@ -926,22 +930,21 @@ static void pr_scenario_tech(unsigned long step)
         }
 #ifdef SC64_RACES
     pr_tech_last_step = step;
+    /* Travelling builds are settled first, before any command gives a worker a new order. */
     for (int k = 0; k < tech.n; ++k) {
-        if (tech.state[k] == PR_TECH_TRAVEL) {
-            int placed = pr_tech_placed(k);
-            if (placed > 0) { tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = step; continue; }   /* in the last update */
-            if (placed < 0) tech.state[k] = PR_TECH_PENDING;   /* cancelled on arrival: give it again */
-            else if (step < tech.step[k] + PR_TECH_PATIENCE) continue;
-            else {   /* the same deadline as a refusal: the worker drops the build, so nothing is
-                        placed or paid for after the command is reported refused */
-                int w = tech.slot[k];
-                if (w >= 0 && w < MAX_UNITS && u[w].alive && u[w].order == ORDER_BUILD_PENDING) {
-                    u[w].order = ORDER_IDLE; u[w].target = -1;
-                }
-                tech.state[k] = PR_TECH_REFUSED;
-                continue;
-            }
+        int placed;
+        if (tech.state[k] != PR_TECH_TRAVEL) continue;
+        placed = pr_tech_placed(k);
+        if (placed > 0) { tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = step; }   /* in the last update */
+        else if (placed < 0) tech.state[k] = PR_TECH_PENDING;   /* cancelled on arrival: give it again */
+        else if (step >= tech.step[k] + PR_TECH_PATIENCE) {
+            /* The same deadline as a refusal: the worker drops this command's own pending build,
+               so nothing is placed or paid for after the command is reported refused. */
+            u[tech.slot[k]].order = ORDER_IDLE; u[tech.slot[k]].target = -1;
+            tech.state[k] = PR_TECH_REFUSED;
         }
+    }
+    for (int k = 0; k < tech.n; ++k) {
         if (tech.state[k] || step < tech.step[k]) continue;
         for (int j = 0; j < k; ++j)   /* a product of an absent one is absent too */
             if (tech.state[j] == PR_TECH_ABSENT && tech.raw[j] == tech.raw[k]) tech.state[k] = PR_TECH_ABSENT;

@@ -139,10 +139,11 @@ def poke_window(cap):
     events = cap.run / 'events.csv'
     manifest = json.loads((cap.run / 'manifest.json').read_text())
     want = manifest.get('outputs_sha256', {}).get('events.csv')
-    if want is None or hashlib.sha256(events.read_bytes()).hexdigest() != want:
+    data = events.read_bytes()   # hashed and parsed from the same bytes
+    if want is None or hashlib.sha256(data).hexdigest() != want:
         raise SystemExit('tech: events.csv does not match its run manifest')
     steps = []
-    for line in events.read_text().splitlines()[1:]:
+    for line in data.decode().splitlines()[1:]:
         parts = line.split(',')
         if len(parts) > 1 and parts[1] == 'poke':
             steps.append(int(parts[0]))
@@ -264,7 +265,8 @@ def gba_args(scenario_id, params, trace):
     for race in cpus:
         args += ['--bot', race.lower()]
     args += ['--seed', str(int(params['seed'])), '--gather', str(trace) + '.gather',
-             '--starve', f'{int(params["starve"][0])},{int(params["starve"][1])}']
+             # Starved to the end of the run whatever cutoff an older golden saved.
+             '--starve', f'{int(params["starve"][0])},{int(params["steps"]) + 1}']
     for cmd in params['tech_cmds']:
         args += ['--tcmd', ','.join(str(int(v)) for v in cmd)]
     return args
