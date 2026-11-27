@@ -94,7 +94,7 @@ static void check_stale_grid_formation(int building)
     static const int near[4][2] = {{48, 0}, {-48, 0}, {0, 48}, {0, -48}};
     int a = player_marine(0), c = player_marine(1), ox = -1, oy = -1;
     select_only(a, c);
-    invalidate_path_grid();
+    if (path_grid_valid) invalidate_path_grid();
     assert(!path_grid_valid);
     for (int k = 0; k < 4 && ox < 0; ++k) {
         int x = b[building].x + near[k][0], y = b[building].y + near[k][1];
@@ -284,7 +284,13 @@ int main(void)
     assert(command_center >= 0);
     assert(spawn_build(SIDE, B_DEPOT, u[2].x + 40, u[2].y + 120, 0) >= 0);
     check_footprints("T1 with buildings");
-    check_stale_grid_formation(command_center);
+    /* A building placed after the grid was built: the stale grid lacks it,
+     * so the formation must see it from b[]. */
+    int depot = spawn_build(SIDE, B_DEPOT, u[2].x + 150, u[2].y - 40, 0);
+    assert(depot >= 0 && !path_grid_valid);
+    assert(SC64_GRID_GET(path_walkable, b[depot].x / 16 + (b[depot].y / 16) * MAP_COLS) ||
+           terrain_blocked(b[depot].x / 16, b[depot].y / 16));
+    check_stale_grid_formation(depot);
     int marine = player_marine(0), witness = player_marine(1);
 
     /* Put a player Dropship in slot 22 (an idle Zergling far from the

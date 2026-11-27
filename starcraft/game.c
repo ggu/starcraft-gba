@@ -6400,7 +6400,12 @@ issue_order(int order, int tx, int ty)
 	        int slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 	        int slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
 #endif
+#ifdef SC64_IMPORTED_MISSION
+	        /* A kept formation's slots already connect to the point. */
+	        if (!sc64_race_unit_flying(u[i].type) && !(formation.keep && formation.ground)) {
+#else
 	        if (!sc64_race_unit_flying(u[i].type)) {
+#endif
 	            int use_cursor = formation_route_pair(u[i].x, u[i].y,
                 slot_x, slot_y, tx, ty, route_hint_slots, route_hint_roots,
                 &route_hint_next);
