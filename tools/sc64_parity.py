@@ -483,16 +483,22 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                           ' lies beyond the band and every recorded value (' +
                           (fmt_spread(base) if known is not None else 'none: the line passed') + ')')
         elif known is None:
-            if min(gaps) > 0:
+            # A NEVER cut short below the band (the run ended first in the human's defeat) may yet
+            # have come in it: not shown outside, though not shown inside either (no PASS).
+            shown = [g if time_gap(v, i) is None else time_gap(v, i) for i, (v, g) in enumerate(zip(spread, gaps))]
+            if min(shown) > 0:
                 row['verdict'] = 'REGRESSION'
                 row['why'] = 'outside the band and not in the baseline' + every
             else:
-                # Inside the band at some offsets: the GBA's own noise reaches the band. --accept
-                # records the line, so its spread is tracked from then on.
+                # Inside the band at some offsets (the GBA's own noise reaches it), or cut short
+                # before it. --accept records the line, so its spread is tracked from then on.
                 row['verdict'] = 'KNOWN'
-                row['why'] = ('outside the band only at frame offset ' +
-                              offset_label(k for k, g in zip(offsets, gaps) if g) + ' (GBA frame noise); '
-                              'no baseline line yet')
+                out = [k for k, s_ in zip(offsets, shown) if s_]
+                short = [k for k, g, s_ in zip(offsets, gaps, shown) if g and not s_]
+                row['why'] = ((f'outside the band only at frame offset {offset_label(out)} (GBA frame noise)'
+                               if out else 'outside the band at no offset') +
+                              (f'; cut short by the human\'s defeat before the band at {offset_label(short)}'
+                               if short else '') + '; no baseline line yet')
         elif untimed and not {kind(v) for v in spread} & was_kinds and min(gaps) > 0:
             # (An offset now inside the band, a checkpoint the match reaches again, is not this.)
             # Every offset changed to or from an outcome with no time: changed at any distance.

@@ -142,7 +142,8 @@ edge), and compares as the frame after it. At several frame offsets:
   the human's defeat (a win or the step limit leaves the reach). It is as far out as that bound lies past the band, and no
   distance at all while the bound lies below the band's upper edge, so an
   early end is gated by the result check, not by every timing it cut
-  short.
+  short. A line with no baseline line that is only cut short reads KNOWN
+  (recorded on `--accept`), never PASS.
 - Only offsets the baseline recorded are evidence for the per-offset check:
   a single run's line (no `gba_offsets`) speaks for offset 0 alone.
 - A seed whose own band is NEVER, in an envelope other seeds made finite,

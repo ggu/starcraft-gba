@@ -899,6 +899,21 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([12000, 12000, 12000]), 'REGRESSION')   # a run that went on: past the reach
         # A run that ended before the band says nothing about the distance: it might have come in it.
         self.assertEqual(verdict([5000, 5000, 5000]), 'KNOWN')
+
+        # With no baseline line: cut short below the band at every offset is not shown outside it
+        # (KNOWN, not PASS); every run reaching past the band without the wave is.
+        def unlisted(cutoffs):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, {}, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(unlisted([9000, 9000, 9000]), 'KNOWN')
+        row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, {}, cutoffs=[9000, 9600, 9000],
+                                more=[(1, {key: sk.NEVER}), (2, {key: sk.NEVER})])[0]
+        self.assertIn('outside the band only at frame offset +1 ', row['why'])
+        self.assertIn('cut short by the human\'s defeat before the band at +0, +2', row['why'])
+        self.assertEqual(unlisted([9600, 9600, 9600]), 'REGRESSION')
+        self.assertEqual(unlisted([9600, 9000, 9600]), 'KNOWN')          # each run's own cutoff
+        self.assertEqual(unlisted(None), 'REGRESSION')
         self.assertEqual(sk.never_time(wave, wave['observations'][0], 9000), (sk.NEVER, 9001))
         self.assertEqual(sk.never_time(wave, wave['observations'][0], 15000), (sk.NEVER, 12001))
 
