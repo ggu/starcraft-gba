@@ -1007,6 +1007,31 @@ class FrameOffsets(unittest.TestCase):
                                           more=[(1, {key: 10078}), (2, {key: 10077})])[0]
                 self.assertEqual(again['verdict'], 'KNOWN')
 
+    def test_accept_keeps_recorded_times_behind_a_disallowed_never(self):
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        key = ('attack.first_wave', 'cpu Terran')
+        line = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+        more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'baseline.json'
+            row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more, cutoffs=[9000] * 3)[0]
+            self.assertEqual(row['verdict'], 'KNOWN')
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            accepted = sc64_parity.load_baseline(path)
+            self.assertEqual(accepted[line]['gba_offsets'], [10079, 10078, 10077])
+            # A later full-length run without the wave still fails against what was kept.
+            later = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more,
+                                      cutoffs=[12000] * 3)[0]
+            self.assertEqual(later['verdict'], 'REGRESSION')
+            # A single run's line keeps its offset-0 value when offset 0 is cut short.
+            legacy = {line: {'key': line, 'gba': 10079}}
+            row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, legacy, more=[(1, {key: 10080}), (2, {key: 10081})],
+                                    cutoffs=[9000, None, None])[0]
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_offsets'], [10079, 10080, 10081])
+
     def test_a_checkpoint_against_a_single_runs_line_keeps_every_offset(self):
         line = 'sk-pvt-w0:supply.cap@8000:cpu Terran'
         legacy = {line: {'key': line, 'gba': 116}}

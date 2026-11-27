@@ -440,12 +440,18 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                     return needed - (own[i][1] - 1)   # frames short: never 0
             return gap(v)
         gaps = [gap_at(i, v) for i, v in enumerate(spread)]
-        # What --accept records: an offset the early end left inconclusive keeps its recorded value.
-        recorded_offsets = known.get('gba_offsets') if known is not None else None
-        if recorded_offsets is not None and len(recorded_offsets) == len(spread) and 'gba_offsets' in row and \
-                any(g != gap(v) for g, v in zip(gaps, spread)):
-            row['accept_offsets'] = [b if g != gap(v) else r for b, g, v, r in
-                                     zip(recorded_offsets, gaps, spread, row['gba_offsets'])]
+        # What --accept records: an offset whose NEVER an early end cut short (its bound below the
+        # run's reach, admitted by the band or not) is inconclusive and keeps its recorded value.
+        def recorded_at(i):
+            if known is None:
+                return None
+            if 'gba_offsets' in known:
+                return known['gba_offsets'][i] if len(known['gba_offsets']) == len(spread) else None
+            return known['gba'] if i == 0 else None
+        inconclusive = [i for i, v in enumerate(spread) if own[i] is not None and never is not None and
+                        v == own[i][0] and own[i][1] < never[1] and recorded_at(i) is not None]
+        if inconclusive and 'gba_offsets' in row:
+            row['accept_offsets'] = [recorded_at(i) if i in inconclusive else r for i, r in enumerate(row['gba_offsets'])]
         every = ' at every frame offset' if len(spread) > 1 else ''
         # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
         # band as seed_lo/seed_hi, and the N64's spread over seeds is no licence to move further out.
