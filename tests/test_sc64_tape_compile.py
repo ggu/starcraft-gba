@@ -666,6 +666,31 @@ class LabMeasureTest(unittest.TestCase):
             s = metrics.lab_gba_steps([0, delta])[1]
             self.assertIn((s - 1) * 4 // 5 - base - delta, (0, 1))
 
+    def test_lab_human_by_type_or_map_slot(self):
+        # Zerg against Zerg (Z7): every type has two owners, so no type names the human.
+        units = {1: (43, 3, 0, 0), 2: (43, 4, 50, 0), 3: (41, 3, 9, 0), 4: (41, 4, 9, 9), 5: (37, 4, 0, 9)}
+        series = {'frames': [{'sf': 0, 'units': units}]}
+        with self.assertRaises(SystemExit):
+            metrics.lab_human(series, {'id': 'z7', 'human_type': 41, 'subject_type': 43})
+        self.assertEqual(metrics.lab_human(series, {'id': 'z7', 'human_type': 37, 'subject_type': 43}), 4)
+        # The map's human slot wins over the type rule, but it must own a unit of the subject's type.
+        self.assertEqual(metrics.lab_human(series, {'id': 'z7', 'human_owner': 3, 'human_type': 37,
+                                                    'subject_type': 43}), 3)
+        with self.assertRaises(SystemExit):
+            metrics.lab_human(series, {'id': 'z7', 'human_owner': 3, 'subject_type': 37})
+
+    def test_enemy_lab_specs_are_complete(self):
+        # Every attack lab names its foe, subject and a way to find the human, and runs a mission
+        # through the lab runner with a mission id.
+        for spec in metrics.LAB_SPECS:
+            if spec['kind'] != 'attack':
+                continue
+            self.assertTrue({'foe', 'foe_type', 'subject_type', 'profile', 'runner', 'title'} <= set(spec), spec['id'])
+            self.assertTrue('human_type' in spec or 'human_owner' in spec, spec['id'])
+            if spec['runner'] == 'lab-mission':
+                self.assertIn(spec['mission'], range(30), spec['id'])
+            self.assertEqual(metrics.SCENARIOS[spec['id']]['decoder_revision'], 3, spec['id'])
+
     def test_attack_hits_cooldown_range_and_death(self):
         pos = {sf: (100, 100) for sf in range(0, 120)}
         marine = {sf: 40.0 for sf in range(0, 120)}

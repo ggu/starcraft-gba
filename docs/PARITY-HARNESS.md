@@ -321,6 +321,19 @@ of its id (`--subject-raw`) with orders given as offsets. Results and
 coverage are in
 [`audits/2026-11-26-parity-unit-labs.md`](audits/2026-11-26-parity-unit-labs.md).
 
+Enemy labs (phase 2 of the [coverage map](audits/2026-11-27-parity-coverage-map.md)) are
+attack labs too. The cartridge has no attack on the player's own units, so each subject
+is sent against an enemy. The lab state is the mission after its opening transmissions
+(the progress-byte launch, then 2,500 steps of text-box dismissal). One subject is
+selected and given B at the enemy's own position, which the cartridge makes an
+attack-move (order 14). The GBA replays the same attack-move. Targets and attackers were
+picked from exploration captures, never from the CHK alone: the CHK placements do not
+show which enemies guard the route. Where both sides field every unit type (Zerg against
+Zerg, Protoss against Protoss), no unit type identifies the human. The spec then names
+the map's human slot (`human_owner`), which must own a unit of the subject's type. The
+labs and results are in
+[`audits/2026-11-27-parity-enemy-labs.md`](audits/2026-11-27-parity-enemy-labs.md).
+
 | Kind | Measures (both engines, `tools/sc64_parity_metrics.py`) | Band |
 | --- | --- | --- |
 | Move, out and back | cruise speed (8-frame chords, middle half), acceleration (frames to a chord at 90% of cruise; the chord is 4 frames, or long enough to span two GBA position steps at the N64 cruise speed, as for the Overlord's 5. A lengthened chord's cutoff is at most the N64 cruise distance rounded down to whole GBA steps, so the Overlord's is 4 px, about 95% of its 5-frame cruise distance. The N64 side records chord and floor in the golden (`accel_chord`, `accel_floor`) for the GBA side to use. A mover slower than about 1 px a frame resolves acceleration to about one GBA step, 3-4 frames), first-leg duration, turn cost (second leg's start latency minus the first's), start latency (report only: the N64 figure includes input lag) | ±10% speed; ±2 frames |
