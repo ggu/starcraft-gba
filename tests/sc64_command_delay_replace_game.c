@@ -174,5 +174,41 @@ int main(void)
     }
     assert(!sc64_delayed_commands[0].active && !sc64_delayed_commands[1].active);
     puts("command delay: unloading a Bunker replaces a pending Move: ok");
+
+    /* The same through a Dropship: a Move given while the Marine walks to
+     * the carrier is pending when it boards; unloading is newer. */
+    int drop_marine = player_marine(2);
+    int ship = spawn_unit(SIDE, sc64_race_unit_from_raw(11), u[drop_marine].x + 12, u[drop_marine].y);
+    assert(ship >= 0 && race_transport_carrier_valid(ship));
+    select_only(drop_marine, -1);
+    assert(race_transport_request_board(drop_marine, ship));
+    move_x = u[drop_marine].x - 50; move_y = u[drop_marine].y + 50;
+    player_move(move_x, move_y);
+    for (int k = 0; k < SC64_COMMAND_DELAY_UPDATES && u[drop_marine].order != ORDER_TRANSPORTED; ++k) input(0);
+    assert(u[drop_marine].order == ORDER_TRANSPORTED);
+    assert(sc64_delayed_commands[0].active || sc64_delayed_commands[1].active);
+    assert(race_transport_request_unload(ship, u[ship].x, u[ship].y));
+    for (int k = 0; k < 3 * SC64_COMMAND_DELAY_UPDATES; ++k) {
+        input(0);
+        assert(u[drop_marine].order == ORDER_TRANSPORTED || u[drop_marine].order == ORDER_IDLE);
+    }
+    assert(u[drop_marine].order == ORDER_IDLE);
+    assert(!sc64_delayed_commands[0].active && !sc64_delayed_commands[1].active);
+    puts("command delay: unloading a Dropship replaces a pending Move: ok");
+
+    /* Three Moves in quick succession: the third applies the oldest at once
+     * (during input; the host audit in this build must not report it), and
+     * the unit ends up following the last. */
+    int runner = player_marine(0);
+    select_only(runner, -1);
+    player_move(u[runner].x + 20, u[runner].y + 10);
+    player_move(u[runner].x + 30, u[runner].y + 20);
+    int last_x = u[runner].x + 40, last_y = u[runner].y + 30;
+    assert(sc64_delayed_commands[0].active && sc64_delayed_commands[1].active);
+    player_move(last_x, last_y);
+    for (int k = 0; k < 2 * SC64_COMMAND_DELAY_UPDATES; ++k) input(0);
+    assert(!sc64_delayed_commands[0].active && !sc64_delayed_commands[1].active);
+    assert(u[runner].tx == last_x && u[runner].ty == last_y);
+    puts("command delay: three quick Moves land in order: ok");
     return 0;
 }

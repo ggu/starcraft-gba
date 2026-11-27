@@ -246,6 +246,10 @@ static int race_transport_request_unload(int carrier, int x, int y)
 #endif
     u[carrier].order = ORDER_UNLOAD;
     SC64_CMD_FORGET(carrier);
+    /* Newer than any command its passengers got before they boarded. */
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == carrier)
+            SC64_CMD_FORGET(i);
     u[carrier].target = -1;
     u[carrier].tx = x; u[carrier].ty = y;
     u[carrier].work_timer = 0;
