@@ -761,7 +761,7 @@ class FrameOffsets(unittest.TestCase):
         # ... and KNOWN (recorded by --accept) while the noise still reaches the band.
         row = self.row([84, 92, 84])
         self.assertEqual(row['verdict'], 'KNOWN')
-        self.assertIn('frame offset +1 ', row['why'])
+        self.assertIn('frame offset +1, inside at +0, +2 (GBA frame noise)', row['why'])
         self.assertNotIn('baseline', row)
 
     def test_improved_only_when_every_offset_is_inside(self):
@@ -909,7 +909,8 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(unlisted([9000, 9000, 9000]), 'KNOWN')
         row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, {}, cutoffs=[9000, 9600, 9000],
                                 more=[(1, {key: sk.NEVER}), (2, {key: sk.NEVER})])[0]
-        self.assertIn('outside the band only at frame offset +1 ', row['why'])
+        self.assertIn('outside the band at frame offset +1;', row['why'])
+        self.assertNotIn('noise', row['why'])
         self.assertIn('cut short by the human\'s defeat before it could show the band at +0, +2', row['why'])
         self.assertEqual(unlisted([9600, 9600, 9600]), 'REGRESSION')
         self.assertEqual(unlisted([9600, 9000, 9600]), 'KNOWN')          # each run's own cutoff
@@ -962,6 +963,15 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([10676] * 3, known), 'IMPROVED')
         self.assertEqual(verdict([9000] * 3, {}), 'KNOWN')
         self.assertEqual(verdict([10676] * 3, {}), 'PASS')
+        # Accepting those cut-short runs records NEVER at every offset; a Factory built later at every
+        # offset is then still a change of outcome.
+        cut = {line: {'key': line, 'gba': sk.NEVER, 'gba_offsets': [sk.NEVER] * 3}}
+        more = [(1, {key: 8000}), (2, {key: 8001})]
+        row = sc64_parity.judge('sk-pvt-w0', never, {key: 8002}, {}, cut, more=more, cutoffs=[9000] * 3)[0]
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('outcome changed', row['why'])
+        mixed = sc64_parity.judge('sk-pvt-w0', never, {key: sk.NEVER}, {}, cut, more=more, cutoffs=[9000] * 3)[0]
+        self.assertEqual(mixed['verdict'], 'KNOWN')
 
     def test_a_checkpoint_against_a_single_runs_line_keeps_every_offset(self):
         line = 'sk-pvt-w0:supply.cap@8000:cpu Terran'

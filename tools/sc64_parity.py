@@ -505,10 +505,17 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 row['verdict'] = 'KNOWN'
                 out = [k for k, s_ in zip(offsets, shown) if s_]
                 short = [k for k, g, s_ in zip(offsets, gaps, shown) if g and not s_]
-                row['why'] = ((f'outside the band only at frame offset {offset_label(out)} (GBA frame noise)'
+                inside = [k for k, g in zip(offsets, gaps) if not g]
+                row['why'] = ((f'outside the band at frame offset {offset_label(out)}' +
+                               (f', inside at {offset_label(inside)} (GBA frame noise)' if inside else '')
                                if out else 'outside the band at no offset') +
                               (f'; cut short by the human\'s defeat before it could show the band at '
                                f'{offset_label(short)}' if short else '') + '; no baseline line yet')
+        elif outcome_band and all(kind(v) == 'number' for v in spread) and 'number' not in was_kinds:
+            # A band that is an outcome (the N64 never made it), a baseline that recorded only that
+            # outcome (runs cut short before the reach), and now a time at every offset: changed.
+            row['verdict'] = 'REGRESSION'
+            row['why'] = f'the outcome changed from the baseline ({fmt_spread(base)})' + every
         elif untimed and not {kind(v) for v in spread} & was_kinds and min(gaps) > 0:
             # (An offset now inside the band, a checkpoint the match reaches again, is not this.)
             # Every offset changed to or from an outcome with no time: changed at any distance.
