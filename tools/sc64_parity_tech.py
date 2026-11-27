@@ -21,6 +21,8 @@ each product at the N64 frame it was paid for: a building at the halved site of 
 a unit or add-on at the human building nearest the halved N64 producer. A product the engine has
 no identity or production path for reads absent (a listed GBA defect), never skipped.
 """
+import hashlib
+import json
 import statistics
 import struct
 
@@ -134,8 +136,13 @@ def n64_production(cap):
 
 def poke_window(cap):
     """Source frames of the first and last guest edit of the run (events.csv), on the capture's clock."""
+    events = cap.run / 'events.csv'
+    manifest = json.loads((cap.run / 'manifest.json').read_text())
+    want = manifest.get('outputs_sha256', {}).get('events.csv')
+    if want is None or hashlib.sha256(events.read_bytes()).hexdigest() != want:
+        raise SystemExit('tech: events.csv does not match its run manifest')
     steps = []
-    for line in (cap.run / 'events.csv').read_text().splitlines()[1:]:
+    for line in events.read_text().splitlines()[1:]:
         parts = line.split(',')
         if len(parts) > 1 and parts[1] == 'poke':
             steps.append(int(parts[0]))
@@ -221,7 +228,10 @@ def make_measure_n64(scenario_id):
         cmds.sort()
         # Long enough for every command to get its whole patience (tests/sc64_parity_run.c).
         gba = {'scenario': 'match', 'profile': profile, 'at_step': 5, 'seed': seed,
-               'steps': max(step_of(m['last']) + 400, max(c[0] for c in cmds) + RUNNER_PATIENCE + 10), 'starve': [step_of(start), step_of(end) + 260], 'tech_cmds': cmds}
+               'steps': max(step_of(m['last']) + 400, max(c[0] for c in cmds) + RUNNER_PATIENCE + 10), 'tech_cmds': cmds}
+        # The computer stays starved from the N64's first edit to the end of the replay, the
+        # retry tail included, so it never spends while a late product is measured.
+        gba['starve'] = [step_of(start), gba['steps'] + 1]
         notes.append(f'human owner {m["human"]}; {len(m["products"])} products, {len(m["queued"])} queue entries')
         return {'observations': obs, 'gba': gba, 'notes': notes,
                 'measured': {'products': m['products'], 'queued': m['queued'], 'debits': m['debits']}}

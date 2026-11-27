@@ -932,7 +932,15 @@ static void pr_scenario_tech(unsigned long step)
             if (placed > 0) { tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = step; continue; }   /* in the last update */
             if (placed < 0) tech.state[k] = PR_TECH_PENDING;   /* cancelled on arrival: give it again */
             else if (step < tech.step[k] + PR_TECH_PATIENCE) continue;
-            else { tech.state[k] = PR_TECH_REFUSED; continue; }   /* the same deadline as a refusal */
+            else {   /* the same deadline as a refusal: the worker drops the build, so nothing is
+                        placed or paid for after the command is reported refused */
+                int w = tech.slot[k];
+                if (w >= 0 && w < MAX_UNITS && u[w].alive && u[w].order == ORDER_BUILD_PENDING) {
+                    u[w].order = ORDER_IDLE; u[w].target = -1;
+                }
+                tech.state[k] = PR_TECH_REFUSED;
+                continue;
+            }
         }
         if (tech.state[k] || step < tech.step[k]) continue;
         for (int j = 0; j < k; ++j)   /* a product of an absent one is absent too */
