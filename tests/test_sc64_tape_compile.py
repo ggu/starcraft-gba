@@ -694,22 +694,27 @@ class LabMeasureTest(unittest.TestCase):
     def test_enemy_labs_are_pinned(self):
         # The nine enemy labs (docs/audits/2026-11-27-parity-enemy-labs.md): mission, profile and
         # the way the human is found. A removed lab or a changed mission fails here.
+        # id: (mission, profile, human selector, subject id, foe id, shields measured)
         expected = {
-            'lab-hydralisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE)),
-            'lab-mutalisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE)),
-            'lab-marine-marine': (8, 'terran', ('human_type', 19)),
-            'lab-mutalisk-hydralisk': (18, 'zerg-z10', ('human_owner', 3)),
-            'lab-marine-hydralisk': (6, 'terran', ('human_type', metrics.MARINE)),
-            'lab-vulture-hydralisk': (6, 'terran', ('human_type', metrics.MARINE)),
-            'lab-guardian-zealot': (17, 'zerg-z10', ('human_type', 38)),
-            'lab-zergling-goliath': (0, 'zerg-z10', ('human_type', metrics.ZERGLING)),
-            'lab-dragoon-zergling-pack': (2, 'protoss-p10', ('human_type', 65)),
+            'lab-hydralisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE), 38, 66, True),
+            'lab-mutalisk-dragoon': (1, 'zerg-z10', ('human_type', metrics.DRONE), 43, 66, True),
+            'lab-marine-marine': (8, 'terran', ('human_type', 19), metrics.MARINE, metrics.MARINE, False),
+            'lab-mutalisk-hydralisk': (18, 'zerg-z10', ('human_owner', 3), 43, 38, False),
+            'lab-marine-hydralisk': (6, 'terran', ('human_type', metrics.MARINE), metrics.MARINE, 38, False),
+            'lab-vulture-hydralisk': (6, 'terran', ('human_type', metrics.MARINE), 2, 38, False),
+            'lab-guardian-zealot': (17, 'zerg-z10', ('human_type', 38), 44, 65, True),
+            'lab-zergling-goliath': (0, 'zerg-z10', ('human_type', metrics.ZERGLING), metrics.ZERGLING, 3, False),
+            'lab-dragoon-zergling-pack': (2, 'protoss-p10', ('human_type', 65), 66, metrics.ZERGLING, True),
         }
         specs = {spec['id']: spec for spec in metrics.LAB_SPECS}
-        for lab, (mission, profile, (key, value)) in expected.items():
+        for lab, (mission, profile, (key, value), subject, foe, shields) in expected.items():
             spec = specs[lab]
             self.assertEqual((spec['runner'], spec['mission'], spec['profile'], spec[key]),
                              ('lab-mission', mission, profile, value), lab)
+            # Exactly one way to find the human: lab_human() lets human_owner win over human_type.
+            self.assertEqual({'human_type', 'human_owner'} & set(spec), {key}, lab)
+            self.assertEqual((spec['subject_type'], spec['foe_type'], spec.get('shields', False)),
+                             (subject, foe, shields), lab)
             self.assertEqual(metrics.SCENARIOS[lab]['profile'], profile, lab)
 
     def test_attack_hits_cooldown_range_and_death(self):
