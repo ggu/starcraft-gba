@@ -2786,10 +2786,12 @@ static int owner_command_center(int owner);
 #ifdef SC64_IMPORTED_MISSION
 static void sc64_start_human_workers_mining(void);
 static void sc64_command_delay_flush(void), sc64_command_delay_reset(void),
-    sc64_command_delay_forget(int);
+    sc64_command_delay_forget(int), sc64_command_delay_input_end(void);
 #define SC64_CMD_FORGET(i) sc64_command_delay_forget(i)
+#define SC64_CMD_INPUT_END() sc64_command_delay_input_end()
 #else
 #define SC64_CMD_FORGET(i) ((void)0)
+#define SC64_CMD_INPUT_END() ((void)0)
 #endif
 static int currently_visible(int x, int y);
 #ifdef SC64_SHARED_BUNKER
@@ -6390,7 +6392,7 @@ issue_order(int order, int tx, int ty)
 	    if (group_order) {
 #ifdef SC64_IMPORTED_MISSION
 	        int slot_x, slot_y;
-	        sc64_group_formation_slot(&formation, &u[i], n, tx, ty, 0, &slot_x, &slot_y);
+	        sc64_group_formation_slot(&formation, &u[i], n, tx, ty, 1, &slot_x, &slot_y);
 #else
 	        int slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 	        int slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
@@ -6657,6 +6659,7 @@ stop_selected(void)
 #ifdef SC64_SHARED_NUKE_PROBE
             if (sc64_race_ordinary_ghost(u[i].type) && race_nuke_ghost_locked(i)) continue;
 #endif
+            SC64_CMD_FORGET(i); /* no pending Move lands after a Stop */
 #ifdef SC64_WORKER_CARGO_KIND
 #ifdef SC64_T6_RUNTIME
             int was_repair = u[i].order == ORDER_REPAIR;
@@ -10645,7 +10648,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     if (menu_open) reset_selection_gestures();
     else field_menu_repeat_reset();
 #ifdef SC_COMMAND_RING
-    if (command_ring_input(held, pressed)) return;
+    if (command_ring_input(held, pressed)) { SC64_CMD_INPUT_END(); return; }
 #endif
     if ((pressed & KEY_B) && !box_state && !(pressed & KEY_L)) {
 	if (menu_open)
@@ -10680,6 +10683,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	}
 	if (pressed & KEY_A)
 	    choose_command(menu_cursor);
+	SC64_CMD_INPUT_END();
 	return;
     }
     if (pressed & KEY_START)

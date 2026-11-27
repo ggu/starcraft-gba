@@ -24,7 +24,7 @@ enum { SC64_COMMAND_DELAY_UPDATES = 4, SC64_COMMAND_DELAY_SLOTS = 2,
        SC64_COMMAND_DELAY_BYTES = (MAX_UNITS + 7) / 8 };
 
 typedef struct {
-    u32 due, seq;
+    u32 left, seq;
     s16 tx, ty;
     u8 order, active;
     u8 selected[SC64_COMMAND_DELAY_BYTES];
@@ -112,10 +112,24 @@ sc64_command_delay_input_end(void)
 static int
 sc64_move_start_frames(const Unit *q)
 {
+#ifdef SC64_RACES
     switch (q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type)) {
     case 2: case 7: return 1;   /* Vulture, SCV */
     default: return 3;          /* Marine, Siege Tank, Hydralisk, Mutalisk; others provisional */
     }
+#else
+    return q->type == U_SCV ? 1 : 3;   /* the non-race profiles' own unit types */
+#endif
+}
+
+static inline int
+sc64_move_start_ground(const Unit *q)
+{
+#ifdef SC64_RACES
+    return !sc64_race_unit_flying(q->type);
+#else
+    (void)q; return 1;   /* the non-race profiles have no flyers */
+#endif
 }
 
 static inline int
@@ -142,7 +156,7 @@ sc64_command_delay_apply(Sc64DelayedCommand *c)
     c->active = 0;
     (void)issue_order(c->order, c->tx, c->ty);
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (((rest[i >> 3] >> (i & 7)) & 1) && u[i].alive && !sc64_race_unit_flying(u[i].type) &&
+        if (((rest[i >> 3] >> (i & 7)) & 1) && u[i].alive && sc64_move_start_ground(&u[i]) &&
             (u[i].order == ORDER_MOVE || u[i].order == ORDER_ATTACK_MOVE)) {
             /* The wait counts updates, and a ground unit spends one more on
              * replanning after it, so the frame count itself lands the first
@@ -171,12 +185,17 @@ sc64_command_delay_oldest(void)
     return (s32)(a->seq - b->seq) < 0 ? a : b;
 }
 
-/* Run each simulation update before orders are processed. */
+/* Run each simulation update before orders are processed. The delay counts
+ * these updates, not frame, which also advances during authored pauses that
+ * freeze orders. */
 static void __attribute__((noinline))
 sc64_command_delay_tick(void)
 {
     Sc64DelayedCommand *c;
-    while ((c = sc64_command_delay_oldest()) && (s32)((u32)frame - c->due) >= 0)
+    for (int k = 0; k < SC64_COMMAND_DELAY_SLOTS; ++k)
+        if (sc64_delayed_commands[k].active && sc64_delayed_commands[k].left)
+            --sc64_delayed_commands[k].left;
+    while ((c = sc64_command_delay_oldest()) && !c->left)
         sc64_command_delay_apply(c);
 }
 
@@ -233,8 +252,8 @@ sc64_command_delay_order(int order, int tx, int ty)
     c->order = (u8)order;
     c->tx = (s16)tx;
     c->ty = (s16)ty;
-    /* frame advances once more before this update's orders run. */
-    c->due = (u32)frame + SC64_COMMAND_DELAY_UPDATES + 1u;
+    /* This update's own order pass counts as the first. */
+    c->left = SC64_COMMAND_DELAY_UPDATES + 1u;
     c->seq = ++sc64_delayed_command_seq;
     c->active = 1;
     selected_building = -1;

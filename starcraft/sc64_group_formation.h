@@ -40,9 +40,10 @@ sc64_group_formation_begin(int order, int group_order, int tx, int ty)
 }
 
 /* The n-th selected unit's destination for a group order to (tx, ty).
- * With check_tile (builds without the reachable-formation fallback, which
- * have no route query free of cache side effects) a translated ground slot
- * on blocked terrain takes its grid slot. */
+ * With check_tile a translated ground slot on blocked terrain takes its grid
+ * slot. Both callers set it: the reachable-formation route check can count
+ * a blocked tile reachable through a neighbour and keep a point no unit
+ * reaches. */
 static inline void
 sc64_group_formation_slot(const Sc64GroupFormation *f, const Unit *q, int n,
                           int tx, int ty, int check_tile, int *slot_x, int *slot_y)

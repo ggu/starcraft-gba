@@ -40,7 +40,7 @@ static int add_unit(int owner, int type, int x, int y)
 
 /* A player's Move or attack-move lands after the command delay; the
  * order marker acknowledges it at once. */
-static void settle_order(int a, int order)
+static void settle_order(int a, int order, int tx, int ty)
 {
 #ifdef SC64_IMPORTED_MISSION
     /* This synthetic match has no buildings, so play is resumed each
@@ -50,7 +50,7 @@ static void settle_order(int a, int order)
         game_update(0, 0);
     }
 #endif
-    assert(u[a].order == order);
+    assert(u[a].order == order && u[a].tx == tx && u[a].ty == ty);
 }
 
 static void test_orders_and_lifetime(void)
@@ -89,7 +89,7 @@ static void test_orders_and_lifetime(void)
     interact();
     assert(ping_color == C_RED && ping_x == 230 && ping_y == 200 &&
            ping_life == SC64_ORDER_MARKER_GBA_TICKS);
-    settle_order(a, ORDER_ATTACK_MOVE);
+    settle_order(a, ORDER_ATTACK_MOVE, 230, 200);
     /* Smart actions use the same accepted-order acknowledgement. */
     mode = MODE_NORMAL; cx = 260; cy = 200;
     assert(field_ui_smart_move());
@@ -99,7 +99,7 @@ static void test_orders_and_lifetime(void)
     cx = 282; cy = 200;
     assert(field_ui_smart_attack());
     assert(ping_color == C_RED && ping_x == u[enemy].x && ping_y == u[enemy].y);
-    settle_order(a, ORDER_ATTACK_MOVE);
+    settle_order(a, ORDER_ATTACK_MOVE, ping_x, ping_y);
     u[a].selected = 0;
     int old_x = ping_x, old_y = ping_y, old_life = ping_life;
     mode = MODE_MOVE; cx = 250; cy = 220; interact();
