@@ -501,6 +501,13 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                    if kind(v) not in was_kinds and (time_gap(v, i) is None or not was_times)]
         if not gating:
             row['verdict'] = 'REPORT'
+        elif max(gaps) == 0 and known is not None and inconclusive:
+            # Inside the band, but an early end left a recorded offset unshown: not an improvement
+            # --accept could drop the line for; it keeps the recorded value there.
+            row['verdict'] = 'KNOWN'
+            row['baseline'] = known['gba']
+            row['why'] = 'inside the band, but cut short by the human\'s defeat at frame offset ' + \
+                offset_label(offsets[i] for i in inconclusive)
         elif max(gaps) == 0:
             row['verdict'] = 'IMPROVED' if known else 'PASS'
         elif jumps:
