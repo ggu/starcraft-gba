@@ -109,7 +109,7 @@ static int race_z6_storm_cast_selected(int x, int y)
         (u16)u[caster].x, (u16)u[caster].y, &u[caster].carry,
         race_z6_storm_technology_researched());
     if (cast) {
-        u[caster].order=ORDER_IDLE; u[caster].target=-1;
+        u[caster].order=ORDER_IDLE; u[caster].target=-1; SC64_CMD_FORGET(caster);
         u[caster].tx=u[caster].x; u[caster].ty=u[caster].y;
     }
     return cast;

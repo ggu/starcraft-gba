@@ -4999,6 +4999,7 @@ sc64_direct_attack_issue_target(int target)
         sc64_worker_gather_pending_set(q, 0);
 #endif
         q->order = ORDER_ATTACK_TARGET;
+        SC64_CMD_FORGET(i);
         q->target = target;
         q->tx = target_x(target);
         q->ty = target_y(target);
@@ -6386,6 +6387,7 @@ issue_order(int order, int tx, int ty)
                 (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
                 u[i].work_timer = 0;
 	    u[i].order = order;
+	    SC64_CMD_FORGET(i);
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[i], 0);
 #endif
@@ -6639,6 +6641,7 @@ start_build(int type)
         (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
         u[i].work_timer = 0;
     u[i].order = ORDER_BUILD;
+    SC64_CMD_FORGET(i);
     u[i].target = slot;
     u[i].tx = px;
     u[i].ty = py;

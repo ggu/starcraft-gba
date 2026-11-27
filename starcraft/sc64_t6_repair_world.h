@@ -36,6 +36,7 @@ race_t6_request_repair(void)
         if (u[i].alive && u[i].owner == SIDE && u[i].selected &&
             u[i].type == U_SCV && !SC64_TRANSPORT_LOADED(&u[i])) {
             u[i].order = ORDER_REPAIR;
+            SC64_CMD_FORGET(i);
             u[i].target = MAX_UNITS + best;
             u[i].tx = b[best].x; u[i].ty = b[best].y;
             u[i].carry = u[i].work_timer = 0;

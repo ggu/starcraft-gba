@@ -230,6 +230,7 @@ static int race_transport_request_board(int passenger, int carrier)
     sc64_worker_gather_pending_set(&u[passenger], 0);
 #endif
     u[passenger].order = ORDER_BOARD;
+    SC64_CMD_FORGET(passenger);
     u[passenger].target = carrier;
     u[passenger].path_timer = u[passenger].path_retry = 0;
     return 1;
@@ -244,6 +245,7 @@ static int race_transport_request_unload(int carrier, int x, int y)
     if (race_mode && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11) return 0;
 #endif
     u[carrier].order = ORDER_UNLOAD;
+    SC64_CMD_FORGET(carrier);
     u[carrier].target = -1;
     u[carrier].tx = x; u[carrier].ty = y;
     u[carrier].work_timer = 0;

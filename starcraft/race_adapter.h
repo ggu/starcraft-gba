@@ -1293,6 +1293,7 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     sc64_worker_gather_pending_set(&u[worker], 0);
 #endif
     u[worker].order = ORDER_BUILD_PENDING;
+    SC64_CMD_FORGET(worker);
     u[worker].target = type;
     u[worker].tx = x;
     u[worker].ty = y;

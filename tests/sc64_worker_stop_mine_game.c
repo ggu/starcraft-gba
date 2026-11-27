@@ -33,6 +33,9 @@ int main(void)
     u[worker].order=ORDER_IDLE;u[worker].target=-1;u[worker].carry=0;
     SC64_GRID_SET(visible,m[0].x/16+(m[0].y/16)*MAP_COLS,0);
     tap(KEY_A);assert(u[worker].order!=ORDER_MINE);
+    /* That tap was a Move to the unseen field: let it land after the
+     * command delay before the next case sets the worker up directly. */
+    for(int i=0;i<=SC64_COMMAND_DELAY_UPDATES;i++)game_update(0,0);
     /* A loaded gas trip cannot be retyped as mineral cargo or discarded. */
     int refinery=spawn_build(SIDE,B_REFINERY,700,700,0);assert(refinery>=0);
     cx=u[worker].x;cy=u[worker].y;tap(KEY_A);assert(u[worker].selected);

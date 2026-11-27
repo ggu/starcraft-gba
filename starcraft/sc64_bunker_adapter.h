@@ -40,7 +40,7 @@ static int __attribute__((noinline)) race_bunker_request_board(int unit, int slo
         !sc64_bunker_owner_matches(u[unit].owner,u[unit].raw_owner,b[slot].owner,b[slot].raw_owner,race_mode,SIDE)) return 0;
     int used=race_bunker_cargo_space(slot),target=sc64_bunker_target_encode(MAX_UNITS,MAX_BUILDINGS,slot);
     if (used<0 || used>=SC64_BUNKER_CAPACITY || target<0) return 0;
-    u[unit].order=ORDER_BOARD;u[unit].target=target;u[unit].build=-1;
+    u[unit].order=ORDER_BOARD;u[unit].target=target;u[unit].build=-1;SC64_CMD_FORGET(unit);
     u[unit].path_timer=u[unit].path_retry=0;return 1;
 }
 static int __attribute__((noinline)) race_bunker_tick_board(int unit)

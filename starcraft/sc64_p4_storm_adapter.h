@@ -108,9 +108,11 @@ static int race_p4_storm_cast_selected(int x, int y)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].selected) { caster = i; break; }
     if (caster < 0) return 0;
-    return sc64_psionic_storm_cast(&race_p4.storm, (u16)x, (u16)y,
+    int cast = sc64_psionic_storm_cast(&race_p4.storm, (u16)x, (u16)y,
         (u16)u[caster].x, (u16)u[caster].y, &u[caster].carry,
         race_p4_storm_technology_researched());
+    if (cast) SC64_CMD_FORGET(caster); /* the cast replaces a pending command */
+    return cast;
 }
 
 /* Called from P4's normal mission tick. The effect clocks and caster energy

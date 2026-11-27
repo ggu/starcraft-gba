@@ -234,7 +234,7 @@ static int race_battery_issue_command(int battery,int x,int y)
     int count=0,unit=selection_target(),order=race_battery_recharge_order();
     if(!race_battery_command_available() || battery!=selected_building || order<0) return 0;
     if(unit>=0 && race_battery_unit_valid(unit,battery)){
-        u[unit].order=order;u[unit].target=battery;SC64_PSC_BATTERY_WORK(&u[unit]);return 1;
+        u[unit].order=order;u[unit].target=battery;SC64_PSC_BATTERY_WORK(&u[unit]);SC64_CMD_FORGET(unit);return 1;
     }
     if(x<0 || y<0 || x>(INT_MAX-128)/2 || y>(INT_MAX-128)/2) return 0;
     int px=x*2,py=y*2;
@@ -242,7 +242,7 @@ static int race_battery_issue_command(int battery,int x,int y)
         int l,t,r,d,raw=sc64_battery_raw_unit(&u[i]);
         if(raw<0 || !sc64_battery_rect((unsigned)raw,u[i].x,u[i].y,0,&l,&t,&r,&d)) continue;
         if(r<=px-128 || l>=px+128 || d<=py-128 || t>=py+128) continue;
-        u[i].order=order;u[i].target=battery;SC64_PSC_BATTERY_WORK(&u[i]);++count;
+        u[i].order=order;u[i].target=battery;SC64_PSC_BATTERY_WORK(&u[i]);SC64_CMD_FORGET(i);++count;
     }
     return count;
 }

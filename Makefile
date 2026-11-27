@@ -6112,6 +6112,7 @@ include tests/gba-diamond/Makefile
 
 include tests/sc64-skirmish-opening/Makefile
 include mk/text-box-game/Makefile
+include mk/command-delay/Makefile
 include tests/sc64-scourge-campaign/Makefile
 
 include tests/sc64-z7-egg-save-auth/Makefile

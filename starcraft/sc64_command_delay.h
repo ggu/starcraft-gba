@@ -10,16 +10,16 @@
  * updates (3.2 source frames, so the order changes on the fourth frame)
  * with the selection it was given, then issued through issue_order().
  *
- * Bounded state: two pending commands, one selection bit per unit slot and
- * one order hash per slot. A third command while two wait applies the
- * oldest at once; commands run in the order given. A newer immediate player
- * command for a unit (see sc64_command_delay_input_end) removes it from the
- * pending ones, and a slot taken by a new unit leaves them too. save_game() applies
+ * Bounded state: two pending commands and one selection bit per unit slot.
+ * A third command while two wait applies the oldest at once; commands run
+ * in the order given. A newer immediate command for a unit removes it from
+ * the pending ones (sc64_command_delay_forget), and a slot taken by a new
+ * unit leaves them too. save_game() applies
  * pending commands once the save will go ahead, so no save holds one; a
  * successful load or a new world drops them. Units that die or are loaded
  * meanwhile drop out, as issue_order() skips them.
  * Direct calls to issue_order() (tests, scripted controllers, AI) are not
- * delayed. Included by game.c before issue_order(). */
+ * delayed, and they drop their units from the pending commands. Included by game.c before issue_order(). */
 enum { SC64_COMMAND_DELAY_UPDATES = 4, SC64_COMMAND_DELAY_SLOTS = 2,
        SC64_COMMAND_DELAY_BYTES = (MAX_UNITS + 7) / 8 };
 
@@ -53,56 +53,78 @@ sc64_command_delay_mover(int i)
     return 1;
 }
 
+/* Set while a pending command is being issued, so that issue_order() does
+ * not drop the same units from the other pending command. */
+static u8 sc64_command_delay_applying;
+
 /* A newer command for a unit, a unit leaving its slot or a new unit taking
- * it: no pending command may reach that slot any more. */
+ * it: no pending command may reach that slot any more. Every path that
+ * replaces a unit's order for the player calls this for that unit (through
+ * SC64_CMD_FORGET): issue_order() itself, Stop, gather, build, repair,
+ * boarding and unloading, direct attack, recharge, spells, Nydus, nukes,
+ * morphs and the mission scripts' own orders. Orders the simulation gives
+ * on its own (auto-acquire, arrival, AI) do not cancel the player's
+ * command, as on the N64, where it lands after its latency regardless. */
 static void
 sc64_command_delay_forget(int slot)
 {
-    if ((unsigned)slot >= MAX_UNITS) return;
+    if ((unsigned)slot >= MAX_UNITS || sc64_command_delay_applying) return;
     for (int k = 0; k < SC64_COMMAND_DELAY_SLOTS; ++k)
         sc64_delayed_commands[k].selected[slot >> 3] &= (u8)~(1u << (slot & 7));
 }
 
-/* A delayed command reaches only units whose order the player has not
- * changed since. While a command waits, each update's input phase hashes
- * every unit's order before and after: a unit whose order changed there was
- * given a newer player command (Stop, gather, build, repair, boarding, a
- * spell...) and leaves the pending commands. Orders the simulation changes
- * (auto-acquire, AI) lie outside that window and do not cancel the
- * player's command. */
-static u8 sc64_command_delay_seen[MAX_UNITS];
-static u8 sc64_command_delay_watching;
-
-/* The timers are in it because a command repeated as it stands (Gather on
- * the same patch, say) still resets them; the input phase runs no
- * simulation, so nothing else changes them there. */
-static inline u8
-sc64_command_delay_hash(const Unit *q)
+/* Host audit (tests only, SC64_COMMAND_DELAY_AUDIT): a unit whose order
+ * changes in the input phase while a pending command still reaches it is a
+ * player command path that does not call SC64_CMD_FORGET. The game itself
+ * keeps no per-unit record. */
+#ifdef SC64_COMMAND_DELAY_AUDIT
+#include <stdio.h>
+#include <stdlib.h>
+static struct {
+    __typeof__(u[0].order) order;
+    __typeof__(u[0].target) target;
+    __typeof__(u[0].tx) tx;
+    __typeof__(u[0].ty) ty;
+} sc64_command_delay_audit_seen[MAX_UNITS];
+static int
+sc64_command_delay_pending(int slot)
 {
-    return (u8)((unsigned)q->order * 37u + (unsigned)q->target * 11u +
-                (unsigned)q->tx * 3u + (unsigned)q->ty * 7u + (unsigned)q->alive +
-                (unsigned)q->path_timer * 13u + (unsigned)q->path_retry * 17u +
-                (unsigned)q->work_timer * 19u);
+    for (int k = 0; k < SC64_COMMAND_DELAY_SLOTS; ++k)
+        if (sc64_delayed_commands[k].active &&
+            ((sc64_delayed_commands[k].selected[slot >> 3] >> (slot & 7)) & 1)) return 1;
+    return 0;
 }
-
-static void __attribute__((noinline))
+static void
 sc64_command_delay_input_begin(void)
 {
-    sc64_command_delay_watching =
-        sc64_delayed_commands[0].active || sc64_delayed_commands[1].active;
-    if (!sc64_command_delay_watching) return;
-    for (int i = 0; i < MAX_UNITS; ++i) sc64_command_delay_seen[i] = sc64_command_delay_hash(&u[i]);
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        sc64_command_delay_audit_seen[i].order = u[i].order;
+        sc64_command_delay_audit_seen[i].target = u[i].target;
+        sc64_command_delay_audit_seen[i].tx = u[i].tx;
+        sc64_command_delay_audit_seen[i].ty = u[i].ty;
+    }
 }
-
-static void __attribute__((noinline))
+static void
 sc64_command_delay_input_end(void)
 {
-    if (!sc64_command_delay_watching) return;
-    sc64_command_delay_watching = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (sc64_command_delay_seen[i] != sc64_command_delay_hash(&u[i]))
-            sc64_command_delay_forget(i);
+        if (sc64_command_delay_pending(i) &&
+            (sc64_command_delay_audit_seen[i].order != u[i].order ||
+             sc64_command_delay_audit_seen[i].target != u[i].target ||
+             sc64_command_delay_audit_seen[i].tx != u[i].tx ||
+             sc64_command_delay_audit_seen[i].ty != u[i].ty)) {
+            fprintf(stderr, "command delay audit: unit %d (type %d) order %d -> %d "
+                    "target %d -> %d at frame %u while a command is pending\n",
+                    i, (int)u[i].type, (int)sc64_command_delay_audit_seen[i].order,
+                    (int)u[i].order, (int)sc64_command_delay_audit_seen[i].target,
+                    (int)u[i].target, (unsigned)frame);
+            abort();
+        }
 }
+#else
+static inline void sc64_command_delay_input_begin(void) {}
+static inline void sc64_command_delay_input_end(void) {}
+#endif
 
 /* StarCraft 64 starts a unit moving some source frames after its order
  * changes (parity unit labs: N64 start latency minus the GBA's with the
@@ -159,7 +181,9 @@ sc64_command_delay_apply(Sc64DelayedCommand *c)
         if (u[i].selected && sc64_move_at_rest(&u[i])) rest[i >> 3] |= (u8)(1u << (i & 7));
     }
     c->active = 0;
+    sc64_command_delay_applying = 1;
     (void)issue_order(c->order, c->tx, c->ty);
+    sc64_command_delay_applying = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (((rest[i >> 3] >> (i & 7)) & 1) && u[i].alive && sc64_move_start_ground(&u[i]) &&
             (u[i].order == ORDER_MOVE || u[i].order == ORDER_ATTACK_MOVE)) {
@@ -170,10 +194,7 @@ sc64_command_delay_apply(Sc64DelayedCommand *c)
             u[i].path_retry = sc64_move_start_frames(&u[i]);
             u[i].path_timer = 0;
         }
-    for (int i = 0; i < MAX_UNITS; ++i) {
-        u[i].selected = (now[i >> 3] >> (i & 7)) & 1;
-        if (sc64_command_delay_watching) sc64_command_delay_seen[i] = sc64_command_delay_hash(&u[i]);
-    }
+    for (int i = 0; i < MAX_UNITS; ++i) u[i].selected = (now[i >> 3] >> (i & 7)) & 1;
     selected_building = building;
     toast_id = line;
     toast_timer = line_timer;
@@ -215,7 +236,7 @@ static void
 sc64_command_delay_reset(void)
 {
     memset(sc64_delayed_commands, 0, sizeof sc64_delayed_commands);
-    sc64_command_delay_watching = 0;
+    sc64_command_delay_applying = 0;
 }
 
 /* StarCraft 64 holds a Move order 1-7 source frames after the unit stops

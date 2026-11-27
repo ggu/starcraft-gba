@@ -56,7 +56,7 @@ static int race_bc_yamato_issue(int slot,int target)
     sc64_bc_shots[index].x_q8=q->x*256;
     sc64_bc_shots[index].y_q8=q->y*256;
     sc64_bc_shots[index].phase=(unsigned char)((unsigned)q->owner | ((unsigned)key<<3));
-    q->order=ORDER_ATTACK_TARGET; q->target=target;
+    q->order=ORDER_ATTACK_TARGET; q->target=target; SC64_CMD_FORGET(slot);
     q->tx=target_x(target); q->ty=target_y(target);
     q->path_timer=q->path_retry=0;
     return 1;
