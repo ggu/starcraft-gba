@@ -910,7 +910,7 @@ class FrameOffsets(unittest.TestCase):
         row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, {}, cutoffs=[9000, 9600, 9000],
                                 more=[(1, {key: sk.NEVER}), (2, {key: sk.NEVER})])[0]
         self.assertIn('outside the band only at frame offset +1 ', row['why'])
-        self.assertIn('cut short by the human\'s defeat before the band at +0, +2', row['why'])
+        self.assertIn('cut short by the human\'s defeat before it could show the band at +0, +2', row['why'])
         self.assertEqual(unlisted([9600, 9600, 9600]), 'REGRESSION')
         self.assertEqual(unlisted([9600, 9000, 9600]), 'KNOWN')          # each run's own cutoff
         self.assertEqual(unlisted(None), 'REGRESSION')
@@ -943,6 +943,36 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([2300] * 3, known), 'IMPROVED')
         self.assertEqual(verdict([2300] * 3, {}), 'PASS')
         self.assertEqual(verdict(None, {}), 'PASS')
+
+    def test_a_never_band_needs_runs_that_reached_the_reach(self):
+        # The N64 never builds a Factory within its run (to 10,676); the baseline recorded one at
+        # 10,079. Runs that all ended at 9,000 have not shown the absence: KNOWN, not IMPROVED.
+        never = dict(self.golden(sk.NEVER, sk.NEVER, sk.NEVER, check='build.first.Factory', subject='cpu Terran'),
+                     gba={'horizon': 10676})
+        key = ('build.first.Factory', 'cpu Terran')
+        line = 'sk-pvt-w0:build.first.Factory:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10079, 10079]}}
+
+        def verdict(cutoffs, baseline):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', never, {key: sk.NEVER}, {}, baseline, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(verdict([9000] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([10675] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([10676] * 3, known), 'IMPROVED')
+        self.assertEqual(verdict([9000] * 3, {}), 'KNOWN')
+        self.assertEqual(verdict([10676] * 3, {}), 'PASS')
+
+    def test_a_checkpoint_against_a_single_runs_line_keeps_every_offset(self):
+        line = 'sk-pvt-w0:supply.cap@8000:cpu Terran'
+        legacy = {line: {'key': line, 'gba': 116}}
+        key = ('supply.cap@8000', 'cpu Terran')
+
+        def verdict(spread):
+            more = [(1, {key: spread[1]}), (2, {key: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', self.golden(), {key: spread[0]}, {}, legacy, more=more)[0]['verdict']
+        self.assertEqual(verdict([148, 116, 116]), 'KNOWN')
+        self.assertEqual(verdict([148, 140, 150]), 'REGRESSION')
 
     def test_a_single_runs_line_speaks_for_offset_0_only(self):
         defeat = dict(self.golden(10076, 10074, 10078, check='result.human_defeated', subject='human'),

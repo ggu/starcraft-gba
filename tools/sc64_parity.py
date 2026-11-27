@@ -424,11 +424,14 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 return max(0, nv[1] - obs['hi'])
             return None
         def gap_at(i, v):
-            # An allowed NEVER counts as inside the band only from a run that reached it: one cut
-            # short before the band's lower edge (an early defeat) has not shown it. Such a reading is
+            # A NEVER the band admits (an also_ok NEVER, or a band that is NEVER itself) counts as
+            # inside it only from a run that went far enough to show the absence: past the band's
+            # lower edge, or for a NEVER band to the run's reach. One cut short by an early defeat is
             # neither inside nor shown outside (its time distance is 0), so the line stays KNOWN.
-            if v in also_ok and own[i] is not None and v == own[i][0] and own[i][1] - 1 < obs['lo']:
-                return obs['lo'] - (own[i][1] - 1)   # frames short of the band: never 0
+            if own[i] is not None and v == own[i][0] and gap(v) == 0:
+                needed = obs['lo'] if obs['lo'] not in specials else (never[1] - 1 if never else None)
+                if needed is not None and own[i][1] - 1 < needed:
+                    return needed - (own[i][1] - 1)   # frames short: never 0
             return gap(v)
         gaps = [gap_at(i, v) for i, v in enumerate(spread)]
         every = ' at every frame offset' if len(spread) > 1 else ''
@@ -504,8 +507,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 short = [k for k, g, s_ in zip(offsets, gaps, shown) if g and not s_]
                 row['why'] = ((f'outside the band only at frame offset {offset_label(out)} (GBA frame noise)'
                                if out else 'outside the band at no offset') +
-                              (f'; cut short by the human\'s defeat before the band at {offset_label(short)}'
-                               if short else '') + '; no baseline line yet')
+                              (f'; cut short by the human\'s defeat before it could show the band at '
+                               f'{offset_label(short)}' if short else '') + '; no baseline line yet')
         elif untimed and not {kind(v) for v in spread} & was_kinds and min(gaps) > 0:
             # (An offset now inside the band, a checkpoint the match reaches again, is not this.)
             # Every offset changed to or from an outcome with no time: changed at any distance.
@@ -544,7 +547,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             unstable = never is not None and len({kind(b) for b in base}) > 1
             numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
                 beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
-                        if kind(v) == 'number' and i < recorded and (never is None or not changed(i, v))],
+                        if kind(v) == 'number' and (never is None or (i < recorded and not changed(i, v)))],
                        [gap(b) for b in base if kind(b) == 'number'])
             timed = None not in [time_gap(v, i) for i, v in enumerate(spread)] and \
                 beyond([(time_gap(v, i), margin(i, v)) for i, v in enumerate(spread)],
