@@ -917,22 +917,29 @@ def make_measure_gba(scenario_id):
             elif check == 'attack.first_wave' and label in measured:
                 measured[label]['wave'] = flat[(check, label)]
         return {'values': flat, 'curves': gba_curves(m, golden),
+                # The last source frame the measurement saw, when the GBA run ended in the human's
+                # defeat (which result.human_defeated gates): it bounds the timings the defeat cut
+                # short. Any other end (a win, the step limit) leaves the run's reach.
+                'cutoff': (late if late is not None else m)['end'] if report.get('lost') else None,
                 'measured': {'players': measured, 'end': m['end'], 'gba_only_types': extra,
                              'past_run_end': sorted(f'{c} {s}' for c, s in past_end),
                              'start_order': match.get('start_order')}}, None
     return measure_gba
 
 
-def never_time(golden, obs):
+def never_time(golden, obs, cutoff=None):
     """The judge's hook: a GBA NEVER for a timing means "not before the measurement's reach" (the
     N64 run's last frame, or the band's upper edge for a finite band; measure_gba), so it compares
-    as the frame after it. None for checks that are not times."""
+    as the frame after it; cutoff, the last source frame a GBA run's measurement saw, takes the
+    place of the reach when that run's trace ended first. None for checks that are not times."""
     horizon = golden.get('gba', {}).get('horizon')
     if horizon is None or not obs['check'].startswith(('build.first.', 'attack.first', 'result.')):
         return None
     hi = obs.get('hi')
     reach = max(int(horizon), int(hi)) if obs.get('value') != NEVER and isinstance(hi, (int, float)) and hi != NEVER \
         else int(horizon)
+    if cutoff is not None:
+        reach = min(reach, int(cutoff))
     return NEVER, reach + 1
 
 
@@ -958,6 +965,7 @@ def scenarios():
             # spread over these offsets (tools/sc64_parity.py judge).
             'frame_offsets': FRAME_OFFSETS,
             'never_time': never_time,
+            'never_value': NEVER,   # the only baseline value a gba_cutoffs entry may stand behind
             'frame_noise': FRAME_NOISE,
             # A seed whose own band is NEVER, in a finite envelope: times keep their +-2 frames.
             'sentinel_slack': lambda obs: TIME_TOLERANCE,

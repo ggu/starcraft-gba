@@ -293,7 +293,7 @@ class GbaTrace(unittest.TestCase):
         # falls at frame 3: past the run's last frame, inside the band.
         tape = hashlib.sha256(sk.lobby_tape(*sk.LOBBIES['sk-zvt-w0']).encode()).hexdigest()
 
-        def defeat(lo, hi, value=2, extra=()):
+        def defeat(lo, hi, value=2, extra=(), report=REPORT):
             golden = {'bundle': {'tape_sha256': tape}, 'gba': {'horizon': 2},
                       'observations': [{'check': 'result.human_defeated', 'subject': 'human', 'value': value,
                                         'lo': lo, 'hi': hi, 'gating': True},
@@ -303,13 +303,23 @@ class GbaTrace(unittest.TestCase):
             check, selfgate.check_trace_complete = selfgate.check_trace_complete, lambda *a, **k: None
             try:
                 values, error = metrics.SCENARIOS['sk-zvt-w0']['measure_gba'](
-                    sk.gba_series(self.trace, REPORT), golden, REPORT)
+                    sk.gba_series(self.trace, report), golden, report)
             finally:
                 selfgate.check_trace_complete = check
             self.assertIsNone(error)
+            cutoffs.append(values['cutoff'])
             return values['values'][('result.human_defeated', 'human')]
+        cutoffs = []
         self.assertEqual(defeat(0, 4), 3)
         self.assertEqual(defeat(0, 2), sk.NEVER)            # past both the run and the band
+        # A run that ended in the human's defeat reports the last frame its measurement saw (through
+        # the band's edge, or the run's cutoff); any other end reports none.
+        self.assertEqual(cutoffs, [None, None])
+        lost = dict(REPORT, lost=1)
+        defeat(0, 4, report=lost)
+        defeat(0, 2, report=lost)
+        self.assertTrue(isinstance(cutoffs[2], int) and 3 <= cutoffs[2] <= 4, cutoffs)
+        self.assertTrue(isinstance(cutoffs[3], int) and cutoffs[3] <= 2, cutoffs)
         self.assertEqual(defeat(sk.NEVER, sk.NEVER, sk.NEVER), sk.NEVER)   # a NEVER keeps the run's cutoff
         # A seed that never saw it, inside an envelope reaching past its run (another check
         # extends the measurement): still the run's cutoff.
@@ -751,7 +761,7 @@ class FrameOffsets(unittest.TestCase):
         # ... and KNOWN (recorded by --accept) while the noise still reaches the band.
         row = self.row([84, 92, 84])
         self.assertEqual(row['verdict'], 'KNOWN')
-        self.assertIn('frame offset +1 ', row['why'])
+        self.assertIn('frame offset +1, inside at +0, +2 (GBA frame noise)', row['why'])
         self.assertNotIn('baseline', row)
 
     def test_improved_only_when_every_offset_is_inside(self):
@@ -870,6 +880,257 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([5000, sk.NEVER, sk.NEVER], mixed), 'REGRESSION')
         self.assertEqual(verdict([sk.NEVER, 5000, sk.NEVER], mixed), 'REGRESSION')
 
+    def test_never_stands_for_each_runs_own_cutoff(self):
+        # Codex follow-up: the GBA human fell at 9,000 at every offset, so its traces end there and the
+        # Terran wave reads NEVER. Against the run's reach (12,000) that NEVER would be 2,460 frames
+        # out; it means only "not before 9,001", which is no further out than the recorded waves.
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        key = ('attack.first_wave', 'cpu Terran')
+        line = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+
+        def verdict(cutoffs):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(verdict(None), 'REGRESSION')
+        self.assertEqual(verdict([9000, 9000, 9000]), 'KNOWN')
+        self.assertEqual(verdict([12000, 12000, 12000]), 'REGRESSION')   # a run that went on: past the reach
+        # A run that ended before the band says nothing about the distance: it might have come in it.
+        self.assertEqual(verdict([5000, 5000, 5000]), 'KNOWN')
+
+        # With no baseline line: cut short below the band at every offset is not shown outside it
+        # (KNOWN, not PASS); every run reaching past the band without the wave is.
+        def unlisted(cutoffs):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, {}, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(unlisted([9000, 9000, 9000]), 'KNOWN')
+        row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, {}, cutoffs=[9000, 9600, 9000],
+                                more=[(1, {key: sk.NEVER}), (2, {key: sk.NEVER})])[0]
+        self.assertIn('outside the band at frame offset +1;', row['why'])
+        self.assertNotIn('noise', row['why'])
+        self.assertIn('cut short by the human\'s defeat before it could show the band at +0, +2', row['why'])
+        # In-band and cut-short offsets with none outside: both groups named.
+        gate = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        row = sc64_parity.judge('sk-pvt-w0', gate, {key: 9539}, {}, {}, cutoffs=[None, 9000, None],
+                                more=[(1, {key: sk.NEVER}), (2, {key: 9540})])[0]
+        self.assertEqual(row['verdict'], 'KNOWN')
+        self.assertIn('outside the band at no offset, inside at +0, +2', row['why'])
+        self.assertIn('show the band at +1', row['why'])
+        # A regression the numbers show at offset 0 alone, the others cut short, names offset 0.
+        line = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+        row = sc64_parity.judge('sk-pvt-w0', gate, {key: 11000}, {}, known, cutoffs=[None, 9000, 9000],
+                                more=[(1, {key: sk.NEVER}), (2, {key: sk.NEVER})])[0]
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertTrue(row['why'].endswith('at frame offset +0'), row['why'])
+        self.assertEqual(unlisted([9600, 9600, 9600]), 'REGRESSION')
+        self.assertEqual(unlisted([9600, 9000, 9600]), 'KNOWN')          # each run's own cutoff
+        self.assertEqual(unlisted(None), 'REGRESSION')
+        self.assertEqual(sk.never_time(wave, wave['observations'][0], 9000), (sk.NEVER, 9001))
+        self.assertEqual(sk.never_time(wave, wave['observations'][0], 15000), (sk.NEVER, 12001))
+
+    def test_an_allowed_never_counts_only_from_a_run_that_reached_the_band(self):
+        # sk-ffa-w0's Gateway: band 2,249-2,253 with NEVER allowed by the seed envelope. Runs that all
+        # ended at 2,149 never reached the band: with a baseline line KNOWN, never IMPROVED (which
+        # --accept would drop); without one PASS, as before (an early end adds no lines).
+        gate = dict(self.golden(2251, 2249, 2253, check='build.first.Gateway', subject='cpu Protoss',
+                                also_ok=[sk.NEVER]), gba={'horizon': 9000})
+        key = ('build.first.Gateway', 'cpu Protoss')
+        line = 'sk-pvt-w0:build.first.Gateway:cpu Protoss'
+        known = {line: {'key': line, 'gba': 1794, 'gba_offsets': [1794, 1804, 1804]}}
+
+        def verdict(cutoffs, baseline):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', gate, {key: sk.NEVER}, {}, baseline, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(verdict([2149] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([2149, 2300, 2300], known), 'KNOWN')
+        self.assertEqual(verdict([2149] * 3, {}), 'PASS')
+        # The edge: a run whose last measured frame is just before the band has not reached it.
+        self.assertEqual(verdict([2248] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([2249] * 3, known), 'IMPROVED')   # reached the band, past the recorded times
+        # A recorded time the runs stopped before: the line stays KNOWN and --accept keeps that value.
+        late = {line: {'key': line, 'gba': 2400, 'gba_offsets': [2400, 1804, 1804]}}
+        row = sc64_parity.judge('sk-pvt-w0', gate, {key: sk.NEVER}, {}, late, cutoffs=[2300, None, None],
+                                more=[(1, {key: 2251}), (2, {key: 2252})])[0]
+        self.assertEqual(row['verdict'], 'KNOWN')
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'b.json'
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_offsets'], [2400, 2251, 2252])
+        # Runs that reached the band without building it: the allowed NEVER counts (on a line with a
+        # baseline line only from runs that went past its recorded times).
+        self.assertEqual(verdict([2300] * 3, known), 'IMPROVED')
+        self.assertEqual(verdict([2300] * 3, {}), 'PASS')
+        self.assertEqual(verdict(None, {}), 'PASS')
+
+    def test_a_never_band_needs_runs_that_reached_the_reach(self):
+        # The N64 never builds a Factory within its run (to 10,676); the baseline recorded one at
+        # 10,079. Runs that all ended at 9,000 have not shown the absence: KNOWN, not IMPROVED.
+        never = dict(self.golden(sk.NEVER, sk.NEVER, sk.NEVER, check='build.first.Factory', subject='cpu Terran'),
+                     gba={'horizon': 10676})
+        key = ('build.first.Factory', 'cpu Terran')
+        line = 'sk-pvt-w0:build.first.Factory:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10079, 10079]}}
+
+        def verdict(cutoffs, baseline):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', never, {key: sk.NEVER}, {}, baseline, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(verdict([9000] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([10675] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([10676] * 3, known), 'IMPROVED')
+        self.assertEqual(verdict([9000] * 3, {}), 'PASS')     # no line: the result check gates the end
+        self.assertEqual(verdict([10676] * 3, {}), 'PASS')
+        # Accepting those cut-short runs records NEVER at every offset; a Factory built later at every
+        # offset is then still a change of outcome.
+        cut = {line: {'key': line, 'gba': sk.NEVER, 'gba_offsets': [sk.NEVER] * 3}}
+        more = [(1, {key: 8000}), (2, {key: 8001})]
+        row = sc64_parity.judge('sk-pvt-w0', never, {key: 8002}, {}, cut, more=more, cutoffs=[9000] * 3)[0]
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('outcome changed', row['why'])
+        mixed = sc64_parity.judge('sk-pvt-w0', never, {key: sk.NEVER}, {}, cut, more=more, cutoffs=[9000] * 3)[0]
+        self.assertEqual(mixed['verdict'], 'KNOWN')
+
+    def test_accept_keeps_values_an_early_end_left_inconclusive(self):
+        never = dict(self.golden(sk.NEVER, sk.NEVER, sk.NEVER, check='build.first.Factory', subject='cpu Terran'),
+                     gba={'horizon': 10676})
+        key = ('build.first.Factory', 'cpu Terran')
+        line = 'sk-pvt-w0:build.first.Factory:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'baseline.json'
+            for cutoffs, spread, want in (([9000] * 3, [sk.NEVER] * 3, [10079, 10078, 10077]),
+                                          ([None, 9000, None], [10070, sk.NEVER, 10071], [10070, 10078, 10071])):
+                more = [(1, {key: spread[1]}), (2, {key: spread[2]})]
+                row = sc64_parity.judge('sk-pvt-w0', never, {key: spread[0]}, {}, known, more=more, cutoffs=cutoffs)[0]
+                self.assertEqual(row['verdict'], 'KNOWN')
+                sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+                accepted = sc64_parity.load_baseline(path)
+                self.assertEqual((accepted[line]['gba'], accepted[line]['gba_offsets']), (want[0], want))
+                # Replaying the original timings against what was accepted stays KNOWN.
+                again = sc64_parity.judge('sk-pvt-w0', never, {key: 10079}, {}, accepted,
+                                          more=[(1, {key: 10078}), (2, {key: 10077})])[0]
+                self.assertEqual(again['verdict'], 'KNOWN')
+
+    def test_accept_keeps_recorded_times_behind_a_disallowed_never(self):
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        key = ('attack.first_wave', 'cpu Terran')
+        line = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+        more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'baseline.json'
+            row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more, cutoffs=[9000] * 3)[0]
+            self.assertEqual(row['verdict'], 'KNOWN')
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            accepted = sc64_parity.load_baseline(path)
+            self.assertEqual(accepted[line]['gba_offsets'], [10079, 10078, 10077])
+            # A later full-length run without the wave still fails against what was kept.
+            later = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more,
+                                      cutoffs=[12000] * 3)[0]
+            self.assertEqual(later['verdict'], 'REGRESSION')
+            # Runs that ended after the recorded waves, still without one, show the wave moved: that
+            # REGRESSION, once accepted, records what was seen, and the same rerun is then KNOWN.
+            # A regression at one offset beside runs that stopped before their recorded waves keeps
+            # those waves, so a later full-length run without a wave still fails.
+            mixed = sc64_parity.judge('sk-pvt-w0', wave, {key: 11000}, {}, known, more=more,
+                                      cutoffs=[None, 9000, 9000])[0]
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [mixed]}], {})
+            kept = sc64_parity.load_baseline(path)
+            self.assertEqual(kept[line]['gba_offsets'], [11000, 10078, 10077])
+            full = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, kept, more=more, cutoffs=[12000] * 3)[0]
+            self.assertEqual(full['verdict'], 'REGRESSION')
+            row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more, cutoffs=[10500] * 3)[0]
+            self.assertEqual(row['verdict'], 'REGRESSION')
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            accepted = sc64_parity.load_baseline(path)
+            self.assertEqual(accepted[line]['gba_offsets'], [sk.NEVER] * 3)
+            rerun = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more, cutoffs=[10500] * 3)[0]
+            self.assertEqual(rerun['verdict'], 'KNOWN')
+            # The accepted NEVERs keep the frame they were shown to ...
+            self.assertEqual(accepted[line]['gba_cutoffs'], [10500] * 3)
+            self.assertIn('"gba_cutoffs": [10500, 10500, 10500]\n', path.read_text())
+            # ... so a later run that goes on to 12,000 without a wave is a regression against them,
+            # where a full-window NEVER on record (a line without cutoffs) would have excused it.
+            later = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more, cutoffs=None)[0]
+            self.assertEqual(later['verdict'], 'REGRESSION')
+            whole = {line: {'key': line, 'gba': sk.NEVER, 'gba_offsets': [sk.NEVER] * 3}}
+            self.assertEqual(sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, whole, more=more)[0]['verdict'],
+                             'KNOWN')
+            # A run cut short no later than the recorded cutoff keeps the line, and its cutoff, as it is.
+            again = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more,
+                                      cutoffs=[10400, 10500, None])[0]
+            self.assertEqual(again['verdict'], 'KNOWN')
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [again]}], {})
+            self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_cutoffs'], [10500, 10500, None])
+            # A run that reaches the event again records a time and no cutoff for it.
+            back = sc64_parity.judge('sk-pvt-w0', wave, {key: 10079}, {}, accepted,
+                                     more=[(1, {key: 10078}), (2, {key: 10077})])[0]
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [back]}], {})
+            self.assertNotIn('gba_cutoffs', sc64_parity.load_baseline(path)[line])
+            # A single run's line keeps its offset-0 value when offset 0 is cut short.
+            legacy = {line: {'key': line, 'gba': 10079}}
+            row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, legacy, more=[(1, {key: 10080}), (2, {key: 10081})],
+                                    cutoffs=[9000, None, None])[0]
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_offsets'], [10079, 10080, 10081])
+
+    def test_a_checkpoint_against_a_single_runs_line_keeps_every_offset(self):
+        line = 'sk-pvt-w0:supply.cap@8000:cpu Terran'
+        legacy = {line: {'key': line, 'gba': 116}}
+        key = ('supply.cap@8000', 'cpu Terran')
+
+        def verdict(spread):
+            more = [(1, {key: spread[1]}), (2, {key: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', self.golden(), {key: spread[0]}, {}, legacy, more=more)[0]['verdict']
+        self.assertEqual(verdict([148, 116, 116]), 'KNOWN')
+        self.assertEqual(verdict([148, 140, 150]), 'REGRESSION')
+
+    def test_a_single_runs_line_speaks_for_offset_0_only(self):
+        defeat = dict(self.golden(10076, 10074, 10078, check='result.human_defeated', subject='human'),
+                      gba={'horizon': 10676})
+        key = ('result.human_defeated', 'human')
+        line = 'sk-pvt-w0:result.human_defeated:human'
+        legacy = {line: {'key': line, 'gba': sk.NEVER}}
+
+        def verdict(spread):
+            more = [(1, {key: spread[1]}), (2, {key: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', defeat, {key: spread[0]}, {}, legacy, more=more)[0]['verdict']
+        self.assertEqual(verdict([sk.NEVER, 1000, 1001]), 'KNOWN')       # offsets +1, +2 were never recorded
+        self.assertEqual(verdict([1000, sk.NEVER, sk.NEVER]), 'REGRESSION')
+        # The whole-spread numbers comparison keeps every matching reading: against a legacy Gateway
+        # line (2,239), numbers that all moved 1,200 frames earlier fail even beside an allowed NEVER.
+        gate = dict(self.golden(2251, 2249, 2253, check='build.first.Gateway', subject='cpu Protoss',
+                                also_ok=[sk.NEVER]), gba={'horizon': 9000})
+        gkey = ('build.first.Gateway', 'cpu Protoss')
+        gline = 'sk-pvt-w0:build.first.Gateway:cpu Protoss'
+
+        def gate_verdict(spread):
+            more = [(1, {gkey: spread[1]}), (2, {gkey: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', gate, {gkey: spread[0]}, {}, {gline: {'key': gline, 'gba': 2239}},
+                                     more=more)[0]['verdict']
+        self.assertEqual(gate_verdict([sk.NEVER, 1000, 1001]), 'REGRESSION')
+        self.assertEqual(gate_verdict([1000, 1001, 1002]), 'REGRESSION')
+        self.assertEqual(gate_verdict([sk.NEVER, 2238, 2240]), 'KNOWN')
+        # Codex: a legacy timing of 10,079 (band ends 9,541, two frames of slack).
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        wkey = ('attack.first_wave', 'cpu Terran')
+        wline = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+
+        def wave_verdict(spread):
+            more = [(1, {wkey: spread[1]}), (2, {wkey: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', wave, {wkey: spread[0]}, {}, {wline: {'key': wline, 'gba': 10079}},
+                                     more=more)[0]['verdict']
+        self.assertEqual(wave_verdict([10082, 10079, 10079]), 'KNOWN')
+        self.assertEqual(wave_verdict([10082, 10082, 10082]), 'REGRESSION')
+
     def test_a_newly_finite_time_is_compared_with_the_outcome_it_replaced(self):
         # Codex: the only recorded time becomes NEVER and the newly finite defeats are nearer the band
         # than the NEVER they replaced (reach 12,000): not worse.
@@ -956,6 +1217,23 @@ class FrameOffsets(unittest.TestCase):
                 path.write_text(text)
                 with self.assertRaises(SystemExit):
                     sc64_parity.load_baseline(path)
+            # gba_cutoffs: one source frame or null per offset, at least one frame, with gba_offsets.
+            for cut in ([10500], [None, None, None], [10500, 'x', None], [10500, -1, None], [True, None, None], 10500):
+                path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': sk.NEVER,
+                                                       'gba_offsets': [sk.NEVER] * 3, 'gba_cutoffs': cut}]}))
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_cutoffs': [9000]}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
+            # A cutoff behind a finite time is refused; behind the NEVER it is kept.
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, sk.NEVER, 132],
+                                                   'gba_cutoffs': [9000, None, None]}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, sk.NEVER, 132],
+                                                   'gba_cutoffs': [None, 9000, None]}]}))
+            self.assertEqual(sc64_parity.load_baseline(path)[self.KEY]['gba_cutoffs'], [None, 9000, None])
             # A line of a scenario this checkout does not know is kept as it is.
             path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': [1, 2]}]}))
             self.assertEqual(sc64_parity.load_baseline(path)['gone-lab:x:s']['gba_offsets'], [1, 2])

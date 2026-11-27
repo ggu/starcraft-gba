@@ -135,7 +135,29 @@ edge), and compares as the frame after it. At several frame offsets:
   still reaches the N64's value (only a newly finite timing is judged on
   its own).
 - A line whose outcomes share none with the baseline's and have no time
-  (ENDED, a marker) is a REGRESSION at any distance.
+  (ENDED, a marker) is a REGRESSION at any distance, when every offset is
+  outside the band.
+- A NEVER is a lower bound on the time: the frame after the run's reach,
+  or after that GBA run's own last measured frame when it ended first in
+  the human's defeat (a win or the step limit leaves the reach). It is as far out as that bound lies past the band, and no
+  distance at all while the bound lies below the band's upper edge, so an
+  early end is gated by the result check, not by every timing it cut
+  short. A NEVER the band does not admit, cut short at every offset, reads
+  KNOWN on a line with no baseline line (recorded on `--accept`) instead of
+  REGRESSION. A NEVER the band admits (`also_ok`, or a band that is NEVER
+  itself) counts as inside it on a line with a baseline line only from a
+  run that reached the band's lower edge (for a NEVER band, the run's
+  reach), so an early end never makes such a line IMPROVED and drops it; on
+  a line with no baseline line it passes as before. `--accept` keeps a
+  line's recorded value at every offset whose run an early end stopped
+  before that recorded time; a run that went past it without the event
+  showed the move, and that is recorded. An accepted NEVER from a run cut
+  short keeps that run's last frame in `gba_cutoffs` (one source frame or
+  null per offset), so it reads "not before that frame", never "not within
+  the whole window"; lines without it keep the full-window meaning.
+- Only offsets the baseline recorded are evidence for the per-offset check
+  of a newly finite time: a single run's line (no `gba_offsets`) speaks for
+  offset 0 alone there. The whole-spread comparisons keep every reading.
 - A seed whose own band is NEVER, in an envelope other seeds made finite,
   keeps the timing tolerance (±2 frames) as its slack.
 

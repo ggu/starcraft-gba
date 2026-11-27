@@ -311,9 +311,10 @@ def check_family(check):
     return 'build.first' if check.startswith('build.first.') else check.split('@')[0]
 
 
-def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=()):
+def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=(), cutoffs=None):
     """Rows for every observation of one golden. values are the GBA's (offset 0); more lists
-    (frame offset, values) for the scenario's other frame offsets, judged as one spread."""
+    (frame offset, values) for the scenario's other frame offsets, judged as one spread; cutoffs,
+    if given, the last source frame each offset's GBA measurement saw (offset 0 first)."""
     rows = []
     offsets = [0] + [k for k, _ in more]
     # The GBA's own frame noise per check family, calibrated once by the scenario (fixed, so no
@@ -393,8 +394,13 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         # outcome, not a number. Numbers are compared with numbers; an outcome with a time (a
         # skirmish NEVER: not before the run's reach) is compared by that time.
         specials = set(metrics.MARKERS) | set(obs.get('sentinels', ()))
-        never = metrics.SCENARIOS.get(scenario_id, {}).get('never_time')
-        never = never(golden, obs) if never else None     # (sentinel, the earliest time it stands for)
+        hook = metrics.SCENARIOS.get(scenario_id, {}).get('never_time')
+        never = hook(golden, obs) if hook else None     # (sentinel, the earliest time it stands for)
+        # Each offset's own NEVER: not before that GBA run's last measured frame, when its trace ended
+        # before the run's reach (an early end is gated by the result check, not by every timing).
+        # Recorded baseline values keep the run's reach, or their own recorded cutoff (gba_cutoffs).
+        own = [hook(golden, obs, (cutoffs or [])[i] if i < len(cutoffs or []) else None) if hook else None
+               for i in range(len(spread))]
 
         def kind(v):
             return v if v in specials else 'number'
@@ -403,18 +409,83 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # 0 for an outcome outside the numeric band that the N64 also showed (skirmish NEVER).
             return 0 if v in also_ok else outside(v, obs['lo'], obs['hi'])
 
-        def time_gap(v):
+        def time_gap(v, at=None, recorded=None):
             # The distance of an outcome by its time; None for one with no time (ENDED, a marker).
+            # at: the spread index whose own NEVER time applies; recorded: the baseline index whose
+            # recorded cutoff applies (neither: the run's reach).
             if v in also_ok:
                 return 0
             if kind(v) == 'number':
                 return outside(v, obs['lo'], obs['hi'])
-            if never is not None and v == never[0]:
-                return outside(never[1], obs['lo'], obs['hi'])
+            nv = own[at] if at is not None else base_own[recorded] if recorded is not None else never
+            if nv is not None and v == nv[0]:
+                # A lower bound on the time: it is no further out than the bound's distance past the
+                # band, and none at all while the bound lies below the band's upper edge (a run that
+                # ended early might still have seen it in the band).
+                return max(0, nv[1] - obs['hi'])
             return None
-        gaps = [gap(v) for v in spread]
-        every = ' at every frame offset' if len(spread) > 1 else ''
         known = baseline.get(key)
+        # A recorded NEVER accepted from a run cut short keeps that run's cutoff (gba_cutoffs): it
+        # means "not before the frame after it", not "never through the whole window". Lines without
+        # one (all before, and every full-length run) keep the run's reach.
+        recorded_cutoffs = known.get('gba_cutoffs') if known is not None else None
+        recorded_values = (known.get('gba_offsets', [known['gba']]) if known is not None else [])
+        base_own = [hook(golden, obs, recorded_cutoffs[j]) if hook and recorded_cutoffs and j < len(recorded_cutoffs)
+                    and recorded_cutoffs[j] is not None else never for j in range(len(recorded_values))]
+
+        def gap_at(i, v):
+            # A NEVER the band admits (an also_ok NEVER, or a band that is NEVER itself) counts as
+            # inside it, for a line with a baseline line, only from a run that went far enough to show
+            # the absence: past the band's lower edge, or for a NEVER band to the run's reach. One
+            # cut short by an early defeat is neither inside nor shown outside (its time distance is
+            # 0), so the line stays KNOWN rather than IMPROVED, and --accept keeps it. On a line with
+            # no baseline line an admitted NEVER still passes, as before: the result check gates the
+            # early end (sk-pvz-w0's GBA human falls 2,000 frames before the N64's, which would
+            # otherwise turn 64 never-built types from PASS to KNOWN).
+            if known is not None and own[i] is not None and v == own[i][0] and gap(v) == 0:
+                needed = obs['lo'] if obs['lo'] not in specials else (never[1] - 1 if never else None)
+                if needed is not None and own[i][1] - 1 < needed:
+                    return needed - (own[i][1] - 1)   # frames short: never 0
+            return gap(v)
+        gaps = [gap_at(i, v) for i, v in enumerate(spread)]
+        # What --accept records: an offset whose NEVER an early end cut short before its recorded
+        # time could be seen (the run's last frame before that time, or before the reach for a
+        # recorded NEVER) is inconclusive and keeps its recorded value; one that ran past the recorded
+        # time without the event showed the move and records it.
+        def recorded_at(i):
+            if known is None:
+                return None
+            if 'gba_offsets' in known:
+                return known['gba_offsets'][i] if len(known['gba_offsets']) == len(spread) else None
+            return known['gba'] if i == 0 else None
+        def recorded_bound(i):
+            # The frame from which the recorded value at offset i was shown: its time, or for a recorded
+            # NEVER the bound it stands for (its own cutoff, or the run's reach).
+            r = recorded_at(i)
+            if kind(r) == 'number':
+                return r
+            j = i if known is not None and 'gba_offsets' in known else 0
+            nv = base_own[j] if j < len(base_own) else never
+            return nv[1] if nv is not None and r == nv[0] else None
+        inconclusive = [i for i, v in enumerate(spread) if own[i] is not None and never is not None and
+                        v == own[i][0] and own[i][1] < never[1] and recorded_at(i) is not None and
+                        recorded_bound(i) is not None and own[i][1] <= recorded_bound(i)]
+        if 'gba_offsets' in row:
+            if inconclusive:
+                row['accept_offsets'] = [recorded_at(i) if i in inconclusive else r
+                                         for i, r in enumerate(row['gba_offsets'])]
+            # The cutoff each accepted NEVER stands for: the recorded one where the recorded value is
+            # kept, this run's where its NEVER was cut short, none where it ran the whole window.
+            accepted = row.get('accept_offsets', row['gba_offsets'])
+            keep = (recorded_cutoffs if recorded_cutoffs and len(recorded_cutoffs) == len(spread) else
+                    [None] * len(spread))
+            cut = [keep[i] if i in inconclusive else
+                   (cutoffs[i] if own[i] is not None and never is not None and v == own[i][0] and
+                    own[i][1] < never[1] else None)
+                   for i, v in enumerate(accepted)]
+            if any(c is not None for c in cut):
+                row['accept_cutoffs'] = cut
+        every = ' at every frame offset' if len(spread) > 1 else ''
         # The slack is the measurement's own tolerance: a seed envelope (skirmish) keeps each seed's
         # band as seed_lo/seed_hi, and the N64's spread over seeds is no licence to move further out.
         seed_lo, seed_hi = obs.get('seed_lo', obs['lo']), obs.get('seed_hi', obs['hi'])
@@ -430,7 +501,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         outcome_band = obs['lo'] == obs['hi'] and obs['lo'] in specials
         if known is not None:
             base = known.get('gba_offsets', [known['gba']])
-            was_times = [g for g in (time_gap(b) for b in base) if g is not None]
+            was_times = [g for g in (time_gap(b, recorded=j) for j, b in enumerate(base)) if g is not None]
         else:
             # No baseline line: the line passed, so the band's outcomes (its own value, the allowed
             # outcomes, and a time wherever the band is finite) are what it recorded, at no distance.
@@ -453,13 +524,23 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         # Timings only (the scenario's never_time names them): a checkpoint count that an offset
         # reaches again after its match ended there stays under the spread comparison.
         allowance = noise.get(check_family(obs['check']), 0)
+        # Only offsets the baseline recorded are evidence: a single run's line speaks for offset 0.
+        recorded = len(spread) if known is None or 'gba_offsets' in known else len(base)
         jumps = [(k, v) for i, (k, v) in enumerate(zip(offsets, spread))
-                 if never is not None and kind(v) == 'number' and changed(i, v) and not outcome_band and was_times
-                 and time_gap(v) > max(was_times) + slack + allowance]
+                 if never is not None and kind(v) == 'number' and i < recorded and changed(i, v) and not outcome_band
+                 and was_times and time_gap(v, i) > max(was_times) + slack + allowance]
         # Offsets whose new outcome has no time to compare (ENDED, a marker), or a baseline without one.
-        untimed = [v for v in spread if kind(v) not in was_kinds and (time_gap(v) is None or not was_times)]
+        untimed = [v for i, v in enumerate(spread)
+                   if kind(v) not in was_kinds and (time_gap(v, i) is None or not was_times)]
         if not gating:
             row['verdict'] = 'REPORT'
+        elif max(gaps) == 0 and known is not None and inconclusive:
+            # Inside the band, but an early end stopped a run before its recorded time: not an
+            # improvement --accept could drop the line for; it keeps the recorded value there.
+            row['verdict'] = 'KNOWN'
+            row['baseline'] = known['gba']
+            row['why'] = 'inside the band, but cut short by the human\'s defeat at frame offset ' + \
+                offset_label(offsets[i] for i in inconclusive)
         elif max(gaps) == 0:
             row['verdict'] = 'IMPROVED' if known else 'PASS'
         elif jumps:
@@ -469,16 +550,29 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                           ' lies beyond the band and every recorded value (' +
                           (fmt_spread(base) if known is not None else 'none: the line passed') + ')')
         elif known is None:
-            if min(gaps) > 0:
+            # A NEVER cut short below the band (the run ended first in the human's defeat) may yet
+            # have come in it: not shown outside, though not shown inside either (no PASS).
+            shown = [g if time_gap(v, i) is None else time_gap(v, i) for i, (v, g) in enumerate(zip(spread, gaps))]
+            if min(shown) > 0:
                 row['verdict'] = 'REGRESSION'
                 row['why'] = 'outside the band and not in the baseline' + every
             else:
-                # Inside the band at some offsets: the GBA's own noise reaches the band. --accept
-                # records the line, so its spread is tracked from then on.
+                # Inside the band at some offsets (the GBA's own noise reaches it), or cut short
+                # before it. --accept records the line, so its spread is tracked from then on.
                 row['verdict'] = 'KNOWN'
-                row['why'] = ('outside the band only at frame offset ' +
-                              offset_label(k for k, g in zip(offsets, gaps) if g) + ' (GBA frame noise); '
-                              'no baseline line yet')
+                out = [k for k, s_ in zip(offsets, shown) if s_]
+                short = [k for k, g, s_ in zip(offsets, gaps, shown) if g and not s_]
+                inside = [k for k, g in zip(offsets, gaps) if not g]
+                row['why'] = ((f'outside the band at frame offset {offset_label(out)}' if out else
+                               'outside the band at no offset') +
+                              (f', inside at {offset_label(inside)} (GBA frame noise)' if inside else '') +
+                              (f'; cut short by the human\'s defeat before it could show the band at '
+                               f'{offset_label(short)}' if short else '') + '; no baseline line yet')
+        elif outcome_band and all(kind(v) == 'number' for v in spread) and 'number' not in was_kinds:
+            # A band that is an outcome (the N64 never made it), a baseline that recorded only that
+            # outcome (runs cut short before the reach), and now a time at every offset: changed.
+            row['verdict'] = 'REGRESSION'
+            row['why'] = f'the outcome changed from the baseline ({fmt_spread(base)})' + every
         elif untimed and not {kind(v) for v in spread} & was_kinds and min(gaps) > 0:
             # (An offset now inside the band, a checkpoint the match reaches again, is not this.)
             # Every offset changed to or from an outcome with no time: changed at any distance.
@@ -515,16 +609,20 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # is as unstable as the GBA gets: its few numbers do not measure its noise, so they too
             # must clear the family's.
             unstable = never is not None and len({kind(b) for b in base}) > 1
+            compared = [i for i, v in enumerate(spread)
+                        if kind(v) == 'number' and (never is None or not changed(i, v))]
             numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
-                beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
-                        if kind(v) == 'number' and (never is None or not changed(i, v))],
+                beyond([(gaps[i], slack + (allowance if unstable else 0)) for i in compared],
                        [gap(b) for b in base if kind(b) == 'number'])
-            timed = None not in [time_gap(v) for v in spread] and \
-                beyond([(time_gap(v), margin(i, v)) for i, v in enumerate(spread)],
-                       [g for g in (time_gap(b) for b in base) if g is not None])
+            timed = None not in [time_gap(v, i) for i, v in enumerate(spread)] and \
+                beyond([(time_gap(v, i), margin(i, v)) for i, v in enumerate(spread)],
+                       [g for g in (time_gap(b, recorded=j) if known is not None else time_gap(b)
+                                    for j, b in enumerate(base)) if g is not None])
             if not outcome_band and (numbers or timed):
                 row['verdict'] = 'REGRESSION'
-                row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
+                at = every if timed or len(compared) == len(spread) else \
+                    f' at frame offset {offset_label(offsets[i] for i in compared)}'
+                row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + at
             else:
                 row['verdict'] = 'KNOWN'
                 row['baseline'] = known['gba']
@@ -635,7 +733,7 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     first = runs[0]
     more = [(k, run['measured']['values']) for k, run in zip(offsets[1:], runs[1:])]
     out = finish_scenario(scenario_id, golden, result, first['measured'], first['err'], baseline, first['report'],
-                          first['cmd'], allow_stale, more)
+                          first['cmd'], allow_stale, more, [run['measured'].get('cutoff') for run in runs])
     if more and out['status'] == 'RUN':
         out['frame_offsets'] = offsets
         out['gba_cpu_seconds'] = sum(run['report'].get('cpu_seconds') or 0 for run in runs)
@@ -660,12 +758,13 @@ def curve_divergence(golden, curves):
     return out
 
 
-def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False, more=()):
+def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False, more=(),
+                    cutoffs=None):
     if err:
         return {**result, 'status': 'ERROR', 'why': 'GBA measurement: ' + err}
     layout = parity_decode.Layout()
     rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout, allow_stale,
-                 more)
+                 more, cutoffs)
     return {**result, 'status': 'RUN', 'rows': rows, 'gba_measured': measured.get('measured'),
             'gba_cpu_seconds': report.get('cpu_seconds'), 'command': cmd}
 
@@ -758,6 +857,19 @@ def load_baseline(path):
                 raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_offsets: one finite '
                                  f'number per frame offset of its scenario ({list(want or ())}), offset 0 first '
                                  'and equal to gba')
+        if 'gba_cutoffs' in line:
+            cut = line['gba_cutoffs']
+            # A cutoff stands only behind its scenario's NEVER (when this checkout knows the scenario).
+            spec = metrics.SCENARIOS.get(line['key'].split(':', 1)[0])
+            never_value = spec.get('never_value') if spec is not None else None
+            if not isinstance(line.get('gba_offsets'), list) or not isinstance(cut, list) or \
+                    len(cut) != len(line['gba_offsets']) or \
+                    not all(c is None or (isinstance(c, int) and not isinstance(c, bool) and 0 <= c <= BASELINE_LIMIT)
+                            for c in cut) or all(c is None for c in cut) or \
+                    (spec is not None and any(c is not None and v != never_value
+                                              for c, v in zip(cut, line['gba_offsets']))):
+                raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_cutoffs: one source '
+                                 'frame or null per gba_offsets entry, at least one frame, frames only behind NEVER')
     return {line['key']: line for line in doc.get('known', [])}
 
 
@@ -772,9 +884,14 @@ def write_baseline(path, results, old):
                     raise ValueError(f'{row["key"]}: no GBA value to accept')
                 line = {'key': row['key'], 'gba': row['gba']}
                 if 'gba_offsets' in row:
-                    if not all(finite_number(v) for v in row['gba_offsets']):
+                    # Offsets an early defeat left inconclusive keep their recorded values.
+                    spread = row.get('accept_offsets', row['gba_offsets'])
+                    if not all(finite_number(v) for v in spread):
                         raise ValueError(f'{row["key"]}: no GBA value to accept at every frame offset')
-                    line['gba_offsets'] = row['gba_offsets']
+                    line['gba'], line['gba_offsets'] = spread[0], spread
+                    if row.get('accept_cutoffs'):
+                        # The frame each cut-short NEVER was shown to, so it never reads as a whole window.
+                        line['gba_cutoffs'] = row['accept_cutoffs']
                 note = old.get(row['key'], {}).get('note')
                 if note:
                     line['note'] = note
@@ -789,7 +906,7 @@ def write_baseline(path, results, old):
            'about': 'Known GBA/N64 parity gaps: GBA values only (N64 bands stay in the private fixture home). '
                     'Rewritten by ./dev parity --accept.', 'known': known}
     # A line's frame offsets on one line, so a change reads as one line.
-    text = re.sub(r'("gba_offsets": )\[\s+([-0-9.e+,\s]*?)\s+\]',
+    text = re.sub(r'("gba_(?:offsets|cutoffs)": )\[\s+([-0-9.e+,\snul]*?)\s+\]',
                   lambda m: m.group(1) + '[' + ', '.join(v.strip() for v in m.group(2).split(',')) + ']',
                   json.dumps(doc, indent=1))
     path.write_text(text + '\n')
