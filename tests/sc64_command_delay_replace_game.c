@@ -202,14 +202,13 @@ static void check_cliff_formation(void)
     assert(!"no cliff geometry found in T1");
 }
 
-/* A Dropship and a Marine ordered onto a blocked tile: the flyer keeps the
- * translation, the Marine gathers on its grid slot. A wide group ordered
- * to open ground at the map's left edge keeps its formation after the
- * clamp (every slot inside the flood window). */
+/* Ordered onto a blocked tile: a Dropship keeps its translated slot and a
+ * Marine whose slot is blocked reaches an open tile; a pair whose slots
+ * are open keeps them and arrives. */
 static void check_flyer_and_edge_formation(void)
 {
     label_components();
-    int blocked = -1, open_row = -1;
+    int blocked = -1;
     for (int c = 0; c < MAP_COLS * MAP_ROWS && blocked < 0; ++c) {
         int x = c % MAP_COLS, y = c / MAP_COLS;
         if (x > 8 && y > 8 && x < MAP_COLS - 8 && y < MAP_ROWS - 8 && terrain_blocked(x, y)) {
@@ -251,7 +250,7 @@ static void check_flyer_and_edge_formation(void)
             cliff_component[c - 3 - MAP_COLS] != k || cliff_component[c - 3 + MAP_COLS] != k) continue;
         wall = c;
     }
-    if (wall < 0) { puts("command delay: no wall tile with open tiles above and below in T1; skipped"); return; }
+    assert(wall >= 0);
     int wx = (wall % MAP_COLS) * 16 + 8, wy = (wall / MAP_COLS) * 16 + 8;
     int up = spawn_unit(SIDE, sc64_race_unit_from_raw(0), wx - 48, wy - 16);
     int down = spawn_unit(SIDE, sc64_race_unit_from_raw(0), wx - 48, wy + 16);
@@ -264,6 +263,15 @@ static void check_flyer_and_edge_formation(void)
     u[up].selected = u[down].selected = 0;
     puts("command delay: a pair ordered onto a wall keeps its open slots and arrives: ok");
 
+}
+
+/* A wide group ordered to open ground at the map's left edge keeps its
+ * formation after the clamp (every slot inside the flood window). */
+static void check_edge_formation(void)
+{
+    int open_row = -1, sx, sy;
+    Sc64GroupFormation f;
+    label_components();
     /* A row whose first nine tiles and a 128 px span further in are one
      * open component. */
     for (int y = 2; y < MAP_ROWS - 2 && open_row < 0; ++y) {
@@ -271,7 +279,7 @@ static void check_flyer_and_edge_formation(void)
         for (int x = 0; x < 20 && ok; ++x) ok = cliff_component[x + y * MAP_COLS] == k;
         if (ok) open_row = y;
     }
-    if (open_row < 0) { puts("command delay: no open map-edge row in T1; edge case skipped"); return; }
+    assert(open_row >= 0);
     int y = open_row * 16 + 8;
     int left = spawn_unit(SIDE, sc64_race_unit_from_raw(0), 8 * 16 + 8, y);
     int right = spawn_unit(SIDE, sc64_race_unit_from_raw(0), 8 * 16 + 8 + 120, y);
@@ -424,5 +432,6 @@ int main(void)
 
     check_cliff_formation();
     check_flyer_and_edge_formation();
+    check_edge_formation();
     return 0;
 }

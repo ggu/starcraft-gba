@@ -217,24 +217,25 @@ sc64_formation_cell_built(int col, int row)
     return 0;
 }
 
-/* The nearest open tile centre within 2 tiles of (*x, *y), for a fallback
- * slot on blocked ground (a Move ends only within 5 px of its point, so a
- * point inside a wall is never reached). Unchanged when it is open or no
- * open tile is near. */
+/* The nearest open tile centre within 2 tiles of (*x, *y), by distance in
+ * pixels with scan order breaking ties, for a fallback slot on blocked
+ * ground (a Move ends only within 5 px of its point, so a point inside a
+ * wall is never reached). Unchanged when it is open or no open tile is
+ * near. */
 static void __attribute__((noinline))
 sc64_group_formation_open_near(int *x, int *y)
 {
-    int col = *x / 16, row = *y / 16;
+    int col = *x / 16, row = *y / 16, best = -1, best_x = *x, best_y = *y;
     if (sc64_formation_cell_open(col, row)) return;
-    for (int r = 1; r <= 2; ++r)
-        for (int dy = -r; dy <= r; ++dy)
-            for (int dx = -r; dx <= r; ++dx) {
-                if (FAST_ABS(dx) != r && FAST_ABS(dy) != r) continue;
-                if (!sc64_formation_cell_open(col + dx, row + dy)) continue;
-                *x = (col + dx) * 16 + 8;
-                *y = (row + dy) * 16 + 8;
-                return;
-            }
+    for (int dy = -2; dy <= 2; ++dy)
+        for (int dx = -2; dx <= 2; ++dx) {
+            int cx = (col + dx) * 16 + 8, cy = (row + dy) * 16 + 8, d;
+            if ((!dx && !dy) || !sc64_formation_cell_open(col + dx, row + dy)) continue;
+            d = dist2(*x, *y, cx, cy);
+            if (best < 0 || d < best) { best = d; best_x = cx; best_y = cy; }
+        }
+    *x = best_x;
+    *y = best_y;
 }
 
 /* The n-th selected unit's destination for a group order to (tx, ty).
@@ -247,7 +248,16 @@ sc64_group_formation_open_near(int *x, int *y)
  * whose slot is blocked takes its grid slot, moved to the nearest open
  * tile when that is blocked too. Flyers keep the translation. Both callers
  * set check_tile: the reachable-formation route check can count a blocked
- * tile reachable through a neighbour and keep a point no unit reaches. */
+ * tile reachable through a neighbour and keep a point no unit reaches.
+ *
+ * Limitation, as without a formation: whether the unit itself can reach
+ * its destination is not known here (that needs a route query or a
+ * map-wide flood). With the ordered point blocked, the nearest open tile
+ * can lie across a wall from the unit; and a group that already straddles
+ * a wall sends its far-side units to the ordered point's side. Such a unit
+ * retries its Move for ever, as any Move to an unreachable point does in
+ * this engine (StarCraft moves to the nearest reachable spot and stops;
+ * a listed engine gap). */
 static inline void
 sc64_group_formation_slot(const Sc64GroupFormation *f, const Unit *q, int n,
                           int tx, int ty, int check_tile, int *slot_x, int *slot_y)
