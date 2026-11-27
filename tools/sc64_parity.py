@@ -581,12 +581,14 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             if now in metrics.MARKERS or was in metrics.MARKERS:
                 # An event the GBA now produces, or no longer produces, is never the known gap,
                 # and neither is a fight with other enemies where the baseline recorded none.
-                row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' +
-                              ('a fight with other enemies' if was == metrics.OFF_TARGET else 'a measurement'),
-                              metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' +
-                              ('no fight' if was == metrics.ABSENT else 'a measurement')}.get(
+                held = {metrics.ABSENT: 'no event', metrics.OFF_TARGET: 'a fight with other enemies',
+                        metrics.REFUSED: 'a refused product'}.get(was, 'a measurement')
+                row['why'] = {metrics.ABSENT: 'the event is absent on the GBA; the baseline holds ' + held,
+                              metrics.OFF_TARGET: 'the GBA subject fought only other enemies; the baseline holds ' + held,
+                              metrics.REFUSED: 'the GBA refused the product; the baseline holds ' + held}.get(
                     now, 'the baseline records the event as ' +
-                    ('absent' if was == metrics.ABSENT else 'a fight with other enemies') +
+                    {metrics.ABSENT: 'absent', metrics.OFF_TARGET: 'a fight with other enemies',
+                     metrics.REFUSED: 'refused'}.get(was, 'a measurement') +
                     ' on the GBA; it is now measured outside the band')
             else:
                 row['why'] = f'the outcome changed from the baseline ({fmt_spread(base)})'
@@ -926,6 +928,8 @@ def fmt(v):
         return 'absent'
     if v == metrics.OFF_TARGET:
         return 'off-target'
+    if v == metrics.REFUSED:
+        return 'refused'
     if isinstance(v, float):
         return f'{v:.4g}'
     return str(v)

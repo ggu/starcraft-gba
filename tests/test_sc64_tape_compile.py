@@ -244,6 +244,57 @@ class CompileTest(unittest.TestCase):
         self.assertIn('poke 800D13C4 0C0A0A', staged)
         self.assertTrue(any(line.startswith('# n64-staged') for line in staged))
 
+    def test_production_ops(self):
+        worker, producer = 0x802D6DD8, 0x802D6CA0
+        out = lines(scenario([{'op': 'build', 'wheel': 'c_left', 'cell': 'se', 'at': [400, 300],
+                               'worker': f'{worker:08X}', 'mark': 'depot'},
+                              {'op': 'train', 'cell': 'n', 'producer': f'{producer:08X}', 'slot': 3, 'unit': 7,
+                               'mark': 'scv'}, {'op': 'train', 'cell': 'n', 'producer': f'{producer:08X}', 'slot': 4,
+                                                'unit': 7, 'mark': 'scv2'}]))
+        for line in out[1:-1]:
+            self.assertTrue(line.startswith(('load ', 'watch ', '# mark ')) or PAD.match(line) or
+                            UNTIL.match(line) or UNTILW.match(line), line)
+        # The grid opens on its wheel button, the highlight moves one cell per push (down, then right), A takes it.
+        left = out.index(f'{tc.PRESS_HOLD} {tc.BUTTONS["c_left"]} 0 0')
+        self.assertTrue(out[left - 1].startswith('until 800F0C20 2 eq 0 1 '))
+        pushes = [line for line in out[left:left + 12] if line.startswith(f'{tc.PUSH_STEPS} 0 ')]
+        self.assertEqual(pushes, [f'{tc.PUSH_STEPS} 0 0 {tc.FAST}', f'{tc.PUSH_STEPS} 0 {tc.FAST} 0'])
+        # The placing A is marked, then the worker's order must read PlaceBuilding.
+        i = out.index('# mark depot')
+        self.assertEqual(out[i + 1], f'{tc.PRESS_HOLD} {tc.BUTTONS["a"]} 0 0')
+        self.assertEqual(out[i + 3], f'until {worker + 0x4D:08X} 1 eq 1e {tc.CONFIRM_MAX} 0 0 0')
+        # Training: the circular queue's slot must be free before the A and filled after it, then B closes the grid.
+        j = out.index('# mark scv')
+        slot = producer + 0x94 + 2 * 3
+        self.assertEqual(out[j - 1], f'until {slot:08X} 2 eq e4 1 0 0 0')
+        self.assertEqual(out[j + 3], f'until {slot:08X} 2 eq 7 {tc.CONFIRM_MAX} 0 0 0')
+        self.assertEqual(out[j + 4], f'{tc.PRESS_HOLD} {tc.BUTTONS["b"]} 0 0')
+        # An add-on: the wheel button starts the placement itself; the confirm names other evidence.
+        addon = lines(scenario([{'op': 'build', 'wheel': 'c_left', 'at': [400, 300], 'worker': f'{producer:08X}',
+                                 'confirm': {'field': '802D92CC:2', 'cmp': 'eq', 'value': 120, 'max': 60}}]))
+        self.assertIn('until 802D92CC 2 eq 78 60 0 0 0', addon)
+        self.assertFalse(any(line.startswith(f'{tc.PUSH_STEPS} 0 ') for line in addon))
+        # A wait that holds a computer's bank repeats its pokes every `every` steps, staged.
+        held = lines(scenario([{'op': 'wait', 'steps': 450, 'every': 200,
+                                'pokes': [{'address': '800B1D48', 'data': '00000000'}]}], frontend_commands=['poke']))
+        self.assertEqual([l for l in held if l.startswith(('poke', '200 0', '50 0'))],
+                         ['poke 800B1D48 00000000', '200 0 0 0', 'poke 800B1D48 00000000', '200 0 0 0',
+                          'poke 800B1D48 00000000', '50 0 0 0'])
+        self.assertTrue(any(line.startswith('# n64-staged') for line in held))
+        for step, message in [({'op': 'build', 'wheel': 'b', 'cell': 'c', 'at': [1, 1], 'worker': '80300210'}, 'wheel'),
+                              ({'op': 'build', 'wheel': 'c_left', 'cell': 'x', 'at': [1, 1], 'worker': '80300210'}, 'cell'),
+                              ({'op': 'train', 'cell': 'n', 'producer': '80300210', 'slot': 5, 'unit': 0}, 'outside'),
+                              ({'op': 'train', 'cell': 'n', 'producer': '80300210'}, 'unit'),
+                              ({'op': 'train', 'cell': 'n', 'producer': '80300210', 'unit': 7, 'mark': 'marine'},
+                               'does not name'),
+                              ({'op': 'wait', 'steps': 5, 'dismiss': True,
+                                'pokes': [{'address': '800B1D48', 'data': '00'}]}, 'not both'),
+                              ({'op': 'build', 'wheel': 'c_left', 'at': [400, 300], 'worker': '80300210',
+                                'confirm': {'field': 'pause', 'cmp': 'near'}}, 'confirm'),
+                              ({'op': 'wait', 'steps': 5, 'pokes': [{'address': '800B1D48', 'data': '00'}]}, 'poke')]:
+            with self.assertRaisesRegex(tc.ScenarioError, message, msg=str(step)):
+                lines(scenario([step]))
+
     def test_pan_leaves_a_safe_axis_alone(self):
         # Y is already inside the safe window: only X pans, and the point is reached.
         doc = scenario([{'op': 'cursor', 'at': [1000, 368]}], camera=[-32, 96], map=[2048, 736])

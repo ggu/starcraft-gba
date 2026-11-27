@@ -804,6 +804,173 @@ static int pr_launch_match(void)
     return 1;
 }
 
+/* tech (the match runner with --tcmd): the N64 production chain replayed on a
+ * passive-AI lobby. Each command names a source-frame step and a cartridge id:
+ *   kind 0  set the human bank to x minerals, y gas (the N64 tape's guest edit)
+ *   kind 1  build raw at the halved site x,y with any live human worker
+ *   kind 2  train raw at the human building nearest x,y
+ *   kind 3  add-on raw at the human building nearest x,y
+ * A command waits until the engine accepts it (prerequisites can finish later
+ * here than on the N64), up to PR_TECH_PATIENCE steps; a cartridge id with no
+ * engine identity, or with no production path, is reported absent and never
+ * retried, and so is every later command that names it. A command the engine
+ * still refuses PR_TECH_PATIENCE steps later, or when the run ends, is reported
+ * refused: a defect, never an absence. A worker's build counts as taken only when
+ * its foundation appears (the engine pays then, and can cancel on arrival): while
+ * the worker travels the command is TRAVEL, and a cancelled one is given again.
+ * A command whose wait the run's end cut short is reported incomplete (its checks
+ * go unmeasured), never refused. --starve FROM,TO holds
+ * every computer bank at zero over those steps, as the N64 tape's guest edits
+ * did. Test code only: it calls the same race_* entry points the menus use. */
+enum { PR_TECH_CAP = 64, PR_TECH_PATIENCE = 6000, PR_TECH_PENDING = 0, PR_TECH_ISSUED = 1, PR_TECH_ABSENT = 2,
+       PR_TECH_REFUSED = 3, PR_TECH_INCOMPLETE = 4, PR_TECH_TRAVEL = 5 };
+static struct {
+    int n;
+    unsigned long step[PR_TECH_CAP], issued[PR_TECH_CAP];
+    int kind[PR_TECH_CAP], raw[PR_TECH_CAP], x[PR_TECH_CAP], y[PR_TECH_CAP], state[PR_TECH_CAP], slot[PR_TECH_CAP];
+} tech;
+static unsigned long pr_tech_last_step;
+static unsigned long pr_starve_from, pr_starve_to;
+
+static int pr_parse_tcmd(const char *text)
+{
+    long step;
+    int kind, raw, x, y;
+    char tail;
+    if (tech.n >= PR_TECH_CAP || sscanf(text, "%ld,%d,%d,%d,%d%c", &step, &kind, &raw, &x, &y, &tail) != 5 ||
+        kind < 0 || kind > 3 || raw < 0 || raw > 65535 || step < 2 || step > 100000000L ||
+        (kind && (x < 0 || x > 4095 || y < 0 || y > 4095)) || (!kind && (x < 0 || x > 65535 || y < 0 || y > 65535)))
+        return 0;
+    tech.step[tech.n] = step; tech.kind[tech.n] = kind; tech.raw[tech.n] = raw;
+    tech.x[tech.n] = x; tech.y[tech.n] = y; tech.slot[tech.n] = -1; ++tech.n;
+    return 1;
+}
+
+#ifdef SC64_RACES
+/* A travelling build is placed when its own worker commits a foundation of its
+ * type (the worker's order turns to BUILD on that building): 1 placed, 0 still
+ * travelling, -1 cancelled (the worker gave the build up or died). */
+static int pr_tech_placed(int k)
+{
+    int w = tech.slot[k], type = sc64_race_building_from_raw(tech.raw[k]), t;
+    if (w < 0 || w >= MAX_UNITS || !u[w].alive) return -1;
+    if (u[w].order == ORDER_BUILD_PENDING) return 0;
+    t = u[w].target;
+    if (u[w].order == ORDER_BUILD && t >= 0 && t < MAX_BUILDINGS && b[t].alive && b[t].owner == SIDE &&
+        b[t].type == type) return 1;
+    return -1;
+}
+
+static int pr_tech_building_near(int x, int y)
+{
+    int best = -1;
+    long best_d = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        long dx, dy, d;
+        if (!b[i].alive || b[i].owner != SIDE || !building_complete(i)) continue;
+        dx = b[i].x - x; dy = b[i].y - y; d = dx * dx + dy * dy;
+        if (best < 0 || d < best_d) { best = i; best_d = d; }
+    }
+    return best;
+}
+
+/* One try of command k; 1 when the engine took it. */
+static int pr_tech_try(int k)
+{
+    int raw = tech.raw[k], producer;
+    switch (tech.kind[k]) {
+    case 0:
+        minerals = (unsigned short)tech.x[k]; gas = (unsigned short)tech.y[k];
+        return 1;
+    case 1: {
+        int type = sc64_race_building_from_raw(raw);
+        if (type < 0) { tech.state[k] = PR_TECH_ABSENT; return 0; }
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) &&
+                race_start_build(SIDE, i, type, tech.x[k], tech.y[k])) {
+                tech.slot[k] = i;
+                tech.state[k] = PR_TECH_TRAVEL;
+                return 0;   /* taken only when the foundation appears */
+            }
+        return 0;
+    }
+    case 2: {
+        int type = sc64_race_unit_from_raw(raw);
+        if (type < 0) { tech.state[k] = PR_TECH_ABSENT; return 0; }
+        producer = pr_tech_building_near(tech.x[k], tech.y[k]);
+        if (producer < 0 || !race_queue_unit(SIDE, producer, type)) return 0;
+        tech.slot[k] = producer;
+        return 1;
+    }
+    default: {
+        const Sc64SkirmishRecord *r = race_skirmish_build_record(SIDE, raw);
+        if (!r || r->kind != SC64_SK_ADDON || sc64_race_building_from_raw(raw) < 0) {
+            tech.state[k] = PR_TECH_ABSENT;
+            return 0;
+        }
+        producer = pr_tech_building_near(tech.x[k], tech.y[k]);
+        if (producer < 0 || !race_skirmish_start_record(SIDE, producer, r)) return 0;
+        tech.slot[k] = producer;
+        return 1;
+    }
+    }
+}
+#endif
+
+static void pr_scenario_tech(unsigned long step)
+{
+    if (step >= pr_starve_from && step < pr_starve_to)
+        for (int k = 0; k < pr_match_nbots; ++k) {
+            int owner = race_bot_owner_ids[k];
+            if (owner >= 0 && owner < 5) { race_minerals[owner] = 0; race_gas[owner] = 0; }
+        }
+#ifdef SC64_RACES
+    pr_tech_last_step = step;
+    for (int k = 0; k < tech.n; ++k) {
+        if (tech.state[k] == PR_TECH_TRAVEL) {
+            int placed = pr_tech_placed(k);
+            if (placed > 0) { tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = step; continue; }   /* in the last update */
+            if (placed < 0) tech.state[k] = PR_TECH_PENDING;   /* cancelled on arrival: give it again */
+            else if (step < tech.step[k] + PR_TECH_PATIENCE) continue;
+            else { tech.state[k] = PR_TECH_REFUSED; continue; }   /* the same deadline as a refusal */
+        }
+        if (tech.state[k] || step < tech.step[k]) continue;
+        for (int j = 0; j < k; ++j)   /* a product of an absent one is absent too */
+            if (tech.state[j] == PR_TECH_ABSENT && tech.raw[j] == tech.raw[k]) tech.state[k] = PR_TECH_ABSENT;
+        if (tech.state[k]) continue;
+        if (pr_tech_try(k)) { tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = step; }
+        else if (tech.state[k] == PR_TECH_PENDING && step >= tech.step[k] + PR_TECH_PATIENCE)
+            tech.state[k] = PR_TECH_REFUSED;   /* reported, never retried: its checks go unmeasured */
+    }
+#else
+    (void)step;
+#endif
+}
+
+static void pr_tech_json(char *out, size_t size)
+{
+    size_t n = 0;
+    if (!tech.n) { out[0] = 0; return; }
+    for (int k = 0; k < tech.n; ++k) {
+#ifdef SC64_RACES
+        /* A foundation the run's last update committed. */
+        if (tech.state[k] == PR_TECH_TRAVEL && pr_tech_placed(k) > 0) {
+            tech.state[k] = PR_TECH_ISSUED; tech.issued[k] = pr_tech_last_step + 1;
+            continue;
+        }
+#endif
+        /* Still waiting when the run ended: refused only after its whole patience. */
+        if (tech.state[k] == PR_TECH_PENDING || tech.state[k] == PR_TECH_TRAVEL)
+            tech.state[k] = pr_tech_last_step >= tech.step[k] + PR_TECH_PATIENCE ? PR_TECH_REFUSED : PR_TECH_INCOMPLETE;
+    }
+    n += (size_t)snprintf(out + n, size - n, ",\"tech\":[");
+    for (int k = 0; k < tech.n && n < size; ++k)
+        n += (size_t)snprintf(out + n, size - n, "%s{\"step\":%lu,\"kind\":%d,\"raw\":%d,\"state\":%d,\"issued\":%lu,\"slot\":%d}",
+                              k ? "," : "", tech.step[k], tech.kind[k], tech.raw[k], tech.state[k], tech.issued[k], tech.slot[k]);
+    if (n < size) n += (size_t)snprintf(out + n, size - n, "]");
+    if (n >= size) out[0] = 0;
+}
+
 /* The match report: owners with race and start, and the supply a queued unit
  * reserves (every report carries the type id maps). */
 static void pr_match_json(char *out, size_t size)
@@ -965,6 +1132,9 @@ int main(int argc, char **argv)
             if (*text < '0' || *text > '9' || *end || pr_match_seed > 0xfffffffful) { scenario = 0; break; }
             pr_match_seed_given = 1; match_args = 1;
         }
+        else if (!strcmp(argv[i], "--tcmd") && i + 1 < argc && pr_parse_tcmd(argv[i + 1])) { ++i; match_args = 1; }
+        else if (!strcmp(argv[i], "--starve") && i + 1 < argc &&
+                 sscanf(argv[i + 1], "%lu,%lu", &pr_starve_from, &pr_starve_to) == 2) { ++i; match_args = 1; }
         else if (!strcmp(argv[i], "--frame-offset") && i + 1 < argc) {
             const char *text = argv[++i];
             if (text[0] < '0' || text[0] > '4' || text[1]) { scenario = 0; break; }
@@ -994,7 +1164,8 @@ int main(int argc, char **argv)
     if (kind < 0 || !limit || !steps_ok || (mission_arg && kind != 6) || (kind == 2 && (!pr_group_n || pr_target_x < 0)) ||
         (lab_args && (kind < 4 || kind > 6)) ||
         (kind >= 4 && kind <= 6 && (pr_group_n || pr_target_x >= 0 || !lab.n || (!lab.by_raw) == (lab.x < 0))) ||
-        (kind == 7) != (match_args != 0) || (kind == 7 && (pr_match_human < 0 || !pr_match_nbots))) {
+        (kind == 7) != (match_args != 0) || (kind == 7 && (pr_match_human < 0 || !pr_match_nbots)) ||
+        (tech.n && pr_checks_on)) {   /* add-ons rebuild the path grid: tech runs without route checks */
         fprintf(stderr, "usage: %s --scenario t1|skirmish [--steps N] [--trace PATH] [--no-render] [--no-chain]\n"
                 "       [--no-route-checks] [--profile NAME]\n"
                 "       %s --scenario move --unit X,Y [--unit X,Y ...] --target X,Y [--at STEP] ...\n"
@@ -1058,7 +1229,7 @@ int main(int argc, char **argv)
             else if (kind == 1) pr_scenario_skirmish(dispatched);
             else if (kind == 2) pr_scenario_move(dispatched);
             else if (kind == 3) pr_scenario_income(dispatched);
-            else if (kind == 7) { /* match: the human stays passive */ }
+            else if (kind == 7) pr_scenario_tech(dispatched);   /* passive unless --tcmd/--starve */
             else pr_scenario_lab(dispatched);
             if (pr_checks_on) {
                 ++pr_route_checks;
@@ -1086,11 +1257,16 @@ int main(int argc, char **argv)
         sc64_pi_fail("scenario", "run ended at step %lu before the train or build command was issued", pr_steps);
     {
         uint64_t world = pr_world_hash();
-        char movers[PR_GROUP_CAP * 8 + 1] = "", lab_json[4096] = "", match[4096] = "";
+        char movers[PR_GROUP_CAP * 8 + 1] = "", lab_json[4096] = "", match[12288] = "";
         /* The command goes in before step pr_command_step, so the last state
          * without it is that of the step before. */
         unsigned long command_sf = pr_command_step ? (pr_command_step - 1) * 4ul / 5ul : 0;
-        if (kind == 7) pr_match_json(match, sizeof(match));
+        if (kind == 7) {
+            char tech_json[8192];
+            pr_match_json(match, sizeof(match));
+            pr_tech_json(tech_json, sizeof(tech_json));
+            if (strlen(match) + strlen(tech_json) < sizeof(match)) strcat(match, tech_json);
+        }
         if (kind >= 4 && kind <= 6) {
             /* Each order's last state without it: the step before its own. */
             snprintf(lab_json, sizeof(lab_json), ",\"subject\":%d,\"subject_start\":[%d,%d],\"lab\":[", lab.slot,
