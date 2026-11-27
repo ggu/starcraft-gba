@@ -49,6 +49,7 @@ private setup never reads as a pass.
 """
 import argparse
 import concurrent.futures
+import concurrent.futures.process
 import hashlib
 import json
 import multiprocessing
@@ -349,22 +350,20 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         row = {'key': key, 'check': obs['check'], 'subject': obs['subject'], 'lo': obs['lo'], 'hi': obs['hi'],
                'n64': obs['value'], 'gba': value, 'provenance': provenance(obs, golden), 'gating': obs['gating'],
                'n_runs': obs['n_runs'], 'tolerance': obs['tolerance'], 'tags': golden_tags(obs, golden)}
-        if value is None:
-            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
-            row['why'] = 'not measured on the GBA' if obs['value'] is not None else 'recorded on neither engine'
-            rows.append(row)
-            continue
         if isinstance(value, float):
             row['gba'] = round(value, 4)
         if len(spread) > 1:
             row['gba_offsets'] = [round(v, 4) if isinstance(v, float) else v for v in spread]
             row['frame_offsets'] = offsets
         if any(v is None for v in spread):
-            # The row keeps its incomplete spread, so --accept refuses it rather than recording
-            # offset 0 alone.
+            # A row with any offset unmeasured keeps its incomplete spread, so --accept refuses it
+            # rather than recording the offsets that were measured.
             row['verdict'] = 'REGRESSION' if gating else 'REPORT'
-            row['why'] = 'not measured on the GBA at frame offset ' + \
-                offset_label(k for k, v in zip(offsets, spread) if v is None)
+            if all(v is None for v in spread):
+                row['why'] = 'not measured on the GBA' if obs['value'] is not None else 'recorded on neither engine'
+            else:
+                row['why'] = 'not measured on the GBA at frame offset ' + \
+                    offset_label(k for k, v in zip(offsets, spread) if v is None)
             rows.append(row)
             continue
         if obs['value'] is None or obs['lo'] is None or obs['hi'] is None:
@@ -387,6 +386,13 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['verdict'] = 'REPORT'
         elif max(gaps) == 0:
             row['verdict'] = 'IMPROVED' if known else 'PASS'
+        elif known is not None and min(gaps) == 0:
+            # An offset inside the band (an also_ok NEVER included) is never a regression: the
+            # GBA's own noise still reaches the N64's outcome.
+            row['verdict'] = 'KNOWN'
+            row['baseline'] = known['gba']
+            if 'gba_offsets' in known:
+                row['baseline_offsets'] = known['gba_offsets']
         elif known is None:
             if min(gaps) > 0:
                 row['verdict'] = 'REGRESSION'
@@ -433,8 +439,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 # A band that is itself an outcome (the N64 never built the type: [NEVER, NEVER]) puts
                 # every GBA time at the same wrong outcome: a frame earlier is not further out.
                 outcome_band = obs['lo'] == obs['hi'] and obs['lo'] in specials
-                # An offset inside the band (an also_ok NEVER included) is never a regression.
-                if now and was and not outcome_band and min(gaps) > 0 and min(now) > max(was) + slack:
+                if now and was and not outcome_band and min(now) > max(was) + slack:
                     row['verdict'] = 'REGRESSION'
                     row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
                 else:
@@ -523,12 +528,19 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     if RUN_POOL is None:
         runs = [run_gba(scenario_id, golden, keep, k) for k in offsets]
     else:
-        jobs = {k: RUN_POOL.submit(run_gba, scenario_id, golden, keep, k) for k in offsets}
+        try:
+            jobs = {k: RUN_POOL.submit(run_gba, scenario_id, golden, keep, k) for k in offsets}
+        except concurrent.futures.process.BrokenProcessPool as error:
+            return {**result, 'status': 'ERROR', 'why': f'the GBA worker pool broke before this scenario ran: {error!r}'}
         runs = []
         for k, job in jobs.items():
             try:
                 runs.append(job.result())
-            except Exception as error:   # a worker that died, or a run that raised: this scenario only
+            except concurrent.futures.process.BrokenProcessPool as error:
+                # A worker died (killed, out of memory): every pending run fails with it, so the
+                # offset is not the cause. The scenario is an ERROR and the run exits 1.
+                return {**result, 'status': 'ERROR', 'why': f'the GBA worker pool broke during this scenario: {error!r}'}
+            except Exception as error:   # this run raised in its worker
                 runs.append({'status': 'ERROR', 'why': f'GBA run failed in its worker: {error!r}'})
     for k, run in zip(offsets, runs):
         if run.get('status') == 'ERROR':

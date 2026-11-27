@@ -777,6 +777,9 @@ class FrameOffsets(unittest.TestCase):
         allowed = self.golden(17045, 17043, 17047, also_ok=[sk.NEVER])
         self.assertEqual(self.verdict([sk.NEVER, 12000, 12000], [sk.NEVER, 16000, 15900], allowed), 'KNOWN')
         self.assertEqual(self.verdict([12100, 12000, 12000], [sk.NEVER, 16000, 15900], allowed), 'REGRESSION')
+        # So is an in-band time where the baseline held only another outcome.
+        self.assertEqual(self.verdict([17045, 12000, 12000], [sk.NEVER] * 3, wave), 'KNOWN')
+        self.assertEqual(self.verdict([17040, 12000, 12000], [sk.NEVER] * 3, wave), 'REGRESSION')
         # A checkpoint some offsets no longer reach (the GBA match ended) is noise while another offset
         # keeps the baseline's outcome; the match's end is gated by its own result line.
         self.assertEqual(self.verdict([116, sk.ENDED, sk.ENDED], [116, 132, 116]), 'KNOWN')
@@ -796,10 +799,15 @@ class FrameOffsets(unittest.TestCase):
         self.assertIn('frame offset +2', row['why'])
         # --accept refuses it, rather than recording offset 0 alone.
         self.assertEqual(row['gba_offsets'], [116, 120, None])
+        # Offset 0 missing: the spread is kept and names the offset.
+        first = sc64_parity.judge('sk-pvt-w0', self.golden(), {}, {}, {}, more=[(1, {key: 120}), (2, {key: 116})])[0]
+        self.assertEqual((first['verdict'], first['gba_offsets']), ('REGRESSION', [None, 120, 116]))
+        self.assertIn('frame offset +0', first['why'])
         with tempfile.TemporaryDirectory() as temp:
-            with self.assertRaises(ValueError):
-                sc64_parity.write_baseline(pathlib.Path(temp) / 'b.json', [{'id': 'sk-pvt-w0', 'status': 'RUN',
-                                                                            'rows': [row]}], {})
+            for bad in (row, first):
+                with self.assertRaises(ValueError):
+                    sc64_parity.write_baseline(pathlib.Path(temp) / 'b.json', [{'id': 'sk-pvt-w0', 'status': 'RUN',
+                                                                                'rows': [bad]}], {})
 
     def test_baseline_lines_keep_every_offset(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -852,24 +860,42 @@ class FrameOffsets(unittest.TestCase):
         import concurrent.futures.process
 
         class Pool:
+            def __init__(self, error):
+                self.error = error
+
             def submit(self, fn, scenario_id, golden, keep, k):
                 job = concurrent.futures.Future()
                 if k == 1:
-                    job.set_exception(concurrent.futures.process.BrokenProcessPool('worker died'))
+                    job.set_exception(self.error)
                 else:
                     job.set_result({'measured': {'values': {}}, 'err': None, 'report': {}, 'cmd': []})
                 return job
+
+        class Broken:
+            def submit(self, *args):
+                raise concurrent.futures.process.BrokenProcessPool('gone')
+
+        def run(pool):
+            sc64_parity.RUN_POOL = pool
+            try:
+                return sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+            finally:
+                sc64_parity.RUN_POOL = None
         with tempfile.TemporaryDirectory() as temp:
             path = pathlib.Path(temp) / 'sk-pvt-w0.json'
             path.write_text(json.dumps(dict(self.golden(), gba={'at_step': 5})))
-            sc64_parity.RUN_POOL = Pool()
-            try:
-                out = sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
-            finally:
-                sc64_parity.RUN_POOL = None
-        self.assertEqual(out['status'], 'ERROR')
-        self.assertIn('worker died', out['why'])
-        self.assertTrue(out['why'].endswith('(frame offset +1)'))
+            # A run that raised in its worker: that offset's error.
+            out = run(Pool(ValueError('bad trace')))
+            self.assertEqual(out['status'], 'ERROR')
+            self.assertIn('bad trace', out['why'])
+            self.assertTrue(out['why'].endswith('(frame offset +1)'))
+            # A worker that died breaks every pending run: the pool, not the offset, is named.
+            out = run(Pool(concurrent.futures.process.BrokenProcessPool('worker died')))
+            self.assertEqual(out['status'], 'ERROR')
+            self.assertIn('worker pool broke during this scenario', out['why'])
+            out = run(Broken())
+            self.assertEqual(out['status'], 'ERROR')
+            self.assertIn('before this scenario ran', out['why'])
 
 
 class Bundles(unittest.TestCase):
