@@ -499,11 +499,13 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['why'] += every
         else:
             # Whole spread against whole spread, by numbers alone and by time (NEVER as the frame
-            # after the run's reach): every offset further out than every recorded value. The
-            # numbers are those of offsets that recorded a number (a time newly finite at its offset
-            # replaced another outcome and is compared with it, by time). In the time comparison such
-            # a time brings no measured spread of its own, so it must also clear the family's frame
-            # noise, as a jump does.
+            # after the run's reach): every offset further out than every recorded value. For a
+            # timing the numbers are those of offsets that recorded a number (a time newly finite at
+            # its offset replaced another outcome and is compared with it, by time); a checkpoint
+            # count keeps every reading. Any number inside the band keeps the numbers KNOWN: the
+            # noise still reaches the N64's value. In the time comparison a newly finite time brings
+            # no measured spread of its own, so it must also clear the family's frame noise, as a
+            # jump does.
             def margin(i, v):
                 return slack + (allowance if never is not None and kind(v) == 'number' and changed(i, v) else 0)
 
@@ -513,9 +515,10 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # is as unstable as the GBA gets: its few numbers do not measure its noise, so they too
             # must clear the family's.
             unstable = never is not None and len({kind(b) for b in base}) > 1
-            numbers = beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
-                              if kind(v) == 'number' and not changed(i, v)],
-                             [gap(b) for b in base if kind(b) == 'number'])
+            numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
+                beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
+                        if kind(v) == 'number' and (never is None or not changed(i, v))],
+                       [gap(b) for b in base if kind(b) == 'number'])
             timed = None not in [time_gap(v) for v in spread] and \
                 beyond([(time_gap(v), margin(i, v)) for i, v in enumerate(spread)],
                        [g for g in (time_gap(b) for b in base) if g is not None])
@@ -736,7 +739,8 @@ def load_baseline(path):
         return {}
     doc = json.loads(path.read_text())
     for line in doc.get('known', []):
-        if not isinstance(line.get('key'), str) or line['key'].count(':') < 2:
+        if not isinstance(line.get('key'), str) or len(line['key'].split(':', 2)) != 3 or \
+                not all(line['key'].split(':', 2)):
             raise SystemExit(f'{path}: baseline line {line.get("key")!r} is not scenario:check:subject')
         if not finite_number(line.get('gba')):
             raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no finite numeric GBA value')

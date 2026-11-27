@@ -882,6 +882,9 @@ class FrameOffsets(unittest.TestCase):
         # An offset whose match ended before the checkpoint now reaches it: counts are not timings.
         self.assertEqual(self.verdict([200, 116, 132], [sk.ENDED, 116, 132]), 'KNOWN')
         self.assertEqual(self.verdict([200, 150, 150], [sk.ENDED, 116, 132]), 'REGRESSION')
+        # Counts keep every reading in the spread, a newly reached one included.
+        self.assertEqual(self.verdict([200, sk.ENDED, sk.ENDED], [sk.ENDED, 116, 132]), 'REGRESSION')
+        self.assertEqual(self.verdict([84, 150, 150], [sk.ENDED, 116, 132]), 'KNOWN')
         # Every offset now reaches it where none did: one in the band keeps it KNOWN; none in it fails.
         self.assertEqual(self.verdict([84, 118, 118], [sk.ENDED] * 3), 'KNOWN')
         self.assertEqual(self.verdict([116, 118, 118], [sk.ENDED] * 3), 'REGRESSION')
@@ -904,6 +907,12 @@ class FrameOffsets(unittest.TestCase):
         mixed = [sk.NEVER, 3562, 3562]
         self.assertEqual(self.verdict([sk.NEVER, 3570, 3570], mixed, defeat), 'KNOWN')
         self.assertEqual(self.verdict([sk.NEVER, 4100, 4100], mixed, defeat), 'REGRESSION')
+        # The edge: 162 frames recorded, + 2 slack + 508 noise = 672.
+        self.assertEqual(self.verdict([sk.NEVER, 3400 + 672, 3400 + 672], mixed, defeat), 'KNOWN')
+        self.assertEqual(self.verdict([sk.NEVER, 3400 + 673, 3400 + 673], mixed, defeat), 'REGRESSION')
+        # A newly finite time inside the band keeps the numbers KNOWN, as any in-band number does.
+        exact = dict(envelope('result.human_defeated', 'human', 3198, 3202))
+        self.assertEqual(self.verdict([3200, 2300, 2300], [sk.NEVER, 3562, 3562], exact), 'KNOWN')
 
     def test_a_value_missing_at_one_offset_fails(self):
         key = ('supply.cap@8000', 'cpu Terran')
@@ -952,9 +961,10 @@ class FrameOffsets(unittest.TestCase):
             path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 1e308, 'gba_offsets': [1e308, -1e308, 1e308]}]}))
             with self.assertRaises(SystemExit):
                 sc64_parity.load_baseline(path)
-            path.write_text(json.dumps({'known': [{'key': 'sk-zvz-w0', 'gba': 1}]}))   # not scenario:check:subject
-            with self.assertRaises(SystemExit):
-                sc64_parity.load_baseline(path)
+            for bad_key in ('sk-zvz-w0', 'sk-pvt-w0::cpu Terran', ':x:s', 'sk-pvt-w0:x:'):   # not scenario:check:subject
+                path.write_text(json.dumps({'known': [{'key': bad_key, 'gba': 1}]}))
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
             path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': 1}]}))
             with self.assertRaises(SystemExit):
                 sc64_parity.load_baseline(path)
