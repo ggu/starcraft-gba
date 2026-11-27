@@ -741,6 +741,8 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(row['verdict'], 'REGRESSION')
         self.assertIn('at every frame offset', row['why'])
         self.assertEqual(self.verdict([132, 148, 140], base), 'KNOWN')     # one offset still at the baseline's edge
+        # The price of robustness: a shift no larger than the line's own spread reads KNOWN.
+        self.assertEqual(self.verdict([132, 148, 132], base), 'KNOWN')
         # A line with no baseline: a regression when every offset is outside the band ...
         self.assertEqual(self.verdict([90, 92, 91]), 'REGRESSION')
         # ... and KNOWN (recorded by --accept) while the noise still reaches the band.
@@ -771,6 +773,14 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(row['verdict'], 'REGRESSION')
         self.assertIn('outcome changed', row['why'])
         self.assertEqual(self.verdict([sk.NEVER] * 3, [8000, 8100, 8050], wave), 'REGRESSION')
+        # An offset inside the band (an also_ok NEVER) is never a regression, however far the others move.
+        allowed = self.golden(17045, 17043, 17047, also_ok=[sk.NEVER])
+        self.assertEqual(self.verdict([sk.NEVER, 12000, 12000], [sk.NEVER, 16000, 15900], allowed), 'KNOWN')
+        self.assertEqual(self.verdict([12100, 12000, 12000], [sk.NEVER, 16000, 15900], allowed), 'REGRESSION')
+        # A checkpoint some offsets no longer reach (the GBA match ended) is noise while another offset
+        # keeps the baseline's outcome; the match's end is gated by its own result line.
+        self.assertEqual(self.verdict([116, sk.ENDED, sk.ENDED], [116, 132, 116]), 'KNOWN')
+        self.assertEqual(self.verdict([sk.ENDED] * 3, [116, 132, 116]), 'REGRESSION')
         # Against a band that is itself an outcome (the N64 never built it), a time a frame earlier
         # is not further out; a line with no baseline still fails when every offset builds it.
         never = self.golden(sk.NEVER, sk.NEVER, sk.NEVER)
@@ -784,6 +794,12 @@ class FrameOffsets(unittest.TestCase):
         row = sc64_parity.judge('sk-pvt-w0', self.golden(), {key: 116}, {}, {}, more=[(1, {key: 120}), (2, {})])[0]
         self.assertEqual(row['verdict'], 'REGRESSION')
         self.assertIn('frame offset +2', row['why'])
+        # --accept refuses it, rather than recording offset 0 alone.
+        self.assertEqual(row['gba_offsets'], [116, 120, None])
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaises(ValueError):
+                sc64_parity.write_baseline(pathlib.Path(temp) / 'b.json', [{'id': 'sk-pvt-w0', 'status': 'RUN',
+                                                                            'rows': [row]}], {})
 
     def test_baseline_lines_keep_every_offset(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -795,10 +811,14 @@ class FrameOffsets(unittest.TestCase):
                              [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, 132, 116]}])
             self.assertIn('"gba_offsets": [116, 132, 116]\n', path.read_text())   # one line per entry's offsets
             self.assertEqual(sc64_parity.load_baseline(path)[self.KEY]['gba_offsets'], [116, 132, 116])
-            for bad in ([132, 116, 116], [], [116, 'x'], 116):
+            for bad in ([132, 116, 116], [], [116, 'x'], 116, None):
                 path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': bad}]}))
                 with self.assertRaises(SystemExit):
                     sc64_parity.load_baseline(path)
+            # Only the offsets are compacted: other text in a line (a note) is written as it is.
+            note = {'key': 'demo:x:s', 'gba': 1, 'note': 'see [ 1,2 ] and [\n 3 ]'}
+            sc64_parity.write_baseline(path, [], {'demo:x:s': note})
+            self.assertEqual(sc64_parity.load_baseline(path)['demo:x:s'], note)
 
     def test_a_scenario_runs_once_per_offset(self):
         key = ('supply.cap@8000', 'cpu Terran')
@@ -827,6 +847,29 @@ class FrameOffsets(unittest.TestCase):
                 self.assertTrue(out['why'].endswith('(frame offset +2)'))
         finally:
             sc64_parity.run_gba = original
+
+    def test_a_worker_failure_is_this_scenarios_error(self):
+        import concurrent.futures.process
+
+        class Pool:
+            def submit(self, fn, scenario_id, golden, keep, k):
+                job = concurrent.futures.Future()
+                if k == 1:
+                    job.set_exception(concurrent.futures.process.BrokenProcessPool('worker died'))
+                else:
+                    job.set_result({'measured': {'values': {}}, 'err': None, 'report': {}, 'cmd': []})
+                return job
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'sk-pvt-w0.json'
+            path.write_text(json.dumps(dict(self.golden(), gba={'at_step': 5})))
+            sc64_parity.RUN_POOL = Pool()
+            try:
+                out = sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+            finally:
+                sc64_parity.RUN_POOL = None
+        self.assertEqual(out['status'], 'ERROR')
+        self.assertIn('worker died', out['why'])
+        self.assertTrue(out['why'].endswith('(frame offset +1)'))
 
 
 class Bundles(unittest.TestCase):

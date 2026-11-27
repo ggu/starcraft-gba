@@ -28,10 +28,10 @@
  * from 0x800EFF20), and gives no command until the match ends; its report
  * adds each owner's race and start, and the supply a queued unit reserves.
  * --frame-offset K (0-4) advances the engine's frame counter by K right after
- * the launch, before the first step: the same seed and corners with every
- * task phased on that counter (the 5:4 source cadence among them) K frames
- * out of phase. The step count, and so the source-frame clock, is
- * unchanged. tools/sc64_parity.py runs each skirmish scenario at a few fixed
+ * the launch (whose release update takes step 1): the same seed and corners
+ * with every task phased on that counter (the 5:4 source cadence among them)
+ * K frames out of phase from step 2 on. The step count, and so the
+ * source-frame clock, is unchanged. tools/sc64_parity.py runs each skirmish scenario at a few fixed
  * offsets to measure the GBA's own one-frame noise.
  *
  * lab-t1 (T1), lab-bb (Blood Bath, human Zerg against one Terran computer)

@@ -51,6 +51,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import json
+import multiprocessing
 import os
 import pathlib
 import re
@@ -344,17 +345,19 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['why'] = 'not measured on the GBA' if obs['value'] is not None else 'recorded on neither engine'
             rows.append(row)
             continue
-        if any(v is None for v in spread):
-            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
-            row['why'] = 'not measured on the GBA at frame offset ' + \
-                offset_label(k for k, v in zip(offsets, spread) if v is None)
-            rows.append(row)
-            continue
         if isinstance(value, float):
             row['gba'] = round(value, 4)
         if len(spread) > 1:
             row['gba_offsets'] = [round(v, 4) if isinstance(v, float) else v for v in spread]
             row['frame_offsets'] = offsets
+        if any(v is None for v in spread):
+            # The row keeps its incomplete spread, so --accept refuses it rather than recording
+            # offset 0 alone.
+            row['verdict'] = 'REGRESSION' if gating else 'REPORT'
+            row['why'] = 'not measured on the GBA at frame offset ' + \
+                offset_label(k for k, v in zip(offsets, spread) if v is None)
+            rows.append(row)
+            continue
         if obs['value'] is None or obs['lo'] is None or obs['hi'] is None:
             # An event only the GBA recorded (a report-only observation the N64 never saw) has no band.
             row['verdict'] = 'REGRESSION' if gating else 'REPORT'
@@ -421,7 +424,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 # A band that is itself an outcome (the N64 never built the type: [NEVER, NEVER]) puts
                 # every GBA time at the same wrong outcome: a frame earlier is not further out.
                 outcome_band = obs['lo'] == obs['hi'] and obs['lo'] in specials
-                if now and was and not outcome_band and min(now) > max(was) + slack:
+                # An offset inside the band (an also_ok NEVER included) is never a regression.
+                if now and was and not outcome_band and min(gaps) > 0 and min(now) > max(was) + slack:
                     row['verdict'] = 'REGRESSION'
                     row['why'] = f'further outside the band than the baseline ({fmt_spread(base)})' + every
                 else:
@@ -510,7 +514,13 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     if RUN_POOL is None:
         runs = [run_gba(scenario_id, golden, keep, k) for k in offsets]
     else:
-        runs = [job.result() for job in [RUN_POOL.submit(run_gba, scenario_id, golden, keep, k) for k in offsets]]
+        jobs = {k: RUN_POOL.submit(run_gba, scenario_id, golden, keep, k) for k in offsets}
+        runs = []
+        for k, job in jobs.items():
+            try:
+                runs.append(job.result())
+            except Exception as error:   # a worker that died, or a run that raised: this scenario only
+                runs.append({'status': 'ERROR', 'why': f'GBA run failed in its worker: {error!r}'})
     for k, run in zip(offsets, runs):
         if run.get('status') == 'ERROR':
             at = f' (frame offset +{k})' if k else ''
@@ -596,8 +606,8 @@ def load_baseline(path):
         if not isinstance(line.get('gba'), (int, float)) or isinstance(line.get('gba'), bool):
             raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no numeric GBA value')
         spread = line.get('gba_offsets')
-        if spread is not None and (not isinstance(spread, list) or not spread or spread[0] != line['gba'] or
-                                   any(not isinstance(v, (int, float)) or isinstance(v, bool) for v in spread)):
+        if 'gba_offsets' in line and (not isinstance(spread, list) or not spread or spread[0] != line['gba'] or
+                                      any(not isinstance(v, (int, float)) or isinstance(v, bool) for v in spread)):
             raise SystemExit(f'{path}: baseline line {line.get("key")!r} has malformed gba_offsets '
                              '(numbers, offset 0 first and equal to gba)')
     return {line['key']: line for line in doc.get('known', [])}
@@ -630,8 +640,9 @@ def write_baseline(path, results, old):
     doc = {'format': 'sc64-parity-baseline/1',
            'about': 'Known GBA/N64 parity gaps: GBA values only (N64 bands stay in the private fixture home). '
                     'Rewritten by ./dev parity --accept.', 'known': known}
-    # One line per list of numbers (a line's frame offsets), so a change reads as one line.
-    text = re.sub(r'\[\s+([^\[\]{}]*?)\s+\]', lambda m: '[' + ', '.join(v.strip() for v in m.group(1).split(',')) + ']',
+    # A line's frame offsets on one line, so a change reads as one line.
+    text = re.sub(r'("gba_offsets": )\[\s+([-0-9.e+,\s]*?)\s+\]',
+                  lambda m: m.group(1) + '[' + ', '.join(v.strip() for v in m.group(2).split(',')) + ']',
                   json.dumps(doc, indent=1))
     path.write_text(text + '\n')
 
@@ -720,7 +731,9 @@ def main(argv=None):
     global RUN_POOL
     # Scenario threads only wait (on the differ's process, or on their runs in RUN_POOL), so
     # every scenario gets one; --jobs bounds the GBA runs measured at once.
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, args.jobs)) as RUN_POOL, \
+    # spawn: workers never fork a process whose scenario threads hold locks.
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, args.jobs),
+                                                mp_context=multiprocessing.get_context('spawn')) as RUN_POOL, \
             concurrent.futures.ThreadPoolExecutor(max_workers=len(goldens) + 1) as pool:
         if not args.no_tables and not args.explain and not args.only:
             jobs.append(pool.submit(run_tables, home))

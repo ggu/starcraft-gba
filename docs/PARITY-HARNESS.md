@@ -124,14 +124,22 @@ noise: a run one to four frames out of phase flipped 18–113 of the 1,328
 gating `sk-*` lines to REGRESSION (51–113 against the baseline then on
 main), as an engine change that shifted timing by a frame would. Each `sk-*` scenario now runs at
 frame offsets 0, 1 and 2 (`FRAME_OFFSETS`; the runner's `--frame-offset K`
-advances the frame counter K frames before the first step and leaves the
-step count, and so the source-frame clock, unchanged) and is judged on the
-spread: REGRESSION only when the whole spread moves further out than the
+advances the frame counter K frames right after the launch, whose release
+update takes step 1, and leaves the step count, and so the source-frame
+clock, unchanged) and is judged on the spread: REGRESSION only when the whole spread moves further out than the
 whole recorded spread, PASS or IMPROVED only when every offset is inside
 the band. In the same test (offsets 0–4, every window of three
 consecutive offsets judged against a baseline accepted at 0–2), no line
 flipped to REGRESSION; three noise lines read IMPROVED (every offset inside
-the band, where one recorded offset was outside).
+the band, where one recorded offset was outside). The price: a shift of
+every offset by no more than the line's own spread reads KNOWN. Comparing
+the ranked offsets instead (each offset's gap against the same rank of the
+baseline's) would catch that, but flipped 0–3 lines of pure frame noise in
+the same test. A line with an offset inside the band (an `also_ok` NEVER
+included) is never a REGRESSION, and an outcome new at some offsets (an
+ENDED checkpoint where the baseline had numbers) is noise while the other
+offsets share the baseline's outcome; the match's own end is gated by its
+`result.*` line.
 Offsets are GBA-side only; the N64 goldens are unchanged. `--jobs` (one
 per CPU by default) runs the GBA runs and their measurement in worker
 processes.
