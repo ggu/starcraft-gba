@@ -1269,6 +1269,28 @@ class LabMeasureTest(unittest.TestCase):
                     others=[(2, metrics.ZERGLING, 4, 130, 100)])
         self.assertEqual(m['counter_values'], [5])
 
+    def test_every_foe_hit_taken_counts_for_the_exact_check(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        # Five-point bites at 20 and 28, then in frame 36 (steps 45 and 46) a 3-point bite and a
+        # killing one: the Marine's row is gone from that frame.
+        own = {sf: 40.0 - 5 * len([t for t in (20, 28) if t <= sf]) for sf in range(0, 36)}
+        series = as_gba(walk(pos, hp={1: own, 2: {sf: 35.0 for sf in range(0, 80)}},
+                             others=[(2, metrics.ZERGLING, 4, 130, 100)]),
+                        [('U', 46, 1, 1, 100, 100, -2, None, 30, metrics.MARINE, 0, None, None)])
+        for frame in series['frames']:
+            frame['live'] = {1: 0, 2: 3}
+        series['applied'] = [(26, 1, 5, 0, 35, 3, 3), (36, 1, 5, 0, 30, 3, 3), (45, 1, 3, 0, 27, 3, 3),
+                             (46, 1, 29, 0, -2, 3, 3)]
+        series['max_units'] = 100
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        self.assertIn(3, m['counter_values'])
+        # A hit from a unit of another type (a Photon Cannon, engine type 7) is left out, not a
+        # reason to drop the foe's own hits.
+        series['applied'] = [(26, 1, 5, 0, 35, 3, 3), (36, 1, 5, 0, 30, 7, 3)]
+        series['removals'] = []
+        m = metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        self.assertEqual(m['counter_values'], [5])
+
     def test_the_self_gate_validates_applied_hit_records(self):
         import sc64_parity_selfgate
         self.assertTrue(sc64_parity_selfgate.record_ok(b'DA 180 0 10 0 3 1'))

@@ -1431,6 +1431,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # drop, cannot bend them); one that several records or regeneration leave open, with none,
     # leaves that kind of exact damage unmeasured.
     applied_hp_at, applied_sh_at, applied_taken_at = {}, {}, {}
+    taken_unplaced = False   # a foe hit on the subject that no single-foe sample can attribute
     for sf, k, hp_lost, shield_lost, hp_after, stype, sowner in applied_hits:
         if hp_after <= 0:
             continue
@@ -1441,8 +1442,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                 applied_hp_at.setdefault((sf, k), []).append(hp_lost)
             elif shield_lost > 0:
                 applied_sh_at.setdefault((sf, k), []).append(shield_lost)   # absorbed whole by shields
-        elif k == uid and not ours_source(sowner) and foe_source(stype) and hp_lost > 0 and single_foe(sf):
-            applied_taken_at.setdefault(sf, []).append(hp_lost)
+        elif k == uid and not ours_source(sowner) and foe_source(stype) and hp_lost > 0:
+            # On the last sample showing the subject (a later hit in the frame may kill it).
+            if single_foe(s1):
+                applied_taken_at.setdefault(sf, []).append(hp_lost)
+            else:
+                taken_unplaced = True
 
     def merged(samples, applied_at, unresolved):
         out, used, blocked = [], set(), False
@@ -1461,12 +1466,12 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                             if (vid, sf) not in clipped], applied_sh_at,
                            multiple | {(sf, vid) for vid, got in shielded.items() for sf, d in got
                                        if regen_masks(vid, sf, d)})
-    # A hit taken whose records come from no unit of the foe's type was not the foe's.
+    # A hit taken whose records come from no unit of the foe's type was not the foe's: left out.
     foreign = {sf for sf, _ in taken
                if sources_at.get((sf, uid)) and not any(not ours_source(o) and foe_source(t)
                                                         for o, t, _ in sources_at[(sf, uid)])}
-    taken_values = merged([(sf, d) for sf, d in taken], applied_taken_at,
-                          {sf for sf, k in multiple if k == uid} | foreign)
+    taken_values = [] if taken_unplaced else merged([(sf, d) for sf, d in taken if sf not in foreign],
+                                                    applied_taken_at, {sf for sf, k in multiple if k == uid})
     result = {
         'hits': len(landed), 'ambiguous_hits': ambiguous, 'damage_values': sorted(set(hp_values)),
         'damage': statistics.median(hp_values) if hp_values else None,
