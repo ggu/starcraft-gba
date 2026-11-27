@@ -531,7 +531,7 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
         try:
             jobs = {k: RUN_POOL.submit(run_gba, scenario_id, golden, keep, k) for k in offsets}
         except concurrent.futures.process.BrokenProcessPool as error:
-            return {**result, 'status': 'ERROR', 'why': f'the GBA worker pool broke before this scenario ran: {error!r}'}
+            return {**result, 'status': 'ERROR', 'why': f'the GBA worker pool broke while this scenario submitted its runs: {error!r}'}
         runs = []
         for k, job in jobs.items():
             try:

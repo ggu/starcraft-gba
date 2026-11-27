@@ -895,7 +895,7 @@ class FrameOffsets(unittest.TestCase):
             self.assertIn('worker pool broke during this scenario', out['why'])
             out = run(Broken())
             self.assertEqual(out['status'], 'ERROR')
-            self.assertIn('before this scenario ran', out['why'])
+            self.assertIn('while this scenario submitted its runs', out['why'])
 
 
 class Bundles(unittest.TestCase):
