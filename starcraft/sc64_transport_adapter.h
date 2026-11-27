@@ -230,6 +230,7 @@ static int race_transport_request_board(int passenger, int carrier)
     sc64_worker_gather_pending_set(&u[passenger], 0);
 #endif
     u[passenger].order = ORDER_BOARD;
+    SC64_CMD_FORGET(passenger);
     u[passenger].target = carrier;
     u[passenger].path_timer = u[passenger].path_retry = 0;
     return 1;
@@ -244,6 +245,7 @@ static int race_transport_request_unload(int carrier, int x, int y)
     if (race_mode && u[carrier].owner == NEUTRAL && u[carrier].raw_owner == 11) return 0;
 #endif
     u[carrier].order = ORDER_UNLOAD;
+    SC64_CMD_FORGET(carrier);
     u[carrier].target = -1;
     u[carrier].tx = x; u[carrier].ty = y;
     u[carrier].work_timer = 0;
@@ -365,6 +367,10 @@ static void race_transport_try_unload(int slot)
             u[i].x = x; u[i].y = y;
             u[i].order = ORDER_IDLE; u[i].target = -1;
             u[i].path_timer = u[i].path_retry = 0;
+            /* A loaded unit takes no commands, so any still pending for it
+             * was given before it boarded and was overtaken by the boarding
+             * (on the N64 it reaches the unit aboard, which ignores it). */
+            SC64_CMD_FORGET(i);
             if (u[i].cd < SC64_TRANSPORT_UNLOAD_TICKS)
                 u[i].cd = SC64_TRANSPORT_UNLOAD_TICKS;
             q->work_timer = SC64_TRANSPORT_UNLOAD_TICKS;

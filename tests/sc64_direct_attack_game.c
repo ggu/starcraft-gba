@@ -18,6 +18,15 @@ static int add_enemy_unit(int type, int x, int y)
     return slot;
 }
 
+/* A player's Move or attack-move lands after the command delay, on the
+ * update pass that processes orders. */
+static void land_delayed_commands(void)
+{
+#ifdef SC64_IMPORTED_MISSION
+    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES; ++k) sc64_command_delay_tick();
+#endif
+}
+
 int main(void)
 {
     int attacker, near_target, far_target, building, last_x, last_y;
@@ -112,7 +121,9 @@ int main(void)
     /* A ground click remains AttackMove. */
     mode = MODE_ATTACK; cx = 300; cy = 300;
     interact();
+    land_delayed_commands();
     assert(u[attacker].order == ORDER_ATTACK_MOVE && u[attacker].target == -1);
+    assert(u[attacker].tx == 300 && u[attacker].ty == 300);
 
     /* SCVs are ground-capable in the race rules and receive direct orders. */
     u[attacker].selected = 0;

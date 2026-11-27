@@ -2785,6 +2785,13 @@ static void update_exploration(void);
 static int owner_command_center(int owner);
 #ifdef SC64_IMPORTED_MISSION
 static void sc64_start_human_workers_mining(void);
+static void sc64_command_delay_flush(void), sc64_command_delay_reset(void),
+    sc64_command_delay_forget(int), sc64_command_delay_input_end(void);
+#define SC64_CMD_FORGET(i) sc64_command_delay_forget(i)
+#define SC64_CMD_INPUT_END() sc64_command_delay_input_end()
+#else
+#define SC64_CMD_FORGET(i) ((void)0)
+#define SC64_CMD_INPUT_END() ((void)0)
 #endif
 static int currently_visible(int x, int y);
 #ifdef SC64_SHARED_BUNKER
@@ -3142,6 +3149,7 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+    SC64_CMD_FORGET(i);
 #if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     sc64_mineral_fifo_remove(&mineral_fifo, (unsigned)i);
 #endif
@@ -4991,6 +4999,7 @@ sc64_direct_attack_issue_target(int target)
         sc64_worker_gather_pending_set(q, 0);
 #endif
         q->order = ORDER_ATTACK_TARGET;
+        SC64_CMD_FORGET(i);
         q->target = target;
         q->tx = target_x(target);
         q->ty = target_y(target);
@@ -5693,6 +5702,9 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_reset();
+#endif
 #if defined(SC64_MINERAL_FIFO) || defined(SC64_PACKED_MINERAL_FIFO)
     memset(&mineral_fifo, 0, sizeof(mineral_fifo));
     mineral_fifo_enabled = 1;
@@ -6289,6 +6301,7 @@ sc64_worker_mineral_issue_selected(int patch)
             !IS_WORKER(u[i].type) || SC64_TRANSPORT_LOADED(&u[i])) continue;
         sc64_worker_reset_repair_for_gather(&u[i]);
         u[i].order = ORDER_MINE;
+        SC64_CMD_FORGET(i);
         u[i].target = patch;
         u[i].work_timer = 0;
         u[i].build = -1; /* A new gather command starts a new home-depot trip. */
@@ -6327,11 +6340,18 @@ remember_unit_tap(int picked)
     unit_tap_x = cx; unit_tap_y = cy;
 }
 
+#ifdef SC64_IMPORTED_MISSION
+#include "sc64_command_delay.h"
+#include "sc64_group_formation.h"
+#endif
 static int
 issue_order(int order, int tx, int ty)
 {
     int i, n = 0;
     int group_order = selected_count() > 1;
+#ifdef SC64_IMPORTED_MISSION
+    Sc64GroupFormation formation = sc64_group_formation_begin(order, group_order, tx, ty);
+#endif
 #ifdef SC64_REACHABLE_FORMATION
     int route_hint_slots[4] = {-1, -1, -1, -1};
     int route_hint_roots[4] = {-1, -1, -1, -1};
@@ -6367,14 +6387,25 @@ issue_order(int order, int tx, int ty)
                 (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
                 u[i].work_timer = 0;
 	    u[i].order = order;
+	    SC64_CMD_FORGET(i);
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[i], 0);
 #endif
 	#ifdef SC64_REACHABLE_FORMATION
 	    if (group_order) {
+#ifdef SC64_IMPORTED_MISSION
+	        int slot_x, slot_y;
+	        sc64_group_formation_slot(&formation, &u[i], n, tx, ty, 1, &slot_x, &slot_y);
+#else
 	        int slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 	        int slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
+#endif
+#ifdef SC64_IMPORTED_MISSION
+	        /* A kept formation's slots already connect to the point. */
+	        if (!sc64_race_unit_flying(u[i].type) && !(formation.keep && formation.ground)) {
+#else
 	        if (!sc64_race_unit_flying(u[i].type)) {
+#endif
 	            int use_cursor = formation_route_pair(u[i].x, u[i].y,
                 slot_x, slot_y, tx, ty, route_hint_slots, route_hint_roots,
                 &route_hint_next);
@@ -6391,8 +6422,15 @@ issue_order(int order, int tx, int ty)
 	    }
 	#else
 	    if (group_order) {
+#ifdef SC64_IMPORTED_MISSION
+		int slot_x, slot_y; /* tx/ty are s16 in compact-storage builds */
+		sc64_group_formation_slot(&formation, &u[i], n, tx, ty, 1, &slot_x, &slot_y);
+		u[i].tx = slot_x;
+		u[i].ty = slot_y;
+#else
 		u[i].tx = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 		u[i].ty = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
+#endif
 	    } else {
 		u[i].tx = tx;
 		u[i].ty = ty;
@@ -6409,6 +6447,12 @@ issue_order(int order, int tx, int ty)
 	toast(5);
     return n;
 }
+
+#ifdef SC64_IMPORTED_MISSION
+#define SC64_PLAYER_ORDER(o, x, y) sc64_command_delay_order((o), (x), (y))
+#else
+#define SC64_PLAYER_ORDER(o, x, y) issue_order((o), (x), (y))
+#endif
 
 static int
 find_selected_worker(void)
@@ -6602,6 +6646,7 @@ start_build(int type)
         (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
         u[i].work_timer = 0;
     u[i].order = ORDER_BUILD;
+    SC64_CMD_FORGET(i);
     u[i].target = slot;
     u[i].tx = px;
     u[i].ty = py;
@@ -6614,70 +6659,7 @@ start_build(int type)
 #endif
 }
 
-static void
-stop_selected(void)
-{
-    int i;
-    for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].selected) {
-#ifdef SC64_SHARED_NUKE_PROBE
-            if (sc64_race_ordinary_ghost(u[i].type) && race_nuke_ghost_locked(i)) continue;
-#endif
-#ifdef SC64_WORKER_CARGO_KIND
-#ifdef SC64_T6_RUNTIME
-            int was_repair = u[i].order == ORDER_REPAIR;
-#else
-            int was_repair = 0;
-#endif
-#endif
-#ifdef SC64_EGG_RUNTIME
-            /* STOP is not Egg cancellation: retain its paid product/timer so
-             * the contextual CANCEL EGG action remains the only cancel path. */
-            if (u[i].type == SC64_EGG_ACTOR) continue;
-#endif
-#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-            if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
-#endif
-            if (IS_WORKER(u[i].type) &&
-                (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS))
-                u[i].work_timer = 0;
-	    u[i].order = ORDER_IDLE;
-#ifdef SC64_WORKER_CARGO_KIND
-            sc64_worker_gather_pending_set(&u[i], 0);
-#endif
-#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-            if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
-#endif
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-            if (sc64_race_raw_unit(u[i].type) != 12)
-#endif
-#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
-            if (sc64_race_raw_unit(u[i].type) != 83)
-#endif
-            SC64_PSC_KEEP_STATE(u[i])
-#ifdef SC64_Z5_CLOAK_ENABLED
-            if (!race_z5_cloak_actor(&u[i]))
-#endif
-#ifdef SC64_P6_STORM_ENABLED
-            if (!(race_p6_active() && u[i].raw_type == 79 && u[i].raw_owner == 2))
-#endif
-#ifdef SC64_Z6_CLOAK_ENABLED
-            if (!race_z6_cloak_actor(&u[i]))
-#endif
-#ifdef SC64_WORKER_CARGO_KIND
-            if (!IS_WORKER(u[i].type) || was_repair) u[i].carry = 0;
-            if (was_repair) {
-                sc64_worker_cargo_clear(&u[i]);
-                sc64_worker_gather_pending_set(&u[i], 0);
-            }
-#else
-	    u[i].carry = 0;
-#endif
-	    u[i].target = -1;
-	}
-    mode = MODE_NORMAL;
-    menu_open = 0;
-}
+#include "sc64_stop_selected.h"
 
 static void
 start_research(int type)
@@ -6967,7 +6949,7 @@ choose_command(int choice)
             else if (action == NUKE_MENU_ARMED) toast(NUKE_TOAST_ARMED);
             else if (action == NUKE_MENU_ABORT) {
                 for (int i = 0; i < MAX_UNITS; ++i)
-                    if (u[i].selected && u[i].owner == SIDE) (void)race_nuke_abort(i);
+                    if (u[i].selected && u[i].owner == SIDE && race_nuke_abort(i)) SC64_CMD_FORGET(i);
             }
             return;
         }
@@ -7750,7 +7732,7 @@ interact(void)
             mode = MODE_NORMAL; return;
         }
 #endif
-	int issued=issue_order(ORDER_MOVE, cx, cy);
+	int issued=SC64_PLAYER_ORDER(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
 	if (issued) field_ui_ping(cx, cy, C_GREEN);
@@ -7774,7 +7756,7 @@ interact(void)
             return;
         }
 #endif
-	int issued=issue_order(ORDER_ATTACK_MOVE, cx, cy);
+	int issued=SC64_PLAYER_ORDER(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
 	if (issued) field_ui_ping(cx, cy, C_RED);
@@ -7846,6 +7828,7 @@ interact(void)
 	    sc64_worker_reset_repair_for_gather(&u[worker]);
 	    u[worker].work_timer = 0;
 	    u[worker].order = ORDER_GAS;
+	    SC64_CMD_FORGET(worker);
 	    u[worker].target = refinery;
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[worker], 1);
@@ -7874,6 +7857,7 @@ interact(void)
                     if (!u[i].alive || !u[i].selected || u[i].owner != SIDE ||
                         SC64_TRANSPORT_LOADED(&u[i]) || !IS_WORKER(u[i].type) || u[i].carry) continue;
                     u[i].order = ORDER_MINE;
+                    SC64_CMD_FORGET(i);
                     u[i].target = patch;
                     u[i].work_timer = 0;
                     u[i].path_timer = u[i].path_retry = 0;
@@ -7951,6 +7935,7 @@ interact(void)
                 sc64_worker_reset_repair_for_gather(&u[worker]);
 		u[worker].work_timer = 0;
 		u[worker].order = ORDER_GAS;
+		SC64_CMD_FORGET(worker);
 		u[worker].target = selected_building;
 #ifdef SC64_WORKER_CARGO_KIND
                 sc64_worker_gather_pending_set(&u[worker], 1);
@@ -9559,7 +9544,11 @@ target_lists_unavailable:
 
 	if (q->order == ORDER_MOVE) {
 	    if (dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5)
+#ifdef SC64_IMPORTED_MISSION
+		sc64_move_arrive(q);
+#else
 		q->order = ORDER_IDLE;
+#endif
 	    else
 		move_toward(q, q->tx, q->ty);
 	    continue;
@@ -10552,6 +10541,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 #ifdef SC_FIELD_FEEDBACK
     if (ping_life) --ping_life;
 #endif
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_input_begin();
+#endif
 #if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     /* A spell hotkey keeps real-time targeting practical on the GBA pad. */
     if ((held&KEY_B) && (pressed&KEY_R) && !box_state &&
@@ -10604,7 +10596,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     if (menu_open) reset_selection_gestures();
     else field_menu_repeat_reset();
 #ifdef SC_COMMAND_RING
-    if (command_ring_input(held, pressed)) return;
+    if (command_ring_input(held, pressed)) { SC64_CMD_INPUT_END(); return; }
 #endif
     if ((pressed & KEY_B) && !box_state && !(pressed & KEY_L)) {
 	if (menu_open)
@@ -10639,6 +10631,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
 	}
 	if (pressed & KEY_A)
 	    choose_command(menu_cursor);
+	SC64_CMD_INPUT_END();
 	return;
     }
     if (pressed & KEY_START)
@@ -10685,6 +10678,9 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     }
     if (pressed & KEY_A)
 	interact();
+#ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_input_end();
+#endif
 
     frame++;
 #ifdef SC64_RANGE_WORK
@@ -10718,6 +10714,7 @@ SC64_GAME_STEP(u16 held, u16 pressed)
     race_bc_yamato_sync_references();
 #endif
 #ifdef SC64_IMPORTED_MISSION
+    sc64_command_delay_tick();
     SC64_UPDATE_ORDERS();
 #else
     update_orders();

@@ -1,5 +1,8 @@
 #ifndef SC64_P6_STORM_ADAPTER_H
 #define SC64_P6_STORM_ADAPTER_H
+#ifndef SC64_CMD_FORGET
+#define SC64_CMD_FORGET(i) ((void)0) /* standalone host tests */
+#endif
 
 #ifdef SC64_EXPERIMENTAL_RESEARCH_Q8_COMBAT
 #include "sc64_research_q8_storm.h"
@@ -143,7 +146,7 @@ static int race_p6_storm_cast_selected(int x, int y)
         (u16)u[caster].x, (u16)u[caster].y, &u[caster].carry,
         race_p6_storm_technology_researched());
     if (cast) {
-        u[caster].order=ORDER_IDLE; u[caster].target=-1;
+        u[caster].order=ORDER_IDLE; u[caster].target=-1; SC64_CMD_FORGET(caster);
         u[caster].tx=u[caster].x; u[caster].ty=u[caster].y;
     }
     return cast;

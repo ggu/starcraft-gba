@@ -299,7 +299,7 @@ field_ui_smart_attack(void)
 {
     int tx, ty;
     if (!selected_count() || !ui_hostile_at(cx, cy, &tx, &ty)) return 0;
-    if (issue_order(ORDER_ATTACK_MOVE, tx, ty)) field_ui_ping(tx, ty, C_RED);
+    if (SC64_PLAYER_ORDER(ORDER_ATTACK_MOVE, tx, ty)) field_ui_ping(tx, ty, C_RED);
     return 1;
 }
 
@@ -310,7 +310,7 @@ static int
 field_ui_smart_move(void)
 {
     if (selected_building >= 0 || !selected_count() || selection_target() >= 0) return 0;
-    if (issue_order(ORDER_MOVE, cx, cy)) field_ui_ping(cx, cy, C_GREEN);
+    if (SC64_PLAYER_ORDER(ORDER_MOVE, cx, cy)) field_ui_ping(cx, cy, C_GREEN);
     return 1;
 }
 

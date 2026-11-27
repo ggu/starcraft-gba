@@ -482,7 +482,7 @@ static const char *race_nuke_menu_label(int action)
 static int race_nuke_issue_selected(int x, int y)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].selected && race_nuke_issue(i, SIDE, x, y)) return 1;
+        if (u[i].selected && race_nuke_issue(i, SIDE, x, y)) { SC64_CMD_FORGET(i); return 1; }
     return 0;
 }
 

@@ -235,6 +235,8 @@ static int order_unit(int slot,int x,int y)
           slot,cx,cy,x,y);return 0;
     }
     tap(KEY_A);
+    /* A player order lands after the N64 command delay (sc64_command_delay.h). */
+    for(int k=0;k<SC64_COMMAND_DELAY_UPDATES&&u[slot].alive&&u[slot].order!=ORDER_MOVE;k++)step(0);
     if(!u[slot].alive||u[slot].order!=ORDER_MOVE){
         fprintf(stderr,"T7 move command not registered slot=%d alive=%d order=%d at=%d,%d intended=%d,%d cursor=%d,%d\n",
           slot,u[slot].alive,u[slot].order,u[slot].x,u[slot].y,x,y,cx,cy);
@@ -993,10 +995,15 @@ static int controller_air_deliver_emitter(int emitter)
     last_carrier_slot=carrier;checkpoint("emitter-loaded-dropship");
     int goal_x=-1,goal_y=-1;
     if(!clear_point_in_location(1,&goal_x,&goal_y))return 0;
+    /* Each leg is planned from the waypoint just reached, not from where the
+       ship is when the next order goes out early (see the lookahead below):
+       planning from a point short of the waypoint gives a different, slower
+       chain of waypoints through the defended approach. */
+    int plan_x=u[ship].x,plan_y=u[ship].y;
     for(int leg=0;leg<128&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;leg++){
         if(dist2(u[ship].x,u[ship].y,goal_x,goal_y)<12*12)break;
         int wx,wy;
-        if(!air_next_waypoint(u[ship].x,u[ship].y,goal_x,goal_y,&wx,&wy)){
+        if(!air_next_waypoint(plan_x,plan_y,goal_x,goal_y,&wx,&wy)){
             fprintf(stderr,"T7 no safe air route ship=%d at=%d,%d goal=%d,%d\n",ship,u[ship].x,u[ship].y,goal_x,goal_y);
             return 0;
         }
@@ -1004,14 +1011,18 @@ static int controller_air_deliver_emitter(int emitter)
         /* The coarse air waypoint search can choose a waypoint already
            inside its arrival radius. Reissuing MOVE at the same point is a
            harmless no-op in the game, not evidence that input failed. */
-        if(dist2(u[ship].x,u[ship].y,wx,wy)<12*12)continue;
+        if(dist2(u[ship].x,u[ship].y,wx,wy)<12*12){plan_x=wx;plan_y=wy;continue;}
         if(!order_unit(ship,wx,wy))return 0;
         int arrived=0;
+        /* Issue the next leg before the ship stops: a player order lands after the
+           N64 command delay, so give it a lookahead of the delay's travel. */
+        const int lookahead=12+SC64_COMMAND_DELAY_UPDATES*2;
         for(int t=0;t<4000&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++){
             step(0);
             if(!u[ship].alive||!u[carrier].alive)return 0;
-            if(dist2(u[ship].x,u[ship].y,wx,wy)<12*12){arrived=1;break;}
+            if(dist2(u[ship].x,u[ship].y,wx,wy)<lookahead*lookahead){arrived=1;break;}
         }
+        plan_x=wx;plan_y=wy;
         if(!arrived){
             fprintf(stderr,"T7 Dropship waypoint timeout ship=%d at=%d,%d target=%d,%d order=%d tx=%d ty=%d leg=%d\n",
               ship,u[ship].x,u[ship].y,wx,wy,u[ship].order,u[ship].tx,u[ship].ty,leg);

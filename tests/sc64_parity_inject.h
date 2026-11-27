@@ -250,7 +250,8 @@ static int sc64_pi_order(const char *verb, int slot, int order, int x, int y)
     if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H)
         return sc64_pi_fail(verb, "point %d,%d is off the map", x, y);
     sc64_pi_select_only(&saved, slot);
-    issued = issue_order(order, x, y);
+    /* The player's command path: the engine delays it as the N64 does. */
+    issued = SC64_PLAYER_ORDER(order, x, y);
     sc64_pi_restore(&saved);
     sc64_pi_route_check(route, verb);
     if (issued != 1) return sc64_pi_fail(verb, "slot %d refused the order (%d issued)", slot, issued);
@@ -284,7 +285,7 @@ static int sc64_pi_group_move(const int *slots, int n, int x, int y)
     if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H)
         return sc64_pi_fail("group_move", "point %d,%d is off the map", x, y);
     if (sc64_pi_select_group("group_move", &saved, slots, n)) return -1;
-    issued = issue_order(ORDER_MOVE, x, y);
+    issued = SC64_PLAYER_ORDER(ORDER_MOVE, x, y);
     sc64_pi_restore(&saved);
     sc64_pi_route_check(route, "group_move");
     if (issued != n) return sc64_pi_fail("group_move", "%d of %d units took the order", issued, n);

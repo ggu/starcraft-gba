@@ -464,6 +464,7 @@ static int race_nydus_issue_selected(int x, int y)
             sc64_worker_gather_pending_set(&u[i], 0);
 #endif
             u[i].order = ORDER_NYDUS_ENTER;
+            SC64_CMD_FORGET(i);
             u[i].target = entrance;
             u[i].tx = ax; u[i].ty = ay;
             u[i].path_timer = u[i].path_retry = 0;

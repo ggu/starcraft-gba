@@ -160,6 +160,7 @@ static int race_late_request_repair(void)
                  worker->alive, worker->selected, SC64_TRANSPORT_LOADED(worker)) ||
             (unit_target && target == i)) continue;
         worker->order = ORDER_REPAIR;
+        SC64_CMD_FORGET(i);
         worker->target = target;
         worker->tx = unit_target ? u[target].x : b[target - MAX_UNITS].x;
         worker->ty = unit_target ? u[target].y : b[target - MAX_UNITS].y;

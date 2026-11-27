@@ -49,6 +49,7 @@ static int race_z5_consume_issue_selected(int x, int y)
     if (target < 0) return 0;
     Unit *caster = &u[hero];
     caster->order = ORDER_Z5_CONSUME;
+    SC64_CMD_FORGET(hero);
     caster->target = target;
     caster->tx = u[target].x; caster->ty = u[target].y;
     caster->path_timer = caster->path_retry = 0;

@@ -33,6 +33,9 @@ int main(void)
     u[worker].order=ORDER_IDLE;u[worker].target=-1;u[worker].carry=0;
     SC64_GRID_SET(visible,m[0].x/16+(m[0].y/16)*MAP_COLS,0);
     tap(KEY_A);assert(u[worker].order!=ORDER_MINE);
+    /* That tap was a Move to the unseen field: let it land after the
+     * command delay before the next case sets the worker up directly. */
+    for(int i=0;i<=SC64_COMMAND_DELAY_UPDATES;i++)game_update(0,0);
     /* A loaded gas trip cannot be retyped as mineral cargo or discarded. */
     int refinery=spawn_build(SIDE,B_REFINERY,700,700,0);assert(refinery>=0);
     cx=u[worker].x;cy=u[worker].y;tap(KEY_A);assert(u[worker].selected);
@@ -55,7 +58,9 @@ int main(void)
     assert(attack>=0);for(int i=0;i<field_menu_count() && menu_cursor!=attack;i++)tap(KEY_DOWN);
     assert(menu_cursor==attack);tap(KEY_A);assert(mode==MODE_ATTACK);
     assert(field_ui_a_action(selected_count())==UI_A_ATTACK_HERE);
-    cx=m[0].x+8;cy=m[0].y;tap(KEY_A);assert(u[second].order==ORDER_ATTACK_MOVE);
+    cx=m[0].x+8;cy=m[0].y;tap(KEY_A);
+    for(int i=0;i<SC64_COMMAND_DELAY_UPDATES && u[second].order!=ORDER_ATTACK_MOVE;i++)game_update(0,0);
+    assert(u[second].order==ORDER_ATTACK_MOVE);
     /* A friendly actor on a patch keeps existing selection priority. */
     int overlapped=spawn_unit(SIDE,U_MARINE,m[0].x,m[0].y);assert(overlapped>=0);
     clear_selection();u[second].selected=1;cx=m[0].x;cy=m[0].y;tap(KEY_A);

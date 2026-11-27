@@ -21,7 +21,7 @@ static void race_guardian_transform(int slot, int type, int hp, int maxhp,
     Unit *q=&u[slot];
     q->type=type; q->raw_type=raw; q->hp=hp; q->maxhp=maxhp;
     q->armor=sc64_race_unit_armor(type); q->shield=0; q->shield_remainder=0;
-    q->order=ORDER_IDLE; q->target=target; q->tx=q->x; q->ty=q->y;
+    q->order=ORDER_IDLE; q->target=target; q->tx=q->x; q->ty=q->y; SC64_CMD_FORGET(slot);
     q->carry=0; q->build=-1; q->work_timer=timer; q->flags=0; q->cd=0;
     q->path_timer=0; q->path_retry=0; q->path_x=q->x; q->path_y=q->y;
     /* Same owner and position keep the spatial and target indexes valid.

@@ -384,9 +384,17 @@ static int check_target_owner(int building, int slot, int owner)
              building ? "structure" : "unit", owner, ui_action, hostile);
     if ((ui_action == UI_A_ATTACK) != hostile) return fail(message);
     press(KEY_A);
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].order == ORDER_ATTACK_MOVE &&
-            dist2(u[i].tx, u[i].ty, x, y) < 24 * 24) attacked = 1;
+    /* The player's attack-move lands after the command delay. */
+    for (int k = 0; k <= 5 && !attacked; ++k) {
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].order == ORDER_ATTACK_MOVE &&
+                dist2(u[i].tx, u[i].ty, x, y) < 24 * 24) attacked = 1;
+#ifdef SC64_IMPORTED_MISSION
+        if (!attacked && hostile) frame_input(0);
+#else
+        break;
+#endif
+    }
     if (attacked != hostile || (hostile && (!ping_life || ping_color != C_RED ||
                                             ping_x != x || ping_y != y)))
         return fail(message);
@@ -911,7 +919,13 @@ static int check_field_controls_races(void)
         if (ui_action != UI_A_MOVE)
             return fail("races: open ground does not offer a move");
         press(KEY_A);
-        if (!u[worker].selected || u[worker].order != ORDER_MOVE || ping_color != C_GREEN)
+        if (!u[worker].selected || ping_color != C_GREEN)
+            return fail("races: A on open ground did not acknowledge a move");
+#ifdef SC64_IMPORTED_MISSION
+        /* The player's Move lands after the command delay. */
+        for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES && u[worker].order != ORDER_MOVE; ++k) frame_input(0);
+#endif
+        if (u[worker].order != ORDER_MOVE)
             return fail("races: A on open ground did not move the worker");
         press(KEY_SELECT);
         if (selected_count() || screen != SCREEN_PLAY) return fail("races: SELECT did not drop the selection");
