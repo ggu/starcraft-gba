@@ -1234,6 +1234,46 @@ class LabMeasureTest(unittest.TestCase):
         series['max_units'] = 100
         self.assertEqual(metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING)[0]['damage_values'], [3, 6])
 
+    def test_hit_sources_decide_whose_fight_it_is(self):
+        pos = {sf: (100, 100) for sf in range(0, 80)}
+        marine = {sf: 40.0 for sf in range(0, 80)}
+        ling = {sf: 35.0 - 6 * len([t for t in (20, 36) if t <= sf]) for sf in range(0, 80)}
+
+        def measure(applied, hp=None, others=None, removals=()):
+            series = as_gba(walk(pos, hp=hp or {1: marine, 2: ling},
+                                 others=others or [(2, metrics.ZERGLING, 4, 150, 100)]), removals)
+            for frame in series['frames']:
+                frame['live'] = {1: 0, 2: 3, 4: 3}
+            series['applied'], series['max_units'] = applied, 100
+            return metrics.lab_attack_measure(series, 1, 5, metrics.ZERGLING, unit_raw=[0, 0, 0, metrics.ZERGLING])[0]
+        # The Zergling's drops came from another owner: none is the subject's, so they give no
+        # damage, cooldown or range (a fight, so those checks are unmeasured).
+        m = measure([(26, 2, 6, 0, 29, 9, 2), (46, 2, 6, 0, 23, 9, 2)])
+        self.assertEqual((m['hits'], m['damage'], m['gaps'], m['foe_combat']), (0, None, [], True))
+        # The subject's own: credited, and an applied 6 sampled as a 5 (a regenerated point) reads 6.
+        regen = {sf: 35.0 - 6 * (sf >= 20) - 5 * (sf >= 36) for sf in range(0, 80)}
+        m = measure([(26, 2, 6, 0, 29, 0, 0), (46, 2, 6, 0, 24, 0, 0)], hp={1: marine, 2: regen})
+        self.assertEqual((m['damage_values'], m['gaps']), ([6], [16]))
+        # A kill in the subject's reach by another owner's lethal hit is no fight of the subject's.
+        gone = {sf: 40.0 for sf in range(0, 28)}
+        m = measure([(35, 4, 40, 0, 0, 9, 2)], hp={1: marine, 2: {sf: 35.0 for sf in range(0, 80)}, 4: gone},
+                    others=[(2, metrics.ZERGLING, 4, 900, 100), (4, metrics.DRONE, 4, 160, 100)],
+                    removals=[('U', 35, 4, 4, 160, 100, 0, None, 40, metrics.DRONE, 0, None, None)])
+        self.assertFalse(m['combat'])
+        # A hit taken whose record names a source of another type is no counter damage of the foe's.
+        hit = {sf: 40.0 - 5 * (sf >= 28) for sf in range(0, 80)}
+        m = measure([(35, 1, 5, 0, 35, 7, 3)], hp={1: hit, 2: {sf: 35.0 for sf in range(0, 80)}},
+                    others=[(2, metrics.ZERGLING, 4, 130, 100)])
+        self.assertEqual((m['counter_values'], m['counter_damage']), ([], None))
+        m = measure([(35, 1, 5, 0, 35, 3, 3)], hp={1: hit, 2: {sf: 35.0 for sf in range(0, 80)}},
+                    others=[(2, metrics.ZERGLING, 4, 130, 100)])
+        self.assertEqual(m['counter_values'], [5])
+
+    def test_the_self_gate_validates_applied_hit_records(self):
+        import sc64_parity_selfgate
+        self.assertTrue(sc64_parity_selfgate.record_ok(b'DA 180 0 10 0 3 1'))
+        self.assertFalse(sc64_parity_selfgate.record_ok(b'DA 180 0 10'))
+
     def test_a_matched_live_removal_outweighs_a_rebirth(self):
         pos = {sf: (100, 100) for sf in range(0, 80)}
         obs = [metrics.observation('lab.survival', 'Marine', 50, 46, 54, '+-4', True, [], provenance='n64-ram', n_runs=2)]
