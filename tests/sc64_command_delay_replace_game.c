@@ -64,9 +64,54 @@ static void player_move(int x, int y)
     assert(mode == MODE_NORMAL);
 }
 
+/* The formation's direct building and door test matches a freshly built
+ * walk grid on every cell. */
+static void check_footprints(const char *where)
+{
+    int cells = 0, built = 0;
+    build_path_grid();
+    assert(path_grid_valid);
+    for (int row = 0; row < MAP_ROWS; ++row)
+        for (int col = 0; col < MAP_COLS; ++col) {
+            int open = !terrain_blocked(col, row), covered = sc64_formation_cell_built(col, row);
+            if (SC64_GRID_GET(path_walkable, col + row * MAP_COLS) != (open && !covered)) {
+                fprintf(stderr, "%s: cell %d,%d grid %d terrain open %d covered %d\n", where, col, row,
+                        (int)SC64_GRID_GET(path_walkable, col + row * MAP_COLS), open, covered);
+                abort();
+            }
+            ++cells; built += open && covered;
+        }
+    printf("%s: %d cells match the walk grid, %d open cells under buildings or doors\n",
+           where, cells, built);
+    assert(built > 0);
+}
+
+static void launch_t4(void)
+{
+    game_init();
+    held_keys = 0;
+    press(KEY_A);
+    press(KEY_RIGHT);
+    press(KEY_DOWN);
+    press(KEY_A);
+    press(KEY_START);
+    assert(screen == SCREEN_PLAY && race_t4_active());
+    for (int k = 0; k < 30; ++k) input(0);
+}
+
 int main(void)
 {
+    launch_t4();
+    int doors = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        doors += b[i].alive && sc64_race_t4_is_door(b[i].type) && sc64_t4_building_collidable(i);
+    assert(doors > 0);
+    check_footprints("T4 closed doors");
+
     launch_t1();
+    assert(spawn_build(SIDE, B_COMMAND, u[2].x + 120, u[2].y + 60, 0) >= 0);
+    assert(spawn_build(SIDE, B_DEPOT, u[2].x + 40, u[2].y + 120, 0) >= 0);
+    check_footprints("T1 with buildings");
     int marine = player_marine(0), witness = player_marine(1);
 
     /* Put a player Dropship in slot 22 (an idle Zergling far from the
