@@ -2761,6 +2761,74 @@
   {
    "key": "t1-move:move.arrival_last:Marine x5",
    "gba": 74
+  },
+  {
+   "key": "tech-terran:tech.build_time:Academy",
+   "gba": 1199.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Armory",
+   "gba": 1199.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Barracks",
+   "gba": 1199.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Bunker",
+   "gba": 449.6
+  },
+  {
+   "key": "tech-terran:tech.build_time:Comsat Station",
+   "gba": -999999
+  },
+  {
+   "key": "tech-terran:tech.build_time:Engineering Bay",
+   "gba": 899.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Factory",
+   "gba": 1199.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Missile Turret",
+   "gba": 449.6
+  },
+  {
+   "key": "tech-terran:tech.build_time:Refinery",
+   "gba": 599.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Science Facility",
+   "gba": 1199.2
+  },
+  {
+   "key": "tech-terran:tech.build_time:Starport",
+   "gba": 1049.6
+  },
+  {
+   "key": "tech-terran:tech.build_time:Supply Depot",
+   "gba": 599.2
+  },
+  {
+   "key": "tech-terran:tech.cost:Comsat Station",
+   "gba": -999999
+  },
+  {
+   "key": "tech-terran:tech.cost:Science Vessel",
+   "gba": -999997
+  },
+  {
+   "key": "tech-terran:tech.cost:Valkyrie",
+   "gba": -999999
+  },
+  {
+   "key": "tech-terran:tech.train_time:Science Vessel",
+   "gba": -999997
+  },
+  {
+   "key": "tech-terran:tech.train_time:Valkyrie",
+   "gba": -999999
   }
  ]
 }

@@ -1600,7 +1600,10 @@ ABSENT = -999999
 # Like ABSENT it is a marker, never a measurement: it inherits KNOWN only from the same marker in
 # the baseline, so a run that fought where the baseline recorded no fight (or the reverse) fails.
 OFF_TARGET = -999998
-MARKERS = (ABSENT, OFF_TARGET)
+# GBA value of a tech-lab check whose product the engine has but refused to make (its runner
+# command never taken: a prerequisite or rule the N64 does not have). A marker like the others.
+REFUSED = -999997
+MARKERS = (ABSENT, OFF_TARGET, REFUSED)
 
 
 def absent_values(golden, values):
@@ -1916,3 +1919,8 @@ SCENARIOS['bb-train'] = {'title': 'Blood Bath: computer train and build times (p
 # frame streams, runner arguments and per-player observations.
 import sc64_parity_skirmish  # noqa: E402
 SCENARIOS.update(sc64_parity_skirmish.scenarios())
+
+# Tech-tree production labs (tools/sc64_parity_tech.py): the human's own build, train and add-on
+# times and costs, from a bank-edited Blood Bath run.
+import sc64_parity_tech  # noqa: E402
+SCENARIOS.update(sc64_parity_tech.scenarios())

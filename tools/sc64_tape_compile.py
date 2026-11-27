@@ -114,6 +114,24 @@ ORDERS = {
     'stop': ('c_down', False),
 }
 
+# Production menus (production-input spike, 2026-11-27): a selected worker's or building's
+# wheel button opens a 3 x 3 grid whose highlight starts on the centre; each stick push
+# (PUSH_STEPS at full stick, then PUSH_GAP idle) moves it one cell, and A takes the cell.
+# A building then follows the cursor until A places it. Evidence that a press took: a
+# worker's order byte (+0x4D) reads PlaceBuilding one tick after the placing A; a
+# producer's queue (+0x94, five u16 slots, 228 = empty) holds the unit after the training A.
+MENU_OPEN = 40          # steps after the wheel button before the first push
+PUSH_STEPS, PUSH_GAP = 10, 30
+CELLS = {'c': (), 'n': ('up',), 'ne': ('up', 'right'), 'e': ('right',), 'se': ('down', 'right'),
+         's': ('down',), 'sw': ('down', 'left'), 'w': ('left',), 'nw': ('up', 'left')}
+PUSH_STICK = {'up': (0, -FAST), 'down': (0, FAST), 'left': (-FAST, 0), 'right': (FAST, 0)}
+WHEEL_BUTTONS = ('c_left', 'c_right', 'c_up', 'c_down')
+ROW_ORDER, ROW_QUEUE = 0x4D, 0x94
+ORDER_PLACE_BUILDING = 30
+QUEUE_EMPTY = 228
+QUEUE_SLOTS = 5
+CONFIRM_MAX = 30        # steps (about 9 ticks) for the evidence to show
+
 # Menu routes from power-on, as the S4 tapes reach them (t1-move, bb-income).
 BOOT_TITLE = [(700, 0), (10, 'start'), (290, 0), (10, 'start'), (290, 0), (10, 'start'), (290, 0), (10, 'start'),
               (1000, 0), (1000, 0), (290, 0)]
@@ -401,6 +419,19 @@ class Tape:
         self.untilw('y', 'ge', wy - REACH, 1)
         self.untilw('y', 'lt', wy + REACH + 1, 1)
 
+    def menu(self, wheel, cell):
+        """Open a production grid with its wheel button and highlight one cell (A not pressed)."""
+        if wheel not in WHEEL_BUTTONS:
+            raise ScenarioError(f'wheel must be one of {WHEEL_BUTTONS}')
+        if cell not in CELLS:
+            raise ScenarioError(f'cell must be one of {sorted(CELLS)}')
+        self.guard()
+        self.press(wheel)
+        self.pad(MENU_OPEN)
+        for push in CELLS[cell]:
+            self.pad(PUSH_STEPS, 0, *PUSH_STICK[push])
+            self.pad(PUSH_GAP)
+
     def cursor_to(self, wx, wy, mask=0):
         """Put the cursor over world point (wx, wy), panning first when it may be off the safe window."""
         if self.camera is None:
@@ -505,6 +536,8 @@ def compile_step(tape, step):
         tape.guard()
     elif op == 'tap':
         tape.emit('tap tick rec')
+    elif op == 'wait' and step.get('dismiss') and 'pokes' in step:
+        raise ScenarioError('a wait either dismisses boxes or repeats pokes, not both')
     elif op == 'wait' and step.get('dismiss'):
         # Mission text boxes come at unknown times: Start is pulsed only while the pause
         # halfword is set (the field-map frontend's `pulse`), for exactly STEPS steps.
@@ -513,8 +546,17 @@ def compile_step(tape, step):
         tape.step_line(f'pulse {hex_addr(PAUSE)} 2 ne 0 {steps} {BUTTONS["start"]} {BOX_PULSE[0]} 60')
     elif op == 'wait':
         steps = integer(step.get('steps'), 'steps', 1, 10000000)
+        # "pokes": guest writes repeated every "every" steps for the whole wait (holding a
+        # computer's bank at zero, say); staged like any poke.
+        pokes = step.get('pokes', [])
+        if not isinstance(pokes, list) or not all(isinstance(p, dict) for p in pokes):
+            raise ScenarioError('pokes must be a list of {"address", "data"}')
+        every = integer(step.get('every', 1000), 'every', 1, 1000) if pokes else 1000
         while steps:
-            chunk = min(steps, 1000)
+            for item in pokes:
+                address, _ = field_of(f'{item.get("address", "")}:1')
+                tape.poke(address, item.get('data'))
+            chunk = min(steps, every)
             tape.pad(chunk)
             steps -= chunk
     elif op == 'cursor':
@@ -587,6 +629,58 @@ def compile_step(tape, step):
             raise ScenarioError(f'{kind} takes no target point')
         tape.guard()
         tape.press(button, mark=step.get('mark'))
+    elif op == 'build':
+        # A selected worker places a building: grid cell, then the cursor onto the site, then A.
+        # With no cell the wheel button itself starts the placement (a Terran add-on: the
+        # building's footprint with its add-on follows the cursor). "worker" is then the building.
+        worker, _ = field_of(f'{step.get("worker", "")}:4')
+        if 'cell' in step:
+            tape.menu(step.get('wheel'), step.get('cell'))
+            tape.press('a')
+        else:
+            if step.get('wheel') not in WHEEL_BUTTONS:
+                raise ScenarioError(f'wheel must be one of {WHEEL_BUTTONS}')
+            tape.guard()
+            tape.press(step['wheel'])
+            tape.pad(MENU_OPEN)
+        tape.cursor_to(*point(step.get('at'), 'at'))
+        if step.get('shot') is not None:   # the footprint at the site, before the placing A
+            if not name_ok(step['shot']):
+                raise ScenarioError('shot needs a plain name')
+            tape.emit(f'shot {step["shot"]}')
+            tape.pad(2)
+        tape.press('a', mark=step.get('mark'))
+        confirm = step.get('confirm')
+        if confirm is not None:
+            # Other evidence (an add-on's own new row, say): a field reaching a value.
+            if not isinstance(confirm, dict) or confirm.get('cmp') not in OPS:
+                raise ScenarioError(f'confirm needs field, cmp in {OPS} and value')
+            address, width = field_of(confirm.get('field'))
+            tape.until(address, width, confirm['cmp'], integer(confirm.get('value', 0), 'value', 0, (1 << 8 * width) - 1),
+                       integer(confirm.get('max', CONFIRM_MAX), 'max', 1, 100000))
+        else:
+            order = integer(step.get('order', ORDER_PLACE_BUILDING), 'order', 0, 255)
+            tape.until(worker + ROW_ORDER, 1, 'eq', order, CONFIRM_MAX)
+    elif op == 'train':
+        # A selected producer queues a unit: grid cell, then A; the queue slot must go from
+        # empty to exactly that unit (its cartridge id), so a push onto another cell stops the run.
+        producer, _ = field_of(f'{step.get("producer", "")}:4')
+        slot = integer(step.get('slot', 0), 'slot', 0, QUEUE_SLOTS - 1)
+        unit = integer(step.get('unit'), 'unit', 0, QUEUE_EMPTY - 1)
+        if step.get('mark') is not None:
+            # Costs are read by the product a mark names (tools/sc64_parity_tech.py): it must be this unit.
+            import sc64_parity_tech
+            if sc64_parity_tech.mark_product(step['mark']) != unit:
+                raise ScenarioError(f'mark {step["mark"]!r} does not name unit {unit} '
+                                    f'(want {sc64_parity_tech.mark_name(unit)!r}, digits allowed after it)')
+        tape.menu(step.get('wheel', 'c_right'), step.get('cell'))
+        tape.until(producer + ROW_QUEUE + 2 * slot, 2, 'eq', QUEUE_EMPTY, 1)   # the slot was free
+        tape.press('a', mark=step.get('mark'))
+        tape.until(producer + ROW_QUEUE + 2 * slot, 2, 'eq', unit, CONFIRM_MAX)
+        # The grid stays open after a unit is queued (the stick would move its highlight):
+        # B closes it.
+        tape.press('b')
+        tape.pad(MENU_OPEN)
     elif op == 'press':
         tape.press(step.get('button'), mark=step.get('mark'))
     elif op == 'hold':

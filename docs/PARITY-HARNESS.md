@@ -212,6 +212,7 @@ judged). With no golden files the scenarios skip; if everything skipped while
 | `t1-move` | Fresh boot to Wasteland, box-select the five Marines, C-Right (Move) then A on open ground | `terran`, `--scenario move`: the five Marines joined by type, owner and halved position get one group order to the target | cruise speed, first and last arrival, group spread; command latency (report only) |
 | `bb-income` | Scenario → Blood Bath, human Zerg, computer Terran, start; no further input | `zerg-z10`, `--scenario income`: Blood Bath, human Zerg against one Terran computer, no command | minerals gathered per frame over 2,000 frames, first delivery, minerals per delivery |
 | `t1-fields` | The campaign launch tape for T1 (below) recording the fog, image, sprite and bullet regions, then the t1-move box select and Move, then Stop, Hold, a second Move and an attack-move | `terran`, `--scenario move`, as t1-move | the t1-move checks on the first Move; order timing (command to Move, to the first and last Marine back in an idle order); fog (first newly visible tile, first dropped tile, visible and explored counts before the Stop); the Marine walk cycle (N64: the image's iscript Walking loop; GBA: stride phases) |
+| `tech-terran` | Blood Bath lobby state, human Terran against one Zerg computer; the human bank edited, the computer's held at zero; one SCV places every building, then add-ons and every unit ([below](#tech-tree-labs)) | `terran`, `--scenario match` with `--tcmd` and `--starve`: the same lobby and seed, bank and starvation, each product at the N64 frame it was paid for | build and train time per product, mineral cost (gating), gas cost (report) |
 | `sk-*` (17 lobbies) | Lobby state → race rows → Start after a delay; no further input, to the end of the match | the human race's profile, `--scenario match`: the same races and the N64 seed, no command | start corners; each computer's build order, first wave; gathered minerals, supply, workers at 1,000–8,000 frames; minerals per frame by worker count (report); each player's elimination |
 
 The human player is resolved per scenario: T1's Marine owner; in Blood Bath
@@ -329,6 +330,35 @@ coverage are in
 Hit points are the 8.8 field at `+0x08`, divided by 256. A capture whose
 tape writes guest memory (`poke`) is labelled `n64-staged`.
 
+## Tech-tree labs
+
+`tech-*` scenarios (phase 2 of the [coverage map](audits/2026-11-27-parity-coverage-map.md);
+results in [`audits/2026-11-27-parity-tech-labs.md`](audits/2026-11-27-parity-tech-labs.md))
+measure what the human's own production costs and takes. The tape edits the human bank
+(10,000 minerals and gas) and zeroes the computer's bank every 200 steps, so the computer
+never builds or attacks; both are guest edits, so the golden is `n64-staged`. Measurement
+is in `tools/sc64_parity_tech.py`, the same rules for both engines:
+
+| Check | N64 | GBA | Band |
+| --- | --- | --- | --- |
+| `tech.build_time` | a human building row's birth (status bit clear) to completion (bit set) | a building's birth to its under-construction flag clearing | ±2 frames |
+| `tech.train_time` | a human unit row's birth to completion | the producer's queue progress reading 1 to the unit's birth | ±2 frames |
+| `tech.cost` | the minerals debited, corrected for minerals gathered in the tick, for the command a tape mark names (`supply_depot2`: the product's name in lower case with underscores, digits allowed after it): a building or add-on at its first birth after the mark (the worker pays on arrival), a unit at the first debit within 12 frames after it. A debit another mark could also claim counts for neither | the debit within one step of the step the command was taken (a worker's building: the step its foundation was seen), corrected by the runner's gather log (required); a debit another command's window holds counts for neither | exact |
+| `tech.gas_cost` | the same for gas (report only: the gas bank is a candidate field) | | exact |
+
+The GBA run issues each product at the source frame the N64 paid for it: a building at
+the halved site of the N64 building, with any human worker; a unit or add-on at the human
+building nearest the halved N64 producer (an add-on's producer is the building at the
+add-on's centre less (96, 16)). A command waits until the engine takes it, because a
+prerequisite can finish later here (a worker's building counts as taken when that worker
+commits its foundation, and is given again if it is cancelled on arrival); a cartridge id
+with no engine identity or production
+path reads `absent`, and a product the engine has but still refuses 6,000 steps later
+reads `refused` (a marker, like `absent`, that inherits KNOWN only from the same marker).
+Both are listed defects, never skips. The N64 production queue (`+0x94`, five u16 slots,
+228 empty, head index byte `+0xA0`) is a candidate field: it only places the GBA commands
+and is never a check.
+
 ## Tape compiler
 
 `tools/sc64_tape_compile.py SCENARIO.json -o TAPE` turns a scenario file
@@ -350,8 +380,10 @@ so both stay in the private fixture home; the compiler and its tests
 | `select`, `cursor` | Cursor onto a world point (panning with Z first when needed); `select` then presses A and checks the selection list (below) |
 | `box` | A held while the cursor drags to the second corner |
 | `order` | `move` (C-Right), `attack` (B), `hold` (C-Left), `stop` (C-Down) at the point under the cursor; `"mark": NAME` puts `# mark NAME` right before the issuing press |
+| `build` | A production grid (`wheel` button, then `cell` `c`, `n`, `ne`, … one stick push per cell from the centre, A), the cursor onto the site, A; the worker's order (`worker`, a row) must read PlaceBuilding (30). With no `cell` the wheel button itself starts the placement (a Terran add-on); `confirm` names other evidence (a field, `cmp`, value) |
+| `train` | A producer's grid (`wheel`, default C-Right) and `cell`, A; the queue slot (`slot`: the circular queue's units so far mod 5) must be free before and hold exactly `unit` (the cartridge id) after; B closes the grid |
 | `boxes N` | Wait for each text box and pulse Start until the pause halfword clears |
-| `wait`, `"dismiss": true` | Idle steps; with `dismiss`, Start is pulsed only while a box is open (`pulse`) |
+| `wait`, `"dismiss": true` | Idle steps; with `dismiss`, Start is pulsed only while a box is open (`pulse`); with `pokes` (and `every`), those guest writes are repeated every `every` steps (staged) |
 | `guard`, `tap`, `save`, `shot`, `peek`, `until`, `hold`, `press`, `poke` | One frontend line each, validated |
 
 `select` needs `"row"`, the KSEG0 address of the subject's unit row (table
