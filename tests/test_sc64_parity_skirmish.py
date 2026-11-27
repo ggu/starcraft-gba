@@ -781,7 +781,12 @@ class FrameOffsets(unittest.TestCase):
         allowed = self.golden(17045, 17043, 17047, also_ok=[sk.NEVER])
         self.assertEqual(self.verdict([sk.NEVER, 15950, 16010], [sk.NEVER, 16000, 15900], allowed), 'KNOWN')
         self.assertEqual(self.verdict([sk.NEVER, 12000, 12000], [sk.NEVER, 16000, 15900], allowed), 'REGRESSION')
-        self.assertEqual(self.verdict([17045, 12000, 12000], [sk.NEVER] * 3, wave), 'REGRESSION')
+        # A check that is not a timing (no time for NEVER): an in-band offset keeps it KNOWN ...
+        self.assertEqual(self.verdict([17045, 12000, 12000], [sk.NEVER] * 3, wave), 'KNOWN')
+        # ... while for a timing the far-early offsets are judged on their own.
+        timed = dict(self.golden(17045, 17043, 17047, check='attack.first_wave', subject='cpu Zerg'),
+                     gba={'horizon': 17600})
+        self.assertEqual(self.verdict([17045, 12000, 12000], [sk.NEVER] * 3, timed), 'REGRESSION')
         self.assertEqual(self.verdict([17045, 17044, 17046], [sk.NEVER] * 3, wave), 'IMPROVED')
         # A checkpoint some offsets no longer reach (the GBA match ended) is noise while another offset
         # keeps the baseline's outcome; the match's end is gated by its own result line.
@@ -870,6 +875,9 @@ class FrameOffsets(unittest.TestCase):
         # An offset whose match ended before the checkpoint now reaches it: counts are not timings.
         self.assertEqual(self.verdict([200, 116, 132], [sk.ENDED, 116, 132]), 'KNOWN')
         self.assertEqual(self.verdict([200, 150, 150], [sk.ENDED, 116, 132]), 'REGRESSION')
+        # Every offset now reaches it where none did: one in the band keeps it KNOWN; none in it fails.
+        self.assertEqual(self.verdict([84, 118, 118], [sk.ENDED] * 3), 'KNOWN')
+        self.assertEqual(self.verdict([116, 118, 118], [sk.ENDED] * 3), 'REGRESSION')
 
     def test_a_seed_that_never_saw_the_event_in_a_finite_envelope(self):
         # sk-ffa-w37: this seed's own band is NEVER, other seeds made the envelope finite.
@@ -929,6 +937,11 @@ class FrameOffsets(unittest.TestCase):
             # A line of a scenario this checkout does not know is kept as it is.
             path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': [1, 2]}]}))
             self.assertEqual(sc64_parity.load_baseline(path)['gone-lab:x:s']['gba_offsets'], [1, 2])
+            # Finite but absurd values would overflow a spread (and the noise allowance): refused.
+            path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 1e308, 'gba_offsets': [1e308, -1e308, 1e308]}]}))
+            with self.assertRaises(SystemExit):
+                sc64_parity.load_baseline(path)
+            self.assertEqual(sc64_parity.offset_noise({self.KEY: {'gba': 1e308, 'gba_offsets': [1e308, -1e308, 1e308]}}), {})
             path.write_text(json.dumps({'known': [{'key': 'gone-lab:x:s', 'gba': 1, 'gba_offsets': 1}]}))
             with self.assertRaises(SystemExit):
                 sc64_parity.load_baseline(path)

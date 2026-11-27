@@ -321,7 +321,7 @@ def offset_noise(baseline):
             continue   # only scenarios this checkout runs at offsets, whose sentinels it knows
         values = [v for v in line.get('gba_offsets', ()) if v not in spec.get('sentinels', ()) and
                   v not in metrics.MARKERS]
-        if len(values) > 1:
+        if len(values) > 1 and all(finite_number(v) for v in values):
             family = check_family(key.split(':')[1])
             noise[family] = max(noise.get(family, 0), max(values) - min(values))
     return noise
@@ -493,7 +493,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 row['why'] = ('outside the band only at frame offset ' +
                               offset_label(k for k, g in zip(offsets, gaps) if g) + ' (GBA frame noise); '
                               'no baseline line yet')
-        elif untimed and not {kind(v) for v in spread} & was_kinds:
+        elif untimed and not {kind(v) for v in spread} & was_kinds and min(gaps) > 0:
+            # (An offset now inside the band, a checkpoint the match reaches again, is not this.)
             # Every offset changed to or from an outcome with no time: changed at any distance.
             now, was = value, base[0]
             row['verdict'] = 'REGRESSION'
@@ -723,11 +724,16 @@ def tables_result(run, out):
          'provenance': 'rom-table', 'verdict': 'REPORT', 'gating': False}]}
 
 
+BASELINE_LIMIT = 1e9   # every GBA value (frames, minerals, counts, rates; NEVER is 999999) is far below
+
+
 def finite_number(v):
+    """A number a baseline line may hold: finite and within BASELINE_LIMIT, so no spread of them
+    overflows."""
     if not isinstance(v, (int, float)) or isinstance(v, bool):
         return False
     try:
-        return math.isfinite(v)
+        return math.isfinite(v) and abs(v) <= BASELINE_LIMIT
     except OverflowError:   # an integer past the float range
         return False
 
