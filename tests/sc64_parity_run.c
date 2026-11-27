@@ -79,6 +79,14 @@ static void sc64_pt_hit(int target, int damage, int source_type, int source_owne
 static void sc64_pt_sound(int kind, int raw, int slot, int x, int y);
 static int sc64_pt_text_box(unsigned trigger, unsigned action, unsigned long string_id, int opened);
 #define SC64_TEST_HIT_OBSERVER(t, d, st, so) sc64_pt_hit((t), (d), (st), (so))
+/* What a hit applied: a guard declared after the observer snapshots the target, and its
+ * cleanup runs on every return from the damage path, invincible and burrowed targets included. */
+typedef struct { int target, source_type, source_owner, hp, shield, alive; } Sc64PtApplied;
+static Sc64PtApplied sc64_pt_applied_begin(int target, int source_type, int source_owner);
+static void sc64_pt_applied_done(Sc64PtApplied *hit);
+#define SC64_TEST_HIT_APPLIED(t, st, so) \
+    Sc64PtApplied sc64_pt_applied_guard __attribute__((cleanup(sc64_pt_applied_done))) = \
+        sc64_pt_applied_begin((t), (st), (so))
 #define GAME_AUDIO_REQUEST(kind, raw, slot, x, y) sc64_pt_sound((kind), (raw), (slot), (x), (y))
 #define SC64_TEXT_BOX_POSTED(row, pushed) \
     sc64_pt_text_box((row)->trigger, (row)->action, (row)->string_id, (pushed))

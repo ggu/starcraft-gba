@@ -5322,6 +5322,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #ifdef SC64_TEST_HIT_OBSERVER
     SC64_TEST_HIT_OBSERVER(target, damage, source_type, source_owner);
 #endif
+#ifdef SC64_TEST_HIT_APPLIED
+    SC64_TEST_HIT_APPLIED(target, source_type, source_owner);   /* host-only scope guard */
+#endif
 #ifdef SC64_Z6_RUNTIME
     if (!(hit_flags & SC64_HIT_SKIP_HALLUCINATION_SCALE)) damage = race_z6_hallucination_incoming_damage(target, damage);
 #endif

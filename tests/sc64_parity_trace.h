@@ -68,6 +68,11 @@
  *   D target damage source_type source_owner   a hit as the damage path saw
  *        it (SC64_TEST_HIT_OBSERVER), before shields, armour and hallucination
  *        scaling; target is a unit slot or MAX_UNITS + a building slot
+ *   DA target hp_lost shields_lost hp_after source_type source_owner
+ *        what that hit applied, read when the damage path returned: written
+ *        only for a hit that took hit points or shields or killed (a rejected
+ *        hit, an invincible, burrowed or loaded target, writes none); hp_after
+ *        is at most 0 for a kill
  *   A kind raw slot x y on_screen              a sound the observer asked for,
  *        before the on-screen, budget and voice gates; Protoss warp-start
  *        requests (game_audio_foundation) are not recorded (kind is the
@@ -163,6 +168,42 @@ static void sc64_pt_hit(int target, int damage, int source_type, int source_owne
 {
     ++sc64_pt.damage;
     sc64_pt_event('D', target, damage, source_type, source_owner, 0, 0);
+}
+
+/* The target as the damage path found it, and what it lost there: a DA record per hit that
+ * took hit points or shields or killed (an invincible, burrowed or loaded target, or a rejected
+ * packet, takes nothing and gets none). */
+static void sc64_pt_actor(int target, int *hp, int *shield, int *alive)
+{
+    *hp = *shield = *alive = 0;
+    if (target >= 0 && target < MAX_UNITS) {
+        *hp = u[target].hp; *alive = u[target].alive != 0;
+#ifdef SC64_RACES
+        *shield = u[target].shield;
+#endif
+    } else if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS) {
+        *hp = b[target - MAX_UNITS].hp; *alive = b[target - MAX_UNITS].alive != 0;
+#ifdef SC64_RACES
+        *shield = b[target - MAX_UNITS].shield;
+#endif
+    }
+}
+
+static Sc64PtApplied sc64_pt_applied_begin(int target, int source_type, int source_owner)
+{
+    Sc64PtApplied hit = {target, source_type, source_owner, 0, 0, 0};
+    sc64_pt_actor(target, &hit.hp, &hit.shield, &hit.alive);
+    return hit;
+}
+
+static void sc64_pt_applied_done(Sc64PtApplied *hit)
+{
+    int hp, shield, alive;
+    if (!hit->alive) return;
+    sc64_pt_actor(hit->target, &hp, &shield, &alive);
+    if (hp < hit->hp || shield < hit->shield || !alive)
+        sc64_pt_event('G', hit->target, hit->hp - hp, hit->shield - shield, alive ? hp : (hp < 0 ? hp : 0),
+                      hit->source_type, hit->source_owner);
 }
 
 static void sc64_pt_sound(int kind, int raw, int slot, int x, int y)
@@ -315,14 +356,14 @@ static void sc64_pt_open(FILE *out, const char *profile, const char *scenario, c
     sc64_pt_write("#sc64-parity-trace 1\n");
     sc64_pt_write("H schema=sc64-parity-trace/1 profile=%s scenario=%s attack=%s\n",
                   profile, scenario, attack_mode);
-    sc64_pt_write("H max_units=%d max_buildings=%d max_minerals=%d owners=%d cell_cap=%u\n",
+    sc64_pt_write("H max_units=%d max_buildings=%d max_minerals=%d owners=%d cell_cap=%u neutral=%d\n",
                   MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS,
 #ifdef SC64_RACES
                   5,
 #else
                   1,
 #endif
-                  (unsigned)SC64_PT_CELL_CAP);
+                  (unsigned)SC64_PT_CELL_CAP, NEUTRAL);
     sc64_pt_write("H time=steps sf=step*4/5 updates_per_source_frame=5/4\n");
 }
 
@@ -479,6 +520,7 @@ static void sc64_pt_flush_events(void)
         const Sc64PtEvent *ev = &sc64_pt.events[i];
         switch (ev->tag) {
         case 'D': sc64_pt_write("D %d %d %d %d\n", ev->v[0], ev->v[1], ev->v[2], ev->v[3]); break;
+        case 'G': sc64_pt_write("DA %d %d %d %d %d %d\n", ev->v[0], ev->v[1], ev->v[2], ev->v[3], ev->v[4], ev->v[5]); break;
         case 'A': sc64_pt_write("A %d %d %d %d %d %d\n", ev->v[0], ev->v[1], ev->v[2], ev->v[3], ev->v[4], ev->v[5]); break;
         default: sc64_pt_write("X %d %d %d %d\n", ev->v[0], ev->v[1], ev->v[2], ev->v[3]); break;
         }

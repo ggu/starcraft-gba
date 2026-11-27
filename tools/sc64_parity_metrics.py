@@ -992,8 +992,10 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # points left, or one that belongs to the slot after an owner change in the same source
     # frame) leaves the subject lost and survival unmeasured.
     vanished = own[-1][0] < last_sf and own[-1][1] > 0
-    confirmed = (series.get('source') != 'gba' or (gone is not None and gone[6] <= 0) or
-                 series['lifetime_end'].get(uid) == 'reborn')
+    # The subject's own matched removal decides: one with hit points left is no death, even
+    # when a birth reuses the slot in the same source frame.
+    confirmed = (series.get('source') != 'gba' or (gone[6] <= 0 if gone is not None else
+                                                   series['lifetime_end'].get(uid) == 'reborn'))
     subject_lost = not subject_changed and vanished and not confirmed
     if not subject_changed and not subject_lost and (own[-1][0] < last_sf or own[-1][1] <= 0):
         death = next((sf for sf, hp in own if hp <= 0), own[-1][0] + 1)
@@ -1039,6 +1041,36 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         gaps_of[vid].update({sf: max(g, gaps_of[vid].get(sf, 1))
                              for sf, g in drop_gaps(hp_track(series, vid, t0, end, key='shield')).items()})
 
+    # The trace's hit records: what each accepted hit applied (DA: hp lost, shields lost, hp
+    # after), or, in traces from before those records, the damage path's D records. Burn never
+    # passes through the damage path, and a rejected hit (an invincible, burrowed or loaded
+    # target) writes no DA record. Each: (step, target, hp lost, shields lost, hp after or None,
+    # source engine type, source owner).
+    max_units = series.get('max_units')
+    if series.get('applied') is not None:
+        records = [r for r in series['applied'] if r[2] > 0 or r[3] > 0 or r[4] <= 0]
+    else:
+        records = [(st, tg, dmg, 0, None, stype, sown) for st, tg, dmg, stype, sown in series.get('hits', [])]
+
+    def slot_of(k):
+        return k if isinstance(k, int) else int(str(k).split('.')[0])
+
+    def ours_source(sowner):
+        # A hit record names its source's live owner: an enemy's hit on an enemy is not the
+        # subject's fight (records without a known subject owner pass to the positional check).
+        return human_live is None or sowner == human_live
+    # The sources of the hit records on each unit slot (and ('B', slot) building) by frame: a drop
+    # whose records all come from other owners is no fight of the subject's.
+    sources_at = {}   # (sf, slot or ('B', slot)) -> {(source owner, source engine type, lethal)}
+    for step_, target, _, _, hp_after_, stype_, sowner_ in records if max_units is not None else ():
+        key = target if target < max_units else ('B', target - max_units)
+        sources_at.setdefault(((step_ or 0) * 4 // 5, key), set()).add(
+            (sowner_, stype_, hp_after_ is not None and hp_after_ <= 0))
+
+    def others_only(sf, key, lethal_only=False):
+        # Every hit record on it in that frame (its lethal ones, with lethal_only) from another owner.
+        found = {o for o, _, lethal in sources_at.get((sf, key), ()) if lethal or not lethal_only}
+        return bool(found) and not any(ours_source(o) for o in found)
     def sole_attacker(sf, vid):
         frame = at_frame.get(sf, {})
         units, hp = frame.get('units', {}), frame.get('hp', {})
@@ -1059,7 +1091,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         # fired and then died or left inside the interval is still in reach on one of them.
         # A drop seen across a sampling gap may have come from a unit that left reach meanwhile.
         return (sole_attacker(sf, vid) and sole_attacker(sf - 1, vid)
-                and gaps_of.get(vid, {}).get(sf, 1) == 1)
+                and gaps_of.get(vid, {}).get(sf, 1) == 1 and not others_only(sf, slot_of(vid)))
     unclear = {sf for vid, got in list(victims.items()) + list(shielded.items()) for sf, _ in got if not ours(sf, vid)}
     barriers = set()
     # A killing drop leaves no exact damage, but it still splits the timing: no cooldown
@@ -1103,7 +1135,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         for key in ('hp', 'shield'):
             track_ = hp_track(series, vid, t0, end, key=key)
             for sf, _ in hits(track_, lethal=True):
-                if near_subject(sf, vid) or near_subject(sf - 1, vid):
+                if (near_subject(sf, vid) or near_subject(sf - 1, vid)) and not others_only(sf, slot_of(vid)):
                     credit(sf, sole_attacker(sf, vid) and sole_attacker(sf - 1, vid))
 
     def point_near(sf, x, y):
@@ -1126,11 +1158,8 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
 
     def burn_loss(frames):
         return (SC64_BURN_Q8 * max(1, frames) + 255) // 256
-    # The trace's weapon hits on buildings (burn never passes through the damage path): a hit on
-    # a building between two of its samples is an attack, whatever its hit points show.
-    max_units = series.get('max_units')
     building_hits = {}
-    for step_, target, *_ in series.get('hits', []) if max_units is not None else ():
+    for step_, target, *_ in records if max_units is not None else ():
         if target >= max_units:
             building_hits.setdefault(target - max_units, []).append(step_ or 0)
 
@@ -1155,7 +1184,7 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             hit = b[4] - a[4] >= 0.5 or (drop >= 0.5 and (
                 weapon_hit(k, before_.get('step'), after_.get('step')) or
                 not (burning(b[3], row[5], row[7], row[6], row[8]) and drop <= burn_loss(after_['sf'] - before_['sf']))))
-            if hit and point_near(after_['sf'], b[1], b[2]):
+            if hit and point_near(after_['sf'], b[1], b[2]) and not others_only(after_['sf'], ('B', k)):
                 credit(after_['sf'], sole_at(after_['sf'], b[1], b[2]) and sole_at(before_['sf'], b[1], b[2]))
     # GBA removals (a unit or building born and removed inside one source frame shows only here):
     # an enemy killed in reach of the subject, unless a burning building could have burned out.
@@ -1183,26 +1212,30 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                 last_hp <= burn_loss(((step or 0) - last_step) * 4 // 5) and \
                 not weapon_hit(slot, last_step, step):
             continue
-        if point_near(sf, x, y):
+        # A kill whose lethal hit records all come from another owner is not the subject's.
+        if point_near(sf, x, y) and not others_only(sf, slot if kind == 'U' else ('B', slot), lethal_only=True):
             credit(sf, sole_at(sf, x, y) and sole_at(sf - 1, x, y))
     # The trace's weapon hits (GBA D records, before shields and armour) are evidence on their
     # own, whatever the sampled hit points show (a repair or construction can offset a hit): on
     # the subject, a hit taken; on the foe, a fight with it; on another enemy or enemy building in
     # reach of the subject, an off-target fight, attributed as the drops are.
-    def slot_of(k):
-        return k if isinstance(k, int) else int(str(k).split('.')[0])
-    struck_by_record, foe_hit_by_record = False, set()
+    struck_by_record, foe_hit_by_record, first_struck = False, set(), []
+    building_turnover = [(ev[2], ev[1] or 0) for ev in series.get('events', []) if ev[0] in ('+B', '-B', 'OB', 'TB')]
+    building_turnover += [(r[2], r[1] or 0) for r in series.get('removals', []) if r[0] == 'B']
+
     # Killing hits: a removal at 0 hit points or below in the hit's own step (a removal with hit
     # points left, a Drone consumed by construction, takes over nothing).
     removed_at = {(r[2], r[1]) for r in series.get('removals', []) if r[0] == 'U' and r[6] <= 0}
     record_count = {}
     record_damage = {}
-    for step_, target, damage_, *_ in series.get('hits', []) if max_units is not None else ():
+    by_victim = {}          # (sf, row) -> source owners of the hit records on it
+    applied_hits = []       # (sf, row, hp lost, shields lost, hp after, source type, source owner)
+    for step_, target, damage_, shield_lost, hp_after, stype, sowner in records if max_units is not None else ():
         sf = (step_ or 0) * 4 // 5
         # After the pre-command sample: a hit in its frame may come before the command.
         if not t0 < sf <= end:
             continue
-        if target < max_units and (target, step_) in removed_at and target != uid:
+        if target < max_units and (target, step_) in removed_at and target != uid and (hp_after is None or hp_after <= 0):
             continue   # a killing hit: its removal record, with the victim's last position, counts it
         if target < max_units:
             # The row as last sampled before the hit, unless the slot was reborn since (a birth
@@ -1227,22 +1260,42 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
                     nearby_ambiguous.add(sf)   # a hit nobody can place: unmeasured, never absent
                 continue
             record_count[(sf, k)] = record_count.get((sf, k), 0) + 1
-            record_damage[(sf, k)] = damage_
+            record_damage[(sf, k)] = damage_ + shield_lost
+            by_victim.setdefault((sf, k), set()).add(sowner)
+            if hp_after is not None:
+                applied_hits.append((sf, k, damage_, shield_lost, hp_after, stype, sowner))
             if k == uid:
                 struck_by_record = True
+                first_struck.append(sf)
             elif enemy(k):
                 foe_hit_by_record.add((sf, k))
-            elif any_enemy(k) and (near_subject(sf, k) or near_subject(sf - 1, k)):
+            elif any_enemy(k) and (near_subject(sf, k) or near_subject(sf - 1, k)) and ours_source(sowner):
                 credit(sf, sole_attacker(sf, k) and sole_attacker(sf - 1, k))
         else:
+            # The building in the slot at the hit's engine step: the sample before it, unless a
+            # building turnover (birth, removal, owner or type change) came between that sample
+            # and the hit, when only the sample after names it; a turnover in the hit's own step
+            # leaves it unresolved.
             slot = target - max_units
-            for s_ in (sf - 1, sf):
+            before_step = at_frame.get(sf - 1, {}).get('step')
+            if any(slot_b == slot and step_b == step_ for slot_b, step_b in building_turnover):
+                nearby_ambiguous.add(sf)
+                continue
+            moved = any(slot_b == slot and (before_step is None or step_b > before_step) and step_b < step_
+                        for slot_b, step_b in building_turnover)
+            b = None
+            for s_ in ((sf,) if moved else (sf - 1, sf)):
                 b = at_frame.get(s_, {}).get('buildings', {}).get(slot)
                 if b is not None:
                     break
-            if b is None or human_building(b) or b[0] >= 8:
+            if b is None:
+                if moved:
+                    nearby_ambiguous.add(sf)
                 continue
-            if point_near(sf, b[1], b[2]):
+            if human_building(b) or b[0] >= 8:
+                continue
+            by_victim.setdefault((sf, ('B', slot)), set()).add(sowner)
+            if point_near(sf, b[1], b[2]) and ours_source(sowner):
                 credit(sf, sole_at(sf, b[1], b[2]) and sole_at(sf - 1, b[1], b[2]))
     # A weapon hit on the foe that no sampled drop of that foe shows in its frame (a unit hit
     # before its first sample, a hit absorbed in the same frame) may be one of the subject's shots:
@@ -1307,21 +1360,19 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
             return False
         gap = gaps_of.get(vid, {}).get(sf, 1)
         return 0 < dealt - round(d) <= (SHIELD_REGEN_Q8 * gap + 255) // 256
-    shield_exact = [d for vid, got in shielded.items() for sf, d in got
-                    if (vid, sf) not in clipped and not regen_masks(vid, sf, d)]
-    # Several hit records on one unit in one frame show as one drop, which can hide a wrong hit:
-    # the exact per-hit values of that unit's kind of damage are then unmeasured.
-    hp_multi = any((sf, vid) in multiple for vid, got in victims.items() for sf, _ in got)
-    shield_multi = any((sf, vid) in multiple for vid, got in shielded.items() for sf, _ in got)
-    shield_masked = any(regen_masks(vid, sf, d) for vid, got in shielded.items() for sf, d in got)
-    if shield_multi or shield_masked:
-        shield_exact = []
     hp_frames = {(sf, vid) for vid, got in victims.items() for sf, _ in got}
     landed = sorted([(sf, vid, round(d)) for vid, got in victims.items() for sf, d in got] +
                     [(sf, vid, 0) for sf, vid, _ in shield_hits if (sf, vid) not in hp_frames])
     taken = [(sf, round(d)) for sf, d in hits(own)]
-    if any((sf, uid) in multiple for sf, _ in taken):
-        taken = []   # a frame with several hits taken can hide a wrong one
+
+    def foe_source(stype):
+        cart = unit_raw[stype] if unit_raw and stype is not None and 0 <= stype < len(unit_raw) else None
+        return foe_type is None or cart == foe_type
+    # A hit taken whose records come from no unit of the foe's type was not the foe's: left out
+    # of the single-foe gate and of the values alike.
+    foreign = {sf for sf, _ in taken
+               if sources_at.get((sf, uid)) and not any(not ours_source(o) and foe_source(t)
+                                                        for o, t, _ in sources_at[(sf, uid)])}
 
     def single_foe(sf):
         # The same single living enemy in reach on the sample before the drop and on the one
@@ -1339,17 +1390,21 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
         me = units.get(uid)
         if me is None:
             return None
-        near = [k for k, u in units.items() if u[1] != human and u[1] < 8 and hp.get(k, 1) > 0
-                and math.hypot(u[2] - me[2], u[3] - me[3]) <= LAB_REACH]
+        near = [k for k, u in units.items() if u[1] != human and u[1] < 8 and not human_unit(frame, k, u)
+                and hp.get(k, 1) > 0 and math.hypot(u[2] - me[2], u[3] - me[3]) <= LAB_REACH]
         # GBA buildings live outside the unit rows (the N64 table holds them as rows already).
         near += [('B', k) for k, b in frame.get('buildings', {}).items()
-                 if b[0] != human and b[0] < 8 and math.hypot(b[1] - me[2], b[2] - me[3]) <= LAB_REACH]
+                 if b[0] != human and b[0] < 8 and not human_building(b)
+                 and math.hypot(b[1] - me[2], b[2] - me[3]) <= LAB_REACH]
         return near[0] if len(near) == 1 else None
     own_gaps = drop_gaps(own)
     # Each hit taken must come between consecutive samples with one enemy in reach.
-    taken_single = all(single_foe(sf) and own_gaps.get(sf, 1) == 1 for sf, _ in taken)
+    taken_single = all(single_foe(sf) and own_gaps.get(sf, 1) == 1 for sf, _ in taken if sf not in foreign)
     # Survival runs from the first hit taken, the killing one included (a one-shot death is 0).
-    first_taken = next((sf for sf, _ in hits(own, lethal=True)), None)
+    # (the earliest confirmed hit: a drop in its hit points or shields, or an accepted hit record)
+    first_taken = min([sf for sf, _ in hits(own, lethal=True)] +
+                      [sf for sf, _ in hits(hp_track(series, uid, t0, end, key='shield'), lethal=True)] +
+                      first_struck, default=None)
     # What the subject took is measured even when it never lands a hit.
     rng = sf0 = None
     # The first hit's range and time stand only when no earlier foe drop or kill could have
@@ -1369,21 +1424,67 @@ def lab_attack_measure(series, uid, t0, foe_type=None, unit_raw=None, building_r
     # Two hits in one frame are no interval: the samples cannot time them apart.
     gaps = [b[0] - a[0] for a, b in zip(landed, landed[1:]) if b[0] > a[0]
             and not any(a[0] <= sf <= b[0] for sf in unclear | barriers)]
-    hp_hits = [] if hp_multi else [d for sf, vid, d in landed if d]
     # The subject was hit: hit points, or shields (a Protoss subject's first hits).
     struck = bool(hits(own, lethal=True) or hits(hp_track(series, uid, t0, end, key='shield'), lethal=True)
                   or struck_by_record)
+    # On the GBA every accepted hit says what it applied, so the exact checks also hold each of
+    # the subject's own hits on the foe (credited as its drops are, from the subject's owner) and
+    # each foe hit on it: a wrong hit no sampled drop can show (inside a lethal frame, offset by
+    # regeneration, behind a clipped shield) still fails them. Lethal hits show only what was left.
+    # Applied per-hit values by frame and row: the subject's credited hits on the foe, and hits on
+    # it from a unit of the foe's type with that foe alone in reach. A sampled drop with them in
+    # its frame reads them instead (regeneration between hit and sample, or several hits in one
+    # drop, cannot bend them); one that several records or regeneration leave open, with none,
+    # leaves that kind of exact damage unmeasured.
+    applied_hp_at, applied_sh_at, applied_taken_at = {}, {}, {}
+    taken_unplaced = False   # a foe hit on the subject that no single-foe sample can attribute
+    for sf, k, hp_lost, shield_lost, hp_after, stype, sowner in applied_hits:
+        if hp_after <= 0:
+            continue
+        # (credited on the last samples showing the victim: it may be gone after a later hit)
+        s1 = sf if k in at_frame.get(sf, {}).get('units', {}) else sf - 1
+        if k != uid and enemy(k) and ours_source(sowner) and sole_attacker(s1, k) and sole_attacker(s1 - 1, k):
+            if hp_lost > 0:
+                applied_hp_at.setdefault((sf, k), []).append(hp_lost)
+            elif shield_lost > 0:
+                applied_sh_at.setdefault((sf, k), []).append(shield_lost)   # absorbed whole by shields
+        elif k == uid and not ours_source(sowner) and foe_source(stype) and hp_lost > 0:
+            # On the last sample showing the subject (a later hit in the frame may kill it).
+            if single_foe(s1):
+                applied_taken_at.setdefault(sf, []).append(hp_lost)
+            else:
+                taken_unplaced = True
+
+    def merged(samples, applied_at, unresolved):
+        out, used, blocked = [], set(), False
+        for key, value in samples:
+            if key in applied_at:
+                out += applied_at[key]
+                used.add(key)
+            elif key in unresolved:
+                blocked = True
+            else:
+                out.append(value)
+        out += [v for key, vs in applied_at.items() if key not in used for v in vs]
+        return [] if blocked else out
+    hp_values = merged([((sf, vid), d) for sf, vid, d in landed if d], applied_hp_at, multiple)
+    shield_values = merged([((sf, vid), round(d)) for vid, got in shielded.items() for sf, d in got
+                            if (vid, sf) not in clipped], applied_sh_at,
+                           multiple | {(sf, vid) for vid, got in shielded.items() for sf, d in got
+                                       if regen_masks(vid, sf, d)})
+    taken_values = [] if taken_unplaced else merged([(sf, d) for sf, d in taken if sf not in foreign],
+                                                    applied_taken_at, {sf for sf, k in multiple if k == uid})
     result = {
-        'hits': len(landed), 'ambiguous_hits': ambiguous, 'damage_values': sorted(set(hp_hits)),
-        'damage': statistics.median(hp_hits) if hp_hits else None,
-        'shield_hits': len(shield_hits), 'shield_values': sorted({round(d) for d in shield_exact}),
-        'shield_damage': statistics.median(round(d) for d in shield_exact) if shield_exact else None,
+        'hits': len(landed), 'ambiguous_hits': ambiguous, 'damage_values': sorted(set(hp_values)),
+        'damage': statistics.median(hp_values) if hp_values else None,
+        'shield_hits': len(shield_hits), 'shield_values': sorted(set(shield_values)),
+        'shield_damage': statistics.median(shield_values) if shield_values else None,
         'cooldown': statistics.median(gaps) if gaps else None, 'gaps': gaps,
         'range_first': rng, 'first_hit': sf0 - t0 if sf0 is not None else None,
         # The first credited hit, resolved or not (sizes the GBA replay).
         'first_landed': landed[0][0] - t0 if landed else None,
-        'taken': len(taken), 'counter_values': sorted({d for _, d in taken}), 'taken_single': taken_single,
-        'counter_damage': statistics.median(d for _, d in taken) if taken else None,
+        'taken': len(taken), 'counter_values': sorted(set(taken_values)), 'taken_single': taken_single,
+        'counter_damage': statistics.median(taken_values) if taken_values else None,
         # A GBA row goes in the step of the killing hit, so a one-shot death shows no hit at all:
         # its first hit taken is the death itself, as on the N64.
         'survival': (death - (first_taken if first_taken is not None else death)) if death is not None else None,
@@ -1620,6 +1721,10 @@ for _spec in LAB_SPECS:
                               'decoder_revision': 2,
                               # An attack golden must check something (tools/sc64_parity.py judge).
                               'require_gating': _spec['kind'] == 'attack'}
+    if _spec['kind'] == 'attack':
+        # 3: cooldown intervals never touch an unresolved drop or join two hits in one frame, and
+        # the first-hit range needs a single hit in its frame (#993 and its follow-up).
+        SCENARIOS[_spec['id']]['decoder_revision'] = 3
     if _spec['kind'] == 'move':
         # 2 added the acceleration chord spanning two GBA position steps at the N64 cruise
         # (gba.accel_chord); 3 adds the order-byte checks and observed-order replay.
