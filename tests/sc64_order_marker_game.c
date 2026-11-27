@@ -38,6 +38,21 @@ static int add_unit(int owner, int type, int x, int y)
     return i;
 }
 
+/* A player's Move or attack-move lands after the command delay; the
+ * order marker acknowledges it at once. */
+static void settle_order(int a, int order)
+{
+#ifdef SC64_IMPORTED_MISSION
+    /* This synthetic match has no buildings, so play is resumed each
+     * update, as the lifetime loop above does. */
+    for (int k = 0; k <= SC64_COMMAND_DELAY_UPDATES + 1 && u[a].order != order; ++k) {
+        screen = SCREEN_PLAY;
+        game_update(0, 0);
+    }
+#endif
+    assert(u[a].order == order);
+}
+
 static void test_orders_and_lifetime(void)
 {
     setup();
@@ -45,7 +60,7 @@ static void test_orders_and_lifetime(void)
     u[a].selected = 1;
     cx = 150; cy = 90; mode = MODE_MOVE;
     game_update(0, KEY_A);
-    assert(u[a].order == ORDER_MOVE && ping_x == 150 && ping_y == 90);
+    assert(ping_x == 150 && ping_y == 90);
     assert(ping_color == C_GREEN && ping_life == SC64_ORDER_MARKER_GBA_TICKS);
     cx = 200; cy = 110;
     assert(ping_x == 150 && ping_y == 90);
@@ -68,10 +83,13 @@ static void test_orders_and_lifetime(void)
         game_update(0, 0);
     }
     assert(!ping_life);
+    /* The Move landed meanwhile, at its point. */
+    assert(u[a].tx == 150 && u[a].ty == 90);
     mode = MODE_ATTACK; cx = 230; cy = 200;
     interact();
-    assert(u[a].order == ORDER_ATTACK_MOVE && ping_color == C_RED &&
-           ping_x == 230 && ping_y == 200 && ping_life == SC64_ORDER_MARKER_GBA_TICKS);
+    assert(ping_color == C_RED && ping_x == 230 && ping_y == 200 &&
+           ping_life == SC64_ORDER_MARKER_GBA_TICKS);
+    settle_order(a, ORDER_ATTACK_MOVE);
     /* Smart actions use the same accepted-order acknowledgement. */
     mode = MODE_NORMAL; cx = 260; cy = 200;
     assert(field_ui_smart_move());
@@ -80,8 +98,8 @@ static void test_orders_and_lifetime(void)
     SC64_GRID_SET(visible, (200/16)*MAP_COLS + 280/16, 1);
     cx = 282; cy = 200;
     assert(field_ui_smart_attack());
-    assert(u[a].order == ORDER_ATTACK_MOVE && ping_color == C_RED &&
-           ping_x == u[enemy].x && ping_y == u[enemy].y);
+    assert(ping_color == C_RED && ping_x == u[enemy].x && ping_y == u[enemy].y);
+    settle_order(a, ORDER_ATTACK_MOVE);
     u[a].selected = 0;
     int old_x = ping_x, old_y = ping_y, old_life = ping_life;
     mode = MODE_MOVE; cx = 250; cy = 220; interact();
