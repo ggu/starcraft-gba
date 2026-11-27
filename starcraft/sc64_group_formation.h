@@ -217,16 +217,37 @@ sc64_formation_cell_built(int col, int row)
     return 0;
 }
 
+/* The nearest open tile centre within 2 tiles of (*x, *y), for a fallback
+ * slot on blocked ground (a Move ends only within 5 px of its point, so a
+ * point inside a wall is never reached). Unchanged when it is open or no
+ * open tile is near. */
+static void __attribute__((noinline))
+sc64_group_formation_open_near(int *x, int *y)
+{
+    int col = *x / 16, row = *y / 16;
+    if (sc64_formation_cell_open(col, row)) return;
+    for (int r = 1; r <= 2; ++r)
+        for (int dy = -r; dy <= r; ++dy)
+            for (int dx = -r; dx <= r; ++dx) {
+                if (FAST_ABS(dx) != r && FAST_ABS(dy) != r) continue;
+                if (!sc64_formation_cell_open(col + dx, row + dy)) continue;
+                *x = (col + dx) * 16 + 8;
+                *y = (row + dy) * 16 + 8;
+                return;
+            }
+}
+
 /* The n-th selected unit's destination for a group order to (tx, ty).
  * With check_tile, a kept formation's ground slot must be open (terrain,
  * buildings and doors: the walk grid when it is current, else b[]
- * directly) and connect to the ordered point (the flood above). Otherwise
+ * directly) and connect to the ordered point (the flood above); otherwise
  * the unit takes its grid slot, or the ordered point itself when that grid
- * slot does not connect either; with the ordered point blocked, ground
- * units take their grid slots as before. Flyers keep the translation.
- * Both callers set check_tile: the reachable-formation route check can
- * count a blocked tile reachable through a neighbour and keep a point no
- * unit reaches. */
+ * slot does not connect either. With the ordered point itself blocked
+ * nothing can connect to it: an open translated slot is kept, and a unit
+ * whose slot is blocked takes its grid slot, moved to the nearest open
+ * tile when that is blocked too. Flyers keep the translation. Both callers
+ * set check_tile: the reachable-formation route check can count a blocked
+ * tile reachable through a neighbour and keep a point no unit reaches. */
 static inline void
 sc64_group_formation_slot(const Sc64GroupFormation *f, const Unit *q, int n,
                           int tx, int ty, int check_tile, int *slot_x, int *slot_y)
@@ -239,14 +260,16 @@ sc64_group_formation_slot(const Sc64GroupFormation *f, const Unit *q, int n,
         *slot_x = q->x + f->dx;
         *slot_y = q->y + f->dy;
         if (!ground) return;
-        if (f->ground && sc64_group_formation_reaches(f, *slot_x, *slot_y) &&
+        if ((!f->ground || sc64_group_formation_reaches(f, *slot_x, *slot_y)) &&
             sc64_formation_cell_open(*slot_x / 16, *slot_y / 16)) return;
     }
     *slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
     *slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
-    if (f->keep && ground && f->ground &&
-        !(sc64_group_formation_reaches(f, *slot_x, *slot_y) &&
-          sc64_formation_cell_open(*slot_x / 16, *slot_y / 16))) {
+    if (!f->keep || !ground) return;
+    if (!f->ground) {
+        sc64_group_formation_open_near(slot_x, slot_y);
+    } else if (!(sc64_group_formation_reaches(f, *slot_x, *slot_y) &&
+                 sc64_formation_cell_open(*slot_x / 16, *slot_y / 16))) {
         *slot_x = tx;
         *slot_y = ty;
     }

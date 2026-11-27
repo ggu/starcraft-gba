@@ -229,10 +229,40 @@ static void check_flyer_and_edge_formation(void)
     int sx, sy;
     sc64_group_formation_slot(&f, &u[ship], 0, bxp, byp, 1, &sx, &sy);
     assert(sx == u[ship].x + f.dx && sy == u[ship].y + f.dy);
+    /* The Marine's own slot is on the blocked tile: it takes an open tile
+     * near its grid slot, never a point inside the wall. */
     sc64_group_formation_slot(&f, &u[walker], 1, bxp, byp, 1, &sx, &sy);
-    assert(sx == limit(bxp - 8, 8, WORLD_W - 8) && sy == limit(byp - 8, 8, WORLD_H - 8));
+    assert(!terrain_blocked(sx / 16, sy / 16) && SC64_GRID_GET(path_walkable, sx / 16 + (sy / 16) * MAP_COLS));
+    assert(issue_order(ORDER_MOVE, bxp, byp) == 2);
+    assert(u[walker].tx == sx && u[walker].ty == sy);
+    for (int t = 0; t < 400 && u[walker].order == ORDER_MOVE; ++t) input(0);
+    assert(u[walker].order == ORDER_IDLE && dist2(u[walker].x, u[walker].y, sx, sy) <= 5 * 5);
     u[ship].selected = u[walker].selected = 0;
-    puts("command delay: a flyer keeps its formation over blocked ground: ok");
+    puts("command delay: over blocked ground a flyer keeps its slot and a Marine reaches an open one: ok");
+
+    /* A pair ordered onto a wall tile whose translated slots, just above
+     * and below it, are open: both slots are kept and both Moves end. */
+    int wall = -1;
+    for (int c = 0; c < MAP_COLS * MAP_ROWS && wall < 0; ++c) {
+        int x = c % MAP_COLS, yy = c / MAP_COLS;
+        if (x < 6 || yy < 3 || x >= MAP_COLS - 3 || yy >= MAP_ROWS - 3 || !terrain_blocked(x, yy)) continue;
+        int k = cliff_component[c - 3];
+        if (k < 0 || cliff_component[c - MAP_COLS] != k || cliff_component[c + MAP_COLS] != k ||
+            cliff_component[c - 3 - MAP_COLS] != k || cliff_component[c - 3 + MAP_COLS] != k) continue;
+        wall = c;
+    }
+    if (wall < 0) { puts("command delay: no wall tile with open tiles above and below in T1; skipped"); return; }
+    int wx = (wall % MAP_COLS) * 16 + 8, wy = (wall / MAP_COLS) * 16 + 8;
+    int up = spawn_unit(SIDE, sc64_race_unit_from_raw(0), wx - 48, wy - 16);
+    int down = spawn_unit(SIDE, sc64_race_unit_from_raw(0), wx - 48, wy + 16);
+    assert(up >= 0 && down >= 0);
+    select_only(up, down);
+    assert(issue_order(ORDER_MOVE, wx, wy) == 2);
+    assert(u[up].tx == wx && u[up].ty == wy - 16 && u[down].tx == wx && u[down].ty == wy + 16);
+    for (int t = 0; t < 400 && (u[up].order == ORDER_MOVE || u[down].order == ORDER_MOVE); ++t) input(0);
+    assert(u[up].order == ORDER_IDLE && u[down].order == ORDER_IDLE);
+    u[up].selected = u[down].selected = 0;
+    puts("command delay: a pair ordered onto a wall keeps its open slots and arrives: ok");
 
     /* A row whose first nine tiles and a 128 px span further in are one
      * open component. */
@@ -288,8 +318,10 @@ int main(void)
      * so the formation must see it from b[]. */
     int depot = spawn_build(SIDE, B_DEPOT, u[2].x + 150, u[2].y - 40, 0);
     assert(depot >= 0 && !path_grid_valid);
-    assert(SC64_GRID_GET(path_walkable, b[depot].x / 16 + (b[depot].y / 16) * MAP_COLS) ||
-           terrain_blocked(b[depot].x / 16, b[depot].y / 16));
+    /* Open in the old grid, covered only by the new building. */
+    assert(SC64_GRID_GET(path_walkable, b[depot].x / 16 + (b[depot].y / 16) * MAP_COLS) &&
+           !terrain_blocked(b[depot].x / 16, b[depot].y / 16) &&
+           sc64_formation_cell_built(b[depot].x / 16, b[depot].y / 16));
     check_stale_grid_formation(depot);
     int marine = player_marine(0), witness = player_marine(1);
 
