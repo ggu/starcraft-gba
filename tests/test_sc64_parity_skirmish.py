@@ -1037,6 +1037,15 @@ class FrameOffsets(unittest.TestCase):
             later = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more,
                                       cutoffs=[12000] * 3)[0]
             self.assertEqual(later['verdict'], 'REGRESSION')
+            # Runs that ended after the recorded waves, still without one, show the wave moved: that
+            # REGRESSION, once accepted, records what was seen, and the same rerun is then KNOWN.
+            row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more, cutoffs=[10500] * 3)[0]
+            self.assertEqual(row['verdict'], 'REGRESSION')
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            accepted = sc64_parity.load_baseline(path)
+            self.assertEqual(accepted[line]['gba_offsets'], [sk.NEVER] * 3)
+            rerun = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, accepted, more=more, cutoffs=[10500] * 3)[0]
+            self.assertEqual(rerun['verdict'], 'KNOWN')
             # A single run's line keeps its offset-0 value when offset 0 is cut short.
             legacy = {line: {'key': line, 'gba': 10079}}
             row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, legacy, more=[(1, {key: 10080}), (2, {key: 10081})],

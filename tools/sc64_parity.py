@@ -837,8 +837,10 @@ def write_baseline(path, results, old):
                     raise ValueError(f'{row["key"]}: no GBA value to accept')
                 line = {'key': row['key'], 'gba': row['gba']}
                 if 'gba_offsets' in row:
-                    # Offsets an early defeat left inconclusive keep their recorded values.
-                    spread = row.get('accept_offsets', row['gba_offsets'])
+                    # Offsets an early defeat left inconclusive keep their recorded values, unless
+                    # the run showed the line moved (a REGRESSION accepted is what is recorded).
+                    spread = row['gba_offsets'] if row['verdict'] == 'REGRESSION' else \
+                        row.get('accept_offsets', row['gba_offsets'])
                     if not all(finite_number(v) for v in spread):
                         raise ValueError(f'{row["key"]}: no GBA value to accept at every frame offset')
                     line['gba'], line['gba_offsets'] = spread[0], spread
