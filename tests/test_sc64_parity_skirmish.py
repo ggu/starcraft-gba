@@ -952,21 +952,19 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([2149] * 3, {}), 'PASS')
         # The edge: a run whose last measured frame is just before the band has not reached it.
         self.assertEqual(verdict([2248] * 3, known), 'KNOWN')
-        self.assertEqual(verdict([2249] * 3, known), 'KNOWN')      # reached the band, short of the reach
-        self.assertEqual(verdict([9000] * 3, known), 'IMPROVED')
-        # An early end at the band's edge at offset 0, the others in the band: the line and its
-        # recorded offset 0 are kept, for a line with offsets and for a single run's line.
-        for baseline in (known, {line: {'key': line, 'gba': 1794}}):
-            row = sc64_parity.judge('sk-pvt-w0', gate, {key: sk.NEVER}, {}, baseline, cutoffs=[2249, None, None],
-                                    more=[(1, {key: 2251}), (2, {key: 2252})])[0]
-            self.assertEqual(row['verdict'], 'KNOWN')
-            with tempfile.TemporaryDirectory() as temp:
-                path = pathlib.Path(temp) / 'b.json'
-                sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
-                self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_offsets'], [1794, 2251, 2252])
-        # Runs that reached the band without building it: the allowed NEVER counts (a line with a
-        # baseline line is dropped only once the runs also reached the run's reach).
-        self.assertEqual(verdict([2300] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([2249] * 3, known), 'IMPROVED')   # reached the band, past the recorded times
+        # A recorded time the runs stopped before: the line stays KNOWN and --accept keeps that value.
+        late = {line: {'key': line, 'gba': 2400, 'gba_offsets': [2400, 1804, 1804]}}
+        row = sc64_parity.judge('sk-pvt-w0', gate, {key: sk.NEVER}, {}, late, cutoffs=[2300, None, None],
+                                more=[(1, {key: 2251}), (2, {key: 2252})])[0]
+        self.assertEqual(row['verdict'], 'KNOWN')
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'b.json'
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})
+            self.assertEqual(sc64_parity.load_baseline(path)[line]['gba_offsets'], [2400, 2251, 2252])
+        # Runs that reached the band without building it: the allowed NEVER counts (on a line with a
+        # baseline line only from runs that went past its recorded times).
+        self.assertEqual(verdict([2300] * 3, known), 'IMPROVED')
         self.assertEqual(verdict([2300] * 3, {}), 'PASS')
         self.assertEqual(verdict(None, {}), 'PASS')
 
@@ -1039,6 +1037,15 @@ class FrameOffsets(unittest.TestCase):
             self.assertEqual(later['verdict'], 'REGRESSION')
             # Runs that ended after the recorded waves, still without one, show the wave moved: that
             # REGRESSION, once accepted, records what was seen, and the same rerun is then KNOWN.
+            # A regression at one offset beside runs that stopped before their recorded waves keeps
+            # those waves, so a later full-length run without a wave still fails.
+            mixed = sc64_parity.judge('sk-pvt-w0', wave, {key: 11000}, {}, known, more=more,
+                                      cutoffs=[None, 9000, 9000])[0]
+            sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [mixed]}], {})
+            kept = sc64_parity.load_baseline(path)
+            self.assertEqual(kept[line]['gba_offsets'], [11000, 10078, 10077])
+            full = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, kept, more=more, cutoffs=[12000] * 3)[0]
+            self.assertEqual(full['verdict'], 'REGRESSION')
             row = sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more, cutoffs=[10500] * 3)[0]
             self.assertEqual(row['verdict'], 'REGRESSION')
             sc64_parity.write_baseline(path, [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [row]}], {})

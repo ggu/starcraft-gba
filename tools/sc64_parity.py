@@ -440,8 +440,10 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                     return needed - (own[i][1] - 1)   # frames short: never 0
             return gap(v)
         gaps = [gap_at(i, v) for i, v in enumerate(spread)]
-        # What --accept records: an offset whose NEVER an early end cut short (its bound below the
-        # run's reach, admitted by the band or not) is inconclusive and keeps its recorded value.
+        # What --accept records: an offset whose NEVER an early end cut short before its recorded
+        # time could be seen (the run's last frame before that time, or before the reach for a
+        # recorded NEVER) is inconclusive and keeps its recorded value; one that ran past the recorded
+        # time without the event showed the move and records it.
         def recorded_at(i):
             if known is None:
                 return None
@@ -449,7 +451,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 return known['gba_offsets'][i] if len(known['gba_offsets']) == len(spread) else None
             return known['gba'] if i == 0 else None
         inconclusive = [i for i, v in enumerate(spread) if own[i] is not None and never is not None and
-                        v == own[i][0] and own[i][1] < never[1] and recorded_at(i) is not None]
+                        v == own[i][0] and own[i][1] < never[1] and recorded_at(i) is not None and
+                        (kind(recorded_at(i)) != 'number' or own[i][1] <= recorded_at(i))]
         if inconclusive and 'gba_offsets' in row:
             row['accept_offsets'] = [recorded_at(i) if i in inconclusive else r for i, r in enumerate(row['gba_offsets'])]
         every = ' at every frame offset' if len(spread) > 1 else ''
@@ -502,8 +505,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         if not gating:
             row['verdict'] = 'REPORT'
         elif max(gaps) == 0 and known is not None and inconclusive:
-            # Inside the band, but an early end left a recorded offset unshown: not an improvement
-            # --accept could drop the line for; it keeps the recorded value there.
+            # Inside the band, but an early end stopped a run before its recorded time: not an
+            # improvement --accept could drop the line for; it keeps the recorded value there.
             row['verdict'] = 'KNOWN'
             row['baseline'] = known['gba']
             row['why'] = 'inside the band, but cut short by the human\'s defeat at frame offset ' + \
@@ -837,10 +840,8 @@ def write_baseline(path, results, old):
                     raise ValueError(f'{row["key"]}: no GBA value to accept')
                 line = {'key': row['key'], 'gba': row['gba']}
                 if 'gba_offsets' in row:
-                    # Offsets an early defeat left inconclusive keep their recorded values, unless
-                    # the run showed the line moved (a REGRESSION accepted is what is recorded).
-                    spread = row['gba_offsets'] if row['verdict'] == 'REGRESSION' else \
-                        row.get('accept_offsets', row['gba_offsets'])
+                    # Offsets an early defeat left inconclusive keep their recorded values.
+                    spread = row.get('accept_offsets', row['gba_offsets'])
                     if not all(finite_number(v) for v in spread):
                         raise ValueError(f'{row["key"]}: no GBA value to accept at every frame offset')
                     line['gba'], line['gba_offsets'] = spread[0], spread

@@ -149,9 +149,9 @@ edge), and compares as the frame after it. At several frame offsets:
   run that reached the band's lower edge (for a NEVER band, the run's
   reach), so an early end never makes such a line IMPROVED and drops it; on
   a line with no baseline line it passes as before. `--accept` keeps a
-  line's recorded value at every offset whose NEVER an early end cut short,
-  except on a REGRESSION: a run that showed the line moved (no event by a
-  frame past the recorded times) is recorded as seen.
+  line's recorded value at every offset whose run an early end stopped
+  before that recorded time; a run that went past it without the event
+  showed the move, and that is recorded.
 - Only offsets the baseline recorded are evidence for the per-offset check
   of a newly finite time: a single run's line (no `gba_offsets`) speaks for
   offset 0 alone there. The whole-spread comparisons keep every reading.
