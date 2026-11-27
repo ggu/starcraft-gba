@@ -691,6 +691,144 @@ class EnvelopeSlack(unittest.TestCase):
         self.assertEqual(verdict(plain, 4200), 'KNOWN')
 
 
+class FrameOffsets(unittest.TestCase):
+    """Skirmish lines are judged on the spread of three GBA runs whose frame counters start 0, 1
+    and 2 frames apart (the GBA's own one-frame noise)."""
+    KEY = 'sk-pvt-w0:supply.cap@8000:cpu Terran'
+
+    def golden(self, value=84, lo=84, hi=84, **extra):
+        return {'decoder_revision': sk.DECODER_REVISION, 'observations': [dict(
+            {'check': 'supply.cap@8000', 'subject': 'cpu Terran', 'value': value, 'lo': lo, 'hi': hi,
+             'sentinels': [sk.NEVER, sk.ENDED], 'gating': True, 'provenance': 'n64-ram', 'n_runs': 2,
+             'tolerance': 'exact'}, **extra)]}
+
+    def row(self, spread, baseline=None, golden=None):
+        key = ('supply.cap@8000', 'cpu Terran')
+        more = [(k, {key: v}) for k, v in zip((1, 2), spread[1:])]
+        known = {} if baseline is None else {self.KEY: {'key': self.KEY, 'gba': baseline[0], 'gba_offsets': baseline}}
+        return sc64_parity.judge('sk-pvt-w0', golden or self.golden(), {key: spread[0]}, {}, known, more=more)[0]
+
+    def verdict(self, spread, baseline=None, golden=None):
+        return self.row(spread, baseline, golden)['verdict']
+
+    def test_offsets_are_the_scenarios_and_reach_the_runner(self):
+        spec = metrics.SCENARIOS['sk-pvt-w0']
+        self.assertEqual(spec['frame_offsets'], (0, 1, 2))
+        golden = {'gba': {'steps': 100, 'at_step': 5, 'seed': 7}}
+        _, plain = sc64_parity.gba_command('sk-pvt-w0', golden, pathlib.Path('x.trace'))
+        _, shifted = sc64_parity.gba_command('sk-pvt-w0', golden, pathlib.Path('x.trace'), 2)
+        self.assertNotIn('--frame-offset', plain)       # offset 0 is the single-run command
+        self.assertEqual(shifted, plain + ['--frame-offset', '2'])
+        with self.assertRaises(ValueError):
+            sc64_parity.gba_command('sk-pvt-w0', golden, pathlib.Path('x.trace'), 3)
+        self.assertNotIn('frame_offsets', metrics.SCENARIOS['bb-train'])
+        with self.assertRaises(ValueError):
+            sc64_parity.gba_command('bb-train', {'gba': {'steps': 10, 'at_step': 5}}, pathlib.Path('x.trace'), 1)
+
+    def test_jitter_within_the_noise_never_flips(self):
+        # The engine session's measurement: 116 / 132 / 116 against the N64's 84.
+        base = [116, 132, 116]
+        for spread in ([132, 132, 116], [132, 116, 132], [116, 116, 116], [132, 132, 132], [100, 116, 132]):
+            row = self.row(spread, base)
+            self.assertEqual(row['verdict'], 'KNOWN', spread)
+            self.assertEqual((row['gba'], row['gba_offsets'], row['baseline_offsets']), (spread[0], spread, base))
+        # A single run of the same noise against a single-run baseline flips both ways.
+        self.assertEqual(self.verdict([132], [116]), 'REGRESSION')
+
+    def test_a_consistent_shift_still_reads_regression(self):
+        base = [116, 132, 116]
+        row = self.row([140, 148, 140], base)
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('at every frame offset', row['why'])
+        self.assertEqual(self.verdict([132, 148, 140], base), 'KNOWN')     # one offset still at the baseline's edge
+        # A line with no baseline: a regression when every offset is outside the band ...
+        self.assertEqual(self.verdict([90, 92, 91]), 'REGRESSION')
+        # ... and KNOWN (recorded by --accept) while the noise still reaches the band.
+        row = self.row([84, 92, 84])
+        self.assertEqual(row['verdict'], 'KNOWN')
+        self.assertIn('frame offset +1 ', row['why'])
+        self.assertNotIn('baseline', row)
+
+    def test_improved_only_when_every_offset_is_inside(self):
+        self.assertEqual(self.verdict([84, 84, 100], [116, 132, 116]), 'KNOWN')
+        self.assertEqual(self.verdict([84, 84, 84], [116, 132, 116]), 'IMPROVED')
+        self.assertEqual(self.verdict([84, 84, 84]), 'PASS')
+
+    def test_the_seed_bands_slack_still_holds(self):
+        # The #988 case: two seeds widen the band to 736-3245, each seed's own band is +-2.
+        golden = self.golden(738, 736, 3245, seed_lo=736, seed_hi=740)
+        base = [3250, 3260, 3255]                               # 5, 15, 10 frames out
+        self.assertEqual(self.verdict([3261, 3262, 3250], base, golden), 'KNOWN')
+        self.assertEqual(self.verdict([3262, 3262, 3262], base, golden), 'KNOWN')       # 17 = 15 + 2
+        self.assertEqual(self.verdict([3263, 3264, 3263], base, golden), 'REGRESSION')  # 18 > 15 + 2
+
+    def test_outcomes_are_compared_as_outcomes(self):
+        wave = self.golden(17045, 17043, 17047)
+        # Some offsets never reach the event: noise as long as an outcome is shared with the baseline.
+        self.assertEqual(self.verdict([sk.NEVER, 15000, sk.NEVER], [sk.NEVER, sk.NEVER, 14000], wave), 'KNOWN')
+        self.assertEqual(self.verdict([14000, 14000, 14000], [sk.NEVER, 14000, 14100], wave), 'KNOWN')
+        row = self.row([8000, 8100, 8050], [sk.NEVER, sk.NEVER, sk.NEVER], wave)
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('outcome changed', row['why'])
+        self.assertEqual(self.verdict([sk.NEVER] * 3, [8000, 8100, 8050], wave), 'REGRESSION')
+        # Against a band that is itself an outcome (the N64 never built it), a time a frame earlier
+        # is not further out; a line with no baseline still fails when every offset builds it.
+        never = self.golden(sk.NEVER, sk.NEVER, sk.NEVER)
+        self.assertEqual(self.verdict([8262, 8261, sk.NEVER], [sk.NEVER, 8264, 8263], never), 'KNOWN')
+        self.assertEqual(self.verdict([5000, 5000, 5000], [sk.NEVER, 8264, 8263], never), 'KNOWN')
+        self.assertEqual(self.verdict([8262, 8261, 8260], None, never), 'REGRESSION')
+        self.assertEqual(self.verdict([sk.NEVER] * 3, [sk.NEVER, 8264, 8263], never), 'IMPROVED')
+
+    def test_a_value_missing_at_one_offset_fails(self):
+        key = ('supply.cap@8000', 'cpu Terran')
+        row = sc64_parity.judge('sk-pvt-w0', self.golden(), {key: 116}, {}, {}, more=[(1, {key: 120}), (2, {})])[0]
+        self.assertEqual(row['verdict'], 'REGRESSION')
+        self.assertIn('frame offset +2', row['why'])
+
+    def test_baseline_lines_keep_every_offset(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / 'baseline.json'
+            results = [{'id': 'sk-pvt-w0', 'status': 'RUN', 'rows': [
+                {'key': self.KEY, 'gba': 116, 'gba_offsets': [116, 132, 116], 'gating': True, 'verdict': 'KNOWN'}]}]
+            sc64_parity.write_baseline(path, results, {})
+            self.assertEqual(json.loads(path.read_text())['known'],
+                             [{'key': self.KEY, 'gba': 116, 'gba_offsets': [116, 132, 116]}])
+            self.assertIn('"gba_offsets": [116, 132, 116]\n', path.read_text())   # one line per entry's offsets
+            self.assertEqual(sc64_parity.load_baseline(path)[self.KEY]['gba_offsets'], [116, 132, 116])
+            for bad in ([132, 116, 116], [], [116, 'x'], 116):
+                path.write_text(json.dumps({'known': [{'key': self.KEY, 'gba': 116, 'gba_offsets': bad}]}))
+                with self.assertRaises(SystemExit):
+                    sc64_parity.load_baseline(path)
+
+    def test_a_scenario_runs_once_per_offset(self):
+        key = ('supply.cap@8000', 'cpu Terran')
+        calls = []
+
+        def fake(scenario_id, golden, keep, frame_offset=0):
+            calls.append(frame_offset)
+            if frame_offset == 2 and fail:
+                return {'status': 'ERROR', 'why': 'GBA run exited 3: x'}
+            return {'measured': {'values': {key: 116 + 16 * (frame_offset == 1)}}, 'err': None,
+                    'report': {'cpu_seconds': 1.0}, 'cmd': ['runner', str(frame_offset)]}
+        original = sc64_parity.run_gba
+        sc64_parity.run_gba = fake
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                path = pathlib.Path(temp) / 'sk-pvt-w0.json'
+                layout = sc64_parity.parity_decode.Layout().sha256   # judged as current, never stale
+                path.write_text(json.dumps(dict(self.golden(), gba={'at_step': 5}, layout_sha256=layout)))
+                fail = False
+                out = sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+                self.assertEqual((calls, out['frame_offsets'], out['gba_cpu_seconds']), ([0, 1, 2], [0, 1, 2], 3.0))
+                self.assertEqual((out['rows'][0]['gba_offsets'], out['command']), ([116, 132, 116], ['runner', '0']))
+                fail = True
+                out = sc64_parity.run_scenario('sk-pvt-w0', path, {}, None)
+                self.assertEqual(out['status'], 'ERROR')
+                self.assertTrue(out['why'].endswith('(frame offset +2)'))
+        finally:
+            sc64_parity.run_gba = original
+
+
 class Bundles(unittest.TestCase):
     """Skirmish goldens read watched words (supply, result) outside the hash chain, so both
     captures' watch.csv must match; whole-match captures may keep their tap compressed."""

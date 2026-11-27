@@ -285,16 +285,20 @@ RECORD_FIELDS = {b"S": 11, b"W": 3, b"U": 23, b"B": 22, b"+U": 3, b"-U": 4, b"+B
                  b"OU": 3, b"OB": 3, b"TU": 3, b"TB": 3, b"P": 5, b"M": 4, b"F": 3,
                  b"D": 4, b"A": 6, b"X": 4}
 INTEGER = re.compile(rb"-?[0-9]+")
+# The whole record at once: its tag, then exactly n space-separated integers (one regex call per
+# line instead of one per field; whole-match traces have millions of fields).
+RECORD_PATTERN = {tag: re.compile(re.escape(tag) + rb"(?: -?[0-9]+){%d}" % n) for tag, n in RECORD_FIELDS.items()}
+V_PATTERN = re.compile(rb"V(?: -?[0-9]+){2}(?:(?: -?[0-9]+){4})?")
 
 
 def record_ok(line: bytes) -> bool:
     """A record of a fixed-shape kind has its field count and integer fields."""
-    parts = line.split(b" ")
-    tag = parts[0]
-    if tag in RECORD_FIELDS:
-        return len(parts) == RECORD_FIELDS[tag] + 1 and all(INTEGER.fullmatch(p) for p in parts[1:])
+    tag = line.split(b" ", 1)[0]
+    if tag in RECORD_PATTERN:
+        return RECORD_PATTERN[tag].fullmatch(line) is not None
     if tag == b"V":
-        return len(parts) in (3, 7) and all(INTEGER.fullmatch(p) for p in parts[1:])
+        return V_PATTERN.fullmatch(line) is not None
+    parts = line.split(b" ")
     if tag in (b"FV", b"FE"):
         if len(parts) != 4 or not re.fullmatch(rb"[1-9][0-9]*", parts[1]) or \
                 not re.fullmatch(rb"[1-9][0-9]*", parts[2]) or not re.fullmatch(rb"[0-9a-f]+", parts[3]):

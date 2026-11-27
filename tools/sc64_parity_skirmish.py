@@ -147,6 +147,8 @@ WAVE_UNITS = 3
 CHECKPOINTS = (1000, 2000, 4000, 6000, 8000)
 TIME_TOLERANCE = 2                      # source frames, as the S4 intervals
 DECODER_REVISION = 2                     # the skirmish scenarios' measurement revision
+FRAME_OFFSETS = (0, 1, 2)               # GBA runs per scenario, the engine's frame counter advanced this far
+                                        # after launch: the spread of a line is the GBA's own one-frame noise
 NEVER = 999999                          # a time not reached within the N64 run
 ENDED = -1                              # a GBA checkpoint after its match ended
 TRIP = 8                                # minerals per delivery
@@ -933,6 +935,10 @@ def scenarios():
             # 2: result bytes and the run's end on the decoder's unpaused clock (paused and
             # trailing ticks); goldens measured before are stale.
             'decoder_revision': DECODER_REVISION,
+            # The GBA's outcomes move by more than a band under a one-frame phase shift (a
+            # computer's supply cap by 16, its first wave by hundreds of frames): judged on the
+            # spread over these offsets (tools/sc64_parity.py judge).
+            'frame_offsets': FRAME_OFFSETS,
         }
     return out
 
