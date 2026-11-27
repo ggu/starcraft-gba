@@ -135,7 +135,16 @@ edge), and compares as the frame after it. At several frame offsets:
   still reaches the N64's value (only a newly finite timing is judged on
   its own).
 - A line whose outcomes share none with the baseline's and have no time
-  (ENDED, a marker) is a REGRESSION at any distance.
+  (ENDED, a marker) is a REGRESSION at any distance, when every offset is
+  outside the band.
+- A NEVER is a lower bound on the time: the frame after the run's reach,
+  or after that GBA run's own last measured frame when its trace ended
+  first. It is as far out as that bound lies past the band, and no
+  distance at all while the bound lies below the band's upper edge, so an
+  early end is gated by the result check, not by every timing it cut
+  short.
+- Only offsets the baseline recorded are evidence for the per-offset check:
+  a single run's line (no `gba_offsets`) speaks for offset 0 alone.
 - A seed whose own band is NEVER, in an envelope other seeds made finite,
   keeps the timing tolerance (±2 frames) as its slack.
 

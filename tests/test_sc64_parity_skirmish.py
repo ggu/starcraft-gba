@@ -307,9 +307,14 @@ class GbaTrace(unittest.TestCase):
             finally:
                 selfgate.check_trace_complete = check
             self.assertIsNone(error)
+            cutoffs.append(values['cutoff'])
             return values['values'][('result.human_defeated', 'human')]
+        cutoffs = []
         self.assertEqual(defeat(0, 4), 3)
         self.assertEqual(defeat(0, 2), sk.NEVER)            # past both the run and the band
+        # The last frame each measurement saw: through the band's edge, or the run's cutoff.
+        self.assertTrue(isinstance(cutoffs[0], int) and 3 <= cutoffs[0] <= 4, cutoffs)
+        self.assertTrue(isinstance(cutoffs[1], int) and cutoffs[1] <= 2, cutoffs)
         self.assertEqual(defeat(sk.NEVER, sk.NEVER, sk.NEVER), sk.NEVER)   # a NEVER keeps the run's cutoff
         # A seed that never saw it, inside an envelope reaching past its run (another check
         # extends the measurement): still the run's cutoff.
@@ -869,6 +874,41 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([sk.NEVER, 8050, sk.NEVER], mixed), 'KNOWN')
         self.assertEqual(verdict([5000, sk.NEVER, sk.NEVER], mixed), 'REGRESSION')
         self.assertEqual(verdict([sk.NEVER, 5000, sk.NEVER], mixed), 'REGRESSION')
+
+    def test_never_stands_for_each_runs_own_cutoff(self):
+        # Codex follow-up: the GBA human fell at 9,000 at every offset, so its traces end there and the
+        # Terran wave reads NEVER. Against the run's reach (12,000) that NEVER would be 2,460 frames
+        # out; it means only "not before 9,001", which is no further out than the recorded waves.
+        wave = dict(self.golden(9539, 9537, 9541, check='attack.first_wave', subject='cpu Terran'),
+                    gba={'horizon': 12000})
+        key = ('attack.first_wave', 'cpu Terran')
+        line = 'sk-pvt-w0:attack.first_wave:cpu Terran'
+        known = {line: {'key': line, 'gba': 10079, 'gba_offsets': [10079, 10078, 10077]}}
+
+        def verdict(cutoffs):
+            more = [(1, {key: sk.NEVER}), (2, {key: sk.NEVER})]
+            return sc64_parity.judge('sk-pvt-w0', wave, {key: sk.NEVER}, {}, known, more=more,
+                                     cutoffs=cutoffs)[0]['verdict']
+        self.assertEqual(verdict(None), 'REGRESSION')
+        self.assertEqual(verdict([9000, 9000, 9000]), 'KNOWN')
+        self.assertEqual(verdict([12000, 12000, 12000]), 'REGRESSION')   # a run that went on: past the reach
+        # A run that ended before the band says nothing about the distance: it might have come in it.
+        self.assertEqual(verdict([5000, 5000, 5000]), 'KNOWN')
+        self.assertEqual(sk.never_time(wave, wave['observations'][0], 9000), (sk.NEVER, 9001))
+        self.assertEqual(sk.never_time(wave, wave['observations'][0], 15000), (sk.NEVER, 12001))
+
+    def test_a_single_runs_line_speaks_for_offset_0_only(self):
+        defeat = dict(self.golden(10076, 10074, 10078, check='result.human_defeated', subject='human'),
+                      gba={'horizon': 10676})
+        key = ('result.human_defeated', 'human')
+        line = 'sk-pvt-w0:result.human_defeated:human'
+        legacy = {line: {'key': line, 'gba': sk.NEVER}}
+
+        def verdict(spread):
+            more = [(1, {key: spread[1]}), (2, {key: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', defeat, {key: spread[0]}, {}, legacy, more=more)[0]['verdict']
+        self.assertEqual(verdict([sk.NEVER, 1000, 1001]), 'KNOWN')       # offsets +1, +2 were never recorded
+        self.assertEqual(verdict([1000, sk.NEVER, sk.NEVER]), 'REGRESSION')
 
     def test_a_newly_finite_time_is_compared_with_the_outcome_it_replaced(self):
         # Codex: the only recorded time becomes NEVER and the newly finite defeats are nearer the band

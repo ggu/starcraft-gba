@@ -311,9 +311,10 @@ def check_family(check):
     return 'build.first' if check.startswith('build.first.') else check.split('@')[0]
 
 
-def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=()):
+def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=(), cutoffs=None):
     """Rows for every observation of one golden. values are the GBA's (offset 0); more lists
-    (frame offset, values) for the scenario's other frame offsets, judged as one spread."""
+    (frame offset, values) for the scenario's other frame offsets, judged as one spread; cutoffs,
+    if given, the last source frame each offset's GBA measurement saw (offset 0 first)."""
     rows = []
     offsets = [0] + [k for k, _ in more]
     # The GBA's own frame noise per check family, calibrated once by the scenario (fixed, so no
@@ -393,8 +394,13 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         # outcome, not a number. Numbers are compared with numbers; an outcome with a time (a
         # skirmish NEVER: not before the run's reach) is compared by that time.
         specials = set(metrics.MARKERS) | set(obs.get('sentinels', ()))
-        never = metrics.SCENARIOS.get(scenario_id, {}).get('never_time')
-        never = never(golden, obs) if never else None     # (sentinel, the earliest time it stands for)
+        hook = metrics.SCENARIOS.get(scenario_id, {}).get('never_time')
+        never = hook(golden, obs) if hook else None     # (sentinel, the earliest time it stands for)
+        # Each offset's own NEVER: not before that GBA run's last measured frame, when its trace ended
+        # before the run's reach (an early end is gated by the result check, not by every timing).
+        # Recorded baseline values keep the run's reach.
+        own = [hook(golden, obs, (cutoffs or [])[i] if i < len(cutoffs or []) else None) if hook else None
+               for i in range(len(spread))]
 
         def kind(v):
             return v if v in specials else 'number'
@@ -403,14 +409,19 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # 0 for an outcome outside the numeric band that the N64 also showed (skirmish NEVER).
             return 0 if v in also_ok else outside(v, obs['lo'], obs['hi'])
 
-        def time_gap(v):
+        def time_gap(v, at=None):
             # The distance of an outcome by its time; None for one with no time (ENDED, a marker).
+            # at: the spread index whose own NEVER time applies (None: a recorded baseline value).
             if v in also_ok:
                 return 0
             if kind(v) == 'number':
                 return outside(v, obs['lo'], obs['hi'])
-            if never is not None and v == never[0]:
-                return outside(never[1], obs['lo'], obs['hi'])
+            nv = never if at is None else own[at]
+            if nv is not None and v == nv[0]:
+                # A lower bound on the time: it is no further out than the bound's distance past the
+                # band, and none at all while the bound lies below the band's upper edge (a run that
+                # ended early might still have seen it in the band).
+                return max(0, nv[1] - obs['hi'])
             return None
         gaps = [gap(v) for v in spread]
         every = ' at every frame offset' if len(spread) > 1 else ''
@@ -453,11 +464,14 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
         # Timings only (the scenario's never_time names them): a checkpoint count that an offset
         # reaches again after its match ended there stays under the spread comparison.
         allowance = noise.get(check_family(obs['check']), 0)
+        # Only offsets the baseline recorded are evidence: a single run's line speaks for offset 0.
+        recorded = len(spread) if known is None or 'gba_offsets' in known else len(base)
         jumps = [(k, v) for i, (k, v) in enumerate(zip(offsets, spread))
-                 if never is not None and kind(v) == 'number' and changed(i, v) and not outcome_band and was_times
-                 and time_gap(v) > max(was_times) + slack + allowance]
+                 if never is not None and kind(v) == 'number' and i < recorded and changed(i, v) and not outcome_band
+                 and was_times and time_gap(v, i) > max(was_times) + slack + allowance]
         # Offsets whose new outcome has no time to compare (ENDED, a marker), or a baseline without one.
-        untimed = [v for v in spread if kind(v) not in was_kinds and (time_gap(v) is None or not was_times)]
+        untimed = [v for i, v in enumerate(spread)
+                   if kind(v) not in was_kinds and (time_gap(v, i) is None or not was_times)]
         if not gating:
             row['verdict'] = 'REPORT'
         elif max(gaps) == 0:
@@ -519,8 +533,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
                 beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
                         if kind(v) == 'number' and (never is None or not changed(i, v))],
                        [gap(b) for b in base if kind(b) == 'number'])
-            timed = None not in [time_gap(v) for v in spread] and \
-                beyond([(time_gap(v), margin(i, v)) for i, v in enumerate(spread)],
+            timed = None not in [time_gap(v, i) for i, v in enumerate(spread)] and \
+                beyond([(time_gap(v, i), margin(i, v)) for i, v in enumerate(spread)],
                        [g for g in (time_gap(b) for b in base) if g is not None])
             if not outcome_band and (numbers or timed):
                 row['verdict'] = 'REGRESSION'
@@ -635,7 +649,7 @@ def run_scenario(scenario_id, golden_path, baseline, keep, allow_stale=False):
     first = runs[0]
     more = [(k, run['measured']['values']) for k, run in zip(offsets[1:], runs[1:])]
     out = finish_scenario(scenario_id, golden, result, first['measured'], first['err'], baseline, first['report'],
-                          first['cmd'], allow_stale, more)
+                          first['cmd'], allow_stale, more, [run['measured'].get('cutoff') for run in runs])
     if more and out['status'] == 'RUN':
         out['frame_offsets'] = offsets
         out['gba_cpu_seconds'] = sum(run['report'].get('cpu_seconds') or 0 for run in runs)
@@ -660,12 +674,13 @@ def curve_divergence(golden, curves):
     return out
 
 
-def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False, more=()):
+def finish_scenario(scenario_id, golden, result, measured, err, baseline, report, cmd, allow_stale=False, more=(),
+                    cutoffs=None):
     if err:
         return {**result, 'status': 'ERROR', 'why': 'GBA measurement: ' + err}
     layout = parity_decode.Layout()
     rows = judge(scenario_id, golden, measured['values'], measured.get('curves', {}), baseline, layout, allow_stale,
-                 more)
+                 more, cutoffs)
     return {**result, 'status': 'RUN', 'rows': rows, 'gba_measured': measured.get('measured'),
             'gba_cpu_seconds': report.get('cpu_seconds'), 'command': cmd}
 
