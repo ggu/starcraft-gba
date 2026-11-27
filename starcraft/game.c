@@ -6300,6 +6300,7 @@ sc64_worker_mineral_issue_selected(int patch)
             !IS_WORKER(u[i].type) || SC64_TRANSPORT_LOADED(&u[i])) continue;
         sc64_worker_reset_repair_for_gather(&u[i]);
         u[i].order = ORDER_MINE;
+        SC64_CMD_FORGET(i);
         u[i].target = patch;
         u[i].work_timer = 0;
         u[i].build = -1; /* A new gather command starts a new home-depot trip. */
@@ -7819,6 +7820,7 @@ interact(void)
 	    sc64_worker_reset_repair_for_gather(&u[worker]);
 	    u[worker].work_timer = 0;
 	    u[worker].order = ORDER_GAS;
+	    SC64_CMD_FORGET(worker);
 	    u[worker].target = refinery;
 #ifdef SC64_WORKER_CARGO_KIND
             sc64_worker_gather_pending_set(&u[worker], 1);
@@ -7847,6 +7849,7 @@ interact(void)
                     if (!u[i].alive || !u[i].selected || u[i].owner != SIDE ||
                         SC64_TRANSPORT_LOADED(&u[i]) || !IS_WORKER(u[i].type) || u[i].carry) continue;
                     u[i].order = ORDER_MINE;
+                    SC64_CMD_FORGET(i);
                     u[i].target = patch;
                     u[i].work_timer = 0;
                     u[i].path_timer = u[i].path_retry = 0;
@@ -7924,6 +7927,7 @@ interact(void)
                 sc64_worker_reset_repair_for_gather(&u[worker]);
 		u[worker].work_timer = 0;
 		u[worker].order = ORDER_GAS;
+		SC64_CMD_FORGET(worker);
 		u[worker].target = selected_building;
 #ifdef SC64_WORKER_CARGO_KIND
                 sc64_worker_gather_pending_set(&u[worker], 1);
