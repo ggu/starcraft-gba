@@ -41,7 +41,7 @@ GBA's noise of the baseline (a line with no baseline line yet gets one on
 --accept). A new finite time where the baseline recorded another outcome at
 that offset (a defeat where the human survived) is judged on its own: beyond
 the band, every recorded value and the GBA's frame noise for checks of its
-kind (offset_noise), it is a REGRESSION whatever the other offsets kept. NEVER
+kind (the scenario's frame_noise), it is a REGRESSION whatever the other offsets kept. NEVER
 compares as the frame after the run's reach (the scenario's never_time). Baseline lines of such scenarios keep the value at each offset
 (gba_offsets, one finite number per offset); gba is offset 0's.
 
@@ -311,28 +311,14 @@ def check_family(check):
     return 'build.first' if check.startswith('build.first.') else check.split('@')[0]
 
 
-def offset_noise(baseline):
-    """{check family: the widest spread of numbers over frame offsets on any baseline line of it}:
-    how far the GBA's own one-frame noise has moved a value of that kind (sentinels left out)."""
-    noise = {}
-    for key, line in baseline.items():
-        spec = metrics.SCENARIOS.get(key.split(':')[0], {})
-        if not spec.get('frame_offsets'):
-            continue   # only scenarios this checkout runs at offsets, whose sentinels it knows
-        values = [v for v in line.get('gba_offsets', ()) if v not in spec.get('sentinels', ()) and
-                  v not in metrics.MARKERS]
-        if len(values) > 1 and all(finite_number(v) for v in values):
-            family = check_family(key.split(':')[1])
-            noise[family] = max(noise.get(family, 0), max(values) - min(values))
-    return noise
-
-
 def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stale=False, more=()):
     """Rows for every observation of one golden. values are the GBA's (offset 0); more lists
     (frame offset, values) for the scenario's other frame offsets, judged as one spread."""
     rows = []
     offsets = [0] + [k for k, _ in more]
-    noise = offset_noise(baseline) if more else {}
+    # The GBA's own frame noise per check family, calibrated once by the scenario (fixed, so no
+    # accept elsewhere in the baseline can tighten or loosen it).
+    noise = metrics.SCENARIOS.get(scenario_id, {}).get('frame_noise', {}) if more else {}
     revision = metrics.SCENARIOS.get(scenario_id, {}).get('decoder_revision', 1)
     if not golden.get('observations'):
         # A golden that checks nothing never passes quietly.
@@ -460,8 +446,8 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             return kind(v) not in was_kinds
         # A new finite time where the baseline had another outcome at that offset (a defeat where
         # the human survived) is judged on its own: beyond the band, every recorded value and the
-        # GBA's own frame noise for checks of its kind (the widest spread over offsets on any
-        # baseline line of the family), it is a regression whatever the other offsets kept. NEVER
+        # GBA's own frame noise for checks of its kind (the scenario's frame_noise), it is a
+        # regression whatever the other offsets kept. NEVER
         # where a time was recorded only bounds the time from below (the run's reach), so it is
         # judged with the whole spread below.
         # Timings only (the scenario's never_time names them): a checkpoint count that an offset
@@ -513,15 +499,22 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             row['why'] += every
         else:
             # Whole spread against whole spread, by numbers alone and by time (NEVER as the frame
-            # after the run's reach): every offset further out than every recorded value. A time
-            # newly finite at its offset brings no measured spread of its own, so it must also clear
-            # the family's frame noise, as a jump does.
+            # after the run's reach): every offset further out than every recorded value. The
+            # numbers are those of offsets that recorded a number (a time newly finite at its offset
+            # replaced another outcome and is compared with it, by time). In the time comparison such
+            # a time brings no measured spread of its own, so it must also clear the family's frame
+            # noise, as a jump does.
             def margin(i, v):
                 return slack + (allowance if never is not None and kind(v) == 'number' and changed(i, v) else 0)
 
             def beyond(now, was):
                 return bool(now) and bool(was) and all(g > max(was) + m for g, m in now)
-            numbers = beyond([(g, margin(i, v)) for i, (v, g) in enumerate(zip(spread, gaps)) if kind(v) == 'number'],
+            # A timing whose outcome itself differed between offsets (a time at some, NEVER at others)
+            # is as unstable as the GBA gets: its few numbers do not measure its noise, so they too
+            # must clear the family's.
+            unstable = never is not None and len({kind(b) for b in base}) > 1
+            numbers = beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
+                              if kind(v) == 'number' and not changed(i, v)],
                              [gap(b) for b in base if kind(b) == 'number'])
             timed = None not in [time_gap(v) for v in spread] and \
                 beyond([(time_gap(v), margin(i, v)) for i, v in enumerate(spread)],
@@ -743,6 +736,8 @@ def load_baseline(path):
         return {}
     doc = json.loads(path.read_text())
     for line in doc.get('known', []):
+        if not isinstance(line.get('key'), str) or line['key'].count(':') < 2:
+            raise SystemExit(f'{path}: baseline line {line.get("key")!r} is not scenario:check:subject')
         if not finite_number(line.get('gba')):
             raise SystemExit(f'{path}: baseline line {line.get("key")!r} has no finite numeric GBA value')
         if 'gba_offsets' in line:

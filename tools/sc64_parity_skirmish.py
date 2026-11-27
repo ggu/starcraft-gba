@@ -147,6 +147,11 @@ WAVE_UNITS = 3
 CHECKPOINTS = (1000, 2000, 4000, 6000, 8000)
 TIME_TOLERANCE = 2                      # source frames, as the S4 intervals
 DECODER_REVISION = 2                     # the skirmish scenarios' measurement revision
+# The GBA's frame noise per timing family: the widest spread of a time over frame offsets 0-4 on
+# any sk-* line of the family (main a0339024, all 17 lobbies). A time newly finite at an offset (a
+# defeat where the human survived) must clear it to be a regression (tools/sc64_parity.py judge).
+FRAME_NOISE = {'build.first': 1352, 'attack.first_wave': 516, 'attack.first_contact': 203,
+               'result.human_defeated': 508, 'result.eliminated': 508}
 FRAME_OFFSETS = (0, 1, 2)               # GBA runs per scenario, the engine's frame counter advanced this far
                                         # after launch: the spread of a line is the GBA's own one-frame noise
 NEVER = 999999                          # a time not reached within the N64 run
@@ -953,7 +958,7 @@ def scenarios():
             # spread over these offsets (tools/sc64_parity.py judge).
             'frame_offsets': FRAME_OFFSETS,
             'never_time': never_time,
-            'sentinels': (NEVER, ENDED),
+            'frame_noise': FRAME_NOISE,
             # A seed whose own band is NEVER, in a finite envelope: times keep their +-2 frames.
             'sentinel_slack': lambda obs: TIME_TOLERANCE,
         }

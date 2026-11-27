@@ -114,18 +114,23 @@ edge), and compares as the frame after it. At several frame offsets:
 - A new finite time where the baseline recorded another outcome at that
   offset (a defeat where the human survived) is judged on its own. It is a
   REGRESSION when it lies beyond the band and every recorded value by more
-  than the slack plus the GBA's own frame noise for checks of its kind: the
-  widest spread over offsets on any baseline line of the family (in the
-  current baseline 1,352 frames for build-order firsts, 516 for first
-  waves, 507 for defeats), whatever the other offsets kept. A defeat
+  than the slack plus the GBA's own frame noise for checks of its kind
+  (`FRAME_NOISE`, calibrated once: the widest spread over offsets 0–4 on
+  any line of the family, 1,352 frames for build-order firsts, 516 for
+  first waves, 508 for defeats; fixed, so accepting a line elsewhere never
+  changes it), whatever the other offsets kept. A defeat
   between the band and "never" is nearer the N64 than surviving, so it is
   not worse.
 - NEVER where a time was recorded only bounds the time from below, so it is
   judged with the whole spread: every offset's time (NEVER as that bound)
   further out than every recorded time. A wave at the very end of the run
   that slips past it at one offset is noise.
-- Numbers alone are also compared spread against spread, so an offset that
-  kept NEVER does not excuse numbers that all moved further out. A number
+- Numbers alone (of offsets that recorded a number) are also compared
+  spread against spread, so an offset that kept NEVER does not excuse
+  numbers that all moved further out. A timing whose recorded outcome
+  itself differed between offsets (a time at some, NEVER at others) is as
+  unstable as the GBA gets, so its numbers must also clear the family's
+  frame noise. A number
   inside the band at any offset keeps the comparison KNOWN: the noise
   still reaches the N64's value (only a newly finite timing is judged on
   its own).
