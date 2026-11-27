@@ -428,7 +428,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             # short before the band's lower edge (an early defeat) has not shown it. Such a reading is
             # neither inside nor shown outside (its time distance is 0), so the line stays KNOWN.
             if v in also_ok and own[i] is not None and v == own[i][0] and own[i][1] - 1 < obs['lo']:
-                return outside(own[i][1], obs['lo'], obs['hi'])
+                return obs['lo'] - (own[i][1] - 1)   # frames short of the band: never 0
             return gap(v)
         gaps = [gap_at(i, v) for i, v in enumerate(spread)]
         every = ' at every frame offset' if len(spread) > 1 else ''
@@ -544,7 +544,7 @@ def judge(scenario_id, golden, values, curves, baseline, layout=None, allow_stal
             unstable = never is not None and len({kind(b) for b in base}) > 1
             numbers = not any(g == 0 for v, g in zip(spread, gaps) if kind(v) == 'number') and \
                 beyond([(g, slack + (allowance if unstable else 0)) for i, (v, g) in enumerate(zip(spread, gaps))
-                        if kind(v) == 'number' and (never is None or not changed(i, v))],
+                        if kind(v) == 'number' and i < recorded and (never is None or not changed(i, v))],
                        [gap(b) for b in base if kind(b) == 'number'])
             timed = None not in [time_gap(v, i) for i, v in enumerate(spread)] and \
                 beyond([(time_gap(v, i), margin(i, v)) for i, v in enumerate(spread)],

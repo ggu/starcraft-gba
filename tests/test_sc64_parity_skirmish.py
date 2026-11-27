@@ -934,6 +934,11 @@ class FrameOffsets(unittest.TestCase):
         self.assertEqual(verdict([2149] * 3, known), 'KNOWN')
         self.assertEqual(verdict([2149] * 3, {}), 'KNOWN')
         self.assertEqual(verdict([2149, 2300, 2300], {}), 'KNOWN')
+        # The edge: a run whose last measured frame is just before the band has not reached it.
+        self.assertEqual(verdict([2248] * 3, {}), 'KNOWN')
+        self.assertEqual(verdict([2248] * 3, known), 'KNOWN')
+        self.assertEqual(verdict([2249] * 3, {}), 'PASS')
+        self.assertEqual(verdict([2249] * 3, known), 'IMPROVED')
         # Runs that reached the band without building it: the allowed NEVER counts.
         self.assertEqual(verdict([2300] * 3, known), 'IMPROVED')
         self.assertEqual(verdict([2300] * 3, {}), 'PASS')
@@ -951,6 +956,18 @@ class FrameOffsets(unittest.TestCase):
             return sc64_parity.judge('sk-pvt-w0', defeat, {key: spread[0]}, {}, legacy, more=more)[0]['verdict']
         self.assertEqual(verdict([sk.NEVER, 1000, 1001]), 'KNOWN')       # offsets +1, +2 were never recorded
         self.assertEqual(verdict([1000, sk.NEVER, sk.NEVER]), 'REGRESSION')
+        # The numbers comparison too: a legacy Gateway line (2,239 at offset 0) says nothing about +1 and +2.
+        gate = dict(self.golden(2251, 2249, 2253, check='build.first.Gateway', subject='cpu Protoss',
+                                also_ok=[sk.NEVER]), gba={'horizon': 9000})
+        gkey = ('build.first.Gateway', 'cpu Protoss')
+        gline = 'sk-pvt-w0:build.first.Gateway:cpu Protoss'
+
+        def gate_verdict(spread):
+            more = [(1, {gkey: spread[1]}), (2, {gkey: spread[2]})]
+            return sc64_parity.judge('sk-pvt-w0', gate, {gkey: spread[0]}, {}, {gline: {'key': gline, 'gba': 2239}},
+                                     more=more)[0]['verdict']
+        self.assertEqual(gate_verdict([sk.NEVER, 1000, 1001]), 'KNOWN')
+        self.assertEqual(gate_verdict([1000, 1001, 1002]), 'REGRESSION')   # offset 0 itself moved
 
     def test_a_newly_finite_time_is_compared_with_the_outcome_it_replaced(self):
         # Codex: the only recorded time becomes NEVER and the newly finite defeats are nearer the band
