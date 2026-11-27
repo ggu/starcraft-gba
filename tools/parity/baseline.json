@@ -19,6 +19,34 @@
    "gba": 599.2
   },
   {
+   "key": "lab-dragoon-zergling-pack:lab.cooldown:Dragoon",
+   "gba": 30.0
+  },
+  {
+   "key": "lab-dragoon-zergling-pack:lab.range_first:Dragoon on Zergling",
+   "gba": 127.3106
+  },
+  {
+   "key": "lab-dragoon-zergling-pack:lab.survival:Dragoon",
+   "gba": -999999
+  },
+  {
+   "key": "lab-guardian-zealot:lab.range_first:Guardian on Zealot",
+   "gba": 256.0
+  },
+  {
+   "key": "lab-guardian-zealot:lab.survival:Guardian",
+   "gba": -999999
+  },
+  {
+   "key": "lab-hydralisk-dragoon:lab.range_first:Hydralisk on Dragoon",
+   "gba": 126.5069
+  },
+  {
+   "key": "lab-hydralisk-dragoon:lab.survival:Hydralisk",
+   "gba": 152
+  },
+  {
    "key": "lab-hydralisk-move:lab.leg_duration:Hydralisk",
    "gba": 79
   },
@@ -37,6 +65,18 @@
   {
    "key": "lab-hydralisk-zealot:lab.survival:Hydralisk",
    "gba": -999999
+  },
+  {
+   "key": "lab-marine-hydralisk:lab.range_first:Marine on Hydralisk",
+   "gba": 126.0635
+  },
+  {
+   "key": "lab-marine-marine:lab.range_first:Marine on Marine",
+   "gba": 126.4911
+  },
+  {
+   "key": "lab-marine-marine:lab.survival:Marine",
+   "gba": 252
   },
   {
    "key": "lab-marine-move:lab.turn_cost:Marine",
@@ -60,6 +100,26 @@
   },
   {
    "key": "lab-marine-zergling:lab.survival:Marine",
+   "gba": -999999
+  },
+  {
+   "key": "lab-mutalisk-dragoon:lab.cooldown:Mutalisk",
+   "gba": 30.0
+  },
+  {
+   "key": "lab-mutalisk-dragoon:lab.range_first:Mutalisk on Dragoon",
+   "gba": 92.0
+  },
+  {
+   "key": "lab-mutalisk-dragoon:lab.survival:Mutalisk",
+   "gba": 332
+  },
+  {
+   "key": "lab-mutalisk-hydralisk:lab.range_first:Mutalisk on Hydralisk",
+   "gba": 92.0
+  },
+  {
+   "key": "lab-mutalisk-hydralisk:lab.survival:Mutalisk",
    "gba": -999999
   },
   {
@@ -91,12 +151,24 @@
    "gba": 40
   },
   {
+   "key": "lab-vulture-hydralisk:lab.range_first:Vulture on Hydralisk",
+   "gba": 127.1377
+  },
+  {
+   "key": "lab-vulture-hydralisk:lab.survival:Vulture",
+   "gba": 121
+  },
+  {
    "key": "lab-vulture-move:lab.accel_frames:Vulture",
    "gba": 3
   },
   {
    "key": "lab-vulture-move:lab.leg_duration:Vulture",
    "gba": 42
+  },
+  {
+   "key": "lab-zergling-goliath:lab.range_first:Zergling on Goliath",
+   "gba": 14.0
   },
   {
    "key": "sk-ffa-w0:build.first.Barracks:cpu Terran",
