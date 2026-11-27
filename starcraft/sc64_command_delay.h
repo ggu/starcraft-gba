@@ -230,12 +230,16 @@ sc64_move_order_due(const Unit *q)
     return ((unsigned)frame + (unsigned)(q - u)) % SC64_MOVE_ORDER_PHASE_UPDATES == 0u;
 }
 
-/* An arrived Move ends on its phase. Out of line: update_orders() is IWRAM
- * code with little room. */
+/* An arrived Move of the player's ends on its phase. The hold is measured
+ * on the player's units (T1); the skirmish captures do not read computer
+ * orders, and holding computer Moves too stopped the Terran computer's first
+ * wave in sk-tvt-w0 (N64 9539) and brought sk-pvz-w0's earlier (14470 ->
+ * 14170, N64 16400), so computer Moves end on arrival as before. Out of
+ * line: update_orders() is IWRAM code with little room. */
 static void __attribute__((noinline))
 sc64_move_arrive(Unit *q)
 {
-    if (sc64_move_order_due(q)) q->order = ORDER_IDLE;
+    if (q->owner != SIDE || sc64_move_order_due(q)) q->order = ORDER_IDLE;
 }
 
 /* The player's Move or attack-move. Returns the number of selected units
